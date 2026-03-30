@@ -128,12 +128,9 @@ if (isset($_SESSION['user_id'])) {
         <section class="login-hero">
             <div class="login-brandline">
                 <img src="assets/img/applefix-logo.png" alt="AppleFix logo" class="login-hero-logo">
-                <div class="login-brandtext">
-                    <span class="login-eyebrow">APPLEFIX S.R.O.</span>
-                </div>
             </div>
 
-            <h1 class="login-headline">Černé.<br>Čisté.<br>Připravené<br>pro servis.</h1>
+            <h1 class="login-headline">Černé.<br>Čisté.<br>Připravené<br>pro servis se vším všudy.</h1>
 
             <p class="login-copy">
                 Minimalistické přihlášení do moderního servisního systému — rychlejší práce,
@@ -176,7 +173,7 @@ if (isset($_SESSION['user_id'])) {
                     <?php echo csrfField(); ?>
                     <div class="mb-3">
                         <label class="form-label"><?php echo e(__('username_label')); ?></label>
-                        <input type="text" name="username" class="form-control" value="Augustin" required autofocus autocomplete="username">
+                        <input type="text" name="username" class="form-control" required autofocus autocomplete="username">
                     </div>
                     <div class="mb-4">
                         <label class="form-label"><?php echo e(__('password')); ?></label>
