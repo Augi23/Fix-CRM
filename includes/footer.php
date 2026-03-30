@@ -1,5 +1,5 @@
     <footer class="mt-5 pt-3 border-top text-center text-muted">
-        <p>&copy; <?php echo date('Y'); ?> Repair CRM - <?php echo __('system_title'); ?></p>
+        <p>&copy; 2026 Fix CRM - Servis se vším všudy</p>
     </footer>
 </div> <!-- /#content -->
 

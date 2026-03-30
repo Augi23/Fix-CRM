@@ -92,6 +92,18 @@ body.modal-open {
     border-radius: 16px;
     color: #e2e8f0;
 }
+
+.dashboard-main-row {
+    align-items: flex-start;
+}
+
+.imei-check-card .form-control {
+    min-width: 0;
+}
+
+.imei-check-result .alert {
+    margin-bottom: 0;
+}
 .navbar {
     background: rgba(10, 15, 20, 0.6) !important;
     backdrop-filter: blur(10px);

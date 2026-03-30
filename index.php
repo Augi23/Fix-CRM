@@ -125,8 +125,8 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-8">
+<div class="row g-4 align-items-start dashboard-main-row">
+    <div class="col-12 col-lg-8">
         <div class="card glass-card border-0">
             <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
@@ -254,7 +254,27 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-12 col-lg-4">
+        <div class="card glass-card border-0 mb-4 imei-check-card">
+            <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-mobile-screen-button text-info me-2"></i>Ověření IMEI</h5>
+                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">PČR</span>
+            </div>
+            <div class="card-body">
+                <form id="imeiCheckForm">
+                    <label class="form-label">IMEI</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="imeiCheckInput" placeholder="Zadej prvních 14 číslic" inputmode="numeric" autocomplete="off" maxlength="14">
+                        <button class="btn btn-outline-info" type="submit">
+                            <i class="fas fa-search me-1"></i> Ověřit
+                        </button>
+                    </div>
+                    <div class="form-text text-white-75">CRM prověří databázi Policie ČR bez odchodu z aplikace.</div>
+                </form>
+                <div id="imeiCheckResult" class="imei-check-result mt-3" aria-live="polite"></div>
+            </div>
+        </div>
+
         <div class="card glass-card border-0 mb-4">
             <div class="card-header bg-transparent border-bottom-0">
                 <h5 class="mb-0"><?php echo __('quick_actions'); ?></h5>
@@ -742,6 +762,60 @@ $(document).ready(function() {
         }, 'json').fail(function() {
             btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __('save'); ?>');
             showAlert('<?php echo __('network_error_client'); ?>');
+        });
+    });
+
+    const $imeiInput = $('#imeiCheckInput');
+    const $imeiResult = $('#imeiCheckResult');
+
+    function renderImeiResult(type, message, details) {
+        const icon = type === 'success' ? 'check-circle' : type === 'danger' ? 'triangle-exclamation' : 'circle-exclamation';
+        const alertClass = type === 'success'
+            ? 'alert alert-success border-success border-opacity-25 bg-success bg-opacity-10 text-success'
+            : type === 'danger'
+                ? 'alert alert-danger border-danger border-opacity-25 bg-danger bg-opacity-10 text-danger'
+                : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
+
+        const detailHtml = details ? `<div class="small mt-1 opacity-75">${escapeHtml(details)}</div>` : '';
+        $imeiResult.html(`<div class="${alertClass} mb-0 py-2"><i class="fas fa-${icon} me-2"></i>${escapeHtml(message)}${detailHtml}</div>`);
+    }
+
+    $imeiInput.on('input', function() {
+        this.value = this.value.replace(/\D+/g, '').slice(0, 14);
+    });
+
+    $('#imeiCheckForm').on('submit', function(e) {
+        e.preventDefault();
+
+        const imei = ($imeiInput.val() || '').replace(/\D+/g, '').slice(0, 14);
+        if (imei.length < 14) {
+            renderImeiResult('warning', 'Zadej prosím prvních 14 číslic IMEI.');
+            return;
+        }
+
+        const $btn = $(this).find('button[type="submit"]');
+        const oldHtml = $btn.html();
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Ověřuji...');
+        $imeiResult.empty();
+
+        $.post('api/check_imei.php', { imei: imei, csrf_token: $('input[name="csrf_token"]').first().val() }, function(res) {
+            $btn.prop('disabled', false).html(oldHtml);
+
+            if (!res || !res.success) {
+                renderImeiResult('warning', res && res.message ? res.message : 'Kontrolu se nepodařilo dokončit.');
+                return;
+            }
+
+            if (res.status === 'found') {
+                renderImeiResult('danger', 'Zařízení je v databázi Policie ČR vedeno jako odcizené.', res.message || '');
+            } else if (res.status === 'not_found') {
+                renderImeiResult('success', 'Zařízení v databázi Policie ČR nalezeno nebylo.', res.message || '');
+            } else {
+                renderImeiResult('warning', res.message || 'Výsledek se nepodařilo jednoznačně vyhodnotit.');
+            }
+        }, 'json').fail(function() {
+            $btn.prop('disabled', false).html(oldHtml);
+            renderImeiResult('warning', 'Kontrola IMEI selhala. Zkus to prosím znovu za chvíli.');
         });
     });
 });
