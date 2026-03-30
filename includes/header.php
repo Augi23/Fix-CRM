@@ -82,7 +82,6 @@ if ($page == 'reports.php') {
             }
         });
     });
-    <script>
     window.LANG_NOTICE = '<?php echo __("notice_title"); ?>';
     window.LANG_CONFIRM = '<?php echo __("confirm_title"); ?>';
     window.LANG_PREVIEW = '<?php echo __("preview_btn"); ?>';

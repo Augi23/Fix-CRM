@@ -274,10 +274,10 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                 <div id="imeiCheckResult" class="imei-check-result mt-3" aria-live="polite"></div>
                 <div class="d-grid gap-2 mt-3">
                     <a href="vykup-zarizeni.php" target="_blank" rel="noopener" class="btn btn-outline-light">
-                        <i class="fas fa-file-signature me-2"></i> Otevřít formulář výkupu
+                        <i class="fas fa-file-signature me-2"></i> Výkupní list / Kupní smlouva
                     </a>
-                    <a href="reklamace.php" target="_blank" rel="noopener" class="btn btn-outline-light">
-                        <i class="fas fa-file-circle-exclamation me-2"></i> Otevřít formulář reklamace
+                    <a href="zastava.php" target="_blank" rel="noopener" class="btn btn-outline-light">
+                        <i class="fas fa-file-contract me-2"></i> Formulář zástavy
                     </a>
                 </div>
             </div>

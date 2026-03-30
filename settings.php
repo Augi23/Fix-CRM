@@ -526,10 +526,11 @@ require_once 'includes/header.php';
                             <button type="button" class="btn btn-primary" id="btnCheckUpdates" onclick="checkForUpdates(true)">
                                 <i class="fas fa-sync-alt me-2"></i><?php echo __('check_updates'); ?>
                             </button>
-                            <button type="button" class="btn btn-success" id="btnInstallUpdate" style="display:none;" onclick="installUpdate()">
-                                <i class="fas fa-cloud-download-alt me-2"></i><?php echo __('install_update'); ?>
+                            <button type="button" class="btn btn-success" id="btnInstallUpdate" onclick="installUpdate()">
+                                <i class="fas fa-cloud-download-alt me-2"></i>Stáhnout poslední verzi
                             </button>
                         </div>
+                        <div class="small text-white-75 mt-2"><?php echo __('update_server_hint'); ?></div>
 
                         <div class="alert alert-warning border-0 bg-warning bg-opacity-10 mt-3 mb-0 small">
                             <i class="fas fa-exclamation-triangle me-2 text-warning"></i><?php echo __('update_warning'); ?>
@@ -769,7 +770,6 @@ function checkForUpdates(force = false) {
                     <strong>${UPDATE_TRANSLATIONS.update_available}</strong> v${data.local_version} → v${data.remote_version}
                     <div class="mt-1 text-white-75">${UPDATE_TRANSLATIONS.update_available_desc}</div>
                 </div>`;
-                document.getElementById('btnInstallUpdate').style.display = 'inline-block';
                 // Show badge
                 const badge = document.getElementById('updateBadgeNav');
                 if (badge) badge.style.display = 'inline';
@@ -779,7 +779,8 @@ function checkForUpdates(force = false) {
                     <strong>${UPDATE_TRANSLATIONS.up_to_date}</strong> (v${data.local_version})
                     <div class="mt-1 text-white-75">${UPDATE_TRANSLATIONS.up_to_date_desc}</div>
                 </div>`;
-                document.getElementById('btnInstallUpdate').style.display = 'none';
+                const badge = document.getElementById('updateBadgeNav');
+                if (badge) badge.style.display = 'none';
             }
 
             // Cache info
@@ -810,11 +811,12 @@ function renderChangelog(commits) {
     let html = '';
     commits.forEach(c => {
         const date = c.date ? new Date(c.date).toLocaleString() : '';
-        const msg = (c.message || '').split('\n')[0]; // first line only
+        const msg = (c.message || '').split('\n')[0];
+        const shortMsg = msg.length > 120 ? msg.slice(0, 117) + '…' : msg;
         html += `<div class="d-flex align-items-start mb-2 pb-2 border-bottom border-secondary">
             <code class="text-info me-2 flex-shrink-0" style="font-size:0.75rem;">${c.sha}</code>
             <div class="flex-grow-1">
-                <div class="text-white small">${escapeHtml(msg)}</div>
+                <div class="text-white small">${escapeHtml(shortMsg)}</div>
                 <div class="text-muted" style="font-size:0.7rem;">${date} · ${escapeHtml(c.author || '')}</div>
             </div>
         </div>`;
@@ -847,7 +849,7 @@ function installUpdate() {
     .then(r => r.json())
     .then(data => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>' + UPDATE_TRANSLATIONS.install_update;
+        btn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Stáhnout poslední verzi';
         
         statusArea.style.display = 'block';
         if (data.success) {
@@ -866,7 +868,6 @@ function installUpdate() {
                 ${migrationsHtml}
                 <div class="mt-2"><a href="settings.php?tab=updates" class="btn btn-sm btn-outline-light"><i class="fas fa-redo me-1"></i> Reload</a></div>
             </div>`;
-            document.getElementById('btnInstallUpdate').style.display = 'none';
             const badge = document.getElementById('updateBadgeNav');
             if (badge) badge.style.display = 'none';
             // Update local version display
@@ -883,7 +884,7 @@ function installUpdate() {
     })
     .catch(err => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>' + UPDATE_TRANSLATIONS.install_update;
+        btn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Stáhnout poslední verzi';
         statusArea.style.display = 'block';
         statusArea.innerHTML = `<div class="alert alert-danger border-0 bg-danger bg-opacity-10 small mb-0">
             <i class="fas fa-exclamation-circle me-2"></i>${err.message || UPDATE_TRANSLATIONS.update_error}
