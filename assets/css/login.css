@@ -95,8 +95,8 @@ body::after {
 
 .login-headline {
     margin: 0;
-    font-size: clamp(3.1rem, 5.8vw, 6.8rem);
-    line-height: 0.91;
+    font-size: clamp(2.8rem, 5.2vw, 6.2rem);
+    line-height: 0.92;
     letter-spacing: -0.06em;
     font-weight: 900;
     color: #f5f8ff;

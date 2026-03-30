@@ -130,7 +130,7 @@ if (isset($_SESSION['user_id'])) {
                 <img src="assets/img/applefix-logo.png" alt="AppleFix logo" class="login-hero-logo">
             </div>
 
-            <h1 class="login-headline">Černé.<br>Čisté.<br>Připravené<br>pro servis se vším všudy.</h1>
+            <h1 class="login-headline">...servis<br>se vším všudy.</h1>
 
             <p class="login-copy">
                 Minimalistické přihlášení do moderního servisního systému — rychlejší práce,
