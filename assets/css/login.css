@@ -3,26 +3,51 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 16px;
+    padding: 24px;
+}
+
+.login-page {
+    width: 100%;
+    display: flex;
+    justify-content: center;
 }
 
 .login-card {
-    width: 100%;
-    max-width: 440px;
-    margin: auto;
+    width: min(100%, 980px);
+    overflow: hidden;
+    border-radius: 24px;
 }
 
-.login-body {
+.login-layout {
+    min-height: 560px;
+}
+
+.login-side,
+.login-main {
     display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+    align-items: center;
+    padding: 3rem;
+}
+
+.login-side {
+    justify-content: center;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        radial-gradient(circle at top left, rgba(13, 127, 242, 0.28), transparent 58%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+}
+
+.login-main {
+    background: rgba(10, 15, 20, 0.12);
 }
 
 .login-brand {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1rem;
+    text-align: center;
+    max-width: 340px;
 }
 
 .login-logo {
@@ -47,6 +72,28 @@ body {
 .login-brand-copy p {
     letter-spacing: 0.12em;
     text-transform: uppercase;
+}
+
+.login-tagline {
+    max-width: 28ch;
+    color: rgba(255, 255, 255, 0.78);
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1.55;
+}
+
+.login-form-wrap {
+    max-width: 420px;
+    margin: 0 auto;
+}
+
+.login-form-header h4 {
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.login-form-header p {
+    line-height: 1.5;
 }
 
 .login-form .form-label {
@@ -75,20 +122,40 @@ body {
     font-weight: 600;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 991.98px) {
+    body {
+        padding: 16px;
+    }
+
+    .login-layout {
+        min-height: auto;
+    }
+
+    .login-side {
+        border-right: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+}
+
+@media (max-width: 576px) {
     body {
         padding: 12px;
     }
 
-    .login-card {
-        max-width: 100%;
+    .login-side,
+    .login-main {
+        padding: 1.5rem;
     }
 
-    .login-body {
-        gap: 1.25rem;
+    .login-card {
+        border-radius: 20px;
     }
 
     .login-logo {
-        width: min(100%, 280px);
+        width: min(100%, 260px);
+    }
+
+    .login-brand {
+        max-width: 100%;
     }
 }
