@@ -31,16 +31,14 @@ body::before {
 body::after {
     content: '';
     position: fixed;
-    inset: -10%;
-    background-image:
-        linear-gradient(120deg, rgba(14, 172, 75, 0.06), rgba(14, 172, 75, 0.02) 30%, transparent 62%),
-        url('https://applefix.cz/wp-content/uploads/2026/03/vecteezy_a_green_leaf_background_with_a_black_background_30629588.jpg.png');
-    background-repeat: no-repeat, no-repeat;
-    background-position: left center, right center;
-    background-size: 42% auto, 34% auto;
-    opacity: 0.10;
+    inset: -8%;
+    background-image: url('../img/login-leaf-bg.png');
+    background-repeat: no-repeat;
+    background-position: center right;
+    background-size: cover;
+    opacity: 0.16;
     mix-blend-mode: screen;
-    filter: saturate(1.15) blur(1px);
+    filter: saturate(1.08) blur(0.5px);
     pointer-events: none;
 }
 
