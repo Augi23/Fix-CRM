@@ -124,45 +124,43 @@ if (isset($_SESSION['user_id'])) {
 <body>
 
 <div class="login-page">
-    <div class="login-card glass-card shadow-lg">
-        <div class="row g-0 login-layout">
-            <div class="col-lg-5 login-side">
-                <div class="login-brand">
-                    <img src="assets/img/applefix-logo.png" alt="AppleFix logo" class="login-logo">
-                    <div class="login-brand-copy">
-                        <h3 class="mb-2">Repair CRM</h3>
-                        <p class="text-white-50 small mb-3">AppleFix</p>
-                        <p class="login-tagline mb-0">Servisní systém pro zakázky, zákazníky a sklad. Přehledně, bez chaosu.</p>
-                    </div>
+    <div class="login-shell">
+        <div class="login-card glass-card shadow-lg login-side-card">
+            <div class="login-brand">
+                <img src="assets/img/applefix-logo.png" alt="AppleFix logo" class="login-logo">
+                <div class="login-brand-copy">
+                    <h3 class="mb-2">Repair CRM</h3>
+                    <p class="text-white-50 small mb-3">AppleFix</p>
+                    <p class="login-tagline mb-0">Servisní systém pro zakázky, zákazníky a sklad. Přehledně, bez chaosu.</p>
                 </div>
             </div>
+        </div>
 
-            <div class="col-lg-7 login-main">
-                <div class="login-form-wrap w-100">
-                    <?php if ($error): ?>
-                        <div class="alert alert-danger small mb-4"><?php echo e($error); ?></div>
-                    <?php endif; ?>
+        <div class="login-card glass-card shadow-lg login-form-card">
+            <div class="login-form-wrap w-100">
+                <?php if ($error): ?>
+                    <div class="alert alert-danger small mb-4"><?php echo e($error); ?></div>
+                <?php endif; ?>
 
-                    <div class="login-form-header mb-4">
-                        <h4 class="mb-1"><?php echo e(__('login_title')); ?></h4>
-                        <p class="text-white-50 mb-0">Přihlas se do systému a pokračuj tam, kde jsi skončil.</p>
-                    </div>
-
-                    <form method="POST" class="login-form">
-                        <?php echo csrfField(); ?>
-                        <div class="mb-3">
-                            <label class="form-label"><?php echo e(__('username_label')); ?></label>
-                            <input type="text" name="username" class="form-control" required autofocus autocomplete="username">
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label"><?php echo e(__('password')); ?></label>
-                            <input type="password" name="password" class="form-control" required autocomplete="current-password">
-                        </div>
-                        <div class="d-grid">
-                            <button type="submit" name="login" class="btn btn-primary"><?php echo e(__('login_btn')); ?></button>
-                        </div>
-                    </form>
+                <div class="login-form-header mb-4">
+                    <h4 class="mb-1"><?php echo e(__('login_title')); ?></h4>
+                    <p class="text-white-50 mb-0">Přihlas se do systému a pokračuj tam, kde jsi skončil.</p>
                 </div>
+
+                <form method="POST" class="login-form">
+                    <?php echo csrfField(); ?>
+                    <div class="mb-3">
+                        <label class="form-label"><?php echo e(__('username_label')); ?></label>
+                        <input type="text" name="username" class="form-control" required autofocus autocomplete="username">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label"><?php echo e(__('password')); ?></label>
+                        <input type="password" name="password" class="form-control" required autocomplete="current-password">
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" name="login" class="btn btn-primary"><?php echo e(__('login_btn')); ?></button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
