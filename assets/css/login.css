@@ -28,6 +28,22 @@ body::before {
     pointer-events: none;
 }
 
+body::after {
+    content: '';
+    position: fixed;
+    inset: -10%;
+    background-image:
+        linear-gradient(120deg, rgba(14, 172, 75, 0.06), rgba(14, 172, 75, 0.02) 30%, transparent 62%),
+        url('https://applefix.cz/wp-content/uploads/2026/03/vecteezy_a_green_leaf_background_with_a_black_background_30629588.jpg.png');
+    background-repeat: no-repeat, no-repeat;
+    background-position: left center, right center;
+    background-size: 42% auto, 34% auto;
+    opacity: 0.10;
+    mix-blend-mode: screen;
+    filter: saturate(1.15) blur(1px);
+    pointer-events: none;
+}
+
 .login-page {
     width: 100%;
     position: relative;
@@ -47,6 +63,20 @@ body::before {
 .login-hero {
     max-width: 640px;
     padding-left: 18px;
+    position: relative;
+}
+
+.login-hero::before {
+    content: '';
+    position: absolute;
+    inset: -36px -24px -36px -24px;
+    background:
+        radial-gradient(circle at 24% 22%, rgba(32, 182, 99, 0.20), transparent 22%),
+        radial-gradient(circle at 78% 68%, rgba(32, 182, 99, 0.10), transparent 26%);
+    filter: blur(20px);
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: -1;
 }
 
 .login-brandline {
