@@ -85,11 +85,11 @@ body::after {
 }
 
 .login-hero-logo {
-    width: 30px;
-    height: 30px;
+    width: 44px;
+    height: 44px;
     object-fit: contain;
     flex: 0 0 auto;
-    border-radius: 9px;
+    border-radius: 12px;
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
 }
 
@@ -296,8 +296,8 @@ body::after {
     }
 
     .login-hero-logo {
-        width: 28px;
-        height: 28px;
+        width: 40px;
+        height: 40px;
     }
 
     .login-copy {
