@@ -32,6 +32,9 @@ function recordLoginAttempt($pdo, $success) {
 }
 
 // ── Login form handler ────────────────────────────────────────────────────────
+$disabledDemoAdminUsername = 'admin';
+$disabledDemoAdminPasswordHash = '$2y$10$qafwiLAk9Osoxr.4UX/YCuO6m6TejA377VwyxMP1zakKWOIdV89Ay';
+
 if (isset($_POST['login'])) {
     // CSRF validation
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -49,16 +52,25 @@ if (isset($_POST['login'])) {
             $user = $stmt->fetch();
 
             if ($user && password_verify($password, $user['password'])) {
-                session_regenerate_id(true); // Session Fixation protection
-                $_SESSION['user_id']   = $user['id'];
-                $_SESSION['username']  = $user['username'];
-                $_SESSION['role']      = 'admin';
-                $_SESSION['full_name'] = $user['full_name'];
-                $_SESSION['tech_id']   = null;
-                invalidatePermissionsCache();
-                recordLoginAttempt($pdo, true);
-                header("Location: index.php");
-                exit;
+                $isDisabledDemoAdmin =
+                    ($user['username'] === $disabledDemoAdminUsername)
+                    && hash_equals($disabledDemoAdminPasswordHash, (string)$user['password']);
+
+                if ($isDisabledDemoAdmin) {
+                    recordLoginAttempt($pdo, false);
+                    $error = __('login_error_auth');
+                } else {
+                    session_regenerate_id(true); // Session Fixation protection
+                    $_SESSION['user_id']   = $user['id'];
+                    $_SESSION['username']  = $user['username'];
+                    $_SESSION['role']      = 'admin';
+                    $_SESSION['full_name'] = $user['full_name'];
+                    $_SESSION['tech_id']   = null;
+                    invalidatePermissionsCache();
+                    recordLoginAttempt($pdo, true);
+                    header("Location: index.php");
+                    exit;
+                }
             }
 
             // 2. Try Technician (technicians table)
@@ -112,15 +124,21 @@ if (isset($_SESSION['user_id'])) {
 <body>
 
 <div class="login-card">
-    <div class="glass-card shadow-sm p-2">
-        <div class="card-body p-4 rounded text-white">
-            <h3 class="text-center mb-4">Repair CRM</h3>
+    <div class="glass-card shadow-sm">
+        <div class="card-body p-4 rounded text-white login-body">
+            <div class="login-brand text-center">
+                <img src="assets/img/applefix-logo.png" alt="AppleFix logo" class="login-logo">
+                <div class="login-brand-copy">
+                    <h3 class="mb-1">Repair CRM</h3>
+                    <p class="text-white-50 small mb-0">AppleFix</p>
+                </div>
+            </div>
 
             <?php if ($error): ?>
-                <div class="alert alert-danger small"><?php echo e($error); ?></div>
+                <div class="alert alert-danger small mb-0"><?php echo e($error); ?></div>
             <?php endif; ?>
 
-            <form method="POST">
+            <form method="POST" class="login-form">
                 <?php echo csrfField(); ?>
                 <div class="mb-3">
                     <label class="form-label"><?php echo e(__('username_label')); ?></label>
@@ -134,9 +152,6 @@ if (isset($_SESSION['user_id'])) {
                     <button type="submit" name="login" class="btn btn-primary"><?php echo e(__('login_btn')); ?></button>
                 </div>
             </form>
-            <div class="mt-4 text-center text-muted small">
-                <p><?php echo e(__('demo_access')); ?></p>
-            </div>
         </div>
     </div>
 </div>
