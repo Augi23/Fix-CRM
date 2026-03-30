@@ -272,6 +272,14 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <div class="form-text text-white-75">CRM prověří databázi Policie ČR bez odchodu z aplikace.</div>
                 </form>
                 <div id="imeiCheckResult" class="imei-check-result mt-3" aria-live="polite"></div>
+                <div class="d-grid gap-2 mt-3">
+                    <a href="vykup-zarizeni.php" target="_blank" rel="noopener" class="btn btn-outline-light">
+                        <i class="fas fa-file-signature me-2"></i> Otevřít formulář výkupu
+                    </a>
+                    <a href="reklamace.php" target="_blank" rel="noopener" class="btn btn-outline-light">
+                        <i class="fas fa-file-circle-exclamation me-2"></i> Otevřít formulář reklamace
+                    </a>
+                </div>
             </div>
         </div>
 
