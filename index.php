@@ -788,6 +788,25 @@ $(document).ready(function() {
         $imeiResult.html(`<div class="${alertClass} mb-0 py-2"><i class="fas fa-${icon} me-2"></i>${escapeHtml(message)}${detailHtml}</div>`);
     }
 
+    function renderIfreeicloudResult(result) {
+        if (!result) return '';
+        if (!result.configured) {
+            return `<div class="alert alert-secondary border-secondary border-opacity-25 bg-secondary bg-opacity-10 text-white-75 mb-0 py-2"><i class="fas fa-cloud me-2"></i>${escapeHtml(result.message || 'iFreeiCloud není nakonfigurovaný.')}</div>`;
+        }
+
+        const type = result.status === 'found' ? 'danger' : result.status === 'not_found' ? 'success' : 'warning';
+        const icon = type === 'success' ? 'check-circle' : type === 'danger' ? 'triangle-exclamation' : 'circle-exclamation';
+        const alertClass = type === 'success'
+            ? 'alert alert-success border-success border-opacity-25 bg-success bg-opacity-10 text-success'
+            : type === 'danger'
+                ? 'alert alert-danger border-danger border-opacity-25 bg-danger bg-opacity-10 text-danger'
+                : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
+        const header = '<div class="fw-semibold mb-1"><i class="fas fa-sim-card me-2"></i>iFreeiCloud</div>';
+        const message = result.message ? `<div class="small mt-1 opacity-75">${escapeHtml(result.message)}</div>` : '';
+        const meta = result.service_id !== undefined ? `<div class="small mt-1 opacity-50">Service ID: ${escapeHtml(String(result.service_id))}${result.http_code ? ` · HTTP ${escapeHtml(String(result.http_code))}` : ''}</div>` : '';
+        return `<div class="${alertClass} mb-0 py-2">${header}<div><i class="fas fa-${icon} me-2"></i>${type === 'danger' ? 'Zařízení je podle iFreeiCloud hlášeno jako blokované / problémové.' : type === 'success' ? 'iFreeiCloud kontrola proběhla úspěšně.' : 'Výsledek iFreeiCloud nebyl jednoznačný.'}</div>${message}${meta}</div>`;
+    }
+
     $imeiInput.on('input', function() {
         this.value = this.value.replace(/\D+/g, '').slice(0, 14);
     });
@@ -810,17 +829,38 @@ $(document).ready(function() {
             $btn.prop('disabled', false).html(oldHtml);
 
             if (!res || !res.success) {
-                renderImeiResult('warning', res && res.message ? res.message : 'Kontrolu se nepodařilo dokončit.');
+                const policeMsg = res && res.police && res.police.message ? res.police.message : (res && res.message ? res.message : 'Kontrolu se nepodařilo dokončit.');
+                const warningAlert = `<div class="alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning mb-3 py-2"><div class="fw-semibold mb-1"><i class="fas fa-shield-halved me-2"></i>Policie ČR</div><div><i class="fas fa-circle-exclamation me-2"></i>${escapeHtml(policeMsg)}</div></div>`;
+                $imeiResult.html(warningAlert + renderIfreeicloudResult(res && res.ifreeicloud));
                 return;
             }
 
+            const policeMessage = res.police && res.police.message ? res.police.message : (res.message || '');
+            let policeType = 'warning';
+            let policeHeadline = 'Výsledek se nepodařilo jednoznačně vyhodnotit.';
             if (res.status === 'found') {
-                renderImeiResult('danger', 'Zařízení je v databázi Policie ČR vedeno jako odcizené.', res.message || '');
+                policeType = 'danger';
+                policeHeadline = 'Zařízení je v databázi Policie ČR vedeno jako odcizené.';
             } else if (res.status === 'not_found') {
-                renderImeiResult('success', 'Zařízení v databázi Policie ČR nalezeno nebylo.', res.message || '');
-            } else {
-                renderImeiResult('warning', res.message || 'Výsledek se nepodařilo jednoznačně vyhodnotit.');
+                policeType = 'success';
+                policeHeadline = 'Zařízení v databázi Policie ČR nalezeno nebylo.';
+            } else if (policeMessage) {
+                policeHeadline = policeMessage;
             }
+
+            const policeAlert = (() => {
+                const icon = policeType === 'success' ? 'check-circle' : policeType === 'danger' ? 'triangle-exclamation' : 'circle-exclamation';
+                const alertClass = policeType === 'success'
+                    ? 'alert alert-success border-success border-opacity-25 bg-success bg-opacity-10 text-success'
+                    : policeType === 'danger'
+                        ? 'alert alert-danger border-danger border-opacity-25 bg-danger bg-opacity-10 text-danger'
+                        : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
+                const detailHtml = policeMessage ? `<div class="small mt-1 opacity-75">${escapeHtml(policeMessage)}</div>` : '';
+                return `<div class="${alertClass} mb-3 py-2"><div class="fw-semibold mb-1"><i class="fas fa-shield-halved me-2"></i>Policie ČR</div><div><i class="fas fa-${icon} me-2"></i>${escapeHtml(policeHeadline)}</div>${detailHtml}</div>`;
+            })();
+
+            const ifreeicloudHtml = renderIfreeicloudResult(res.ifreeicloud);
+            $imeiResult.html(policeAlert + ifreeicloudHtml);
         }, 'json').fail(function() {
             $btn.prop('disabled', false).html(oldHtml);
             renderImeiResult('warning', 'Kontrola IMEI selhala. Zkus to prosím znovu za chvíli.');

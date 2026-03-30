@@ -29,6 +29,8 @@ if (isset($_POST['update_integrations']) && $is_admin_check) {
     set_setting('ai_provider', $_POST['ai_provider']);
     set_setting('ai_api_key', trim($_POST['ai_api_key']));
     set_setting('ai_model', $_POST['ai_model']);
+    set_setting('ifreeicloud_api_key', trim($_POST['ifreeicloud_api_key'] ?? ''));
+    set_setting('ifreeicloud_service_id', (string) intval($_POST['ifreeicloud_service_id'] ?? 0));
 
     if (!empty($_POST['tg_bot_token'])) {
         $token = trim($_POST['tg_bot_token']);
@@ -307,6 +309,14 @@ require_once 'includes/header.php';
                         <div class="mb-3">
                             <label class="form-label small text-white-75">AI Model</label>
                             <input type="text" name="ai_model" class="form-control" value="<?php echo htmlspecialchars(get_setting('ai_model', 'google/gemini-2.0-flash-001')); ?>">
+                        </div>
+                        <div class="mb-3 pt-2 border-top border-secondary">
+                            <h6 class="small fw-bold text-info mb-3"><i class="fas fa-sim-card me-2"></i>iFreeiCloud IMEI API</h6>
+                            <label class="form-label small text-white-75">API Key</label>
+                            <input type="password" name="ifreeicloud_api_key" class="form-control mb-3" value="<?php echo htmlspecialchars(get_setting('ifreeicloud_api_key')); ?>" placeholder="83L-...">
+                            <label class="form-label small text-white-75">Service ID</label>
+                            <input type="number" name="ifreeicloud_service_id" class="form-control" value="<?php echo htmlspecialchars(get_setting('ifreeicloud_service_id', '0')); ?>" min="0" step="1">
+                            <div class="form-text small text-white-75 mt-2">Použije se jako druhé ověření pod výsledkem od Policie ČR.</div>
                         </div>
                         <div class="form-text small text-white-75"><?php echo __('ai_hint'); ?></div>
                     </div>

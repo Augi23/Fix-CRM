@@ -69,17 +69,22 @@ function classifyPoliceResult(string $message): string {
     return 'unknown';
 }
 
-function curlRequest(string $url, ?array $postFields = null, ?string $cookieJar = null): array {
+function curlRequest(string $url, ?array $postFields = null, ?string $cookieJar = null, bool $jsonResponse = false): array {
     if (!function_exists('curl_init')) {
         return [
             'ok' => false,
             'code' => 0,
             'body' => '',
+            'json' => null,
             'error' => 'Server nemá k dispozici cURL.'
         ];
     }
 
     $ch = curl_init($url);
+    $headers = [
+        'Accept: ' . ($jsonResponse ? 'application/json, text/javascript, */*;q=0.8' : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
+        'Accept-Language: cs-CZ,cs;q=0.9,en;q=0.8',
+    ];
     $options = [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_FOLLOWLOCATION => true,
@@ -89,10 +94,7 @@ function curlRequest(string $url, ?array $postFields = null, ?string $cookieJar 
         CURLOPT_ENCODING => '',
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_SSL_VERIFYHOST => 2,
-        CURLOPT_HTTPHEADER => [
-            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language: cs-CZ,cs;q=0.9,en;q=0.8',
-        ],
+        CURLOPT_HTTPHEADER => $headers,
     ];
 
     if ($cookieJar) {
@@ -103,7 +105,7 @@ function curlRequest(string $url, ?array $postFields = null, ?string $cookieJar 
     if ($postFields !== null) {
         $options[CURLOPT_POST] = true;
         $options[CURLOPT_POSTFIELDS] = http_build_query($postFields);
-        $options[CURLOPT_HTTPHEADER][] = 'Content-Type: application/x-www-form-urlencoded';
+        $options[CURLOPT_HTTPHEADER][] = $jsonResponse ? 'Content-Type: application/x-www-form-urlencoded' : 'Content-Type: application/x-www-form-urlencoded';
         $options[CURLOPT_REFERER] = $url;
     }
 
@@ -113,11 +115,47 @@ function curlRequest(string $url, ?array $postFields = null, ?string $cookieJar 
     $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
     curl_close($ch);
 
+    $decoded = null;
+    if ($jsonResponse && is_string($body) && $body !== '') {
+        $decoded = json_decode($body, true);
+    }
+
     return [
         'ok' => $body !== false && $code >= 200 && $code < 400,
         'code' => $code,
         'body' => $body !== false ? $body : '',
+        'json' => $decoded,
         'error' => $error,
+    ];
+}
+
+function normalizeIfreeicloudResult(array $data): array {
+    $status = 'unknown';
+    $message = '';
+
+    if (isset($data['success']) && $data['success'] === true) {
+        $status = 'found';
+    } elseif (isset($data['success']) && $data['success'] === false) {
+        $status = 'not_found';
+    }
+
+    if (!empty($data['response']) && is_string($data['response'])) {
+        $message = trim($data['response']);
+    } elseif (!empty($data['message']) && is_string($data['message'])) {
+        $message = trim($data['message']);
+    } elseif (!empty($data['error']) && is_string($data['error'])) {
+        $message = trim($data['error']);
+    }
+
+    if ($message === '' && !empty($data['object']) && is_array($data['object'])) {
+        $message = json_encode($data['object'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    return [
+        'success' => $status !== 'unknown' || $message !== '',
+        'status' => $status,
+        'message' => $message,
+        'raw' => $data,
     ];
 }
 
@@ -159,6 +197,9 @@ if ($cookieJar === false) {
     exit;
 }
 
+$ifreeicloudKey = trim((string) get_setting('ifreeicloud_api_key', getenv('IFREEICLOUD_API_KEY') ?: ''));
+$ifreeicloudService = (int) get_setting('ifreeicloud_service_id', getenv('IFREEICLOUD_SERVICE_ID') ?: 0);
+
 try {
     $initial = curlRequest($endpoint, null, $cookieJar);
     if (!$initial['ok']) {
@@ -184,16 +225,66 @@ try {
     $status = classifyPoliceResult($message);
     $success = $status !== 'unknown' || $message !== '';
 
+    $ifreeicloud = [
+        'configured' => $ifreeicloudKey !== '',
+        'success' => false,
+        'status' => 'unknown',
+        'message' => '',
+        'http_code' => 0,
+        'service_id' => $ifreeicloudService,
+    ];
+
+    if ($ifreeicloudKey !== '') {
+        $ifreeicloudPayload = [
+            'service' => $ifreeicloudService,
+            'imei' => $imei,
+            'key' => $ifreeicloudKey,
+        ];
+        $ifreeicloudResponse = curlRequest('https://api.ifreeicloud.co.uk', $ifreeicloudPayload, null, true);
+        $ifreeicloud['http_code'] = $ifreeicloudResponse['code'];
+        if ($ifreeicloudResponse['ok'] && is_array($ifreeicloudResponse['json'])) {
+            $normalized = normalizeIfreeicloudResult($ifreeicloudResponse['json']);
+            $ifreeicloud['success'] = $normalized['success'];
+            $ifreeicloud['status'] = $normalized['status'];
+            $ifreeicloud['message'] = $normalized['message'];
+            $ifreeicloud['response'] = $ifreeicloudResponse['json']['response'] ?? '';
+            $ifreeicloud['object'] = $ifreeicloudResponse['json']['object'] ?? null;
+            $ifreeicloud['raw'] = $ifreeicloudResponse['json'];
+        } else {
+            $ifreeicloud['message'] = $ifreeicloudResponse['error'] ?: 'Ověření přes iFreeiCloud selhalo.';
+        }
+    } else {
+        $ifreeicloud['message'] = 'iFreeiCloud API klíč není nastavený.';
+    }
+
     echo json_encode([
         'success' => $success,
         'status' => $status,
         'imei' => $imei,
         'message' => $message,
+        'police' => [
+            'success' => $success,
+            'status' => $status,
+            'message' => $message,
+        ],
+        'ifreeicloud' => $ifreeicloud,
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage(),
+        'police' => [
+            'success' => false,
+            'status' => 'unknown',
+            'message' => $e->getMessage(),
+        ],
+        'ifreeicloud' => [
+            'configured' => $ifreeicloudKey !== '',
+            'success' => false,
+            'status' => 'unknown',
+            'message' => 'iFreeiCloud kontrola nebyla provedena.',
+            'service_id' => $ifreeicloudService,
+        ],
     ], JSON_UNESCAPED_UNICODE);
 } finally {
     if (is_file($cookieJar)) {
