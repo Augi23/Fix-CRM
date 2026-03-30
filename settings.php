@@ -315,7 +315,7 @@ require_once 'includes/header.php';
                             <label class="form-label small text-white-75">API Key</label>
                             <input type="password" name="ifreeicloud_api_key" class="form-control mb-3" value="<?php echo htmlspecialchars(get_setting('ifreeicloud_api_key')); ?>" placeholder="83L-...">
                             <label class="form-label small text-white-75">Service ID</label>
-                            <input type="number" name="ifreeicloud_service_id" class="form-control" value="<?php echo htmlspecialchars(get_setting('ifreeicloud_service_id', '0')); ?>" min="0" step="1">
+                            <input type="number" name="ifreeicloud_service_id" class="form-control" value="<?php echo htmlspecialchars(get_setting('ifreeicloud_service_id', '205')); ?>" min="0" step="1">
                             <div class="form-text small text-white-75 mt-2">Použije se jako druhé ověření pod výsledkem od Policie ČR.</div>
                         </div>
                         <div class="form-text small text-white-75"><?php echo __('ai_hint'); ?></div>

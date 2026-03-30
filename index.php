@@ -794,17 +794,22 @@ $(document).ready(function() {
             return `<div class="alert alert-secondary border-secondary border-opacity-25 bg-secondary bg-opacity-10 text-white-75 mb-0 py-2"><i class="fas fa-cloud me-2"></i>${escapeHtml(result.message || 'iFreeiCloud není nakonfigurovaný.')}</div>`;
         }
 
-        const type = result.status === 'found' ? 'danger' : result.status === 'not_found' ? 'success' : 'warning';
+        const type = result.status === 'error' ? 'danger' : result.status === 'success' ? 'success' : 'warning';
         const icon = type === 'success' ? 'check-circle' : type === 'danger' ? 'triangle-exclamation' : 'circle-exclamation';
         const alertClass = type === 'success'
             ? 'alert alert-success border-success border-opacity-25 bg-success bg-opacity-10 text-success'
             : type === 'danger'
                 ? 'alert alert-danger border-danger border-opacity-25 bg-danger bg-opacity-10 text-danger'
                 : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
-        const header = '<div class="fw-semibold mb-1"><i class="fas fa-sim-card me-2"></i>iFreeiCloud</div>';
+        const headline = type === 'danger'
+            ? 'iFreeiCloud hlásí problém nebo odmítl požadavek.'
+            : type === 'success'
+                ? 'iFreeiCloud kontrola proběhla úspěšně.'
+                : 'Výsledek iFreeiCloud nebyl jednoznačný.';
         const message = result.message ? `<div class="small mt-1 opacity-75">${escapeHtml(result.message)}</div>` : '';
-        const meta = result.service_id !== undefined ? `<div class="small mt-1 opacity-50">Service ID: ${escapeHtml(String(result.service_id))}${result.http_code ? ` · HTTP ${escapeHtml(String(result.http_code))}` : ''}</div>` : '';
-        return `<div class="${alertClass} mb-0 py-2">${header}<div><i class="fas fa-${icon} me-2"></i>${type === 'danger' ? 'Zařízení je podle iFreeiCloud hlášeno jako blokované / problémové.' : type === 'success' ? 'iFreeiCloud kontrola proběhla úspěšně.' : 'Výsledek iFreeiCloud nebyl jednoznačný.'}</div>${message}${meta}</div>`;
+        const summary = result.summary ? `<pre class="small mt-2 mb-0 p-2 rounded border border-opacity-25 bg-dark bg-opacity-25 text-white-75" style="white-space: pre-wrap;">${escapeHtml(result.summary)}</pre>` : '';
+        const meta = result.service_id !== undefined ? `<div class="small mt-2 opacity-50">Service ID: ${escapeHtml(String(result.service_id))}${result.http_code ? ` · HTTP ${escapeHtml(String(result.http_code))}` : ''}</div>` : '';
+        return `<div class="${alertClass} mb-0 py-2"><div class="fw-semibold mb-1"><i class="fas fa-sim-card me-2"></i>iFreeiCloud</div><div><i class="fas fa-${icon} me-2"></i>${headline}</div>${message}${summary}${meta}</div>`;
     }
 
     $imeiInput.on('input', function() {

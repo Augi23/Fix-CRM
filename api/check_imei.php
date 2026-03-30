@@ -134,9 +134,9 @@ function normalizeIfreeicloudResult(array $data): array {
     $message = '';
 
     if (isset($data['success']) && $data['success'] === true) {
-        $status = 'found';
+        $status = 'success';
     } elseif (isset($data['success']) && $data['success'] === false) {
-        $status = 'not_found';
+        $status = 'error';
     }
 
     if (!empty($data['response']) && is_string($data['response'])) {
@@ -147,16 +147,52 @@ function normalizeIfreeicloudResult(array $data): array {
         $message = trim($data['error']);
     }
 
-    if ($message === '' && !empty($data['object']) && is_array($data['object'])) {
-        $message = json_encode($data['object'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    }
-
     return [
-        'success' => $status !== 'unknown' || $message !== '',
+        'success' => $status === 'success' || $status === 'error' || $message !== '',
         'status' => $status,
         'message' => $message,
+        'object' => (!empty($data['object']) && is_array($data['object'])) ? $data['object'] : null,
         'raw' => $data,
     ];
+}
+
+function ifreeicloudSummary(?array $object = null): string {
+    if (!$object) return '';
+
+    $map = [
+        'model' => 'Model',
+        'network' => 'Network',
+        'imei' => 'IMEI',
+        'imei2' => 'IMEI2',
+        'meid' => 'MEID',
+        'serial' => 'Serial',
+        'warrantyStatus' => 'Warranty',
+        'estPurchaseDate' => 'Purchase date',
+        'technicalSupport' => 'Technical support',
+        'repairCoverage' => 'Repairs/service coverage',
+        'replaced' => 'Replaced by Apple',
+        'fmiOn' => 'Find My iPhone',
+        'lostMode' => 'Lost mode',
+        'usaBlockStatus' => 'US block status',
+        'simLock' => 'SIM lock',
+        'isAppleDevice' => 'Apple device',
+    ];
+
+    $rows = [];
+    foreach ($map as $key => $label) {
+        if (!array_key_exists($key, $object)) continue;
+        $value = $object[$key];
+        if (is_bool($value)) {
+            $value = $value ? 'Ano' : 'Ne';
+        } elseif (is_array($value)) {
+            $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } elseif ($value === null || $value === '') {
+            continue;
+        }
+        $rows[] = $label . ': ' . (string) $value;
+    }
+
+    return implode("\n", $rows);
 }
 
 if (!isset($_SESSION['user_id'])) {
@@ -198,7 +234,7 @@ if ($cookieJar === false) {
 }
 
 $ifreeicloudKey = trim((string) get_setting('ifreeicloud_api_key', getenv('IFREEICLOUD_API_KEY') ?: ''));
-$ifreeicloudService = (int) get_setting('ifreeicloud_service_id', getenv('IFREEICLOUD_SERVICE_ID') ?: 0);
+$ifreeicloudService = (int) get_setting('ifreeicloud_service_id', getenv('IFREEICLOUD_SERVICE_ID') ?: 205);
 
 try {
     $initial = curlRequest($endpoint, null, $cookieJar);
@@ -232,6 +268,8 @@ try {
         'message' => '',
         'http_code' => 0,
         'service_id' => $ifreeicloudService,
+        'summary' => '',
+        'object' => null,
     ];
 
     if ($ifreeicloudKey !== '') {
@@ -247,8 +285,8 @@ try {
             $ifreeicloud['success'] = $normalized['success'];
             $ifreeicloud['status'] = $normalized['status'];
             $ifreeicloud['message'] = $normalized['message'];
-            $ifreeicloud['response'] = $ifreeicloudResponse['json']['response'] ?? '';
-            $ifreeicloud['object'] = $ifreeicloudResponse['json']['object'] ?? null;
+            $ifreeicloud['object'] = $normalized['object'];
+            $ifreeicloud['summary'] = ifreeicloudSummary($normalized['object']);
             $ifreeicloud['raw'] = $ifreeicloudResponse['json'];
         } else {
             $ifreeicloud['message'] = $ifreeicloudResponse['error'] ?: 'Ověření přes iFreeiCloud selhalo.';
