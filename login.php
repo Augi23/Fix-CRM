@@ -124,45 +124,72 @@ if (isset($_SESSION['user_id'])) {
 <body>
 
 <div class="login-page">
-    <div class="login-shell">
-        <div class="login-card glass-card shadow-lg login-side-card">
-            <div class="login-brand">
-                <img src="assets/img/applefix-logo.png" alt="AppleFix logo" class="login-logo">
-                <div class="login-brand-copy">
-                    <h3 class="mb-2">Repair CRM</h3>
-                    <p class="text-white-50 small mb-3">AppleFix</p>
-                    <p class="login-tagline mb-0">Servisní systém pro zakázky, zákazníky a sklad. Přehledně, bez chaosu.</p>
+    <div class="login-scene">
+        <section class="login-hero">
+            <div class="login-brandline">
+                <img src="assets/img/applefix-logo.png" alt="AppleFix logo" class="login-hero-logo">
+                <div class="login-brandtext">
+                    <span class="login-eyebrow">APPLEFIX S.R.O.</span>
                 </div>
             </div>
-        </div>
 
-        <div class="login-card glass-card shadow-lg login-form-card">
-            <div class="login-form-wrap w-100">
+            <h1 class="login-headline">Černé.<br>Čisté.<br>Připravené<br>pro servis.</h1>
+
+            <p class="login-copy">
+                Minimalistické přihlášení do moderního servisního systému — rychlejší práce,
+                přehlednější provoz a lepší fokus.
+            </p>
+
+            <div class="login-points">
+                <div class="login-point">
+                    <span class="login-point-icon"><i class="fas fa-magnifying-glass"></i></span>
+                    <span>Rychlé vyhledávání zakázek a zákazníků</span>
+                </div>
+                <div class="login-point">
+                    <span class="login-point-icon"><i class="fas fa-layer-group"></i></span>
+                    <span>Přehledné workflow pro servisní den</span>
+                </div>
+                <div class="login-point">
+                    <span class="login-point-icon"><i class="fas fa-window-restore"></i></span>
+                    <span>Čistý Apple-like vzhled s černým pozadím</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="login-panel glass-card shadow-lg">
+            <div class="login-panel-inner">
+                <div class="login-panel-head">
+                    <div class="login-panel-badge">
+                        <img src="assets/img/applefix-logo.png" alt="AppleFix logo" class="login-panel-logo">
+                    </div>
+                    <div>
+                        <span class="login-panel-kicker">Secure Access</span>
+                        <h2><?php echo e(__('login_title')); ?></h2>
+                    </div>
+                </div>
+
                 <?php if ($error): ?>
                     <div class="alert alert-danger small mb-4"><?php echo e($error); ?></div>
                 <?php endif; ?>
-
-                <div class="login-form-header mb-4">
-                    <h4 class="mb-1"><?php echo e(__('login_title')); ?></h4>
-                    <p class="text-white-50 mb-0">Přihlas se do systému a pokračuj tam, kde jsi skončil.</p>
-                </div>
 
                 <form method="POST" class="login-form">
                     <?php echo csrfField(); ?>
                     <div class="mb-3">
                         <label class="form-label"><?php echo e(__('username_label')); ?></label>
-                        <input type="text" name="username" class="form-control" required autofocus autocomplete="username">
+                        <input type="text" name="username" class="form-control" value="Augustin" required autofocus autocomplete="username">
                     </div>
                     <div class="mb-4">
                         <label class="form-label"><?php echo e(__('password')); ?></label>
-                        <input type="password" name="password" class="form-control" required autocomplete="current-password">
+                        <input type="password" name="password" class="form-control" value="" required autocomplete="current-password">
                     </div>
                     <div class="d-grid">
                         <button type="submit" name="login" class="btn btn-primary"><?php echo e(__('login_btn')); ?></button>
                     </div>
                 </form>
+
+                <div class="login-note">Použij své přihlašovací údaje.</div>
             </div>
-        </div>
+        </section>
     </div>
 </div>
 
