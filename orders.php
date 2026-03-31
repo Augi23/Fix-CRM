@@ -329,13 +329,13 @@ if (isset($pdo)) {
                                     );
                                 ?>
                                 <?php // inline quick-status buttons removed; using dropdown only ?>
-                                <div class="btn-group btn-group-sm shadow-sm">
+                                <div class="btn-group btn-group-sm shadow-sm dropup">
                                     <?php if ($show_quick): ?>
-                                    <div class="dropdown">
-                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="<?php echo __('quick_status'); ?>">
+                                    <div class="dropdown dropup">
+                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" title="<?php echo __('quick_status'); ?>">
                                             <i class="fas fa-bolt text-primary"></i>
                                         </button>
-                                        <ul class="dropdown-menu shadow">
+                                        <ul class="dropdown-menu shadow dropdown-menu-end">
                                             <?php if ($order['status'] === 'New'): ?>
                                                 <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="In Progress"><i class="fas fa-play me-2 text-primary"></i><?php echo __('move_to_in_progress'); ?></a></li>
                                             <?php elseif (in_array($order['status'], ['Pending Approval', 'Waiting for Parts', 'In Progress'], true)): ?>
@@ -349,11 +349,11 @@ if (isset($pdo)) {
                                         </ul>
                                     </div>
                                     <?php endif; ?>
-                                    <div class="dropdown">
-                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="<?php echo __('print'); ?>">
+                                    <div class="dropdown dropup">
+                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" title="<?php echo __('print'); ?>">
                                             <i class="fas fa-print text-white-75"></i>
                                         </button>
-                                        <ul class="dropdown-menu shadow">
+                                        <ul class="dropdown-menu shadow dropdown-menu-end">
                                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', 'Order #<?php echo $order['id']; ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
                                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openReceptionLangModal(<?php echo $order['id']; ?>)"><i class="fas fa-file-import me-2 text-info"></i> <?php echo __('reception_act_thermal'); ?></a></li>
                                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', 'Workshop Order #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
@@ -776,11 +776,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('close'); ?></button>
                 </div>
                 <div class="d-flex gap-2">
-                    <div class="dropdown">
-                        <button class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <div class="dropdown dropup">
+                        <button class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport">
                             <i class="fas fa-print me-2"></i> <?php echo __('print'); ?>
                         </button>
-                        <ul class="dropdown-menu shadow">
+                        <ul class="dropdown-menu shadow dropdown-menu-end">
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=${o.id}', '<?php echo __('order_header'); ?> #' + o.id)"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openReceptionLangModal(${o.id})"><i class="fas fa-file-import me-2 text-info"></i> <?php echo __('reception_act_thermal'); ?></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=${o.id}', 'Workshop #' + o.id)"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>

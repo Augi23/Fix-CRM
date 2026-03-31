@@ -185,6 +185,15 @@ body.modal-open {
     font-weight: 800;
 }
 
+.dropdown-menu {
+    z-index: 2005;
+}
+
+.table-responsive .dropdown-menu,
+.modal .dropdown-menu {
+    z-index: 3000;
+}
+
 .navbar {
     background: rgba(10, 15, 20, 0.6) !important;
     backdrop-filter: blur(10px);
