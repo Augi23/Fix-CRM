@@ -64,6 +64,10 @@ TG_BOT_TOKEN=
 AI_API_KEY=
 AI_MODEL=google/gemini-2.0-flash-001
 AI_PROVIDER=openrouter
+
+# iFreeiCloud IMEI API (optional)
+IFREEICLOUD_API_KEY=
+IFREEICLOUD_SERVICE_ID=205
 ```
 
 ### 4. Run migrations
