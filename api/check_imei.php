@@ -129,9 +129,52 @@ function curlRequest(string $url, ?array $postFields = null, ?string $cookieJar 
     ];
 }
 
+function ifreeicloudRequest(array $payload): array {
+    if (!function_exists('curl_init')) {
+        return [
+            'ok' => false,
+            'code' => 0,
+            'body' => '',
+            'json' => null,
+            'error' => 'Server nemá k dispozici cURL.'
+        ];
+    }
+
+    $ch = curl_init('https://api.ifreeicloud.co.uk');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 60,
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_HTTPHEADER => [
+            'Accept: application/json',
+        ],
+    ]);
+
+    $body = curl_exec($ch);
+    $error = curl_error($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $decoded = null;
+    if (is_string($body) && $body !== '') {
+        $decoded = json_decode($body, true);
+    }
+
+    return [
+        'ok' => $body !== false && $code === 200,
+        'code' => $code,
+        'body' => $body !== false ? $body : '',
+        'json' => $decoded,
+        'error' => $error,
+    ];
+}
+
 function normalizeIfreeicloudResult(array $data): array {
     $status = 'unknown';
     $message = '';
+    $response = '';
 
     if (isset($data['success']) && $data['success'] === true) {
         $status = 'success';
@@ -140,7 +183,8 @@ function normalizeIfreeicloudResult(array $data): array {
     }
 
     if (!empty($data['response']) && is_string($data['response'])) {
-        $message = trim($data['response']);
+        $response = trim($data['response']);
+        $message = $response;
     } elseif (!empty($data['message']) && is_string($data['message'])) {
         $message = trim($data['message']);
     } elseif (!empty($data['error']) && is_string($data['error'])) {
@@ -151,6 +195,7 @@ function normalizeIfreeicloudResult(array $data): array {
         'success' => $status === 'success' || $status === 'error' || $message !== '',
         'status' => $status,
         'message' => $message,
+        'response' => $response,
         'object' => (!empty($data['object']) && is_array($data['object'])) ? $data['object'] : null,
         'raw' => $data,
     ];
@@ -172,6 +217,7 @@ function ifreeicloudSummary(?array $object = null): string {
         'repairCoverage' => 'Repairs/service coverage',
         'replaced' => 'Replaced by Apple',
         'fmiOn' => 'Find My iPhone',
+        'findMyIphone' => 'Find My iPhone',
         'lostMode' => 'Lost mode',
         'usaBlockStatus' => 'US block status',
         'simLock' => 'SIM lock',
@@ -278,13 +324,14 @@ try {
             'imei' => $imei,
             'key' => $ifreeicloudKey,
         ];
-        $ifreeicloudResponse = curlRequest('https://api.ifreeicloud.co.uk', $ifreeicloudPayload, null, true);
+        $ifreeicloudResponse = ifreeicloudRequest($ifreeicloudPayload);
         $ifreeicloud['http_code'] = $ifreeicloudResponse['code'];
         if ($ifreeicloudResponse['ok'] && is_array($ifreeicloudResponse['json'])) {
             $normalized = normalizeIfreeicloudResult($ifreeicloudResponse['json']);
             $ifreeicloud['success'] = $normalized['success'];
             $ifreeicloud['status'] = $normalized['status'];
             $ifreeicloud['message'] = $normalized['message'];
+            $ifreeicloud['response'] = $normalized['response'];
             $ifreeicloud['object'] = $normalized['object'];
             $ifreeicloud['summary'] = ifreeicloudSummary($normalized['object']);
             $ifreeicloud['raw'] = $ifreeicloudResponse['json'];
