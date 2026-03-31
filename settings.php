@@ -313,9 +313,9 @@ require_once 'includes/header.php';
                         <div class="mb-3 pt-2 border-top border-secondary">
                             <h6 class="small fw-bold text-info mb-3"><i class="fas fa-sim-card me-2"></i>iFreeiCloud IMEI API</h6>
                             <label class="form-label small text-white-75">API Key</label>
-                            <input type="password" name="ifreeicloud_api_key" class="form-control mb-3" value="<?php echo htmlspecialchars(get_setting('ifreeicloud_api_key')); ?>" placeholder="83L-...">
+                            <input type="password" name="ifreeicloud_api_key" class="form-control mb-3" value="<?php echo htmlspecialchars(get_setting_with_fallback('ifreeicloud_api_key', '', 'IFREEICLOUD_API_KEY')); ?>" placeholder="83L-...">
                             <label class="form-label small text-white-75">Service ID z iFreeiCloud dashboardu</label>
-                            <input type="number" name="ifreeicloud_service_id" class="form-control" value="<?php echo htmlspecialchars(get_setting('ifreeicloud_service_id', '205')); ?>" min="0" step="1">
+                            <input type="number" name="ifreeicloud_service_id" class="form-control" value="<?php echo htmlspecialchars(get_setting_with_fallback('ifreeicloud_service_id', '205', 'IFREEICLOUD_SERVICE_ID')); ?>" min="0" step="1">
                             <div class="form-text small text-white-75 mt-2">Použije se jako druhé ověření pod výsledkem od Policie ČR. Do pole patří skutečné service ID pro vybraný check na iFreeiCloud (např. FMI / model / serial dle dashboardu).</div>
                         </div>
                         <div class="form-text small text-white-75"><?php echo __('ai_hint'); ?></div>

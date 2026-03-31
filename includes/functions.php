@@ -170,6 +170,22 @@ function get_setting($key, $default = '') {
     return $default;
 }
 
+function get_setting_with_fallback($key, $default = '', ?string $envKey = null) {
+    $value = trim((string) get_setting($key, ''));
+    if ($value !== '') {
+        return $value;
+    }
+
+    if ($envKey) {
+        $envValue = trim((string) getenv($envKey));
+        if ($envValue !== '') {
+            return $envValue;
+        }
+    }
+
+    return $default;
+}
+
 function set_setting($key, $value) {
     global $pdo;
     $stmt = $pdo->prepare("REPLACE INTO system_settings (setting_key, setting_value) VALUES (?, ?)");

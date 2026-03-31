@@ -279,8 +279,8 @@ if ($cookieJar === false) {
     exit;
 }
 
-$ifreeicloudKey = trim((string) get_setting('ifreeicloud_api_key', getenv('IFREEICLOUD_API_KEY') ?: ''));
-$ifreeicloudService = (int) get_setting('ifreeicloud_service_id', getenv('IFREEICLOUD_SERVICE_ID') ?: 205);
+$ifreeicloudKey = get_setting_with_fallback('ifreeicloud_api_key', '', 'IFREEICLOUD_API_KEY');
+$ifreeicloudService = (int) get_setting_with_fallback('ifreeicloud_service_id', '205', 'IFREEICLOUD_SERVICE_ID');
 
 try {
     $initial = curlRequest($endpoint, null, $cookieJar);
