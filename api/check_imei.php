@@ -69,6 +69,31 @@ function classifyPoliceResult(string $message): string {
     return 'unknown';
 }
 
+function imeiWithCheckDigit(string $digits): string {
+    $digits = preg_replace('/\D+/', '', $digits);
+    if (strlen($digits) === 15) {
+        return $digits;
+    }
+    if (strlen($digits) !== 14) {
+        return $digits;
+    }
+
+    $sum = 0;
+    for ($i = 0; $i < 14; $i++) {
+        $digit = (int) $digits[$i];
+        if ((($i + 1) % 2) === 0) {
+            $digit *= 2;
+            if ($digit > 9) {
+                $digit = intdiv($digit, 10) + ($digit % 10);
+            }
+        }
+        $sum += $digit;
+    }
+
+    $checkDigit = (10 - ($sum % 10)) % 10;
+    return $digits . $checkDigit;
+}
+
 function curlRequest(string $url, ?array $postFields = null, ?string $cookieJar = null, bool $jsonResponse = false): array {
     if (!function_exists('curl_init')) {
         return [
@@ -258,7 +283,9 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 $rawImei = preg_replace('/\D+/', '', (string) ($_POST['imei'] ?? ''));
-$imei = substr($rawImei, 0, 14);
+$imei = substr($rawImei, 0, 15);
+$imeiPolice = substr($imei, 0, 14);
+$imeiIfreeicloud = imeiWithCheckDigit($imeiPolice);
 
 if (strlen($imei) < 14) {
     echo json_encode([
@@ -289,7 +316,7 @@ try {
     }
 
     $postFields = extractHiddenFields($initial['body']);
-    $postFields['ctl00$Application$tbImei'] = $imei;
+    $postFields['ctl00$Application$tbImei'] = $imeiPolice;
     $postFields['ctl00$Application$Button1'] = 'Vyhledat';
     $postFields['__EVENTTARGET'] = $postFields['__EVENTTARGET'] ?? '';
     $postFields['__EVENTARGUMENT'] = $postFields['__EVENTARGUMENT'] ?? '';
@@ -321,7 +348,7 @@ try {
     if ($ifreeicloudKey !== '') {
         $ifreeicloudPayload = [
             'service' => $ifreeicloudService,
-            'imei' => $imei,
+            'imei' => $imeiIfreeicloud,
             'key' => $ifreeicloudKey,
         ];
         $ifreeicloudResponse = ifreeicloudRequest($ifreeicloudPayload);
@@ -346,6 +373,8 @@ try {
         'success' => $success,
         'status' => $status,
         'imei' => $imei,
+        'imei_police' => $imeiPolice,
+        'imei_ifreeicloud' => $imeiIfreeicloud,
         'message' => $message,
         'police' => [
             'success' => $success,

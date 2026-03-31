@@ -264,12 +264,12 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                 <form id="imeiCheckForm">
                     <label class="form-label">IMEI</label>
                     <div class="input-group">
-                        <input type="text" class="form-control" id="imeiCheckInput" placeholder="Zadej prvních 14 číslic" inputmode="numeric" autocomplete="off" maxlength="14">
+                        <input type="text" class="form-control" id="imeiCheckInput" placeholder="Zadej IMEI (14 nebo 15 číslic)" inputmode="numeric" autocomplete="off" maxlength="15">
                         <button class="btn btn-outline-info" type="submit">
                             <i class="fas fa-search me-1"></i> Ověřit
                         </button>
                     </div>
-                    <div class="form-text text-white-75">CRM prověří databázi Policie ČR bez odchodu z aplikace.</div>
+                    <div class="form-text text-white-75">CRM prověří databázi Policie ČR bez odchodu z aplikace. iFreeiCloud dostane plný 15místný IMEI, pokud zadáš jen 14 číslic, dopočítá se kontrolní číslice.</div>
                 </form>
                 <div id="imeiCheckResult" class="imei-check-result mt-3" aria-live="polite"></div>
                 <div class="d-grid gap-2 mt-3">
@@ -813,15 +813,15 @@ $(document).ready(function() {
     }
 
     $imeiInput.on('input', function() {
-        this.value = this.value.replace(/\D+/g, '').slice(0, 14);
+        this.value = this.value.replace(/\D+/g, '').slice(0, 15);
     });
 
     $('#imeiCheckForm').on('submit', function(e) {
         e.preventDefault();
 
-        const imei = ($imeiInput.val() || '').replace(/\D+/g, '').slice(0, 14);
+        const imei = ($imeiInput.val() || '').replace(/\D+/g, '').slice(0, 15);
         if (imei.length < 14) {
-            renderImeiResult('warning', 'Zadej prosím prvních 14 číslic IMEI.');
+            renderImeiResult('warning', 'Zadej prosím IMEI alespoň ze 14 číslic.');
             return;
         }
 
