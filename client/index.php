@@ -43,30 +43,32 @@ if (isset($_POST['login'])) {
     } elseif (!clientCheckLoginAttempts($pdo ?? null)) {
         $error = __('login_rate_limit');
     } else {
-        $orderId = isset($_POST['order_id']) ? (int)$_POST['order_id'] : 0;
+        $loginIdentifier = trim((string)($_POST['login_identifier'] ?? ''));
         $pinCode = trim((string)($_POST['pin_code'] ?? ''));
 
-        if ($orderId <= 0 || $pinCode === '') {
-            $error = 'Vyplň číslo zakázky i PIN kód.';
+        if ($loginIdentifier === '' || $pinCode === '') {
+            $error = 'Vyplň telefon, e-mail nebo číslo zakázky a PIN kód.';
         } elseif (isset($pdo)) {
             try {
-                $stmt = $pdo->prepare(
-                    "SELECT o.*, c.first_name, c.last_name, c.phone, c.email, c.company, c.customer_type
-                     FROM orders o
-                     INNER JOIN customers c ON c.id = o.customer_id
-                     WHERE o.id = ?
-                     LIMIT 1"
-                );
-                $stmt->execute([$orderId]);
-                $order = $stmt->fetch();
+                $lookup = clientLookupCustomerAndOrders($pdo, $loginIdentifier);
+                $customer = $lookup['customer'];
+                $orders = $lookup['orders'];
+                $matchedOrder = null;
 
-                if ($order && hash_equals(trim((string)($order['pin_code'] ?? '')), $pinCode)) {
+                foreach ($orders as $order) {
+                    if (hash_equals(trim((string)($order['pin_code'] ?? '')), $pinCode)) {
+                        $matchedOrder = $order;
+                        break;
+                    }
+                }
+
+                if ($matchedOrder && $customer) {
                     session_regenerate_id(true);
                     $_SESSION['client_authenticated'] = true;
-                    $_SESSION['client_customer_id'] = (int)$order['customer_id'];
-                    $_SESSION['client_order_id'] = (int)$order['id'];
-                    $_SESSION['client_full_name'] = trim(($order['first_name'] ?? '') . ' ' . ($order['last_name'] ?? ''));
-                    $_SESSION['client_company'] = $order['company'] ?? '';
+                    $_SESSION['client_customer_id'] = (int)$customer['id'];
+                    $_SESSION['client_order_id'] = (int)$matchedOrder['id'];
+                    $_SESSION['client_full_name'] = trim(($customer['first_name'] ?? '') . ' ' . ($customer['last_name'] ?? ''));
+                    $_SESSION['client_company'] = $customer['company'] ?? '';
                     $_SESSION['client_last_login'] = time();
                     clientRecordLoginAttempt($pdo, true);
                     header('Location: dashboard.php');
@@ -74,7 +76,7 @@ if (isset($_POST['login'])) {
                 }
 
                 clientRecordLoginAttempt($pdo, false);
-                $error = 'Neplatné číslo zakázky nebo PIN kód.';
+                $error = 'Neplatný telefon, e-mail, číslo zakázky nebo PIN kód.';
             } catch (Exception $e) {
                 clientRecordLoginAttempt($pdo, false);
                 $error = 'Přihlášení se nezdařilo. Zkus to prosím znovu.';
@@ -160,8 +162,8 @@ if (isset($_POST['login'])) {
                 <form method="POST" class="login-form">
                     <?php echo csrfField(); ?>
                     <div class="mb-3">
-                        <label class="form-label">Číslo zakázky</label>
-                        <input type="number" name="order_id" class="form-control" required autofocus autocomplete="off" placeholder="Např. 1234">
+                        <label class="form-label">Telefon, e-mail nebo číslo zakázky</label>
+                        <input type="text" name="login_identifier" class="form-control" required autofocus autocomplete="username" placeholder="Např. 777 123 456 nebo jmeno@email.cz">
                     </div>
                     <div class="mb-4">
                         <label class="form-label">PIN kód z protokolu</label>
@@ -172,7 +174,7 @@ if (isset($_POST['login'])) {
                     </div>
                 </form>
 
-                <div class="login-note">Data jsou čtena přímo z CRM. Klient vidí jen své zakázky.</div>
+                <div class="login-note">Přihlášení funguje přes telefon, e-mail nebo číslo zakázky. Data jsou čtena přímo z CRM a klient vidí jen své zakázky.</div>
             </div>
         </section>
     </div>
