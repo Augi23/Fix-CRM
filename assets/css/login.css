@@ -349,3 +349,8 @@ body::after {
         margin-top: 28px;
     }
 }
+
+/* Hide hero bullet points on the unified login screen */
+.login-points {
+    display: none !important;
+}
