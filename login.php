@@ -156,9 +156,6 @@ if (isset($_SESSION['user_id'])) {
         <section class="login-panel glass-card shadow-lg">
             <div class="login-panel-inner">
                 <div class="login-panel-head">
-                    <div class="login-panel-badge">
-                        <img src="assets/img/applefix-logo.png" alt="AppleFix logo" class="login-panel-logo">
-                    </div>
                     <div>
                         <span class="login-panel-kicker">Secure Access</span>
                         <h2><?php echo e(__('login_title')); ?></h2>
