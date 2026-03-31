@@ -99,12 +99,20 @@ body::after {
 }
 
 .login-copy {
-    margin: 20px 0 0;
-    max-width: 460px;
-    font-size: 1rem;
-    line-height: 1.6;
-    color: rgba(229, 236, 246, 0.72);
-    font-weight: 400;
+    margin: 18px 0 0;
+    display: inline-flex;
+    align-items: center;
+    max-width: 520px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.96rem;
+    line-height: 1.45;
+    color: rgba(243, 247, 255, 0.88);
+    font-weight: 500;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .login-quip {
@@ -302,6 +310,7 @@ body::after {
 
     .login-copy {
         font-size: 1rem;
+        width: 100%;
     }
 
     .login-quip {

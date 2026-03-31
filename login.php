@@ -116,6 +116,19 @@ $loginQuips = [
     'Od iPhonu po MacBook: oprava s hlavou, ne s chaosem.',
     'Jablečný servis bez hluku, jen s výsledkem.',
     'Když praskne displej, přichází klid z AppleFix.',
+    'Kde jiní vidí problém, my vidíme nový displej a hotovo.',
+    'iPhone zpátky v kondici, MacBook zpátky v tempu.',
+    'Žádný servisní drama — jen precizní Apple oprava.',
+    'Vyměníme rozbitý chaos za funkční jablečný pořádek.',
+    'Displeje, baterie, klávesnice — a potom zase klid.',
+    'Když se Apple ozve, my už máme nářadí v ruce.',
+    'MacBook bez hluku, iPhone bez prasklin, zákazník bez starostí.',
+    'Malá závada, velká pozornost — přesně náš styl.',
+    'Jablečný servis, který se neztratí v detailu.',
+    'Neopracujeme jen zařízení. Vracíme mu druhý dech.',
+    'Od nalomeného displeje k hotové zakázce během chvíle.',
+    'Čistá oprava. Čistý výsledek. Čisté AppleFix.',
+    'Servis, co rozumí iPhonu, MacBooku i času zákazníka.',
 ];
 $loginQuip = $loginQuips[array_rand($loginQuips)];
 ?>
@@ -144,14 +157,8 @@ $loginQuip = $loginQuips[array_rand($loginQuips)];
             <h1 class="login-headline">...servis<br>se vším všudy.</h1>
 
             <p class="login-copy">
-                Minimalistické přihlášení do moderního servisního systému — rychlejší práce,
-                přehlednější provoz a lepší fokus.
+                <?php echo e($loginQuip); ?>
             </p>
-
-            <div class="login-quip">
-                <i class="fas fa-screwdriver-wrench"></i>
-                <span><?php echo e($loginQuip); ?></span>
-            </div>
 
             <div class="login-points">
                 <div class="login-point">
