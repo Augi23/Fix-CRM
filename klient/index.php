@@ -149,7 +149,7 @@ if (isset($_POST['login'])) {
             <div class="login-panel-inner">
                 <div class="login-panel-head d-flex justify-content-between align-items-start">
                     <div>
-                        <span class="login-panel-kicker">Client Access</span>
+                        <span class="login-panel-kicker">Klient</span>
                         <h2>AppleFix klient</h2>
                     </div>
                     <span class="client-badge"><i class="fas fa-shield-halved"></i> oddělený login</span>

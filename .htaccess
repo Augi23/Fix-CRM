@@ -1,9 +1,9 @@
 RewriteEngine On
 
-# ── Route client subdomain to the client portal folder ───────────────────────
-RewriteCond %{HTTP_HOST} ^(client|klient)\.applefix\.space$ [NC]
-RewriteCond %{REQUEST_URI} !^/(assets|api|includes|uploads|temp|migrations|models|client|favicon\.ico|robots\.txt)(/|$) [NC]
-RewriteRule ^(.*)$ client/$1 [L,QSA]
+# ── Route klient subdomain to the klient portal folder ──────────────────────
+RewriteCond %{HTTP_HOST} ^klient\.applefix\.space$ [NC]
+RewriteCond %{REQUEST_URI} !^/(assets|api|includes|uploads|temp|migrations|models|klient|favicon\.ico|robots\.txt)(/|$) [NC]
+RewriteRule ^(.*)$ klient/$1 [L,QSA]
 
 # ── Block debug / test files from public access ──────────────────────────────
 <FilesMatch "^(debug_check|debug_reports|test)\.php$">
