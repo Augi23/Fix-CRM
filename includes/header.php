@@ -100,6 +100,10 @@ if ($page == 'reports.php') {
     <div class="p-4 text-center sidebar-brand">
         <img src="assets/img/applefix-logo.png" alt="AppleFix" class="sidebar-logo">
         <div class="sidebar-brand-text text-white-50 small mt-2"><?php echo htmlspecialchars(get_setting('company_name', 'Fix CRM')); ?></div>
+        <div class="mt-2">
+            <?php $roleLabel = ($_SESSION['role'] ?? '') === 'admin' ? 'Admin' : (($_SESSION['role'] ?? '') === 'technician' ? 'Technik' : ucfirst((string)($_SESSION['role'] ?? ''))); ?>
+            <span class="badge bg-primary bg-opacity-75 text-white"><?php echo e($roleLabel ?: 'Zaměstnanec'); ?></span>
+        </div>
     </div>
     <nav class="nav flex-column">
         <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="index.php"><i class="fas fa-home me-2"></i> <?php echo __('dashboard'); ?></a>
@@ -168,6 +172,8 @@ if ($page == 'reports.php') {
             <?php endif; ?>
 
             <div class="d-flex align-items-center">
+                <?php $roleLabel = ($_SESSION['role'] ?? '') === 'admin' ? 'Admin' : (($_SESSION['role'] ?? '') === 'technician' ? 'Technik' : ucfirst((string)($_SESSION['role'] ?? ''))); ?>
+                <span class="badge bg-secondary bg-opacity-75 text-white me-2"><?php echo e($roleLabel ?: 'Zaměstnanec'); ?></span>
                 <span class="navbar-text me-3">
                     <i class="fas fa-user-circle me-1"></i> <?php echo e($_SESSION['full_name'] ?? __('technician')); ?>
                 </span>
