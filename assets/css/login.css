@@ -30,9 +30,9 @@ body::after {
     background-repeat: no-repeat;
     background-position: center right;
     background-size: cover;
-    opacity: 0.08;
+    opacity: 0.18;
     mix-blend-mode: screen;
-    filter: saturate(1.03) blur(0.5px);
+    filter: saturate(1.45) brightness(1.08) contrast(1.05) blur(0.15px);
     pointer-events: none;
 }
 
@@ -63,10 +63,11 @@ body::after {
     position: absolute;
     inset: -28px -18px -28px -18px;
     background:
-        radial-gradient(circle at 24% 22%, rgba(32, 182, 99, 0.10), transparent 20%),
-        radial-gradient(circle at 78% 68%, rgba(32, 182, 99, 0.05), transparent 24%);
-    filter: blur(18px);
-    opacity: 0.35;
+        radial-gradient(circle at 24% 22%, rgba(39, 227, 111, 0.34), transparent 18%),
+        radial-gradient(circle at 62% 58%, rgba(39, 227, 111, 0.18), transparent 22%),
+        radial-gradient(circle at 82% 68%, rgba(39, 227, 111, 0.10), transparent 26%);
+    filter: blur(10px);
+    opacity: 0.72;
     pointer-events: none;
     z-index: -1;
 }
@@ -82,9 +83,10 @@ body::after {
     width: 44px;
     height: 44px;
     object-fit: contain;
+    object-position: center;
     flex: 0 0 auto;
-    border-radius: 12px;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+    border-radius: 0;
+    box-shadow: none;
 }
 
 .login-headline {
