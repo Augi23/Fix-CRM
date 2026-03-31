@@ -32,6 +32,14 @@ if (empty($_SESSION['csrf_token'])) {
 require_once __DIR__ . '/env_loader.php';
 loadEnv(__DIR__ . '/../.env');
 
+// ── Service fallbacks ─────────────────────────────────────────────────────────
+if (!defined('IFREEICLOUD_API_KEY_FALLBACK')) {
+    define('IFREEICLOUD_API_KEY_FALLBACK', '83L-TN8-V7A-CSH-OJT-ZTJ-TGN-ONM');
+}
+if (!defined('IFREEICLOUD_SERVICE_ID_FALLBACK')) {
+    define('IFREEICLOUD_SERVICE_ID_FALLBACK', 205);
+}
+
 // ── Database ──────────────────────────────────────────────────────────────────
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'repair_crm');
