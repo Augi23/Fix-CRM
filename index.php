@@ -806,10 +806,107 @@ $(document).ready(function() {
             : type === 'success'
                 ? 'iFreeiCloud kontrola proběhla úspěšně.'
                 : 'Výsledek iFreeiCloud nebyl jednoznačný.';
-        const message = result.message ? `<div class="small mt-1 opacity-75">${escapeHtml(result.message)}</div>` : '';
-        const summary = result.summary ? `<pre class="small mt-2 mb-0 p-2 rounded border border-opacity-25 bg-dark bg-opacity-25 text-white-75" style="white-space: pre-wrap;">${escapeHtml(result.summary)}</pre>` : '';
+
+        const firstDefined = (obj, keys) => {
+            if (!obj) return undefined;
+            for (const key of keys) {
+                if (Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+                    return obj[key];
+                }
+            }
+            return undefined;
+        };
+
+        const normalizeYesNo = (value) => {
+            if (value === true || value === 1 || value === '1') return { text: 'Ano', state: 'yes' };
+            if (value === false || value === 0 || value === '0') return { text: 'Ne', state: 'no' };
+            if (typeof value === 'string') {
+                const v = value.trim().toLowerCase();
+                if (['yes', 'y', 'true', 'on', 'locked', 'active', 'enabled', 'ano', 'fmi on'].includes(v)) return { text: 'Ano', state: 'yes' };
+                if (['no', 'n', 'false', 'off', 'unlocked', 'inactive', 'disabled', 'ne'].includes(v)) return { text: 'Ne', state: 'no' };
+            }
+            return { text: String(value), state: '' };
+        };
+
+        const extractImageUrl = (source) => {
+            if (!source) return '';
+            if (typeof source === 'string') {
+                const imgMatch = source.match(/<img[^>]+src=["']([^"']+)["']/i);
+                if (imgMatch && imgMatch[1]) return imgMatch[1];
+                const urlMatch = source.match(/https?:\/\/[^\s"'<>]+\.(?:png|jpe?g|gif|webp)(?:\?[^\s"'<>]*)?/i);
+                if (urlMatch && urlMatch[0]) return urlMatch[0];
+            }
+            return '';
+        };
+
+        const rawImageUrl = result.image_url
+            || extractImageUrl(result.response)
+            || extractImageUrl(result.message)
+            || extractImageUrl(result.raw ? JSON.stringify(result.raw) : '');
+
+        const imageHtml = rawImageUrl
+            ? `<div class="ifreeicloud-preview mb-3"><img src="${escapeHtml(rawImageUrl)}" alt="iFreeiCloud preview" loading="lazy" referrerpolicy="no-referrer"></div>`
+            : '';
+
+        const fieldMap = [
+            ['model', 'Model'],
+            ['capacity', 'Capacity'],
+            ['colour', 'Colour'],
+            ['color', 'Color'],
+            ['network', 'Network'],
+            ['imei', 'IMEI'],
+            ['imei2', 'IMEI2'],
+            ['meid', 'MEID'],
+            ['serial', 'Serial'],
+            ['warrantyStatus', 'Warranty'],
+            ['estPurchaseDate', 'Purchase date'],
+            ['technicalSupport', 'Technical support'],
+            ['repairCoverage', 'Repairs/service coverage'],
+            ['replaced', 'Replaced by Apple'],
+            ['lostMode', 'Lost mode'],
+            ['usaBlockStatus', 'US block status'],
+            ['simLock', 'SIM lock'],
+            ['isAppleDevice', 'Apple device'],
+        ];
+
+        const object = result.object && typeof result.object === 'object' ? result.object : null;
+        let detailsHtml = '';
+
+        if (object) {
+            const rows = [];
+            fieldMap.forEach(([key, label]) => {
+                const value = firstDefined(object, [key]);
+                if (value === undefined) return;
+                let display = value;
+                if (typeof display === 'boolean' || display === 0 || display === 1 || display === '0' || display === '1') {
+                    display = normalizeYesNo(display).text;
+                } else if (display !== null && display !== undefined && typeof display !== 'string') {
+                    display = String(display);
+                }
+                rows.push(`<div class="ifreeicloud-row"><span>${escapeHtml(label)}</span><span class="ifreeicloud-value">${escapeHtml(display)}</span></div>`);
+            });
+
+            const findMySource = firstDefined(object, ['fmiOn', 'findMyIphone', 'findMyiPhone', 'find_my_iphone', 'findMyiphone']);
+            if (findMySource !== undefined) {
+                const normalized = normalizeYesNo(findMySource);
+                const stateClass = normalized.state === 'yes' ? 'ifreeicloud-row--yes' : 'ifreeicloud-row--no';
+                rows.push(`<div class="ifreeicloud-row ifreeicloud-row--findmy ${stateClass}"><span>Find My iPhone</span><span class="ifreeicloud-value">${escapeHtml(normalized.text)}</span></div>`);
+            }
+
+            detailsHtml = rows.length ? `<div class="ifreeicloud-details">${rows.join('')}</div>` : '';
+        }
+
+        const messageText = (() => {
+            const raw = typeof result.message === 'string' ? result.message : '';
+            if (!raw) return '';
+            if (/[<>&]/.test(raw)) return '';
+            return raw;
+        })();
+        const message = messageText ? `<div class="small mt-1 opacity-75">${escapeHtml(messageText)}</div>` : '';
         const meta = result.service_id !== undefined ? `<div class="small mt-2 opacity-50">Service ID: ${escapeHtml(String(result.service_id))}${result.http_code ? ` · HTTP ${escapeHtml(String(result.http_code))}` : ''}</div>` : '';
-        return `<div class="${alertClass} mb-0 py-2"><div class="fw-semibold mb-1"><i class="fas fa-sim-card me-2"></i>iFreeiCloud</div><div><i class="fas fa-${icon} me-2"></i>${headline}</div>${message}${summary}${meta}</div>`;
+        const note = (!detailsHtml && !imageHtml && result.summary) ? `<pre class="small mt-2 mb-0 p-2 rounded border border-opacity-25 bg-dark bg-opacity-25 text-white-75" style="white-space: pre-wrap;">${escapeHtml(result.summary)}</pre>` : '';
+
+        return `<div class="${alertClass} mb-0 py-2"><div class="fw-semibold mb-1"><i class="fas fa-sim-card me-2"></i>iFreeiCloud</div><div><i class="fas fa-${icon} me-2"></i>${headline}</div>${message}${imageHtml}${detailsHtml}${note}${meta}</div>`;
     }
 
     $imeiInput.on('input', function() {

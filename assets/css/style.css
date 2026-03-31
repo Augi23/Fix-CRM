@@ -124,6 +124,66 @@ body.modal-open {
 .imei-check-result .alert {
     margin-bottom: 0;
 }
+
+.ifreeicloud-preview {
+    max-width: 100%;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ifreeicloud-preview img {
+    display: block;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+    border-radius: 14px;
+    object-fit: contain;
+    filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.24));
+}
+
+.ifreeicloud-details {
+    display: grid;
+    gap: 8px;
+}
+
+.ifreeicloud-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.ifreeicloud-row strong {
+    font-weight: 700;
+}
+
+.ifreeicloud-row--findmy {
+    font-weight: 800;
+}
+
+.ifreeicloud-row--yes {
+    color: #ff5f6d;
+    border-color: rgba(220, 53, 69, 0.28);
+    background: rgba(220, 53, 69, 0.12);
+}
+
+.ifreeicloud-row--no {
+    color: #43d17a;
+    border-color: rgba(25, 135, 84, 0.28);
+    background: rgba(25, 135, 84, 0.12);
+}
+
+.ifreeicloud-row--yes .ifreeicloud-value,
+.ifreeicloud-row--no .ifreeicloud-value {
+    font-weight: 800;
+}
+
 .navbar {
     background: rgba(10, 15, 20, 0.6) !important;
     backdrop-filter: blur(10px);

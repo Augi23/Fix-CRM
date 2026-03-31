@@ -265,6 +265,39 @@ function ifreeicloudSummary(?array $object = null): string {
     return implode("\n", $rows);
 }
 
+function ifreeicloudImageUrlFromText(string $text): string {
+    if ($text === '') return '';
+
+    if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $text, $matches)) {
+        return html_entity_decode(trim($matches[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    if (preg_match('/https?:\/\/[^\s"\'<>]+\.(?:png|jpe?g|gif|webp)(?:\?[^\s"\'<>]*)?/i', $text, $matches)) {
+        return html_entity_decode(trim($matches[0]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    return '';
+}
+
+function extractIfreeicloudImageUrl(array $data): string {
+    foreach (['image_url', 'imageUrl', 'image', 'photo', 'picture', 'thumbnail'] as $key) {
+        if (isset($data[$key]) && is_string($data[$key]) && trim($data[$key]) !== '') {
+            return trim($data[$key]);
+        }
+    }
+
+    foreach (['response', 'message'] as $key) {
+        if (isset($data[$key]) && is_string($data[$key])) {
+            $url = ifreeicloudImageUrlFromText($data[$key]);
+            if ($url !== '') {
+                return $url;
+            }
+        }
+    }
+
+    return '';
+}
+
 if (!isset($_SESSION['user_id'])) {
     echo json_encode([
         'success' => false,
@@ -360,6 +393,7 @@ try {
             $ifreeicloud['response'] = $normalized['response'];
             $ifreeicloud['object'] = $normalized['object'];
             $ifreeicloud['summary'] = ifreeicloudSummary($normalized['object']);
+            $ifreeicloud['image_url'] = extractIfreeicloudImageUrl($normalized);
             $ifreeicloud['raw'] = $ifreeicloudResponse['json'];
         } else {
             $ifreeicloud['message'] = $ifreeicloudResponse['error'] ?: 'Ověření přes iFreeiCloud selhalo.';
@@ -397,6 +431,7 @@ try {
             'status' => 'unknown',
             'message' => 'iFreeiCloud kontrola nebyla provedena.',
             'service_id' => $ifreeicloudService,
+            'image_url' => '',
         ],
     ], JSON_UNESCAPED_UNICODE);
 } finally {
