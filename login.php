@@ -107,6 +107,17 @@ if (isset($_SESSION['user_id'])) {
     header("Location: index.php");
     exit;
 }
+
+$loginQuips = [
+    'Baterka v iPhonu, co drží. MacBook, co zase chladí. Servis, co neotravuje.',
+    'Když Apple zavolá o pomoc, jsme první na lince.',
+    'Šroubky, displeje a čistý macOS — přesně naše parketa.',
+    'Rychlá oprava. Čistý stůl. Jablečný klid.',
+    'Od iPhonu po MacBook: oprava s hlavou, ne s chaosem.',
+    'Jablečný servis bez hluku, jen s výsledkem.',
+    'Když praskne displej, přichází klid z AppleFix.',
+];
+$loginQuip = $loginQuips[array_rand($loginQuips)];
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo e($_SESSION['lang'] ?? 'ru'); ?>" data-bs-theme="dark">
@@ -136,6 +147,11 @@ if (isset($_SESSION['user_id'])) {
                 Minimalistické přihlášení do moderního servisního systému — rychlejší práce,
                 přehlednější provoz a lepší fokus.
             </p>
+
+            <div class="login-quip">
+                <i class="fas fa-screwdriver-wrench"></i>
+                <span><?php echo e($loginQuip); ?></span>
+            </div>
 
             <div class="login-points">
                 <div class="login-point">
