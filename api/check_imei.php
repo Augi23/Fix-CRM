@@ -165,10 +165,9 @@ function ifreeicloudRequest(array $payload): array {
         ];
     }
 
-    $ch = curl_init('https://api.ifreeicloud.co.uk');
+    $url = 'https://api.ifreeicloud.co.uk?' . http_build_query($payload);
+    $ch = curl_init($url);
     curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $payload,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CONNECTTIMEOUT => 60,
         CURLOPT_TIMEOUT => 60,
