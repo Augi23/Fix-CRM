@@ -863,7 +863,6 @@ $(document).ready(function() {
             ['technicalSupport', 'Technical support'],
             ['repairCoverage', 'Repairs/service coverage'],
             ['replaced', 'Replaced by Apple'],
-            ['lostMode', 'Lost mode'],
             ['usaBlockStatus', 'US block status'],
             ['simLock', 'SIM lock'],
             ['isAppleDevice', 'Apple device'],
@@ -891,6 +890,13 @@ $(document).ready(function() {
                 const normalized = normalizeYesNo(findMySource);
                 const stateClass = normalized.state === 'yes' ? 'ifreeicloud-row--yes' : 'ifreeicloud-row--no';
                 rows.push(`<div class="ifreeicloud-row ifreeicloud-row--findmy ${stateClass}"><span>Find My iPhone</span><span class="ifreeicloud-value">${escapeHtml(normalized.text)}</span></div>`);
+            }
+
+            const lostModeSource = firstDefined(object, ['lostMode', 'lost_mode', 'lostmode']);
+            if (lostModeSource !== undefined) {
+                const normalized = normalizeYesNo(lostModeSource);
+                const stateClass = normalized.state === 'yes' ? 'ifreeicloud-row--yes' : 'ifreeicloud-row--no';
+                rows.push(`<div class="ifreeicloud-row ifreeicloud-row--lostmode ${stateClass}"><span>Lost mode</span><span class="ifreeicloud-value">${escapeHtml(normalized.text)}</span></div>`);
             }
 
             detailsHtml = rows.length ? `<div class="ifreeicloud-details">${rows.join('')}</div>` : '';

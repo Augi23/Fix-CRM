@@ -163,7 +163,8 @@ body.modal-open {
     font-weight: 700;
 }
 
-.ifreeicloud-row--findmy {
+.ifreeicloud-row--findmy,
+.ifreeicloud-row--lostmode {
     font-weight: 800;
 }
 
