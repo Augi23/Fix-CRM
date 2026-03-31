@@ -74,16 +74,16 @@ body::after {
 
 .login-brandline {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    align-items: flex-start;
+    justify-content: flex-start;
     margin-bottom: 18px;
 }
 
 .login-hero-logo {
-    width: 44px;
-    height: 44px;
+    width: min(100%, 280px);
+    height: auto;
     object-fit: contain;
-    object-position: center;
+    object-position: left center;
     flex: 0 0 auto;
     border-radius: 0;
     box-shadow: none;
@@ -291,8 +291,8 @@ body::after {
     }
 
     .login-hero-logo {
-        width: 40px;
-        height: 40px;
+        width: min(100%, 220px);
+        height: auto;
     }
 
     .login-copy {
