@@ -272,14 +272,6 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <div class="form-text text-white-75">CRM prověří databázi Policie ČR bez odchodu z aplikace. iFreeiCloud dostane plný 15místný IMEI, pokud zadáš jen 14 číslic, dopočítá se kontrolní číslice.</div>
                 </form>
                 <div id="imeiCheckResult" class="imei-check-result mt-3" aria-live="polite"></div>
-                <div class="d-grid gap-2 mt-3">
-                    <a href="vykup-zarizeni.php" target="_blank" rel="noopener" class="btn btn-outline-light">
-                        <i class="fas fa-file-signature me-2"></i> Výkupní list / Kupní smlouva
-                    </a>
-                    <a href="zastava.php" target="_blank" rel="noopener" class="btn btn-outline-light">
-                        <i class="fas fa-file-contract me-2"></i> Formulář zástavy
-                    </a>
-                </div>
             </div>
         </div>
 
@@ -294,6 +286,12 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <a href="customers.php" class="btn btn-outline-secondary"><i class="fas fa-user-plus me-2"></i> <?php echo __('customers'); ?></a>
                     <a href="inventory.php" class="btn btn-outline-info"><i class="fas fa-search me-2"></i> <?php echo __('check_stock'); ?></a>
                     <?php endif; ?>
+                    <a href="vykup-zarizeni.php" target="_blank" rel="noopener" class="btn btn-outline-light mt-2">
+                        <i class="fas fa-file-signature me-2"></i> Výkupní list / Kupní smlouva
+                    </a>
+                    <a href="zastava.php" target="_blank" rel="noopener" class="btn btn-outline-light">
+                        <i class="fas fa-file-contract me-2"></i> Formulář zástavy
+                    </a>
                 </div>
             </div>
         </div>
