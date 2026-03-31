@@ -1,5 +1,12 @@
 <?php
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/../klient/includes/auth.php';
+
+// Keep client users inside the client portal
+if (clientIsLoggedIn()) {
+    header('Location: klient/dashboard.php');
+    exit;
+}
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php') {
