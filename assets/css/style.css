@@ -532,3 +532,148 @@ body.modal-open {
     color: #6edff6 !important;
     box-shadow: 0 0 8px rgba(13, 202, 240, 0.4);
 }
+
+/* ------------------------------------------------------------------
+   Modern dashboard surface overhaul
+   ------------------------------------------------------------------ */
+#content {
+    padding: 28px;
+}
+
+.navbar {
+    max-width: calc(100% - 8px);
+    margin: 0 auto 24px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(30, 34, 86, 0.88), rgba(18, 21, 58, 0.84)) !important;
+    border: 1px solid rgba(151, 162, 255, 0.14);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 18px 44px rgba(3, 6, 24, 0.30);
+}
+
+.card,
+.glass-card,
+.glass-panel,
+.modal-content,
+.dropdown-menu,
+.qr-popover,
+.offcanvas,
+.toast,
+.alert,
+.list-group,
+.table-responsive {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(153, 164, 255, 0.12);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.018)),
+        linear-gradient(135deg, rgba(34, 38, 92, 0.88), rgba(18, 20, 54, 0.92));
+    backdrop-filter: blur(22px) saturate(145%);
+    -webkit-backdrop-filter: blur(22px) saturate(145%);
+    border-radius: 28px;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.02),
+        0 20px 48px rgba(4, 8, 28, 0.32);
+}
+
+.card::before,
+.glass-card::before,
+.glass-panel::before,
+.modal-content::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.12) 0%, transparent 26%),
+        radial-gradient(circle at 85% 88%, rgba(111, 123, 255, 0.10) 0%, transparent 26%);
+    opacity: 0.9;
+}
+
+.card-header,
+.card-footer,
+.modal-header,
+.modal-footer {
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.025) !important;
+    border-color: rgba(151, 162, 255, 0.10) !important;
+}
+
+.card-body,
+.table-responsive > table,
+.modal-body {
+    position: relative;
+    z-index: 1;
+}
+
+.table-responsive {
+    padding: 8px 10px;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.table thead th {
+    background: transparent;
+    color: #98a4da;
+    border-bottom: 1px solid rgba(151, 162, 255, 0.10);
+}
+
+.table tbody tr > td {
+    background: transparent;
+}
+
+.btn,
+.btn-primary,
+.btn-outline-primary,
+.btn-outline-secondary,
+.btn-outline-light,
+.btn-secondary {
+    border-radius: 999px;
+    border-color: rgba(151, 162, 255, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #6c79ff, #4e5cff) !important;
+    border-color: rgba(126, 138, 255, 0.42) !important;
+}
+
+.btn-outline-primary,
+.btn-outline-secondary,
+.btn-outline-light {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.form-control,
+.form-select,
+.input-group-text,
+.select2-container--default .select2-selection--single,
+.select2-container--default .select2-selection--multiple {
+    min-height: 46px;
+    background: rgba(255, 255, 255, 0.025) !important;
+    border: 1px solid rgba(151, 162, 255, 0.12) !important;
+    border-radius: 16px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.badge {
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(151, 162, 255, 0.14);
+}
+
+.row > [class*='col-'] > .card,
+.row > [class*='col-'] > .glass-card,
+.row > [class*='col-'] > .glass-panel {
+    height: 100%;
+}
+
+.order-row--company > td,
+.order-row--high > td {
+    backdrop-filter: blur(10px);
+}
+
