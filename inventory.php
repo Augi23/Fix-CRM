@@ -162,7 +162,7 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                                 <?php foreach ($inventory as $item): ?>
                                 <tr>
                                     <td class="ps-4">
-                                        <?php if(!empty($item['image_path'])): ?>
+                                        <?php if(!empty($item['image_path'] ?? '')): ?>
                                             <a href="<?php echo $item['image_path']; ?>" data-fancybox="inventory">
                                                 <img src="<?php echo $item['image_path']; ?>" class="rounded shadow-sm" style="width: 40px; height: 40px; object-fit: cover;">
                                             </a>

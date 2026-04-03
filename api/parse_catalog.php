@@ -101,6 +101,28 @@ function getCatalogOrigin(string $url): string {
     return $origin;
 }
 
+function inventoryHasImagePathColumn(): bool {
+    static $hasColumn = null;
+
+    if ($hasColumn !== null) {
+        return $hasColumn;
+    }
+
+    global $pdo;
+
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventory' AND COLUMN_NAME = 'image_path'"
+        );
+        $stmt->execute();
+        $hasColumn = ((int)$stmt->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        $hasColumn = false;
+    }
+
+    return $hasColumn;
+}
+
 function normalizePath(string $path): string {
     $segments = [];
     foreach (explode('/', $path) as $segment) {
@@ -258,12 +280,18 @@ function parseMoneyValue(string $rawValue): float {
 function upsertInventoryItem(string $name, string $sku, float $price, string $imageUrl): string {
     global $pdo;
 
+    $hasImagePath = inventoryHasImagePathColumn();
+    $imageSelect = $hasImagePath ? ', image_path' : '';
+    $imageSet = $hasImagePath ? ', image_path = ?' : '';
+    $imageInsertColumn = $hasImagePath ? ', image_path' : '';
+    $imageInsertValue = $hasImagePath ? ', ?' : '';
+
     $lookupBySku = $sku !== '';
     if ($lookupBySku) {
-        $stmt = $pdo->prepare("SELECT id, sale_price, image_path FROM inventory WHERE sku = ? LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id, sale_price{$imageSelect} FROM inventory WHERE sku = ? LIMIT 1");
         $stmt->execute([$sku]);
     } else {
-        $stmt = $pdo->prepare("SELECT id, sale_price, image_path FROM inventory WHERE part_name = ? AND (sku IS NULL OR sku = '') LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id, sale_price{$imageSelect} FROM inventory WHERE part_name = ? AND (sku IS NULL OR sku = '') LIMIT 1");
         $stmt->execute([$name]);
     }
 
@@ -271,14 +299,22 @@ function upsertInventoryItem(string $name, string $sku, float $price, string $im
 
     if ($existing) {
         $newPrice = $price > 0 ? $price : (float)$existing['sale_price'];
-        $newImageUrl = $imageUrl !== '' ? $imageUrl : (string)($existing['image_path'] ?? '');
-        $update = $pdo->prepare("UPDATE inventory SET sale_price = ?, image_path = ? WHERE id = ?");
-        $update->execute([$newPrice, $newImageUrl, $existing['id']]);
+        $params = [$newPrice];
+        if ($hasImagePath) {
+            $params[] = $imageUrl !== '' ? $imageUrl : (string)($existing['image_path'] ?? '');
+        }
+        $params[] = $existing['id'];
+        $update = $pdo->prepare("UPDATE inventory SET sale_price = ?{$imageSet} WHERE id = ?");
+        $update->execute($params);
         return 'updated';
     }
 
-    $insert = $pdo->prepare("INSERT INTO inventory (part_name, sku, sale_price, cost_price, quantity, min_stock, image_path) VALUES (?, ?, ?, ?, 0, 5, ?)");
-    $insert->execute([$name, $lookupBySku ? $sku : null, $price, $price > 0 ? $price * 0.7 : 0, $imageUrl]);
+    $params = [$name, $lookupBySku ? $sku : null, $price, $price > 0 ? $price * 0.7 : 0];
+    if ($hasImagePath) {
+        $params[] = $imageUrl;
+    }
+    $insert = $pdo->prepare("INSERT INTO inventory (part_name, sku, sale_price, cost_price, quantity, min_stock{$imageInsertColumn}) VALUES (?, ?, ?, ?, 0, 5{$imageInsertValue})");
+    $insert->execute($params);
     return 'added';
 }
 
