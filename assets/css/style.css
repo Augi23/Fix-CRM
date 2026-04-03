@@ -141,11 +141,11 @@ body.modal-open {
 .glass-card, .glass-panel {
     border: 1px solid var(--glass-border-strong);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
-        var(--glass-bg);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)),
+        rgba(13, 28, 20, 0.62);
     box-shadow:
-        0 18px 42px rgba(0, 0, 0, 0.22),
-        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        0 18px 42px rgba(0, 0, 0, 0.20),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
     border-radius: 14px;
     color: #e2e8f0;
 }
@@ -345,10 +345,10 @@ body.modal-open {
 .table-responsive {
     border: 1px solid var(--glass-border-strong);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-        rgba(12, 24, 18, 0.94);
-    backdrop-filter: blur(22px) saturate(135%);
-    -webkit-backdrop-filter: blur(22px) saturate(135%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+        rgba(12, 24, 18, 0.72);
+    backdrop-filter: blur(18px) saturate(125%);
+    -webkit-backdrop-filter: blur(18px) saturate(125%);
     box-shadow: var(--surface-shadow);
     border-radius: 14px;
 }
@@ -567,17 +567,17 @@ body.modal-open {
 .table-responsive {
     position: relative;
     overflow: hidden;
-    border: 1px solid rgba(149, 232, 153, 0.11);
+    border: 1px solid rgba(149, 232, 153, 0.09);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.02)),
-        linear-gradient(135deg, rgba(16, 40, 23, 0.78), rgba(9, 18, 12, 0.82));
-    backdrop-filter: blur(26px) saturate(135%);
-    -webkit-backdrop-filter: blur(26px) saturate(135%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.008)),
+        linear-gradient(135deg, rgba(16, 40, 23, 0.52), rgba(9, 18, 12, 0.58));
+    backdrop-filter: blur(18px) saturate(125%);
+    -webkit-backdrop-filter: blur(18px) saturate(125%);
     border-radius: 18px;
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.07),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.02),
-        0 20px 48px rgba(2, 12, 6, 0.34);
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.015),
+        0 20px 48px rgba(2, 12, 6, 0.28);
 }
 
 .card::before,
@@ -589,9 +589,9 @@ body.modal-open {
     inset: 0;
     pointer-events: none;
     background:
-        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.12) 0%, transparent 26%),
-        radial-gradient(circle at 85% 88%, rgba(115, 214, 120, 0.08) 0%, transparent 26%);
-    opacity: 0.9;
+        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.06) 0%, transparent 24%),
+        radial-gradient(circle at 85% 88%, rgba(115, 214, 120, 0.04) 0%, transparent 24%);
+    opacity: 0.7;
 }
 
 .card-header,
