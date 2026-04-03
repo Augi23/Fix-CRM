@@ -281,6 +281,37 @@ function collectCategoryUrls(DOMXPath $xpath, string $currentUrl, string $origin
     return $categoryUrls;
 }
 
+function collectPaginationUrls(DOMXPath $xpath, string $currentUrl, string $origin): array {
+    $nodes = $xpath->query("//*[@data-target-url]");
+    $pageUrls = [];
+    $originHost = (string)parse_url($origin, PHP_URL_HOST);
+
+    foreach ($nodes as $node) {
+        if (!$node instanceof DOMElement) {
+            continue;
+        }
+
+        $targetUrl = trim($node->getAttribute('data-target-url'));
+        if ($targetUrl === '') {
+            continue;
+        }
+
+        $resolvedUrl = resolveCatalogUrl($origin, $currentUrl, $targetUrl);
+        if ($resolvedUrl === '') {
+            continue;
+        }
+
+        $host = (string)parse_url($resolvedUrl, PHP_URL_HOST);
+        if ($host === '' || strcasecmp($host, $originHost) !== 0) {
+            continue;
+        }
+
+        $pageUrls[$resolvedUrl] = trim((string)$node->textContent);
+    }
+
+    return $pageUrls;
+}
+
 function queryFirstValue(DOMXPath $xpath, DOMNode $contextNode, array $queries): string {
     foreach ($queries as $query) {
         $node = $xpath->query($query, $contextNode)->item(0);
@@ -458,11 +489,19 @@ try {
     $addedCount = 0;
     $updatedCount = 0;
     $processedPages = [];
-    $maxPages = 120;
-    $maxProducts = 1500;
+    $queuedPages = [];
+    $maxPages = 200;
+    $maxProducts = 5000;
     $scannedProducts = 0;
 
-    foreach (array_keys($categoryUrls) as $pageUrl) {
+    foreach (array_keys($categoryUrls) as $seedPageUrl) {
+        $queuedPages[$seedPageUrl] = true;
+    }
+
+    while (!empty($queuedPages)) {
+        $pageUrl = array_key_first($queuedPages);
+        unset($queuedPages[$pageUrl]);
+
         if (isset($processedPages[$pageUrl])) {
             continue;
         }
@@ -480,6 +519,16 @@ try {
         $pageXPath = createXPathFromHtml($pageHtml);
         if (!$pageXPath instanceof DOMXPath) {
             continue;
+        }
+
+        $discoveredPages = array_merge(
+            collectCategoryUrls($pageXPath, $pageUrl, $origin),
+            collectPaginationUrls($pageXPath, $pageUrl, $origin)
+        );
+        foreach (array_keys($discoveredPages) as $discoveredPageUrl) {
+            if (!isset($processedPages[$discoveredPageUrl])) {
+                $queuedPages[$discoveredPageUrl] = true;
+            }
         }
 
         $products = $pageXPath->query(
