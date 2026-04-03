@@ -221,7 +221,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
                                 $has_media = isset($has_media_ids[$r['id']]);
                             ?>
-                            <tr class="clickable-order-row<?php echo $r['priority'] == 'High' ? ' table-danger' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
+                            <tr class="clickable-order-row<?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
                                 <td>
                                     <a href="view_order.php?id=<?php echo $r['id']; ?>" class="fw-bold text-decoration-none">#<?php echo $r['id']; ?></a>
                                     <?php if($has_media): ?>
