@@ -214,8 +214,6 @@ function resolveCatalogUrl(string $origin, string $currentUrl, string $candidate
 }
 
 function fetchHtml(string $url): string {
-    sleep(1);
-
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -416,8 +414,8 @@ try {
     $addedCount = 0;
     $updatedCount = 0;
     $processedPages = [];
-    $maxPages = 25;
-    $maxProducts = 300;
+    $maxPages = 120;
+    $maxProducts = 1500;
     $scannedProducts = 0;
 
     foreach (array_keys($categoryUrls) as $pageUrl) {
