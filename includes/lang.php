@@ -1186,7 +1186,7 @@ $lang_data = [
         // Statuses
         'new' => 'Nová',
         'pending_approval' => 'Čeká na schválení',
-        'in_progress' => 'V řešení',
+        'in_progress' => 'Provádí se',
         'waiting_parts' => 'Čeká na díly',
         'status_completed' => 'Hotovo',
         'status_collected' => 'Vydáno',
