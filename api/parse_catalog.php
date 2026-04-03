@@ -123,6 +123,22 @@ function inventoryHasImagePathColumn(): bool {
     return $hasColumn;
 }
 
+function ensureInventoryImagePathColumn(): bool {
+    global $pdo;
+
+    if (inventoryHasImagePathColumn()) {
+        return true;
+    }
+
+    try {
+        $pdo->exec("ALTER TABLE `inventory` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL AFTER `min_stock`");
+        return inventoryHasImagePathColumn();
+    } catch (Throwable $e) {
+        log_error('Catalog import schema upgrade failed', 'inventory_import', $e->getMessage());
+        return false;
+    }
+}
+
 function normalizePath(string $path): string {
     $segments = [];
     foreach (explode('/', $path) as $segment) {
@@ -280,7 +296,7 @@ function parseMoneyValue(string $rawValue): float {
 function upsertInventoryItem(string $name, string $sku, float $price, string $imageUrl): string {
     global $pdo;
 
-    $hasImagePath = inventoryHasImagePathColumn();
+    $hasImagePath = ensureInventoryImagePathColumn();
     $imageSelect = $hasImagePath ? ', image_path' : '';
     $imageSet = $hasImagePath ? ', image_path = ?' : '';
     $imageInsertColumn = $hasImagePath ? ', image_path' : '';
