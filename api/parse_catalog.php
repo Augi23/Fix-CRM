@@ -123,20 +123,26 @@ function inventoryHasImagePathColumn(): bool {
     return $hasColumn;
 }
 
-function ensureInventoryImagePathColumn(): bool {
+function ensureInventoryCatalogSchema(): bool {
     global $pdo;
 
-    if (inventoryHasImagePathColumn()) {
-        return true;
-    }
-
     try {
-        $pdo->exec("ALTER TABLE `inventory` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL AFTER `min_stock`");
-        return inventoryHasImagePathColumn();
+        $pdo->exec("ALTER TABLE `inventory` MODIFY COLUMN `part_name` VARCHAR(255) NOT NULL");
     } catch (Throwable $e) {
-        log_error('Catalog import schema upgrade failed', 'inventory_import', $e->getMessage());
+        log_error('Catalog import schema upgrade failed', 'inventory_import', 'part_name: ' . $e->getMessage());
         return false;
     }
+
+    if (!inventoryHasImagePathColumn()) {
+        try {
+            $pdo->exec("ALTER TABLE `inventory` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL AFTER `min_stock`");
+        } catch (Throwable $e) {
+            log_error('Catalog import schema upgrade failed', 'inventory_import', 'image_path: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    return true;
 }
 
 function normalizePath(string $path): string {
@@ -153,6 +159,26 @@ function normalizePath(string $path): string {
     }
 
     return '/' . implode('/', $segments);
+}
+
+function extractFirstSrcsetUrl(string $srcset): string {
+    $srcset = trim($srcset);
+    if ($srcset === '') {
+        return '';
+    }
+
+    $parts = preg_split('/\s*,\s*/', $srcset);
+    if (!is_array($parts) || empty($parts)) {
+        return '';
+    }
+
+    $first = trim((string)$parts[0]);
+    if ($first === '') {
+        return '';
+    }
+
+    $spacePos = strpos($first, ' ');
+    return $spacePos === false ? $first : trim(substr($first, 0, $spacePos));
 }
 
 function resolveCatalogUrl(string $origin, string $currentUrl, string $candidate): string {
@@ -293,10 +319,31 @@ function parseMoneyValue(string $rawValue): float {
     return (float)$value;
 }
 
+function normalizeInventoryText(string $value, int $maxLength): string {
+    $value = trim(preg_replace('/\s+/u', ' ', html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
+    if ($value === '') {
+        return '';
+    }
+
+    if (function_exists('mb_substr')) {
+        return mb_substr($value, 0, $maxLength, 'UTF-8');
+    }
+
+    return substr($value, 0, $maxLength);
+}
+
 function upsertInventoryItem(string $name, string $sku, float $price, string $imageUrl): string {
     global $pdo;
 
-    $hasImagePath = ensureInventoryImagePathColumn();
+    $name = normalizeInventoryText($name, 255);
+    $sku = normalizeInventoryText($sku, 50);
+    $imageUrl = normalizeInventoryText($imageUrl, 255);
+
+    if ($name === '') {
+        return 'skipped';
+    }
+
+    $hasImagePath = inventoryHasImagePathColumn();
     $imageSelect = $hasImagePath ? ', image_path' : '';
     $imageSet = $hasImagePath ? ', image_path = ?' : '';
     $imageInsertColumn = $hasImagePath ? ', image_path' : '';
@@ -342,6 +389,10 @@ if (!isPublicCatalogUrl($catalogUrl)) {
 $origin = getCatalogOrigin($catalogUrl);
 if ($origin === '') {
     redirectCatalogError('invalid_url', 'Nepodařilo se určit origin katalogu.');
+}
+
+if (!ensureInventoryCatalogSchema()) {
+    redirectCatalogError('processing_failed', 'Nepodařilo se připravit databázové sloupce pro katalog.');
 }
 
 set_setting('inventory_catalog_url', $catalogUrl);
@@ -422,18 +473,27 @@ try {
             $imageUrl = queryFirstValue($pageXPath, $product, [
                 ".//img/@data-micro-image",
                 ".//img/@data-src",
+                ".//img/@data-lazy-src",
+                ".//img/@data-original",
+                ".//img/@data-srcset",
+                ".//img/@srcset",
                 ".//img/@src",
+                ".//source/@data-srcset",
+                ".//source/@srcset",
             ]);
             if (strpos($imageUrl, 'data:image') === 0) {
                 $imageUrl = '';
-            } elseif ($imageUrl !== '') {
+            } elseif (str_contains($imageUrl, ',') || str_contains($imageUrl, ' ')) {
+                $imageUrl = extractFirstSrcsetUrl($imageUrl);
+            }
+            if ($imageUrl !== '') {
                 $imageUrl = resolveCatalogUrl($origin, $pageUrl, $imageUrl);
             }
 
             $result = upsertInventoryItem($name, $sku, $price, $imageUrl);
             if ($result === 'added') {
                 $addedCount++;
-            } else {
+            } elseif ($result === 'updated') {
                 $updatedCount++;
             }
 
