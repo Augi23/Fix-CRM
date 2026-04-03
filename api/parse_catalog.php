@@ -339,11 +339,12 @@ function extractAvailabilityInfo(DOMXPath $xpath, DOMNode $contextNode): array {
     $availability = queryFirstValue($xpath, $contextNode, [
         ".//*[@data-micro='availability']",
         ".//*[@itemprop='availability']",
-        ".//*[contains(@class, 'availability')]",
-        ".//*[contains(@class, 'availability-info')]",
-        ".//*[contains(@class, 'stock')]",
-        ".//*[contains(@class, 'available')]",
-        ".//*[contains(@class, 'availability-label')]",
+        ".//*[contains(concat(' ', normalize-space(@class), ' '), ' stock-info ')]",
+        ".//*[contains(concat(' ', normalize-space(@class), ' '), ' availability ')]",
+        ".//*[contains(concat(' ', normalize-space(@class), ' '), ' availability-info ')]",
+        ".//*[contains(concat(' ', normalize-space(@class), ' '), ' stock ')]",
+        ".//*[contains(concat(' ', normalize-space(@class), ' '), ' available ')]",
+        ".//*[contains(concat(' ', normalize-space(@class), ' '), ' availability-label ')]",
     ]);
 
     if ($availability === '') {
@@ -481,7 +482,13 @@ try {
             continue;
         }
 
-        $products = $pageXPath->query("//div[contains(@class, 'product') and (.//*[@data-micro='name'] or .//span[@data-micro='name'])]");
+        $products = $pageXPath->query(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), ' product-card ')] |
+             //div[contains(concat(' ', normalize-space(@class), ' '), ' product ')] |
+             //article[contains(concat(' ', normalize-space(@class), ' '), ' product ')] |
+             //*[@data-testid='productItem'] |
+             //*[@data-micro='product']"
+        );
         if (!$products || $products->length === 0) {
             continue;
         }
@@ -491,8 +498,12 @@ try {
 
             $name = queryFirstValue($pageXPath, $product, [
                 ".//span[@data-micro='name']",
-                ".//*[contains(@class, 'product-name')]//a",
-                ".//*[contains(@class, 'name')]//a",
+                ".//img/@alt",
+                ".//a[@title]/@title",
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' product-name ')]//a",
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' name ')]//a",
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' line-clamp-3 ')]",
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' font-bold ')]",
             ]);
             if ($name === '') {
                 continue;
@@ -500,15 +511,29 @@ try {
 
             $sku = queryFirstValue($pageXPath, $product, [
                 ".//span[@data-micro='sku']",
-                ".//*[contains(@class, 'sku')]",
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' sku ')]",
             ]);
+            if ($sku === '') {
+                $productText = trim(preg_replace('/\s+/u', ' ', html_entity_decode($product->textContent ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
+                if (preg_match('/(?:^|\b)Kód:\s*([^\n\r]+)/iu', $productText, $match)) {
+                    $sku = trim((string)$match[1]);
+                }
+            }
 
             $priceRaw = queryFirstValue($pageXPath, $product, [
                 ".//div[@data-micro='offer']/@data-micro-price",
                 ".//*[@data-micro='price']/@content",
                 ".//*[@itemprop='price']/@content",
-                ".//*[contains(@class, 'price-final')]",
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' price-final ')]",
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' product-card-list__price ')]//*[contains(concat(' ', normalize-space(@class), ' '), ' font-bold ')]",
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' font-bold ')]",
             ]);
+            if ($priceRaw === '') {
+                $productText = trim(preg_replace('/\s+/u', ' ', html_entity_decode($product->textContent ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
+                if (preg_match('/(\d[\d\s]*[.,]?\d*)\s*Kč/iu', $productText, $match)) {
+                    $priceRaw = trim((string)$match[1]);
+                }
+            }
             $price = parseMoneyValue($priceRaw);
 
             $imageUrl = queryFirstValue($pageXPath, $product, [
@@ -531,9 +556,17 @@ try {
                 $imageUrl = resolveCatalogUrl($origin, $pageUrl, $imageUrl);
             }
 
+            $productUrl = queryFirstValue($pageXPath, $product, [
+                ".//a[@data-instant]/@href",
+                ".//a[@href]/@href",
+            ]);
+            if ($productUrl !== '') {
+                $productUrl = resolveCatalogUrl($origin, $pageUrl, $productUrl);
+            }
+
             [$supplierAvailability, $supplierStockQty] = extractAvailabilityInfo($pageXPath, $product);
 
-            $result = upsertInventoryItem($name, $sku, $price, $imageUrl, $catalogSupplierKey, $catalogUrl, $supplierAvailability, $supplierStockQty);
+            $result = upsertInventoryItem($name, $sku, $price, $imageUrl, $catalogSupplierKey, $productUrl !== '' ? $productUrl : $catalogUrl, $supplierAvailability, $supplierStockQty);
             if ($result === 'added') {
                 $addedCount++;
             } elseif ($result === 'updated') {
