@@ -191,7 +191,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                             }
 
                             $search_id = ($search && is_numeric($search)) ? (int)$search : 0;
-                            $sql = "SELECT o.*, c.first_name, c.last_name, c.phone, t.name as tech_name 
+                            $sql = "SELECT o.*, c.first_name, c.last_name, c.phone, c.company, c.customer_type, t.name as tech_name 
                                     FROM orders o 
                                     JOIN customers c ON o.customer_id = c.id 
                                     LEFT JOIN technicians t ON o.technician_id = t.id" . 
@@ -221,7 +221,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
                                 $has_media = isset($has_media_ids[$r['id']]);
                             ?>
-                            <tr class="clickable-order-row<?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
+                            <tr class="clickable-order-row<?php echo !empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''; ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
                                 <td>
                                     <a href="view_order.php?id=<?php echo $r['id']; ?>" class="fw-bold text-decoration-none">#<?php echo $r['id']; ?></a>
                                     <?php if($has_media): ?>
