@@ -283,6 +283,71 @@ function ensureProcurementSchema(): bool {
     return true;
 }
 
+function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $quantity, string $notes = ''): bool {
+    global $pdo;
+
+    if ($orderId <= 0 || $inventoryId <= 0 || $quantity <= 0) {
+        return false;
+    }
+
+    ensureProcurementSchema();
+
+    $stmt = $pdo->prepare("SELECT i.id, i.part_name, i.sku, i.source_supplier, i.source_url FROM inventory i WHERE i.id = ? LIMIT 1");
+    $stmt->execute([$inventoryId]);
+    $inventory = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$inventory) {
+        return false;
+    }
+
+    $supplierKey = trim((string)($inventory['source_supplier'] ?? ''));
+    if ($supplierKey === '') {
+        $supplierKey = supplierKeyFromUrl((string)($inventory['source_url'] ?? ''));
+    }
+    if ($supplierKey === '') {
+        $catalogUrl = trim((string)get_setting('inventory_catalog_url', ''));
+        $supplierKey = supplierKeyFromUrl($catalogUrl);
+    }
+    if ($supplierKey === '') {
+        $suppliers = array_keys(getSupplierCatalogs());
+        $supplierKey = $suppliers[0] ?? '';
+    }
+    if ($supplierKey === '') {
+        return false;
+    }
+
+    $itemName = trim((string)($inventory['part_name'] ?? ''));
+    if ($itemName === '') {
+        return false;
+    }
+
+    $sku = trim((string)($inventory['sku'] ?? ''));
+    $requestedBy = $_SESSION['user_id'] ?? ($_SESSION['tech_id'] ?? null);
+
+    $stmt = $pdo->prepare("SELECT id, quantity FROM purchase_requests WHERE order_id = ? AND inventory_id = ? AND status = 'pending' LIMIT 1");
+    $stmt->execute([$orderId, $inventoryId]);
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($existing) {
+        $upd = $pdo->prepare("UPDATE purchase_requests SET quantity = quantity + ?, notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes END WHERE id = ?");
+        $upd->execute([$quantity, $notes !== '' ? $notes : null, $existing['id']]);
+        return true;
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO purchase_requests (order_id, supplier_key, inventory_id, item_name, sku, quantity, priority, status, notes, requested_by) VALUES (?, ?, ?, ?, ?, ?, 'this_week', 'pending', ?, ?)");
+    $stmt->execute([
+        $orderId,
+        $supplierKey,
+        $inventoryId,
+        $itemName,
+        $sku !== '' ? $sku : null,
+        $quantity,
+        $notes !== '' ? $notes : null,
+        $requestedBy,
+    ]);
+
+    return true;
+}
+
 /**
  * Log System Error
  */

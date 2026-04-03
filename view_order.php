@@ -807,9 +807,15 @@ $(document).ready(function() {
 
     $('#addPartForm').on('submit', function(e) {
         e.preventDefault();
-        $.post('api/add_order_item.php', $(this).serialize(), function(res) {
+        const $form = $(this);
+        $.post('api/add_order_item.php', $form.serialize(), function(res) {
             if(res.success) {
-                location.reload();
+                if (res.message) {
+                    showAlert(res.message);
+                }
+                setTimeout(function() {
+                    location.reload();
+                }, res.auto_procurement_queued ? 900 : 200);
             } else {
                 showAlert('<?php echo __('error'); ?>: ' + res.message);
             }
