@@ -4,7 +4,7 @@ require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
 // Pagination and Filters
-$limit = 20;
+$limit = 50;
 $page = isset($_GET['p']) && is_numeric($_GET['p']) ? (int)$_GET['p'] : 1;
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
