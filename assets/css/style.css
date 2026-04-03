@@ -1,21 +1,21 @@
 :root {
     --sidebar-width: 250px;
-    --primary-color: #58c26b;
-    --primary-color-soft: rgba(88, 194, 107, 0.18);
-    --glass-bg: rgba(13, 28, 20, 0.84);
-    --glass-bg-strong: rgba(12, 24, 18, 0.92);
-    --glass-border: rgba(119, 214, 124, 0.12);
-    --glass-border-strong: rgba(149, 232, 153, 0.18);
+    --primary-color: #d0d5dd;
+    --primary-color-soft: rgba(208, 213, 221, 0.18);
+    --glass-bg: rgba(22, 24, 28, 0.84);
+    --glass-bg-strong: rgba(16, 18, 22, 0.92);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-border-strong: rgba(255, 255, 255, 0.16);
     --surface-elevated: rgba(255, 255, 255, 0.03);
-    --surface-shadow: 0 24px 60px rgba(2, 10, 6, 0.42);
-    --surface-shadow-soft: 0 14px 30px rgba(4, 12, 8, 0.30);
+    --surface-shadow: 0 24px 60px rgba(0, 0, 0, 0.40);
+    --surface-shadow-soft: 0 14px 30px rgba(0, 0, 0, 0.28);
 }
 body {
-    background-color: #051109;
+    background-color: #0b0c0f;
     background-image:
-        radial-gradient(circle at 18% 18%, rgba(103, 210, 96, 0.12) 0%, transparent 22%),
-        radial-gradient(circle at 80% 18%, rgba(21, 58, 30, 0.40) 0%, transparent 28%),
-        linear-gradient(180deg, #0c2013 0%, #07140b 100%);
+        radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.06) 0%, transparent 22%),
+        radial-gradient(circle at 80% 18%, rgba(80, 84, 92, 0.24) 0%, transparent 28%),
+        linear-gradient(180deg, #17191e 0%, #0d0f13 100%);
     background-attachment: fixed;
     color: #edf2f7;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -32,17 +32,17 @@ body::after {
 }
 body::before {
     background:
-        radial-gradient(circle at 18% 20%, rgba(130, 255, 119, 0.18) 0%, transparent 18%),
-        radial-gradient(circle at 82% 16%, rgba(44, 121, 54, 0.24) 0%, transparent 24%),
-        radial-gradient(circle at 46% 64%, rgba(19, 52, 24, 0.38) 0%, transparent 32%),
-        linear-gradient(180deg, rgba(4, 10, 6, 0.22), rgba(4, 10, 6, 0.40));
+        radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.08) 0%, transparent 18%),
+        radial-gradient(circle at 82% 16%, rgba(96, 100, 108, 0.18) 0%, transparent 24%),
+        radial-gradient(circle at 46% 64%, rgba(32, 34, 40, 0.36) 0%, transparent 32%),
+        linear-gradient(180deg, rgba(8, 9, 12, 0.22), rgba(8, 9, 12, 0.42));
     filter: blur(26px);
     opacity: 0.95;
 }
 body::after {
     background:
-        radial-gradient(circle at 12% 86%, rgba(73, 160, 74, 0.18) 0%, transparent 20%),
-        radial-gradient(circle at 86% 84%, rgba(34, 84, 41, 0.22) 0%, transparent 24%),
+        radial-gradient(circle at 12% 86%, rgba(120, 124, 132, 0.10) 0%, transparent 20%),
+        radial-gradient(circle at 86% 84%, rgba(56, 60, 66, 0.18) 0%, transparent 24%),
         radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 46%);
     filter: blur(36px);
     opacity: 0.75;
@@ -76,10 +76,10 @@ body.modal-open {
     position: fixed;
     left: 0;
     top: 0;
-    background: linear-gradient(180deg, rgba(10, 24, 15, 0.96), rgba(8, 18, 11, 0.94));
+    background: linear-gradient(180deg, rgba(18, 20, 24, 0.96), rgba(12, 14, 18, 0.94));
     backdrop-filter: blur(22px) saturate(140%);
     -webkit-backdrop-filter: blur(22px) saturate(140%);
-    border-right: 1px solid rgba(119, 214, 124, 0.08);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03), 0 8px 30px rgba(0, 0, 0, 0.24);
     color: white;
     transition: all 0.3s;
@@ -108,7 +108,7 @@ body.modal-open {
     padding: 15px 20px;
 }
 #sidebar .nav-link:hover, #sidebar .nav-link.active {
-    background: rgba(88, 194, 107, 0.12);
+    background: rgba(255, 255, 255, 0.08);
     color: white;
 }
 .card,
@@ -290,12 +290,12 @@ body.modal-open {
 }
 .order-row--company > td {
     background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(135, 185, 138, 0.05)),
-        rgba(14, 34, 20, 0.92) !important;
+        linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(180, 186, 196, 0.04)),
+        rgba(24, 26, 30, 0.92) !important;
     color: #eff3f8 !important;
-    box-shadow: inset 3px 0 0 rgba(158, 220, 161, 0.34);
+    box-shadow: inset 3px 0 0 rgba(190, 196, 204, 0.30);
 }
-.order-row--company td { border-color: rgba(119, 214, 124, 0.06) !important; }
+.order-row--company td { border-color: rgba(255, 255, 255, 0.06) !important; }
 .order-row--company a,
 .order-row--company small,
 .order-row--company .text-white-75,
@@ -304,14 +304,14 @@ body.modal-open {
     color: #eff3f8 !important;
 }
 .order-row--company .badge {
-    border-color: rgba(119, 214, 124, 0.16) !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
 }
 .order-row--high > td {
     background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(88, 194, 107, 0.08)),
-        rgba(16, 42, 24, 0.94) !important;
+        linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(210, 210, 210, 0.06)),
+        rgba(28, 30, 34, 0.94) !important;
     color: #fffaf0 !important;
-    box-shadow: inset 3px 0 0 rgba(88, 194, 107, 0.68);
+    box-shadow: inset 3px 0 0 rgba(214, 218, 224, 0.44);
 }
 .order-row--high td { border-color: rgba(255, 255, 255, 0.08) !important; }
 .order-row--high a,
@@ -413,7 +413,7 @@ body.modal-open {
     font-weight: 500;
     padding: 0.52em 0.82em;
     border-radius: 999px;
-    background-color: rgba(88, 194, 107, 0.12);
+    background-color: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px) saturate(140%);
     -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
@@ -430,7 +430,7 @@ body.modal-open {
 .form-select,
 .input-group-text {
     background: rgba(255, 255, 255, 0.03) !important;
-    border: 1px solid rgba(122, 136, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
     color: #fff !important;
     backdrop-filter: blur(12px) saturate(135%);
     border-radius: 12px;
@@ -547,11 +547,11 @@ body.modal-open {
     margin: 0 auto 24px;
     padding: 10px 16px;
     border-radius: 18px;
-    background: linear-gradient(180deg, rgba(18, 45, 26, 0.88), rgba(12, 28, 18, 0.84)) !important;
-    border: 1px solid rgba(149, 232, 153, 0.14);
+    background: linear-gradient(180deg, rgba(34, 36, 42, 0.88), rgba(20, 22, 28, 0.84)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.06),
-        0 18px 44px rgba(2, 12, 6, 0.34);
+        0 18px 44px rgba(0, 0, 0, 0.34);
 }
 
 .card,
@@ -567,17 +567,17 @@ body.modal-open {
 .table-responsive {
     position: relative;
     overflow: hidden;
-    border: 1px solid rgba(149, 232, 153, 0.09);
+    border: 1px solid rgba(255, 255, 255, 0.10);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.008)),
-        linear-gradient(135deg, rgba(16, 40, 23, 0.52), rgba(9, 18, 12, 0.58));
-    backdrop-filter: blur(18px) saturate(125%);
-    -webkit-backdrop-filter: blur(18px) saturate(125%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
+        linear-gradient(135deg, rgba(28, 30, 36, 0.50), rgba(14, 16, 20, 0.58));
+    backdrop-filter: blur(18px) saturate(120%);
+    -webkit-backdrop-filter: blur(18px) saturate(120%);
     border-radius: 18px;
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.05),
         inset 0 -1px 0 rgba(255, 255, 255, 0.015),
-        0 20px 48px rgba(2, 12, 6, 0.28);
+        0 20px 48px rgba(0, 0, 0, 0.28);
 }
 
 .card::before,
@@ -590,7 +590,7 @@ body.modal-open {
     pointer-events: none;
     background:
         radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.06) 0%, transparent 24%),
-        radial-gradient(circle at 85% 88%, rgba(115, 214, 120, 0.04) 0%, transparent 24%);
+        radial-gradient(circle at 85% 88%, rgba(255, 255, 255, 0.03) 0%, transparent 24%);
     opacity: 0.7;
 }
 
@@ -641,8 +641,9 @@ body.modal-open {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #63d36a, #42a94f) !important;
-    border-color: rgba(112, 210, 116, 0.42) !important;
+    background: linear-gradient(135deg, #f5f5f7, #cfd4dc) !important;
+    border-color: rgba(255, 255, 255, 0.24) !important;
+    color: #111318 !important;
 }
 
 .btn-outline-primary,
