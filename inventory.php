@@ -281,24 +281,53 @@ $catalog_import_success = isset($_GET['catalog_imported']);
         
         <!-- Pagination -->
         <?php if ($total_pages > 1): ?>
+        <?php
+            $params_p = $_GET;
+            unset($params_p['p']);
+            $qs = http_build_query($params_p);
+            $url_pre = $qs ? "&$qs" : "";
+
+            $pagination_window = 10;
+            if ($total_pages <= $pagination_window) {
+                $start_page = 1;
+                $end_page = $total_pages;
+            } else {
+                $half_window = (int)floor($pagination_window / 2);
+                $start_page = max(1, $page - $half_window);
+                $end_page = $start_page + $pagination_window - 1;
+
+                if ($end_page > $total_pages) {
+                    $end_page = $total_pages;
+                    $start_page = max(1, $end_page - $pagination_window + 1);
+                }
+            }
+        ?>
         <nav class="mt-4">
-            <ul class="pagination justify-content-center">
-                <?php 
-                $params_p = $_GET;
-                unset($params_p['p']);
-                $qs = http_build_query($params_p);
-                $url_pre = $qs ? "&$qs" : "";
-                ?>
+            <ul class="pagination pagination-sm justify-content-center flex-wrap gap-1">
                 <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="?p=<?php echo $page-1 . $url_pre; ?>"><i class="fas fa-chevron-left"></i></a>
+                    <a class="page-link" href="?p=<?php echo max(1, $page - 1) . $url_pre; ?>" aria-label="Předchozí">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
                 </li>
-                <?php for($i=1; $i<=$total_pages; $i++): ?>
+
+                <?php if ($start_page > 1): ?>
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                <?php endif; ?>
+
+                <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
                     <li class="page-item <?php echo $page == $i ? 'active' : ''; ?>">
                         <a class="page-link" href="?p=<?php echo $i . $url_pre; ?>"><?php echo $i; ?></a>
                     </li>
                 <?php endfor; ?>
+
+                <?php if ($end_page < $total_pages): ?>
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                <?php endif; ?>
+
                 <li class="page-item <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
-                    <a class="page-link" href="?p=<?php echo $page+1 . $url_pre; ?>"><i class="fas fa-chevron-right"></i></a>
+                    <a class="page-link" href="?p=<?php echo min($total_pages, $page + 1) . $url_pre; ?>" aria-label="Další">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
                 </li>
             </ul>
         </nav>
