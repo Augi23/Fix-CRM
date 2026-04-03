@@ -2,20 +2,20 @@
     --sidebar-width: 250px;
     --primary-color: #0a84ff;
     --primary-color-soft: rgba(10, 132, 255, 0.12);
-    --glass-bg: rgba(24, 26, 30, 0.52);
-    --glass-bg-strong: rgba(18, 20, 24, 0.72);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-border-strong: rgba(255, 255, 255, 0.12);
-    --surface-elevated: rgba(255, 255, 255, 0.03);
-    --surface-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
-    --surface-shadow-soft: 0 12px 24px rgba(0, 0, 0, 0.18);
+    --glass-bg: rgba(255, 255, 255, 0.08);
+    --glass-bg-strong: rgba(255, 255, 255, 0.12);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-border-strong: rgba(255, 255, 255, 0.16);
+    --surface-elevated: rgba(255, 255, 255, 0.04);
+    --surface-shadow: 0 22px 50px rgba(0, 0, 0, 0.22);
+    --surface-shadow-soft: 0 14px 28px rgba(0, 0, 0, 0.14);
 }
 body {
-    background-color: #070b10;
+    background-color: #061018;
     background-image:
-        radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.055) 0%, transparent 22%),
-        radial-gradient(circle at 82% 18%, rgba(10, 132, 255, 0.12) 0%, transparent 26%),
-        radial-gradient(circle at 50% 92%, rgba(255, 255, 255, 0.035) 0%, transparent 30%);
+        radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.08) 0%, transparent 20%),
+        radial-gradient(circle at 82% 18%, rgba(10, 132, 255, 0.16) 0%, transparent 24%),
+        radial-gradient(circle at 50% 92%, rgba(255, 255, 255, 0.05) 0%, transparent 30%);
     background-attachment: fixed;
     color: #edf2f7;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -50,10 +50,11 @@ body.modal-open {
     position: fixed;
     left: 0;
     top: 0;
-    background: linear-gradient(180deg, rgba(20, 22, 26, 0.88), rgba(16, 18, 22, 0.80));
-    backdrop-filter: blur(24px) saturate(150%);
-    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.06));
+    backdrop-filter: blur(28px) saturate(165%);
+    -webkit-backdrop-filter: blur(28px) saturate(165%);
     border-right: 1px solid var(--glass-border);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
     color: white;
     transition: all 0.3s;
     z-index: 1000;
@@ -79,7 +80,7 @@ body.modal-open {
     padding: 15px 20px;
 }
 #sidebar .nav-link:hover, #sidebar .nav-link.active {
-    background: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.08);
     color: white;
 }
 .card,
@@ -95,12 +96,12 @@ body.modal-open {
 .table-responsive {
     border: 1px solid var(--glass-border);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
-        rgba(22, 24, 28, 0.72);
-    backdrop-filter: blur(20px) saturate(145%);
-    -webkit-backdrop-filter: blur(20px) saturate(145%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.04)),
+        rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(26px) saturate(170%);
+    -webkit-backdrop-filter: blur(26px) saturate(170%);
     box-shadow: var(--surface-shadow-soft);
-    border-radius: 22px;
+    border-radius: 26px;
     color: #e2e8f0;
 }
 .card,
@@ -112,12 +113,12 @@ body.modal-open {
 .glass-card, .glass-panel {
     border: 1px solid var(--glass-border-strong);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05)),
         var(--glass-bg);
     box-shadow:
-        0 14px 34px rgba(0, 0, 0, 0.24),
-        inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    border-radius: 22px;
+        0 18px 42px rgba(0, 0, 0, 0.20),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    border-radius: 26px;
     color: #e2e8f0;
 }
 
@@ -223,11 +224,11 @@ body.modal-open {
 }
 
 .navbar {
-    background: linear-gradient(180deg, rgba(18, 20, 24, 0.84), rgba(16, 18, 22, 0.72)) !important;
-    backdrop-filter: blur(20px) saturate(150%);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.05)) !important;
+    backdrop-filter: blur(26px) saturate(170%);
+    -webkit-backdrop-filter: blur(26px) saturate(170%);
     border-bottom: 1px solid var(--glass-border);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 .table {
     color: #dbe4ee;
@@ -235,12 +236,12 @@ body.modal-open {
     border-spacing: 0;
 }
 .table thead th {
-    background: rgba(255,255,255,0.03);
+    background: rgba(255,255,255,0.04);
     text-transform: uppercase;
     font-size: 0.72rem;
     letter-spacing: 0.08em;
-    color: #9aa9bb;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    color: #9fb0c2;
+    border-bottom: 1px solid rgba(255,255,255,0.10);
 }
 .table td {
     border-color: rgba(255,255,255,0.05);
@@ -249,31 +250,31 @@ body.modal-open {
     transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 .clickable-order-row:hover > td {
-    background-color: rgba(255, 255, 255, 0.04) !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
 }
 .order-row--company > td {
     background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.035), rgba(160, 160, 170, 0.10)),
-        rgba(28, 30, 34, 0.72) !important;
-    color: #eef2f7 !important;
-    box-shadow: inset 4px 0 0 rgba(170, 176, 186, 0.42);
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(180, 186, 196, 0.14)),
+        rgba(255, 255, 255, 0.07) !important;
+    color: #eff3f8 !important;
+    box-shadow: inset 4px 0 0 rgba(200, 206, 214, 0.46);
 }
-.order-row--company td { border-color: rgba(255, 255, 255, 0.06) !important; }
+.order-row--company td { border-color: rgba(255, 255, 255, 0.07) !important; }
 .order-row--company a,
 .order-row--company small,
 .order-row--company .text-white-75,
 .order-row--company strong,
 .order-row--company .badge {
-    color: #eef2f7 !important;
+    color: #eff3f8 !important;
 }
 .order-row--company .badge {
-    border-color: rgba(255, 255, 255, 0.16) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
 }
 .order-row--high > td {
     background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 199, 108, 0.12)),
-        rgba(34, 31, 24, 0.72) !important;
-    color: #fff9ef !important;
+        linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 199, 108, 0.10)),
+        rgba(255, 255, 255, 0.06) !important;
+    color: #fffaf0 !important;
     box-shadow: inset 4px 0 0 rgba(255, 200, 90, 0.72);
 }
 .order-row--high td { border-color: rgba(255, 255, 255, 0.08) !important; }
@@ -282,7 +283,7 @@ body.modal-open {
 .order-row--high .text-white-75,
 .order-row--high strong,
 .order-row--high .badge {
-    color: #fff9ef !important;
+    color: #fffaf0 !important;
 }
 .order-row--high .badge {
     border-color: rgba(255, 255, 255, 0.18) !important;
@@ -290,29 +291,37 @@ body.modal-open {
 
 /* Custom text class to replace low contrast text-white-50 */
 .text-white-75 {
-    color: rgba(255, 255, 255, 0.75) !important;
+    color: rgba(255, 255, 255, 0.78) !important;
 }
 
 /* Fancybox dark theme fix */
 .fancybox__backdrop {
-    background: rgba(6, 10, 16, 0.78) !important;
+    background: rgba(6, 10, 16, 0.72) !important;
 }
 
 .modal-content,
 .dropdown-menu,
-.qr-popover {
+.qr-popover,
+.offcanvas,
+.toast,
+.alert,
+.list-group,
+.table-responsive {
     border: 1px solid var(--glass-border-strong);
-    background: linear-gradient(180deg, rgba(26, 28, 32, 0.92), rgba(18, 20, 24, 0.90));
-    backdrop-filter: blur(22px) saturate(150%);
-    -webkit-backdrop-filter: blur(22px) saturate(150%);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.30);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08)),
+        rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    box-shadow: var(--surface-shadow);
+    border-radius: 26px;
 }
 .modal-content {
-    border-radius: 22px;
+    border-radius: 28px;
 }
 .dropdown-menu,
 .qr-popover {
-    border-radius: 18px;
+    border-radius: 22px;
 }
 
 /* Pagination */
@@ -368,6 +377,8 @@ body.modal-open {
     font-weight: 500;
     padding: 0.52em 0.82em;
     border-radius: 999px;
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
 }
 .status-new { color: #0d6efd; }
 .status-progress { color: #fd7e14; }
@@ -377,11 +388,15 @@ body.modal-open {
 
 /* Select2 Dark Mode Override */
 .select2-container--default .select2-selection--single,
-.select2-container--default .select2-selection--multiple {
-    background: rgba(255, 255, 255, 0.06) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+.select2-container--default .select2-selection--multiple,
+.form-control,
+.form-select,
+.input-group-text {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
     color: #fff !important;
-    backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(170%);
+    border-radius: 16px;
 }
 .select2-container--default .select2-selection--single .select2-selection__rendered,
 .select2-container--default .select2-selection--multiple .select2-selection__rendered {
