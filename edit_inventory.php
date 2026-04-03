@@ -52,6 +52,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="alert alert-success"><?php echo $success; ?></div>
 <?php endif; ?>
 
+<?php if (!empty($item['source_supplier']) || !empty($item['supplier_availability'])): ?>
+    <div class="alert alert-info">
+        <div class="fw-semibold">Dodavatelský zdroj</div>
+        <div class="small mb-1">
+            <?php echo !empty($item['source_supplier']) ? htmlspecialchars(supplierLabel((string)$item['source_supplier'])) : '—'; ?>
+        </div>
+        <?php if (!empty($item['supplier_availability'])): ?>
+            <div class="small">Dostupnost: <?php echo htmlspecialchars($item['supplier_availability']); ?><?php echo isset($item['supplier_stock_qty']) && $item['supplier_stock_qty'] !== null ? ' (' . (int)$item['supplier_stock_qty'] . ' ks)' : ''; ?></div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+
 <div class="card">
     <div class="card-body">
         <form method="POST">

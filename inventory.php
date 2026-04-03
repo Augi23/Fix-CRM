@@ -12,6 +12,8 @@ $offset = ($page - 1) * $limit;
 $search = $_GET['search'] ?? '';
 $min_price = $_GET['min_price'] ?? '';
 $max_price = $_GET['max_price'] ?? '';
+$supplier_filter = trim((string)($_GET['supplier'] ?? ''));
+$suppliers = getSupplierCatalogs();
 
 $where_clauses = [];
 $params = [];
@@ -32,6 +34,11 @@ if ($max_price !== '') {
     $params[] = floatval($max_price);
 }
 
+if ($supplier_filter !== '' && isset($suppliers[$supplier_filter])) {
+    $where_clauses[] = "source_supplier = ?";
+    $params[] = $supplier_filter;
+}
+
 $where_sql = $where_clauses ? " WHERE " . implode(" AND ", $where_clauses) : "";
 
 $total_items = $pdo->prepare("SELECT COUNT(*) FROM inventory" . $where_sql);
@@ -48,8 +55,10 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
 $default_catalog_url = 'https://www.mobilnidily.cz/nahradni-dily-apple/';
 $catalog_url = trim((string)get_setting('inventory_catalog_url', $default_catalog_url));
 $catalog_host = '';
+$catalog_supplier_key = '';
 if ($catalog_url !== '') {
     $catalog_host = (string)parse_url($catalog_url, PHP_URL_HOST);
+    $catalog_supplier_key = supplierKeyFromUrl($catalog_url);
 }
 
 $catalog_error_key = $_GET['catalog_error'] ?? '';
@@ -77,8 +86,8 @@ $catalog_import_success = isset($_GET['catalog_imported']);
     <div>
         <h2 class="mb-0"><?php echo __('inventory'); ?></h2>
         <small class="text-muted"><?php echo __('total_items'); ?>: <?php echo $total_count; ?></small>
-        <?php if ($catalog_host !== ''): ?>
-            <div class="small text-muted mt-1">Zdroj katalogu: <?php echo htmlspecialchars($catalog_host); ?></div>
+        <?php if ($catalog_supplier_key !== '' || $catalog_host !== ''): ?>
+            <div class="small text-muted mt-1">Zdroj katalogu: <?php echo htmlspecialchars($catalog_supplier_key !== '' ? supplierLabel($catalog_supplier_key) : $catalog_host); ?></div>
         <?php endif; ?>
     </div>
     <div class="d-flex gap-2 align-items-center">
@@ -94,6 +103,24 @@ $catalog_import_success = isset($_GET['catalog_imported']);
         <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#catalogUpdateModal">
             <i class="fas fa-sync me-2"></i> <?php echo __('update_catalog'); ?>
         </button>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <div class="fw-semibold">Katalogy dodavatelů</div>
+                <div class="small text-muted">Rychlé odkazy na zdroje katalogů, podle kterých můžete filtrovat nebo rovnou importovat.</div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <?php foreach ($suppliers as $supplierKey => $supplier): ?>
+                    <a href="<?php echo htmlspecialchars($supplier['default_url']); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-external-link-alt me-1"></i><?php echo htmlspecialchars($supplier['name']); ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -118,11 +145,20 @@ $catalog_import_success = isset($_GET['catalog_imported']);
 <div class="collapse mb-4 <?php echo (!empty($search) || !empty($min_price) || !empty($max_price)) ? 'show' : ''; ?>" id="filterPanel">
     <div class="card card-body shadow-sm">
         <form action="inventory.php" method="GET" class="row g-3">
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <label class="form-label small"><?php echo __('search_sku_placeholder'); ?></label>
                 <input type="text" name="search" class="form-control form-control-sm" value="<?php echo htmlspecialchars($search); ?>" placeholder="<?php echo __('name_or_sku'); ?>">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <label class="form-label small">Dodavatel</label>
+                <select name="supplier" class="form-select form-select-sm">
+                    <option value="">Všichni dodavatelé</option>
+                    <?php foreach ($suppliers as $supplierKey => $supplier): ?>
+                        <option value="<?php echo htmlspecialchars($supplierKey); ?>" <?php echo $supplier_filter === $supplierKey ? 'selected' : ''; ?>><?php echo htmlspecialchars($supplier['name']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-2">
                 <label class="form-label small"><?php echo __('price_from'); ?></label>
                 <input type="number" name="min_price" class="form-control form-control-sm" value="<?php echo htmlspecialchars($min_price); ?>" step="0.01">
             </div>
@@ -149,7 +185,9 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                                 <th class="ps-4"><?php echo __('photo_col'); ?></th>
                                 <th><?php echo __('part_name'); ?></th>
                                 <th><?php echo __('sku'); ?></th>
-                                <th><?php echo __('quantity'); ?></th>
+                                <th>Dodavatel</th>
+                                <th>Dostupnost</th>
+                                <th>Náš sklad</th>
                                 <th><?php echo __('buy_price'); ?></th>
                                 <th><?php echo __('sell_price'); ?></th>
                                 <th><?php echo __('status'); ?></th>
@@ -159,7 +197,7 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                         <tbody>
                             <?php if (empty($inventory)): ?>
                                 <tr>
-                                    <td colspan="9" class="text-center py-5 text-muted">
+                                    <td colspan="10" class="text-center py-5 text-muted">
                                         <i class="fas fa-boxes fa-3x mb-3 d-block opacity-25"></i>
                                         <?php echo __('stock_empty'); ?>
                                     </td>
@@ -182,6 +220,34 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                                         <div class="fw-bold"><?php echo htmlspecialchars($item['part_name']); ?></div>
                                     </td>
                                     <td><code><?php echo htmlspecialchars($item['sku']); ?></code></td>
+                                    <td>
+                                        <?php $supplierKey = (string)($item['source_supplier'] ?? ''); ?>
+                                        <?php $supplierUrl = trim((string)($item['source_url'] ?? '')); ?>
+                                        <?php if ($supplierKey !== ''): ?>
+                                            <div class="d-flex flex-column gap-1">
+                                                <span class="badge bg-info text-dark d-inline-block"><?php echo htmlspecialchars(supplierLabel($supplierKey)); ?></span>
+                                                <?php if ($supplierUrl !== ''): ?>
+                                                    <a href="<?php echo htmlspecialchars($supplierUrl); ?>" target="_blank" rel="noopener noreferrer" class="small text-decoration-none">
+                                                        <i class="fas fa-external-link-alt me-1"></i>Katalog
+                                                    </a>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-white-75">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php $availabilityText = trim((string)($item['supplier_availability'] ?? '')); ?>
+                                        <?php $availabilityQty = isset($item['supplier_stock_qty']) && $item['supplier_stock_qty'] !== null && $item['supplier_stock_qty'] !== '' ? (int)$item['supplier_stock_qty'] : null; ?>
+                                        <?php if ($availabilityText !== ''): ?>
+                                            <div class="fw-medium"><?php echo htmlspecialchars($availabilityText); ?></div>
+                                            <?php if ($availabilityQty !== null): ?>
+                                                <div class="small text-white-75"><?php echo $availabilityQty; ?> ks</div>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <span class="text-white-75">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <span class="fw-medium <?php echo $item['quantity'] <= $item['min_stock'] ? 'text-danger' : ''; ?>">
                                             <?php echo $item['quantity']; ?> <?php echo __('pcs_short'); ?>
@@ -303,6 +369,18 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
+                        <label for="catalogPreset" class="form-label">Rychlý výběr dodavatele</label>
+                        <select id="catalogPreset" class="form-select">
+                            <option value="">Vlastní URL</option>
+                            <?php foreach ($suppliers as $supplierKey => $supplier): ?>
+                                <option value="<?php echo htmlspecialchars($supplierKey); ?>" data-url="<?php echo htmlspecialchars($supplier['default_url']); ?>">
+                                    <?php echo htmlspecialchars($supplier['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Vyber dodavatele a URL se doplní automaticky.</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="catalogUrl" class="form-label">URL katalogu</label>
                         <input
                             type="url"
@@ -313,7 +391,14 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                             placeholder="Např. https://www.mobilnidily.cz/nahradni-dily-apple-iphone/"
                             required
                         >
-                        <div class="form-text">Zadej veřejnou URL katalogu, ze kterého se mají načíst ceny, názvy, SKU a obrázky.</div>
+                        <div class="form-text">Zadej veřejnou URL katalogu, ze kterého se mají načíst ceny, názvy, SKU, obrázky a dostupnost.</div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach ($suppliers as $supplierKey => $supplier): ?>
+                            <a class="btn btn-sm btn-outline-secondary" href="<?php echo htmlspecialchars($supplier['default_url']); ?>" target="_blank" rel="noopener noreferrer">
+                                <i class="fas fa-external-link-alt me-1"></i><?php echo htmlspecialchars($supplier['name']); ?>
+                            </a>
+                        <?php endforeach; ?>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -333,6 +418,27 @@ $(document).ready(function() {
         width: '100%',
         dropdownParent: $('#filterPanel')
     });
+
+    const presets = {
+        <?php foreach ($suppliers as $supplierKey => $supplier): ?>
+        <?php echo json_encode($supplierKey); ?>: <?php echo json_encode($supplier['default_url']); ?>,
+        <?php endforeach; ?>
+    };
+
+    $('#catalogPreset').on('change', function() {
+        const url = presets[$(this).val()];
+        if (url) {
+            $('#catalogUrl').val(url);
+        }
+    });
+
+    const currentUrl = $('#catalogUrl').val() || '';
+    const matchedPreset = Object.keys(presets).find(function(key) {
+        return presets[key] === currentUrl;
+    });
+    if (matchedPreset) {
+        $('#catalogPreset').val(matchedPreset);
+    }
 });
 
 function deletePart(id) {

@@ -137,6 +137,8 @@ function ensureInventoryCatalogSchema(): bool {
         "ALTER TABLE `inventory` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL AFTER `min_stock`",
         "ALTER TABLE `inventory` ADD COLUMN `source_supplier` VARCHAR(50) DEFAULT NULL AFTER `image_path`",
         "ALTER TABLE `inventory` ADD COLUMN `source_url` VARCHAR(255) DEFAULT NULL AFTER `source_supplier`",
+        "ALTER TABLE `inventory` ADD COLUMN `supplier_availability` VARCHAR(120) DEFAULT NULL AFTER `source_url`",
+        "ALTER TABLE `inventory` ADD COLUMN `supplier_stock_qty` INT NULL AFTER `supplier_availability`",
     ] as $sql) {
         try {
             $pdo->exec($sql);
@@ -333,7 +335,44 @@ function normalizeInventoryText(string $value, int $maxLength): string {
     return substr($value, 0, $maxLength);
 }
 
-function upsertInventoryItem(string $name, string $sku, float $price, string $imageUrl, string $sourceSupplier, string $sourceUrl): string {
+function extractAvailabilityInfo(DOMXPath $xpath, DOMNode $contextNode): array {
+    $availability = queryFirstValue($xpath, $contextNode, [
+        ".//*[@data-micro='availability']",
+        ".//*[@itemprop='availability']",
+        ".//*[contains(@class, 'availability')]",
+        ".//*[contains(@class, 'availability-info')]",
+        ".//*[contains(@class, 'stock')]",
+        ".//*[contains(@class, 'available')]",
+        ".//*[contains(@class, 'availability-label')]",
+    ]);
+
+    if ($availability === '') {
+        $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode($contextNode->textContent ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
+        if ($text !== '') {
+            $lines = preg_split('/\R/u', $text) ?: [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '') {
+                    continue;
+                }
+                if (preg_match('/(skladem|na dotaz|vyprodáno|na objednání|na objednavku|dostupnost|dostupné|není skladem|na skladě)/iu', $line)) {
+                    $availability = $line;
+                    break;
+                }
+            }
+        }
+    }
+
+    $availability = normalizeInventoryText($availability, 120);
+    $stockQty = null;
+    if ($availability !== '' && preg_match('/(?:\(|\b)(\d+)\s*ks\b/iu', $availability, $match)) {
+        $stockQty = (int)$match[1];
+    }
+
+    return [$availability, $stockQty];
+}
+
+function upsertInventoryItem(string $name, string $sku, float $price, string $imageUrl, string $sourceSupplier, string $sourceUrl, string $supplierAvailability, ?int $supplierStockQty): string {
     global $pdo;
 
     $name = normalizeInventoryText($name, 255);
@@ -341,15 +380,16 @@ function upsertInventoryItem(string $name, string $sku, float $price, string $im
     $imageUrl = normalizeInventoryText($imageUrl, 255);
     $sourceSupplier = normalizeInventoryText($sourceSupplier, 50);
     $sourceUrl = normalizeInventoryText($sourceUrl, 255);
+    $supplierAvailability = normalizeInventoryText($supplierAvailability, 120);
 
     if ($name === '') {
         return 'skipped';
     }
 
-    $imageSelect = ', image_path, source_supplier, source_url';
-    $imageSet = ', image_path = ?, source_supplier = ?, source_url = ?';
-    $imageInsertColumn = ', image_path, source_supplier, source_url';
-    $imageInsertValue = ', ?, ?, ?';
+    $imageSelect = ', image_path, source_supplier, source_url, supplier_availability, supplier_stock_qty';
+    $imageSet = ', image_path = ?, source_supplier = ?, source_url = ?, supplier_availability = ?, supplier_stock_qty = ?';
+    $imageInsertColumn = ', image_path, source_supplier, source_url, supplier_availability, supplier_stock_qty';
+    $imageInsertValue = ', ?, ?, ?, ?, ?';
 
     $lookupBySku = $sku !== '';
     if ($lookupBySku) {
@@ -367,13 +407,15 @@ function upsertInventoryItem(string $name, string $sku, float $price, string $im
         $newImageUrl = $imageUrl !== '' ? $imageUrl : (string)($existing['image_path'] ?? '');
         $newSourceSupplier = $sourceSupplier !== '' ? $sourceSupplier : (string)($existing['source_supplier'] ?? '');
         $newSourceUrl = $sourceUrl !== '' ? $sourceUrl : (string)($existing['source_url'] ?? '');
-        $params = [$newPrice, $newImageUrl, $newSourceSupplier, $newSourceUrl, $existing['id']];
+        $newAvailability = $supplierAvailability !== '' ? $supplierAvailability : (string)($existing['supplier_availability'] ?? '');
+        $newStockQty = $supplierStockQty !== null ? $supplierStockQty : ($existing['supplier_stock_qty'] ?? null);
+        $params = [$newPrice, $newImageUrl, $newSourceSupplier, $newSourceUrl, $newAvailability, $newStockQty, $existing['id']];
         $update = $pdo->prepare("UPDATE inventory SET sale_price = ?{$imageSet} WHERE id = ?");
         $update->execute($params);
         return 'updated';
     }
 
-    $params = [$name, $lookupBySku ? $sku : null, $price, $price > 0 ? $price * 0.7 : 0, $imageUrl, $sourceSupplier, $sourceUrl];
+    $params = [$name, $lookupBySku ? $sku : null, $price, $price > 0 ? $price * 0.7 : 0, $imageUrl, $sourceSupplier, $sourceUrl, $supplierAvailability, $supplierStockQty];
     $insert = $pdo->prepare("INSERT INTO inventory (part_name, sku, sale_price, cost_price, quantity, min_stock{$imageInsertColumn}) VALUES (?, ?, ?, ?, 0, 5{$imageInsertValue})");
     $insert->execute($params);
     return 'added';
@@ -489,7 +531,9 @@ try {
                 $imageUrl = resolveCatalogUrl($origin, $pageUrl, $imageUrl);
             }
 
-            $result = upsertInventoryItem($name, $sku, $price, $imageUrl, $catalogSupplierKey, $catalogUrl);
+            [$supplierAvailability, $supplierStockQty] = extractAvailabilityInfo($pageXPath, $product);
+
+            $result = upsertInventoryItem($name, $sku, $price, $imageUrl, $catalogSupplierKey, $catalogUrl, $supplierAvailability, $supplierStockQty);
             if ($result === 'added') {
                 $addedCount++;
             } elseif ($result === 'updated') {
