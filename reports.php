@@ -3,6 +3,8 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
+ensureOrderWorkTrackingSchema();
+
 // Filter by date range (default to current week)
 $start_date = $_GET['start_date'] ?? date('Y-m-d', strtotime('monday this week'));
 $end_date = $_GET['end_date'] ?? date('Y-m-d', strtotime('sunday this week'));
@@ -43,6 +45,17 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE status = 'Cancelled' AND (updated_at BETWEEN ? AND ?)" . $tech_cond);
     $stmt->execute($params);
     $cancelled = $stmt->fetchColumn();
+
+    // Work time (only counted when the order is finished)
+    $work_params = [$start . ' 00:00:00', $end . ' 23:59:59'];
+    $work_tech_cond = "";
+    if ($tech_id) {
+        $work_tech_cond = " AND technician_id = ?";
+        $work_params[] = $tech_id;
+    }
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(COALESCE(work_duration_seconds, 0)), 0) FROM orders WHERE status IN ('Completed', 'Collected') AND work_finished_at BETWEEN ? AND ?" . $work_tech_cond);
+    $stmt->execute($work_params);
+    $work_seconds = (int)$stmt->fetchColumn();
 
     // ─── Financials ───────────────────────────────────────────────────────────
     // Finance date priority:
@@ -126,6 +139,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
         'in_progress' => $in_progress,
         'completed' => $completed,
         'cancelled' => $cancelled,
+        'work_seconds' => $work_seconds,
         'revenue' => $revenue,
         'expenses' => $expenses,
         'parts_cost' => $parts_cost,
@@ -183,6 +197,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <th class="text-end"><?php echo __('total_revenue'); ?></th>
                             <th class="text-end text-muted small"><?php echo __('parts_cost'); ?></th>
                             <th class="text-end text-muted small"><?php echo __('expenses_label'); ?></th>
+                            <th class="text-end">Odpracováno</th>
                             <th class="text-end"><?php echo __('earned'); ?></th>
                             <th class="text-end"><?php echo __('sc_income'); ?></th>
                             <th class="text-center" style="width:60px">%</th>
@@ -193,6 +208,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         $techs = $pdo->query("SELECT id, name FROM technicians WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
                         $totals = [
                             'received' => 0, 'in_progress' => 0, 'completed' => 0, 'cancelled' => 0,
+                            'work_seconds' => 0,
                             'revenue' => 0, 'parts_cost' => 0, 'expenses' => 0,
                             'earnings' => 0, 'profit' => 0
                         ];
@@ -203,6 +219,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             $totals['in_progress'] += $s['in_progress'];
                             $totals['completed'] += $s['completed'];
                             $totals['cancelled'] += $s['cancelled'];
+                            $totals['work_seconds'] += $s['work_seconds'];
                             $totals['revenue'] += $s['revenue'];
                             $totals['parts_cost'] += $s['parts_cost'];
                             $totals['expenses'] += $s['expenses'];
@@ -219,6 +236,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                     <?php echo $s['completed']; ?>
                                 </a>
                             </td>
+                            <td class="text-end"><?php echo formatWorkDuration($s['work_seconds']); ?></td>
                             <td class="text-end"><?php echo formatMoney($s['revenue']); ?></td>
                             <td class="text-end text-muted small"><?php echo $s['parts_cost'] > 0 ? '-'.formatMoney($s['parts_cost']) : '—'; ?></td>
                             <td class="text-end text-muted small"><?php echo $s['expenses'] > 0 ? '-'.formatMoney($s['expenses']) : '—'; ?></td>
@@ -232,6 +250,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <tr>
                             <td><?php echo __('total_period'); ?></td>
                             <td class="text-center"><?php echo $totals['completed']; ?></td>
+                            <td class="text-end"><?php echo formatWorkDuration($totals['work_seconds']); ?></td>
                             <td class="text-end"><?php echo formatMoney($totals['revenue']); ?></td>
                             <td class="text-end text-muted small">-<?php echo formatMoney($totals['parts_cost']); ?></td>
                             <td class="text-end text-muted small">-<?php echo formatMoney($totals['expenses']); ?></td>
@@ -365,6 +384,12 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     </div>
                     <div class="col-md-3">
                         <div class="card p-3 border shadow-none text-center">
+                            <div class="small text-muted mb-1">Odpracováno</div>
+                            <h3 class="mb-0 text-warning"><?php echo formatWorkDuration($is['work_seconds']); ?></h3>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3 border shadow-none text-center">
                             <div class="small text-muted mb-1"><?php echo __('engineer_earnings'); ?> <span class="badge bg-secondary"><?php echo $is['engineer_rate']; ?>%</span></div>
                             <h3 class="mb-0 text-primary"><?php echo formatMoney($is['earnings']); ?></h3>
                         </div>
@@ -386,6 +411,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <tr>
                                 <th><?php echo __('order_id'); ?></th>
                                 <th><?php echo __('issue_date'); ?></th>
+                                <th>Doba</th>
                                 <th><?php echo __('device'); ?></th>
                                 <th><?php echo __('client'); ?></th>
                                 <th class="text-end"><?php echo __('sum'); ?></th>
@@ -422,6 +448,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <tr>
                                 <td><a href="view_order.php?id=<?php echo $r['id']; ?>&return=<?php echo $current_url; ?>" class="fw-bold">#<?php echo $r['id']; ?></a></td>
                                 <td><?php echo date('d.m.Y', strtotime($r['finance_date'])); ?></td>
+                                <td><?php echo formatWorkDuration($r['work_duration_seconds'] ?? 0); ?></td>
                                 <td><?php echo htmlspecialchars($r['device_brand'] . ' ' . $r['device_model']); ?></td>
                                 <td><?php echo htmlspecialchars($r['first_name'] . ' ' . $r['last_name']); ?></td>
                                 <td class="text-end fw-bold"><?php echo formatMoney($rev); ?></td>

@@ -24,6 +24,8 @@ $new_status = $_REQUEST['status'] ?? null;
 $final_cost = $_REQUEST['final_cost'] ?? null;
 $technician_id = $_REQUEST['technician_id'] ?? null;
 
+ensureOrderWorkTrackingSchema();
+
 if (!$order_id || !$new_status) {
     echo json_encode(['success' => false, 'message' => __('missing_data')]);
     exit;
@@ -48,6 +50,7 @@ try {
     $current_tech_id = $order_data['technician_id'];
     $current_estimated = $order_data['estimated_cost'];
     $current_final = $order_data['final_cost'];
+    $target_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
 
     if ($current_status === 'Collected' && $new_status !== 'Collected') {
         throw new Exception('Cannot change status after Collected');
@@ -56,9 +59,30 @@ try {
     $finishing_statuses = ['Completed', 'Collected'];
     $was_finished = in_array($current_status, $finishing_statuses, true);
     $is_finishing = in_array($new_status, $finishing_statuses, true);
+    $is_starting = ($new_status === 'In Progress' && $current_status !== 'In Progress');
+
+    if ($new_status === 'In Progress') {
+        if (!$target_tech_id) {
+            throw new Exception('Pro stav Provádí se musí být zakázka přiřazená technikovi.');
+        }
+        $active_count = getTechnicianInProgressCount($target_tech_id, (int)$order_id);
+        if ($active_count >= 2 && !$was_finished) {
+            throw new Exception('Technik může mít současně maximálně 2 rozdělané zakázky.');
+        }
+    }
 
     $sql = 'UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP';
     $params = [$new_status];
+
+    if ($is_starting) {
+        $sql .= ', work_started_at = CURRENT_TIMESTAMP, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL, work_duration_seconds = 0';
+        $params[] = $target_tech_id;
+    }
+
+    if ($current_status === 'In Progress' && $is_finishing) {
+        $sql .= ', work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = CASE WHEN work_started_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP)) ELSE work_duration_seconds END';
+        $params[] = $target_tech_id;
+    }
 
     if ($new_status === 'Collected') {
         $sql .= ', shipping_date = IFNULL(shipping_date, CURRENT_TIMESTAMP)';

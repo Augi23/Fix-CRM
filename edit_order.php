@@ -20,6 +20,8 @@ if ($_SESSION['role'] == 'technician' && !hasPermission('edit_orders') && $order
 // Fetch customers for the dropdown
 $customers = $pdo->query("SELECT id, first_name, last_name FROM customers ORDER BY last_name ASC")->fetchAll();
 
+ensureOrderWorkTrackingSchema();
+
 $success = false;
 $error = false;
 
@@ -48,7 +50,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $shipping_date_sql = ", shipping_date = NOW()";
         }
 
-        $update = $pdo->prepare("UPDATE orders SET 
+        $is_starting = ($status === 'In Progress' && ($current_order['status'] ?? '') !== 'In Progress');
+        $is_finishing = in_array($status, ['Completed', 'Collected'], true) && ($current_order['status'] ?? '') === 'In Progress';
+        if ($status === 'In Progress') {
+            if (!$technician_id) {
+                throw new Exception('Pro stav Provádí se musí být zakázka přiřazená technikovi.');
+            }
+            $active_count = getTechnicianInProgressCount((int)$technician_id, (int)$id);
+            if ($active_count >= 2) {
+                throw new Exception('Technik může mít současně maximálně 2 rozdělané zakázky.');
+            }
+        }
+
+        $updateSql = "UPDATE orders SET
             customer_id = ?, 
             technician_id = ?,
             device_type = ?, 
@@ -60,10 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             problem_description = ?, 
             technician_notes = ?, 
             estimated_cost = ?, 
-            status = ? 
-            $shipping_date_sql
-            WHERE id = ?");
-        $update->execute([
+            status = ?";
+        $updateParams = [
             $customer_id, 
             $technician_id,
             $device_type, 
@@ -75,9 +87,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $problem_description, 
             $technician_notes, 
             $estimated_cost, 
-            $status, 
-            $id
-        ]);
+            $status
+        ];
+
+        if ($is_starting) {
+            $updateSql .= ", work_started_at = CURRENT_TIMESTAMP, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL, work_duration_seconds = 0";
+            $updateParams[] = $technician_id;
+        }
+
+        if ($is_finishing) {
+            $updateSql .= ", work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = CASE WHEN work_started_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP)) ELSE work_duration_seconds END";
+            $updateParams[] = $technician_id;
+        }
+
+        $updateSql .= " $shipping_date_sql WHERE id = ?";
+        $updateParams[] = $id;
+
+        $update = $pdo->prepare($updateSql);
+        $update->execute($updateParams);
 
         // Handle File Uploads during Edit
         if (isset($_FILES['files'])) {

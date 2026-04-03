@@ -25,6 +25,8 @@ if (!$order_id) {
 try {
     $pdo->beginTransaction();
 
+    ensureOrderWorkTrackingSchema();
+
     $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $current = $stmt->fetch();
@@ -38,6 +40,23 @@ try {
         && ($current['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)
     ) {
         throw new Exception('No permission');
+    }
+
+    $new_status = $_POST['status'] ?? $current['status'];
+    $technician_id = ($_POST['technician_id'] ?? '') !== '' ? (int)$_POST['technician_id'] : (int)$current['technician_id'];
+    $is_starting = ($new_status === 'In Progress' && $current['status'] !== 'In Progress');
+    $finishing_statuses = ['Completed', 'Collected'];
+    $was_finished = in_array($current['status'], $finishing_statuses, true);
+    $is_finishing = in_array($new_status, $finishing_statuses, true);
+
+    if ($new_status === 'In Progress') {
+        if (!$technician_id) {
+            throw new Exception('Pro stav Provádí se musí být zakázka přiřazená technikovi.');
+        }
+        $active_count = getTechnicianInProgressCount($technician_id, (int)$order_id);
+        if ($active_count >= 2 && !$was_finished) {
+            throw new Exception('Technik může mít současně maximálně 2 rozdělané zakázky.');
+        }
     }
 
     $sql = "UPDATE orders SET
@@ -57,9 +76,7 @@ try {
         appearance = ?,
         priority = ?,
         serial_number = ?,
-        serial_number_2 = ?,
-        updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?";
+        serial_number_2 = ?";
 
     $params = [
         !empty($_POST['customer_id']) ? $_POST['customer_id'] : $current['customer_id'],
@@ -78,9 +95,21 @@ try {
         isset($_POST['appearance']) ? $_POST['appearance'] : $current['appearance'],
         isset($_POST['priority']) ? $_POST['priority'] : $current['priority'],
         isset($_POST['serial_number']) ? $_POST['serial_number'] : $current['serial_number'],
-        isset($_POST['serial_number_2']) ? $_POST['serial_number_2'] : $current['serial_number_2'],
-        $order_id
+        isset($_POST['serial_number_2']) ? $_POST['serial_number_2'] : $current['serial_number_2']
     ];
+
+    if ($is_starting) {
+        $sql .= ", work_started_at = CURRENT_TIMESTAMP, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL, work_duration_seconds = 0";
+        $params[] = $technician_id;
+    }
+
+    if ($current['status'] === 'In Progress' && $is_finishing) {
+        $sql .= ", work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = CASE WHEN work_started_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP)) ELSE work_duration_seconds END";
+        $params[] = $technician_id;
+    }
+
+    $sql .= " WHERE id = ?";
+    $params[] = $order_id;
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

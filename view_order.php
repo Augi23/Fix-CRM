@@ -151,6 +151,21 @@ try {
                     </div>
                 </div>
 
+                <?php if (!empty($order['work_duration_seconds']) || !empty($order['work_started_at'])): ?>
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="alert alert-success bg-transparent border border-success py-2 mb-0">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small">
+                                <div><i class="far fa-clock me-2"></i><strong>Čas na zakázce:</strong> <?php echo formatWorkDuration($order['work_duration_seconds'] ?? 0); ?></div>
+                                <?php if (!empty($order['work_started_at'])): ?>
+                                    <div class="text-white-75">Start: <?php echo date('d.m.Y H:i', strtotime($order['work_started_at'])); ?><?php if (!empty($order['work_finished_at'])): ?> | Konec: <?php echo date('d.m.Y H:i', strtotime($order['work_finished_at'])); ?><?php endif; ?></div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <div class="row mb-4">
                     <div class="col-md-12">
                         <h6><?php echo __('appearance'); ?></h6>

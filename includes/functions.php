@@ -422,6 +422,62 @@ function logOrderStatusChange($order_id, $old_status, $new_status) {
     }
 }
 
+function ensureOrderWorkTrackingSchema() {
+    global $pdo;
+    foreach ([
+        "ALTER TABLE `orders` ADD COLUMN `work_started_at` DATETIME NULL AFTER `updated_at`",
+        "ALTER TABLE `orders` ADD COLUMN `work_finished_at` DATETIME NULL AFTER `work_started_at`",
+        "ALTER TABLE `orders` ADD COLUMN `work_duration_seconds` INT NOT NULL DEFAULT 0 AFTER `work_finished_at`",
+        "ALTER TABLE `orders` ADD COLUMN `work_started_by` INT NULL AFTER `work_duration_seconds`",
+        "ALTER TABLE `orders` ADD COLUMN `work_finished_by` INT NULL AFTER `work_started_by`",
+    ] as $sql) {
+        try {
+            $pdo->exec($sql);
+        } catch (Throwable $e) {
+            // Ignore duplicate-column errors and keep bootstrapping resilient.
+        }
+    }
+    return true;
+}
+
+function getTechnicianInProgressCount($technicianId, $excludeOrderId = null) {
+    global $pdo;
+    if (!$technicianId) return 0;
+    $sql = "SELECT COUNT(*) FROM orders WHERE technician_id = ? AND status = 'In Progress'";
+    $params = [$technicianId];
+    if ($excludeOrderId) {
+        $sql .= " AND id <> ?";
+        $params[] = $excludeOrderId;
+    }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return (int)$stmt->fetchColumn();
+}
+
+function formatWorkDuration($seconds) {
+    $seconds = (int)($seconds ?? 0);
+    if ($seconds <= 0) {
+        return '—';
+    }
+
+    $days = intdiv($seconds, 86400);
+    $seconds %= 86400;
+    $hours = intdiv($seconds, 3600);
+    $seconds %= 3600;
+    $minutes = intdiv($seconds, 60);
+
+    $parts = [];
+    if ($days > 0) {
+        $parts[] = $days . ' d';
+    }
+    if ($hours > 0 || $days > 0) {
+        $parts[] = $hours . ' h';
+    }
+    $parts[] = $minutes . ' min';
+
+    return implode(' ', $parts);
+}
+
 /**
  * Change inventory quantity safely, preventing negative stock.
  */
