@@ -265,7 +265,7 @@ if (isset($pdo)) {
                             $client_phone = $order['phone'] ?? '';
                             $phone_clean  = preg_replace('/[^0-9+]/', '', $client_phone);
                         ?>
-                        <tr>
+                        <tr class="order-row" data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
                             <td class="ps-4">
                                 <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none">#<?php echo (int)$order['id']; ?></a>
                                 <?php if($has_media): ?>
@@ -1089,6 +1089,24 @@ $(document).ready(function() {
         }
 
         performQuickStatusUpdate(id, status, btn);
+    });
+
+    $(document).on('click', '.order-row', function(e) {
+        if ($(e.target).closest('a, button, .btn, .dropdown, .dropdown-menu, .dropdown-item, .phone-qr-trigger, .quick-status-btn, .accounting-btn, input, select, textarea, label').length) {
+            return;
+        }
+        const url = $(this).data('order-url');
+        if (url) window.location.href = url;
+    });
+
+    $(document).on('keydown', '.order-row', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            const url = $(this).data('order-url');
+            if (url) {
+                e.preventDefault();
+                window.location.href = url;
+            }
+        }
     });
 
     // Inline New Customer: company/private toggle
