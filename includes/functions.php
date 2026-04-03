@@ -152,21 +152,50 @@ function getDeviceIcon($type) {
     }
 }
 
+function getOrderStatusAliases(): array {
+    return [
+        'new' => ['New', 'Новый'],
+        'pending_approval' => ['Pending Approval', 'На согласовании'],
+        'in_progress' => ['In Progress', 'В работе'],
+        'waiting_parts' => ['Waiting for Parts', 'Ожидание запчастей'],
+        'completed' => ['Completed', 'Готов'],
+        'collected' => ['Collected', 'Выдан'],
+        'cancelled' => ['Cancelled', 'Отменен'],
+        'done' => ['Completed', 'Collected', 'Готов', 'Выдан'],
+    ];
+}
+
+function getOrderStatusList(string $key): array {
+    $aliases = getOrderStatusAliases();
+    return $aliases[$key] ?? [$key];
+}
+
+function sqlPlaceholders(array $values): string {
+    return implode(',', array_fill(0, count($values), '?'));
+}
+
 function getStatusBadge($status) {
     switch ($status) {
         case 'New':
+        case 'Новый':
             return '<span class="badge bg-primary">'.__('new').'</span>';
         case 'Pending Approval':
+        case 'На согласовании':
             return '<span class="badge bg-info text-dark">'.__('pending_approval').'</span>';
         case 'In Progress':
+        case 'В работе':
             return '<span class="badge bg-warning">'.__('in_progress').'</span>';
         case 'Waiting for Parts':
+        case 'Ожидание запчастей':
             return '<span class="badge bg-secondary">'.__('waiting_parts').'</span>';
         case 'Completed':
+        case 'Готов':
             return '<span class="badge bg-success">'.__('status_completed').'</span>';
         case 'Collected':
+        case 'Выдан':
             return '<span class="badge bg-info text-dark">'.__('status_collected').'</span>';
         case 'Cancelled':
+        case 'Отменен':
             return '<span class="badge bg-danger">'.__('status_cancelled').'</span>';
         default:
             return '<span class="badge bg-dark">' . $status . '</span>';

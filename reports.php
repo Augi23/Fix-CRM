@@ -26,24 +26,28 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     $tech_cond = $tech_id ? " AND technician_id = ?" : "";
     if ($tech_id) $params[] = $tech_id;
 
+    $inProgressStatuses = getOrderStatusList('in_progress');
+    $doneStatuses = getOrderStatusList('done');
+    $cancelledStatuses = getOrderStatusList('cancelled');
+
     // Received
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE (created_at BETWEEN ? AND ?)" . $tech_cond);
     $stmt->execute($params);
     $received = $stmt->fetchColumn();
 
     // In Progress
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE status = 'In Progress' AND (updated_at BETWEEN ? AND ?)" . $tech_cond);
-    $stmt->execute($params);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE status IN (" . sqlPlaceholders($inProgressStatuses) . ") AND (updated_at BETWEEN ? AND ?)" . $tech_cond);
+    $stmt->execute(array_merge($inProgressStatuses, $params));
     $in_progress = $stmt->fetchColumn();
 
     // Completed/Collected (Done)
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE status IN ('Completed', 'Collected') AND (updated_at BETWEEN ? AND ?)" . $tech_cond);
-    $stmt->execute($params);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE status IN (" . sqlPlaceholders($doneStatuses) . ") AND (updated_at BETWEEN ? AND ?)" . $tech_cond);
+    $stmt->execute(array_merge($doneStatuses, $params));
     $completed = $stmt->fetchColumn();
 
     // Cancelled (Without repair)
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE status = 'Cancelled' AND (updated_at BETWEEN ? AND ?)" . $tech_cond);
-    $stmt->execute($params);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE status IN (" . sqlPlaceholders($cancelledStatuses) . ") AND (updated_at BETWEEN ? AND ?)" . $tech_cond);
+    $stmt->execute(array_merge($cancelledStatuses, $params));
     $cancelled = $stmt->fetchColumn();
 
     // Work time (only counted when the order is finished)
@@ -53,8 +57,8 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
         $work_tech_cond = " AND technician_id = ?";
         $work_params[] = $tech_id;
     }
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(COALESCE(work_duration_seconds, 0)), 0) FROM orders WHERE status IN ('Completed', 'Collected') AND work_finished_at BETWEEN ? AND ?" . $work_tech_cond);
-    $stmt->execute($work_params);
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(COALESCE(work_duration_seconds, 0)), 0) FROM orders WHERE status IN (" . sqlPlaceholders($doneStatuses) . ") AND work_finished_at BETWEEN ? AND ?" . $work_tech_cond);
+    $stmt->execute(array_merge($doneStatuses, $work_params));
     $work_seconds = (int)$stmt->fetchColumn();
 
     // ─── Financials / performance ────────────────────────────────────────────
@@ -86,12 +90,12 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
              WHERE oi2.order_id = o.id) AS inventory_cost
         FROM orders o
         LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'
-        WHERE o.status IN ('Completed', 'Collected')
+        WHERE o.status IN (" . sqlPlaceholders($doneStatuses) . ")
           AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
     " . $fin_tech_cond;
 
     $stmt = $pdo->prepare($sql_orders);
-    $stmt->execute($fin_params);
+    $stmt->execute(array_merge($doneStatuses, $fin_params));
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $revenue          = 0;
@@ -420,6 +424,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <tbody>
                             <?php
                             $current_url = urlencode($_SERVER['REQUEST_URI']);
+                            $doneStatuses = getOrderStatusList('done');
                             $stmt = $pdo->prepare("
                                 SELECT o.*, c.first_name, c.last_name,
                                     COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) AS finance_date,
@@ -427,11 +432,11 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 FROM orders o
                                 JOIN customers c ON o.customer_id = c.id
                                 LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'
-                                WHERE o.technician_id = ? AND o.status IN ('Completed', 'Collected')
+                                WHERE o.technician_id = ? AND o.status IN (" . sqlPlaceholders($doneStatuses) . ")
                                   AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
                                 ORDER BY finance_date DESC
                             ");
-                            $stmt->execute([$selected_tech_id, $start_date, $end_date]);
+                            $stmt->execute(array_merge([$selected_tech_id], $doneStatuses, [$start_date, $end_date]));
                             
                             while($r = $stmt->fetch()): 
                                 $rev = $r['final_cost'] !== null ? $r['final_cost'] : $r['estimated_cost'];

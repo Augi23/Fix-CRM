@@ -33,23 +33,28 @@ if ($tech_id) {
 switch ($type) {
     case 'received':
         $where .= " AND o.created_at BETWEEN ? AND ?";
+        $params[] = $start;
+        $params[] = $end;
         break;
     case 'in_progress':
-        $where .= " AND o.status = 'In Progress' AND o.updated_at BETWEEN ? AND ?";
+        $statuses = getOrderStatusList('in_progress');
+        $where .= " AND o.status IN (" . sqlPlaceholders($statuses) . ") AND o.updated_at BETWEEN ? AND ?";
+        $params = array_merge($params, $statuses, [$start, $end]);
         break;
     case 'completed':
-        $where .= " AND o.status IN ('Completed', 'Collected') AND o.updated_at BETWEEN ? AND ?";
+        $statuses = getOrderStatusList('done');
+        $where .= " AND o.status IN (" . sqlPlaceholders($statuses) . ") AND o.updated_at BETWEEN ? AND ?";
+        $params = array_merge($params, $statuses, [$start, $end]);
         break;
     case 'cancelled':
-        $where .= " AND o.status = 'Cancelled' AND o.updated_at BETWEEN ? AND ?";
+        $statuses = getOrderStatusList('cancelled');
+        $where .= " AND o.status IN (" . sqlPlaceholders($statuses) . ") AND o.updated_at BETWEEN ? AND ?";
+        $params = array_merge($params, $statuses, [$start, $end]);
         break;
     default:
         echo json_encode(['success' => false, 'message' => 'Invalid type']);
         exit;
 }
-
-$params[] = $start;
-$params[] = $end;
 
 try {
     $sql = "SELECT o.id, o.device_brand, o.device_model, o.status, o.final_cost, o.estimated_cost, o.created_at, c.first_name, c.last_name 
