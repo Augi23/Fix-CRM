@@ -99,7 +99,13 @@ $catalog_import_success = isset($_GET['catalog_imported']);
 
 <?php if ($catalog_import_success): ?>
     <div class="alert alert-success shadow-sm border-0">
-        Katalog aktualizován: přidáno <?php echo $catalog_added; ?>, aktualizováno <?php echo $catalog_updated; ?>.
+        <div class="fw-bold mb-2">Katalog byl aktualizován</div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="badge bg-success-subtle text-success border">Nové položky: <?php echo $catalog_added; ?></span>
+            <span class="badge bg-primary-subtle text-primary border">Aktualizované: <?php echo $catalog_updated; ?></span>
+            <span class="badge bg-dark-subtle text-dark border">Celkem: <?php echo (int)$catalog_added + (int)$catalog_updated; ?></span>
+        </div>
+        <div class="small text-muted mt-2">Zobrazuje se jen stručné shrnutí importu. Položky s obrázky byly uloženy, pokud je katalog poskytl.</div>
     </div>
 <?php endif; ?>
 
