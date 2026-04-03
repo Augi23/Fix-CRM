@@ -53,6 +53,20 @@ if (!$selectedOrder && !empty($orders)) {
     $selectedOrder = $orders[0];
 }
 
+$orderMedia = [];
+if (isset($pdo) && $selectedOrder) {
+    try {
+        $stmt = $pdo->prepare("SELECT file_path, file_type, file_name FROM order_attachments WHERE order_id = ? ORDER BY id DESC");
+        $stmt->execute([(int)$selectedOrder['id']]);
+        $orderMedia = array_values(array_filter($stmt->fetchAll(), static function ($item) {
+            $type = strtolower((string)($item['file_type'] ?? ''));
+            return str_starts_with($type, 'image/');
+        }));
+    } catch (Exception $e) {
+        $orderMedia = [];
+    }
+}
+
 function clientStatusMeta(string $status): array {
     $map = [
         'New' => ['Přijato', 'primary'],
@@ -345,6 +359,75 @@ $today = date('d.m.Y');
             font-weight: 600;
         }
 
+        .media-section {
+            margin-top: 18px;
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+
+        .media-section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .media-section-title h4 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .media-section-title p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: rgba(243,247,255,0.68);
+        }
+
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .media-card {
+            display: block;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.035);
+            text-decoration: none;
+            transition: transform .15s ease, border-color .15s ease, background .15s ease;
+        }
+
+        .media-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255,255,255,0.14);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .media-card img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .media-card-caption {
+            padding: 10px 12px;
+            color: rgba(243,247,255,0.78);
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         .empty-state {
             padding: 28px;
             text-align: center;
@@ -380,7 +463,6 @@ $today = date('d.m.Y');
                 <img src="../assets/img/applefix-logo.png" alt="AppleFix logo">
                 <div>
                     <div class="client-chip mb-2"><i class="fas fa-user-shield"></i> Klientská sekce</div>
-                    <div class="text-white-50 small">AppleFix — oddělený přístup pro zákazníky</div>
                 </div>
             </div>
             <div class="client-meta">
@@ -444,6 +526,30 @@ $today = date('d.m.Y');
                                 <div class="label">Přijato</div>
                                 <div class="value"><?php echo e(date('d.m.Y', strtotime((string)($selectedOrder['created_at'] ?? 'now')))); ?></div>
                             </div>
+                        </div>
+
+                        <div class="media-section">
+                            <div class="media-section-title">
+                                <div>
+                                    <h4><i class="fas fa-camera me-2"></i>Fotky od technika</h4>
+                                    <p>Přehled stavu zařízení a průběhu opravy.</p>
+                                </div>
+                            </div>
+
+                            <?php if (!empty($orderMedia)): ?>
+                                <div class="media-grid">
+                                    <?php foreach ($orderMedia as $media): ?>
+                                        <a class="media-card" href="../<?php echo e(ltrim((string)$media['file_path'], '/')); ?>" target="_blank" rel="noopener noreferrer">
+                                            <img src="../<?php echo e(ltrim((string)$media['file_path'], '/')); ?>" alt="Fotka zakázky">
+                                            <div class="media-card-caption"><?php echo e($media['file_name'] ?: 'Fotka technika'); ?></div>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="empty-state py-3 px-0 text-start">
+                                    Zatím tu nejsou žádné fotografie k této zakázce.
+                                </div>
+                            <?php endif; ?>
                         </div>
 
                         <?php if (in_array($selectedOrder['status'], ['Completed', 'Collected'], true)): ?>
