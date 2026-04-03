@@ -11,15 +11,43 @@
     --surface-shadow-soft: 0 14px 28px rgba(0, 0, 0, 0.14);
 }
 body {
-    background-color: #061018;
+    background-color: #040707;
     background-image:
-        radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.08) 0%, transparent 20%),
-        radial-gradient(circle at 82% 18%, rgba(10, 132, 255, 0.16) 0%, transparent 24%),
-        radial-gradient(circle at 50% 92%, rgba(255, 255, 255, 0.05) 0%, transparent 30%);
+        radial-gradient(circle at 14% 18%, rgba(133, 255, 86, 0.18) 0%, transparent 20%),
+        radial-gradient(circle at 26% 10%, rgba(73, 180, 37, 0.12) 0%, transparent 16%),
+        radial-gradient(circle at 78% 16%, rgba(255, 255, 255, 0.04) 0%, transparent 18%),
+        radial-gradient(circle at 86% 72%, rgba(77, 190, 48, 0.14) 0%, transparent 22%),
+        radial-gradient(circle at 50% 92%, rgba(255, 255, 255, 0.04) 0%, transparent 30%);
     background-attachment: fixed;
     color: #edf2f7;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     position: relative;
+    overflow-x: hidden;
+}
+body::before,
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+body::before {
+    background:
+        radial-gradient(circle at 16% 22%, rgba(120, 255, 70, 0.28) 0%, rgba(120, 255, 70, 0.08) 12%, transparent 26%),
+        radial-gradient(circle at 84% 20%, rgba(98, 255, 52, 0.16) 0%, transparent 22%),
+        radial-gradient(circle at 45% 54%, rgba(20, 90, 40, 0.20) 0%, transparent 30%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.35));
+    filter: blur(28px);
+    opacity: 0.95;
+}
+body::after {
+    background:
+        radial-gradient(circle at 8% 92%, rgba(45, 120, 50, 0.16) 0%, transparent 24%),
+        radial-gradient(circle at 92% 86%, rgba(135, 70, 30, 0.16) 0%, transparent 22%),
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 45%);
+    filter: blur(42px);
+    opacity: 0.85;
 }
 /* Bootstrap 5 Modal Fixes */
 .modal {
@@ -50,11 +78,11 @@ body.modal-open {
     position: fixed;
     left: 0;
     top: 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.06));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.07));
     backdrop-filter: blur(28px) saturate(165%);
     -webkit-backdrop-filter: blur(28px) saturate(165%);
     border-right: 1px solid var(--glass-border);
-    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.14);
     color: white;
     transition: all 0.3s;
     z-index: 1000;
@@ -74,6 +102,8 @@ body.modal-open {
     margin-left: var(--sidebar-width);
     padding: 20px;
     transition: all 0.3s;
+    position: relative;
+    z-index: 1;
 }
 #sidebar .nav-link {
     color: rgba(255,255,255,0.8);
@@ -96,12 +126,12 @@ body.modal-open {
 .table-responsive {
     border: 1px solid var(--glass-border);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.04)),
-        rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(26px) saturate(170%);
-    -webkit-backdrop-filter: blur(26px) saturate(170%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06)),
+        rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
     box-shadow: var(--surface-shadow-soft);
-    border-radius: 26px;
+    border-radius: 30px;
     color: #e2e8f0;
 }
 .card,
@@ -113,12 +143,12 @@ body.modal-open {
 .glass-card, .glass-panel {
     border: 1px solid var(--glass-border-strong);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07)),
         var(--glass-bg);
     box-shadow:
         0 18px 42px rgba(0, 0, 0, 0.20),
-        inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    border-radius: 26px;
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    border-radius: 30px;
     color: #e2e8f0;
 }
 
@@ -223,12 +253,20 @@ body.modal-open {
     z-index: 3000;
 }
 
+.card-header,
+.card-footer,
+.modal-header,
+.modal-footer {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
 .navbar {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.05)) !important;
-    backdrop-filter: blur(26px) saturate(170%);
-    -webkit-backdrop-filter: blur(26px) saturate(170%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)) !important;
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
     border-bottom: 1px solid var(--glass-border);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.10);
 }
 .table {
     color: #dbe4ee;
