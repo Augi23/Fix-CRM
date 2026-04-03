@@ -1,23 +1,21 @@
 :root {
     --sidebar-width: 250px;
-    --primary-color: #0a84ff;
-    --primary-color-soft: rgba(10, 132, 255, 0.12);
-    --glass-bg: rgba(255, 255, 255, 0.08);
-    --glass-bg-strong: rgba(255, 255, 255, 0.12);
-    --glass-border: rgba(255, 255, 255, 0.10);
-    --glass-border-strong: rgba(255, 255, 255, 0.16);
-    --surface-elevated: rgba(255, 255, 255, 0.04);
-    --surface-shadow: 0 22px 50px rgba(0, 0, 0, 0.22);
-    --surface-shadow-soft: 0 14px 28px rgba(0, 0, 0, 0.14);
+    --primary-color: #5663ff;
+    --primary-color-soft: rgba(86, 99, 255, 0.18);
+    --glass-bg: rgba(18, 20, 52, 0.82);
+    --glass-bg-strong: rgba(20, 22, 58, 0.90);
+    --glass-border: rgba(120, 132, 255, 0.12);
+    --glass-border-strong: rgba(146, 158, 255, 0.18);
+    --surface-elevated: rgba(255, 255, 255, 0.03);
+    --surface-shadow: 0 24px 60px rgba(3, 6, 24, 0.38);
+    --surface-shadow-soft: 0 14px 30px rgba(4, 8, 28, 0.28);
 }
 body {
-    background-color: #040707;
+    background-color: #23285e;
     background-image:
-        radial-gradient(circle at 14% 18%, rgba(133, 255, 86, 0.18) 0%, transparent 20%),
-        radial-gradient(circle at 26% 10%, rgba(73, 180, 37, 0.12) 0%, transparent 16%),
-        radial-gradient(circle at 78% 16%, rgba(255, 255, 255, 0.04) 0%, transparent 18%),
-        radial-gradient(circle at 86% 72%, rgba(77, 190, 48, 0.14) 0%, transparent 22%),
-        radial-gradient(circle at 50% 92%, rgba(255, 255, 255, 0.04) 0%, transparent 30%);
+        radial-gradient(circle at 20% 18%, rgba(108, 121, 255, 0.12) 0%, transparent 22%),
+        radial-gradient(circle at 80% 16%, rgba(44, 50, 113, 0.35) 0%, transparent 28%),
+        linear-gradient(180deg, #2c316d 0%, #23285e 100%);
     background-attachment: fixed;
     color: #edf2f7;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -34,20 +32,18 @@ body::after {
 }
 body::before {
     background:
-        radial-gradient(circle at 16% 22%, rgba(120, 255, 70, 0.28) 0%, rgba(120, 255, 70, 0.08) 12%, transparent 26%),
-        radial-gradient(circle at 84% 20%, rgba(98, 255, 52, 0.16) 0%, transparent 22%),
-        radial-gradient(circle at 45% 54%, rgba(20, 90, 40, 0.20) 0%, transparent 30%),
-        linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.35));
-    filter: blur(28px);
-    opacity: 0.95;
+        radial-gradient(circle at 22% 22%, rgba(90, 103, 255, 0.18) 0%, transparent 18%),
+        radial-gradient(circle at 78% 14%, rgba(31, 38, 102, 0.28) 0%, transparent 24%),
+        linear-gradient(180deg, rgba(12, 15, 42, 0.10), rgba(12, 15, 42, 0.26));
+    filter: blur(22px);
+    opacity: 0.9;
 }
 body::after {
     background:
-        radial-gradient(circle at 8% 92%, rgba(45, 120, 50, 0.16) 0%, transparent 24%),
-        radial-gradient(circle at 92% 86%, rgba(135, 70, 30, 0.16) 0%, transparent 22%),
-        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 45%);
-    filter: blur(42px);
-    opacity: 0.85;
+        radial-gradient(circle at 10% 86%, rgba(63, 73, 180, 0.12) 0%, transparent 20%),
+        radial-gradient(circle at 88% 84%, rgba(28, 34, 90, 0.18) 0%, transparent 24%);
+    filter: blur(32px);
+    opacity: 0.7;
 }
 /* Bootstrap 5 Modal Fixes */
 .modal {
@@ -78,11 +74,11 @@ body.modal-open {
     position: fixed;
     left: 0;
     top: 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.07));
-    backdrop-filter: blur(28px) saturate(165%);
-    -webkit-backdrop-filter: blur(28px) saturate(165%);
-    border-right: 1px solid var(--glass-border);
-    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.14);
+    background: linear-gradient(180deg, rgba(15, 18, 48, 0.96), rgba(11, 14, 38, 0.94));
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    border-right: 1px solid rgba(122, 136, 255, 0.08);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03), 0 8px 30px rgba(0, 0, 0, 0.22);
     color: white;
     transition: all 0.3s;
     z-index: 1000;
@@ -110,7 +106,7 @@ body.modal-open {
     padding: 15px 20px;
 }
 #sidebar .nav-link:hover, #sidebar .nav-link.active {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(86, 99, 255, 0.12);
     color: white;
 }
 .card,
@@ -126,12 +122,12 @@ body.modal-open {
 .table-responsive {
     border: 1px solid var(--glass-border);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06)),
-        rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(30px) saturate(180%);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+        rgba(14, 17, 48, 0.90);
+    backdrop-filter: blur(18px) saturate(135%);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
     box-shadow: var(--surface-shadow-soft);
-    border-radius: 30px;
+    border-radius: 16px;
     color: #e2e8f0;
 }
 .card,
@@ -143,12 +139,12 @@ body.modal-open {
 .glass-card, .glass-panel {
     border: 1px solid var(--glass-border-strong);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
         var(--glass-bg);
     box-shadow:
-        0 18px 42px rgba(0, 0, 0, 0.20),
-        inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    border-radius: 30px;
+        0 18px 42px rgba(0, 0, 0, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
     color: #e2e8f0;
 }
 
@@ -257,16 +253,16 @@ body.modal-open {
 .card-footer,
 .modal-header,
 .modal-footer {
-    background: rgba(255, 255, 255, 0.04) !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border-color: rgba(122, 136, 255, 0.08) !important;
 }
 
 .navbar {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)) !important;
-    backdrop-filter: blur(30px) saturate(180%);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
-    border-bottom: 1px solid var(--glass-border);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.10);
+    background: linear-gradient(180deg, rgba(18, 21, 58, 0.94), rgba(15, 18, 48, 0.90)) !important;
+    backdrop-filter: blur(18px) saturate(130%);
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
+    border-bottom: 1px solid rgba(122, 136, 255, 0.08);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
 }
 .table {
     color: #dbe4ee;
@@ -274,12 +270,12 @@ body.modal-open {
     border-spacing: 0;
 }
 .table thead th {
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.025);
     text-transform: uppercase;
     font-size: 0.72rem;
     letter-spacing: 0.08em;
-    color: #9fb0c2;
-    border-bottom: 1px solid rgba(255,255,255,0.10);
+    color: #8d97c8;
+    border-bottom: 1px solid rgba(122,136,255,0.08);
 }
 .table td {
     border-color: rgba(255,255,255,0.05);
@@ -292,12 +288,12 @@ body.modal-open {
 }
 .order-row--company > td {
     background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(180, 186, 196, 0.14)),
-        rgba(255, 255, 255, 0.07) !important;
+        linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(172, 180, 212, 0.05)),
+        rgba(28, 32, 78, 0.92) !important;
     color: #eff3f8 !important;
-    box-shadow: inset 4px 0 0 rgba(200, 206, 214, 0.46);
+    box-shadow: inset 3px 0 0 rgba(177, 186, 220, 0.34);
 }
-.order-row--company td { border-color: rgba(255, 255, 255, 0.07) !important; }
+.order-row--company td { border-color: rgba(122, 136, 255, 0.06) !important; }
 .order-row--company a,
 .order-row--company small,
 .order-row--company .text-white-75,
@@ -306,14 +302,14 @@ body.modal-open {
     color: #eff3f8 !important;
 }
 .order-row--company .badge {
-    border-color: rgba(255, 255, 255, 0.18) !important;
+    border-color: rgba(122, 136, 255, 0.16) !important;
 }
 .order-row--high > td {
     background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 199, 108, 0.10)),
-        rgba(255, 255, 255, 0.06) !important;
+        linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(108, 121, 255, 0.08)),
+        rgba(32, 36, 92, 0.94) !important;
     color: #fffaf0 !important;
-    box-shadow: inset 4px 0 0 rgba(255, 200, 90, 0.72);
+    box-shadow: inset 3px 0 0 rgba(108, 121, 255, 0.68);
 }
 .order-row--high td { border-color: rgba(255, 255, 255, 0.08) !important; }
 .order-row--high a,
@@ -334,7 +330,7 @@ body.modal-open {
 
 /* Fancybox dark theme fix */
 .fancybox__backdrop {
-    background: rgba(6, 10, 16, 0.72) !important;
+    background: rgba(5, 8, 26, 0.82) !important;
 }
 
 .modal-content,
@@ -347,19 +343,19 @@ body.modal-open {
 .table-responsive {
     border: 1px solid var(--glass-border-strong);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08)),
-        rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(28px) saturate(180%);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+        rgba(14, 17, 48, 0.94);
+    backdrop-filter: blur(18px) saturate(135%);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
     box-shadow: var(--surface-shadow);
-    border-radius: 26px;
+    border-radius: 16px;
 }
 .modal-content {
-    border-radius: 28px;
+    border-radius: 18px;
 }
 .dropdown-menu,
 .qr-popover {
-    border-radius: 22px;
+    border-radius: 14px;
 }
 
 /* Pagination */
@@ -415,8 +411,9 @@ body.modal-open {
     font-weight: 500;
     padding: 0.52em 0.82em;
     border-radius: 999px;
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    background-color: rgba(86, 99, 255, 0.14);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
 .status-new { color: #0d6efd; }
 .status-progress { color: #fd7e14; }
@@ -430,11 +427,11 @@ body.modal-open {
 .form-control,
 .form-select,
 .input-group-text {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(122, 136, 255, 0.12) !important;
     color: #fff !important;
-    backdrop-filter: blur(18px) saturate(170%);
-    border-radius: 16px;
+    backdrop-filter: blur(12px) saturate(135%);
+    border-radius: 12px;
 }
 .select2-container--default .select2-selection--single .select2-selection__rendered,
 .select2-container--default .select2-selection--multiple .select2-selection__rendered {
