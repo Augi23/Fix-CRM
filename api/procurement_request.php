@@ -93,6 +93,16 @@ try {
             throw new Exception('Neplatný stav.');
         }
 
+        $pdo->beginTransaction();
+
+        $stmt = $pdo->prepare("SELECT id, status, inventory_id, quantity, item_name FROM purchase_requests WHERE id = ? LIMIT 1 FOR UPDATE");
+        $stmt->execute([$id]);
+        $request = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$request) {
+            throw new Exception('Požadavek nebyl nalezen.');
+        }
+
         $stmt = $pdo->prepare("UPDATE purchase_requests SET status = ?, ordered_by = CASE WHEN ? = 'ordered' THEN ? ELSE ordered_by END, ordered_at = CASE WHEN ? = 'ordered' AND ordered_at IS NULL THEN NOW() ELSE ordered_at END, received_at = CASE WHEN ? = 'received' AND received_at IS NULL THEN NOW() ELSE received_at END WHERE id = ?");
         $stmt->execute([
             $status,
@@ -102,6 +112,17 @@ try {
             $status,
             $id,
         ]);
+
+        $wasReceived = (($request['status'] ?? '') === 'received');
+        $isNowReceived = ($status === 'received');
+        $inventoryId = (int)($request['inventory_id'] ?? 0);
+        $quantity = max(1, (int)($request['quantity'] ?? 1));
+
+        if (!$wasReceived && $isNowReceived && $inventoryId > 0) {
+            changeInventoryQuantity($inventoryId, $quantity);
+        }
+
+        $pdo->commit();
 
         echo json_encode(['success' => true, 'message' => 'Stav aktualizován.']);
         exit;
@@ -121,6 +142,9 @@ try {
 
     throw new Exception('Neznámá akce.');
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
