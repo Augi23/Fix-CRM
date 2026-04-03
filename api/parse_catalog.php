@@ -24,8 +24,12 @@ function redirectToInventory(array $params = []): void {
     exit;
 }
 
-function redirectCatalogError(string $errorKey): void {
-    redirectToInventory(['catalog_error' => $errorKey]);
+function redirectCatalogError(string $errorKey, string $detail = ''): void {
+    $params = ['catalog_error' => $errorKey];
+    if ($detail !== '') {
+        $params['catalog_error_detail'] = $detail;
+    }
+    redirectToInventory($params);
 }
 
 function isPublicCatalogUrl(string $url): bool {
@@ -280,12 +284,12 @@ function upsertInventoryItem(string $name, string $sku, float $price, string $im
 
 $catalogUrl = trim((string)($_POST['catalog_url'] ?? ''));
 if (!isPublicCatalogUrl($catalogUrl)) {
-    redirectCatalogError('invalid_url');
+    redirectCatalogError('invalid_url', 'URL musí být veřejná a platná.');
 }
 
 $origin = getCatalogOrigin($catalogUrl);
 if ($origin === '') {
-    redirectCatalogError('invalid_url');
+    redirectCatalogError('invalid_url', 'Nepodařilo se určit origin katalogu.');
 }
 
 set_setting('inventory_catalog_url', $catalogUrl);
@@ -293,12 +297,12 @@ set_setting('inventory_catalog_url', $catalogUrl);
 try {
     $startHtml = fetchHtml($catalogUrl);
     if ($startHtml === '') {
-        redirectCatalogError('fetch_failed');
+        redirectCatalogError('fetch_failed', $catalogUrl);
     }
 
     $startXPath = createXPathFromHtml($startHtml);
     if (!$startXPath instanceof DOMXPath) {
-        redirectCatalogError('processing_failed');
+        redirectCatalogError('processing_failed', 'DOM parser nedokázal zpracovat úvodní stránku.');
     }
 
     $categoryUrls = collectCategoryUrls($startXPath, $catalogUrl, $origin);
@@ -311,6 +315,7 @@ try {
     $processedPages = [];
     $maxPages = 25;
     $maxProducts = 300;
+    $scannedProducts = 0;
 
     foreach (array_keys($categoryUrls) as $pageUrl) {
         if (isset($processedPages[$pageUrl])) {
@@ -333,7 +338,13 @@ try {
         }
 
         $products = $pageXPath->query("//div[contains(@class, 'product') and (.//*[@data-micro='name'] or .//span[@data-micro='name'])]");
+        if (!$products || $products->length === 0) {
+            continue;
+        }
+
         foreach ($products as $product) {
+            $scannedProducts++;
+
             $name = queryFirstValue($pageXPath, $product, [
                 ".//span[@data-micro='name']",
                 ".//*[contains(@class, 'product-name')]//a",
@@ -381,7 +392,7 @@ try {
     }
 
     if (($addedCount + $updatedCount) === 0) {
-        redirectCatalogError('no_products');
+        redirectCatalogError('no_products', 'Prohledáno stránek: ' . count($processedPages) . ', nalezených produktů: ' . $scannedProducts . '.');
     }
 
     redirectToInventory([
@@ -391,5 +402,5 @@ try {
     ]);
 } catch (Throwable $e) {
     log_error('Catalog import failed', 'inventory_import', $e->getMessage());
-    redirectCatalogError('processing_failed');
+    redirectCatalogError('processing_failed', $e->getMessage());
 }

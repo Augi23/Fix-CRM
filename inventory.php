@@ -53,6 +53,7 @@ if ($catalog_url !== '') {
 }
 
 $catalog_error_key = $_GET['catalog_error'] ?? '';
+$catalog_error_detail = trim((string)($_GET['catalog_error_detail'] ?? ''));
 $catalog_error_message = '';
 if ($catalog_error_key !== '') {
     $catalog_error_map = [
@@ -62,6 +63,9 @@ if ($catalog_error_key !== '') {
         'processing_failed' => 'Katalog se nepodařilo zpracovat.',
     ];
     $catalog_error_message = $catalog_error_map[$catalog_error_key] ?? 'Katalog se nepodařilo zpracovat.';
+    if ($catalog_error_detail !== '') {
+        $catalog_error_message .= ' (' . $catalog_error_detail . ')';
+    }
 }
 
 $catalog_added = isset($_GET['catalog_added']) ? max(0, (int)$_GET['catalog_added']) : 0;
