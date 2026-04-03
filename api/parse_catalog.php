@@ -133,12 +133,15 @@ function ensureInventoryCatalogSchema(): bool {
         return false;
     }
 
-    if (!inventoryHasImagePathColumn()) {
+    foreach ([
+        "ALTER TABLE `inventory` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL AFTER `min_stock`",
+        "ALTER TABLE `inventory` ADD COLUMN `source_supplier` VARCHAR(50) DEFAULT NULL AFTER `image_path`",
+        "ALTER TABLE `inventory` ADD COLUMN `source_url` VARCHAR(255) DEFAULT NULL AFTER `source_supplier`",
+    ] as $sql) {
         try {
-            $pdo->exec("ALTER TABLE `inventory` ADD COLUMN `image_path` VARCHAR(255) DEFAULT NULL AFTER `min_stock`");
+            $pdo->exec($sql);
         } catch (Throwable $e) {
-            log_error('Catalog import schema upgrade failed', 'inventory_import', 'image_path: ' . $e->getMessage());
-            return false;
+            // Ignore duplicate-column errors so older installs can be upgraded in place.
         }
     }
 
@@ -330,22 +333,23 @@ function normalizeInventoryText(string $value, int $maxLength): string {
     return substr($value, 0, $maxLength);
 }
 
-function upsertInventoryItem(string $name, string $sku, float $price, string $imageUrl): string {
+function upsertInventoryItem(string $name, string $sku, float $price, string $imageUrl, string $sourceSupplier, string $sourceUrl): string {
     global $pdo;
 
     $name = normalizeInventoryText($name, 255);
     $sku = normalizeInventoryText($sku, 50);
     $imageUrl = normalizeInventoryText($imageUrl, 255);
+    $sourceSupplier = normalizeInventoryText($sourceSupplier, 50);
+    $sourceUrl = normalizeInventoryText($sourceUrl, 255);
 
     if ($name === '') {
         return 'skipped';
     }
 
-    $hasImagePath = inventoryHasImagePathColumn();
-    $imageSelect = $hasImagePath ? ', image_path' : '';
-    $imageSet = $hasImagePath ? ', image_path = ?' : '';
-    $imageInsertColumn = $hasImagePath ? ', image_path' : '';
-    $imageInsertValue = $hasImagePath ? ', ?' : '';
+    $imageSelect = ', image_path, source_supplier, source_url';
+    $imageSet = ', image_path = ?, source_supplier = ?, source_url = ?';
+    $imageInsertColumn = ', image_path, source_supplier, source_url';
+    $imageInsertValue = ', ?, ?, ?';
 
     $lookupBySku = $sku !== '';
     if ($lookupBySku) {
@@ -360,20 +364,16 @@ function upsertInventoryItem(string $name, string $sku, float $price, string $im
 
     if ($existing) {
         $newPrice = $price > 0 ? $price : (float)$existing['sale_price'];
-        $params = [$newPrice];
-        if ($hasImagePath) {
-            $params[] = $imageUrl !== '' ? $imageUrl : (string)($existing['image_path'] ?? '');
-        }
-        $params[] = $existing['id'];
+        $newImageUrl = $imageUrl !== '' ? $imageUrl : (string)($existing['image_path'] ?? '');
+        $newSourceSupplier = $sourceSupplier !== '' ? $sourceSupplier : (string)($existing['source_supplier'] ?? '');
+        $newSourceUrl = $sourceUrl !== '' ? $sourceUrl : (string)($existing['source_url'] ?? '');
+        $params = [$newPrice, $newImageUrl, $newSourceSupplier, $newSourceUrl, $existing['id']];
         $update = $pdo->prepare("UPDATE inventory SET sale_price = ?{$imageSet} WHERE id = ?");
         $update->execute($params);
         return 'updated';
     }
 
-    $params = [$name, $lookupBySku ? $sku : null, $price, $price > 0 ? $price * 0.7 : 0];
-    if ($hasImagePath) {
-        $params[] = $imageUrl;
-    }
+    $params = [$name, $lookupBySku ? $sku : null, $price, $price > 0 ? $price * 0.7 : 0, $imageUrl, $sourceSupplier, $sourceUrl];
     $insert = $pdo->prepare("INSERT INTO inventory (part_name, sku, sale_price, cost_price, quantity, min_stock{$imageInsertColumn}) VALUES (?, ?, ?, ?, 0, 5{$imageInsertValue})");
     $insert->execute($params);
     return 'added';
@@ -393,6 +393,7 @@ if (!ensureInventoryCatalogSchema()) {
     redirectCatalogError('processing_failed', 'Nepodařilo se připravit databázové sloupce pro katalog.');
 }
 
+$catalogSupplierKey = supplierKeyFromUrl($catalogUrl);
 set_setting('inventory_catalog_url', $catalogUrl);
 
 try {
@@ -488,7 +489,7 @@ try {
                 $imageUrl = resolveCatalogUrl($origin, $pageUrl, $imageUrl);
             }
 
-            $result = upsertInventoryItem($name, $sku, $price, $imageUrl);
+            $result = upsertInventoryItem($name, $sku, $price, $imageUrl, $catalogSupplierKey, $catalogUrl);
             if ($result === 'added') {
                 $addedCount++;
             } elseif ($result === 'updated') {

@@ -108,6 +108,7 @@ if ($page == 'reports.php') {
     <nav class="nav flex-column">
         <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="index.php"><i class="fas fa-home me-2"></i> <?php echo __('dashboard'); ?></a>
         <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'orders.php' ? 'active' : ''; ?>" href="orders.php"><i class="fas fa-tools me-2"></i> <?php echo __('orders'); ?></a>
+        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading me-2"></i> Nákupy</a>
         <?php if (hasPermission('edit_customers')): ?>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'customers.php' ? 'active' : ''; ?>" href="customers.php"><i class="fas fa-users me-2"></i> <?php echo __('customers'); ?></a>
         <?php endif; ?>

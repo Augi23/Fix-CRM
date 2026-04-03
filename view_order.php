@@ -267,9 +267,14 @@ try {
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="mb-0"><?php echo __('parts_used'); ?></h6>
-                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPartModal">
-                        <i class="fas fa-plus me-1"></i> <?php echo __('add_part'); ?>
-                    </button>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a class="btn btn-sm btn-outline-success" href="procurement.php?order_id=<?php echo $order['id']; ?>">
+                            <i class="fas fa-truck-loading me-1"></i> Přidat do nákupu
+                        </a>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPartModal">
+                            <i class="fas fa-plus me-1"></i> <?php echo __('add_part'); ?>
+                        </button>
+                    </div>
                 </div>
                 
                 <table class="table table-sm border align-middle">

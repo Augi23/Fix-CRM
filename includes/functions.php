@@ -201,6 +201,88 @@ function getDeviceBrands() {
     }
 }
 
+function getSupplierCatalogs(): array {
+    return [
+        'mobilnidily' => [
+            'name' => 'Mobilnidily.cz',
+            'host' => 'mobilnidily.cz',
+            'default_url' => 'https://www.mobilnidily.cz/nahradni-dily-apple/',
+        ],
+        'refurb-zone' => [
+            'name' => 'refurb.zone',
+            'host' => 'refurb.zone',
+            'default_url' => 'https://refurb.zone/',
+        ],
+        'fixshop' => [
+            'name' => 'fixshop.cz',
+            'host' => 'fixshop.cz',
+            'default_url' => 'https://fixshop.cz/',
+        ],
+    ];
+}
+
+function supplierKeyFromUrl(string $url): string {
+    $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+    if ($host === '') {
+        return '';
+    }
+
+    foreach (getSupplierCatalogs() as $key => $supplier) {
+        $supplierHost = strtolower((string)($supplier['host'] ?? ''));
+        if ($supplierHost !== '' && ($host === $supplierHost || str_ends_with($host, '.' . $supplierHost))) {
+            return $key;
+        }
+    }
+
+    return '';
+}
+
+function supplierLabel(string $supplierKey): string {
+    $catalogs = getSupplierCatalogs();
+    return (string)($catalogs[$supplierKey]['name'] ?? $supplierKey);
+}
+
+function ensureProcurementSchema(): bool {
+    global $pdo;
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS purchase_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NULL,
+            supplier_key VARCHAR(50) NOT NULL,
+            inventory_id INT NULL,
+            item_name VARCHAR(255) NOT NULL,
+            sku VARCHAR(80) DEFAULT NULL,
+            quantity INT NOT NULL DEFAULT 1,
+            priority ENUM('today','this_week','later') NOT NULL DEFAULT 'this_week',
+            status ENUM('pending','ordered','received','cancelled') NOT NULL DEFAULT 'pending',
+            notes TEXT NULL,
+            requested_by INT NULL,
+            ordered_by INT NULL,
+            ordered_at TIMESTAMP NULL DEFAULT NULL,
+            received_at TIMESTAMP NULL DEFAULT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_status (status),
+            INDEX idx_supplier (supplier_key),
+            INDEX idx_order (order_id),
+            INDEX idx_inventory (inventory_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $pdo->exec("ALTER TABLE `inventory` ADD COLUMN `source_supplier` VARCHAR(50) DEFAULT NULL");
+    } catch (Throwable $e) {
+        // ignore duplicate column/table errors below
+    }
+
+    try {
+        $pdo->exec("ALTER TABLE `inventory` ADD COLUMN `source_url` VARCHAR(255) DEFAULT NULL");
+    } catch (Throwable $e) {
+        // ignore duplicate column/table errors below
+    }
+
+    return true;
+}
+
 /**
  * Log System Error
  */
