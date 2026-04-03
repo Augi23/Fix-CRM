@@ -212,11 +212,16 @@ body.modal-open {
 .table td {
     border-color: rgba(255,255,255,0.05);
 }
-.table-danger {
-    background-color: #4a1515 !important;
-    color: #ffcccc !important;
+.table-danger > :not(caption) > * > * {
+    background-color: rgba(120, 34, 34, 0.72) !important;
+    color: #fff3f3 !important;
 }
-.table-danger td { border-color: #5c1b1b !important; }
+.table-danger td { border-color: rgba(255, 255, 255, 0.08) !important; }
+.table-danger a,
+.table-danger small,
+.table-danger .text-white-75 {
+    color: rgba(255, 255, 255, 0.88) !important;
+}
 
 /* Custom text class to replace low contrast text-white-50 */
 .text-white-75 {
