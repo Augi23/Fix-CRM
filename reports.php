@@ -11,10 +11,10 @@ $end_date = $_GET['end_date'] ?? date('Y-m-d', strtotime('sunday this week'));
 $active_tab = $_GET['tab'] ?? 'staff_stats';
 $selected_tech_id = $_GET['tech_id'] ?? null;
 
-$is_admin = hasPermission('admin_access');
+$is_admin = hasPermission('admin_access') || hasPermission('view_reports_all');
 $is_tech = ($_SESSION['role'] ?? '') == 'technician';
 
-// If technician, force them to see only their own stats and only the individual tab
+// If technician without elevated reporting permission, force them to see only their own stats and only the individual tab
 if (!$is_admin && $is_tech) {
     $active_tab = 'individual_stats';
     $selected_tech_id = $_SESSION['tech_id'];
@@ -57,15 +57,11 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     $stmt->execute($work_params);
     $work_seconds = (int)$stmt->fetchColumn();
 
-    // ─── Financials ───────────────────────────────────────────────────────────
-    // Finance date priority:
-    //   1. payment_date from linked invoice (status='paid')  ← correct for accounting
-    //   2. shipping_date of the order (fallback when no invoice exists)
-    // Only 'Collected' orders are counted.
-    //
-    // IMPORTANT: Use a SEPARATE params array here, because:
-    //  - $params above has layout: [start_dt, end_dt, tech_id]
-    //  - This query needs: [start_date, end_date, tech_id?] in THAT order
+    // ─── Financials / performance ────────────────────────────────────────────
+    // For staff reports we want results to appear immediately after a technician
+    // finishes the job, not only after the device is collected/paid.
+    // Therefore we count both Completed + Collected and primarily date them by
+    // work_finished_at, with invoice / shipping / updated_at only as fallbacks.
     $fin_params = [$start, $end];
     $fin_tech_cond = "";
     if ($tech_id) {
@@ -81,16 +77,17 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
             o.extra_expenses,
             o.technician_id,
             o.shipping_date,
+            o.work_finished_at,
             inv.total_amount AS invoice_amount,
-            COALESCE(inv.payment_date, DATE(o.shipping_date)) AS finance_date,
+            COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) AS finance_date,
             (SELECT SUM(oi2.quantity * invt.cost_price)
              FROM order_items oi2
              JOIN inventory invt ON oi2.inventory_id = invt.id
              WHERE oi2.order_id = o.id) AS inventory_cost
         FROM orders o
         LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'
-        WHERE o.status = 'Collected'
-          AND COALESCE(inv.payment_date, DATE(o.shipping_date)) BETWEEN ? AND ?
+        WHERE o.status IN ('Completed', 'Collected')
+          AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
     " . $fin_tech_cond;
 
     $stmt = $pdo->prepare($sql_orders);
@@ -425,13 +422,13 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             $current_url = urlencode($_SERVER['REQUEST_URI']);
                             $stmt = $pdo->prepare("
                                 SELECT o.*, c.first_name, c.last_name,
-                                    COALESCE(inv.payment_date, DATE(o.shipping_date)) AS finance_date,
+                                    COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) AS finance_date,
                                     (SELECT SUM(oi.quantity * invt.cost_price) FROM order_items oi JOIN inventory invt ON oi.inventory_id = invt.id WHERE oi.order_id = o.id) as inventory_cost
                                 FROM orders o
                                 JOIN customers c ON o.customer_id = c.id
                                 LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'
-                                WHERE o.technician_id = ? AND o.status = 'Collected'
-                                  AND COALESCE(inv.payment_date, DATE(o.shipping_date)) BETWEEN ? AND ?
+                                WHERE o.technician_id = ? AND o.status IN ('Completed', 'Collected')
+                                  AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
                                 ORDER BY finance_date DESC
                             ");
                             $stmt->execute([$selected_tech_id, $start_date, $end_date]);

@@ -282,8 +282,10 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             <div class="card-body">
                 <div class="d-grid gap-2">
                     <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-2"></i> <?php echo __('new_order'); ?></button>
-                    <?php if ($_SESSION['role'] == 'admin'): ?>
+                    <?php if (hasPermission('edit_customers')): ?>
                     <a href="customers.php" class="btn btn-outline-secondary"><i class="fas fa-user-plus me-2"></i> <?php echo __('customers'); ?></a>
+                    <?php endif; ?>
+                    <?php if (hasPermission('manage_inventory')): ?>
                     <a href="inventory.php" class="btn btn-outline-info"><i class="fas fa-search me-2"></i> <?php echo __('check_stock'); ?></a>
                     <?php endif; ?>
                     <a href="vykup-zarizeni.php" target="_blank" rel="noopener" class="btn btn-outline-light mt-2">

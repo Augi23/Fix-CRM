@@ -4,6 +4,21 @@
  */
 
 /**
+ * Return the effective internal staff role for the current employee session.
+ */
+function getCurrentStaffRole(): string {
+    if (($_SESSION['role'] ?? '') === 'admin') {
+        return 'admin';
+    }
+
+    if (($_SESSION['role'] ?? '') === 'technician') {
+        return (string)($_SESSION['internal_role'] ?? 'engineer');
+    }
+
+    return (string)($_SESSION['role'] ?? '');
+}
+
+/**
  * Check if current user has a specific permission.
  * All permissions are loaded from the DB once per session and cached in $_SESSION['_perms'].
  * Call invalidatePermissionsCache() whenever permissions or the session is updated.
@@ -29,7 +44,20 @@ function hasPermission($permission) {
             return true;
         }
 
-        return in_array($permission, $_SESSION['_perms'], true);
+        $implicitPermissions = [];
+        if (getCurrentStaffRole() === 'manager') {
+            $implicitPermissions = [
+                'view_all_orders',
+                'edit_orders',
+                'edit_customers',
+                'manage_inventory',
+                'procurement_manage',
+                'view_reports_all',
+            ];
+        }
+
+        return in_array($permission, $_SESSION['_perms'], true)
+            || in_array($permission, $implicitPermissions, true);
     }
 
     return false;
@@ -105,6 +133,9 @@ function getAvailablePermissions() {
         'view_all_orders' => ['name' => __('perm_view_all_orders'), 'desc' => __('perm_view_all_orders_desc'), 'icon' => 'fas fa-eye text-info'],
         'edit_orders' => ['name' => __('perm_edit_orders'), 'desc' => __('perm_edit_orders_desc'), 'icon' => 'fas fa-edit text-primary'],
         'edit_customers' => ['name' => __('perm_edit_customers'), 'desc' => __('perm_edit_customers_desc'), 'icon' => 'fas fa-user-edit text-success'],
+        'manage_inventory' => ['name' => 'Správa skladu', 'desc' => 'Může upravovat sklad, měnit počty kusů a pracovat s katalogem dílů.', 'icon' => 'fas fa-boxes text-info'],
+        'procurement_manage' => ['name' => 'Objednávání dílů', 'desc' => 'Může spravovat nákupní frontu, označovat díly jako objednané / doručené a mazat požadavky.', 'icon' => 'fas fa-truck-loading text-warning'],
+        'view_reports_all' => ['name' => 'Přehledy všech zaměstnanců', 'desc' => 'Vidí souhrnné a individuální přehledy za všechny techniky.', 'icon' => 'fas fa-chart-line text-success'],
         'manage_passwords' => ['name' => __('perm_manage_passwords'), 'desc' => __('perm_manage_passwords_desc'), 'icon' => 'fas fa-key text-danger'],
     ];
 }

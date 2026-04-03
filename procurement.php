@@ -105,6 +105,7 @@ function procurementPriorityBadge(string $priority): string {
 }
 
 $requestsJson = json_encode($openRequests, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$can_manage_procurement = hasPermission('procurement_manage') || hasPermission('admin_access');
 ?>
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
@@ -113,9 +114,11 @@ $requestsJson = json_encode($openRequests, JSON_UNESCAPED_UNICODE | JSON_UNESCAP
         <div class="text-white-75 small">Všechny požadavky na díly na jednom místě. Technik přidá požadavek z objednávky, nákupčí pak objedná po dodavatelích.</div>
     </div>
     <div class="d-flex gap-2">
+        <?php if ($can_manage_procurement): ?>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestModal">
             <i class="fas fa-plus me-2"></i>Přidat požadavek
         </button>
+        <?php endif; ?>
         <a href="orders.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Zpět na zakázky</a>
     </div>
 </div>
@@ -147,6 +150,7 @@ $requestsJson = json_encode($openRequests, JSON_UNESCAPED_UNICODE | JSON_UNESCAP
                         <span class="badge bg-primary">Objednáno: <?php echo (int)$s['ordered']; ?></span>
                         <span class="badge bg-success">Doručeno: <?php echo (int)$s['received']; ?></span>
                     </div>
+                    <?php if ($can_manage_procurement): ?>
                     <div class="d-flex gap-2 flex-wrap">
                         <button class="btn btn-sm btn-outline-primary copy-supplier-list" data-supplier="<?php echo htmlspecialchars($supplierKey); ?>">
                             <i class="fas fa-copy me-1"></i>Kopírovat seznam
@@ -155,6 +159,7 @@ $requestsJson = json_encode($openRequests, JSON_UNESCAPED_UNICODE | JSON_UNESCAP
                             <i class="fas fa-plus me-1"></i>Přidat
                         </button>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -210,6 +215,7 @@ $requestsJson = json_encode($openRequests, JSON_UNESCAPED_UNICODE | JSON_UNESCAP
                             <td class="small"><?php echo htmlspecialchars($orderText); ?></td>
                             <td class="small text-white-75"><?php echo nl2br(htmlspecialchars((string)($request['notes'] ?? ''))); ?></td>
                             <td class="text-end">
+                                <?php if ($can_manage_procurement): ?>
                                 <div class="btn-group btn-group-sm">
                                     <?php if ($status !== 'ordered'): ?>
                                         <button class="btn btn-outline-primary procurement-status-btn" data-id="<?php echo (int)$request['id']; ?>" data-status="ordered" title="Objednáno"><i class="fas fa-paper-plane"></i></button>
@@ -222,6 +228,9 @@ $requestsJson = json_encode($openRequests, JSON_UNESCAPED_UNICODE | JSON_UNESCAP
                                     <?php endif; ?>
                                     <button class="btn btn-outline-danger procurement-delete-btn" data-id="<?php echo (int)$request['id']; ?>" title="Smazat"><i class="fas fa-trash"></i></button>
                                 </div>
+                                <?php else: ?>
+                                    <span class="text-white-50 small">Jen pro managera</span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -423,7 +432,7 @@ $(function() {
         });
     });
 
-    if (<?php echo $selectedOrderId > 0 ? 'true' : 'false'; ?> && requestModal) {
+    if (<?php echo ($selectedOrderId > 0 && $can_manage_procurement) ? 'true' : 'false'; ?> && requestModal) {
         requestModal.show();
     }
 });

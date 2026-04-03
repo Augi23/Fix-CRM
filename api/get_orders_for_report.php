@@ -14,8 +14,8 @@ if (!isset($_SESSION['user_id'])) {
 $tech_id = $_GET['tech_id'] ?? null;
 $type = $_GET['type'] ?? '';
 
-// Security: If not admin, force tech_id to current user's tech_id
-if (!hasPermission('admin_access') && ($_SESSION['role'] ?? '') == 'technician') {
+// Security: If user has no elevated reporting permission, force own technician scope
+if (!hasPermission('admin_access') && !hasPermission('view_reports_all') && ($_SESSION['role'] ?? '') == 'technician') {
     $tech_id = $_SESSION['tech_id'];
 }
 

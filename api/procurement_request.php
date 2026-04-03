@@ -82,6 +82,10 @@ try {
     }
 
     if ($action === 'update') {
+        if (!hasPermission('procurement_manage')) {
+            throw new Exception('Nemáte oprávnění objednávat nebo měnit stav nákupu.');
+        }
+
         $id = (int)($_POST['id'] ?? 0);
         $status = trim((string)($_POST['status'] ?? 'pending'));
         $allowed = ['pending', 'ordered', 'received', 'cancelled'];
@@ -104,6 +108,10 @@ try {
     }
 
     if ($action === 'delete') {
+        if (!hasPermission('procurement_manage')) {
+            throw new Exception('Nemáte oprávnění mazat požadavky v nákupní frontě.');
+        }
+
         $id = (int)($_POST['id'] ?? 0);
         $stmt = $pdo->prepare("DELETE FROM purchase_requests WHERE id = ?");
         $stmt->execute([$id]);

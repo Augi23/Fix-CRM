@@ -21,12 +21,13 @@ $page = basename($_SERVER['PHP_SELF']);
 $permission_pages = [
     'customers.php' => 'edit_customers',
     'edit_customer.php' => 'edit_customers',
-    'inventory.php' => 'admin_access',
+    'inventory.php' => 'manage_inventory',
+    'edit_inventory.php' => 'manage_inventory',
     // 'reports.php' => 'admin_access', // Handled specially below
 ];
 
 if ($page == 'reports.php') {
-    if (!hasPermission('admin_access') && (($_SESSION['role'] ?? '') != 'technician')) {
+    if (!hasPermission('view_reports_all') && !hasPermission('admin_access') && (($_SESSION['role'] ?? '') != 'technician')) {
         header("Location: index.php");
         exit;
     }
@@ -101,7 +102,14 @@ if ($page == 'reports.php') {
         <img src="assets/img/applefix-logo.png" alt="AppleFix" class="sidebar-logo">
         <div class="sidebar-brand-text text-white-50 small mt-2"><?php echo htmlspecialchars(get_setting('company_name', 'Fix CRM')); ?></div>
         <div class="mt-2">
-            <?php $roleLabel = ($_SESSION['role'] ?? '') === 'admin' ? 'Admin' : (($_SESSION['role'] ?? '') === 'technician' ? 'Technik' : ucfirst((string)($_SESSION['role'] ?? ''))); ?>
+            <?php
+                $roleLabel = match (getCurrentStaffRole()) {
+                    'admin' => 'Admin',
+                    'manager' => 'Manager',
+                    'engineer' => 'Technik',
+                    default => ucfirst((string)getCurrentStaffRole()),
+                };
+            ?>
             <span class="badge bg-primary bg-opacity-75 text-white"><?php echo e($roleLabel ?: 'Zaměstnanec'); ?></span>
         </div>
     </div>
@@ -112,8 +120,10 @@ if ($page == 'reports.php') {
         <?php if (hasPermission('edit_customers')): ?>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'customers.php' ? 'active' : ''; ?>" href="customers.php"><i class="fas fa-users me-2"></i> <?php echo __('customers'); ?></a>
         <?php endif; ?>
-        <?php if (hasPermission('admin_access')): ?>
+        <?php if (hasPermission('manage_inventory')): ?>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'inventory.php' ? 'active' : ''; ?>" href="inventory.php"><i class="fas fa-boxes me-2"></i> <?php echo __('inventory'); ?></a>
+        <?php endif; ?>
+        <?php if (hasPermission('admin_access')): ?>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line me-2"></i> <?php echo __('reports'); ?></a>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'accounting.php' ? 'active' : ''; ?>" href="accounting.php"><i class="fas fa-file-invoice-dollar me-2"></i> <?php echo __('accounting'); ?></a>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>" href="settings.php"><i class="fas fa-cog me-2"></i> <?php echo __('settings'); ?></a>
@@ -173,7 +183,14 @@ if ($page == 'reports.php') {
             <?php endif; ?>
 
             <div class="d-flex align-items-center">
-                <?php $roleLabel = ($_SESSION['role'] ?? '') === 'admin' ? 'Admin' : (($_SESSION['role'] ?? '') === 'technician' ? 'Technik' : ucfirst((string)($_SESSION['role'] ?? ''))); ?>
+                <?php
+                    $roleLabel = match (getCurrentStaffRole()) {
+                        'admin' => 'Admin',
+                        'manager' => 'Manager',
+                        'engineer' => 'Technik',
+                        default => ucfirst((string)getCurrentStaffRole()),
+                    };
+                ?>
                 <span class="badge bg-secondary bg-opacity-75 text-white me-2"><?php echo e($roleLabel ?: 'Zaměstnanec'); ?></span>
                 <span class="navbar-text me-3">
                     <i class="fas fa-user-circle me-1"></i> <?php echo e($_SESSION['full_name'] ?? __('technician')); ?>
