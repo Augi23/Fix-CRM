@@ -441,12 +441,20 @@ function sendTelegramNotification($chatId, $message) {
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
     $response = curl_exec($ch);
+    $err = curl_error($ch);
     curl_close($ch);
     
-    if ($response === false) return false;
+    if ($response === false) {
+        error_log('Telegram sendMessage curl failed: ' . $err);
+        return false;
+    }
     
     $result = json_decode($response, true);
-    return isset($result['ok']) && $result['ok'];
+    if (!is_array($result) || !isset($result['ok']) || !$result['ok']) {
+        error_log('Telegram sendMessage failed: ' . $response);
+        return false;
+    }
+    return true;
 }
 
 function ensureOrderStatusLogTable() {
