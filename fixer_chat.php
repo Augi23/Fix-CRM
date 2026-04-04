@@ -28,7 +28,7 @@ if (!$selectedTech && !empty($staff)) $selectedTech = $staff[0];
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <strong><?php echo htmlspecialchars($s['name']); ?></strong><br>
-                                <small>@<?php echo htmlspecialchars($s['telegram_id'] ?: 'nepropojeno'); ?></small>
+                                <small><?php echo htmlspecialchars(ltrim((string)($s['telegram_id'] ?: 'nepropojeno'), '@')); ?></small>
                             </div>
                             <span class="badge bg-<?php echo ($s['role'] ?? '') === 'manager' ? 'info' : 'secondary'; ?>"><?php echo htmlspecialchars($s['role'] ?? ''); ?></span>
                         </div>
