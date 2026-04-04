@@ -57,7 +57,8 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     $phone = $_POST['tech_phone'] ?? '';
     $spec = $_POST['tech_spec'];
     $role = $_POST['role'] ?? 'engineer';
-    $tg_id = $_POST['tech_tg'] ?? '';
+    $tg_id = trim($_POST['tech_tg'] ?? '');
+    $tg_id = ltrim($tg_id, '@');
     $username = trim($_POST['tech_username'] ?? '');
     $password = $_POST['tech_password'] ?? '';
 
@@ -89,7 +90,8 @@ if (isset($_POST['edit_tech'])) {
     $phone = $_POST['tech_phone'] ?? '';
     $spec = $_POST['tech_spec'];
     $role = $_POST['role'] ?? 'engineer';
-    $tg_id = $_POST['tech_tg'] ?? '';
+    $tg_id = trim($_POST['tech_tg'] ?? '');
+    $tg_id = ltrim($tg_id, '@');
     $active = isset($_POST['is_active']) ? 1 : 0;
     $username = trim($_POST['tech_username'] ?? '');
     $password = $_POST['tech_password'] ?? '';
