@@ -38,12 +38,13 @@ if (!$tech) {
 }
 
 if ($text === '/start' || $text === '/help' || $text === '') {
-    $msg = "👋 Ahoj <b>{$tech['name']}</b>, tady Fixer.\n\n";
-    $msg .= "Jsem napojený na CRM a umím ti pomoct s přehledem i komunikací.\n\n";
-    $msg .= "<b>Co umím:</b>\n";
-    $msg .= "📂 /my - tvoje aktivní zakázky\n";
-    $msg .= "🔍 /view [ID] - detail zakázky\n";
-    $msg .= "\n<small>Tip: když se na něco nebudeš chtít hrabat v CRM, napiš normálně sem.</small>";
+    $msg = "👋 Ahoj <b>{$tech['name']}</b>, jsem Fixer.\n\n";
+    $msg .= "Pomůžu ti s přehledem zakázek, stavem práce i rychlou komunikací.\n\n";
+    $msg .= "<b>Rychlé příkazy:</b>\n";
+    $msg .= "• /my — tvoje aktivní zakázky\n";
+    $msg .= "• /view [ID] — detail zakázky\n";
+    $msg .= "• /me — profil v CRM\n";
+    $msg .= "\n<small>Když napíšeš normální zprávu, odpovím stručně a věcně.</small>";
     sendTelegramNotification($chatId, $msg);
     exit;
 }
@@ -97,7 +98,7 @@ if (preg_match('/^(\/whoami|\/me)$/', $text)) {
 }
 
 if ($botUsername !== '') {
-    sendTelegramNotification($chatId, "Jsem Fixer, bot pro CRM. Když chceš pomoct, napiš /help.");
+    sendTelegramNotification($chatId, "Jsem Fixer. Když chceš pomoct, napiš /help nebo /my.");
 } else {
-    sendTelegramNotification($chatId, "Nerozumím příkazu. Napiš /help.");
+    sendTelegramNotification($chatId, "Nerozumím příkazu. Zkus /help, /my nebo /view [ID].");
 }

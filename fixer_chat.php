@@ -10,6 +10,7 @@ if (!hasPermission('admin_access')) {
 
 $staff = $pdo->query("SELECT id, name, role, telegram_id, is_active FROM technicians WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
 $selectedTechId = (int)($_GET['tech_id'] ?? ($_SESSION['tech_id'] ?? 0));
+$chatChatId = $selectedTech ? (string)($selectedTech['telegram_id'] ?? '') : '';
 $selectedTech = null;
 foreach ($staff as $s) {
     if ((int)$s['id'] === $selectedTechId) { $selectedTech = $s; break; }

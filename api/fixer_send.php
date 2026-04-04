@@ -10,5 +10,6 @@ $stmt = $pdo->prepare('SELECT telegram_id, name FROM technicians WHERE id = ? LI
 $stmt->execute([$techId]);
 $tech = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$tech || empty($tech['telegram_id'])) { echo json_encode(['success'=>false,'message'=>'Technik nemá Telegram ID']); exit; }
-$ok = sendTelegramNotification($tech['telegram_id'], '💬 <b>Fixer / CRM</b>\n\n' . htmlspecialchars($message, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+$safe = htmlspecialchars($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+$ok = sendTelegramNotification($tech['telegram_id'], '💬 <b>Fixer / CRM</b>\n\n' . $safe);
 echo json_encode(['success'=>$ok,'message'=>$ok ? 'Odesláno do Telegramu' : 'Telegram message failed']);
