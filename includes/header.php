@@ -123,7 +123,7 @@ if ($page == 'reports.php') {
         <?php if (hasPermission('manage_inventory')): ?>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'inventory.php' ? 'active' : ''; ?>" href="inventory.php"><i class="fas fa-boxes me-2"></i> <?php echo __('inventory'); ?></a>
         <?php endif; ?>
-        <?php if (hasPermission('admin_access')): ?>
+        <?php if (hasPermission('admin_access') || getCurrentStaffRole() === 'manager'): ?>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line me-2"></i> <?php echo __('reports'); ?></a>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'accounting.php' ? 'active' : ''; ?>" href="accounting.php"><i class="fas fa-file-invoice-dollar me-2"></i> <?php echo __('accounting'); ?></a>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'fixer_chat.php' ? 'active' : ''; ?>" href="fixer_chat.php"><i class="fab fa-telegram-plane me-2"></i> Fixer Chat</a>
