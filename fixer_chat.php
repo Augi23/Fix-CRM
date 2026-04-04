@@ -94,8 +94,7 @@ if ($chatTag) {
     const appendBubble = (who, text, outbound, meta='') => {
         const wrap = document.createElement('div');
         wrap.className = 'mb-3 d-flex ' + (outbound ? 'justify-content-end' : 'justify-content-start');
-        wrap.innerHTML = `<div class="p-3 rounded-3 ${outbound ? 'bg-primary bg-opacity-25' : 'bg-light bg-opacity-10'}" style="max-width:82%; border:1px solid rgba(255,255,255,.15);"><div class="small text-white-50 mb-1">${escapeHtml(who)}${meta ? ' · ' + escapeHtml(meta) : ''}</div><div>${escapeHtml(text).replace(/
-/g,'<br>')}</div></div>`;
+        wrap.innerHTML = `<div class="p-3 rounded-3 ${outbound ? 'bg-primary bg-opacity-25' : 'bg-light bg-opacity-10'}" style="max-width:82%; border:1px solid rgba(255,255,255,.15);"><div class="small text-white-50 mb-1">${escapeHtml(who)}${meta ? ' · ' + escapeHtml(meta) : ''}</div><div>${escapeHtml(text).replace(/\n/g,'<br>')}</div></div>`;
         chatLog.appendChild(wrap);
         chatLog.scrollTop = chatLog.scrollHeight;
     };
