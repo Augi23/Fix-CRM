@@ -680,3 +680,17 @@ body.modal-open {
     backdrop-filter: blur(10px);
 }
 
+
+
+/* Dashboard stat cards: tighter top-row layout */
+#content .row.g-4.mb-4 .card.glass-card.p-3.h-100 {
+    margin-bottom: 0;
+}
+#content .row.g-4.mb-4 > [class*="col-"] {
+    padding-left: 8px;
+    padding-right: 8px;
+}
+#content .row.g-4.mb-4 {
+    margin-left: -8px;
+    margin-right: -8px;
+}
