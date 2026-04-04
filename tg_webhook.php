@@ -5,26 +5,37 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-$content = file_get_contents("php://input");
+$content = file_get_contents('php://input');
 $update = json_decode($content, true);
-
 if (!$update) exit;
 
-$message = $update['message'] ?? null;
-if (!$message) {
-    $message = $update['edited_message'] ?? null;
-}
+$message = $update['message'] ?? ($update['edited_message'] ?? null);
 if (!$message) exit;
 
-$chatId = $message['chat']['id'];
+$chatId = (string)($message['chat']['id'] ?? '');
 $text = trim((string)($message['text'] ?? ''));
 $botUsername = trim((string)get_setting('fixer_bot_username', ''));
-$fromId = $message['from']['id'];
+$fromId = (string)($message['from']['id'] ?? '');
 $username = isset($message['from']['username']) ? '@' . $message['from']['username'] : '';
 
 $stmt = $pdo->prepare("SELECT id, name FROM technicians WHERE (telegram_id = ? OR telegram_id = ?) AND is_active = 1");
 $stmt->execute([$fromId, $username !== '' ? $username : '---']);
 $tech = $stmt->fetch();
+
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS fixer_chat_messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        chat_tag VARCHAR(64) NOT NULL,
+        direction ENUM('outbound','inbound') NOT NULL,
+        sender_type ENUM('crm','telegram') NOT NULL,
+        sender_id VARCHAR(64) NOT NULL,
+        sender_name VARCHAR(100) DEFAULT NULL,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_chat_tag (chat_tag),
+        INDEX idx_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+} catch (Throwable $e) {}
 
 if (!$tech) {
     $msg = "❌ Nejseš ještě propojený s CRM.\n\n";
@@ -36,6 +47,10 @@ if (!$tech) {
     sendTelegramNotification($chatId, $msg);
     exit;
 }
+
+$chatTag = 'fixer_chat_' . $tech['id'];
+$insert = $pdo->prepare("INSERT INTO fixer_chat_messages (chat_tag, direction, sender_type, sender_id, sender_name, message) VALUES (?, 'inbound', 'telegram', ?, ?, ?)");
+$insert->execute([$chatTag, $fromId, $tech['name'], $text]);
 
 if ($text === '/start' || $text === '/help' || $text === '') {
     $msg = "👋 Ahoj <b>{$tech['name']}</b>, jsem Fixer.\n\n";
@@ -53,9 +68,8 @@ if ($text === '/my') {
     $stmt = $pdo->prepare("SELECT id, device_brand, device_model, status FROM orders WHERE technician_id = ? AND status NOT IN ('Collected', 'Cancelled') ORDER BY created_at DESC");
     $stmt->execute([$tech['id']]);
     $orders = $stmt->fetchAll();
-    
     if (empty($orders)) {
-        sendTelegramNotification($chatId, "✅ Nemáš žádné aktivní zakázky.");
+        sendTelegramNotification($chatId, '✅ Nemáš žádné aktivní zakázky.');
     } else {
         $msg = "📂 <b>Tvoje aktivní zakázky:</b>\n\n";
         foreach ($orders as $o) {
@@ -71,7 +85,6 @@ if (preg_match('/^\/view (\d+)$/', $text, $matches)) {
     $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ? AND o.technician_id = ?");
     $stmt->execute([$orderId, $tech['id']]);
     $order = $stmt->fetch();
-    
     if (!$order) {
         sendTelegramNotification($chatId, "❌ Zakázka #$orderId nebyla nalezena nebo není přiřazená tobě.");
     } else {
@@ -98,7 +111,7 @@ if (preg_match('/^(\/whoami|\/me)$/', $text)) {
 }
 
 if ($botUsername !== '') {
-    sendTelegramNotification($chatId, "Jsem Fixer. Když chceš pomoct, napiš /help nebo /my.");
+    sendTelegramNotification($chatId, 'Jsem Fixer. Když chceš pomoct, napiš /help nebo /my.');
 } else {
-    sendTelegramNotification($chatId, "Nerozumím příkazu. Zkus /help, /my nebo /view [ID].");
+    sendTelegramNotification($chatId, 'Nerozumím příkazu. Zkus /help, /my nebo /view [ID].');
 }
