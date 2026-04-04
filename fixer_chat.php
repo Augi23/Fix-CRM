@@ -17,32 +17,12 @@ foreach ($staff as $s) {
 if (!$selectedTech && !empty($staff)) $selectedTech = $staff[0];
 ?>
 <div class="row g-4">
-    <div class="col-12 col-xl-3">
-        <div class="card glass-card border-0 h-100">
-            <div class="card-header bg-transparent border-bottom-0">
-                <h5 class="mb-0"><i class="fas fa-users me-2"></i> Zaměstnanci</h5>
-            </div>
-            <div class="list-group list-group-flush">
-                <?php foreach ($staff as $s): ?>
-                    <a class="list-group-item list-group-item-action <?php echo $selectedTech && (int)$selectedTech['id'] === (int)$s['id'] ? 'active' : ''; ?>" href="fixer_chat.php?tech_id=<?php echo (int)$s['id']; ?>">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong><?php echo htmlspecialchars($s['name']); ?></strong><br>
-                                <small><?php echo htmlspecialchars(ltrim((string)($s['telegram_id'] ?: 'nepropojeno'), '@')); ?></small>
-                            </div>
-                            <span class="badge bg-<?php echo ($s['role'] ?? '') === 'manager' ? 'info' : 'secondary'; ?>"><?php echo htmlspecialchars($s['role'] ?? ''); ?></span>
-                        </div>
-                    </a>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-xl-9">
+    <div class="col-12">
         <div class="card glass-card border-0 h-100">
             <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
                 <div>
                     <h5 class="mb-0"><i class="fab fa-telegram-plane me-2"></i>Fixer Chat</h5>
-                    <small class="text-white-75">Decentní interní panel pro komunikaci se zaměstnanci přes Telegram bota.</small>
+                    <small class="text-white-75">Interní panel pro komunikaci přes Telegram bota.</small>
                 </div>
                 <?php if ($selectedTech): ?>
                     <span class="badge bg-primary"><?php echo htmlspecialchars($selectedTech['name']); ?></span>
@@ -53,17 +33,18 @@ if (!$selectedTech && !empty($staff)) $selectedTech = $staff[0];
                     <div class="alert alert-secondary mb-0">Žádný zaměstnanec nebyl nalezen.</div>
                 <?php else: ?>
                     <div class="alert alert-info">
+                        <strong>Komu píšeš:</strong> <?php echo htmlspecialchars($selectedTech['name']); ?><br>
                         <strong>Telegram chat ID:</strong> <?php echo htmlspecialchars($selectedTech['telegram_id'] ?: 'není spárované'); ?><br>
                         <strong>Jak používat:</strong> Posílej text dole. Odpověď přijde přes bot do Telegramu.
                     </div>
                     <div id="fixerChatLog" class="border rounded p-3 mb-3 bg-black bg-opacity-25" style="min-height: 320px; max-height: 520px; overflow:auto;"></div>
                     <form id="fixerChatForm" class="row g-2">
                         <input type="hidden" name="tech_id" value="<?php echo (int)$selectedTech['id']; ?>">
-                        <div class="col-12 col-md-10">
+                        <div class="col-12">
                             <textarea class="form-control bg-transparent text-white shadow-none" style="border:2px solid #d7ff00; box-shadow:0 0 0 1px rgba(0,0,0,.15), 0 0 10px rgba(215,255,0,.18);" name="message" rows="3" placeholder="Napiš zprávu pro Fixer / zaměstnance..."></textarea>
                         </div>
-                        <div class="col-12 col-md-2 d-grid">
-                            <button class="btn btn-primary h-100" type="submit"><i class="fas fa-paper-plane me-2"></i>Odeslat</button>
+                        <div class="col-12 d-grid d-md-flex justify-content-md-end">
+                            <button class="btn btn-primary px-4" type="submit"><i class="fas fa-paper-plane me-2"></i>Odeslat</button>
                         </div>
                     </form>
                 <?php endif; ?>
@@ -71,29 +52,4 @@ if (!$selectedTech && !empty($staff)) $selectedTech = $staff[0];
         </div>
     </div>
 </div>
-<script>
-const chatForm = document.getElementById('fixerChatForm');
-const chatLog = document.getElementById('fixerChatLog');
-if (chatForm && chatLog) {
-  const appendLine = (who, text) => {
-    const div = document.createElement('div');
-    div.className = 'mb-2';
-    div.innerHTML = `<strong>${who}:</strong> <span>${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`;
-    chatLog.appendChild(div);
-    chatLog.scrollTop = chatLog.scrollHeight;
-  };
-  chatForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData(chatForm);
-    const msg = (fd.get('message') || '').toString().trim();
-    if (!msg) return;
-    appendLine('CRM', msg);
-    const techId = fd.get('tech_id');
-    const resp = await fetch('api/fixer_send.php', { method:'POST', body: fd, credentials:'same-origin' });
-    const json = await resp.json().catch(()=>({success:false,message:'invalid response'}));
-    appendLine(json.success ? 'Fixer' : 'Error', json.message || (json.success ? 'Odesláno' : 'Nepodařilo se odeslat'));
-    chatForm.reset();
-  });
-}
-</script>
 <?php require_once 'includes/footer.php'; ?>
