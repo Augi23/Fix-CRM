@@ -656,7 +656,7 @@ require_once 'includes/header.php';
             <div class="mb-3">
                 <label class="form-label">Telegram ID / Username</label>
                 <div class="input-group">
-                    <input type="text" name="tech_tg" class="form-control" value="<?php echo htmlspecialchars($t['telegram_id'] ?? ''); ?>" placeholder="123456789 или @username">
+                    <input type="text" name="tech_tg" class="form-control" value="<?php echo htmlspecialchars($t['telegram_id'] ?? ''); ?>" placeholder="123456789 (bez @)">
                     <button class="btn btn-outline-info" type="button" onclick="testTechTG(<?php echo $t['id']; ?>)"><i class="fab fa-telegram-plane"></i></button>
                 </div>
             </div>
