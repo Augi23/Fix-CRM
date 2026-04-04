@@ -46,7 +46,8 @@ $insert = $pdo->prepare("INSERT INTO fixer_chat_messages (chat_tag, direction, s
 $insert->execute([$chatTag, $fromStaffId, $fromName, $message]);
 
 $safe = htmlspecialchars($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-$ok = sendTelegramNotification($tech['telegram_id'], '💬 <b>Fixer / CRM</b>\n\n' . $safe);
+$telegramChatId = ltrim((string)$tech['telegram_id'], '@');
+$ok = sendTelegramNotification($telegramChatId, '💬 <b>Fixer / CRM</b>\n\n' . $safe);
 
 if ($ok) {
     echo json_encode(['success' => true, 'message' => 'Odesláno do Telegramu']);
