@@ -59,6 +59,10 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     $role = $_POST['role'] ?? 'engineer';
     $tg_id = trim($_POST['tech_tg'] ?? '');
     $tg_id = ltrim($tg_id, '@');
+    if ($tg_id !== '' && !preg_match('/^\d+$/', $tg_id)) {
+        header("Location: settings.php?tab=staff&error=telegram_id_must_be_numeric");
+        exit;
+    }
     $username = trim($_POST['tech_username'] ?? '');
     $password = $_POST['tech_password'] ?? '';
 
@@ -92,6 +96,10 @@ if (isset($_POST['edit_tech'])) {
     $role = $_POST['role'] ?? 'engineer';
     $tg_id = trim($_POST['tech_tg'] ?? '');
     $tg_id = ltrim($tg_id, '@');
+    if ($tg_id !== '' && !preg_match('/^\d+$/', $tg_id)) {
+        header("Location: settings.php?tab=staff&error=telegram_id_must_be_numeric");
+        exit;
+    }
     $active = isset($_POST['is_active']) ? 1 : 0;
     $username = trim($_POST['tech_username'] ?? '');
     $password = $_POST['tech_password'] ?? '';
