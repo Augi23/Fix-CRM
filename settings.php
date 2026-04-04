@@ -26,6 +26,9 @@ if (isset($_POST['update_company']) && $is_admin_check) {
 if (isset($_POST['update_integrations']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     set_setting('tg_bot_token', trim($_POST['tg_bot_token']));
+    set_setting('fixer_webhook_url', trim($_POST['fixer_webhook_url'] ?? ''));
+    set_setting('fixer_webhook_secret', trim($_POST['fixer_webhook_secret'] ?? ''));
+    set_setting('fixer_api_token', trim($_POST['fixer_api_token'] ?? ''));
     set_setting('ai_provider', $_POST['ai_provider']);
     set_setting('ai_api_key', trim($_POST['ai_api_key']));
     set_setting('ai_model', $_POST['ai_model']);
@@ -276,6 +279,11 @@ require_once 'includes/header.php';
                         <div class="mb-3">
                             <label class="form-label small text-white-75">API Bot Token</label>
                             <input type="password" name="tg_bot_token" class="form-control" value="<?php echo htmlspecialchars(get_setting('tg_bot_token')); ?>">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-12"><label class="form-label small text-white-75">Fixer webhook URL</label><input type="text" name="fixer_webhook_url" class="form-control" value="<?php echo htmlspecialchars(get_setting('fixer_webhook_url', '')); ?>" placeholder="https://your-domain.com"></div>
+                            <div class="col-12"><label class="form-label small text-white-75">Fixer webhook secret</label><input type="text" name="fixer_webhook_secret" class="form-control" value="<?php echo htmlspecialchars(get_setting('fixer_webhook_secret', '')); ?>" placeholder="random-secret"></div>
+                            <div class="col-12"><label class="form-label small text-white-75">Fixer API token</label><input type="text" name="fixer_api_token" class="form-control" value="<?php echo htmlspecialchars(get_setting('fixer_api_token', '')); ?>" placeholder="another-random-secret"></div>
                         </div>
                         <div class="glass-panel p-3 border-secondary mb-3">
                             <h6 class="small fw-bold mb-2 text-white"><?php echo __('webhook_status'); ?></h6>

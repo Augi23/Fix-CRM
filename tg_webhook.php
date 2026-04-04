@@ -14,42 +14,46 @@ $message = $update['message'] ?? null;
 if (!$message) exit;
 
 $chatId = $message['chat']['id'];
-$text = $message['text'] ?? '';
+$text = trim((string)($message['text'] ?? ''));
+$botUsername = trim((string)get_setting('fixer_bot_username', ''));
 $fromId = $message['from']['id'];
+$username = isset($message['from']['username']) ? '@' . $message['from']['username'] : '';
 
 $stmt = $pdo->prepare("SELECT id, name FROM technicians WHERE (telegram_id = ? OR telegram_id = ?) AND is_active = 1");
-$stmt->execute([$fromId, "@" . ($message['from']['username'] ?? '---')]);
+$stmt->execute([$fromId, $username !== '' ? $username : '---']);
 $tech = $stmt->fetch();
 
 if (!$tech) {
-    $username = isset($message['from']['username']) ? "@" . $message['from']['username'] : "без никнейма";
-    $msg = "❌ Вы не зарегистрированы в CRM.\n\n";
-    $msg .= "Ваш цифровой ID: <code>$fromId</code>\n";
-    $msg .= "Ваш никнейм: <code>$username</code>\n\n";
-    $msg .= "Попросите администратора добавить ваш ID в настройки вашего профиля.";
+    $msg = "❌ Nejseš ještě propojený s CRM.\n\n";
+    $msg .= "Tvoje Telegram ID: <code>$fromId</code>\n";
+    if ($username !== '') {
+        $msg .= "Tvůj nick: <code>$username</code>\n";
+    }
+    $msg .= "\nPošli to administrátorovi, ať tě přidá jako technika.\n";
     sendTelegramNotification($chatId, $msg);
     exit;
 }
 
-if ($text == '/start' || $text == '/help') {
-    $msg = "👋 Привет, <b>{$tech['name']}</b>!\n\n";
-    $msg .= "Ваш цифровой ID: <code>$fromId</code> (скопируйте его в настройки CRM)\n\n";
-    $msg .= "Команды:\n";
-    $msg .= "📂 /my - Мои активные заявки\n";
-    $msg .= "🔍 /view [ID] - Детали заявки\n";
+if ($text === '/start' || $text === '/help') {
+    $msg = "👋 Ahoj <b>{$tech['name']}</b>, tady Fixer.\n\n";
+    $msg .= "Jsem napojený na CRM a umím ti pomoct s přehledem i komunikací.\n\n";
+    $msg .= "<b>Co umím:</b>\n";
+    $msg .= "📂 /my - tvoje aktivní zakázky\n";
+    $msg .= "🔍 /view [ID] - detail zakázky\n";
+    $msg .= "\n<small>Tip: když se na něco nebudeš chtít hrabat v CRM, napiš normálně sem.</small>";
     sendTelegramNotification($chatId, $msg);
     exit;
 }
 
-if ($text == '/my') {
+if ($text === '/my') {
     $stmt = $pdo->prepare("SELECT id, device_brand, device_model, status FROM orders WHERE technician_id = ? AND status NOT IN ('Collected', 'Cancelled') ORDER BY created_at DESC");
     $stmt->execute([$tech['id']]);
     $orders = $stmt->fetchAll();
     
     if (empty($orders)) {
-        sendTelegramNotification($chatId, "✅ У вас нет активных заявок.");
+        sendTelegramNotification($chatId, "✅ Nemáš žádné aktivní zakázky.");
     } else {
-        $msg = "📂 <b>Ваши активные заявки:</b>\n\n";
+        $msg = "📂 <b>Tvoje aktivní zakázky:</b>\n\n";
         foreach ($orders as $o) {
             $msg .= "#{$o['id']} - {$o['device_brand']} {$o['device_model']} [{$o['status']}]\n";
         }
@@ -59,21 +63,38 @@ if ($text == '/my') {
 }
 
 if (preg_match('/^\/view (\d+)$/', $text, $matches)) {
-    $orderId = $matches[1];
+    $orderId = (int)$matches[1];
     $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ? AND o.technician_id = ?");
     $stmt->execute([$orderId, $tech['id']]);
     $order = $stmt->fetch();
     
     if (!$order) {
-        sendTelegramNotification($chatId, "❌ Заявка #$orderId не найдена или назначена не вам.");
+        sendTelegramNotification($chatId, "❌ Zakázka #$orderId nebyla nalezena nebo není přiřazená tobě.");
     } else {
-        $msg = "📑 <b>Заявка #{$order['id']}</b>\n";
-        $msg .= "👤 Клиент: {$order['first_name']} {$order['last_name']} ({$order['phone']})\n";
-        $msg .= "📱 Устройство: {$order['device_brand']} {$order['device_model']}\n";
-        $msg .= "📝 Проблема: {$order['problem_description']}\n";
-        $msg .= "📍 Статус: {$order['status']}\n";
+        $msg = "📑 <b>Zakázka #{$order['id']}</b>\n";
+        $msg .= "👤 Klient: {$order['first_name']} {$order['last_name']} ({$order['phone']})\n";
+        $msg .= "📱 Zařízení: {$order['device_brand']} {$order['device_model']}\n";
+        $msg .= "📝 Problém: {$order['problem_description']}\n";
+        $msg .= "📍 Stav: {$order['status']}\n";
+        if (!empty($order['final_cost'])) {
+            $msg .= "💰 Cena: " . formatMoney((float)$order['final_cost']) . "\n";
+        }
         sendTelegramNotification($chatId, $msg);
     }
     exit;
 }
-?>
+
+if (preg_match('/^(\/whoami|\/me)$/', $text)) {
+    $msg = "🪪 <b>Profil v CRM</b>\n";
+    $msg .= "Jméno: {$tech['name']}\n";
+    $msg .= "Telegram ID: <code>$fromId</code>\n";
+    $msg .= "Status: aktivní\n";
+    sendTelegramNotification($chatId, $msg);
+    exit;
+}
+
+if ($botUsername !== '') {
+    sendTelegramNotification($chatId, "Jsem Fixer, bot pro CRM. Když chceš pomoct, napiš /help.");
+} else {
+    sendTelegramNotification($chatId, "Nerozumím příkazu. Napiš /help.");
+}

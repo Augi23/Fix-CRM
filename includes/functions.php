@@ -423,13 +423,14 @@ function log_error($message, $type = 'system', $details = '') {
 }
 
 function sendTelegramNotification($chatId, $message) {
-    if (!defined('TG_BOT_TOKEN') || empty($chatId)) return false;
+    if (!defined('TG_BOT_TOKEN') || TG_BOT_TOKEN === '' || empty($chatId)) return false;
     
     $url = "https://api.telegram.org/bot" . TG_BOT_TOKEN . "/sendMessage";
     $data = [
         'chat_id' => $chatId,
         'text' => $message,
-        'parse_mode' => 'HTML'
+        'parse_mode' => 'HTML',
+        'disable_web_page_preview' => true,
     ];
     
     $ch = curl_init();
