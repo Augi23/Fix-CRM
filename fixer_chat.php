@@ -117,6 +117,8 @@ if ($chatTag) {
         const fd = new FormData(chatForm);
         const msg = (fd.get('message') || '').toString().trim();
         if (!msg) return;
+        const tempMeta = new Date().toISOString().replace('T',' ').slice(0,19);
+        appendBubble('<?php echo addslashes($_SESSION['full_name'] ?? $_SESSION['username'] ?? 'CRM'); ?>', msg, true, tempMeta);
         const resp = await fetch('api/fixer_send.php', { method:'POST', body: fd, credentials:'same-origin' });
         const json = await resp.json().catch(()=>({success:false,message:'invalid response'}));
         if (!json.success) {
