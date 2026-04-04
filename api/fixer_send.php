@@ -46,7 +46,7 @@ $insert = $pdo->prepare("INSERT INTO fixer_chat_messages (chat_tag, direction, s
 $insert->execute([$chatTag, $fromStaffId, $fromName, $message]);
 
 $safe = htmlspecialchars($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-$telegramChatId = ltrim((string)$tech['telegram_id'], '@');
+$telegramChatId = trim((string)$tech['telegram_id']);
 include_once __DIR__ . '/../includes/functions.php';
 $ok = sendTelegramNotification($telegramChatId, '💬 <b>Fixer / CRM</b>\n\n' . $safe);
 if (!$ok) {
