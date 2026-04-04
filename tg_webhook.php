@@ -11,6 +11,9 @@ $update = json_decode($content, true);
 if (!$update) exit;
 
 $message = $update['message'] ?? null;
+if (!$message) {
+    $message = $update['edited_message'] ?? null;
+}
 if (!$message) exit;
 
 $chatId = $message['chat']['id'];
@@ -34,7 +37,7 @@ if (!$tech) {
     exit;
 }
 
-if ($text === '/start' || $text === '/help') {
+if ($text === '/start' || $text === '/help' || $text === '') {
     $msg = "👋 Ahoj <b>{$tech['name']}</b>, tady Fixer.\n\n";
     $msg .= "Jsem napojený na CRM a umím ti pomoct s přehledem i komunikací.\n\n";
     $msg .= "<b>Co umím:</b>\n";
