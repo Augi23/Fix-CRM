@@ -41,7 +41,7 @@ if (!$selectedTech && !empty($staff)) $selectedTech = $staff[0];
                     <form id="fixerChatForm" class="row g-2">
                         <input type="hidden" name="tech_id" value="<?php echo (int)$selectedTech['id']; ?>">
                         <div class="col-12">
-                            <textarea class="form-control bg-transparent text-white shadow-none" style="border:2px solid #d7ff00; box-shadow:0 0 0 1px rgba(0,0,0,.15), 0 0 10px rgba(215,255,0,.18);" name="message" rows="3" placeholder="Napiš zprávu pro Fixer / zaměstnance..."></textarea>
+                            <textarea class="form-control bg-transparent text-white shadow-none" style="border:2px solid #d7ff00 !important; box-shadow:0 0 0 1px rgba(0,0,0,.15), 0 0 10px rgba(215,255,0,.18) !important; outline:none !important;" name="message" rows="3" placeholder="Napiš zprávu pro Fixer / zaměstnance..."></textarea>
                         </div>
                         <div class="col-12 d-grid d-md-flex justify-content-md-end">
                             <button class="btn btn-primary px-4" type="submit"><i class="fas fa-paper-plane me-2"></i>Odeslat</button>
