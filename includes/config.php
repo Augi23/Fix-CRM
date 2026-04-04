@@ -20,6 +20,8 @@ ini_set('session.use_only_cookies', 1);
 
 session_start();
 
+date_default_timezone_set('Europe/Prague');
+
 // ── CSRF Token (generated once per session) ───────────────────────────────────
 if (empty($_SESSION['csrf_token'])) {
     try {
