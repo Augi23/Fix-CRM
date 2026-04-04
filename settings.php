@@ -37,7 +37,7 @@ if (isset($_POST['update_integrations']) && $is_admin_check) {
 
     if (!empty($_POST['tg_bot_token'])) {
         $token = trim($_POST['tg_bot_token']);
-        $webhook_url = "https://app.servis.expert/tg_webhook.php";
+        $webhook_url = rtrim((string)get_setting("fixer_webhook_url", "https://admin.applefix.cloud"), "/") . "/tg_webhook.php";
         $api_url = "https://api.telegram.org/bot" . $token . "/setWebhook?url=" . urlencode($webhook_url) . "&drop_pending_updates=true";
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $api_url);
