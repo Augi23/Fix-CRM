@@ -126,8 +126,9 @@ if ($page == 'reports.php') {
         <?php if (hasPermission('admin_access') || getCurrentStaffRole() === 'manager'): ?>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line me-2"></i> <?php echo __('reports'); ?></a>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'accounting.php' ? 'active' : ''; ?>" href="accounting.php"><i class="fas fa-file-invoice-dollar me-2"></i> <?php echo __('accounting'); ?></a>
-            <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'fixer_chat.php' ? 'active' : ''; ?>" href="fixer_chat.php"><i class="fab fa-telegram-plane me-2"></i> Fixer Chat</a>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>" href="settings.php"><i class="fas fa-cog me-2"></i> <?php echo __('settings'); ?></a>
+            <div style="height:14px;"></div>
+            <a class="nav-link fw-semibold" style="color:#baff00 !important; text-shadow:0 0 6px rgba(186,255,0,.28);" href="fixer_chat.php"><i class="fab fa-telegram-plane me-2"></i> Fixer Chat</a>
         <?php else: ?>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line me-2"></i> <?php echo __('reports'); ?></a>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>" href="settings.php"><i class="fas fa-user-circle me-2"></i> <?php echo __('settings'); ?></a>
