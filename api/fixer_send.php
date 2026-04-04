@@ -47,7 +47,32 @@ $insert->execute([$chatTag, $fromStaffId, $fromName, $message]);
 
 $safe = htmlspecialchars($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 $telegramChatId = ltrim((string)$tech['telegram_id'], '@');
-$ok = sendTelegramNotification($telegramChatId, '💬 <b>Fixer / CRM</b>\n\n' . $safe);
+$apiUrl = 'https://api.telegram.org/bot' . TG_BOT_TOKEN . '/sendMessage';
+$payload = [
+    'chat_id' => $telegramChatId,
+    'text' => '💬 <b>Fixer / CRM</b>\n\n' . $safe,
+    'parse_mode' => 'HTML',
+    'disable_web_page_preview' => true,
+];
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $apiUrl);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($payload));
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+$response = curl_exec($ch);
+$curlErr = curl_error($ch);
+curl_close($ch);
+$ok = false;
+if ($response !== false) {
+    $decoded = json_decode($response, true);
+    $ok = is_array($decoded) && !empty($decoded['ok']);
+}
+if (!$ok) {
+    error_log('Fixer CRM -> Telegram send failed: ' . ($response !== false ? $response : $curlErr));
+}
+
 
 if ($ok) {
     echo json_encode(['success' => true, 'message' => 'Odesláno do Telegramu']);
