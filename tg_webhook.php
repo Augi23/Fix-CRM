@@ -37,7 +37,7 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 } catch (Throwable $e) {}
 
-if (!$tech) {
+if (!$tech && ($message['chat']['type'] ?? 'private') === 'private') {
     $msg = "❌ Nejseš ještě propojený s CRM.\n\n";
     $msg .= "Tvoje Telegram ID: <code>$fromId</code>\n";
     if ($username !== '') {
@@ -48,9 +48,14 @@ if (!$tech) {
     exit;
 }
 
-$chatTag = 'fixer_chat_' . $tech['id'];
+if (!$tech && ($message['chat']['type'] ?? 'private') !== 'private') {
+    $tech = ['id' => 0, 'name' => 'Group'];
+}
+
+$chatType = (string)($message['chat']['type'] ?? 'private');
+$chatTag = $chatType === 'private' ? ('fixer_chat_' . $tech['id']) : ('fixer_group_' . $chatId);
 $insert = $pdo->prepare("INSERT INTO fixer_chat_messages (chat_tag, direction, sender_type, sender_id, sender_name, message) VALUES (?, 'inbound', 'telegram', ?, ?, ?)");
-$insert->execute([$chatTag, $fromId, $tech['name'], $text]);
+$insert->execute([$chatTag, $fromId, $message['from']['first_name'] ?? ($username ?: 'telegram'), $text]);
 
 if ($text === '/start' || $text === '/help' || $text === '') {
     $msg = "👋 Ahoj <b>{$tech['name']}</b>, jsem Fixer.\n\n";
