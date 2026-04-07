@@ -3,6 +3,8 @@ ob_start();
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 
+ensureTechnicianTelegramSchema();
+
 if (ob_get_length()) ob_clean();
 header('Content-Type: application/json');
 
@@ -24,7 +26,7 @@ if (!$tech_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT name, telegram_id FROM technicians WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT name, telegram_id, telegram_username FROM technicians WHERE id = ?");
     $stmt->execute([$tech_id]);
     $tech = $stmt->fetch();
 
@@ -40,6 +42,8 @@ try {
         } else {
             throw new Exception(__('tg_send_error'));
         }
+    } elseif ($tech && !empty($tech['telegram_username'])) {
+        throw new Exception('Zatím je uložený jen @username. Zaměstnanec musí nejdřív napsat botovi, aby se jeho Telegram ID spárovalo automaticky.');
     } else {
         throw new Exception(__('tg_id_missing'));
     }

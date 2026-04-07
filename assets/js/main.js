@@ -22,15 +22,45 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Fix for aria-hidden on focusable elements inside modals (Accessibility)
+    // Keep modal accessibility fix minimal and avoid fighting Bootstrap layering
     $(document).on('show.bs.modal shown.bs.modal', '.modal', function() {
         this.removeAttribute('aria-hidden');
-        // Extra safety for some Bootstrap versions that re-add it during animation
+        this.style.pointerEvents = 'auto';
         setTimeout(() => this.removeAttribute('aria-hidden'), 0);
+    });
+
+    $(document).on('hidden.bs.modal', '.modal', function() {
+        document.body.style.removeProperty('padding-right');
     });
 
     // Initialize Global Modals
     initGlobalModals();
+
+    // Emergency fallback: ensure modal forms submit normally even after redesign regressions
+    $(document).on('click', '.modal button[type="submit"]', function(e) {
+        const form = this.closest('form');
+        if (!form) return;
+        e.preventDefault();
+        form.requestSubmit ? form.requestSubmit(this) : form.submit();
+    });
+
+    // Fallback for inline new-customer panel inside order modals
+    $(document).on('click', '#toggleNewCustomerPanelBtn', function(e) {
+        e.preventDefault();
+        const panel = document.getElementById('inlineNewCustomerPanel');
+        if (!panel) return;
+        panel.classList.add('show');
+        panel.style.display = 'block';
+        panel.style.height = 'auto';
+    });
+
+    $(document).on('change', 'input[name="customer_type"]', function() {
+        const panel = document.getElementById('inlineNewCustomerPanel');
+        if (!panel) return;
+        panel.classList.add('show');
+        panel.style.display = 'block';
+        panel.style.height = 'auto';
+    });
 
     // Select2 Global Initialization
     if (typeof $.fn.select2 === 'function') {

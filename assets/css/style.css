@@ -24,36 +24,14 @@ body {
 }
 body::before,
 body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-}
-body::before {
-    background:
-        radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.08) 0%, transparent 18%),
-        radial-gradient(circle at 82% 16%, rgba(96, 100, 108, 0.18) 0%, transparent 24%),
-        radial-gradient(circle at 46% 64%, rgba(32, 34, 40, 0.36) 0%, transparent 32%),
-        linear-gradient(180deg, rgba(8, 9, 12, 0.22), rgba(8, 9, 12, 0.42));
-    filter: blur(26px);
-    opacity: 0.95;
-}
-body::after {
-    background:
-        radial-gradient(circle at 12% 86%, rgba(120, 124, 132, 0.10) 0%, transparent 20%),
-        radial-gradient(circle at 86% 84%, rgba(56, 60, 66, 0.18) 0%, transparent 24%),
-        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 46%);
-    filter: blur(36px);
-    opacity: 0.75;
+    content: none;
 }
 /* Bootstrap 5 Modal Fixes */
 .modal {
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 1050 !important;
+    z-index: 1055 !important;
 }
 .modal-backdrop {
-    z-index: 1040 !important;
+    z-index: 1050 !important;
 }
 body.modal-open {
     overflow: hidden !important;
@@ -100,8 +78,6 @@ body.modal-open {
     margin-left: var(--sidebar-width);
     padding: 20px;
     transition: all 0.3s;
-    position: relative;
-    z-index: 1;
 }
 #sidebar .nav-link {
     color: rgba(255,255,255,0.8);
@@ -114,7 +90,6 @@ body.modal-open {
 .card,
 .glass-card,
 .glass-panel,
-.modal-content,
 .dropdown-menu,
 .qr-popover,
 .offcanvas,
@@ -335,7 +310,6 @@ body.modal-open {
     background: rgba(4, 10, 6, 0.84) !important;
 }
 
-.modal-content,
 .dropdown-menu,
 .qr-popover,
 .offcanvas,
@@ -351,9 +325,6 @@ body.modal-open {
     -webkit-backdrop-filter: blur(18px) saturate(125%);
     box-shadow: var(--surface-shadow);
     border-radius: 14px;
-}
-.modal-content {
-    border-radius: 16px;
 }
 .dropdown-menu,
 .qr-popover {
@@ -557,7 +528,6 @@ body.modal-open {
 .card,
 .glass-card,
 .glass-panel,
-.modal-content,
 .dropdown-menu,
 .qr-popover,
 .offcanvas,
@@ -580,10 +550,17 @@ body.modal-open {
         0 20px 48px rgba(0, 0, 0, 0.28);
 }
 
+.modal-content {
+    border: 1px solid var(--glass-border);
+    background: rgba(25, 30, 36, 0.96);
+    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    color: #e2e8f0;
+}
+
 .card::before,
 .glass-card::before,
-.glass-panel::before,
-.modal-content::before {
+.glass-panel::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -610,6 +587,7 @@ body.modal-open {
     position: relative;
     z-index: 1;
 }
+
 
 .table-responsive {
     padding: 8px 10px;

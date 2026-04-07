@@ -422,6 +422,176 @@ function log_error($message, $type = 'system', $details = '') {
     }
 }
 
+function ensureTechnicianTelegramSchema(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+
+    try {
+        $hasUsername = !empty($pdo->query("SHOW COLUMNS FROM technicians LIKE 'telegram_username'")->fetchAll());
+        if (!$hasUsername) {
+            $pdo->exec("ALTER TABLE technicians ADD COLUMN telegram_username VARCHAR(64) DEFAULT NULL AFTER telegram_id");
+        }
+        try {
+            $pdo->exec("CREATE INDEX idx_technicians_telegram_username ON technicians (telegram_username)");
+        } catch (Exception $e) {
+        }
+    } catch (Exception $e) {
+        error_log('ensureTechnicianTelegramSchema failed: ' . $e->getMessage());
+    }
+}
+
+function parseTelegramContactInput($value): array {
+    $raw = trim((string)$value);
+    if ($raw === '') {
+        return ['id' => null, 'username' => null, 'valid' => true, 'raw' => ''];
+    }
+
+    $compact = preg_replace('/\s+/u', '', $raw);
+    if ($compact === null) $compact = $raw;
+
+    if (preg_match('/^\+?\d+$/', $compact)) {
+        return [
+            'id' => ltrim($compact, '+'),
+            'username' => null,
+            'valid' => true,
+            'raw' => $raw,
+        ];
+    }
+
+    $username = ltrim($compact, '@');
+    if (preg_match('/^[A-Za-z][A-Za-z0-9_]{4,31}$/', $username)) {
+        return [
+            'id' => null,
+            'username' => strtolower($username),
+            'valid' => true,
+            'raw' => $raw,
+        ];
+    }
+
+    return ['id' => null, 'username' => null, 'valid' => false, 'raw' => $raw];
+}
+
+function telegramContactDisplayValue($telegramId, $telegramUsername = null): string {
+    $telegramId = trim((string)$telegramId);
+    if ($telegramId !== '') return $telegramId;
+    $telegramUsername = trim((string)$telegramUsername);
+    if ($telegramUsername !== '') return '@' . ltrim($telegramUsername, '@');
+    return '';
+}
+
+function runGitCommand(string $repoRoot, string $command, ?int &$exitCode = null): string {
+    $cmd = 'git -C ' . escapeshellarg($repoRoot) . ' ' . $command . ' 2>&1';
+    $output = [];
+    $code = 0;
+    exec($cmd, $output, $code);
+    $exitCode = $code;
+    return trim(implode("\n", $output));
+}
+
+function gitRemoteSlug(string $repoRoot): ?string {
+    $code = 0;
+    $url = runGitCommand($repoRoot, 'config --get remote.origin.url', $code);
+    if ($code !== 0 || $url === '') {
+        return null;
+    }
+    if (preg_match('~github\.com[:/](.+?)(?:\.git)?$~', $url, $m)) {
+        return trim($m[1]);
+    }
+    return null;
+}
+
+function getGitRepoInfo(string $repoRoot): array {
+    $repoRoot = rtrim($repoRoot, '/');
+    $info = [
+        'repo_root' => $repoRoot,
+        'branch' => 'unknown',
+        'local_commit' => '',
+        'local_short' => '',
+        'local_date' => '',
+        'dirty' => false,
+        'remote_commit' => '',
+        'remote_short' => '',
+        'remote_date' => '',
+        'ahead_by' => null,
+        'behind_by' => null,
+        'update_available' => null,
+        'changelog' => [],
+        'remote_slug' => gitRemoteSlug($repoRoot),
+        'error' => null,
+    ];
+
+    if (!is_dir($repoRoot . '/.git')) {
+        $info['error'] = 'Repository not found';
+        return $info;
+    }
+
+    $code = 0;
+    $branch = runGitCommand($repoRoot, 'rev-parse --abbrev-ref HEAD', $code);
+    if ($code === 0 && $branch !== '') {
+        $info['branch'] = $branch;
+    }
+
+    $head = runGitCommand($repoRoot, 'rev-parse HEAD', $code);
+    if ($code === 0 && $head !== '') {
+        $info['local_commit'] = $head;
+        $info['local_short'] = substr($head, 0, 7);
+    }
+
+    $localDate = runGitCommand($repoRoot, "show -s --format=%cI HEAD", $code);
+    if ($code === 0 && $localDate !== '') {
+        $info['local_date'] = $localDate;
+    }
+
+    $dirty = runGitCommand($repoRoot, 'status --porcelain', $code);
+    $info['dirty'] = ($code === 0 && $dirty !== '');
+
+    $remoteSlug = $info['remote_slug'];
+    if ($remoteSlug) {
+        $remoteUrl = 'https://github.com/' . $remoteSlug . '.git';
+        $fetchCode = 0;
+        runGitCommand($repoRoot, 'fetch --quiet ' . escapeshellarg($remoteUrl) . ' main', $fetchCode);
+        if ($fetchCode === 0) {
+            $remote = runGitCommand($repoRoot, 'rev-parse FETCH_HEAD', $code);
+            if ($code === 0 && $remote !== '') {
+                $info['remote_commit'] = $remote;
+                $info['remote_short'] = substr($remote, 0, 7);
+            }
+            $remoteDate = runGitCommand($repoRoot, 'show -s --format=%cI FETCH_HEAD', $code);
+            if ($code === 0 && $remoteDate !== '') {
+                $info['remote_date'] = $remoteDate;
+            }
+            $counts = runGitCommand($repoRoot, 'rev-list --left-right --count HEAD...FETCH_HEAD', $code);
+            if ($code === 0 && preg_match('/^(\d+)\s+(\d+)$/', $counts, $m)) {
+                $info['ahead_by'] = (int)$m[1];
+                $info['behind_by'] = (int)$m[2];
+                $info['update_available'] = ((int)$m[2]) > 0;
+            }
+            $log = runGitCommand($repoRoot, "log --format='%H|%h|%cI|%s' -n 8 HEAD", $code);
+            if ($code === 0 && $log !== '') {
+                foreach (explode("\n", $log) as $row) {
+                    $parts = explode('|', $row, 4);
+                    if (count($parts) === 4) {
+                        $info['changelog'][] = [
+                            'hash' => $parts[0],
+                            'short' => $parts[1],
+                            'date' => $parts[2],
+                            'message' => $parts[3],
+                        ];
+                    }
+                }
+            }
+        } else {
+            $info['error'] = $fetchCode === 128 ? 'GitHub access denied or repository unavailable' : 'Git fetch failed';
+        }
+    } else {
+        $info['error'] = 'Origin remote is not a GitHub repository';
+    }
+
+    return $info;
+}
+
 function sendTelegramNotification($chatId, $message) {
     if (!defined('TG_BOT_TOKEN') || TG_BOT_TOKEN === '' || empty($chatId)) return false;
     

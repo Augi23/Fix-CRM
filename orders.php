@@ -554,6 +554,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     <div class="mb-3">
                                                         <label class="form-label"><?php echo __('company_name'); ?></label>
                                                         <input type="text" name="company_name" id="inline_ares_name" class="form-control">
+                                                    </div>
                                                 </div>
                                                 <div class="row g-3">
                                                     <div class="col-md-6">

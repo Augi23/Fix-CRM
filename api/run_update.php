@@ -1,143 +1,87 @@
 <?php
 /**
  * API: Run CRM Update via git pull
- * Executes 'git pull origin main' on the server to update the CRM files.
- * 
- * SECURITY: Admin-only, CSRF-protected.
- * IMPORTANT: The web server user (www-data / apache) must have write access 
- *            to the CRM directory and git must be installed on the server.
+ * Uses HTTPS GitHub remote so it works without SSH keys on the web stack.
  */
+
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// Only admins
-if (($_SESSION['role'] ?? '') !== 'admin' && !hasPermission('admin_access')) {
-    echo json_encode(['success' => false, 'message' => __('access_denied')]);
-    exit;
-}
-
-// CSRF check
-if (!validateCsrfToken($_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? ''))) {
-    echo json_encode(['success' => false, 'message' => __('csrf_invalid')]);
-    exit;
-}
-
-$projectDir = realpath(__DIR__ . '/..');
-
-// Check if git is available
-$gitCheck = shell_exec('git --version 2>&1');
-if (strpos($gitCheck, 'git version') === false) {
-    echo json_encode([
-        'success' => false, 
-        'message' => 'Git is not installed on this server.',
-        'step'    => 'git_check',
-    ]);
-    exit;
-}
-
-// Check if this is a git repo
-if (!is_dir($projectDir . '/.git')) {
+if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     echo json_encode([
         'success' => false,
-        'message' => 'Project directory is not a git repository. Please initialize git on the server first.',
-        'step'    => 'git_repo_check',
-        'hint'    => 'Run: cd ' . $projectDir . ' && git init && git remote add origin https://github.com/RichTechCZ/Repair-CRM.git && git fetch && git checkout main',
-    ]);
+        'message' => __('csrf_invalid'),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-// Save pre-update version
-$preVersionFile = $projectDir . '/version.json';
-$preVersion = file_exists($preVersionFile) ? json_decode(file_get_contents($preVersionFile), true) : null;
-
-// Stash any local changes (safety net for .env, uploads, etc.)
-$stashOutput = shell_exec("cd " . escapeshellarg($projectDir) . " && git stash 2>&1");
-
-// Pull latest from GitHub
-$pullOutput = shell_exec("cd " . escapeshellarg($projectDir) . " && git pull origin main 2>&1");
-
-// Check for errors
-$isError = (
-    strpos($pullOutput, 'fatal:') !== false ||
-    strpos($pullOutput, 'error:') !== false ||
-    strpos($pullOutput, 'CONFLICT') !== false
-);
-
-if ($isError) {
-    // Try to recover
-    shell_exec("cd " . escapeshellarg($projectDir) . " && git stash pop 2>&1");
-    
+if (!hasPermission('admin_access')) {
     echo json_encode([
         'success' => false,
-        'message' => 'Git pull failed',
-        'output'  => $pullOutput,
-        'step'    => 'git_pull',
-    ]);
+        'message' => 'Nemáš oprávnění spouštět update.',
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-// Pop stash if there was one
-if (strpos($stashOutput, 'No local changes') === false) {
-    $stashPopOutput = shell_exec("cd " . escapeshellarg($projectDir) . " && git stash pop 2>&1");
+$repoRoot = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+$info = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : [];
+
+if (empty($info) || empty($info['local_commit'])) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Nepodařilo se načíst git informace repozitáře.',
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
 }
 
-// Read new version
-$postVersion = file_exists($preVersionFile) ? json_decode(file_get_contents($preVersionFile), true) : null;
-
-// Run migrations if needed
-$migrationsDir = $projectDir . '/migrations';
-$migrationResults = [];
-if (is_dir($migrationsDir)) {
-    $migrationFiles = glob($migrationsDir . '/*.sql');
-    sort($migrationFiles);
-    
-    // Get list of already-run migrations
-    try {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS _migrations (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            filename VARCHAR(255) NOT NULL UNIQUE,
-            executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )");
-        
-        $executed = $pdo->query("SELECT filename FROM _migrations")->fetchAll(PDO::FETCH_COLUMN);
-        
-        foreach ($migrationFiles as $migFile) {
-            $basename = basename($migFile);
-            if (!in_array($basename, $executed)) {
-                try {
-                    $sql = file_get_contents($migFile);
-                    $pdo->exec($sql);
-                    $pdo->prepare("INSERT INTO _migrations (filename) VALUES (?)")->execute([$basename]);
-                    $migrationResults[] = ['file' => $basename, 'status' => 'ok'];
-                } catch (Exception $e) {
-                    $migrationResults[] = ['file' => $basename, 'status' => 'error', 'message' => $e->getMessage()];
-                }
-            }
-        }
-    } catch (Exception $e) {
-        $migrationResults[] = ['status' => 'error', 'message' => 'Migration system error: ' . $e->getMessage()];
-    }
+if (!empty($info['dirty'])) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Nejprve ulož nebo zahoď lokální změny, pracovní strom není čistý.',
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
 }
 
-// Clear update check cache
-set_setting('last_update_check', '');
+if ((int)($info['behind_by'] ?? 0) <= 0) {
+    echo json_encode([
+        'success' => true,
+        'message' => 'Jsi už na aktuálním gitu.',
+        'updated' => false,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
-// Log the update
-try {
-    log_error(
-        'CRM Updated: ' . ($preVersion['version'] ?? '?') . ' → ' . ($postVersion['version'] ?? '?'),
-        'update',
-        $pullOutput
-    );
-} catch (Exception $e) {}
+if (empty($info['remote_slug'])) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Repozitář nemá GitHub remote, update nejde spustit.',
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$remoteUrl = 'https://github.com/' . $info['remote_slug'] . '.git';
+$exitCode = 0;
+$pullOutput = runGitCommand($repoRoot, 'pull --ff-only ' . escapeshellarg($remoteUrl) . ' main', $exitCode);
+
+if ($exitCode !== 0) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Update selhal: ' . ($pullOutput ?: 'neznámá chyba'),
+        'output' => $pullOutput,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$newInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : $info;
 
 echo json_encode([
-    'success'          => true,
-    'message'          => 'CRM updated successfully!',
-    'previous_version' => $preVersion['version'] ?? 'unknown',
-    'new_version'      => $postVersion['version'] ?? 'unknown',
-    'git_output'       => $pullOutput,
-    'migrations'       => $migrationResults,
-]);
+    'success' => true,
+    'message' => 'Repozitář byl aktualizován z gitu.',
+    'updated' => true,
+    'previous_version' => trim(($info['branch'] ?? 'main') . ' @ ' . ($info['local_short'] ?? '—')),
+    'new_version' => trim(($newInfo['branch'] ?? $info['branch']) . ' @ ' . ($newInfo['local_short'] ?? $info['local_short'])),
+    'current_version' => trim(($newInfo['branch'] ?? $info['branch']) . ' @ ' . ($newInfo['local_short'] ?? $info['local_short'])),
+    'build' => sprintf('ahead %d / behind %d', (int)($newInfo['ahead_by'] ?? 0), (int)($newInfo['behind_by'] ?? 0)),
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

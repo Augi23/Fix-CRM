@@ -2,6 +2,14 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
+ensureTechnicianTelegramSchema();
+
+if (!function_exists('settingsDebugLog')) {
+    function settingsDebugLog(array $data): void {
+        @file_put_contents(__DIR__ . '/temp/settings-debug.log', json_encode($data, JSON_UNESCAPED_UNICODE) . PHP_EOL, FILE_APPEND);
+    }
+}
+
 // Processing before header to avoid header already sent
 $is_admin_check = (($_SESSION['role'] ?? '') == 'admin') || (hasPermission('admin_access'));
 
@@ -51,16 +59,16 @@ if (isset($_POST['update_integrations']) && $is_admin_check) {
 }
 
 if (isset($_POST['add_tech']) && $is_admin_check) {
+    settingsDebugLog(['event' => 'add_tech_hit', 'post' => $_POST, 'time' => date('c')]);
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     $name = $_POST['tech_name'];
     $email = $_POST['tech_email'] ?? '';
     $phone = $_POST['tech_phone'] ?? '';
     $spec = $_POST['tech_spec'];
     $role = $_POST['role'] ?? 'engineer';
-    $tg_id = trim($_POST['tech_tg'] ?? '');
-    $tg_id = ltrim($tg_id, '@');
-    if ($tg_id !== '' && !preg_match('/^\d+$/', $tg_id)) {
-        header("Location: settings.php?tab=staff&error=telegram_id_must_be_numeric");
+    $telegramContact = parseTelegramContactInput($_POST['tech_tg'] ?? '');
+    if (!$telegramContact['valid']) {
+        header("Location: settings.php?tab=staff&error=telegram_contact_invalid");
         exit;
     }
     $username = trim($_POST['tech_username'] ?? '');
@@ -73,13 +81,14 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     }
     $username_val = !empty($username) ? $username : null;
     $hashed_password = !empty($password) ? password_hash($password, PASSWORD_DEFAULT) : '';
-    $stmt = $pdo->prepare("INSERT INTO technicians (name, email, phone, specialization, role, telegram_id, username, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$name, $email, $phone, $spec, $role, $tg_id, $username_val, $hashed_password]);
+    $stmt = $pdo->prepare("INSERT INTO technicians (name, email, phone, specialization, role, telegram_id, telegram_username, username, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$name, $email, $phone, $spec, $role, $telegramContact['id'], $telegramContact['username'], $username_val, $hashed_password]);
     header("Location: settings.php?tab=staff&tech_added=1");
     exit;
 }
 
 if (isset($_POST['edit_tech'])) {
+    settingsDebugLog(['event' => 'edit_tech_hit', 'post' => $_POST, 'time' => date('c')]);
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     $id = $_POST['tech_id'];
     
@@ -94,10 +103,9 @@ if (isset($_POST['edit_tech'])) {
     $phone = $_POST['tech_phone'] ?? '';
     $spec = $_POST['tech_spec'];
     $role = $_POST['role'] ?? 'engineer';
-    $tg_id = trim($_POST['tech_tg'] ?? '');
-    $tg_id = ltrim($tg_id, '@');
-    if ($tg_id !== '' && !preg_match('/^\d+$/', $tg_id)) {
-        header("Location: settings.php?tab=staff&error=telegram_id_must_be_numeric");
+    $telegramContact = parseTelegramContactInput($_POST['tech_tg'] ?? '');
+    if (!$telegramContact['valid']) {
+        header("Location: settings.php?tab=staff&error=telegram_contact_invalid");
         exit;
     }
     $active = isset($_POST['is_active']) ? 1 : 0;
@@ -107,7 +115,7 @@ if (isset($_POST['edit_tech'])) {
 
     // Re-verify important fields if NOT admin
     if (!$is_admin_check) {
-        $stmt = $pdo->prepare("SELECT role, is_active, username, engineer_rate, name, specialization FROM technicians WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT role, is_active, username, engineer_rate, name, specialization, email, phone, telegram_id, telegram_username FROM technicians WHERE id = ?");
         $stmt->execute([$id]);
         $current = $stmt->fetch();
         $role = $current['role'];
@@ -116,6 +124,17 @@ if (isset($_POST['edit_tech'])) {
         $engineer_rate = $current['engineer_rate'];
         $name = $current['name'];
         $spec = $current['specialization'];
+
+        // Non-admin users may update only their own contact fields
+        $email = $_POST['tech_email'] ?? ($current['email'] ?? '');
+        $phone = $_POST['tech_phone'] ?? ($current['phone'] ?? '');
+        if (empty($_POST['tech_tg'])) {
+            $telegramContact = [
+                'id' => $current['telegram_id'] ?? null,
+                'username' => $current['telegram_username'] ?? null,
+                'valid' => true,
+            ];
+        }
     }
 
     if (!empty($username) && $is_admin_check) { // Only admin can change username or check it
@@ -129,14 +148,25 @@ if (isset($_POST['edit_tech'])) {
     
     $username_val = !empty($username) ? $username : null;
     if (!empty($password)) {
-        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, telegram_id = ?, is_active = ?, username = ?, password = ?, engineer_rate = ? WHERE id = ?";
-        $params = [$name, $email, $phone, $spec, $role, $tg_id, $active, $username_val, password_hash($password, PASSWORD_DEFAULT), $engineer_rate, $id];
+        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, password = ?, engineer_rate = ? WHERE id = ?";
+        $params = [$name, $email, $phone, $spec, $role, $telegramContact['id'], $telegramContact['username'], $active, $username_val, password_hash($password, PASSWORD_DEFAULT), $engineer_rate, $id];
     } else {
-        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, telegram_id = ?, is_active = ?, username = ?, engineer_rate = ? WHERE id = ?";
-        $params = [$name, $email, $phone, $spec, $role, $tg_id, $active, $username_val, $engineer_rate, $id];
+        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, engineer_rate = ? WHERE id = ?";
+        $params = [$name, $email, $phone, $spec, $role, $telegramContact['id'], $telegramContact['username'], $active, $username_val, $engineer_rate, $id];
     }
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
+    settingsDebugLog([
+        'event' => 'edit_tech_saved',
+        'tech_id' => $id,
+        'email' => $email,
+        'phone' => $phone,
+        'telegram_id' => $telegramContact['id'] ?? null,
+        'telegram_username' => $telegramContact['username'] ?? null,
+        'role' => $role,
+        'username' => $username_val,
+        'time' => date('c')
+    ]);
     header("Location: settings.php?tab=staff&updated=1");
     exit;
 }
@@ -218,6 +248,23 @@ require_once 'includes/header.php';
             <span class="badge bg-success-glow"><?php echo __('updated_success'); ?></span>
         <?php endif; ?>
     </div>
+
+    <?php if (!empty($_GET['error'])): ?>
+        <div class="alert alert-warning border-warning mb-4">
+            <?php
+                $settingsError = (string)$_GET['error'];
+                $settingsErrorMessages = [
+                    'telegram_id_must_be_numeric' => 'Telegram je potřeba zadat jako číselné Telegram ID, ne jako @username.',
+                    'telegram_contact_invalid' => 'Telegram vyplň jako číselné ID nebo @username.',
+                    'username_taken' => 'Toto přihlašovací jméno už existuje.',
+                    'unauthorized' => 'Na tuhle úpravu nemáš oprávnění.',
+                    'short_password' => 'Heslo je příliš krátké.',
+                    'csrf' => 'Formulář vypršel, zkus stránku obnovit.',
+                ];
+                echo htmlspecialchars($settingsErrorMessages[$settingsError] ?? $settingsError, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            ?>
+        </div>
+    <?php endif; ?>
 
     <!-- Tab Navigation -->
     <ul class="nav nav-pills mb-4 glass-panel p-2 border-secondary" id="settingsTabs">
@@ -525,25 +572,34 @@ require_once 'includes/header.php';
                         </div>
 
                         <?php
-                        $versionFile = __DIR__ . '/../version.json';
-                        $localVer = file_exists($versionFile) ? json_decode(file_get_contents($versionFile), true) : null;
+                        $gitInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo(__DIR__) : [];
                         ?>
-
                         <div class="row g-3 mb-4">
                             <div class="col-6">
                                 <div class="glass-panel p-3 text-center border-secondary">
-                                    <div class="text-white-75 small mb-1"><?php echo __('current_version'); ?></div>
-                                    <div class="h4 text-white mb-0" id="localVersion"><?php echo htmlspecialchars($localVer['version'] ?? '?.?.?'); ?></div>
-                                    <div class="small text-muted"><?php echo __('build'); ?>: <?php echo (int)($localVer['build'] ?? 0); ?></div>
+                                    <div class="text-white-75 small">Lokální git</div>
+                                    <div class="h4 text-white mb-0" id="localVersion"><?php echo htmlspecialchars(trim(($gitInfo['branch'] ?? 'main') . ' @ ' . ($gitInfo['local_short'] ?? '—'))); ?></div>
+                                    <div class="small text-muted">
+                                        <?php echo !empty($gitInfo['dirty']) ? 'dirty' : 'clean'; ?> · ahead <?php echo (int)($gitInfo['ahead_by'] ?? 0); ?> · behind <?php echo (int)($gitInfo['behind_by'] ?? 0); ?>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-6">
-                                <div class="glass-panel p-3 text-center border-secondary" id="remoteVersionPanel">
-                                    <div class="text-white-75 small mb-1"><?php echo __('latest_version'); ?></div>
-                                    <div class="h4 text-muted mb-0" id="remoteVersion">—</div>
-                                    <div class="small text-muted" id="remoteReleaseDate"></div>
+                                <div class="glass-panel p-3 text-center border-secondary">
+                                    <div class="text-white-75 small">GitHub main</div>
+                                    <div class="h4 text-muted mb-0" id="remoteVersion"><?php echo htmlspecialchars(trim(($gitInfo['branch'] ?? 'main') . ' @ ' . ($gitInfo['remote_short'] ?? '—'))); ?></div>
+                                    <div class="small text-muted" id="remoteReleaseDate"><?php echo !empty($gitInfo['remote_date']) ? htmlspecialchars(date('Y-m-d H:i', strtotime($gitInfo['remote_date']))) : ''; ?></div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="button" class="btn btn-primary" id="btnCheckUpdates" onclick="checkForUpdates(true)">
+                                <i class="fas fa-cloud-download-alt me-2"></i>Zkontrolovat git
+                            </button>
+                            <button type="button" class="btn btn-outline-warning" id="btnRunUpdate" onclick="installUpdate()" style="display:none;">
+                                <i class="fas fa-sync-alt me-2"></i>Aktualizovat z gitu
+                            </button>
                         </div>
 
                         <!-- Status area -->
@@ -583,7 +639,7 @@ require_once 'includes/header.php';
 
 <!-- MODALS -->
 <div class="modal fade" id="addTechModal" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content glass-card border-secondary text-white"><form method="POST">
+    <div class="modal-dialog"><div class="modal-content border-secondary text-white"><form method="POST">
         <?php echo csrfField(); ?>
         <div class="modal-header border-secondary"><h5 class="modal-title"><?php echo __('add_employee_title'); ?></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
@@ -604,9 +660,9 @@ require_once 'includes/header.php';
             </div>
             <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Email</label><input type="email" name="tech_email" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('phone_label'); ?></label><input type="text" name="tech_phone" class="form-control"></div></div>
             <div class="mb-3">
-                <label class="form-label">Telegram ID / Username</label>
-                <input type="text" name="tech_tg" class="form-control" placeholder="123456789 или @username">
-                <div class="form-text small"><?php echo __('tg_notification_hint'); ?></div>
+                <label class="form-label">Telegram ID nebo @username</label>
+                <input type="text" name="tech_tg" class="form-control" value="" placeholder="123456789 nebo @uzivatel">
+                <div class="form-text small">Můžeš zadat číselné ID nebo @username. Pokud zadáš username, zaměstnanec musí botovi napsat a CRM si jeho ID spáruje samo.</div>
             </div>
             <hr><h6 class="mb-3"><?php echo __('system_access_header'); ?></h6>
             <div class="row"><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('login_col'); ?></label><input type="text" name="tech_username" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('password_btn'); ?></label><input type="password" name="tech_password" class="form-control"></div></div>
@@ -617,8 +673,9 @@ require_once 'includes/header.php';
 
 <?php foreach ($techs as $t): ?>
 <div class="modal fade" id="editTechModal<?php echo $t['id']; ?>" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content glass-card border-secondary text-white"><form method="POST">
+    <div class="modal-dialog"><div class="modal-content border-secondary text-white"><form method="POST" id="editTechForm<?php echo $t['id']; ?>">
         <?php echo csrfField(); ?>
+        <input type="hidden" name="edit_tech" value="1">
         <input type="hidden" name="tech_id" value="<?php echo $t['id']; ?>">
         <div class="modal-header border-secondary"><h5 class="modal-title"><?php echo __('edit_title'); ?><?php echo htmlspecialchars($t['name']); ?></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
@@ -663,12 +720,25 @@ require_once 'includes/header.php';
                     <input type="hidden" name="tech_username" value="<?php echo htmlspecialchars($t['username'] ?? ''); ?>">
                 <?php endif; ?>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Telegram ID / Username</label>
-                <div class="input-group">
-                    <input type="text" name="tech_tg" class="form-control" value="<?php echo htmlspecialchars($t['telegram_id'] ?? ''); ?>" placeholder="123456789 (bez @)">
-                    <button class="btn btn-outline-info" type="button" onclick="testTechTG(<?php echo $t['id']; ?>)"><i class="fab fa-telegram-plane"></i></button>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="tech_email" class="form-control" value="<?php echo htmlspecialchars($t['email'] ?? ''); ?>">
                 </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label"><?php echo __('phone_label'); ?></label>
+                    <input type="text" name="tech_phone" class="form-control" value="<?php echo htmlspecialchars($t['phone'] ?? ''); ?>">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Telegram ID nebo @username</label>
+                <div class="input-group">
+                    <input type="text" name="tech_tg" class="form-control" value="<?php echo htmlspecialchars(telegramContactDisplayValue($t['telegram_id'] ?? '', $t['telegram_username'] ?? '')); ?>" placeholder="123456789 nebo @uzivatel">
+                    <?php if ($is_admin_user): ?>
+                    <button class="btn btn-outline-info" type="button" onclick="testTechTG(<?php echo $t['id']; ?>)"><i class="fab fa-telegram-plane"></i></button>
+                    <?php endif; ?>
+                </div>
+                <div class="form-text small"><?php echo __('tg_notification_hint'); ?></div>
             </div>
             <div class="mb-3"><label class="form-label"><?php echo __('new_password_label'); ?></label><input type="password" name="tech_password" class="form-control" placeholder="<?php echo __('password_placeholder'); ?>"></div>
             <?php if ($is_admin_user): ?>
@@ -686,12 +756,12 @@ require_once 'includes/header.php';
                 <input type="hidden" name="is_active" value="1">
             <?php endif; ?>
         </div>
-        <div class="modal-footer"><button type="submit" name="edit_tech" class="btn btn-primary"><?php echo __('save'); ?></button></div>
+        <div class="modal-footer"><button type="submit" class="btn btn-primary"><?php echo __('save'); ?></button></div>
     </form></div></div>
 </div>
 
 <div class="modal fade" id="permModal<?php echo $t['id']; ?>" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content glass-card border-secondary text-white"><form method="POST">
+    <div class="modal-dialog"><div class="modal-content border-secondary text-white"><form method="POST">
         <?php echo csrfField(); ?>
         <input type="hidden" name="tech_id" value="<?php echo $t['id']; ?>">
         <div class="modal-header border-secondary bg-warning bg-opacity-10"><h5 class="modal-title"><?php echo __('permissions_title'); ?><?php echo htmlspecialchars($t['name']); ?></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
@@ -708,7 +778,7 @@ require_once 'includes/header.php';
 <?php if ($is_admin_user): ?>
 <?php foreach ($admins as $admin): ?>
 <div class="modal fade" id="adminPwdModal<?php echo $admin['id']; ?>" tabindex="-1">
-    <div class="modal-dialog modal-sm"><div class="modal-content glass-card border-secondary text-white"><form method="POST">
+    <div class="modal-dialog modal-sm"><div class="modal-content border-secondary text-white"><form method="POST">
         <?php echo csrfField(); ?>
         <input type="hidden" name="admin_id" value="<?php echo $admin['id']; ?>">
         <div class="modal-header border-secondary bg-danger bg-opacity-25 text-white"><h6 class="modal-title"><?php echo __('change_password_title'); ?></h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
