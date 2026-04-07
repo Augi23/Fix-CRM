@@ -17,6 +17,9 @@ $text = trim((string)($message['text'] ?? ''));
 $botUsername = trim((string)get_setting('fixer_bot_username', ''));
 $fromId = (string)($message['from']['id'] ?? '');
 $username = isset($message['from']['username']) ? '@' . $message['from']['username'] : '';
+$chatType = (string)($message['chat']['type'] ?? 'private');
+$chatTitle = (string)($message['chat']['title'] ?? '');
+$mentioned = ($botUsername !== '' && stripos($text, '@' . $botUsername) !== false);
 
 $stmt = $pdo->prepare("SELECT id, name FROM technicians WHERE (telegram_id = ? OR telegram_id = ?) AND is_active = 1");
 $stmt->execute([$fromId, $username !== '' ? $username : '---']);
@@ -38,6 +41,13 @@ try {
 } catch (Throwable $e) {}
 
 if (!$tech) {
+    if ($chatType !== 'private') {
+        if ($mentioned || in_array($text, ['/start', '/help'], true)) {
+            sendTelegramNotification($chatId, 'Jsem Fixer. Ve skupině odpovím na /help, /my nebo /view [ID].');
+        }
+        exit;
+    }
+
     $msg = "❌ Nejseš ještě propojený s CRM.\n\n";
     $msg .= "Tvoje Telegram ID: <code>$fromId</code>\n";
     if ($username !== '') {
@@ -51,6 +61,11 @@ if (!$tech) {
 $chatTag = 'fixer_chat_' . $tech['id'];
 $insert = $pdo->prepare("INSERT INTO fixer_chat_messages (chat_tag, direction, sender_type, sender_id, sender_name, message) VALUES (?, 'inbound', 'telegram', ?, ?, ?)");
 $insert->execute([$chatTag, $fromId, $tech['name'], $text]);
+
+if ($chatType !== 'private' && ($mentioned || in_array($text, ['/start', '/help'], true))) {
+    sendTelegramNotification($chatId, 'Jsem Fixer. Ve skupině odpovím na /help, /my nebo /view [ID].');
+    exit;
+}
 
 if ($text === '/start' || $text === '/help' || $text === '') {
     $msg = "👋 Ahoj <b>{$tech['name']}</b>, jsem Fixer.\n\n";
@@ -111,7 +126,11 @@ if (preg_match('/^(\/whoami|\/me)$/', $text)) {
 }
 
 if ($botUsername !== '') {
-    sendTelegramNotification($chatId, 'Jsem Fixer. Když chceš pomoct, napiš /help nebo /my.');
+    if ($chatType !== 'private' && ($mentioned || strpos($text, '/') === 0)) {
+        sendTelegramNotification($chatId, 'Jsem Fixer. Ve skupině odpovím na /help, /my nebo /view [ID].');
+    } else {
+        sendTelegramNotification($chatId, 'Nerozumím příkazu. Zkus /help, /my nebo /view [ID].');
+    }
 } else {
     sendTelegramNotification($chatId, 'Nerozumím příkazu. Zkus /help, /my nebo /view [ID].');
 }
