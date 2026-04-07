@@ -38,14 +38,11 @@ try {
 } catch (Throwable $e) {}
 
 if (!$tech && ($message['chat']['type'] ?? 'private') === 'private') {
-    $msg = "❌ Nejseš ještě propojený s CRM.\n\n";
-    $msg .= "Tvoje Telegram ID: <code>$fromId</code>\n";
-    if ($username !== '') {
-        $msg .= "Tvůj nick: <code>$username</code>\n";
+    if ($text === '/start' || $text === '/help' || $text === '') {
+        sendTelegramNotification($chatId, 'Jsem Fixer. Napiš /help nebo normální zprávu, ať můžu pomoct.');
+        exit;
     }
-    $msg .= "\nPošli to administrátorovi, ať tě přidá jako technika.\n";
-    sendTelegramNotification($chatId, $msg);
-    exit;
+    $tech = ['id' => 0, 'name' => 'Private'];
 }
 
 if (!$tech && ($message['chat']['type'] ?? 'private') !== 'private') {
