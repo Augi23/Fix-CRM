@@ -13,7 +13,6 @@ $message = $update['message'] ?? ($update['edited_message'] ?? null);
 if (!$message) exit;
 
 $chatId = (string)($message['chat']['id'] ?? '');
-$chatType = (string)($message['chat']['type'] ?? 'private');
 $text = trim((string)($message['text'] ?? ''));
 $botUsername = trim((string)get_setting('fixer_bot_username', ''));
 $fromId = (string)($message['from']['id'] ?? '');
@@ -39,13 +38,6 @@ try {
 } catch (Throwable $e) {}
 
 if (!$tech) {
-    if ($chatType !== 'private') {
-        if ($text === '/start' || $text === '/help') {
-            sendTelegramNotification($chatId, 'Jsem Fixer. V této skupině jsou cmd povolené, napiš /help, /my nebo /view [ID].');
-        }
-        exit;
-    }
-
     $msg = "❌ Nejseš ještě propojený s CRM.\n\n";
     $msg .= "Tvoje Telegram ID: <code>$fromId</code>\n";
     if ($username !== '') {
@@ -59,11 +51,6 @@ if (!$tech) {
 $chatTag = 'fixer_chat_' . $tech['id'];
 $insert = $pdo->prepare("INSERT INTO fixer_chat_messages (chat_tag, direction, sender_type, sender_id, sender_name, message) VALUES (?, 'inbound', 'telegram', ?, ?, ?)");
 $insert->execute([$chatTag, $fromId, $tech['name'], $text]);
-
-if ($chatType !== 'private' && ($text === '/start' || $text === '/help')) {
-    sendTelegramNotification($chatId, 'Jsem Fixer. V této skupině jsou cmd povolené, napiš /help, /my nebo /view [ID].');
-    exit;
-}
 
 if ($text === '/start' || $text === '/help' || $text === '') {
     $msg = "👋 Ahoj <b>{$tech['name']}</b>, jsem Fixer.\n\n";
