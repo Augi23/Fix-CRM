@@ -294,8 +294,6 @@ if (isset($_SESSION['user_id'])) {
                 <div class="login-section-note mt-3">
                     <?php echo __('login_shared_form_note'); ?>
                 </div>
-
-                <div class="login-note"><?php echo __('login_footer_note'); ?></div>
             </div>
         </section>
     </div>

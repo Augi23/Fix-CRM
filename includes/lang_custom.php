@@ -58,8 +58,8 @@ $lang_overrides = [
         'login_panel_secure_access' => 'Secure Access',
         'login_username_placeholder' => 'E-mail, telefon, číslo zakázky nebo uživatelské jméno',
         'login_password_placeholder' => 'Heslo nebo PIN',
-        'login_shared_form_note' => 'Zaměstnanec se přihlásí svými údaji, klient telefonem / e-mailem / číslem zakázky a PINem. Formulář je společný, systém po přihlášení sám pošle každého do správného prostoru.',
-        'login_footer_note' => 'Všechno vypadá stejně jako dřív u admin sekce, jen už bez rozdělených vstupů.',
+        'login_shared_form_note' => 'Klient se přihlásí telefonem, e-mailem nebo číslem zakázky + PINem.',
+        'login_footer_note' => '',
 
         'print_reception_terms' => 'Zakázka je přijata k opravě. Diagnostika může být zpoplatněna. Záruka na práci je 6 měsíců. Skladování nad 30 dní je zpoplatněno.',
         'status_page_label' => 'Stav',
@@ -209,8 +209,8 @@ $lang_overrides = [
         'login_panel_secure_access' => 'Secure Access',
         'login_username_placeholder' => 'Email, phone, order number, or username',
         'login_password_placeholder' => 'Password or PIN',
-        'login_shared_form_note' => 'Employees sign in with their credentials, clients with phone/email/order number and PIN. The form is shared and the system routes each user to the correct area after login.',
-        'login_footer_note' => 'Everything stays as before in admin, now without split entry points.',
+        'login_shared_form_note' => 'Clients can sign in using phone, email, or order number + PIN.',
+        'login_footer_note' => '',
 
         // Client portal
         'client_section_title' => 'Client portal',

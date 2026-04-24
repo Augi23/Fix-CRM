@@ -249,12 +249,14 @@ body::after {
     font-weight: 700;
     font-size: 1rem;
     background: linear-gradient(180deg, #2b98e0 0%, #0f78c8 100%);
-    box-shadow: 0 14px 28px rgba(24, 139, 232, 0.22);
+    box-shadow: 0 6px 16px rgba(24, 139, 232, 0.14);
 }
 
 .login-form .btn-primary:hover,
-.login-form .btn-primary:focus {
+.login-form .btn-primary:focus,
+.login-form .btn-primary:active {
     background: linear-gradient(180deg, #369ee6 0%, #0e72bc 100%);
+    box-shadow: 0 4px 12px rgba(24, 139, 232, 0.12) !important;
 }
 
 .alert-danger {
