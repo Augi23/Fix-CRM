@@ -1,6 +1,4 @@
-    <footer class="mt-5 pt-3 border-top text-center text-muted">
-        <p>&copy; 2026 Fix CRM - Service done right</p>
-    </footer>
+    </div><!-- /.crm-main-content -->
 </div> <!-- /#content -->
 
 <!-- Universal Preview Modal -->

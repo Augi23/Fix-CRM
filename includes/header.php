@@ -176,7 +176,11 @@ try {
 
     <div class="crm-v2-divider"></div>
     <div class="crm-v2-user">
-        <div class="crm-v2-avatar"><?php echo mb_strtoupper(mb_substr(trim((string)($_SESSION['full_name'] ?? 'U')), 0, 1)); ?></div>
+        <div class="crm-v2-avatar"><?php
+            $fn = trim((string)($_SESSION['full_name'] ?? 'U'));
+            $fp = array_values(array_filter(explode(' ', $fn)));
+            echo mb_strtoupper(count($fp) >= 2 ? mb_substr($fp[0],0,1).mb_substr($fp[1],0,1) : mb_substr($fn,0,2));
+        ?></div>
         <div class="crm-v2-user-meta">
             <div class="crm-v2-user-name"><?php echo e($_SESSION['full_name'] ?? __('technician')); ?></div>
             <div class="crm-v2-user-role"><?php echo e($roleLabel ?: __('role_employee')); ?></div>
@@ -231,3 +235,4 @@ try {
             </div>
         </div>
     </nav>
+    <div class="crm-main-content">
