@@ -356,3 +356,85 @@ function openPreviewInNewTab() {
         window.open(activePreviewUrl, '_blank');
     }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   NEW ORDER WIZARD — 3-step navigation
+   ═══════════════════════════════════════════════════════════ */
+(function() {
+    function initWizard(modal) {
+        if (!modal || modal.dataset.wizardInit) return;
+        modal.dataset.wizardInit = '1';
+        var steps = modal.querySelectorAll('.crm-wizard-step');
+        var segs  = modal.querySelectorAll('.crm-wizard-seg');
+        var prevBtn = modal.querySelector('[data-wizard-prev]');
+        var nextBtn = modal.querySelector('[data-wizard-next]');
+        var subBtn  = modal.querySelector('[data-wizard-submit]');
+        var curEl   = modal.querySelector('[data-wizard-current]');
+        var cur = 1;
+        var total = steps.length || 3;
+
+        function render() {
+            steps.forEach(function(s){ s.hidden = (parseInt(s.dataset.step,10) !== cur); });
+            segs.forEach(function(s){ s.classList.toggle('active', parseInt(s.dataset.seg,10) <= cur); });
+            if (curEl) curEl.textContent = cur;
+            if (prevBtn) prevBtn.hidden = (cur === 1);
+            if (nextBtn) nextBtn.hidden = (cur === total);
+            if (subBtn)  subBtn.hidden  = (cur !== total);
+            if (cur === total) fillSummary();
+        }
+
+        function fillSummary() {
+            var form = modal.querySelector('form');
+            if (!form) return;
+            var fd = new FormData(form);
+            var fn = (fd.get('first_name')||'').toString().trim();
+            var ln = (fd.get('last_name')||'').toString().trim();
+            var cname = (fn+' '+ln).trim();
+            if (!cname) {
+                var sel = form.querySelector('select[name="customer_id"]');
+                if (sel && sel.options[sel.selectedIndex]) cname = sel.options[sel.selectedIndex].text || '—';
+            }
+            var brand = (fd.get('device_brand')||'').toString();
+            var model = (fd.get('device_model')||'').toString();
+            var device = (brand+' '+model).trim() || '—';
+            var type = (fd.get('device_type')||'').toString() || '—';
+            var prio = fd.get('priority') === 'High' ? 'Urgentní' : 'Normální';
+            var set = function(k,v){ var el = modal.querySelector('[data-summary="'+k+'"]'); if(el) el.textContent = v || '—'; };
+            set('customer', cname || '—');
+            set('device', device);
+            set('service', type);
+            set('priority', prio);
+        }
+
+        if (prevBtn) prevBtn.addEventListener('click', function(e){ e.preventDefault(); if(cur>1){ cur--; render(); }});
+        if (nextBtn) nextBtn.addEventListener('click', function(e){
+            e.preventDefault();
+            var active = modal.querySelector('.crm-wizard-step[data-step="'+cur+'"]');
+            if (active) {
+                var required = active.querySelectorAll('[required]');
+                for (var i=0; i<required.length; i++) {
+                    if (!required[i].checkValidity()) { required[i].reportValidity(); return; }
+                }
+            }
+            if (cur < total) { cur++; render(); }
+        });
+
+        modal.addEventListener('hidden.bs.modal', function(){ cur = 1; render(); });
+        render();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.crm-wizard-modal').forEach(initWizard);
+    });
+})();
+
+/* Sidebar avatar: 2 initials */
+document.addEventListener('DOMContentLoaded', function() {
+    var av = document.querySelector('.crm-v2-avatar');
+    var nm = document.querySelector('.crm-v2-user-name');
+    if (av && nm) {
+        var parts = (nm.textContent||'').trim().split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) av.textContent = (parts[0][0] + parts[1][0]).toUpperCase();
+        else if (parts.length === 1 && parts[0].length >= 2) av.textContent = parts[0].substring(0,2).toUpperCase();
+    }
+});

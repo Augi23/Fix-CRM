@@ -501,17 +501,26 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <!-- New Order Modal -->
-<div class="modal fade" id="newOrderModal" tabindex="-1" data-bs-focus="false">
+<div class="modal fade crm-wizard-modal" id="newOrderModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content border-0 shadow">
-            <form action="api/add_order.php" method="POST" enctype="multipart/form-data">
-                <?php echo csrfField(); ?> <!-- FIX #6: CSRF protection -->
-                <div class="modal-header bg-dark bg-opacity-25 border-secondary">
-                    <h5 class="modal-title"><?php echo __('new_order'); ?></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content glass-card border-secondary text-white shadow-lg">
+            <form action="api/add_order.php" method="POST" enctype="multipart/form-data" id="newOrderForm">
+                <?php echo csrfField(); ?>
+                <div class="modal-header bg-transparent border-secondary py-3">
+                    <div class="w-100">
+                        <h5 class="modal-title crm-grad-text mb-1">Nová zakázka</h5>
+                        <div class="crm-wizard-step-label">Krok <span data-wizard-current>1</span> ze 3</div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- ═══ 1. КЛИЕНТ ═══ -->
+                    <div class="crm-wizard-progress">
+                        <div class="crm-wizard-seg" data-seg="1"></div>
+                        <div class="crm-wizard-seg" data-seg="2"></div>
+                        <div class="crm-wizard-seg" data-seg="3"></div>
+                    </div>
+                    <div class="crm-wizard-step" data-step="1">
+                    <!-- ═══ 1. KLIENT ═══ -->
                     <div class="mb-2">
                         <div class="d-flex align-items-center mb-2">
                             <i class="fas fa-user text-primary me-2"></i>
@@ -598,9 +607,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
 
-                    <hr class="border-secondary my-3 opacity-50">
-
-                    <!-- ═══ 2. УСТРОЙСТВО ═══ -->
+                    </div><!-- /step 1 -->
+                    <div class="crm-wizard-step" data-step="2" hidden>
+                    <!-- ═══ 2. ZAŘÍZENÍ ═══ -->
                     <div class="mb-2">
                         <div class="d-flex align-items-center mb-2">
                             <i class="fas fa-laptop text-info me-2"></i>
@@ -706,9 +715,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
 
-                    <hr class="border-secondary my-3 opacity-50">
-
-                    <!-- ═══ 4. ФИНАНСЫ ═══ -->
+                    </div><!-- /step 2 -->
+                    <div class="crm-wizard-step" data-step="3" hidden>
+                    <div class="crm-wizard-summary">
+                        <div class="crm-wizard-summary-label">Přehled zakázky</div>
+                        <div class="crm-wizard-summary-grid">
+                            <div><span>Zákazník:</span> <strong data-summary="customer">—</strong></div>
+                            <div><span>Zařízení:</span> <strong data-summary="device">—</strong></div>
+                            <div><span>Typ opravy:</span> <strong data-summary="service">—</strong></div>
+                            <div><span>Priorita:</span> <strong data-summary="priority">Normální</strong></div>
+                        </div>
+                    </div>
+                    <!-- ═══ 3. FINANCE / PŘIŘAZENÍ ═══ -->
                     <div class="mb-2">
                         <div class="d-flex align-items-center mb-2">
                             <i class="fas fa-coins text-success me-2"></i>
@@ -753,9 +771,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-dark bg-opacity-25 border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
-                    <button type="submit" class="btn btn-primary"><?php echo __('save'); ?></button>
+                    </div><!-- /step 3 -->
+                </div>
+                <div class="modal-footer bg-transparent border-secondary crm-wizard-footer">
+                    <button type="button" class="btn btn-secondary" data-wizard-prev hidden>← Zpět</button>
+                    <button type="button" class="btn btn-primary" data-wizard-next>Pokračovat →</button>
+                    <button type="submit" class="btn btn-primary" data-wizard-submit hidden>Vytvořit zakázku</button>
                 </div>
             </form>
         </div>

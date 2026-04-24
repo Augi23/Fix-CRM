@@ -18,6 +18,29 @@ $pending_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'Pendin
 $progress_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'In Progress'" . $tech_cond)->fetchColumn();
 $ready_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ('Completed', 'Collected')" . $tech_cond)->fetchColumn();
 
+// Design-system stats
+$waiting_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'Waiting for Parts'" . $tech_cond)->fetchColumn();
+$active_count = (int)$new_count + (int)$pending_count + (int)$progress_count + $waiting_count;
+$urgent_waiting = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'Waiting for Parts' AND priority = 'High'" . $tech_cond)->fetchColumn();
+try {
+    $completed_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ('Completed','Collected') AND DATE(updated_at) = CURDATE()" . $tech_cond)->fetchColumn();
+    $planned_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()" . $tech_cond)->fetchColumn();
+    $new_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'New' AND DATE(created_at) = CURDATE()" . $tech_cond)->fetchColumn();
+    $revenue_month = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ('Completed','Collected') AND MONTH(updated_at) = MONTH(CURDATE()) AND YEAR(updated_at) = YEAR(CURDATE())" . $tech_cond)->fetchColumn();
+    $revenue_prev = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ('Completed','Collected') AND MONTH(updated_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(updated_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)" . $tech_cond)->fetchColumn();
+    $revenue_trend = $revenue_prev > 0 ? round((($revenue_month - $revenue_prev) / $revenue_prev) * 100) : 0;
+    $revenue_12m = [];
+    for ($i = 11; $i >= 0; $i--) {
+        $m = $pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ('Completed','Collected') AND YEAR(updated_at)*12+MONTH(updated_at) = YEAR(CURDATE())*12+MONTH(CURDATE()) - $i" . $tech_cond)->fetchColumn();
+        $revenue_12m[] = (float)$m;
+    }
+} catch (Throwable $e) {
+    $completed_today = $planned_today = $new_today = 0;
+    $revenue_month = $revenue_prev = 0; $revenue_trend = 0; $revenue_12m = array_fill(0, 12, 0);
+}
+$month_labels = ['D','L','Ú','B','D','Č','Č','S','Z','Ř','L','D'];
+$rev_max = max(1, max($revenue_12m));
+
 // Online Techs (Last 5 minutes) - Admin or those with admin_access
 $online_count = 0;
 if (hasPermission('admin_access')) {
@@ -40,88 +63,33 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
 ?>
 
-<div class="row g-4 mb-4">
-    <!-- Stat Cards -->
-    <div class="col-12 col-sm-6 col-md-4 col-xl">
-        <a href="?filter=New" class="text-decoration-none">
-            <div class="card glass-card p-3 h-100 <?php echo $filter_status == 'New' ? 'border-primary border-2' : 'border-0'; ?>">
-                <div class="d-flex align-items-center">
-                    <div class="bg-primary bg-opacity-10 p-2 rounded-circle me-3">
-                        <i class="fas fa-clipboard-list text-primary fa-xl"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bold"><?php echo $new_count; ?></h4>
-                        <p class="text-white-75 mb-0 small"><?php echo __('new_orders'); ?></p>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-12 col-sm-6 col-md-4 col-xl">
-        <a href="?filter=Pending Approval" class="text-decoration-none">
-            <div class="card glass-card p-3 h-100 <?php echo $filter_status == 'Pending Approval' ? 'border-info border-2' : 'border-0'; ?>">
-                <div class="d-flex align-items-center">
-                    <div class="bg-info bg-opacity-10 p-2 rounded-circle me-3">
-                        <i class="fas fa-handshake text-info fa-xl"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bold"><?php echo $pending_count; ?></h4>
-                        <p class="text-white-75 mb-0 small"><?php echo __('pending_approval_orders'); ?></p>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-12 col-sm-6 col-md-4 col-xl">
-        <a href="?filter=In Progress" class="text-decoration-none">
-            <div class="card glass-card p-3 h-100 <?php echo $filter_status == 'In Progress' ? 'border-warning border-2' : 'border-0'; ?>">
-                <div class="d-flex align-items-center">
-                    <div class="bg-warning bg-opacity-10 p-2 rounded-circle me-3">
-                        <i class="fas fa-spinner text-warning fa-xl"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bold"><?php echo $progress_count; ?></h4>
-                        <p class="text-white-75 mb-0 small"><?php echo __('in_progress_orders'); ?></p>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-12 col-sm-6 col-md-4 col-xl">
-        <a href="?filter=Completed" class="text-decoration-none">
-            <div class="card glass-card p-3 h-100 <?php echo ($filter_status == 'Completed' || $filter_status == 'Collected') ? 'border-success border-2' : 'border-0'; ?>">
-                <div class="d-flex align-items-center">
-                    <div class="bg-success bg-opacity-10 p-2 rounded-circle me-3">
-                        <i class="fas fa-check-double text-success fa-xl"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bold"><?php echo $ready_count; ?></h4>
-                        <p class="text-white-75 mb-0 small"><?php echo __('completed_orders'); ?></p>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-12 col-sm-6 col-md-4 col-xl">
-        <?php if ($_SESSION['role'] == 'admin'): ?>
-            <div class="card glass-card p-3 h-100 border-0" data-bs-toggle="tooltip" title="<?php echo __('online_techs_tooltip'); ?>">
-                <div class="d-flex align-items-center">
-                    <div class="bg-info bg-opacity-10 p-2 rounded-circle me-3">
-                        <i class="fas fa-users text-info fa-xl"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bold"><?php echo $online_count; ?></h4>
-                        <p class="text-white-75 mb-0 small"><?php echo __('online_techs'); ?></p>
-                    </div>
-                </div>
-            </div>
-        <?php else: ?>
-            <div class="card p-3 h-100 border-0 bg-dark bg-opacity-25 shadow-none">
-                <div class="d-flex align-items-center justify-content-center h-100">
-                    <img src="https://servis.expert/wp-content/uploads/2021/04/cropped-logo-servis-expert-1.png" style="max-height: 40px; opacity: 0.5;">
-                </div>
-            </div>
-        <?php endif; ?>
+<div class="crm-stat-grid mb-4">
+    <a href="orders.php" class="crm-stat-card crm-stat-1 text-decoration-none">
+        <div class="crm-stat-label">Aktivní zakázky</div>
+        <div class="crm-stat-value"><?php echo (int)$active_count; ?></div>
+        <div class="crm-stat-sub <?php echo $new_today > 0 ? 'up' : ''; ?>">
+            <?php if ($new_today > 0): ?>↑ <?php echo $new_today; ?> dnes<?php else: ?>beze změny<?php endif; ?>
+        </div>
+    </a>
+    <a href="?filter=Waiting for Parts" class="crm-stat-card crm-stat-2 text-decoration-none">
+        <div class="crm-stat-label">Čeká na díl</div>
+        <div class="crm-stat-value"><?php echo (int)$waiting_count; ?></div>
+        <div class="crm-stat-sub <?php echo $urgent_waiting > 0 ? 'down' : ''; ?>">
+            <?php echo $urgent_waiting > 0 ? $urgent_waiting.' urgentní' : 'v normě'; ?>
+        </div>
+    </a>
+    <a href="?filter=Completed" class="crm-stat-card crm-stat-3 text-decoration-none">
+        <div class="crm-stat-label">Opraveno dnes</div>
+        <div class="crm-stat-value"><?php echo (int)$completed_today; ?></div>
+        <div class="crm-stat-sub">z <?php echo (int)$planned_today; ?> plánovaných</div>
+    </a>
+    <div class="crm-stat-card crm-stat-4">
+        <?php $_monthCz = ['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec']; ?>
+        <div class="crm-stat-label">Tržby (<?php echo $_monthCz[(int)date('n')-1] ?? ''; ?>)</div>
+        <div class="crm-stat-value"><?php echo number_format($revenue_month, 0, ',', ' '); ?> Kč</div>
+        <div class="crm-stat-sub <?php echo $revenue_trend > 0 ? 'up' : ($revenue_trend < 0 ? 'down' : ''); ?>">
+            <?php if ($revenue_trend > 0): ?>↑ <?php echo $revenue_trend; ?> % vs. minulý<?php elseif ($revenue_trend < 0): ?>↓ <?php echo abs($revenue_trend); ?> % vs. minulý<?php else: ?>beze změny<?php endif; ?>
+        </div>
     </div>
 </div>
 
@@ -262,6 +230,65 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
         </div>
     </div>
     <div class="col-12 col-lg-4">
+        <!-- Revenue chart (design-system) -->
+        <div class="crm-revenue-card mb-4">
+            <div class="crm-revenue-label">Tržby po měsících</div>
+            <div class="crm-revenue-value"><?php echo number_format($revenue_month, 0, ',', ' '); ?> Kč</div>
+            <?php
+                $chart_h = 56; $chart_w = 260;
+                $bar_w = 12; $bar_gap = ($chart_w - count($revenue_12m)*$bar_w) / max(1, count($revenue_12m)-1);
+            ?>
+            <svg class="crm-revenue-chart" width="<?php echo $chart_w; ?>" height="<?php echo $chart_h + 16; ?>" viewBox="0 0 <?php echo $chart_w; ?> <?php echo $chart_h + 16; ?>">
+                <defs>
+                    <linearGradient id="barGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stop-color="#0A84FF"/>
+                        <stop offset="50%" stop-color="#5E5CE6"/>
+                        <stop offset="100%" stop-color="#BF5AF2"/>
+                    </linearGradient>
+                </defs>
+                <?php foreach ($revenue_12m as $i => $v):
+                    $bh = max(1, round(($v / $rev_max) * $chart_h));
+                    $x = $i * ($bar_w + $bar_gap);
+                    $is_last = $i === count($revenue_12m) - 1;
+                ?>
+                    <rect x="<?php echo $x; ?>" y="<?php echo $chart_h - $bh; ?>" width="<?php echo $bar_w; ?>" height="<?php echo $bh; ?>" rx="3"
+                        fill="<?php echo $is_last ? 'url(#barGrad)' : 'rgba(110,58,250,0.25)'; ?>"/>
+                <?php endforeach; ?>
+                <?php foreach ($month_labels as $i => $lbl): ?>
+                    <text x="<?php echo $i*($bar_w+$bar_gap) + $bar_w/2; ?>" y="<?php echo $chart_h + 12; ?>" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.25)"><?php echo $lbl; ?></text>
+                <?php endforeach; ?>
+            </svg>
+        </div>
+
+        <!-- Fronta dnes (design-system) -->
+        <?php
+        try {
+            $queue_today = $pdo->query("SELECT o.id, o.device_model, o.device_brand, o.status, c.first_name, c.last_name, t.name AS tech_name FROM orders o JOIN customers c ON o.customer_id=c.id LEFT JOIN technicians t ON o.technician_id=t.id WHERE o.status IN ('New','Pending Approval','In Progress','Waiting for Parts')" . $tech_cond . " ORDER BY o.priority='High' DESC, o.created_at DESC LIMIT 6")->fetchAll();
+        } catch (Throwable $e) { $queue_today = []; }
+        ?>
+        <div class="crm-queue-card mb-4">
+            <div class="crm-queue-head">
+                <div class="crm-queue-title">Fronta dnes</div>
+                <div class="crm-queue-date"><?php echo date('j. n. Y'); ?></div>
+            </div>
+            <div class="crm-queue-body">
+                <?php if (empty($queue_today)): ?>
+                    <div class="crm-queue-empty">Žádné otevřené zakázky</div>
+                <?php else: foreach ($queue_today as $q):
+                    $init = strtoupper(mb_substr($q['tech_name'] ?? '?', 0, 2));
+                ?>
+                    <a href="view_order.php?id=<?php echo (int)$q['id']; ?>" class="crm-queue-item text-decoration-none">
+                        <div class="crm-queue-avatar"><?php echo e($init); ?></div>
+                        <div class="crm-queue-meta">
+                            <div class="crm-queue-name"><?php echo e(trim($q['first_name'].' '.$q['last_name'])); ?></div>
+                            <div class="crm-queue-device"><?php echo e(trim($q['device_brand'].' '.$q['device_model'])); ?></div>
+                        </div>
+                        <?php echo getStatusBadge($q['status']); ?>
+                    </a>
+                <?php endforeach; endif; ?>
+            </div>
+        </div>
+
         <div class="card glass-card border-0 mb-4 imei-check-card">
             <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="fas fa-mobile-screen-button text-info me-2"></i><?php echo __('imei_check_title'); ?></h5>
@@ -343,18 +370,27 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
     </div>
 </div>
 
-<!-- New Order Modal -->
-<div class="modal fade" id="newOrderModal" tabindex="-1" data-bs-focus="false">
+<!-- New Order Modal — 3-step wizard -->
+<div class="modal fade crm-wizard-modal" id="newOrderModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content glass-card border-secondary text-white shadow-lg">
-            <form action="api/add_order.php" method="POST" enctype="multipart/form-data">
+            <form action="api/add_order.php" method="POST" enctype="multipart/form-data" id="newOrderForm">
                 <?php echo csrfField(); ?>
                 <div class="modal-header bg-transparent border-secondary py-3">
-                    <h5 class="modal-title"><?php echo __('new_order'); ?></h5>
+                    <div class="w-100">
+                        <h5 class="modal-title crm-grad-text mb-1">Nová zakázka</h5>
+                        <div class="crm-wizard-step-label">Krok <span data-wizard-current>1</span> ze 3</div>
+                    </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- ═══ 1. КЛИЕНТ ═══ -->
+                    <div class="crm-wizard-progress">
+                        <div class="crm-wizard-seg" data-seg="1"></div>
+                        <div class="crm-wizard-seg" data-seg="2"></div>
+                        <div class="crm-wizard-seg" data-seg="3"></div>
+                    </div>
+                    <div class="crm-wizard-step" data-step="1">
+                    <!-- ═══ 1. KLIENT ═══ -->
                     <div class="mb-2">
                         <div class="d-flex align-items-center mb-2">
                             <i class="fas fa-user text-primary me-2"></i>
@@ -445,9 +481,9 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                         </div>
                     </div>
 
-                    <hr class="border-secondary my-3 opacity-50">
-
-                    <!-- ═══ 2. УСТРОЙСТВО ═══ -->
+                    </div><!-- /step 1 -->
+                    <div class="crm-wizard-step" data-step="2" hidden>
+                    <!-- ═══ 2. ZAŘÍZENÍ ═══ -->
                     <div class="mb-2">
                         <div class="d-flex align-items-center mb-2">
                             <i class="fas fa-laptop text-info me-2"></i>
@@ -553,9 +589,18 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                         </div>
                     </div>
 
-                    <hr class="border-secondary my-3 opacity-50">
-
-                    <!-- ═══ 4. ФИНАНСЫ ═══ -->
+                    </div><!-- /step 2 -->
+                    <div class="crm-wizard-step" data-step="3" hidden>
+                    <div class="crm-wizard-summary">
+                        <div class="crm-wizard-summary-label">Přehled zakázky</div>
+                        <div class="crm-wizard-summary-grid">
+                            <div><span>Zákazník:</span> <strong data-summary="customer">—</strong></div>
+                            <div><span>Zařízení:</span> <strong data-summary="device">—</strong></div>
+                            <div><span>Typ opravy:</span> <strong data-summary="service">—</strong></div>
+                            <div><span>Priorita:</span> <strong data-summary="priority">Normální</strong></div>
+                        </div>
+                    </div>
+                    <!-- ═══ 3. FINANCE / PŘIŘAZENÍ ═══ -->
                     <div class="mb-2">
                         <div class="d-flex align-items-center mb-2">
                             <i class="fas fa-coins text-success me-2"></i>
@@ -597,10 +642,12 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                             </div>
                         </div>
                     </div>
+                    </div><!-- /step 3 -->
                 </div>
-                <div class="modal-footer bg-transparent border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
-                    <button type="submit" class="btn btn-primary"><?php echo __('save'); ?></button>
+                <div class="modal-footer bg-transparent border-secondary crm-wizard-footer">
+                    <button type="button" class="btn btn-secondary" data-wizard-prev hidden>← Zpět</button>
+                    <button type="button" class="btn btn-primary" data-wizard-next>Pokračovat →</button>
+                    <button type="submit" class="btn btn-primary" data-wizard-submit hidden>Vytvořit zakázku</button>
                 </div>
             </form>
         </div>

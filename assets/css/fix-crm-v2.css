@@ -1952,3 +1952,309 @@ body.sidebar-open .sidebar-backdrop {
   background: rgba(0,0,0,0.25) !important;
   border-color: var(--b2) !important;
 }
+
+/* ============================================================
+   V3 — DESIGN MATCH: dashboard stat grid, revenue, queue, wizard
+   Bump base font, per-card stat accents, wizard modal
+   ============================================================ */
+
+/* Font size bump */
+html, body { font-size: 14px !important; }
+.table tbody td { font-size: 13.5px !important; }
+.crm-main-content { font-size: 14px !important; }
+
+/* ── STAT GRID (4 cards) ───────────────────────── */
+.crm-stat-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 14px !important;
+}
+@media (max-width: 1199.98px) {
+  .crm-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 575.98px) {
+  .crm-stat-grid { grid-template-columns: 1fr !important; }
+}
+
+.crm-stat-card {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--b1) !important;
+  border-radius: var(--r2) !important;
+  padding: 20px 22px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: border-color 200ms, transform 200ms !important;
+  display: block !important;
+  color: var(--fg1) !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+}
+.crm-stat-card:hover {
+  border-color: rgba(110,58,250,0.35) !important;
+  transform: translateY(-1px) !important;
+}
+.crm-stat-card::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  height: 2px !important;
+  opacity: 0.85 !important;
+  display: block !important;
+}
+/* Per-card accent colors matching design */
+.crm-stat-1::before { background: linear-gradient(90deg, #0A84FF 0%, #5E5CE6 50%, #BF5AF2 100%) !important; }
+.crm-stat-2::before { background: linear-gradient(90deg, #FF9500 0%, #FF375F 100%) !important; }
+.crm-stat-3::before { background: linear-gradient(90deg, #34C759 0%, #0A84FF 100%) !important; }
+.crm-stat-4::before { background: linear-gradient(90deg, #BF5AF2 0%, #5E5CE6 50%, #0A84FF 100%) !important; }
+
+.crm-stat-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: var(--fg3) !important;
+  margin: 0 0 10px 0 !important;
+}
+.crm-stat-value {
+  background: var(--grad-text) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  font-size: 30px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.1 !important;
+  margin: 0 0 6px 0 !important;
+  font-family: 'SF Pro Display', -apple-system, sans-serif !important;
+}
+.crm-stat-sub {
+  font-size: 12px !important;
+  color: var(--fg3) !important;
+  margin: 0 !important;
+}
+.crm-stat-sub.up   { color: var(--green) !important; }
+.crm-stat-sub.down { color: var(--red) !important; }
+
+/* ── REVENUE CARD ───────────────────────────── */
+.crm-revenue-card {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--b1) !important;
+  border-radius: var(--r2) !important;
+  padding: 18px 20px !important;
+}
+.crm-revenue-label {
+  font-size: 12px !important;
+  color: var(--fg2) !important;
+  font-weight: 600 !important;
+  margin-bottom: 4px !important;
+}
+.crm-revenue-value {
+  background: var(--grad-text) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  margin-bottom: 12px !important;
+}
+.crm-revenue-chart { display: block; max-width: 100%; height: auto; }
+
+/* ── QUEUE CARD ───────────────────────────── */
+.crm-queue-card {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--b1) !important;
+  border-radius: var(--r2) !important;
+  overflow: hidden !important;
+}
+.crm-queue-head {
+  padding: 14px 18px !important;
+  border-bottom: 1px solid var(--b1) !important;
+}
+.crm-queue-title {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--fg1) !important;
+}
+.crm-queue-date {
+  font-size: 11px !important;
+  color: var(--fg3) !important;
+  margin-top: 1px !important;
+}
+.crm-queue-body {
+  padding: 6px 8px !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
+}
+.crm-queue-empty {
+  padding: 24px !important;
+  text-align: center !important;
+  color: var(--fg3) !important;
+  font-size: 13px !important;
+}
+.crm-queue-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 8px 10px !important;
+  border-radius: var(--r1) !important;
+  transition: background 100ms !important;
+  color: var(--fg1) !important;
+  text-decoration: none !important;
+}
+.crm-queue-item:hover {
+  background: rgba(110,58,250,0.08) !important;
+  color: var(--fg1) !important;
+}
+.crm-queue-avatar {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  background: var(--grad) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: #fff !important;
+  flex-shrink: 0 !important;
+  box-shadow: var(--glow-sm) !important;
+}
+.crm-queue-meta { flex: 1; min-width: 0; }
+.crm-queue-name {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--fg1) !important;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.crm-queue-device {
+  font-size: 10px !important;
+  color: var(--fg3) !important;
+  margin-top: 1px !important;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── WIZARD MODAL (3-step) ───────────────────── */
+.crm-wizard-modal .modal-content {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--b1) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+.crm-wizard-modal .modal-content::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  height: 2px !important;
+  background: var(--grad) !important;
+  z-index: 3 !important;
+}
+.crm-wizard-modal .modal-title.crm-grad-text {
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+}
+.crm-wizard-step-label {
+  font-size: 12px !important;
+  color: var(--fg3) !important;
+  font-weight: 500 !important;
+}
+.crm-wizard-progress {
+  display: flex !important;
+  gap: 4px !important;
+  margin: 4px 0 22px 0 !important;
+}
+.crm-wizard-seg {
+  flex: 1 !important;
+  height: 3px !important;
+  border-radius: 2px !important;
+  background: rgba(255,255,255,0.10) !important;
+  transition: background 300ms !important;
+}
+.crm-wizard-seg.active {
+  background: var(--grad) !important;
+  box-shadow: var(--glow-sm) !important;
+}
+.crm-wizard-step { display: block !important; }
+.crm-wizard-step[hidden] { display: none !important; }
+.crm-wizard-footer {
+  display: flex !important;
+  gap: 10px !important;
+  padding: 14px 20px !important;
+}
+.crm-wizard-footer .btn[data-wizard-prev] {
+  flex: 1 !important;
+}
+.crm-wizard-footer .btn[data-wizard-next],
+.crm-wizard-footer .btn[data-wizard-submit] {
+  flex: 3 !important;
+  background: var(--grad) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: var(--glow-sm) !important;
+}
+.crm-wizard-footer .btn[data-wizard-next]:hover,
+.crm-wizard-footer .btn[data-wizard-submit]:hover {
+  opacity: 0.85 !important;
+}
+
+/* Summary box in step 3 */
+.crm-wizard-summary {
+  background: rgba(110,58,250,0.07) !important;
+  border: 1px solid rgba(110,58,250,0.20) !important;
+  border-radius: var(--r2) !important;
+  padding: 16px 18px !important;
+  margin-bottom: 20px !important;
+}
+.crm-wizard-summary-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: var(--fg3) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  margin-bottom: 10px !important;
+}
+.crm-wizard-summary-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px 14px !important;
+}
+.crm-wizard-summary-grid > div {
+  display: flex !important;
+  gap: 6px !important;
+  font-size: 13px !important;
+}
+.crm-wizard-summary-grid span {
+  color: var(--fg3) !important;
+  flex-shrink: 0 !important;
+}
+.crm-wizard-summary-grid strong {
+  color: var(--fg1) !important;
+  font-weight: 600 !important;
+}
+
+/* Remove HRs between wizard sections (they split steps now) */
+.crm-wizard-step > hr.border-secondary { display: none !important; }
+.crm-wizard-step .mb-2 > .d-flex > i {
+  display: inline-flex !important;
+  width: 24px !important; height: 24px !important;
+  align-items: center !important; justify-content: center !important;
+  background: rgba(110,58,250,0.15) !important;
+  border-radius: 50% !important;
+  color: var(--purple) !important;
+  font-size: 11px !important;
+  margin-right: 10px !important;
+}
+.crm-wizard-step .text-primary,
+.crm-wizard-step .text-info,
+.crm-wizard-step .text-warning,
+.crm-wizard-step .text-success,
+.crm-wizard-step .text-secondary { color: var(--purple) !important; }
+
+/* Collapse new customer panel inside wizard */
+.crm-wizard-step .collapse .card {
+  background: rgba(0,0,0,0.25) !important;
+  border: 1px solid var(--b2) !important;
+}
