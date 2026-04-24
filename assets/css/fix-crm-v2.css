@@ -1,527 +1,1050 @@
+/*
+ * Fix-CRM v2 — AppleFix Design System
+ * Tento soubor je načten PO style.css a plně přebíjí konfliktní styly.
+ * Neupravujte style.css — veškeré přepisy jsou zde.
+ */
+
+/* ============================================================
+   @FONT-FACE — SF Pro Display
+   ============================================================ */
 @font-face {
   font-family: 'SF Pro Display';
   src: url('../fonts/SF-Pro-Display-Light.otf') format('opentype');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 300; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'SF Pro Display';
   src: url('../fonts/SF-Pro-Display-Regular.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 400; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'SF Pro Display';
   src: url('../fonts/SF-Pro-Display-Medium.otf') format('opentype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 500; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'SF Pro Display';
   src: url('../fonts/SF-Pro-Display-Semibold.otf') format('opentype');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('../fonts/SF-Pro-Display-Bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 600; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: 'SF Pro Display';
   src: url('../fonts/SF-Pro-Display-Black.otf') format('opentype');
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
+  font-weight: 900; font-style: normal; font-display: swap;
 }
 
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
 :root {
-  --bg: #000;
-  --s1: #0D0B1F;
-  --s2: #15103A;
-  --s3: #1E1650;
-  --s4: #2E1D6E;
-  --b1: rgba(255,255,255,0.06);
-  --b2: rgba(255,255,255,0.10);
-  --b3: rgba(255,255,255,0.16);
-  --fg1: #fff;
-  --fg2: rgba(255,255,255,0.55);
-  --fg3: rgba(255,255,255,0.28);
-  --blue: #0A84FF;
-  --indigo: #5E5CE6;
-  --violet: #6E3AFA;
-  --purple: #BF5AF2;
+  --bg:    #000000;
+  --s1:    #0D0B1F;
+  --s2:    #15103A;
+  --s3:    #1E1650;
+  --s4:    #2E1D6E;
+  --b1:    rgba(255,255,255,0.06);
+  --b2:    rgba(255,255,255,0.10);
+  --b3:    rgba(255,255,255,0.16);
+  --fg1:   #ffffff;
+  --fg2:   rgba(255,255,255,0.55);
+  --fg3:   rgba(255,255,255,0.28);
+  --blue:  #0A84FF;
+  --indigo:#5E5CE6;
+  --violet:#6E3AFA;
+  --purple:#BF5AF2;
   --green: #34C759;
-  --orange: #FF9500;
-  --red: #FF375F;
-  --grad: linear-gradient(135deg, #0A84FF 0%, #5E5CE6 45%, #BF5AF2 100%);
-  --grad-text: linear-gradient(90deg, #0A84FF 0%, #5E5CE6 40%, #BF5AF2 80%);
-  --glow: 0 0 24px rgba(110,58,250,0.35);
-  --glow-sm: 0 0 12px rgba(110,58,250,0.25);
+  --orange:#FF9500;
+  --red:   #FF375F;
+  --grad:        linear-gradient(135deg, #0A84FF 0%, #5E5CE6 45%, #BF5AF2 100%);
+  --grad-text:   linear-gradient(90deg,  #0A84FF 0%, #5E5CE6 40%, #BF5AF2 80%);
+  --grad-danger: linear-gradient(135deg, #FF375F 0%, #BF5AF2 100%);
+  --glow:        0 0 24px rgba(110,58,250,0.35);
+  --glow-sm:     0 0 12px rgba(110,58,250,0.25);
+  --card-bg:     rgba(13,11,31,0.97);
+  --sw:    232px;
+  --topbar-h: 52px;
+  --r1: 6px; --r2: 12px; --r3: 18px; --r4: 9999px;
 }
+
+/* ============================================================
+   RESET — BASE
+   ============================================================ */
+*,*::before,*::after { box-sizing: border-box; }
 
 html, body {
   background: var(--bg) !important;
-  color: var(--fg1);
-  font-family: 'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  background-image: none !important;
+  color: var(--fg1) !important;
+  font-family: 'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
 }
 
-body::before,
-body::after {
-  display: none !important;
-}
+/* Potlačit pseudo-elementy z style.css */
+body::before, body::after { display: none !important; }
+.card::before, .card::after,
+.glass-card::before, .glass-card::after,
+.glass-panel::before, .glass-panel::after { display: none !important; }
 
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(110,58,250,0.3); border-radius: 2px; }
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+#sidebar,
 #sidebar.crm-v2-sidebar {
-  width: 232px;
+  width: var(--sw) !important;
+  min-width: var(--sw) !important;
+  height: 100vh !important;
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 1040 !important;
+  display: flex !important;
+  flex-direction: column !important;
   background: var(--s1) !important;
-  border-right: 1px solid var(--b1);
-  display: flex;
-  flex-direction: column;
-  z-index: 1040;
+  background-image: none !important;
+  border-right: 1px solid var(--b1) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  overflow: hidden !important;
+  transition: transform .25s ease !important;
 }
 
+/* Logo sekce */
 #sidebar .sidebar-brand {
-  padding: 18px 20px 14px;
-  border-bottom: 1px solid var(--b1);
+  padding: 18px 20px 14px !important;
+  border-bottom: 1px solid var(--b1) !important;
+  flex-shrink: 0;
 }
-
 #sidebar .sidebar-logo {
-  height: 17px;
-  width: auto;
-  filter: invert(1);
-  opacity: 0.9;
-  object-fit: contain;
+  display: block !important;
+  height: 17px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  filter: invert(1) !important;
+  opacity: 0.9 !important;
+  object-fit: contain !important;
 }
-
 .sidebar-brand-kicker {
-  margin-top: 9px;
-  color: var(--fg3);
+  margin-top: 6px;
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-.crm-v2-nav {
-  padding: 10px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.crm-nav-group-title {
   color: var(--fg3);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 10px 10px 4px;
 }
 
+/* Nav */
+.crm-v2-nav,
+#sidebar .nav.flex-column {
+  flex: 1 !important;
+  padding: 10px !important;
+  overflow-y: auto !important;
+  gap: 0 !important;
+}
+.crm-nav-group-title {
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: var(--fg3) !important;
+  padding: 10px 10px 4px !important;
+  margin: 0 !important;
+}
+
+/* Nav links */
 #sidebar .nav-link {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  margin-bottom: 1px;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 8px 10px !important;
+  border-radius: var(--r1) !important;
+  margin-bottom: 1px !important;
   color: var(--fg2) !important;
-  font-size: 13px;
-  font-weight: 400;
-  border: 1px solid transparent;
-  position: relative;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  text-decoration: none !important;
+  position: relative !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  transition: all 140ms ease !important;
 }
-
 #sidebar .nav-link:hover {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.05) !important;
   color: var(--fg1) !important;
 }
-
-#sidebar .nav-link i {
-  width: 16px;
-  text-align: center;
-  font-size: 14px;
+#sidebar .nav-link i,
+#sidebar .nav-link .fas,
+#sidebar .nav-link .far,
+#sidebar .nav-link .fab {
+  width: 16px !important;
+  text-align: center !important;
+  font-size: 14px !important;
+  color: var(--fg3) !important;
+  flex-shrink: 0;
 }
 
+/* Aktivní nav link */
 #sidebar .nav-link.active {
-  background: rgba(110,58,250,0.18);
+  background: rgba(110,58,250,0.18) !important;
   color: #fff !important;
-  font-weight: 600;
+  font-weight: 600 !important;
 }
-
+#sidebar .nav-link.active i,
+#sidebar .nav-link.active .fas,
+#sidebar .nav-link.active .far {
+  color: var(--purple) !important;
+}
 #sidebar .nav-link.active::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 15%;
-  bottom: 15%;
+  left: 0; top: 15%; bottom: 15%;
   width: 3px;
   border-radius: 2px;
   background: var(--grad);
 }
-
-#sidebar .nav-link.active i {
-  color: var(--purple);
-}
-
 #sidebar .nav-link.active::after {
   content: '';
   margin-left: auto;
-  width: 4px;
-  height: 4px;
+  width: 4px; height: 4px;
   border-radius: 50%;
   background: var(--purple);
-  box-shadow: 0 0 6px rgba(191,90,242,0.6);
+  box-shadow: 0 0 6px rgba(191,90,242,0.7);
+  flex-shrink: 0;
 }
 
+/* Badge v nav */
 .crm-nav-pill {
   margin-left: auto;
-  background: rgba(110,58,250,0.25);
-  color: var(--purple);
-  border-radius: 999px;
+  background: rgba(110,58,250,0.25) !important;
+  color: var(--purple) !important;
+  border-radius: var(--r4);
   padding: 2px 7px;
   font-size: 10px;
   font-weight: 700;
 }
 
+/* Gradient divider */
 .crm-v2-divider {
-  height: 1px;
-  background: var(--grad);
-  opacity: .2;
-  margin: 2px 12px 0;
+  height: 1px !important;
+  background: var(--grad) !important;
+  opacity: 0.2 !important;
+  margin: 2px 0 0 !important;
+  flex-shrink: 0;
 }
 
+/* User sekce */
 .crm-v2-user {
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  padding: 12px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-shrink: 0;
 }
-
 .crm-v2-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--grad);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  box-shadow: var(--glow-sm);
+  width: 34px !important; height: 34px !important;
+  border-radius: 50% !important;
+  background: var(--grad) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  flex-shrink: 0;
+  box-shadow: var(--glow-sm) !important;
 }
-
-.crm-v2-user-name { font-size: 13px; font-weight: 600; color: #fff; }
-.crm-v2-user-role { font-size: 10px; color: var(--fg3); }
-
+.crm-v2-user-meta { flex: 1; min-width: 0; }
+.crm-v2-user-name { font-size: 13px !important; font-weight: 600 !important; color: #fff !important; }
+.crm-v2-user-role { font-size: 10px !important; color: var(--fg3) !important; }
 .crm-v2-online-dot {
+  width: 8px !important; height: 8px !important;
+  border-radius: 50% !important;
+  background: var(--green) !important;
+  box-shadow: 0 0 6px var(--green) !important;
+  flex-shrink: 0;
   margin-left: auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 6px var(--green);
 }
 
+/* ============================================================
+   CONTENT WRAPPER
+   ============================================================ */
+#content,
 #content.crm-v2-content {
-  margin-left: 232px;
-  padding: 0;
-  min-height: 100vh;
-  background: transparent;
+  margin-left: var(--sw) !important;
+  padding: 0 !important;
+  min-height: 100vh !important;
+  background: transparent !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
-.crm-v2-topbar {
-  min-height: 52px;
-  position: sticky;
-  top: 0;
-  z-index: 1030;
-  margin-bottom: 0 !important;
-  padding: 0 6px;
-  border-radius: 0 !important;
+/* ============================================================
+   TOPBAR
+   ============================================================ */
+.crm-v2-topbar,
+.crm-topbar.crm-v2-topbar,
+.navbar.crm-v2-topbar {
+  min-height: var(--topbar-h) !important;
+  height: var(--topbar-h) !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 1030 !important;
   background: rgba(0,0,0,0.72) !important;
-  backdrop-filter: blur(24px) saturate(180%);
-  border-bottom: 1px solid var(--b1);
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  border-bottom: 1px solid var(--b1) !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 24px !important;
+  box-shadow: none !important;
+  flex-shrink: 0;
 }
-
-.crm-v2-topbar .navbar-brand {
+.crm-v2-topbar .navbar-brand,
+.crm-v2-topbar .h1 {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
   color: var(--fg1) !important;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  margin: 0 !important;
+}
+.crm-topbar-inner {
+  width: 100% !important;
+  padding: 0 !important;
 }
 
+/* Vyhledávání */
 .crm-v2-search {
-  max-width: 400px;
-  width: 100%;
+  max-width: 380px !important;
+  width: 100% !important;
 }
-
 .crm-v2-search .input-group {
-  border: 1px solid var(--b2);
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.04);
-  transition: all 200ms ease;
+  border: 1px solid var(--b2) !important;
+  border-radius: var(--r4) !important;
+  overflow: hidden !important;
+  background: rgba(255,255,255,0.04) !important;
+  transition: all 200ms ease !important;
+  box-shadow: none !important;
 }
-
 .crm-v2-search .input-group:focus-within {
-  border-color: rgba(110,58,250,0.5);
-  box-shadow: 0 0 0 3px rgba(110,58,250,0.15);
+  border-color: rgba(110,58,250,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(110,58,250,0.15) !important;
 }
-
-.crm-v2-search .form-control,
 .crm-v2-search .input-group-text {
   background: transparent !important;
-  border: 0 !important;
-  color: var(--fg2);
-  height: 32px;
-  font-size: 13px;
+  border: none !important;
+  color: var(--fg3) !important;
+  min-height: unset !important;
+  height: 32px !important;
+  padding: 0 8px 0 12px !important;
 }
-
 .crm-v2-search .form-control {
-  color: var(--fg1);
+  background: transparent !important;
+  border: none !important;
+  color: var(--fg1) !important;
+  font-size: 13px !important;
+  min-height: unset !important;
+  height: 32px !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }
-
-.crm-v2-search .form-control::placeholder { color: var(--fg2); }
-
+.crm-v2-search .form-control::placeholder { color: var(--fg2) !important; }
+.crm-v2-search .form-control:focus { box-shadow: none !important; border: none !important; }
 .crm-kbd-hint {
   font-size: 9px !important;
-  border-left: 1px solid var(--b1) !important;
   color: var(--fg3) !important;
+  background: rgba(255,255,255,0.07) !important;
+  border: 1px solid var(--b2) !important;
+  border-radius: 4px !important;
+  padding: 1px 5px !important;
+  margin-right: 8px !important;
+  min-height: unset !important;
+  height: auto !important;
+  align-self: center !important;
 }
 
+/* Notifikační tlačítko */
 .crm-v2-icon-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--fg2);
-  position: relative;
+  width: 32px !important; height: 32px !important;
+  border-radius: var(--r1) !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--fg2) !important;
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  transition: all 140ms !important;
 }
-
-.crm-v2-icon-btn:hover {
-  background: rgba(110,58,250,0.15);
-  border-color: rgba(110,58,250,0.3);
-  color: #fff;
-}
-
-.crm-v2-alert-dot {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--red);
-  box-shadow: 0 0 6px var(--red);
-  border: 2px solid #000;
-}
-
-.crm-v2-cta-new-order,
-.btn-primary,
-.page-item.active .page-link {
-  background: var(--grad) !important;
-  border-color: transparent !important;
+.crm-v2-icon-btn:hover,
+.crm-v2-icon-btn.active {
+  background: rgba(110,58,250,0.15) !important;
+  border-color: rgba(110,58,250,0.3) !important;
   color: #fff !important;
-  box-shadow: var(--glow-sm);
+}
+.crm-v2-alert-dot {
+  position: absolute !important;
+  top: 5px !important; right: 5px !important;
+  width: 7px !important; height: 7px !important;
+  border-radius: 50% !important;
+  background: var(--red) !important;
+  box-shadow: 0 0 6px var(--red) !important;
+  border: 2px solid #000 !important;
 }
 
-.crm-v2-cta-new-order { border-radius: 999px !important; padding: 7px 14px !important; font-size: 13px; font-weight: 600; }
-.crm-v2-cta-new-order:hover { opacity: .85; }
+/* CTA tlačítko v topbaru */
+a.crm-v2-cta-new-order,
+.crm-v2-cta-new-order {
+  background: var(--grad) !important;
+  border: none !important;
+  border-color: transparent !important;
+  border-radius: var(--r4) !important;
+  padding: 7px 16px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+  box-shadow: var(--glow-sm) !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: opacity 150ms !important;
+}
+.crm-v2-cta-new-order:hover { opacity: 0.85 !important; }
 
+/* Lang switch + logout */
+.crm-lang-switch,
+.btn-outline-danger.btn-sm {
+  border-radius: var(--r1) !important;
+  font-size: 12px !important;
+}
+
+/* ============================================================
+   MAIN CONTENT PADDING
+   ============================================================ */
+#content > *:not(.crm-v2-topbar):not(.navbar):not(.crm-notifications-panel) {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+/* Reset style.css margin hack */
 #content > .row,
 #content > .d-flex,
 #content > .card,
 #content > .container-fluid,
 #content > .alert,
-#content > h1,
-#content > h2,
-#content > h3,
-#content > h4,
-#content > h5,
-#content > h6 {
-  margin-left: 22px;
-  margin-right: 22px;
+#content > h1, #content > h2, #content > h3,
+#content > h4, #content > h5, #content > h6 {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
+/* ============================================================
+   CARDS
+   ============================================================ */
 .card,
 .glass-card,
-.glass-panel,
-.modal-content,
-.dropdown-menu {
-  background: rgba(13,11,31,0.95) !important;
+.glass-panel {
+  background: var(--card-bg) !important;
+  background-image: none !important;
   border: 1px solid var(--b1) !important;
-  border-radius: 12px !important;
-  color: var(--fg1);
+  border-radius: var(--r2) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  color: var(--fg1) !important;
+  transition: border-color 200ms ease !important;
+  position: relative !important;
+  overflow: visible !important;
 }
-
-.card:hover,
-.glass-card:hover {
-  border-color: rgba(110,58,250,0.3) !important;
+.card:hover, .glass-card:hover {
+  border-color: rgba(110,58,250,0.28) !important;
 }
-
-.card-header,
-.modal-header,
-.modal-footer {
+.card-header, .card-footer {
+  background: rgba(0,0,0,0.25) !important;
   border-color: var(--b1) !important;
-  background: rgba(0,0,0,.25) !important;
+  color: var(--fg1) !important;
 }
+.card-body { position: relative; z-index: 1; }
 
+/* ============================================================
+   TABULKY
+   ============================================================ */
 .table {
-  color: var(--fg1);
-  margin-bottom: 0;
+  color: var(--fg1) !important;
+  border-collapse: collapse !important;
+  margin-bottom: 0 !important;
 }
-
 .table thead th {
-  background: rgba(0,0,0,0.38) !important;
-  color: var(--fg3);
-  border-bottom: 1px solid var(--b1);
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  font-size: 10px;
-  font-weight: 700;
+  background: rgba(0,0,0,0.35) !important;
+  color: var(--fg3) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  border-bottom: 1px solid var(--b1) !important;
+  padding: 10px 16px !important;
+  white-space: nowrap;
+}
+.table tbody td {
+  border-color: var(--b1) !important;
+  color: var(--fg1) !important;
+  vertical-align: middle !important;
+  padding: 12px 16px !important;
+  background: transparent !important;
+}
+.table-hover tbody tr { transition: background 100ms ease; }
+.table-hover tbody tr:hover > td {
+  background: rgba(110,58,250,0.07) !important;
+}
+.table-responsive {
+  border-radius: var(--r2) !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+.table-responsive > .table { margin: 0 !important; }
+
+/* Clickable rows */
+.clickable-order-row { cursor: pointer; }
+.clickable-order-row:hover > td {
+  background: rgba(110,58,250,0.07) !important;
 }
 
-.table tbody td { border-color: var(--b1); }
-.table-hover tbody tr:hover { background: rgba(110,58,250,0.08) !important; }
-
+/* ============================================================
+   FORMULÁŘE
+   ============================================================ */
 .form-control,
-.form-select,
-.input-group-text,
+.form-select {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid var(--b2) !important;
+  border-radius: var(--r1) !important;
+  color: var(--fg1) !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+  min-height: 40px !important;
+  box-shadow: none !important;
+  transition: border-color 150ms, box-shadow 150ms !important;
+}
+.form-control::placeholder { color: var(--fg3) !important; }
+.form-control:focus,
+.form-select:focus {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(110,58,250,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(110,58,250,0.12) !important;
+  color: var(--fg1) !important;
+  outline: none !important;
+}
+.input-group-text {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid var(--b2) !important;
+  color: var(--fg3) !important;
+  min-height: 40px !important;
+}
+.form-label {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--fg3) !important;
+  letter-spacing: 0.06em !important;
+  margin-bottom: 6px !important;
+}
+
+/* Select2 */
 .select2-container--default .select2-selection--single,
 .select2-container--default .select2-selection--multiple {
   background: rgba(255,255,255,0.04) !important;
   border: 1px solid var(--b2) !important;
-  color: #fff !important;
-  border-radius: 6px !important;
+  border-radius: var(--r1) !important;
+  min-height: 40px !important;
+  height: 40px !important;
 }
-
-.form-control::placeholder { color: var(--fg3) !important; }
-
-.form-control:focus,
-.form-select:focus {
-  border-color: rgba(110,58,250,0.5) !important;
-  box-shadow: 0 0 0 3px rgba(110,58,250,0.12) !important;
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+  color: var(--fg1) !important;
+  line-height: 38px !important;
 }
-
-code,
-.mono,
-.text-mono,
-.small code,
-.badge code,
-.table td:first-child,
-.table td:nth-child(2) .small {
-  font-family: 'Fira Code', 'SF Mono', Menlo, monospace;
+.select2-container--default .select2-selection--single .select2-selection__placeholder {
+  color: var(--fg3) !important;
 }
-
-.badge {
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 8px;
-}
-
-.badge.bg-primary { background: rgba(10,132,255,.12) !important; color: #5E9BFF !important; }
-.badge.bg-info { background: rgba(255,149,0,.12) !important; color: #FF9500 !important; }
-.badge.bg-warning { background: rgba(110,58,250,.14) !important; color: #BF5AF2 !important; }
-.badge.bg-success { background: rgba(52,199,89,.12) !important; color: #34C759 !important; }
-.badge.bg-secondary { background: rgba(255,255,255,.06) !important; color: rgba(255,255,255,.35) !important; }
-.badge.bg-danger { background: rgba(255,55,95,.12) !important; color: #FF375F !important; }
-
-.pagination .page-link {
-  background: rgba(255,255,255,0.05);
+.select2-dropdown {
+  background: #0D0B1F !important;
   border: 1px solid var(--b2) !important;
-  color: var(--fg2);
+  border-radius: var(--r1) !important;
+}
+.select2-container--default .select2-results__option {
+  color: var(--fg2) !important;
+  font-size: 13px !important;
+}
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+  background: rgba(110,58,250,0.25) !important;
+  color: #fff !important;
+}
+.select2-container--default .select2-search--dropdown .select2-search__field {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid var(--b2) !important;
+  color: var(--fg1) !important;
+  border-radius: var(--r1) !important;
 }
 
-.dropdown-item,
-.navbar-text,
-.text-muted,
-.text-white-75 {
+/* ============================================================
+   TLAČÍTKA
+   ============================================================ */
+.btn {
+  font-family: inherit !important;
+  font-weight: 600 !important;
+  border-radius: var(--r4) !important;
+  font-size: 13px !important;
+  transition: opacity 150ms, box-shadow 150ms, background 150ms !important;
+  border: none !important;
+}
+/* Primární = náš gradient */
+.btn-primary,
+.btn.btn-primary {
+  background: var(--grad) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: var(--glow-sm) !important;
+}
+.btn-primary:hover,
+.btn.btn-primary:hover {
+  background: var(--grad) !important;
+  opacity: 0.85 !important;
+  color: #fff !important;
+  box-shadow: var(--glow) !important;
+}
+.btn-primary:focus,
+.btn-primary:active {
+  background: var(--grad) !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 3px rgba(110,58,250,0.25) !important;
+}
+/* Secondary */
+.btn-secondary,
+.btn-outline-secondary {
+  background: rgba(255,255,255,0.05) !important;
+  border: 1px solid var(--b2) !important;
+  color: var(--fg2) !important;
+}
+.btn-secondary:hover,
+.btn-outline-secondary:hover {
+  background: rgba(255,255,255,0.09) !important;
+  border-color: var(--b3) !important;
+  color: var(--fg1) !important;
+}
+/* Danger */
+.btn-danger,
+.btn-outline-danger {
+  background: rgba(255,55,95,0.12) !important;
+  border: 1px solid rgba(255,55,95,0.3) !important;
+  color: var(--red) !important;
+}
+.btn-danger:hover { background: rgba(255,55,95,0.22) !important; color: #fff !important; }
+/* Success */
+.btn-success {
+  background: rgba(52,199,89,0.12) !important;
+  border: 1px solid rgba(52,199,89,0.3) !important;
+  color: var(--green) !important;
+}
+.btn-success:hover { background: rgba(52,199,89,0.22) !important; color: #fff !important; }
+/* Info / outline-primary */
+.btn-info, .btn-outline-primary, .btn-outline-info {
+  background: rgba(10,132,255,0.1) !important;
+  border: 1px solid rgba(10,132,255,0.3) !important;
+  color: var(--blue) !important;
+}
+/* Warning */
+.btn-warning {
+  background: rgba(255,149,0,0.12) !important;
+  border: 1px solid rgba(255,149,0,0.3) !important;
+  color: var(--orange) !important;
+}
+/* Light / outline-light */
+.btn-light, .btn-outline-light {
+  background: rgba(255,255,255,0.07) !important;
+  border: 1px solid var(--b2) !important;
+  color: var(--fg2) !important;
+}
+/* Disabled */
+.btn:disabled, .btn.disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+}
+
+/* ============================================================
+   BADGES / STATUS
+   ============================================================ */
+.badge {
+  border-radius: var(--r1) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 3px 8px !important;
+  letter-spacing: 0.02em;
+  box-shadow: none !important;
+  border: none !important;
+  backdrop-filter: none !important;
+}
+/* Bootstrap color mappings → náš design */
+.badge.bg-primary,  .bg-primary  { background: rgba(10,132,255,0.14) !important;  color: #5E9BFF !important; }
+.badge.bg-secondary,.bg-secondary{ background: rgba(255,255,255,0.07) !important;  color: rgba(255,255,255,0.4) !important; }
+.badge.bg-success,  .bg-success  { background: rgba(52,199,89,0.14) !important;   color: var(--green) !important; }
+.badge.bg-danger,   .bg-danger   { background: rgba(255,55,95,0.14) !important;   color: var(--red) !important; }
+.badge.bg-warning,  .bg-warning  { background: rgba(255,149,0,0.14) !important;   color: var(--orange) !important; }
+.badge.bg-info,     .bg-info     { background: rgba(110,58,250,0.16) !important;  color: var(--purple) !important; }
+.badge.bg-dark,     .bg-dark     { background: rgba(255,255,255,0.06) !important; color: var(--fg2) !important; }
+.badge.bg-light,    .bg-light    { background: rgba(255,255,255,0.07) !important; color: var(--fg2) !important; }
+
+/* Status tečka uvnitř badgí */
+.badge .crm-dot {
+  display: inline-block;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* ============================================================
+   MODALY
+   ============================================================ */
+.modal-content {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--b1) !important;
+  border-radius: var(--r2) !important;
+  color: var(--fg1) !important;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6) !important;
+}
+.modal-header {
+  background: rgba(0,0,0,0.25) !important;
+  border-bottom: 1px solid var(--b1) !important;
+  color: var(--fg1) !important;
+}
+.modal-footer {
+  background: rgba(0,0,0,0.15) !important;
+  border-top: 1px solid var(--b1) !important;
+}
+.modal-title { font-size: 15px !important; font-weight: 600 !important; }
+.btn-close { filter: invert(1) !important; opacity: 0.5 !important; }
+.btn-close:hover { opacity: 0.9 !important; }
+
+/* Backdrop */
+.modal-backdrop { background: rgba(0,0,0,0.7) !important; }
+
+/* ============================================================
+   DROPDOWNY
+   ============================================================ */
+.dropdown-menu {
+  background: var(--s1) !important;
+  border: 1px solid var(--b2) !important;
+  border-radius: var(--r2) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5) !important;
+  backdrop-filter: none !important;
+  padding: 6px !important;
+  z-index: 3000 !important;
+}
+.dropdown-item {
+  color: var(--fg2) !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+  border-radius: var(--r1) !important;
+  transition: all 120ms !important;
+}
+.dropdown-item:hover {
+  background: rgba(110,58,250,0.12) !important;
+  color: #fff !important;
+}
+.dropdown-item.active {
+  background: rgba(110,58,250,0.2) !important;
+  color: #fff !important;
+}
+.dropdown-divider { border-color: var(--b1) !important; }
+
+/* ============================================================
+   NAVIGAČNÍ ZÁLOŽKY (nav-tabs)
+   ============================================================ */
+.nav-tabs {
+  border-bottom: 1px solid var(--b1) !important;
+  gap: 0 !important;
+}
+.nav-tabs .nav-link {
+  color: var(--fg3) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  padding: 10px 18px !important;
+  background: transparent !important;
+  transition: all 140ms !important;
+  margin-bottom: -1px !important;
+}
+.nav-tabs .nav-link:hover { color: var(--fg1) !important; background: transparent !important; }
+.nav-tabs .nav-link.active {
+  color: #fff !important;
+  font-weight: 600 !important;
+  border-bottom-color: var(--purple) !important;
+  background: transparent !important;
+}
+
+/* ============================================================
+   PAGINACE
+   ============================================================ */
+.pagination { gap: 4px !important; }
+.pagination .page-link {
+  background: rgba(255,255,255,0.05) !important;
+  border: 1px solid var(--b2) !important;
+  color: var(--fg2) !important;
+  border-radius: var(--r1) !important;
+  width: 32px !important; height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  transition: all 140ms !important;
+}
+.pagination .page-link:hover {
+  background: rgba(110,58,250,0.15) !important;
+  border-color: rgba(110,58,250,0.35) !important;
+  color: #fff !important;
+}
+.pagination .page-item.active .page-link {
+  background: var(--grad) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: var(--glow-sm) !important;
+}
+.pagination .page-item.disabled .page-link {
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+}
+
+/* ============================================================
+   ALERTS
+   ============================================================ */
+.alert {
+  background: var(--card-bg) !important;
+  border-radius: var(--r2) !important;
+  border: 1px solid var(--b1) !important;
+  color: var(--fg1) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.alert-success { border-color: rgba(52,199,89,0.3) !important; }
+.alert-danger   { border-color: rgba(255,55,95,0.3) !important; }
+.alert-warning  { border-color: rgba(255,149,0,0.3) !important; }
+.alert-info     { border-color: rgba(10,132,255,0.3) !important; }
+
+/* ============================================================
+   NOTIFIKAČNÍ PANEL
+   ============================================================ */
+#crmNotificationsPanel,
+.crm-notifications-panel {
+  position: fixed !important;
+  top: var(--topbar-h) !important;
+  right: 0 !important;
+  width: 320px !important;
+  bottom: 0 !important;
+  z-index: 1055 !important;
+  transform: translateX(100%) !important;
+  transition: transform 260ms cubic-bezier(0.4,0,0.2,1) !important;
+  background: rgba(13,11,31,0.98) !important;
+  backdrop-filter: blur(24px) !important;
+  border-left: 1px solid var(--b1) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 0 !important;
+  box-shadow: -8px 0 32px rgba(0,0,0,0.4) !important;
+}
+#crmNotificationsPanel.is-open,
+.crm-notifications-panel.is-open {
+  transform: translateX(0) !important;
+}
+.crm-notifications-head,
+.crm-notifications-foot {
+  padding: 14px 16px !important;
+  border-bottom: 1px solid var(--b1) !important;
+  border-top: none !important;
+}
+.crm-notifications-foot {
+  border-top: 1px solid var(--b1) !important;
+  border-bottom: none !important;
+  margin-top: auto !important;
+}
+.crm-notifications-item {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid var(--b1) !important;
+  display: flex !important;
+  gap: 10px !important;
+  align-items: flex-start !important;
+  transition: background 120ms !important;
+}
+.crm-notifications-item:hover { background: rgba(110,58,250,0.06) !important; }
+.crm-notifications-icon {
+  width: 28px !important; height: 28px !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  font-size: 12px !important;
+}
+.crm-notifications-icon.warning { background: rgba(255,149,0,0.14) !important; color: var(--orange) !important; }
+.crm-notifications-icon.success { background: rgba(52,199,89,0.14) !important;  color: var(--green) !important; }
+.crm-notifications-icon.error   { background: rgba(255,55,95,0.14) !important;  color: var(--red) !important; }
+.crm-notifications-icon.info    { background: rgba(10,132,255,0.14) !important; color: var(--blue) !important; }
+
+/* ============================================================
+   UTIL TŘÍDY
+   ============================================================ */
+/* Gradient text */
+.crm-grad-text,
+.grad-text {
+  background: var(--grad-text) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+/* Mono */
+.font-mono,
+.crm-mono,
+td.crm-id,
+.order-id-cell {
+  font-family: 'Fira Code', 'SF Mono', Menlo, monospace !important;
+  font-size: 12px !important;
+}
+/* Text barvy */
+.text-muted, .text-white-50, .text-white-75 { color: var(--fg2) !important; }
+.text-white { color: var(--fg1) !important; }
+.text-success { color: var(--green) !important; }
+.text-danger  { color: var(--red) !important; }
+.text-warning { color: var(--orange) !important; }
+.text-info    { color: var(--blue) !important; }
+.text-primary { color: var(--purple) !important; }
+
+/* Borders */
+.border, .border-top, .border-bottom, .border-start, .border-end {
+  border-color: var(--b1) !important;
+}
+
+/* ============================================================
+   GRADIENT TOP ACCENT (karty s důrazem)
+   ============================================================ */
+.crm-card-accent::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--grad);
+  border-radius: var(--r2) var(--r2) 0 0;
+  z-index: 2;
+}
+
+/* ============================================================
+   STAT KARTY (dashboard)
+   ============================================================ */
+.crm-stat-card {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--b1) !important;
+  border-radius: var(--r2) !important;
+  padding: 20px 22px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: border-color 200ms !important;
+}
+.crm-stat-card:hover { border-color: rgba(110,58,250,0.3) !important; }
+.crm-stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--grad);
+  opacity: 0.6;
+}
+.crm-stat-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: var(--fg3) !important;
+  margin-bottom: 10px !important;
+}
+.crm-stat-value {
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+  margin-bottom: 6px !important;
+}
+.crm-stat-sub {
+  font-size: 12px !important;
+  font-weight: 500 !important;
   color: var(--fg2) !important;
 }
 
-.alert {
-  border-radius: 12px;
-  border: 1px solid var(--b1);
+/* ============================================================
+   SIDEBAR BACKDROP (mobilní)
+   ============================================================ */
+.sidebar-backdrop {
+  display: none !important;
+}
+body.sidebar-open .sidebar-backdrop {
+  display: block !important;
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(2px) !important;
+  z-index: 1035 !important;
 }
 
-.crm-notifications-panel {
-  position: fixed;
-  top: 52px;
-  right: 0;
-  width: 320px;
-  bottom: 0;
-  z-index: 1055;
-  transform: translateX(100%);
-  transition: transform 260ms cubic-bezier(0.4,0,0.2,1);
-  background: rgba(13,11,31,0.97);
-  backdrop-filter: blur(24px);
-  border-left: 1px solid var(--b1);
-  display: flex;
-  flex-direction: column;
+/* ============================================================
+   FOOTER — potlačit
+   ============================================================ */
+#content > footer,
+#content footer.mt-5 {
+  display: none !important;
 }
 
-.crm-notifications-panel.is-open { transform: translateX(0); }
+/* ============================================================
+   FANCYBOX
+   ============================================================ */
+.fancybox__backdrop { background: rgba(0,0,0,0.85) !important; }
+.fancybox__content { border-radius: var(--r2) !important; }
 
-.crm-notifications-head,
-.crm-notifications-foot {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--b1);
-}
-
-.crm-notifications-foot { border-top: 1px solid var(--b1); border-bottom: 0; margin-top: auto; }
-
-.crm-notifications-item {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--b1);
-  display: flex;
-  gap: 10px;
-}
-
-.crm-notifications-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-
-.crm-notifications-icon.warning { background: rgba(255,149,0,.12); color: #FF9500; }
-.crm-notifications-icon.success { background: rgba(52,199,89,.12); color: #34C759; }
-.crm-notifications-icon.error { background: rgba(255,55,95,.12); color: #FF375F; }
-.crm-notifications-icon.info { background: rgba(10,132,255,.12); color: #0A84FF; }
-
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
 @media (max-width: 991.98px) {
-  #sidebar.crm-v2-sidebar { transform: translateX(-100%); transition: transform .25s ease; }
-  #sidebar.crm-v2-sidebar.active { transform: translateX(0); }
-  #content.crm-v2-content { margin-left: 0; }
-  .crm-v2-search { max-width: 220px; }
+  #sidebar,
+  #sidebar.crm-v2-sidebar {
+    transform: translateX(-100%) !important;
+    transition: transform .25s ease !important;
+  }
+  #sidebar.active,
+  #sidebar.crm-v2-sidebar.active {
+    transform: translateX(0) !important;
+  }
+  #content,
+  #content.crm-v2-content {
+    margin-left: 0 !important;
+  }
+  .crm-v2-search {
+    max-width: 200px !important;
+  }
+}
+@media (max-width: 767.98px) {
+  .crm-v2-search { display: none !important; }
+  #content > *:not(.crm-v2-topbar):not(.navbar):not(.crm-notifications-panel) {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
 }
 
-@media (max-width: 767.98px) {
-  #content > .row,
-  #content > .d-flex,
-  #content > .card,
-  #content > .container-fluid,
-  #content > .alert,
-  #content > h1,
-  #content > h2,
-  #content > h3,
-  #content > h4,
-  #content > h5,
-  #content > h6 {
-    margin-left: 12px;
-    margin-right: 12px;
-  }
-
-  .crm-v2-search { display: none !important; }
+/* ============================================================
+   JS TOGGLE — notifikace
+   ============================================================ */
+#notificationsToggle.active {
+  background: rgba(110,58,250,0.15) !important;
+  border-color: rgba(110,58,250,0.3) !important;
+  color: #fff !important;
 }
