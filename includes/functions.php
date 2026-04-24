@@ -133,9 +133,9 @@ function getAvailablePermissions() {
         'view_all_orders' => ['name' => __('perm_view_all_orders'), 'desc' => __('perm_view_all_orders_desc'), 'icon' => 'fas fa-eye text-info'],
         'edit_orders' => ['name' => __('perm_edit_orders'), 'desc' => __('perm_edit_orders_desc'), 'icon' => 'fas fa-edit text-primary'],
         'edit_customers' => ['name' => __('perm_edit_customers'), 'desc' => __('perm_edit_customers_desc'), 'icon' => 'fas fa-user-edit text-success'],
-        'manage_inventory' => ['name' => 'Správa skladu', 'desc' => 'Může upravovat sklad, měnit počty kusů a pracovat s katalogem dílů.', 'icon' => 'fas fa-boxes text-info'],
-        'procurement_manage' => ['name' => 'Objednávání dílů', 'desc' => 'Může spravovat nákupní frontu, označovat díly jako objednané / doručené a mazat požadavky.', 'icon' => 'fas fa-truck-loading text-warning'],
-        'view_reports_all' => ['name' => 'Přehledy všech zaměstnanců', 'desc' => 'Vidí souhrnné a individuální přehledy za všechny techniky.', 'icon' => 'fas fa-chart-line text-success'],
+        'manage_inventory' => ['name' => 'Inventory management', 'desc' => 'Can edit inventory, adjust stock quantity, and work with the parts catalog.', 'icon' => 'fas fa-boxes text-info'],
+        'procurement_manage' => ['name' => 'Procurement management', 'desc' => 'Can manage the procurement queue, mark parts as ordered/received, and delete requests.', 'icon' => 'fas fa-truck-loading text-warning'],
+        'view_reports_all' => ['name' => 'Reports for all employees', 'desc' => 'Can view summary and individual reports for all technicians.', 'icon' => 'fas fa-chart-line text-success'],
         'manage_passwords' => ['name' => __('perm_manage_passwords'), 'desc' => __('perm_manage_passwords_desc'), 'icon' => 'fas fa-key text-danger'],
     ];
 }
@@ -152,16 +152,40 @@ function getDeviceIcon($type) {
     }
 }
 
+function normalizePhoneForTel(?string $phone): string {
+    $phone = trim((string)$phone);
+    if ($phone === '') {
+        return '';
+    }
+
+    $hasPlus = strpos($phone, '+') === 0;
+    $digits = preg_replace('/\D+/', '', $phone);
+    if ($digits === null || $digits === '') {
+        return '';
+    }
+
+    return $hasPlus ? ('+' . $digits) : $digits;
+}
+
+function normalizeEmailForMailto(?string $email): string {
+    $email = trim((string)$email);
+    if ($email === '') {
+        return '';
+    }
+
+    return str_replace(["\r", "\n"], '', $email);
+}
+
 function getOrderStatusAliases(): array {
     return [
-        'new' => ['New', 'Новый'],
-        'pending_approval' => ['Pending Approval', 'На согласовании'],
-        'in_progress' => ['In Progress', 'В работе'],
-        'waiting_parts' => ['Waiting for Parts', 'Ожидание запчастей'],
-        'completed' => ['Completed', 'Готов'],
-        'collected' => ['Collected', 'Выдан'],
-        'cancelled' => ['Cancelled', 'Отменен'],
-        'done' => ['Completed', 'Collected', 'Готов', 'Выдан'],
+        'new' => ['New', 'Новый', 'Nová'],
+        'pending_approval' => ['Pending Approval', 'На согласовании', 'K odsouhlasení', 'Čeká na schválení'],
+        'in_progress' => ['In Progress', 'В работе', 'V práci', 'V procesu', 'Provádí se'],
+        'waiting_parts' => ['Waiting for Parts', 'Ожидание запчастей', 'Čeká na díly'],
+        'completed' => ['Completed', 'Готов', 'Hotovo'],
+        'collected' => ['Collected', 'Выдан', 'Vydáno'],
+        'cancelled' => ['Cancelled', 'Отменен', 'Zrušeno'],
+        'done' => ['Completed', 'Collected', 'Готов', 'Выдан', 'Hotovo', 'Vydáno'],
     ];
 }
 
@@ -178,24 +202,34 @@ function getStatusBadge($status) {
     switch ($status) {
         case 'New':
         case 'Новый':
+        case 'Nová':
             return '<span class="badge bg-primary">'.__('new').'</span>';
         case 'Pending Approval':
         case 'На согласовании':
+        case 'K odsouhlasení':
+        case 'Čeká na schválení':
             return '<span class="badge bg-info text-dark">'.__('pending_approval').'</span>';
         case 'In Progress':
         case 'В работе':
+        case 'V práci':
+        case 'V procesu':
+        case 'Provádí se':
             return '<span class="badge bg-warning">'.__('in_progress').'</span>';
         case 'Waiting for Parts':
         case 'Ожидание запчастей':
+        case 'Čeká na díly':
             return '<span class="badge bg-secondary">'.__('waiting_parts').'</span>';
         case 'Completed':
         case 'Готов':
+        case 'Hotovo':
             return '<span class="badge bg-success">'.__('status_completed').'</span>';
         case 'Collected':
         case 'Выдан':
+        case 'Vydáno':
             return '<span class="badge bg-info text-dark">'.__('status_collected').'</span>';
         case 'Cancelled':
         case 'Отменен':
+        case 'Zrušeno':
             return '<span class="badge bg-danger">'.__('status_cancelled').'</span>';
         default:
             return '<span class="badge bg-dark">' . $status . '</span>';
@@ -551,7 +585,8 @@ function getGitRepoInfo(string $repoRoot): array {
     if ($remoteSlug) {
         $remoteUrl = 'https://github.com/' . $remoteSlug . '.git';
         $fetchCode = 0;
-        runGitCommand($repoRoot, 'fetch --quiet ' . escapeshellarg($remoteUrl) . ' main', $fetchCode);
+        $remoteBranch = $branch !== '' ? $branch : 'main';
+        runGitCommand($repoRoot, 'fetch --quiet ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($remoteBranch), $fetchCode);
         if ($fetchCode === 0) {
             $remote = runGitCommand($repoRoot, 'rev-parse FETCH_HEAD', $code);
             if ($code === 0 && $remote !== '') {
@@ -592,9 +627,345 @@ function getGitRepoInfo(string $repoRoot): array {
     return $info;
 }
 
+function crmNormalizeTelegramChatId($chatId): ?string {
+    $chatId = trim((string)$chatId);
+    if ($chatId === '') {
+        return null;
+    }
+
+    if ($chatId[0] === '+') {
+        $chatId = substr($chatId, 1);
+    }
+
+    return preg_match('/^-?\d+$/', $chatId) ? $chatId : null;
+}
+
+function crmTelegramEscape($value): string {
+    return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function crmBuildOrderViewLink(int $orderId): string {
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+    $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+    $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $basePath = rtrim(dirname($scriptName), '/');
+
+    if (substr($basePath, -4) === '/api') {
+        $basePath = substr($basePath, 0, -4);
+    }
+
+    $basePath = rtrim($basePath === '.' ? '' : $basePath, '/');
+    $path = ($basePath !== '' ? $basePath : '') . '/view_order.php?id=' . $orderId;
+    if ($path === '' || $path[0] !== '/') {
+        $path = '/' . ltrim($path, '/');
+    }
+
+    if ($host === '') {
+        return $path;
+    }
+
+    return $scheme . $host . $path;
+}
+
+function crmGetTechnicianById(int $technicianId): ?array {
+    global $pdo;
+    if ($technicianId <= 0) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare('SELECT id, name, role, telegram_id, is_active FROM technicians WHERE id = ? LIMIT 1');
+    $stmt->execute([$technicianId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+
+    $row['telegram_id'] = crmNormalizeTelegramChatId($row['telegram_id'] ?? null);
+    return $row;
+}
+
+function crmGetOrderNotificationContext(int $orderId): ?array {
+    global $pdo;
+    if ($orderId <= 0) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT o.id, o.status, o.technician_id, o.device_brand, o.device_model, o.problem_description,
+                o.final_cost, o.estimated_cost,
+                TRIM(CONCAT(COALESCE(c.last_name, ''), ' ', COALESCE(c.first_name, ''))) AS customer_name,
+                COALESCE(t.name, '') AS technician_name
+         FROM orders o
+         LEFT JOIN customers c ON c.id = o.customer_id
+         LEFT JOIN technicians t ON t.id = o.technician_id
+         WHERE o.id = ?
+         LIMIT 1"
+    );
+    $stmt->execute([$orderId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+
+    return $row;
+}
+
+function crmGetOversightRecipients($excludeTechnicianIds = []): array {
+    global $pdo;
+    $stmt = $pdo->query("SELECT id, name, role, telegram_id FROM technicians WHERE is_active = 1 AND role IN ('admin', 'manager')");
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!is_array($excludeTechnicianIds)) {
+        $excludeTechnicianIds = [$excludeTechnicianIds];
+    }
+
+    $excludeMap = [];
+    foreach ($excludeTechnicianIds as $excludeId) {
+        $excludeId = (int)$excludeId;
+        if ($excludeId > 0) {
+            $excludeMap[$excludeId] = true;
+        }
+    }
+
+    $result = [];
+    foreach ($rows as $row) {
+        $techId = (int)($row['id'] ?? 0);
+        if ($techId > 0 && isset($excludeMap[$techId])) {
+            continue;
+        }
+
+        $chatId = crmNormalizeTelegramChatId($row['telegram_id'] ?? null);
+        if (!$chatId) {
+            continue;
+        }
+
+        if (!isset($result[$chatId])) {
+            $result[$chatId] = [
+                'id' => $techId,
+                'name' => (string)($row['name'] ?? ''),
+                'role' => (string)($row['role'] ?? ''),
+                'telegram_id' => $chatId,
+            ];
+        }
+    }
+
+    return array_values($result);
+}
+
+function crmFormatOrderDeviceLabel($brand, $model): string {
+    $brand = trim((string)$brand);
+    $model = trim((string)$model);
+    $device = trim($brand . ' ' . $model);
+    return $device !== '' ? $device : '-';
+}
+
+function crmFormatOrderProblemSnippet($problem): string {
+    $problem = trim((string)$problem);
+    if ($problem === '') {
+        return '-';
+    }
+    return function_exists('mb_substr') ? mb_substr($problem, 0, 180) : substr($problem, 0, 180);
+}
+
+function crmNotifyOrderLifecycleEvent(array $event): void {
+    $type = (string)($event['type'] ?? '');
+    $orderId = (int)($event['order_id'] ?? 0);
+    if ($type === '' || $orderId <= 0) {
+        return;
+    }
+
+    $ctx = crmGetOrderNotificationContext($orderId);
+    if (!$ctx) {
+        return;
+    }
+
+    $oldStatus = trim((string)($event['old_status'] ?? ''));
+    $newStatus = trim((string)($event['new_status'] ?? ($ctx['status'] ?? '')));
+    $statusChanged = ($oldStatus !== '' && $newStatus !== '' && $oldStatus !== $newStatus);
+
+    $assignedTechId = isset($event['technician_id'])
+        ? (int)$event['technician_id']
+        : (int)($ctx['technician_id'] ?? 0);
+    $previousTechId = isset($event['previous_technician_id']) ? (int)$event['previous_technician_id'] : 0;
+    $technicianChanged = ($previousTechId > 0 && $assignedTechId > 0 && $previousTechId !== $assignedTechId);
+    $technicianAssigned = ($assignedTechId > 0 && $previousTechId !== $assignedTechId);
+
+    $actorRole = (string)($event['actor_role'] ?? ($_SESSION['role'] ?? ''));
+    $actorTechId = (int)($event['actor_tech_id'] ?? ($_SESSION['tech_id'] ?? 0));
+    $actorName = trim((string)($event['actor_name'] ?? ($_SESSION['full_name'] ?? '')));
+    if ($actorName === '' && $actorTechId > 0) {
+        $actor = crmGetTechnicianById($actorTechId);
+        $actorName = trim((string)($actor['name'] ?? ''));
+    }
+    if ($actorName === '') {
+        $actorName = $actorTechId > 0 ? ('Technik #' . $actorTechId) : 'Systém';
+    }
+
+    $assignedTech = $assignedTechId > 0 ? crmGetTechnicianById($assignedTechId) : null;
+
+    $deviceLabel = crmTelegramEscape(crmFormatOrderDeviceLabel($ctx['device_brand'] ?? '', $ctx['device_model'] ?? ''));
+    $customerLabel = crmTelegramEscape(trim((string)($ctx['customer_name'] ?? '')) ?: '-');
+    $problemSnippet = crmTelegramEscape(crmFormatOrderProblemSnippet($ctx['problem_description'] ?? ''));
+    $link = crmBuildOrderViewLink($orderId);
+
+    if ($assignedTechId > 0) {
+        $assignedChatId = $assignedTech['telegram_id'] ?? null;
+        if ($assignedChatId) {
+            $statusLabel = $newStatus !== '' ? crmTelegramEscape($newStatus) : crmTelegramEscape((string)($ctx['status'] ?? '-'));
+            $techMsg = '';
+
+            if ($type === 'order_created') {
+                $techMsg = "🆕 <b>Nová zakázka #{$orderId}</b>
+"
+                    . "👤 Klient: <b>{$customerLabel}</b>
+"
+                    . "📱 Zařízení: <b>{$deviceLabel}</b>
+"
+                    . "📝 Problém: {$problemSnippet}
+"
+                    . "📍 Stav: <b>{$statusLabel}</b>
+"
+                    . "🔗 <a href=\"{$link}\">Otevřít zakázku</a>";
+            }
+
+            if ($type === 'order_status_changed' && ($statusChanged || $technicianChanged)) {
+                $statusText = $statusChanged
+                    ? crmTelegramEscape($oldStatus) . ' → ' . crmTelegramEscape($newStatus)
+                    : $statusLabel;
+                $techMsg = "🛠️ <b>Aktualizace zakázky #{$orderId}</b>
+"
+                    . "📍 Stav: <b>{$statusText}</b>
+"
+                    . "📱 Zařízení: <b>{$deviceLabel}</b>
+"
+                    . "👤 Klient: <b>{$customerLabel}</b>
+";
+
+                $finalCost = $event['final_cost'] ?? ($ctx['final_cost'] ?? null);
+                if ($finalCost !== null && $finalCost !== '') {
+                    $techMsg .= '💰 Cena: <b>' . crmTelegramEscape(formatMoney((float)$finalCost)) . "</b>
+";
+                }
+
+                if ($technicianChanged) {
+                    $techMsg .= "👨‍🔧 Zakázka byla přiřazena právě vám.
+";
+                }
+
+                $techMsg .= "🔗 <a href=\"{$link}\">Otevřít zakázku</a>";
+            }
+
+            if ($techMsg !== '') {
+                sendTelegramNotification($assignedChatId, $techMsg);
+            }
+        }
+    }
+
+    if ($type === 'order_created') {
+        $statusLabel = $newStatus !== '' ? crmTelegramEscape($newStatus) : crmTelegramEscape((string)($ctx['status'] ?? '-'));
+        $assignedTechName = trim((string)($assignedTech['name'] ?? ($ctx['technician_name'] ?? '')));
+        if ($assignedTechName === '') {
+            $assignedTechName = 'Nepřiřazeno';
+        }
+
+        $oversightRecipients = crmGetOversightRecipients([$actorTechId, $assignedTechId]);
+        if (!empty($oversightRecipients)) {
+            $oversightMsg = "🆕 <b>Nová zakázka #{$orderId}</b>
+"
+                . "👤 Klient: <b>{$customerLabel}</b>
+"
+                . "📱 Zařízení: <b>{$deviceLabel}</b>
+"
+                . "📝 Problém: {$problemSnippet}
+"
+                . "📍 Stav: <b>{$statusLabel}</b>
+"
+                . "🛠 Přiřazený technik: <b>" . crmTelegramEscape($assignedTechName) . "</b>
+"
+                . "👨‍💼 Založil: <b>" . crmTelegramEscape($actorName) . "</b>
+"
+                . "🔗 <a href=\"{$link}\">Otevřít zakázku</a>";
+
+            foreach ($oversightRecipients as $recipient) {
+                sendTelegramNotification($recipient['telegram_id'], $oversightMsg);
+            }
+        }
+    }
+
+    if ($type === 'order_status_changed' && $technicianAssigned) {
+        $assignedTechName = trim((string)($assignedTech['name'] ?? ($ctx['technician_name'] ?? '')));
+        if ($assignedTechName === '') {
+            $assignedTechName = 'Nepřiřazeno';
+        }
+
+        $previousTechName = 'Nepřiřazeno';
+        if ($previousTechId > 0) {
+            $previousTech = crmGetTechnicianById($previousTechId);
+            $previousTechName = trim((string)($previousTech['name'] ?? ''));
+            if ($previousTechName === '') {
+                $previousTechName = 'Technik #' . $previousTechId;
+            }
+        }
+
+        $statusLabel = $newStatus !== '' ? crmTelegramEscape($newStatus) : crmTelegramEscape((string)($ctx['status'] ?? '-'));
+        $oversightRecipients = crmGetOversightRecipients([$actorTechId, $assignedTechId]);
+        if (!empty($oversightRecipients)) {
+            $assignmentMsg = "👨‍🔧 <b>Přiřazení technika na zakázce #{$orderId}</b>
+"
+                . "👤 Klient: <b>{$customerLabel}</b>
+"
+                . "📱 Zařízení: <b>{$deviceLabel}</b>
+"
+                . "🧑‍🔧 Technik: <b>" . crmTelegramEscape($previousTechName) . " → " . crmTelegramEscape($assignedTechName) . "</b>
+"
+                . "📍 Stav: <b>{$statusLabel}</b>
+"
+                . "👨‍💼 Změnil: <b>" . crmTelegramEscape($actorName) . "</b>
+"
+                . "🔗 <a href=\"{$link}\">Otevřít zakázku</a>";
+
+            foreach ($oversightRecipients as $recipient) {
+                sendTelegramNotification($recipient['telegram_id'], $assignmentMsg);
+            }
+        }
+    }
+
+    if ($type === 'order_status_changed' && $statusChanged && $actorRole === 'technician') {
+        $assignedTechName = trim((string)($ctx['technician_name'] ?? ''));
+        if ($assignedTechName === '' && $assignedTechId > 0) {
+            $assignedTechName = trim((string)($assignedTech['name'] ?? ''));
+        }
+        if ($assignedTechName === '') {
+            $assignedTechName = 'Nepřiřazeno';
+        }
+
+        $oversightRecipients = crmGetOversightRecipients($actorTechId);
+        if (!empty($oversightRecipients)) {
+            $oversightMsg = "👀 <b>Dohled nad změnou stavu</b>
+"
+                . "🧾 Zakázka: <b>#{$orderId}</b>
+"
+                . "👨‍🔧 Změnil: <b>" . crmTelegramEscape($actorName) . "</b>
+"
+                . "📍 Stav: <b>" . crmTelegramEscape($oldStatus) . ' → ' . crmTelegramEscape($newStatus) . "</b>
+"
+                . "🛠 Přiřazený technik: <b>" . crmTelegramEscape($assignedTechName) . "</b>
+"
+                . "📱 Zařízení: <b>{$deviceLabel}</b>
+"
+                . "🔗 <a href=\"{$link}\">Otevřít zakázku</a>";
+
+            foreach ($oversightRecipients as $recipient) {
+                sendTelegramNotification($recipient['telegram_id'], $oversightMsg);
+            }
+        }
+    }
+}
+
 function sendTelegramNotification($chatId, $message) {
-    if (!defined('TG_BOT_TOKEN') || TG_BOT_TOKEN === '' || empty($chatId)) return false;
-    
+    $chatId = crmNormalizeTelegramChatId($chatId);
+    if (!defined('TG_BOT_TOKEN') || TG_BOT_TOKEN === '' || !$chatId) return false;
+
     $url = "https://api.telegram.org/bot" . TG_BOT_TOKEN . "/sendMessage";
     $data = [
         'chat_id' => $chatId,
@@ -602,7 +973,7 @@ function sendTelegramNotification($chatId, $message) {
         'parse_mode' => 'HTML',
         'disable_web_page_preview' => true,
     ];
-    
+
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -613,12 +984,12 @@ function sendTelegramNotification($chatId, $message) {
     $response = curl_exec($ch);
     $err = curl_error($ch);
     curl_close($ch);
-    
+
     if ($response === false) {
         error_log('Telegram sendMessage curl failed: ' . $err);
         return false;
     }
-    
+
     $result = json_decode($response, true);
     if (!is_array($result) || !isset($result['ok']) || !$result['ok']) {
         error_log('Telegram sendMessage failed: ' . $response);
@@ -676,6 +1047,18 @@ function ensureOrderWorkTrackingSchema() {
             // Ignore duplicate-column errors and keep bootstrapping resilient.
         }
     }
+
+    // Legacy compatibility: older builds stored this field in seconds.
+    // Current behavior stores cumulative minutes in the same column.
+    try {
+        if (get_setting('work_duration_unit', 'seconds') !== 'minutes') {
+            $pdo->exec("UPDATE orders SET work_duration_seconds = ROUND(COALESCE(work_duration_seconds, 0) / 60) WHERE COALESCE(work_duration_seconds, 0) > 0");
+            set_setting('work_duration_unit', 'minutes');
+        }
+    } catch (Throwable $e) {
+        // Keep schema bootstrap resilient.
+    }
+
     return true;
 }
 
@@ -693,17 +1076,16 @@ function getTechnicianInProgressCount($technicianId, $excludeOrderId = null) {
     return (int)$stmt->fetchColumn();
 }
 
-function formatWorkDuration($seconds) {
-    $seconds = (int)($seconds ?? 0);
-    if ($seconds <= 0) {
+function formatWorkDuration($minutesTotal) {
+    $minutesTotal = (int)($minutesTotal ?? 0);
+    if ($minutesTotal <= 0) {
         return '—';
     }
 
-    $days = intdiv($seconds, 86400);
-    $seconds %= 86400;
-    $hours = intdiv($seconds, 3600);
-    $seconds %= 3600;
-    $minutes = intdiv($seconds, 60);
+    $days = intdiv($minutesTotal, 1440);
+    $minutesTotal %= 1440;
+    $hours = intdiv($minutesTotal, 60);
+    $minutes = $minutesTotal % 60;
 
     $parts = [];
     if ($days > 0) {

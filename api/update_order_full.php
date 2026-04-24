@@ -5,41 +5,48 @@ require_once '../includes/functions.php';
 ob_clean();
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => __('unauthorized')]);
+$ui_lang = $_REQUEST['ui_lang'] ?? null;
+$t = static function(string $key) use ($ui_lang): string {
+    return __($key, is_string($ui_lang) ? $ui_lang : null);
+};
+
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) {
+    echo json_encode(['success' => false, 'message' => $t('unauthorized')]);
     exit;
 }
 
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => __('csrf_token_invalid')]);
+    echo json_encode(['success' => false, 'message' => $t('csrf_token_invalid')]);
     exit;
 }
 
 $order_id = $_POST['order_id'] ?? null;
 if (!$order_id) {
-    echo json_encode(['success' => false, 'message' => __('missing_id')]);
+    echo json_encode(['success' => false, 'message' => $t('missing_id')]);
     exit;
 }
 
 try {
-    $pdo->beginTransaction();
-
+    // DDL checks can trigger implicit commits on MySQL/MariaDB,
+    // so run schema/bootstrap guard before starting explicit transaction.
     ensureOrderWorkTrackingSchema();
+
+    $pdo->beginTransaction();
 
     $stmt = $pdo->prepare('SELECT * FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $current = $stmt->fetch();
 
     if (!$current) {
-        throw new Exception('Order not found');
+        throw new Exception($t('order_not_found'));
     }
 
     if (($_SESSION['role'] ?? '') === 'technician'
         && !hasPermission('edit_orders')
         && ($current['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)
     ) {
-        throw new Exception('No permission');
+        throw new Exception($t('access_denied_msg'));
     }
 
     $new_status = $_POST['status'] ?? $current['status'];
@@ -48,14 +55,19 @@ try {
     $finishing_statuses = ['Completed', 'Collected'];
     $was_finished = in_array($current['status'], $finishing_statuses, true);
     $is_finishing = in_array($new_status, $finishing_statuses, true);
+    $technician_changed = (int)$technician_id !== (int)($current['technician_id'] ?? 0);
+    $is_reassigning_in_progress = ($current['status'] === 'In Progress' && $new_status === 'In Progress' && $technician_changed);
 
     if ($new_status === 'In Progress') {
         if (!$technician_id) {
-            throw new Exception('Pro stav Provádí se musí být zakázka přiřazená technikovi.');
+            throw new Exception($t('in_progress_requires_technician'));
         }
-        $active_count = getTechnicianInProgressCount($technician_id, (int)$order_id);
-        if ($active_count >= 2 && !$was_finished) {
-            throw new Exception('Technik může mít současně maximálně 2 rozdělané zakázky.');
+
+        if ($is_starting || $technician_changed) {
+            $active_count = getTechnicianInProgressCount($technician_id, (int)$order_id);
+            if ($active_count >= 2 && !$was_finished) {
+                throw new Exception($t('technician_in_progress_limit_reached'));
+            }
         }
     }
 
@@ -85,7 +97,7 @@ try {
         isset($_POST['device_type']) ? $_POST['device_type'] : $current['device_type'],
         isset($_POST['order_type']) ? $_POST['order_type'] : $current['order_type'],
         isset($_POST['status']) ? $_POST['status'] : $current['status'],
-        (isset($_POST['technician_id']) && $_POST['technician_id'] !== '') ? $_POST['technician_id'] : $current['technician_id'],
+        $technician_id,
         isset($_POST['estimated_cost']) ? $_POST['estimated_cost'] : $current['estimated_cost'],
         isset($_POST['final_cost']) ? $_POST['final_cost'] : $current['final_cost'],
         isset($_POST['extra_expenses']) ? $_POST['extra_expenses'] : $current['extra_expenses'],
@@ -99,12 +111,17 @@ try {
     ];
 
     if ($is_starting) {
-        $sql .= ", work_started_at = CURRENT_TIMESTAMP, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL, work_duration_seconds = 0";
+        $sql .= ", work_started_at = CASE WHEN work_started_at IS NULL OR work_finished_at IS NOT NULL THEN CURRENT_TIMESTAMP ELSE work_started_at END, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL";
+        $params[] = $technician_id;
+    }
+
+    if ($is_reassigning_in_progress) {
+        $sql .= ", work_duration_seconds = COALESCE(work_duration_seconds, 0) + CASE WHEN work_started_at IS NOT NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, work_started_at, CURRENT_TIMESTAMP)) ELSE 0 END, work_started_at = CURRENT_TIMESTAMP, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL";
         $params[] = $technician_id;
     }
 
     if ($current['status'] === 'In Progress' && $is_finishing) {
-        $sql .= ", work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = CASE WHEN work_started_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP)) ELSE work_duration_seconds END";
+        $sql .= ", work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = COALESCE(work_duration_seconds, 0) + CASE WHEN work_started_at IS NOT NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP))) ELSE 0 END";
         $params[] = $technician_id;
     }
 
@@ -114,8 +131,88 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
+    if (isset($_FILES['files']) && !empty($_FILES['files']['name'][0])) {
+        $upload_dir = __DIR__ . '/../uploads/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+
+        $htaccess = $upload_dir . '.htaccess';
+        if (!file_exists($htaccess)) {
+            file_put_contents($htaccess,
+                "# Deny PHP execution in uploads\n" .
+                "<FilesMatch \"\\.php$\">\n    Require all denied\n</FilesMatch>\n" .
+                "RemoveHandler .php .phtml .php3 .php4 .php5\n" .
+                "RemoveType .php .phtml .php3 .php4 .php5\n"
+            );
+        }
+
+        $allowed_mime_to_ext = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'video/mp4' => 'mp4',
+            'video/quicktime' => 'mov',
+            'video/x-msvideo' => 'avi',
+        ];
+        $allowed_exts  = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi'];
+        if (!is_writable($upload_dir)) {
+            throw new Exception($t('upload_dir_not_writable'));
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $uploaded_count = 0;
+        $rejected = [];
+
+        foreach ($_FILES['files']['tmp_name'] as $key => $tmp) {
+            $err = (int)($_FILES['files']['error'][$key] ?? UPLOAD_ERR_NO_FILE);
+            if ($err !== UPLOAD_ERR_OK) {
+                $rejected[] = basename((string)($_FILES['files']['name'][$key] ?? 'file')) . " (upload error " . $err . ")";
+                continue;
+            }
+
+            $name = (string)($_FILES['files']['name'][$key] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) {
+                $rejected[] = basename($name) . " (temporary upload missing)";
+                continue;
+            }
+
+            $real_type = strtolower((string)finfo_file($finfo, $tmp));
+            if (!isset($allowed_mime_to_ext[$real_type])) {
+                $rejected[] = basename($name) . " (unsupported type: " . ($real_type ?: 'unknown') . ")";
+                continue;
+            }
+            if (strpos($real_type, 'image/') === 0 && getimagesize($tmp) === false) {
+                $rejected[] = basename($name) . " (image validation failed)";
+                continue;
+            }
+
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            if (!in_array($ext, $allowed_exts, true)) {
+                $ext = $allowed_mime_to_ext[$real_type];
+            }
+
+            $new_name = bin2hex(random_bytes(16)) . '.' . $ext;
+            if (move_uploaded_file($tmp, $upload_dir . $new_name)) {
+                $stmt_file = $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name) VALUES (?, ?, ?, ?)");
+                $stmt_file->execute([$order_id, 'uploads/' . $new_name, $real_type, basename($name)]);
+                $uploaded_count++;
+            } else {
+                $rejected[] = basename($name) . " (cannot move uploaded file)";
+            }
+        }
+
+        finfo_close($finfo);
+
+        if ($uploaded_count === 0) {
+            $detail = !empty($rejected) ? (' ' . implode('; ', array_slice($rejected, 0, 3))) : '';
+            throw new Exception($t('upload_no_valid_file') . $detail);
+        }
+    }
+
+
     $new_status = $_POST['status'] ?? $current['status'];
-    $technician_id = $_POST['technician_id'] ?? $current['technician_id'];
     $final_cost = isset($_POST['final_cost']) ? (float)$_POST['final_cost'] : (float)$current['final_cost'];
 
     $finishing_statuses = ['Completed', 'Collected'];
@@ -123,25 +220,15 @@ try {
     $is_finishing = in_array($new_status, $finishing_statuses, true);
 
     if ($current['status'] === 'Collected' && $new_status !== 'Collected') {
-        throw new Exception('Cannot change status after Collected');
+        throw new Exception($t('status_locked_after_collected'));
     }
 
-    if ($current['status'] !== $new_status) {
+    $status_changed = ((string)$current['status'] !== (string)$new_status);
+    $technician_changed = ((int)($current['technician_id'] ?? 0) !== (int)$technician_id);
+
+    if ($status_changed) {
         if (!$was_finished && $is_finishing) {
             processOrderInventoryChange($order_id, $is_finishing, $was_finished);
-
-            $tech = $pdo->prepare('SELECT telegram_id, name FROM technicians WHERE id = ?');
-            $tech->execute([$technician_id ?: $current['technician_id']]);
-            $techData = $tech->fetch();
-            if ($techData && $techData['telegram_id']) {
-                $msg = sprintf(__('tg_order_ready'), $order_id) . "\n";
-                $msg .= sprintf(__('tg_device'), ($_POST['device_model'] ?? $current['device_model'])) . "\n";
-                $msg .= sprintf(__('tg_final_price'), formatMoney($final_cost)) . "\n";
-                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-                $link = $protocol . $_SERVER['HTTP_HOST'] . '/view_order.php?id=' . $order_id;
-                $msg .= sprintf(__('tg_open_link'), $link);
-                sendTelegramNotification($techData['telegram_id'], $msg);
-            }
 
             if ($new_status === 'Completed' && get_setting('acc_auto_create_invoice', '0') == '1') {
                 require_once '../models/InvoiceManager.php';
@@ -192,6 +279,21 @@ try {
     }
 
     $pdo->commit();
+
+    if ($status_changed || $technician_changed) {
+        crmNotifyOrderLifecycleEvent([
+            'type' => 'order_status_changed',
+            'order_id' => (int)$order_id,
+            'old_status' => (string)$current['status'],
+            'new_status' => (string)$new_status,
+            'technician_id' => (int)$technician_id,
+            'previous_technician_id' => (int)($current['technician_id'] ?? 0),
+            'final_cost' => $final_cost,
+            'actor_role' => (string)($_SESSION['role'] ?? ''),
+            'actor_tech_id' => (int)($_SESSION['tech_id'] ?? 0),
+            'actor_name' => (string)($_SESSION['full_name'] ?? ''),
+        ]);
+    }
 
     if (ob_get_length()) {
         ob_clean();

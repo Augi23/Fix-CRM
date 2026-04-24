@@ -7,7 +7,7 @@ require_once 'includes/functions.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Formulář zástavy</title>
+    <title>Pawn form</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -79,8 +79,8 @@ require_once 'includes/functions.php';
                 <div class="brand">
                     <img src="assets/img/applefix-logo.png" alt="AppleFix logo">
                     <div class="title">
-                        <h1>Formulář zástavy</h1>
-                        <p>Vyplň formulář, zkontroluj údaje a vytiskni hotový dokument.</p>
+                        <h1>Pawn form</h1>
+                        <p>Fill in the form, check the details, and print the final document.</p>
                     </div>
                 </div>
                 <div class="text-end meta-line">
@@ -89,7 +89,7 @@ require_once 'includes/functions.php';
                         <input type="text" class="form-control form-control-sm" name="doc_date">
                     </div>
                     <div class="field mb-0">
-                        <label class="mb-1">Číslo dokumentu</label>
+                        <label class="mb-1">Document number</label>
                         <input type="text" class="form-control form-control-sm" name="doc_number">
                     </div>
                 </div>
@@ -97,45 +97,45 @@ require_once 'includes/functions.php';
 
             <form class="paper-body" id="pawnForm">
                 <div class="section">
-                    <h2>Zákazník</h2>
+                    <h2>Customer</h2>
                     <div class="grid-2">
-                        <div class="field"><label>Jméno a příjmení</label><input type="text" class="form-control" name="customer_name"></div>
+                        <div class="field"><label>First and last name</label><input type="text" class="form-control" name="customer_name"></div>
                         <div class="field"><label>Telefon</label><input type="text" class="form-control" name="customer_phone"></div>
                         <div class="field"><label>Adresa</label><input type="text" class="form-control" name="customer_address"></div>
-                        <div class="field"><label>Číslo OP / pasu</label><input type="text" class="form-control" name="customer_id_doc"></div>
+                        <div class="field"><label>ID card / passport number</label><input type="text" class="form-control" name="customer_id_doc"></div>
                     </div>
                 </div>
 
                 <div class="section">
-                    <h2>Předmět zástavy</h2>
+                    <h2>Pledged item</h2>
                     <div class="grid-2">
-                        <div class="field"><label>Přesný popis předmětu</label><input type="text" class="form-control" name="item_description"></div>
-                        <div class="field"><label>Značka / model</label><input type="text" class="form-control" name="item_model"></div>
+                        <div class="field"><label>Exact item description</label><input type="text" class="form-control" name="item_description"></div>
+                        <div class="field"><label>Brand / model</label><input type="text" class="form-control" name="item_model"></div>
                         <div class="field"><label>IMEI / S/N</label><input type="text" class="form-control" name="item_serial"></div>
-                        <div class="field"><label>Stav zařízení</label><textarea class="form-control" name="item_state"></textarea></div>
-                        <div class="field"><label>Příslušenství</label><textarea class="form-control" name="item_accessories"></textarea></div>
-                        <div class="field"><label>Odhadní hodnota</label><input type="text" class="form-control" name="item_estimate"></div>
+                        <div class="field"><label>Device condition</label><textarea class="form-control" name="item_state"></textarea></div>
+                        <div class="field"><label>Accessories</label><textarea class="form-control" name="item_accessories"></textarea></div>
+                        <div class="field"><label>Estimated value</label><input type="text" class="form-control" name="item_estimate"></div>
                     </div>
                 </div>
 
                 <div class="section">
-                    <h2>Zástavní podmínky</h2>
+                    <h2>Pledge terms</h2>
                     <div class="grid-3">
-                        <div class="field"><label>Poskytnutá částka</label><input type="text" class="form-control" name="loan_amount"></div>
+                        <div class="field"><label>Provided amount</label><input type="text" class="form-control" name="loan_amount"></div>
                         <div class="field"><label>Splatnost do</label><input type="text" class="form-control" name="due_date"></div>
-                        <div class="field"><label>Poplatek / úrok</label><input type="text" class="form-control" name="fee_rate"></div>
+                        <div class="field"><label>Fee / interest</label><input type="text" class="form-control" name="fee_rate"></div>
                     </div>
-                    <div class="field"><label>Poznámka</label><textarea class="form-control" name="note"></textarea></div>
+                    <div class="field"><label>Note</label><textarea class="form-control" name="note"></textarea></div>
                 </div>
 
                 <div class="section">
-                    <h2>Právní ujednání</h2>
-                    <div class="legal-helper text-muted small mb-0">Text pod tímto nadpisem se zobrazí až ve vytištěné verzi.</div>
+                    <h2>Legal terms</h2>
+                    <div class="legal-helper text-muted small mb-0">Text under this heading is shown only in print version.</div>
                     <div class="print-only legal-block">
                         <ol>
-                            <li>Zástavce předává výše uvedený předmět do zástavy za účelem zajištění poskytnuté částky.</li>
-                            <li>Zástavní věřitel předmět přijímá a zavazuje se postupovat dle sjednaných podmínek.</li>
-                            <li>Po splnění podmínek a úhradě závazku bude předmět vydán zpět zástavci.</li>
+                            <li>The pledger transfers the above item as collateral to secure the provided amount.</li>
+                            <li>The pledge creditor accepts the item and undertakes to act according to agreed terms.</li>
+                            <li>After conditions are met and liability is paid, the item will be returned to the pledger.</li>
                         </ol>
                     </div>
                 </div>
@@ -143,16 +143,16 @@ require_once 'includes/functions.php';
                 <div class="section mb-0">
                     <h2>Podpisy</h2>
                     <div class="grid-2">
-                        <div class="field"><label>Místo a datum podpisu</label><input type="text" class="form-control" name="sign_place_date"></div>
-                        <div class="field"><label>Podpis zástavce</label><input type="text" class="form-control" name="pledger_signature"></div>
-                        <div class="field"><label>Podpis zástavního věřitele</label><input type="text" class="form-control" name="creditor_signature"></div>
-                        <div class="field"><label>Vyplaceno / způsob výplaty</label><input type="text" class="form-control" name="payment_method"></div>
+                        <div class="field"><label>Place and date of signature</label><input type="text" class="form-control" name="sign_place_date"></div>
+                        <div class="field"><label>Pledger signature</label><input type="text" class="form-control" name="pledger_signature"></div>
+                        <div class="field"><label>Creditor signature</label><input type="text" class="form-control" name="creditor_signature"></div>
+                        <div class="field"><label>Paid out / payout method</label><input type="text" class="form-control" name="payment_method"></div>
                     </div>
                 </div>
             </form>
 
             <div class="actions">
-                <a href="index.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Zpět do CRM</a>
+                <a href="index.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Back to CRM</a>
                 <button class="btn btn-primary" type="button" onclick="window.print()"><i class="fas fa-print me-2"></i>Tisknout</button>
             </div>
         </div>

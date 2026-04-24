@@ -1262,19 +1262,135 @@ $lang_data = [
     ],
 ];
 
-function __($key, $override_lang = null) {
-    global $lang_data, $pdo;
-    $lang = 'ru';
-    if ($override_lang) {
-        $lang = $override_lang;
-    } elseif (isset($_GET['lang']) && in_array(strtolower($_GET['lang']), ['ru', 'cs'])) {
-        $lang = strtolower($_GET['lang']);
-    } elseif (isset($_SESSION['lang'])) {
-        $lang = $_SESSION['lang'];
-    } elseif (isset($pdo) && function_exists('get_setting')) {
-        // Only call get_setting() when both $pdo and functions.php are available
-        $lang = get_setting('language', 'ru');
+$langCustomFile = __DIR__ . '/lang_custom.php';
+if (is_file($langCustomFile)) {
+    require $langCustomFile;
+    if (!empty($lang_overrides) && is_array($lang_overrides)) {
+        foreach ($lang_overrides as $code => $messages) {
+            if (!is_array($messages)) {
+                continue;
+            }
+            if (!isset($lang_data[$code]) || !is_array($lang_data[$code])) {
+                $lang_data[$code] = [];
+            }
+            $lang_data[$code] = array_merge($lang_data[$code], $messages);
+        }
     }
-    return $lang_data[$lang][$key] ?? $key;
+}
+
+function crm_supported_languages(): array {
+    return ['ru', 'cs', 'en'];
+}
+
+function crm_normalize_language($lang): ?string {
+    if (!is_string($lang)) {
+        return null;
+    }
+
+    $code = strtolower(trim($lang));
+    if ($code === '') {
+        return null;
+    }
+
+    return in_array($code, crm_supported_languages(), true) ? $code : null;
+}
+
+function crm_set_language($lang): bool {
+    $normalized = crm_normalize_language($lang);
+    if ($normalized === null) {
+        return false;
+    }
+
+    $_SESSION['lang'] = $normalized;
+    setcookie(
+        'crm_lang',
+        $normalized,
+        [
+            'expires' => time() + (86400 * 365),
+            'path' => '/',
+            'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on'),
+            'httponly' => false,
+            'samesite' => 'Lax',
+        ]
+    );
+
+    return true;
+}
+
+function crm_get_language($override_lang = null): string {
+    global $pdo;
+
+    if ($override_lang !== null) {
+        return crm_normalize_language((string)$override_lang) ?? 'ru';
+    }
+
+    if (!empty($_GET['lang'])) {
+        $queryLang = crm_normalize_language((string)$_GET['lang']);
+        if ($queryLang !== null) {
+            return $queryLang;
+        }
+    }
+
+    if (!empty($_SESSION['lang'])) {
+        $sessionLang = crm_normalize_language((string)$_SESSION['lang']);
+        if ($sessionLang !== null) {
+            return $sessionLang;
+        }
+    }
+
+    if (!empty($_COOKIE['crm_lang'])) {
+        $cookieLang = crm_normalize_language((string)$_COOKIE['crm_lang']);
+        if ($cookieLang !== null) {
+            return $cookieLang;
+        }
+    }
+
+    if (isset($pdo) && function_exists('get_setting')) {
+        $dbLang = crm_normalize_language((string)get_setting('language', 'ru'));
+        if ($dbLang !== null) {
+            return $dbLang;
+        }
+    }
+
+    return 'ru';
+}
+
+function crm_humanize_lang_key(string $key): string {
+    $parts = explode('_', trim($key));
+    $parts = array_filter($parts, static fn($part) => $part !== '');
+    if (empty($parts)) {
+        return $key;
+    }
+
+    $result = array_map(static function ($part) {
+        $upper = strtoupper($part);
+        if (in_array($upper, ['ID', 'IMEI', 'SKU', 'API', 'URL', 'DB', 'CRM', 'VAT', 'PIN', 'SMS', 'PDF'], true)) {
+            return $upper;
+        }
+        return ucfirst($part);
+    }, $parts);
+
+    return implode(' ', $result);
+}
+
+function __($key, $override_lang = null) {
+    global $lang_data;
+
+    $lang = crm_get_language($override_lang);
+    if (isset($lang_data[$lang][$key])) {
+        return $lang_data[$lang][$key];
+    }
+
+    if ($lang === 'en') {
+        return crm_humanize_lang_key((string)$key);
+    }
+
+    foreach (['cs', 'ru'] as $fallbackLang) {
+        if (isset($lang_data[$fallbackLang][$key])) {
+            return $lang_data[$fallbackLang][$key];
+        }
+    }
+
+    return $key;
 }
 ?>

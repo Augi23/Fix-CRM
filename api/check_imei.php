@@ -101,7 +101,7 @@ function curlRequest(string $url, ?array $postFields = null, ?string $cookieJar 
             'code' => 0,
             'body' => '',
             'json' => null,
-            'error' => 'Server nemá k dispozici cURL.'
+            'error' => 'Server does not have cURL available.'
         ];
     }
 
@@ -161,7 +161,7 @@ function ifreeicloudRequest(array $payload): array {
             'code' => 0,
             'body' => '',
             'json' => null,
-            'error' => 'Server nemá k dispozici cURL.'
+            'error' => 'Server does not have cURL available.'
         ];
     }
 
@@ -301,7 +301,7 @@ function extractIfreeicloudImageUrl(array $data): string {
 if (!isset($_SESSION['user_id'])) {
     echo json_encode([
         'success' => false,
-        'message' => 'Pro ověření IMEI se nejprve přihlas.',
+        'message' => 'Please sign in first to verify IMEI.',
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -309,7 +309,7 @@ if (!isset($_SESSION['user_id'])) {
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     echo json_encode([
         'success' => false,
-        'message' => 'Neplatný CSRF token.',
+        'message' => 'Invalid CSRF token.',
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -322,7 +322,7 @@ $imeiIfreeicloud = imeiWithCheckDigit($imeiPolice);
 if (strlen($imei) < 14) {
     echo json_encode([
         'success' => false,
-        'message' => 'IMEI musí mít alespoň 14 číslic.',
+        'message' => 'IMEI must contain at least 14 digits.',
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -333,7 +333,7 @@ $cookieJar = tempnam(sys_get_temp_dir(), 'imei_police_');
 if ($cookieJar === false) {
     echo json_encode([
         'success' => false,
-        'message' => 'Nepodařilo se připravit pracovní prostor pro ověření.',
+        'message' => 'Failed to prepare workspace for verification.',
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -344,7 +344,7 @@ $ifreeicloudService = (int) get_setting_with_fallback('ifreeicloud_service_id', 
 try {
     $initial = curlRequest($endpoint, null, $cookieJar);
     if (!$initial['ok']) {
-        throw new RuntimeException('Nepodařilo se načíst stránku Policie ČR.');
+        throw new RuntimeException('Failed to load Police database page.');
     }
 
     $postFields = extractHiddenFields($initial['body']);
@@ -355,7 +355,7 @@ try {
 
     $response = curlRequest($endpoint, $postFields, $cookieJar);
     if (!$response['ok']) {
-        throw new RuntimeException('Vyhledání na webu Policie ČR selhalo.');
+        throw new RuntimeException('Search on Police website failed.');
     }
 
     $message = extractNodeTextById($response['body'], 'ctl00_Application_Label1');
@@ -396,10 +396,10 @@ try {
             $ifreeicloud['image_url'] = extractIfreeicloudImageUrl($normalized);
             $ifreeicloud['raw'] = $ifreeicloudResponse['json'];
         } else {
-            $ifreeicloud['message'] = $ifreeicloudResponse['error'] ?: 'Ověření přes iFreeiCloud selhalo.';
+            $ifreeicloud['message'] = $ifreeicloudResponse['error'] ?: 'iFreeiCloud verification failed.';
         }
     } else {
-        $ifreeicloud['message'] = 'iFreeiCloud API klíč není nastavený.';
+        $ifreeicloud['message'] = 'iFreeiCloud API key is not configured.';
     }
 
     echo json_encode([

@@ -15,7 +15,7 @@ $info = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : [];
 if (empty($info) || empty($info['local_commit'])) {
     echo json_encode([
         'success' => false,
-        'message' => 'Nepodařilo se načíst git informace repozitáře.',
+        'message' => 'Failed to load repository git information.',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -26,19 +26,19 @@ $remoteLabel = $info['remote_short'] ? trim($branch . ' @ ' . $info['remote_shor
 $buildLabel = sprintf('ahead %d / behind %d', (int)($info['ahead_by'] ?? 0), (int)($info['behind_by'] ?? 0));
 
 if ($info['behind_by'] > 0) {
-    $message = 'Na gitu je nová verze k dispozici.';
+    $message = 'A new version is available on git.';
 } elseif ($info['ahead_by'] > 0) {
-    $message = 'Lokální repozitář je napřed vůči originu.';
+    $message = 'Local repository is ahead of origin.';
 } elseif (!empty($info['dirty'])) {
-    $message = 'Pracovní strom obsahuje neuložené změny.';
+    $message = 'Working tree contains uncommitted changes.';
 } else {
-    $message = 'Jsi na aktuálním gitu.';
+    $message = 'Repository is up to date.';
 }
 
 $response = [
     'success' => true,
     'message' => $message,
-    'hint' => !empty($info['dirty']) ? 'Pozor, pracovní strom není čistý.' : '',
+    'hint' => !empty($info['dirty']) ? 'Warning: working tree is not clean.' : '',
     'new_version' => $localLabel,
     'current_version' => $localLabel,
     'local_version' => $localLabel,

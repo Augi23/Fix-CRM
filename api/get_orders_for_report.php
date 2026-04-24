@@ -19,11 +19,16 @@ if (!hasPermission('admin_access') && !hasPermission('view_reports_all') && ($_S
     $tech_id = $_SESSION['tech_id'];
 }
 
-$start = ($_GET['start_date'] ?? date('Y-m-01')) . ' 00:00:00';
-$end = ($_GET['end_date'] ?? date('Y-m-t')) . ' 23:59:59';
+$start_date = $_GET['start_date'] ?? date('Y-m-01');
+$end_date = $_GET['end_date'] ?? date('Y-m-t');
+$start = $start_date . ' 00:00:00';
+$end = $end_date . ' 23:59:59';
 
 $where = "WHERE 1=1";
 $params = [];
+$joins = "JOIN customers c ON o.customer_id = c.id";
+$selectExtra = "";
+$orderBy = "o.id DESC";
 
 if ($tech_id) {
     $where .= " AND o.technician_id = ?";
@@ -43,8 +48,11 @@ switch ($type) {
         break;
     case 'completed':
         $statuses = getOrderStatusList('done');
-        $where .= " AND o.status IN (" . sqlPlaceholders($statuses) . ") AND o.updated_at BETWEEN ? AND ?";
-        $params = array_merge($params, $statuses, [$start, $end]);
+        $joins .= " LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'";
+        $selectExtra = ", COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) AS finance_date, COALESCE(o.work_duration_seconds, 0) AS work_duration_seconds";
+        $where .= " AND o.status IN (" . sqlPlaceholders($statuses) . ") AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?";
+        $params = array_merge($params, $statuses, [$start_date, $end_date]);
+        $orderBy = "finance_date DESC, o.id DESC";
         break;
     case 'cancelled':
         $statuses = getOrderStatusList('cancelled');
@@ -57,11 +65,11 @@ switch ($type) {
 }
 
 try {
-    $sql = "SELECT o.id, o.device_brand, o.device_model, o.status, o.final_cost, o.estimated_cost, o.created_at, c.first_name, c.last_name 
+    $sql = "SELECT o.id, o.device_brand, o.device_model, o.status, o.final_cost, o.estimated_cost, o.created_at, c.first_name, c.last_name $selectExtra
             FROM orders o 
-            JOIN customers c ON o.customer_id = c.id 
+            $joins 
             $where 
-            ORDER BY o.id DESC";
+            ORDER BY $orderBy";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);

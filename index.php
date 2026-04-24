@@ -218,6 +218,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                             foreach($orders_list as $r):
                                 $found = true;
                                 $icon = getDeviceIcon($r['device_type']);
+                                $phone_href = normalizePhoneForTel($r['phone'] ?? '');
 
                                 $has_media = isset($has_media_ids[$r['id']]);
                             ?>
@@ -230,7 +231,13 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                 </td>
                                 <td>
                                     <strong><?php echo htmlspecialchars($r['first_name'].' '.$r['last_name']); ?></strong><br>
-                                    <small class="text-white-75"><?php echo htmlspecialchars($r['phone']); ?></small>
+                                    <small class="text-white-75">
+                                        <?php if ($phone_href !== ''): ?>
+                                            <a href="tel:<?php echo e($phone_href); ?>" class="text-reset text-decoration-none" onclick="event.stopPropagation();"><?php echo htmlspecialchars($r['phone']); ?></a>
+                                        <?php else: ?>
+                                            <?php echo htmlspecialchars($r['phone']); ?>
+                                        <?php endif; ?>
+                                    </small>
                                 </td>
                                 <td>
                                     <?php echo $icon; ?> <strong><?php echo htmlspecialchars($r['device_brand']); ?></strong><br>
@@ -257,19 +264,19 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
     <div class="col-12 col-lg-4">
         <div class="card glass-card border-0 mb-4 imei-check-card">
             <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-mobile-screen-button text-info me-2"></i>Ověření IMEI</h5>
-                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">PČR</span>
+                <h5 class="mb-0"><i class="fas fa-mobile-screen-button text-info me-2"></i><?php echo __('imei_check_title'); ?></h5>
+                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25"><?php echo __('police_db'); ?></span>
             </div>
             <div class="card-body">
                 <form id="imeiCheckForm">
                     <label class="form-label">IMEI</label>
                     <div class="input-group">
-                        <input type="text" class="form-control" id="imeiCheckInput" placeholder="Zadej IMEI (14 nebo 15 číslic)" inputmode="numeric" autocomplete="off" maxlength="15">
+                        <input type="text" class="form-control" id="imeiCheckInput" placeholder="<?php echo e(__('imei_input_placeholder')); ?>" inputmode="numeric" autocomplete="off" maxlength="15">
                         <button class="btn btn-outline-info" type="submit">
-                            <i class="fas fa-search me-1"></i> Ověřit
+                            <i class="fas fa-search me-1"></i><?php echo __('check'); ?>
                         </button>
                     </div>
-                    <div class="form-text text-white-75">CRM prověří databázi Policie ČR bez odchodu z aplikace. iFreeiCloud dostane plný 15místný IMEI, pokud zadáš jen 14 číslic, dopočítá se kontrolní číslice.</div>
+                    <div class="form-text text-white-75"><?php echo __('imei_help_text'); ?></div>
                 </form>
                 <div id="imeiCheckResult" class="imei-check-result mt-3" aria-live="polite"></div>
             </div>
@@ -289,10 +296,10 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <a href="inventory.php" class="btn btn-outline-info"><i class="fas fa-search me-2"></i> <?php echo __('check_stock'); ?></a>
                     <?php endif; ?>
                     <a href="vykup-zarizeni.php" target="_blank" rel="noopener" class="btn btn-outline-light mt-2">
-                        <i class="fas fa-file-signature me-2"></i> Výkupní list / Kupní smlouva
+                        <i class="fas fa-file-signature me-2"></i> <?php echo __('buyout_sheet_purchase_agreement'); ?>
                     </a>
                     <a href="zastava.php" target="_blank" rel="noopener" class="btn btn-outline-light">
-                        <i class="fas fa-file-contract me-2"></i> Formulář zástavy
+                        <i class="fas fa-file-contract me-2"></i> <?php echo __('pawn_form'); ?>
                     </a>
                 </div>
             </div>
@@ -449,7 +456,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                         <div class="row g-3">
                             <div class="col-md-3">
                                 <label class="form-label"><?php echo __('device_type'); ?></label>
-                                <select name="device_type" class="form-select" required>
+                                <select name="device_type" class="form-select select2-device-type" style="width: 100%;" required>
                                     <option value="Phone">📱 <?php echo __('Phone'); ?></option>
                                     <option value="Notebook">💻 <?php echo __('Notebook'); ?></option>
                                     <option value="PC">🖥️ <?php echo __('PC'); ?></option>
@@ -460,7 +467,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label"><?php echo __('warranty_type'); ?></label>
-                                <select name="order_type" class="form-select" required>
+                                <select name="order_type" class="form-select select2-order-type" style="width: 100%;" required>
                                     <option value="Non-Warranty">🛠 <?php echo __('warranty_no'); ?></option>
                                     <option value="Warranty">📜 <?php echo __('warranty_yes'); ?></option>
                                 </select>
@@ -615,43 +622,95 @@ $(document).ready(function() {
         return safe.replace(re, '<span class="match">$1</span>');
     }
 
-    $('.select2-customer').select2({
-        dropdownParent: $('#newOrderModal'),
-        placeholder: "<?php echo __('search_client_placeholder'); ?>",
-        allowClear: true,
-        minimumInputLength: 0,
-        ajax: {
-            url: 'api/search_customers.php',
-            dataType: 'json',
-            delay: 250,
-            data: function(params) {
-                currentCustomerSearch = params.term || '';
-                return { q: params.term, page: params.page || 1 };
-            },
-            processResults: function(data, params) {
-                params.page = params.page || 1;
-                return { results: data.results, pagination: { more: data.pagination.more } };
-            }
-        },
-        templateResult: function(item) {
-            if (item.loading) return item.text;
-            const name = item.name || item.text || '';
-            const phone = item.phone || '';
-            const title = highlightMatch(name, currentCustomerSearch);
-            const meta = phone ? '<span class="meta">' + highlightMatch(phone, currentCustomerSearch) + '</span>' : '';
-            return $('<div class="customer-option"><div>' + title + '</div>' + meta + '</div>');
-        },
-        templateSelection: function(item) {
-            return item.text || item.name || '';
-        },
-        escapeMarkup: function(markup) { return markup; }
-    });
+    function initNewOrderModalSelects() {
+        const $modal = $('#newOrderModal');
+        const $dropdownParent = $modal.find('.modal-content');
 
-    $('.select2-brand').select2({
-        dropdownParent: $('#newOrderModal'),
-        placeholder: "<?php echo __('brand'); ?>",
-        tags: true
-    });
+        const $customerSelect = $modal.find('.select2-customer');
+        if ($customerSelect.length) {
+            if ($customerSelect.data('select2')) {
+                $customerSelect.select2('destroy');
+            }
+
+            $customerSelect.select2({
+                dropdownParent: $dropdownParent,
+                placeholder: "<?php echo __('search_client_placeholder'); ?>",
+                allowClear: true,
+                minimumInputLength: 0,
+                width: '100%',
+                ajax: {
+                    url: 'api/search_customers.php',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) {
+                        currentCustomerSearch = params.term || '';
+                        return { q: params.term, page: params.page || 1 };
+                    },
+                    processResults: function(data, params) {
+                        params.page = params.page || 1;
+                        return { results: data.results, pagination: { more: data.pagination.more } };
+                    }
+                },
+                templateResult: function(item) {
+                    if (item.loading) return item.text;
+                    const name = item.name || item.text || '';
+                    const phone = item.phone || '';
+                    const title = highlightMatch(name, currentCustomerSearch);
+                    const meta = phone ? '<span class="meta">' + highlightMatch(phone, currentCustomerSearch) + '</span>' : '';
+                    return $('<div class="customer-option"><div>' + title + '</div>' + meta + '</div>');
+                },
+                templateSelection: function(item) {
+                    return item.text || item.name || '';
+                },
+                escapeMarkup: function(markup) { return markup; }
+            });
+        }
+
+        const $brandSelect = $modal.find('.select2-brand');
+        if ($brandSelect.length) {
+            if ($brandSelect.data('select2')) {
+                $brandSelect.select2('destroy');
+            }
+
+            $brandSelect.select2({
+                dropdownParent: $dropdownParent,
+                placeholder: "<?php echo __('brand_placeholder'); ?>",
+                tags: true,
+                width: '100%',
+                dropdownAutoWidth: false
+            });
+        }
+
+        const $deviceTypeSelect = $modal.find('.select2-device-type');
+        if ($deviceTypeSelect.length) {
+            if ($deviceTypeSelect.data('select2')) {
+                $deviceTypeSelect.select2('destroy');
+            }
+
+            $deviceTypeSelect.select2({
+                dropdownParent: $dropdownParent,
+                width: '100%',
+                minimumResultsForSearch: Infinity,
+                dropdownAutoWidth: false
+            });
+        }
+
+        const $orderTypeSelect = $modal.find('.select2-order-type');
+        if ($orderTypeSelect.length) {
+            if ($orderTypeSelect.data('select2')) {
+                $orderTypeSelect.select2('destroy');
+            }
+
+            $orderTypeSelect.select2({
+                dropdownParent: $dropdownParent,
+                width: '100%',
+                minimumResultsForSearch: Infinity,
+                dropdownAutoWidth: false
+            });
+        }
+    }
+
+    $('#newOrderModal').on('shown.bs.modal', initNewOrderModalSelects);
 
     $('.order-template-select').on('change', function() {
         const value = $(this).val();
@@ -775,6 +834,22 @@ $(document).ready(function() {
 
     const $imeiInput = $('#imeiCheckInput');
     const $imeiResult = $('#imeiCheckResult');
+    const IMEI_I18N = {
+        policeDb: <?php echo json_encode(__('police_db'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        ifreeicloudNotConfigured: <?php echo json_encode(__('ifreeicloud_not_configured'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        ifreeicloudIssue: <?php echo json_encode(__('ifreeicloud_issue'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        ifreeicloudSuccess: <?php echo json_encode(__('ifreeicloud_success'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        ifreeicloudInconclusive: <?php echo json_encode(__('ifreeicloud_inconclusive'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        yes: <?php echo json_encode(__('yes'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        no: <?php echo json_encode(__('no'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        imeiMinDigits: <?php echo json_encode(__('imei_min_digits_warning'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        checking: <?php echo json_encode(__('checking'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        checkFailed: <?php echo json_encode(__('imei_check_failed_try_again'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        checkCouldNotComplete: <?php echo json_encode(__('imei_check_could_not_complete'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        resultUnknown: <?php echo json_encode(__('imei_result_unknown'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        resultFound: <?php echo json_encode(__('imei_result_found'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        resultNotFound: <?php echo json_encode(__('imei_result_not_found'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+    };
 
     function renderImeiResult(type, message, details) {
         const icon = type === 'success' ? 'check-circle' : type === 'danger' ? 'triangle-exclamation' : 'circle-exclamation';
@@ -791,7 +866,7 @@ $(document).ready(function() {
     function renderIfreeicloudResult(result) {
         if (!result) return '';
         if (!result.configured) {
-            return `<div class="alert alert-secondary border-secondary border-opacity-25 bg-secondary bg-opacity-10 text-white-75 mb-0 py-2"><i class="fas fa-cloud me-2"></i>${escapeHtml(result.message || 'iFreeiCloud není nakonfigurovaný.')}</div>`;
+            return `<div class="alert alert-secondary border-secondary border-opacity-25 bg-secondary bg-opacity-10 text-white-75 mb-0 py-2"><i class="fas fa-cloud me-2"></i>${escapeHtml(result.message || IMEI_I18N.ifreeicloudNotConfigured)}</div>`;
         }
 
         const type = result.status === 'error' ? 'danger' : result.status === 'success' ? 'success' : 'warning';
@@ -802,10 +877,10 @@ $(document).ready(function() {
                 ? 'alert alert-danger border-danger border-opacity-25 bg-danger bg-opacity-10 text-danger'
                 : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
         const headline = type === 'danger'
-            ? 'iFreeiCloud hlásí problém nebo odmítl požadavek.'
+            ? IMEI_I18N.ifreeicloudIssue
             : type === 'success'
-                ? 'iFreeiCloud kontrola proběhla úspěšně.'
-                : 'Výsledek iFreeiCloud nebyl jednoznačný.';
+                ? IMEI_I18N.ifreeicloudSuccess
+                : IMEI_I18N.ifreeicloudInconclusive;
 
         const firstDefined = (obj, keys) => {
             if (!obj) return undefined;
@@ -818,12 +893,12 @@ $(document).ready(function() {
         };
 
         const normalizeYesNo = (value) => {
-            if (value === true || value === 1 || value === '1') return { text: 'Ano', state: 'yes' };
-            if (value === false || value === 0 || value === '0') return { text: 'Ne', state: 'no' };
+            if (value === true || value === 1 || value === '1') return { text: IMEI_I18N.yes, state: 'yes' };
+            if (value === false || value === 0 || value === '0') return { text: IMEI_I18N.no, state: 'no' };
             if (typeof value === 'string') {
                 const v = value.trim().toLowerCase();
-                if (['yes', 'y', 'true', 'on', 'locked', 'active', 'enabled', 'ano', 'fmi on'].includes(v)) return { text: 'Ano', state: 'yes' };
-                if (['no', 'n', 'false', 'off', 'unlocked', 'inactive', 'disabled', 'ne'].includes(v)) return { text: 'Ne', state: 'no' };
+                if (['yes', 'y', 'true', 'on', 'locked', 'active', 'enabled', 'ano', 'fmi on'].includes(v)) return { text: 'Yes', state: 'yes' };
+                if (['no', 'n', 'false', 'off', 'unlocked', 'inactive', 'disabled', 'ne'].includes(v)) return { text: 'No', state: 'no' };
             }
             return { text: String(value), state: '' };
         };
@@ -851,17 +926,17 @@ $(document).ready(function() {
         const fieldMap = [
             ['model', 'Model'],
             ['capacity', 'Capacity'],
-            ['colour', 'Colour'],
+            ['colour', 'Color'],
             ['color', 'Color'],
             ['network', 'Network'],
             ['imei', 'IMEI'],
             ['imei2', 'IMEI2'],
             ['meid', 'MEID'],
-            ['serial', 'Serial'],
+            ['serial', 'Serial number'],
             ['warrantyStatus', 'Warranty'],
             ['estPurchaseDate', 'Purchase date'],
             ['technicalSupport', 'Technical support'],
-            ['repairCoverage', 'Repairs/service coverage'],
+            ['repairCoverage', 'Service coverage'],
             ['replaced', 'Replaced by Apple'],
             ['usaBlockStatus', 'US block status'],
             ['simLock', 'SIM lock'],
@@ -924,34 +999,34 @@ $(document).ready(function() {
 
         const imei = ($imeiInput.val() || '').replace(/\D+/g, '').slice(0, 15);
         if (imei.length < 14) {
-            renderImeiResult('warning', 'Zadej prosím IMEI alespoň ze 14 číslic.');
+            renderImeiResult('warning', IMEI_I18N.imeiMinDigits);
             return;
         }
 
         const $btn = $(this).find('button[type="submit"]');
         const oldHtml = $btn.html();
-        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Ověřuji...');
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + escapeHtml(IMEI_I18N.checking));
         $imeiResult.empty();
 
         $.post('api/check_imei.php', { imei: imei, csrf_token: $('input[name="csrf_token"]').first().val() }, function(res) {
             $btn.prop('disabled', false).html(oldHtml);
 
             if (!res || !res.success) {
-                const policeMsg = res && res.police && res.police.message ? res.police.message : (res && res.message ? res.message : 'Kontrolu se nepodařilo dokončit.');
-                const warningAlert = `<div class="alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning mb-3 py-2"><div class="fw-semibold mb-1"><i class="fas fa-shield-halved me-2"></i>Policie ČR</div><div><i class="fas fa-circle-exclamation me-2"></i>${escapeHtml(policeMsg)}</div></div>`;
+                const policeMsg = res && res.police && res.police.message ? res.police.message : (res && res.message ? res.message : IMEI_I18N.checkCouldNotComplete);
+                const warningAlert = `<div class="alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning mb-3 py-2"><div class="fw-semibold mb-1"><i class="fas fa-shield-halved me-2"></i>${escapeHtml(IMEI_I18N.policeDb)}</div><div><i class="fas fa-circle-exclamation me-2"></i>${escapeHtml(policeMsg)}</div></div>`;
                 $imeiResult.html(warningAlert + renderIfreeicloudResult(res && res.ifreeicloud));
                 return;
             }
 
             const policeMessage = res.police && res.police.message ? res.police.message : (res.message || '');
             let policeType = 'warning';
-            let policeHeadline = 'Výsledek se nepodařilo jednoznačně vyhodnotit.';
+            let policeHeadline = IMEI_I18N.resultUnknown;
             if (res.status === 'found') {
                 policeType = 'danger';
-                policeHeadline = 'Zařízení je v databázi Policie ČR vedeno jako odcizené.';
+                policeHeadline = IMEI_I18N.resultFound;
             } else if (res.status === 'not_found') {
                 policeType = 'success';
-                policeHeadline = 'Zařízení v databázi Policie ČR nalezeno nebylo.';
+                policeHeadline = IMEI_I18N.resultNotFound;
             } else if (policeMessage) {
                 policeHeadline = policeMessage;
             }
@@ -964,14 +1039,14 @@ $(document).ready(function() {
                         ? 'alert alert-danger border-danger border-opacity-25 bg-danger bg-opacity-10 text-danger'
                         : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
                 const detailHtml = policeMessage ? `<div class="small mt-1 opacity-75">${escapeHtml(policeMessage)}</div>` : '';
-                return `<div class="${alertClass} mb-3 py-2"><div class="fw-semibold mb-1"><i class="fas fa-shield-halved me-2"></i>Policie ČR</div><div><i class="fas fa-${icon} me-2"></i>${escapeHtml(policeHeadline)}</div>${detailHtml}</div>`;
+                return `<div class="${alertClass} mb-3 py-2"><div class="fw-semibold mb-1"><i class="fas fa-shield-halved me-2"></i>${escapeHtml(IMEI_I18N.policeDb)}</div><div><i class="fas fa-${icon} me-2"></i>${escapeHtml(policeHeadline)}</div>${detailHtml}</div>`;
             })();
 
             const ifreeicloudHtml = renderIfreeicloudResult(res.ifreeicloud);
             $imeiResult.html(policeAlert + ifreeicloudHtml);
         }, 'json').fail(function() {
             $btn.prop('disabled', false).html(oldHtml);
-            renderImeiResult('warning', 'Kontrola IMEI selhala. Zkus to prosím znovu za chvíli.');
+            renderImeiResult('warning', IMEI_I18N.checkFailed);
         });
     });
 });

@@ -50,7 +50,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     $stmt->execute(array_merge($cancelledStatuses, $params));
     $cancelled = $stmt->fetchColumn();
 
-    // Work time (only counted when the order is finished)
+    // Work time in minutes (only counted when the order is finished)
     $work_params = [$start . ' 00:00:00', $end . ' 23:59:59'];
     $work_tech_cond = "";
     if ($tech_id) {
@@ -59,7 +59,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     }
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(COALESCE(work_duration_seconds, 0)), 0) FROM orders WHERE status IN (" . sqlPlaceholders($doneStatuses) . ") AND work_finished_at BETWEEN ? AND ?" . $work_tech_cond);
     $stmt->execute(array_merge($doneStatuses, $work_params));
-    $work_seconds = (int)$stmt->fetchColumn();
+    $work_minutes = (int)$stmt->fetchColumn();
 
     // ─── Financials / performance ────────────────────────────────────────────
     // For staff reports we want results to appear immediately after a technician
@@ -87,7 +87,8 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
             (SELECT SUM(oi2.quantity * invt.cost_price)
              FROM order_items oi2
              JOIN inventory invt ON oi2.inventory_id = invt.id
-             WHERE oi2.order_id = o.id) AS inventory_cost
+             WHERE oi2.order_id = o.id) AS inventory_cost,
+            o.work_duration_seconds
         FROM orders o
         LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'
         WHERE o.status IN (" . sqlPlaceholders($doneStatuses) . ")
@@ -103,13 +104,13 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     $parts_cost       = 0;
     $engineer_earnings = 0;
 
-    // Load all engineer rates once
+    // Load all technician hourly wages once (stored in engineer_rate column for compatibility)
     $stmt_rates = $pdo->query("SELECT id, engineer_rate FROM technicians");
     $rates = [];
     while ($row = $stmt_rates->fetch(PDO::FETCH_ASSOC)) {
-        $rates[$row['id']] = (float)($row['engineer_rate'] ?? 50);
+        $rates[$row['id']] = (float)($row['engineer_rate'] ?? 0);
     }
-    $engineer_rate = $tech_id ? ($rates[$tech_id] ?? 50) : 50;
+    $hourly_wage = $tech_id ? ($rates[$tech_id] ?? 0) : 0;
 
     foreach ($orders as $o) {
         // Revenue priority: final_cost → invoice total_amount → estimated_cost
@@ -128,8 +129,9 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
         $net  = $rev - $p_cost - $exp;
         if ($net < 0) $net = 0;
 
-        $rate = $rates[$o['technician_id']] ?? $engineer_rate;
-        $engineer_earnings += $net * ($rate / 100);
+        $rate = $rates[$o['technician_id']] ?? $hourly_wage;
+        $workMinutes = (int)($o['work_duration_seconds'] ?? 0);
+        $engineer_earnings += ($workMinutes / 60) * $rate;
     }
 
     $net_revenue = $revenue - $parts_cost - $expenses;
@@ -140,12 +142,12 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
         'in_progress' => $in_progress,
         'completed' => $completed,
         'cancelled' => $cancelled,
-        'work_seconds' => $work_seconds,
+        'work_seconds' => $work_minutes,
         'revenue' => $revenue,
         'expenses' => $expenses,
         'parts_cost' => $parts_cost,
         'net_revenue' => $net_revenue,
-        'engineer_rate' => $engineer_rate,
+        'engineer_rate' => $hourly_wage,
         'earnings' => $engineer_earnings,
         'profit' => $sc_profit
     ];
@@ -195,10 +197,10 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <tr>
                             <th><?php echo __('technician'); ?></th>
                             <th class="text-center"><?php echo __('repaired_count'); ?></th>
+                            <th class="text-end">Worked</th>
                             <th class="text-end"><?php echo __('total_revenue'); ?></th>
                             <th class="text-end text-muted small"><?php echo __('parts_cost'); ?></th>
                             <th class="text-end text-muted small"><?php echo __('expenses_label'); ?></th>
-                            <th class="text-end">Odpracováno</th>
                             <th class="text-end"><?php echo __('earned'); ?></th>
                             <th class="text-end"><?php echo __('sc_income'); ?></th>
                             <th class="text-center" style="width:60px">%</th>
@@ -206,7 +208,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     </thead>
                     <tbody>
                         <?php
-                        $techs = $pdo->query("SELECT id, name FROM technicians WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
+                        $techs = $pdo->query("SELECT id, name, is_active FROM technicians ORDER BY is_active DESC, name ASC")->fetchAll();
                         $totals = [
                             'received' => 0, 'in_progress' => 0, 'completed' => 0, 'cancelled' => 0,
                             'work_seconds' => 0,
@@ -230,6 +232,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <tr>
                             <td>
                                 <strong><?php echo htmlspecialchars($t['name']); ?></strong>
+                                <?php if ((int)($t['is_active'] ?? 1) !== 1): ?><span class="badge bg-secondary ms-2">inactive</span><?php endif; ?>
                                 <a href="?tab=individual_stats&tech_id=<?php echo $t['id']; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>" class="ms-2 small text-primary"><i class="fas fa-external-link-alt"></i></a>
                             </td>
                             <td class="text-center">
@@ -243,7 +246,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <td class="text-end text-muted small"><?php echo $s['expenses'] > 0 ? '-'.formatMoney($s['expenses']) : '—'; ?></td>
                             <td class="text-end fw-bold text-primary"><?php echo formatMoney($s['earnings']); ?></td>
                             <td class="text-end text-success fw-bold"><?php echo formatMoney($s['profit']); ?></td>
-                            <td class="text-center"><span class="badge bg-secondary"><?php echo $s['engineer_rate']; ?>%</span></td>
+                            <td class="text-center"><span class="badge bg-secondary"><?php echo formatMoney($s['engineer_rate']); ?>/h</span></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -357,9 +360,9 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <select name="tech_id" class="form-select" onchange="this.form.submit()">
                             <option value=""><?php echo __('select_employee_option'); ?></option>
                             <?php 
-                            $techs_list = $pdo->query("SELECT id, name FROM technicians WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
+                            $techs_list = $pdo->query("SELECT id, name, is_active FROM technicians ORDER BY is_active DESC, name ASC")->fetchAll();
                             foreach($techs_list as $tl): ?>
-                                <option value="<?php echo $tl['id']; ?>" <?php echo $selected_tech_id == $tl['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($tl['name']); ?></option>
+                                <option value="<?php echo $tl['id']; ?>" <?php echo $selected_tech_id == $tl['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($tl['name']); ?><?php echo ((int)($tl['is_active'] ?? 1) !== 1) ? ' (inactive)' : ''; ?></option>
                             <?php endforeach; ?>
                         </select>
                     </form>
@@ -385,13 +388,13 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     </div>
                     <div class="col-md-3">
                         <div class="card p-3 border shadow-none text-center">
-                            <div class="small text-muted mb-1">Odpracováno</div>
+                            <div class="small text-muted mb-1">Worked</div>
                             <h3 class="mb-0 text-warning"><?php echo formatWorkDuration($is['work_seconds']); ?></h3>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="card p-3 border shadow-none text-center">
-                            <div class="small text-muted mb-1"><?php echo __('engineer_earnings'); ?> <span class="badge bg-secondary"><?php echo $is['engineer_rate']; ?>%</span></div>
+                            <div class="small text-muted mb-1"><?php echo __('engineer_earnings'); ?> <span class="badge bg-secondary"><?php echo formatMoney($is['engineer_rate']); ?>/h</span></div>
                             <h3 class="mb-0 text-primary"><?php echo formatMoney($is['earnings']); ?></h3>
                         </div>
                     </div>
@@ -445,7 +448,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 $e_cost = floatval($r['extra_expenses'] ?: 0);
                                 $net = $rev - $p_cost - $e_cost;
                                 if ($net < 0) $net = 0;
-                                $earn = $net * ($is['engineer_rate'] / 100);
+                                $earn = ((int)($r['work_duration_seconds'] ?? 0) / 60) * (float)$is['engineer_rate'];
                             ?>
                             <tr>
                                 <td><a href="view_order.php?id=<?php echo $r['id']; ?>&return=<?php echo $current_url; ?>" class="fw-bold">#<?php echo $r['id']; ?></a></td>
@@ -489,7 +492,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                 <div id="modalTableWrapper" class="table-responsive d-none">
                     <table class="table table-hover align-middle mb-0 text-white">
                         <thead class="table-dark">
-                            <tr>
+                            <tr id="reportOrdersTableHeadRow">
                                 <th class="ps-4">ID</th>
                                 <th><?php echo __('device'); ?></th>
                                 <th><?php echo __('client'); ?></th>
@@ -526,7 +529,23 @@ function showOrdersModal(techId, type, title) {
         .then(res => {
             document.getElementById('modalLoading').classList.add('d-none');
             const tbody = document.getElementById('reportOrdersTableBody');
+            const headRow = document.getElementById('reportOrdersTableHeadRow');
+            const isCompleted = type === 'completed';
             tbody.innerHTML = '';
+
+            headRow.innerHTML = isCompleted
+                ? `<th class="ps-4">ID</th>
+                   <th><?php echo __('date'); ?></th>
+                   <th>Doba</th>
+                   <th><?php echo __('device'); ?></th>
+                   <th><?php echo __('client'); ?></th>
+                   <th><?php echo __('status'); ?></th>
+                   <th class="text-end pe-4"><?php echo __('sum'); ?></th>`
+                : `<th class="ps-4">ID</th>
+                   <th><?php echo __('device'); ?></th>
+                   <th><?php echo __('client'); ?></th>
+                   <th><?php echo __('status'); ?></th>
+                   <th class="text-end pe-4"><?php echo __('sum'); ?></th>`;
 
             if (res.success && res.data.length > 0) {
                 res.data.forEach(order => {
@@ -561,6 +580,20 @@ function showOrdersModal(techId, type, title) {
                     tdSum.textContent = parseFloat(cost).toFixed(2) + ' <?php echo get_setting('currency', 'Kč'); ?>';
 
                     row.appendChild(tdId);
+
+                    if (isCompleted) {
+                        const tdDate = document.createElement('td');
+                        tdDate.textContent = order.finance_date ? new Date(order.finance_date + 'T00:00:00').toLocaleDateString('cs-CZ') : '—';
+
+                        const tdDuration = document.createElement('td');
+                        tdDuration.textContent = order.work_duration_seconds && Number(order.work_duration_seconds) > 0
+                            ? formatDurationMinutes(Number(order.work_duration_seconds))
+                            : '—';
+
+                        row.appendChild(tdDate);
+                        row.appendChild(tdDuration);
+                    }
+
                     row.appendChild(tdDevice);
                     row.appendChild(tdClient);
                     row.appendChild(tdStatus);
@@ -569,7 +602,8 @@ function showOrdersModal(techId, type, title) {
                 });
                 document.getElementById('modalTableWrapper').classList.remove('d-none');
             } else {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><?php echo __('no_orders_found'); ?></td></tr>';
+                const colspan = isCompleted ? 7 : 5;
+                tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center py-4 text-muted"><?php echo __('no_orders_found'); ?></td></tr>`;
                 document.getElementById('modalTableWrapper').classList.remove('d-none');
             }
         })
@@ -581,6 +615,22 @@ function showOrdersModal(techId, type, title) {
             if (modalInstance) modalInstance.hide();
             showAlert('<?php echo __('error_loading_data'); ?>');
         });
+}
+
+function formatDurationMinutes(totalMinutes) {
+    totalMinutes = parseInt(totalMinutes || 0, 10);
+    if (totalMinutes <= 0) return '—';
+
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+
+    const parts = [];
+    if (days > 0) parts.push(`${days} d`);
+    if (hours > 0 || days > 0) parts.push(`${hours} h`);
+    parts.push(`${minutes} min`);
+
+    return parts.join(' ');
 }
 
 function getStatusBadgeClass(status) {

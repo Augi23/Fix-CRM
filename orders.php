@@ -263,7 +263,7 @@ if (isset($pdo)) {
                             $has_media   = isset($has_media_ids[$order['id']]);
                             $device_icon = getDeviceIcon($order['device_type']);
                             $client_phone = $order['phone'] ?? '';
-                            $phone_clean  = preg_replace('/[^0-9+]/', '', $client_phone);
+                            $phone_clean  = normalizePhoneForTel($client_phone);
                         ?>
                         <tr class="order-row" data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
                             <td class="ps-4">
@@ -276,11 +276,18 @@ if (isset($pdo)) {
                             <td>
                                 <div><?php echo e($order['first_name'] . ' ' . $order['last_name']); ?></div>
                                 <?php if($client_phone): ?>
-                                <div class="phone-qr-trigger small text-white-75" 
-                                     data-phone="<?php echo e($phone_clean); ?>"
-                                     style="cursor: pointer;">
-                                    <i class="fas fa-phone me-1 text-success"></i><?php echo e($client_phone); ?>
-                                </div>
+                                    <?php if ($phone_clean !== ''): ?>
+                                    <a class="phone-qr-trigger small text-white-75 text-decoration-none"
+                                       href="tel:<?php echo e($phone_clean); ?>"
+                                       data-phone="<?php echo e($phone_clean); ?>"
+                                       onclick="event.stopPropagation();">
+                                        <i class="fas fa-phone me-1 text-success"></i><?php echo e($client_phone); ?>
+                                    </a>
+                                    <?php else: ?>
+                                    <div class="small text-white-75">
+                                        <i class="fas fa-phone me-1 text-success"></i><?php echo e($client_phone); ?>
+                                    </div>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -354,10 +361,10 @@ if (isset($pdo)) {
                                             <i class="fas fa-print text-white-75"></i>
                                         </button>
                                         <ul class="dropdown-menu shadow dropdown-menu-end">
-                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', 'Order #<?php echo $order['id']; ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
+                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
                                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openReceptionLangModal(<?php echo $order['id']; ?>)"><i class="fas fa-file-import me-2 text-info"></i> <?php echo __('reception_act_thermal'); ?></a></li>
-                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', 'Workshop Order #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
-                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', 'Receipt #<?php echo $order['id']; ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
+                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
+                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
                                         </ul>
                                     </div>
                                     <?php if (hasPermission('admin_access')): ?>
@@ -602,7 +609,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="row g-3">
                             <div class="col-12 col-sm-6 col-md-3">
                                 <label class="form-label"><?php echo __('device_type'); ?></label>
-                                <select name="device_type" class="form-select" required>
+                                <select name="device_type" class="form-select select2-device-type" style="width: 100%;" required>
                                     <option value="Phone">📱 <?php echo __('Phone'); ?></option>
                                     <option value="Notebook">💻 <?php echo __('Notebook'); ?></option>
                                     <option value="PC">🖥️ <?php echo __('PC'); ?></option>
@@ -613,7 +620,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                             <div class="col-12 col-sm-6 col-md-3">
                                 <label class="form-label"><?php echo __('warranty_type'); ?></label>
-                                <select name="order_type" class="form-select" required>
+                                <select name="order_type" class="form-select select2-order-type" style="width: 100%;" required>
                                     <option value="Non-Warranty">🛠 <?php echo __('warranty_no'); ?></option>
                                     <option value="Warranty">📜 <?php echo __('warranty_yes'); ?></option>
                                 </select>
@@ -784,7 +791,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <ul class="dropdown-menu shadow dropdown-menu-end">
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=${o.id}', '<?php echo __('order_header'); ?> #' + o.id)"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openReceptionLangModal(${o.id})"><i class="fas fa-file-import me-2 text-info"></i> <?php echo __('reception_act_thermal'); ?></a></li>
-                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=${o.id}', 'Workshop #' + o.id)"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=${o.id}', '<?php echo __('work_order'); ?> #' + o.id)"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=${o.id}', '<?php echo __('thermal_receipt'); ?> #' + o.id)"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
                         </ul>
                     </div>
@@ -805,6 +812,8 @@ function escHTML(str) {
     return d.innerHTML;
 }
 
+const canEditQuickTechnician = <?php echo (hasPermission('admin_access') || hasPermission('edit_orders')) ? 'true' : 'false'; ?>;
+
 $(document).ready(function() {
     $('.order-modal-trigger').on('click', function() {
         const id = $(this).data('id');
@@ -823,17 +832,17 @@ $(document).ready(function() {
                 if (attachments.length > 0) {
                     mediaHtml = '<div class="row g-2 mt-2">';
                     attachments.forEach(file => {
-                        const isVideo = file.file_type.includes('video');
+                        const isVideo = String(file.file_type || '').includes('video');
                         mediaHtml += `
                             <div class="col-3 col-md-2" id="media-item-${file.id}">
                                 <div class="card h-100 shadow-sm border position-relative">
                                     <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-1 line-height-1" style="z-index: 10; font-size: 0.6rem;" onclick="deleteMedia(${file.id})">
                                         <i class="fas fa-times"></i>
                                     </button>
-                                    <div class="ratio ratio-1x1 bg-dark bg-opacity-25 border-secondary">
+                                    <div class="ratio ratio-1x1 bg-dark bg-opacity-25 border-secondary overflow-hidden">
                                         ${isVideo ? 
-                                            `<div class="d-flex align-items-center justify-content-center bg-dark"><i class="fas fa-video text-white"></i></div>` : 
-                                            `<img src="${file.file_path}" class="object-fit-cover" alt="Photo">`
+                                            `<div class="w-100 h-100 d-flex align-items-center justify-content-center bg-dark"><i class="fas fa-video text-white"></i></div>` : 
+                                            `<img src="${file.file_path}" class="w-100 h-100 object-fit-cover d-block" alt="Attachment">`
                                         }
                                     </div>
                                 </div>
@@ -845,8 +854,9 @@ $(document).ready(function() {
                 }
 
                 let html = `
-                    <form id="quickOrderForm">
+                    <form id="quickOrderForm" enctype="multipart/form-data">
                         <input type="hidden" name="order_id" value="${(+o.id) || 0}">
+                        <input type="hidden" name="csrf_token" value="<?php echo e($_SESSION['csrf_token'] ?? ''); ?>">
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <label class="form-label text-white-75 small mb-1"><?php echo __('client_and_date'); ?></label>
@@ -882,7 +892,7 @@ $(document).ready(function() {
                             </div>
                             <div class="col-12 col-sm-6 col-md-3">
                                 <label class="form-label"><?php echo __('technician'); ?></label>
-                                <select name="technician_id" class="form-select" ${res.role != 'admin' ? 'disabled' : ''}>
+                                <select name="technician_id" class="form-select" ${!canEditQuickTechnician ? 'disabled' : ''}>
                                     <option value="">-- <?php echo __('edit'); ?> --</option>
                                     <?php
                                     // FIX #5: use pre-loaded $techs_list
@@ -925,6 +935,11 @@ $(document).ready(function() {
                                 <label class="form-label"><?php echo __('media_files'); ?></label>
                                 ${mediaHtml}
                             </div>
+                            <div class="col-12">
+                                <label class="form-label"><?php echo __('add_media_files'); ?></label>
+                                <input type="file" name="files[]" class="form-control" multiple accept="image/*,video/*">
+                                <div class="form-text"><?php echo __('upload_multiple_hint'); ?></div>
+                            </div>
                         </div>
                     </form>
                 `;
@@ -957,7 +972,7 @@ $(document).ready(function() {
     $('#saveQuickOrderBtn').off('click').on('click', function(e) {
         e.preventDefault();
         const form = $('#quickOrderForm');
-        const formData = form.serialize();
+        const formData = new FormData(form[0]);
         const btn = $(this);
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> <?php echo __('saving'); ?>...');
         
@@ -966,6 +981,8 @@ $(document).ready(function() {
             type: 'POST',
             data: formData,
             dataType: 'json',
+            processData: false,
+            contentType: false,
             cache: false,
             success: function(res) {
                 if (res.success) {
@@ -1001,43 +1018,95 @@ $(document).ready(function() {
         return safe.replace(re, '<span class="match">$1</span>');
     }
 
-    $('.select2-customer').select2({
-        dropdownParent: $('#newOrderModal'),
-        placeholder: "<?php echo __('search_client_placeholder'); ?>",
-        allowClear: true,
-        minimumInputLength: 0,
-        ajax: {
-            url: 'api/search_customers.php',
-            dataType: 'json',
-            delay: 250,
-            data: function(params) {
-                currentCustomerSearch = params.term || '';
-                return { q: params.term, page: params.page || 1 };
-            },
-            processResults: function(data, params) {
-                params.page = params.page || 1;
-                return { results: data.results, pagination: { more: data.pagination.more } };
-            }
-        },
-        templateResult: function(item) {
-            if (item.loading) return item.text;
-            const name = item.name || item.text || '';
-            const phone = item.phone || '';
-            const title = highlightMatch(name, currentCustomerSearch);
-            const meta = phone ? '<span class="meta">' + highlightMatch(phone, currentCustomerSearch) + '</span>' : '';
-            return $('<div class="customer-option"><div>' + title + '</div>' + meta + '</div>');
-        },
-        templateSelection: function(item) {
-            return item.text || item.name || '';
-        },
-        escapeMarkup: function(markup) { return markup; }
-    });
+    function initNewOrderModalSelects() {
+        const $modal = $('#newOrderModal');
+        const $dropdownParent = $modal.find('.modal-content');
 
-    $('.select2-brand').select2({
-        dropdownParent: $('#newOrderModal'),
-        placeholder: "<?php echo __('brand'); ?>",
-        tags: true
-    });
+        const $customerSelect = $modal.find('.select2-customer');
+        if ($customerSelect.length) {
+            if ($customerSelect.data('select2')) {
+                $customerSelect.select2('destroy');
+            }
+
+            $customerSelect.select2({
+                dropdownParent: $dropdownParent,
+                width: '100%',
+                placeholder: "<?php echo __('search_client_placeholder'); ?>",
+                allowClear: true,
+                minimumInputLength: 0,
+                ajax: {
+                    url: 'api/search_customers.php',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) {
+                        currentCustomerSearch = params.term || '';
+                        return { q: params.term, page: params.page || 1 };
+                    },
+                    processResults: function(data, params) {
+                        params.page = params.page || 1;
+                        return { results: data.results, pagination: { more: data.pagination.more } };
+                    }
+                },
+                templateResult: function(item) {
+                    if (item.loading) return item.text;
+                    const name = item.name || item.text || '';
+                    const phone = item.phone || '';
+                    const title = highlightMatch(name, currentCustomerSearch);
+                    const meta = phone ? '<span class="meta">' + highlightMatch(phone, currentCustomerSearch) + '</span>' : '';
+                    return $('<div class="customer-option"><div>' + title + '</div>' + meta + '</div>');
+                },
+                templateSelection: function(item) {
+                    return item.text || item.name || '';
+                },
+                escapeMarkup: function(markup) { return markup; }
+            });
+        }
+
+        const $brandSelect = $modal.find('.select2-brand');
+        if ($brandSelect.length) {
+            if ($brandSelect.data('select2')) {
+                $brandSelect.select2('destroy');
+            }
+
+            $brandSelect.select2({
+                dropdownParent: $dropdownParent,
+                width: '100%',
+                placeholder: "<?php echo __('brand'); ?>",
+                tags: true,
+                dropdownAutoWidth: false
+            });
+        }
+
+        const $deviceTypeSelect = $modal.find('.select2-device-type');
+        if ($deviceTypeSelect.length) {
+            if ($deviceTypeSelect.data('select2')) {
+                $deviceTypeSelect.select2('destroy');
+            }
+
+            $deviceTypeSelect.select2({
+                dropdownParent: $dropdownParent,
+                width: '100%',
+                minimumResultsForSearch: Infinity,
+                dropdownAutoWidth: false
+            });
+        }
+
+        const $orderTypeSelect = $modal.find('.select2-order-type');
+        if ($orderTypeSelect.length) {
+            if ($orderTypeSelect.data('select2')) {
+                $orderTypeSelect.select2('destroy');
+            }
+
+            $orderTypeSelect.select2({
+                dropdownParent: $dropdownParent,
+                width: '100%',
+                minimumResultsForSearch: Infinity,
+                dropdownAutoWidth: false
+            });
+        }
+    }
+
+    $('#newOrderModal').on('shown.bs.modal', initNewOrderModalSelects);
 
     $('.order-template-select').on('change', function() {
         const value = $(this).val();
@@ -1402,6 +1471,9 @@ $(document).ready(function() {
                     <button type="button" class="btn btn-outline-primary py-3 btn-lang-select" data-lang="cs">
                         <img src="https://flagcdn.com/w40/cz.png" class="me-2 rounded-1" width="24"> <?php echo __('lang_cs'); ?>
                     </button>
+                    <button type="button" class="btn btn-outline-primary py-3 btn-lang-select" data-lang="en">
+                        <img src="https://flagcdn.com/w40/gb.png" class="me-2 rounded-1" width="24"> <?php echo __('lang_en'); ?>
+                    </button>
                 </div>
             </div>
         </div>
@@ -1430,7 +1502,7 @@ function deleteMedia(id) {
         if (confirm('<?php echo __('confirm_delete_file'); ?>')) {
             $.post('api/delete_media.php', {id: id}, function(res) {
                 if (res.success) $('#media-item-' + id).fadeOut();
-                else alert('Error: ' + res.message);
+                else alert('<?php echo __('error'); ?>: ' + res.message);
             });
         }
         return;

@@ -7,7 +7,7 @@ require_once 'includes/functions.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Výkupní list / Kupní smlouva</title>
+    <title>Buyout Sheet / Purchase Agreement</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -254,8 +254,8 @@ require_once 'includes/functions.php';
                 <div class="brand">
                     <img src="assets/img/applefix-logo.png" alt="AppleFix logo">
                     <div class="title">
-                        <h1>Výkupní list / Kupní smlouva</h1>
-                        <p>Vyplň formulář, zkontroluj údaje a vytiskni hotový dokument.</p>
+                        <h1>Buyout Sheet / Purchase Agreement</h1>
+                        <p>Fill in the form, check the details, and print the final document.</p>
                     </div>
                 </div>
                 <div class="text-end meta-line">
@@ -264,7 +264,7 @@ require_once 'includes/functions.php';
                         <input type="text" class="form-control form-control-sm" name="doc_date">
                     </div>
                     <div class="field mb-0">
-                        <label class="mb-1">Číslo dokumentu</label>
+                        <label class="mb-1">Document number</label>
                         <input type="text" class="form-control form-control-sm" name="doc_number">
                     </div>
                 </div>
@@ -272,37 +272,37 @@ require_once 'includes/functions.php';
 
             <form class="paper-body" id="buybackForm">
                 <div class="section">
-                    <h2>Zákazník</h2>
+                    <h2>Customer</h2>
                     <div class="grid-2">
-                        <div class="field"><label>Jméno a příjmení</label><input type="text" class="form-control" name="customer_name"></div>
+                        <div class="field"><label>First and last name</label><input type="text" class="form-control" name="customer_name"></div>
                         <div class="field"><label>Telefon</label><input type="text" class="form-control" name="customer_phone"></div>
                         <div class="field"><label>Adresa</label><input type="text" class="form-control" name="customer_address"></div>
-                        <div class="field"><label>Rodné číslo / datum narození</label><input type="text" class="form-control" name="customer_birth"></div>
-                        <div class="field"><label>Číslo OP / pasu</label><input type="text" class="form-control" name="customer_id_doc"></div>
+                        <div class="field"><label>National ID / date of birth</label><input type="text" class="form-control" name="customer_birth"></div>
+                        <div class="field"><label>ID card / passport number</label><input type="text" class="form-control" name="customer_id_doc"></div>
                         <div class="field"><label>Vydal / platnost do</label><input type="text" class="form-control" name="customer_id_valid"></div>
                     </div>
                 </div>
 
                 <div class="section">
-                    <h2>Předmět výkupu</h2>
+                    <h2>Buyout item</h2>
                     <div class="grid-2">
-                        <div class="field"><label>Přesný popis předmětu</label><input type="text" class="form-control" name="item_description"></div>
-                        <div class="field"><label>Značka / model</label><input type="text" class="form-control" name="item_model"></div>
+                        <div class="field"><label>Exact item description</label><input type="text" class="form-control" name="item_description"></div>
+                        <div class="field"><label>Brand / model</label><input type="text" class="form-control" name="item_model"></div>
                         <div class="field"><label>IMEI / S/N</label><input type="text" class="form-control" name="item_serial"></div>
                         <div class="field"><label>Cena</label><input type="text" class="form-control" name="item_price"></div>
-                        <div class="field"><label>Stav zařízení</label><textarea class="form-control" name="item_state"></textarea></div>
-                        <div class="field"><label>Příslušenství</label><textarea class="form-control" name="item_accessories"></textarea></div>
+                        <div class="field"><label>Device condition</label><textarea class="form-control" name="item_state"></textarea></div>
+                        <div class="field"><label>Accessories</label><textarea class="form-control" name="item_accessories"></textarea></div>
                     </div>
                 </div>
 
                 <div class="section">
-                    <h2>Právní ujednání</h2>
-                    <div class="legal-helper text-muted small mb-0">Text pod tímto nadpisem se zobrazí až ve vytištěné verzi.</div>
+                    <h2>Legal terms</h2>
+                    <div class="legal-helper text-muted small mb-0">Text under this heading is shown only in print version.</div>
                     <div class="print-only legal-block">
                         <ol>
-                            <li>Prodávající prohlašuje, že je výlučným vlastníkem předmětu a že na něm neváznou práva třetích osob.</li>
-                            <li>Kupující předmět kupuje do svého vlastnictví za sjednanou cenu uvedenou výše.</li>
-                            <li>Smluvní strany potvrzují, že si smlouvu přečetly, souhlasí s jejím obsahem a na důkaz toho připojují své podpisy.</li>
+                            <li>The seller declares they are the sole owner of the item and no third-party rights exist on it.</li>
+                            <li>The buyer purchases the item into ownership for the agreed price listed above.</li>
+                            <li>Both parties confirm they have read the agreement, agree with its content, and sign it as proof.</li>
                         </ol>
                     </div>
                 </div>
@@ -310,16 +310,16 @@ require_once 'includes/functions.php';
                 <div class="section mb-0">
                     <h2>Podpisy</h2>
                     <div class="grid-2">
-                        <div class="field"><label>Místo a datum podpisu</label><input type="text" class="form-control" name="sign_place_date"></div>
-                        <div class="field"><label>Vyplaceno / způsob výplaty</label><input type="text" class="form-control" name="sign_payment"></div>
-                        <div class="field"><label>Podpis prodávajícího</label><input type="text" class="form-control" name="seller_signature"></div>
-                        <div class="field"><label>Podpis kupujícího</label><input type="text" class="form-control" name="buyer_signature"></div>
+                        <div class="field"><label>Place and date of signature</label><input type="text" class="form-control" name="sign_place_date"></div>
+                        <div class="field"><label>Paid out / payout method</label><input type="text" class="form-control" name="sign_payment"></div>
+                        <div class="field"><label>Seller signature</label><input type="text" class="form-control" name="seller_signature"></div>
+                        <div class="field"><label>Buyer signature</label><input type="text" class="form-control" name="buyer_signature"></div>
                     </div>
                 </div>
             </form>
 
             <div class="actions">
-                <a href="index.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Zpět do CRM</a>
+                <a href="index.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Back to CRM</a>
                 <button class="btn btn-primary" type="button" onclick="window.print()"><i class="fas fa-print me-2"></i>Tisknout</button>
             </div>
         </div>

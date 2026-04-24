@@ -15,8 +15,11 @@ $is_admin_check = (($_SESSION['role'] ?? '') == 'admin') || (hasPermission('admi
 
 if (isset($_POST['set_lang']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
-    $_SESSION['lang'] = $_POST['lang'];
-    set_setting('language', $_POST['lang']);
+    $chosenLang = crm_normalize_language((string)($_POST['lang'] ?? ''));
+    if ($chosenLang) {
+        crm_set_language($chosenLang);
+        set_setting('language', $chosenLang);
+    }
     header("Location: settings.php?tab=system");
     exit;
 }
@@ -111,7 +114,7 @@ if (isset($_POST['edit_tech'])) {
     $active = isset($_POST['is_active']) ? 1 : 0;
     $username = trim($_POST['tech_username'] ?? '');
     $password = $_POST['tech_password'] ?? '';
-    $engineer_rate = floatval($_POST['engineer_rate'] ?? 50);
+    $engineer_rate = floatval($_POST['engineer_rate'] ?? 0);
 
     // Re-verify important fields if NOT admin
     if (!$is_admin_check) {
@@ -229,6 +232,7 @@ if (isset($_POST['update_system_settings']) && $is_admin_check) {
 }
 
 $is_admin_user = hasPermission('admin_access');
+$can_view_all_staff = $is_admin_user || getCurrentStaffRole() === 'manager' || hasPermission('view_reports_all');
 
 $active_tab = $_GET['tab'] ?? ($is_admin_user ? 'company' : 'staff');
 
@@ -254,12 +258,12 @@ require_once 'includes/header.php';
             <?php
                 $settingsError = (string)$_GET['error'];
                 $settingsErrorMessages = [
-                    'telegram_id_must_be_numeric' => 'Telegram je potřeba zadat jako číselné Telegram ID, ne jako @username.',
-                    'telegram_contact_invalid' => 'Telegram vyplň jako číselné ID nebo @username.',
-                    'username_taken' => 'Toto přihlašovací jméno už existuje.',
-                    'unauthorized' => 'Na tuhle úpravu nemáš oprávnění.',
-                    'short_password' => 'Heslo je příliš krátké.',
-                    'csrf' => 'Formulář vypršel, zkus stránku obnovit.',
+                    'telegram_id_must_be_numeric' => 'Telegram must be entered as a numeric Telegram ID, not @username.',
+                    'telegram_contact_invalid' => 'Enter Telegram as numeric ID or @username.',
+                    'username_taken' => 'This username already exists.',
+                    'unauthorized' => 'You do not have permission for this edit.',
+                    'short_password' => 'Password is too short.',
+                    'csrf' => 'Form expired, please refresh the page.'
                 ];
                 echo htmlspecialchars($settingsErrorMessages[$settingsError] ?? $settingsError, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             ?>
@@ -330,7 +334,7 @@ require_once 'includes/header.php';
         <div class="tab-pane fade <?php echo $active_tab == 'integrations' ? 'show active' : ''; ?>">
             <form method="POST">
                 <?php echo csrfField(); ?>
-                <div class="row g-4">
+                <div class="row g-4 settings-integrations-row">
                     <div class="col-md-6 border-end border-secondary">
                         <h5 class="mb-3 text-info"><i class="fab fa-telegram-plane me-2"></i>Telegram Bot</h5>
                         <div class="mb-3">
@@ -342,7 +346,7 @@ require_once 'includes/header.php';
                             <div class="col-12"><label class="form-label small text-white-75">Fixer webhook secret</label><input type="text" name="fixer_webhook_secret" class="form-control" value="<?php echo htmlspecialchars(get_setting('fixer_webhook_secret', '')); ?>" placeholder="random-secret"></div>
                             <div class="col-12"><label class="form-label small text-white-75">Fixer API token</label><input type="text" name="fixer_api_token" class="form-control" value="<?php echo htmlspecialchars(get_setting('fixer_api_token', '')); ?>" placeholder="another-random-secret"></div>
                         </div>
-                        <div class="glass-panel p-3 border-secondary mb-3">
+                        <div class="glass-panel webhook-status-panel p-3 border-secondary mb-3">
                             <h6 class="small fw-bold mb-2 text-white"><?php echo __('webhook_status'); ?></h6>
                             <?php 
                             $current_token = get_setting('tg_bot_token');
@@ -381,11 +385,11 @@ require_once 'includes/header.php';
                             <input type="password" name="ifreeicloud_api_key" class="form-control mb-3" value="<?php echo htmlspecialchars(get_setting_with_fallback('ifreeicloud_api_key', IFREEICLOUD_API_KEY_FALLBACK, 'IFREEICLOUD_API_KEY')); ?>" placeholder="83L-...">
                             <label class="form-label small text-white-75">Service ID z iFreeiCloud dashboardu</label>
                             <input type="number" name="ifreeicloud_service_id" class="form-control" value="<?php echo htmlspecialchars(get_setting_with_fallback('ifreeicloud_service_id', (string) IFREEICLOUD_SERVICE_ID_FALLBACK, 'IFREEICLOUD_SERVICE_ID')); ?>" min="0" step="1">
-                            <div class="form-text small text-white-75 mt-2">Použije se jako druhé ověření pod výsledkem od Policie ČR. Do pole patří skutečné service ID pro vybraný check na iFreeiCloud (např. FMI / model / serial dle dashboardu).</div>
+                            <div class="form-text small text-white-75 mt-2">Used as secondary verification below the Police DB result. Enter the real service ID for the selected iFreeiCloud check (e.g. FMI / model / serial from dashboard).</div>
                         </div>
                         <div class="form-text small text-white-75"><?php echo __('ai_hint'); ?></div>
                     </div>
-                    <div class="col-12 border-top border-secondary pt-3">
+                    <div class="col-12 border-top border-secondary pt-3 integrations-save-row">
                         <button type="submit" name="update_integrations" class="btn btn-primary px-5"><?php echo __('save'); ?></button>
                     </div>
                 </div>
@@ -405,7 +409,7 @@ require_once 'includes/header.php';
                     <thead class="table-dark"><tr><th><?php echo __('name_col'); ?></th><th><?php echo __('login_col'); ?></th><th><?php echo __('role_col'); ?></th><th><?php echo __('spec_col'); ?></th><th>Telegram</th><th><?php echo __('status_col'); ?></th><th class="text-end"><?php echo __('actions_col'); ?></th></tr></thead>
                     <tbody>
                         <?php 
-                        $techs_query = $is_admin_user ? "SELECT * FROM technicians ORDER BY name ASC" : "SELECT * FROM technicians WHERE id = " . intval($_SESSION['tech_id'] ?? 0);
+                        $techs_query = $can_view_all_staff ? "SELECT * FROM technicians ORDER BY name ASC" : "SELECT * FROM technicians WHERE id = " . intval($_SESSION['tech_id'] ?? 0);
                         $techs = $pdo->query($techs_query)->fetchAll();
                         foreach ($techs as $t): ?>
                         <tr>
@@ -434,7 +438,9 @@ require_once 'includes/header.php';
                                     <?php if ($is_admin_user): ?>
                                         <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#permModal<?php echo $t['id']; ?>"><i class="fas fa-shield-alt"></i></button>
                                     <?php endif; ?>
-                                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTechModal<?php echo $t['id']; ?>"><i class="fas fa-edit"></i></button>
+                                    <?php if ($is_admin_user || (int)$t['id'] === (int)($_SESSION['tech_id'] ?? 0)): ?>
+                                        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTechModal<?php echo $t['id']; ?>"><i class="fas fa-edit"></i></button>
+                                    <?php endif; ?>
                                     <?php if ($is_admin_user): ?>
                                         <form method="POST" class="d-inline">
                                             <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
@@ -465,8 +471,9 @@ require_once 'includes/header.php';
                         <?php echo csrfField(); ?>
                         <div class="col-auto">
                             <select name="lang" class="form-select bg-dark text-white border-secondary">
-                                <option value="ru" <?php echo ($_SESSION['lang'] ?? 'ru') == 'ru' ? 'selected' : ''; ?>>Русский (RU)</option>
-                                <option value="cs" <?php echo ($_SESSION['lang'] ?? 'ru') == 'cs' ? 'selected' : ''; ?>>Čeština (CS)</option>
+                                <option value="ru" <?php echo crm_get_language() === 'ru' ? 'selected' : ''; ?>>Русский (RU)</option>
+                                <option value="cs" <?php echo crm_get_language() === 'cs' ? 'selected' : ''; ?>>Czech (CS)</option>
+                                <option value="en" <?php echo crm_get_language() === 'en' ? 'selected' : ''; ?>>English (EN)</option>
                             </select>
                         </div>
                         <div class="col-auto"><button type="submit" name="set_lang" class="btn btn-primary"><?php echo __('save'); ?></button></div>
@@ -561,6 +568,12 @@ require_once 'includes/header.php';
                 <!-- Left: Version & Update -->
                 <div class="col-md-6">
                     <div class="glass-panel p-4 mb-4 border-secondary">
+                        <?php
+                        $gitInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo(__DIR__) : [];
+                        $branchLabel = $gitInfo['branch'] ?? 'main';
+                        $localShort = $gitInfo['local_short'] ?? '—';
+                        $remoteShort = $gitInfo['remote_short'] ?? '—';
+                        ?>
                         <div class="d-flex align-items-center mb-3">
                             <div class="rounded-circle bg-primary bg-opacity-25 p-3 me-3">
                                 <i class="fas fa-code-branch fa-lg text-primary"></i>
@@ -568,17 +581,17 @@ require_once 'includes/header.php';
                             <div>
                                 <h5 class="mb-1 text-white"><?php echo __('updates_title'); ?></h5>
                                 <div class="text-white-75 small"><?php echo __('update_server_hint'); ?></div>
+                                <div class="text-white-50 small mt-1">
+                                    <?php echo htmlspecialchars(($gitInfo['remote_slug'] ?? 'origin') . ' · ' . ($gitInfo['branch'] ?? 'main')); ?>
+                                </div>
                             </div>
                         </div>
 
-                        <?php
-                        $gitInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo(__DIR__) : [];
-                        ?>
                         <div class="row g-3 mb-4">
                             <div class="col-6">
                                 <div class="glass-panel p-3 text-center border-secondary">
-                                    <div class="text-white-75 small">Lokální git</div>
-                                    <div class="h4 text-white mb-0" id="localVersion"><?php echo htmlspecialchars(trim(($gitInfo['branch'] ?? 'main') . ' @ ' . ($gitInfo['local_short'] ?? '—'))); ?></div>
+                                    <div class="text-white-75 small"><?php echo __('current_version'); ?></div>
+                                    <div class="h4 text-white mb-0" id="localVersion"><?php echo htmlspecialchars(trim($branchLabel . ' @ ' . $localShort)); ?></div>
                                     <div class="small text-muted">
                                         <?php echo !empty($gitInfo['dirty']) ? 'dirty' : 'clean'; ?> · ahead <?php echo (int)($gitInfo['ahead_by'] ?? 0); ?> · behind <?php echo (int)($gitInfo['behind_by'] ?? 0); ?>
                                     </div>
@@ -586,8 +599,8 @@ require_once 'includes/header.php';
                             </div>
                             <div class="col-6">
                                 <div class="glass-panel p-3 text-center border-secondary">
-                                    <div class="text-white-75 small">GitHub main</div>
-                                    <div class="h4 text-muted mb-0" id="remoteVersion"><?php echo htmlspecialchars(trim(($gitInfo['branch'] ?? 'main') . ' @ ' . ($gitInfo['remote_short'] ?? '—'))); ?></div>
+                                    <div class="text-white-75 small"><?php echo __('latest_version'); ?></div>
+                                    <div class="h4 text-muted mb-0" id="remoteVersion"><?php echo htmlspecialchars(trim($branchLabel . ' @ ' . $remoteShort)); ?></div>
                                     <div class="small text-muted" id="remoteReleaseDate"><?php echo !empty($gitInfo['remote_date']) ? htmlspecialchars(date('Y-m-d H:i', strtotime($gitInfo['remote_date']))) : ''; ?></div>
                                 </div>
                             </div>
@@ -595,33 +608,20 @@ require_once 'includes/header.php';
 
                         <div class="d-grid gap-2 mb-3">
                             <button type="button" class="btn btn-primary" id="btnCheckUpdates" onclick="checkForUpdates(true)">
-                                <i class="fas fa-cloud-download-alt me-2"></i>Zkontrolovat git
-                            </button>
-                            <button type="button" class="btn btn-outline-warning" id="btnRunUpdate" onclick="installUpdate()" style="display:none;">
-                                <i class="fas fa-sync-alt me-2"></i>Aktualizovat z gitu
-                            </button>
-                        </div>
-
-                        <!-- Status area -->
-                        <div id="updateStatusArea" class="mb-4" style="display:none;"></div>
-
-                        <!-- Action buttons -->
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button type="button" class="btn btn-primary" id="btnCheckUpdates" onclick="checkForUpdates(true)">
                                 <i class="fas fa-sync-alt me-2"></i><?php echo __('check_updates'); ?>
                             </button>
-                            <button type="button" class="btn btn-success" id="btnInstallUpdate" onclick="installUpdate()">
-                                <i class="fas fa-cloud-download-alt me-2"></i>Stáhnout poslední verzi
+                            <button type="button" class="btn btn-success" id="btnInstallUpdate" onclick="installUpdate()" style="display:none;">
+                                <i class="fas fa-cloud-download-alt me-2"></i><?php echo __('install_update'); ?>
                             </button>
                         </div>
-                        <div class="small text-white-75 mt-2"><?php echo __('update_server_hint'); ?></div>
 
+                        <div id="updateStatusArea" class="mb-4" style="display:none;"></div>
+                        <div class="small text-white-75 mt-2"><?php echo __('update_server_hint'); ?></div>
                         <div class="alert alert-warning border-0 bg-warning bg-opacity-10 mt-3 mb-0 small">
                             <i class="fas fa-exclamation-triangle me-2 text-warning"></i><?php echo __('update_warning'); ?>
                         </div>
                     </div>
                 </div>
-
                 <!-- Right: Changelog -->
                 <div class="col-md-6">
                     <div class="glass-panel p-4 border-secondary">
@@ -662,7 +662,7 @@ require_once 'includes/header.php';
             <div class="mb-3">
                 <label class="form-label">Telegram ID nebo @username</label>
                 <input type="text" name="tech_tg" class="form-control" value="" placeholder="123456789 nebo @uzivatel">
-                <div class="form-text small">Můžeš zadat číselné ID nebo @username. Pokud zadáš username, zaměstnanec musí botovi napsat a CRM si jeho ID spáruje samo.</div>
+                <div class="form-text small">You can enter numeric ID or @username. If you enter username, the employee must message the bot first and CRM will auto-pair the ID.</div>
             </div>
             <hr><h6 class="mb-3"><?php echo __('system_access_header'); ?></h6>
             <div class="row"><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('login_col'); ?></label><input type="text" name="tech_username" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('password_btn'); ?></label><input type="password" name="tech_password" class="form-control"></div></div>
@@ -743,16 +743,16 @@ require_once 'includes/header.php';
             <div class="mb-3"><label class="form-label"><?php echo __('new_password_label'); ?></label><input type="password" name="tech_password" class="form-control" placeholder="<?php echo __('password_placeholder'); ?>"></div>
             <?php if ($is_admin_user): ?>
             <div class="mb-3">
-                <label class="form-label"><i class="fas fa-percentage me-1 text-success"></i><?php echo __('engineer_rate_label'); ?></label>
+                <label class="form-label"><i class="fas fa-money-bill-wave me-1 text-success"></i><?php echo __('engineer_rate_label'); ?></label>
                 <div class="input-group">
-                    <input type="number" name="engineer_rate" class="form-control" step="0.01" min="0" max="100" value="<?php echo htmlspecialchars($t['engineer_rate'] ?? 50); ?>">
-                    <span class="input-group-text">%</span>
+                    <input type="number" name="engineer_rate" class="form-control" step="0.01" min="0" value="<?php echo htmlspecialchars($t['engineer_rate'] ?? 0); ?>">
+                    <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?>/h</span>
                 </div>
                 <div class="form-text small"><?php echo __('rate_hint'); ?></div>
             </div>
             <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_active" id="isActive<?php echo $t['id']; ?>" <?php echo ($t['is_active'] ?? 1) ? 'checked' : ''; ?>><label class="form-check-label" for="isActive<?php echo $t['id']; ?>"><?php echo __('active_status'); ?></label></div>
             <?php else: ?>
-                <input type="hidden" name="engineer_rate" value="<?php echo htmlspecialchars($t['engineer_rate'] ?? 50); ?>">
+                <input type="hidden" name="engineer_rate" value="<?php echo htmlspecialchars($t['engineer_rate'] ?? 0); ?>">
                 <input type="hidden" name="is_active" value="1">
             <?php endif; ?>
         </div>
@@ -828,11 +828,20 @@ const UPDATE_TRANSLATIONS = {
 
 function checkForUpdates(force = false) {
     const btn = document.getElementById('btnCheckUpdates');
+    const installBtn = document.getElementById('btnInstallUpdate');
     const statusArea = document.getElementById('updateStatusArea');
     
+    if (!btn || !statusArea) return;
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + UPDATE_TRANSLATIONS.checking_updates;
     statusArea.style.display = 'none';
+
+    if (installBtn) {
+        installBtn.style.display = 'none';
+        installBtn.disabled = false;
+        installBtn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>' + UPDATE_TRANSLATIONS.install_update;
+    }
 
     const url = 'api/check_updates.php' + (force ? '?force=1' : '');
     
@@ -847,16 +856,17 @@ function checkForUpdates(force = false) {
                 statusArea.innerHTML = `<div class="alert alert-danger border-0 bg-danger bg-opacity-10 small mb-0">
                     <i class="fas fa-exclamation-circle me-2"></i>${data.message || UPDATE_TRANSLATIONS.update_error}
                 </div>`;
+                if (installBtn) installBtn.style.display = 'none';
                 return;
             }
 
             // Update remote version display
             const rv = document.getElementById('remoteVersion');
-            rv.textContent = data.remote_version;
+            rv.textContent = data.remote_version || rv.textContent;
             rv.className = data.has_update ? 'h4 text-success mb-0' : 'h4 text-white mb-0';
             
             const rd = document.getElementById('remoteReleaseDate');
-            if (data.release_date) {
+            if (rd && data.release_date) {
                 rd.textContent = UPDATE_TRANSLATIONS.release_date + ': ' + data.release_date;
             }
 
@@ -867,7 +877,9 @@ function checkForUpdates(force = false) {
                     <i class="fas fa-arrow-circle-up me-2 text-info"></i>
                     <strong>${UPDATE_TRANSLATIONS.update_available}</strong> v${data.local_version} → v${data.remote_version}
                     <div class="mt-1 text-white-75">${UPDATE_TRANSLATIONS.update_available_desc}</div>
+                    <div class="mt-1 text-muted small"><i class="fas fa-code-branch me-1"></i>${UPDATE_TRANSLATIONS.build}: ${escapeHtml(data.build || '')}</div>
                 </div>`;
+                if (installBtn) installBtn.style.display = 'block';
                 // Show badge
                 const badge = document.getElementById('updateBadgeNav');
                 if (badge) badge.style.display = 'inline';
@@ -876,7 +888,9 @@ function checkForUpdates(force = false) {
                     <i class="fas fa-check-circle me-2 text-success"></i>
                     <strong>${UPDATE_TRANSLATIONS.up_to_date}</strong> (v${data.local_version})
                     <div class="mt-1 text-white-75">${UPDATE_TRANSLATIONS.up_to_date_desc}</div>
+                    <div class="mt-1 text-muted small"><i class="fas fa-code-branch me-1"></i>${UPDATE_TRANSLATIONS.build}: ${escapeHtml(data.build || '')}</div>
                 </div>`;
+                if (installBtn) installBtn.style.display = 'none';
                 const badge = document.getElementById('updateBadgeNav');
                 if (badge) badge.style.display = 'none';
             }
@@ -897,6 +911,7 @@ function checkForUpdates(force = false) {
             statusArea.innerHTML = `<div class="alert alert-danger border-0 bg-danger bg-opacity-10 small mb-0">
                 <i class="fas fa-exclamation-circle me-2"></i>${err.message || UPDATE_TRANSLATIONS.update_error}
             </div>`;
+            if (installBtn) installBtn.style.display = 'none';
         });
 }
 
@@ -934,6 +949,8 @@ function installUpdate() {
     const btn = document.getElementById('btnInstallUpdate');
     const statusArea = document.getElementById('updateStatusArea');
     
+    if (!btn || !statusArea) return;
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + UPDATE_TRANSLATIONS.installing_update;
 
@@ -947,7 +964,7 @@ function installUpdate() {
     .then(r => r.json())
     .then(data => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Stáhnout poslední verzi';
+        btn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>' + UPDATE_TRANSLATIONS.install_update;
         
         statusArea.style.display = 'block';
         if (data.success) {
@@ -968,6 +985,8 @@ function installUpdate() {
             </div>`;
             const badge = document.getElementById('updateBadgeNav');
             if (badge) badge.style.display = 'none';
+            const installBtn = document.getElementById('btnInstallUpdate');
+            if (installBtn) installBtn.style.display = 'none';
             // Update local version display
             document.getElementById('localVersion').textContent = data.new_version;
         } else {
@@ -982,7 +1001,7 @@ function installUpdate() {
     })
     .catch(err => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Stáhnout poslední verzi';
+        btn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>' + UPDATE_TRANSLATIONS.install_update;
         statusArea.style.display = 'block';
         statusArea.innerHTML = `<div class="alert alert-danger border-0 bg-danger bg-opacity-10 small mb-0">
             <i class="fas fa-exclamation-circle me-2"></i>${err.message || UPDATE_TRANSLATIONS.update_error}

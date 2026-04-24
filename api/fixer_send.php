@@ -19,7 +19,7 @@ $stmt = $pdo->prepare('SELECT telegram_id, name FROM technicians WHERE id = ? LI
 $stmt->execute([$techId]);
 $tech = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$tech || empty($tech['telegram_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Technik nemá Telegram ID']);
+    echo json_encode(['success' => false, 'message' => 'Technician does not have Telegram ID']);
     exit;
 }
 
@@ -55,7 +55,7 @@ if (!$ok) {
 
 
 if ($ok) {
-    echo json_encode(['success' => true, 'message' => 'Odesláno do Telegramu']);
+    echo json_encode(['success' => true, 'message' => 'Sent to Telegram']);
 } else {
     echo json_encode(['success' => false, 'message' => 'Telegram message failed']);
 }

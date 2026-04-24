@@ -3,7 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
 if (!isset($_SESSION['user_id'])) die(__("unauthorized"));
-if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("ID zakázky není zadáno");
+if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
 
 $id = $_GET['id'] ?? $_GET['order_id'];
 $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address 
@@ -29,7 +29,7 @@ function _l($key) {
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Potvrzení o zakázce #<?php echo $order['id']; ?></title>
+    <title>Order confirmation #<?php echo $order['id']; ?></title>
     <style>
         body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
         .receipt-box { max-width: 800px; margin: auto; border: 1px solid #eee; padding: 30px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); }
@@ -64,7 +64,7 @@ function _l($key) {
                <?php echo _l('phone'); ?>: <?php echo htmlspecialchars(get_setting('company_phone')); ?></p>
         </div>
         <div style="text-align: right;">
-            <h2><?php echo mb_strtoupper(_l('order')); ?> č. <?php echo $order['id']; ?></h2>
+            <h2><?php echo mb_strtoupper(_l('order')); ?> No. <?php echo $order['id']; ?></h2>
             <p><?php echo _l('created'); ?>: <?php echo date('d.m.Y', strtotime($order['created_at'])); ?></p>
         </div>
     </div>
@@ -140,15 +140,15 @@ function _l($key) {
 
     <div class="signatures">
         <div>
-            <div class="sig-line">Podpis zákazníka</div>
+            <div class="sig-line">Customer signature</div>
         </div>
         <div>
-            <div class="sig-line">Převzal (razítko)</div>
+            <div class="sig-line">Received by (stamp)</div>
         </div>
     </div>
 
     <div class="footer">
-        <p>Záruka na provedené práce je 30 dní. Záruka se nevztahuje na poškození způsobená nesprávným používáním zařízení.</p>
+        <p>Warranty for performed work is 30 days. Warranty does not apply to damage caused by improper device use.</p>
     </div>
 </div>
 

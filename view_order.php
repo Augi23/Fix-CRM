@@ -6,7 +6,7 @@ require_once 'includes/header.php';
 $id = $_GET['id'] ?? $_GET['order_id'] ?? null;
 if (!$id) die(__('order_id_missing'));
 
-$stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, t.name as tech_name 
+$stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.email, t.name as tech_name 
                        FROM orders o 
                        JOIN customers c ON o.customer_id = c.id 
                        LEFT JOIN technicians t ON o.technician_id = t.id
@@ -26,8 +26,8 @@ $stmt = $pdo->prepare("SELECT oi.*, i.part_name FROM order_items oi JOIN invento
 $stmt->execute([$id]);
 $order_items = $stmt->fetchAll();
 
-// Fetch all available parts for the dropdown (limit 500 max to prevent HTML crash)
-$inventory = $pdo->query("SELECT id, part_name, quantity, sale_price FROM inventory ORDER BY part_name ASC LIMIT 500")->fetchAll();
+// Parts are loaded dynamically in the modal so technicians can search the full catalog.
+$inventory = [];
 
 // Fetch all customers for edit modal (limit 500 max to prevent HTML crash)
 $customers_list = $pdo->query("SELECT id, first_name, last_name, phone FROM customers ORDER BY last_name ASC LIMIT 500")->fetchAll();
@@ -54,6 +54,8 @@ $show_shipping = in_array($status, ['Completed', 'Collected'], true);
 $show_invoice = hasPermission('admin_access')
     && in_array($status, ['Completed', 'Collected'], true)
     && (($order['final_cost'] ?? 0) > 0 || ($order['estimated_cost'] ?? 0) > 0);
+$can_change_technician = hasPermission('admin_access') || hasPermission('edit_orders');
+$ui_lang = crm_get_language();
 
 // Fetch status log
 $status_log = [];
@@ -71,6 +73,38 @@ try {
     $status_log = $stmt->fetchAll();
 } catch (Exception $e) {
     $status_log = [];
+}
+
+function localizedOrderStatusLabel(string $status): string {
+    static $map = [
+        'New' => 'new',
+        'Новый' => 'new',
+        'Nová' => 'new',
+        'Pending Approval' => 'pending_approval',
+        'На согласовании' => 'pending_approval',
+        'K odsouhlasení' => 'pending_approval',
+        'Čeká na schválení' => 'pending_approval',
+        'In Progress' => 'in_progress',
+        'В работе' => 'in_progress',
+        'V práci' => 'in_progress',
+        'V procesu' => 'in_progress',
+        'Provádí se' => 'in_progress',
+        'Waiting for Parts' => 'waiting_parts',
+        'Ожидание запчастей' => 'waiting_parts',
+        'Čeká na díly' => 'waiting_parts',
+        'Completed' => 'status_completed',
+        'Готов' => 'status_completed',
+        'Hotovo' => 'status_completed',
+        'Collected' => 'status_collected',
+        'Выдан' => 'status_collected',
+        'Vydáno' => 'status_collected',
+        'Cancelled' => 'status_cancelled',
+        'Отменен' => 'status_cancelled',
+        'Zrušeno' => 'status_cancelled',
+    ];
+
+    $key = $map[$status] ?? null;
+    return $key ? __($key) : $status;
 }
 ?>
 
@@ -107,7 +141,28 @@ try {
                     <div class="col-md-6">
                         <h6><?php echo __('client'); ?></h6>
                         <p class="mb-1"><strong><?php echo htmlspecialchars($order['first_name'].' '.$order['last_name']); ?></strong></p>
-                        <p class="text-white-75"><i class="fas fa-phone me-2 text-success"></i><?php echo htmlspecialchars($order['phone']); ?></p>
+                        <?php
+                            $order_phone_href = normalizePhoneForTel($order['phone'] ?? '');
+                            $order_email_href = normalizeEmailForMailto($order['email'] ?? '');
+                        ?>
+                        <p class="text-white-75 mb-1">
+                            <i class="fas fa-phone me-2 text-success"></i>
+                            <?php if ($order_phone_href !== ''): ?>
+                                <a href="tel:<?php echo e($order_phone_href); ?>" class="text-reset text-decoration-none"><?php echo htmlspecialchars($order['phone']); ?></a>
+                            <?php else: ?>
+                                <?php echo htmlspecialchars($order['phone']); ?>
+                            <?php endif; ?>
+                        </p>
+                        <?php if (!empty($order['email'])): ?>
+                        <p class="text-white-75 mb-0">
+                            <i class="fas fa-envelope me-2 text-info"></i>
+                            <?php if ($order_email_href !== ''): ?>
+                                <a href="mailto:<?php echo e($order_email_href); ?>" class="text-reset text-decoration-none"><?php echo htmlspecialchars($order['email']); ?></a>
+                            <?php else: ?>
+                                <?php echo htmlspecialchars($order['email']); ?>
+                            <?php endif; ?>
+                        </p>
+                        <?php endif; ?>
                     </div>
                     <div class="col-md-6 text-md-end">
                         <h6><?php echo __('device_model'); ?></h6>
@@ -156,9 +211,9 @@ try {
                     <div class="col-md-12">
                         <div class="alert alert-success bg-transparent border border-success py-2 mb-0">
                             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small">
-                                <div><i class="far fa-clock me-2"></i><strong>Čas na zakázce:</strong> <?php echo formatWorkDuration($order['work_duration_seconds'] ?? 0); ?></div>
+                                <div><i class="far fa-clock me-2"></i><strong>Work time on order:</strong> <?php echo formatWorkDuration($order['work_duration_seconds'] ?? 0); ?></div>
                                 <?php if (!empty($order['work_started_at'])): ?>
-                                    <div class="text-white-75">Start: <?php echo date('d.m.Y H:i', strtotime($order['work_started_at'])); ?><?php if (!empty($order['work_finished_at'])): ?> | Konec: <?php echo date('d.m.Y H:i', strtotime($order['work_finished_at'])); ?><?php endif; ?></div>
+                                    <div class="text-white-75">Start: <?php echo date('d.m.Y H:i', strtotime($order['work_started_at'])); ?><?php if (!empty($order['work_finished_at'])): ?> | End: <?php echo date('d.m.Y H:i', strtotime($order['work_finished_at'])); ?><?php endif; ?></div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -205,9 +260,9 @@ try {
                             <tr>
                                 <td class="small text-white-75"><?php echo date('d.m.Y H:i', strtotime($log['changed_at'])); ?></td>
                                 <td>
-                                    <span class="badge bg-transparent border border-secondary text-white-75"><?php echo htmlspecialchars($log['old_status']); ?></span>
+                                    <span class="badge bg-transparent border border-secondary text-white-75"><?php echo htmlspecialchars(localizedOrderStatusLabel((string)$log['old_status'])); ?></span>
                                     <i class="fas fa-arrow-right mx-1 text-white-75"></i>
-                                    <span class="badge bg-primary text-white"><?php echo htmlspecialchars($log['new_status']); ?></span>
+                                    <span class="badge bg-primary text-white"><?php echo htmlspecialchars(localizedOrderStatusLabel((string)$log['new_status'])); ?></span>
                                 </td>
                                 <td><?php echo htmlspecialchars($who); ?></td>
                             </tr>
@@ -255,8 +310,8 @@ try {
                                     </a>
                                 <?php else: ?>
                                     <a href="<?php echo $file['file_path']; ?>" data-fancybox="gallery" data-type="image" data-caption="<?php echo htmlspecialchars($file['file_name']); ?>">
-                                        <div class="ratio ratio-1x1">
-                                            <img src="<?php echo $file['file_path']; ?>" class="card-img-top object-fit-cover" alt="Photo">
+                                        <div class="ratio ratio-1x1 overflow-hidden">
+                                            <img src="<?php echo $file['file_path']; ?>" class="w-100 h-100 object-fit-cover d-block" alt="Attachment">
                                         </div>
                                     </a>
                                 <?php endif; ?>
@@ -284,7 +339,7 @@ try {
                     <h6 class="mb-0"><?php echo __('parts_used'); ?></h6>
                     <div class="d-flex gap-2 flex-wrap">
                         <a class="btn btn-sm btn-outline-success" href="procurement.php?order_id=<?php echo $order['id']; ?>">
-                            <i class="fas fa-truck-loading me-1"></i> Přidat do nákupu
+                            <i class="fas fa-truck-loading me-1"></i> Add to procurement
                         </a>
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPartModal">
                             <i class="fas fa-plus me-1"></i> <?php echo __('add_part'); ?>
@@ -343,6 +398,7 @@ try {
             <div class="card-body">
                 <form id="statusForm">
                     <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
+                    <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">
                     <div class="d-grid gap-2 mb-2">
                         <?php if ($next_status): ?>
                             <button type="button" class="btn btn-success" id="nextStatusBtn" data-next-status="<?php echo $next_status; ?>">
@@ -366,7 +422,7 @@ try {
                     <div class="collapse" id="actionsAdvanced">
                         <div class="mb-3">
                             <label class="form-label"><?php echo __('technician'); ?></label>
-                            <select name="technician_id" class="form-select mb-2" <?php echo $_SESSION['role'] != 'admin' ? 'disabled' : ''; ?>>
+                            <select name="technician_id" class="form-select mb-2" <?php echo !$can_change_technician ? 'disabled' : ''; ?>>
                                 <option value="">-- <?php echo __('edit'); ?> --</option>
                                 <?php $techs = getActiveTechnicians(); foreach($techs as $t): ?>
                                 <option value="<?php echo $t['id']; ?>" <?php echo $order['technician_id'] == $t['id'] ? 'selected' : ''; ?>>
@@ -374,7 +430,7 @@ try {
                                 </option>
                                 <?php endforeach; ?>
                             </select>
-                            <?php if ($_SESSION['role'] != 'admin'): ?>
+                            <?php if (!$can_change_technician): ?>
                                 <input type="hidden" name="technician_id" value="<?php echo $order['technician_id']; ?>">
                             <?php endif; ?>
                         </div>
@@ -420,9 +476,9 @@ try {
                                 <i class="fas fa-print me-2"></i> <?php echo __('print'); ?>
                             </button>
                             <ul class="dropdown-menu w-100 shadow">
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', 'Order #<?php echo $order['id']; ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', 'Workshop #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', 'Receipt #<?php echo $order['id']; ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
+                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
+                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
+                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
                             </ul>
                         </div>
                     </div>
@@ -446,8 +502,8 @@ try {
                         <select name="shipping_method" class="form-select">
                             <option value="" <?php echo empty($order['shipping_method']) ? 'selected' : ''; ?>>-- <?php echo __('not_found'); ?> --</option>
                             <option value="Self Pickup" <?php echo $order['shipping_method'] == 'Self Pickup' ? 'selected' : ''; ?>><?php echo __('self_pickup'); ?></option>
-                            <option value="Zasilkovna" <?php echo $order['shipping_method'] == 'Zasilkovna' ? 'selected' : ''; ?>>Zásilkovna</option>
-                            <option value="Ceska Posta" <?php echo $order['shipping_method'] == 'Ceska Posta' ? 'selected' : ''; ?>>Česká pošta</option>
+                            <option value="Zasilkovna" <?php echo $order['shipping_method'] == 'Zasilkovna' ? 'selected' : ''; ?>>Zasilkovna</option>
+                            <option value="Ceska Posta" <?php echo $order['shipping_method'] == 'Ceska Posta' ? 'selected' : ''; ?>>Czech Post</option>
                             <option value="PPL" <?php echo $order['shipping_method'] == 'PPL' ? 'selected' : ''; ?>>PPL</option>
                             <option value="DPD" <?php echo $order['shipping_method'] == 'DPD' ? 'selected' : ''; ?>>DPD</option>
                             <option value="GLS" <?php echo $order['shipping_method'] == 'GLS' ? 'selected' : ''; ?>>GLS</option>
@@ -555,10 +611,10 @@ try {
                             <?php echo $existing_invoice ? __('save') : __('create_invoice'); ?>
                         </button>
                         <?php if($existing_invoice): ?>
-                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $existing_invoice['id']; ?>', 'Invoice #<?php echo $existing_invoice['invoice_number']; ?>')" class="btn btn-outline-secondary" title="<?php echo __('print'); ?>">
+                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $existing_invoice['id']; ?>', '<?php echo __('invoice'); ?> #<?php echo $existing_invoice['invoice_number']; ?>')" class="btn btn-outline-secondary" title="<?php echo __('print'); ?>">
                             <i class="fas fa-print"></i>
                         </a>
-                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice_thermal.php?id=<?php echo $existing_invoice['id']; ?>', 'Receipt #<?php echo $existing_invoice['invoice_number']; ?>')" class="btn btn-outline-success" title="<?php echo __('thermal_receipt'); ?>">
+                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice_thermal.php?id=<?php echo $existing_invoice['id']; ?>', '<?php echo __('thermal_receipt'); ?> #<?php echo $existing_invoice['invoice_number']; ?>')" class="btn btn-outline-success" title="<?php echo __('thermal_receipt'); ?>">
                             <i class="fas fa-receipt"></i>
                         </a>
                         <?php endif; ?>
@@ -584,14 +640,8 @@ try {
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label"><?php echo __('select_part_from_warehouse'); ?></label>
-                        <select name="inventory_id" class="form-select" required>
-                            <option value=""><?php echo __('choose_option'); ?></option>
-                            <?php foreach($inventory as $item): ?>
-                            <option value="<?php echo $item['id']; ?>">
-                                <?php echo htmlspecialchars($item['part_name']); ?> (<?php echo __('in_stock'); ?>: <?php echo $item['quantity']; ?>)
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <select name="inventory_id" id="addPartInventory" class="form-select" required></select>
+                        <div class="form-text text-white-75 small"><?php echo getCurrentStaffRole() === 'engineer' ? 'Search by name, SKU, or price. Technicians only see in-stock items.' : 'Search by name, SKU, or price.'; ?></div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label"><?php echo __('quantity'); ?></label>
@@ -612,7 +662,9 @@ try {
     <div class="modal-dialog">
         <div class="modal-content glass-card border-secondary text-white">
             <form id="uploadMediaForm" enctype="multipart/form-data">
+                <?php echo csrfField(); ?>
                 <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
+                <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title"><?php echo __('upload_media'); ?></h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -793,10 +845,35 @@ $(document).ready(function() {
         width: '100%'
     });
 
-    $('select[name="inventory_id"]').select2({
+    const addPartStockOnly = <?php echo getCurrentStaffRole() === 'engineer' ? '1' : '0'; ?>;
+
+    $('#addPartInventory').select2({
         dropdownParent: $('#addPartModal'),
         placeholder: "<?php echo __('search_part_placeholder'); ?>",
-        width: '100%'
+        width: '100%',
+        ajax: {
+            url: 'api/search_catalog_items.php',
+            dataType: 'json',
+            delay: 250,
+            data: function(params) {
+                return { q: params.term || '', limit: 20, stock_only: addPartStockOnly };
+            },
+            processResults: function(data) {
+                return {
+                    results: (data.results || []).map(function(item) {
+                        return {
+                            id: item.id,
+                            text: item.text,
+                            part_name: item.part_name,
+                            sku: item.sku || '',
+                            quantity: item.quantity || 0,
+                            sale_price: item.sale_price || 0,
+                            supplier_key: item.supplier_key || ''
+                        };
+                    })
+                };
+            }
+        }
     });
 
     $('#shippingForm').on('submit', function(e) {
@@ -947,7 +1024,7 @@ function deleteMedia(id) {
         if (confirm('<?php echo __('confirm_delete_file'); ?>')) {
             $.post('api/delete_media.php', {id: id, csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>'}, function(res) {
                 if (res.success) $('#media-item-' + id).fadeOut();
-                else alert('Error: ' + res.message);
+                else alert('<?php echo __('error'); ?>: ' + res.message);
             });
         }
         return;
@@ -1119,8 +1196,10 @@ function deleteOrder(id) {
 <div class="modal fade" id="editOrderFullModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-xl">
         <div class="modal-content glass-card border-secondary text-white">
-            <form id="editOrderFullForm">
+            <form id="editOrderFullForm" enctype="multipart/form-data">
+                <?php echo csrfField(); ?>
                 <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
+                <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title"><?php echo __('edit_order_title'); ?> #<?php echo $order['id']; ?></h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -1160,7 +1239,7 @@ function deleteOrder(id) {
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('technician'); ?></label>
-                            <select name="technician_id" class="form-select" <?php echo $_SESSION['role'] != 'admin' ? 'disabled' : ''; ?>>
+                            <select name="technician_id" class="form-select" <?php echo !$can_change_technician ? 'disabled' : ''; ?>>
                                 <option value=""><?php echo __('choose_option'); ?></option>
                                 <?php 
                                 foreach($techs as $t): ?>

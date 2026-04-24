@@ -82,14 +82,14 @@ $is_vat_payer = $invoice['is_vat_payer'];
     <table class="header-table">
         <tr>
             <td>
-                <div class="doc-title"><?php echo ($invoice['invoice_type'] == 'credit_note') ? 'OPRAVNÝ DAŇOVÝ DOKLAD' : 'FAKTURA - DAŇOVÝ DOKLAD'; ?></div>
-                <div class="doc-number">číslo: <?php echo $invoice['invoice_number']; ?></div>
+                <div class="doc-title"><?php echo ($invoice['invoice_type'] == 'credit_note') ? 'CREDIT NOTE' : 'INVOICE - TAX DOCUMENT'; ?></div>
+                <div class="doc-number">number: <?php echo $invoice['invoice_number']; ?></div>
             </td>
             <td class="text-right">
                 <?php if ($invoice['variable_symbol']): ?>
-                    <div><strong>Variabilní symbol:</strong> <?php echo $invoice['variable_symbol']; ?></div>
+                    <div><strong>Variable symbol:</strong> <?php echo $invoice['variable_symbol']; ?></div>
                 <?php endif; ?>
-                <div><strong>Konstantní symbol:</strong> 0308</div>
+                <div><strong>Constant symbol:</strong> 0308</div>
             </td>
         </tr>
     </table>
@@ -109,7 +109,7 @@ $is_vat_payer = $invoice['is_vat_payer'];
                 </div>
             </td>
             <td>
-                <div class="addr-title">Odběratel</div>
+                <div class="addr-title">Customer</div>
                 <?php 
                 $cust_name = $invoice['cust_name_override'] ?: ($invoice['company'] ?: $invoice['first_name'] . ' ' . $invoice['last_name']);
                 $cust_address = $invoice['cust_address_override'] ?: $invoice['address'];
@@ -124,7 +124,7 @@ $is_vat_payer = $invoice['is_vat_payer'];
                 </div>
                 <?php if ($invoice['order_id']): ?>
                     <div style="margin-top: 5px; font-size: 10px; color: #666;">
-                        K zakázce: #<?php echo $invoice['order_id']; ?> (<?php echo $invoice['device_brand'] . ' ' . $invoice['device_model']; ?>)
+                        For order: #<?php echo $invoice['order_id']; ?> (<?php echo $invoice['device_brand'] . ' ' . $invoice['device_model']; ?>)
                     </div>
                 <?php endif; ?>
             </td>
@@ -134,26 +134,26 @@ $is_vat_payer = $invoice['is_vat_payer'];
     <table class="payment-table">
         <tr>
             <td>
-                <div class="pay-label">Peněžní ústav</div>
+                <div class="pay-label">Bank</div>
                 <div class="pay-value"><?php echo htmlspecialchars(get_setting('acc_bank_name')); ?></div>
             </td>
             <td>
-                <div class="pay-label">Číslo účtu</div>
+                <div class="pay-label">Account number</div>
                 <div class="pay-value"><?php echo htmlspecialchars(get_setting('acc_bank_account')); ?></div>
             </td>
             <td>
-                <div class="pay-label">Datum vystavení</div>
+                <div class="pay-label">Issue date</div>
                 <div class="pay-value"><?php echo date('d.m.Y', strtotime($invoice['date_issue'])); ?></div>
             </td>
             <td>
-                <div class="pay-label">Forma úhrady</div>
+                <div class="pay-label">Payment method</div>
                 <div class="pay-value">
                     <?php 
                     $p_method = $invoice['payment_method'];
-                    if ($p_method == 'cash') echo 'Hotově';
+                    if ($p_method == 'cash') echo 'Cash';
                     elseif ($p_method == 'card') echo 'Kartou';
-                    elseif ($p_method == 'cod') echo 'Dobírka';
-                    else echo 'Bankovní převod';
+                    elseif ($p_method == 'cod') echo 'Cash on delivery';
+                    else echo 'Bank transfer';
                     ?>
                 </div>
             </td>
@@ -172,7 +172,7 @@ $is_vat_payer = $invoice['is_vat_payer'];
                 <div class="pay-value"><?php echo date('d.m.Y', strtotime($invoice['date_due'])); ?></div>
             </td>
             <td>
-                <div class="pay-label">Datum zdan. plnění</div>
+                <div class="pay-label">Tax date</div>
                 <div class="pay-value"><?php echo date('d.m.Y', strtotime($invoice['date_tax'])); ?></div>
             </td>
         </tr>
@@ -181,12 +181,12 @@ $is_vat_payer = $invoice['is_vat_payer'];
     <table class="items-table">
         <thead>
             <tr>
-                <th style="width: <?php echo $is_vat_payer ? '40%' : '70%'; ?>">Položka</th>
+                <th style="width: <?php echo $is_vat_payer ? '40%' : '70%'; ?>">Item</th>
                 <th class="text-right"><?php echo __('table_quantity'); ?></th>
                 <th class="text-right"><?php echo __('table_price'); ?></th>
                 <?php if ($is_vat_payer): ?>
                     <th class="text-right">DPH %</th>
-                    <th class="text-right">Základ</th>
+                    <th class="text-right">Base</th>
                     <th class="text-right">DPH</th>
                 <?php endif; ?>
                 <th class="text-right"><?php echo __('table_total'); ?></th>
@@ -228,7 +228,7 @@ $is_vat_payer = $invoice['is_vat_payer'];
             <thead>
                 <tr>
                     <th><?php echo __('table_vat_rate'); ?></th>
-                    <th class="text-right">Základ</th>
+                    <th class="text-right">Base</th>
                     <th class="text-right">DPH</th>
                     <th class="text-right"><?php echo __('table_total'); ?></th>
                 </tr>
@@ -246,24 +246,24 @@ $is_vat_payer = $invoice['is_vat_payer'];
         </table>
         <?php else: ?>
             <div style="flex: 1; font-weight: bold; font-size: 12px; color: #666;">
-                Neplátce DPH
+                Non-VAT payer
             </div>
         <?php endif; ?>
 
         <div class="grand-total-box">
-            <div class="grand-label">CELKEM K ÚHRADĚ</div>
+            <div class="grand-label">TOTAL DUE</div>
             <div class="grand-value"><?php echo number_format($invoice['total_amount'], 2, ',', ' ') . ' ' . $invoice['currency']; ?></div>
         </div>
     </div>
 
     <div class="footer-note">
         <?php if (!$is_vat_payer): ?>
-            <p>Nejsem plátce DPH.</p>
+            <p>I am not a VAT payer.</p>
         <?php endif; ?>
         <?php if ($invoice['notes']): ?>
-            <p><strong>Poznámka:</strong> <?php echo nl2br(htmlspecialchars($invoice['notes'])); ?></p>
+            <p><strong>Note:</strong> <?php echo nl2br(htmlspecialchars($invoice['notes'])); ?></p>
         <?php endif; ?>
-        <p><?php echo __('print_title_invoice'); ?> slouží zároveň jako dodací a záruční list. Převzetím zboží/služby souhlasíte s platebními podmínkami.</p>
+        <p><?php echo __('print_title_invoice'); ?> also serves as delivery and warranty note. By accepting goods/services, you agree to payment terms.</p>
     </div>
 
     <div class="signatures">
@@ -272,7 +272,7 @@ $is_vat_payer = $invoice['is_vat_payer'];
         </div>
         <div class="signature-box">
             <div style="height: 60px;"></div>
-            Razítko a podpis
+            Stamp and signature
         </div>
     </div>
 </div>

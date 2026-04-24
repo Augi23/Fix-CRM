@@ -43,7 +43,7 @@ try {
             throw new Exception(__('tg_send_error'));
         }
     } elseif ($tech && !empty($tech['telegram_username'])) {
-        throw new Exception('Zatím je uložený jen @username. Zaměstnanec musí nejdřív napsat botovi, aby se jeho Telegram ID spárovalo automaticky.');
+        throw new Exception('Only @username is stored so far. The employee must message the bot first so Telegram ID can be paired automatically.');
     } else {
         throw new Exception(__('tg_id_missing'));
     }

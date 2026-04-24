@@ -2,7 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("ID zakázky není zadáno");
+if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
 
 $id = $_GET['id'] ?? $_GET['order_id'];
 $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address 
@@ -73,7 +73,7 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
         <div style="font-size: 12px;"><?php echo htmlspecialchars(get_setting('company_address')); ?></div>
         <div><?php echo _l('phone'); ?>: <?php echo htmlspecialchars(get_setting('company_phone')); ?></div>
         <div class="line"></div>
-        <div class="order-num bold"><?php echo mb_strtoupper(_l('order')); ?> č. <?php echo $order['id']; ?></div>
+        <div class="order-num bold"><?php echo mb_strtoupper(_l('order')); ?> No. <?php echo $order['id']; ?></div>
         <div class="bold"><?php echo mb_strtoupper(_l('collected')); ?></div>
         <div><?php echo date('d.m.Y H:i'); ?></div>
         <div class="line"></div>
@@ -126,11 +126,11 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
 
     <div class="text-center qr-code">
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode('https://servis.expert/status/?id='.$order['id']); ?>" alt="QR">
-        <div style="font-size: 10px; margin-top: 5px;">Ověřit stav zakázky</div>
+        <div style="font-size: 10px; margin-top: 5px;">Check order status</div>
     </div>
 
     <div class="footer text-center">
-        Prosím, uchovejte tuto účtenku do dokončení opravy.<br>
+        Please keep this receipt until repair is completed.<br>
         <div class="bold" style="margin-top: 5px;">www.servis.expert</div>
     </div>
 </div>
@@ -140,7 +140,7 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
 </div>
 
 <div class="footer text-center">
-    Děkujeme za Vaši důvěru!<br>
+    Thank you for your trust!<br>
     www.servis.expert
 </div>
 

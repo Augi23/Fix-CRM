@@ -22,10 +22,10 @@ $items = $stmt->fetchAll();
 
 // Payment method translations
 $payment_methods = [
-    'bank_transfer' => 'Bankovní převod',
+    'bank_transfer' => 'Bank transfer',
     'cash' => 'Hotovost',
     'card' => 'Kartou',
-    'cod' => 'Dobírka'
+    'cod' => 'Cash on delivery'
 ];
 $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['payment_method'];
 ?>
@@ -96,10 +96,10 @@ $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['paym
     </div>
 
     <div class="doc-title" style="text-align: center;">
-        <?php echo ($invoice['invoice_type'] == 'credit_note') ? 'DOBROPIS' : 'ÚČTENKA'; ?>
+        <?php echo ($invoice['invoice_type'] == 'credit_note') ? 'CREDIT NOTE' : 'RECEIPT'; ?>
     </div>
     <div style="text-align: center; margin-bottom: 10px;">
-        č. <?php echo $invoice['invoice_number']; ?>
+        No. <?php echo $invoice['invoice_number']; ?>
     </div>
 
     <div class="section">
@@ -109,13 +109,13 @@ $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['paym
     </div>
 
     <div class="section">
-        <div class="label">Odběratel:</div>
+        <div class="label">Customer:</div>
         <div><strong><?php echo htmlspecialchars($invoice['company'] ?: $invoice['first_name'] . ' ' . $invoice['last_name']); ?></strong></div>
         <?php if($invoice['ico']): ?><div>IČO: <?php echo $invoice['ico']; ?></div><?php endif; ?>
     </div>
 
     <div class="items">
-        <div style="border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 5px;"><strong>Položky:</strong></div>
+        <div style="border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 5px;"><strong>Items:</strong></div>
         <?php foreach($items as $item): ?>
         <div class="item">
             <div class="item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
@@ -128,7 +128,7 @@ $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['paym
         
         <?php if(empty($items)): ?>
         <div class="item">
-            <div class="item-name"><?php echo htmlspecialchars($invoice['notes'] ?: 'Služba'); ?></div>
+            <div class="item-name"><?php echo htmlspecialchars($invoice['notes'] ?: 'Service'); ?></div>
             <div class="item-details">
                 <span>1 ks</span>
                 <span class="item-price"><?php echo number_format($invoice['total_amount'], 2, ',', ' '); ?> <?php echo $invoice['currency'] ?: 'Kč'; ?></span>
@@ -149,7 +149,7 @@ $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['paym
     </div>
 
     <div class="footer">
-        <div>Děkujeme za Vaši důvěru!</div>
+        <div>Thank you for your trust!</div>
         <div style="margin-top: 5px;"><?php echo get_setting('company_phone'); ?></div>
     </div>
 </div>

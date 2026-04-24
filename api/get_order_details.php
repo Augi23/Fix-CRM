@@ -27,7 +27,12 @@ try {
     $order = $stmt->fetch();
 
     if (!$order) {
-        echo json_encode(['success' => false, 'message' => 'Order not found']);
+        echo json_encode(['success' => false, 'message' => __('order_not_found')]);
+        exit;
+    }
+
+    if (!hasPermission('edit_orders') && ($order['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)) {
+        echo json_encode(['success' => false, 'message' => __('access_denied_msg')]);
         exit;
     }
 

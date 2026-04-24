@@ -114,8 +114,26 @@ if (isset($pdo)) {
                                     <div class="small text-muted">IČO: <?php echo htmlspecialchars($customer['ico']); ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td><?php echo htmlspecialchars($customer['phone']); ?></td>
-                            <td><?php echo htmlspecialchars($customer['email']); ?></td>
+                            <td>
+                                <?php
+                                $phone_href = normalizePhoneForTel($customer['phone'] ?? '');
+                                if ($phone_href !== ''):
+                                ?>
+                                    <a href="tel:<?php echo e($phone_href); ?>" class="text-reset text-decoration-none"><?php echo htmlspecialchars($customer['phone']); ?></a>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars($customer['phone']); ?>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php
+                                $email_href = normalizeEmailForMailto($customer['email'] ?? '');
+                                if ($email_href !== ''):
+                                ?>
+                                    <a href="mailto:<?php echo e($email_href); ?>" class="text-reset text-decoration-none"><?php echo htmlspecialchars($customer['email']); ?></a>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars($customer['email']); ?>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo htmlspecialchars($customer['address']); ?></td>
                             <td>
                                 <?php 

@@ -48,6 +48,16 @@ body.modal-open {
     height: 100% !important;
     min-height: 36px;
 }
+.select2-container {
+    width: 100% !important;
+}
+.select2-dropdown {
+    z-index: 1070 !important;
+}
+.select2-container--open {
+    z-index: 1070 !important;
+}
+
 #sidebar {
     width: var(--sidebar-width);
     height: 100vh;
@@ -60,20 +70,51 @@ body.modal-open {
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03), 0 8px 30px rgba(0, 0, 0, 0.24);
     color: white;
-    transition: all 0.3s;
+    transition: left 0.3s ease;
     z-index: 1000;
 }
+
+.sidebar-backdrop {
+    display: none;
+}
+
 @media (max-width: 991.98px) {
     #sidebar {
         left: calc(-1 * var(--sidebar-width));
+        z-index: 1040;
     }
+
     #content {
         margin-left: 0 !important;
     }
+
     #sidebar.active {
         left: 0;
     }
+
+    .sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        display: block;
+        opacity: 0;
+        pointer-events: none;
+        background: rgba(7, 10, 14, 0.58);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        transition: opacity 0.2s ease;
+        z-index: 1035;
+    }
+
+    body.sidebar-open {
+        overflow: hidden;
+    }
+
+    body.sidebar-open .sidebar-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
+
 #content {
     margin-left: var(--sidebar-width);
     padding: 20px;
@@ -653,6 +694,25 @@ body.modal-open {
     height: 100%;
 }
 
+/* Settings > Integrace: webhook status nesmí překrývat tlačítko Uložit */
+.settings-integrations-row {
+    align-items: flex-start;
+}
+
+.settings-integrations-row .webhook-status-panel {
+    height: auto !important;
+    min-height: 0;
+}
+
+.settings-integrations-row .webhook-status-panel .text-break {
+    overflow-wrap: anywhere;
+}
+
+.settings-integrations-row > .integrations-save-row {
+    position: relative;
+    z-index: 2;
+}
+
 .order-row--company > td,
 .order-row--high > td {
     backdrop-filter: blur(10px);
@@ -671,4 +731,76 @@ body.modal-open {
 #content .row.g-4.mb-4 {
     margin-left: -8px;
     margin-right: -8px;
+}
+
+/* Edit order: force readable native select dropdown options */
+.edit-order-form .form-select option,
+.edit-order-form .form-select optgroup,
+#editOrderFullModal .form-select option,
+#editOrderFullModal .form-select optgroup,
+#quickOrderModal .form-select option,
+#quickOrderModal .form-select optgroup {
+    color: #111318 !important;
+    background-color: #ffffff !important;
+}
+
+/* Keep dropdowns usable inside redesigned table wrappers */
+.table-responsive {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive .dropdown-menu,
+.card .dropdown-menu,
+.glass-card .dropdown-menu,
+.glass-panel .dropdown-menu {
+    z-index: 3000;
+}
+
+@media (max-width: 991.98px) {
+    .table-responsive[style*="overflow-y: auto"] {
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
+
+    .crm-topbar .crm-topbar-inner {
+        flex-wrap: wrap;
+        row-gap: 10px;
+    }
+
+    .crm-topbar .crm-topbar-left {
+        order: 1;
+    }
+
+    .crm-topbar .crm-navbar-actions {
+        order: 2;
+        margin-left: auto;
+        min-width: 0;
+        gap: 0.35rem;
+    }
+
+    .crm-topbar .crm-navbar-search {
+        order: 3;
+        margin: 0 !important;
+        flex: 1 0 100%;
+        max-width: 100% !important;
+    }
+
+    .crm-topbar .crm-navbar-search--placeholder {
+        display: none;
+    }
+
+    .crm-topbar .crm-role-badge,
+    .crm-topbar .crm-user-name {
+        display: none;
+    }
+
+    .crm-topbar .crm-lang-switch {
+        min-width: 68px;
+    }
+
+    #content {
+        padding: 14px;
+    }
 }

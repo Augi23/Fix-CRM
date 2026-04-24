@@ -15,6 +15,7 @@ ensureProcurementSchema();
 
 $q = trim((string)($_GET['q'] ?? $_GET['term'] ?? ''));
 $supplier = trim((string)($_GET['supplier'] ?? ''));
+$stockOnly = filter_var($_GET['stock_only'] ?? false, FILTER_VALIDATE_BOOL);
 $limit = max(1, min(30, (int)($_GET['limit'] ?? 20)));
 
 try {
@@ -24,6 +25,10 @@ try {
     if ($supplier !== '') {
         $sql .= " AND source_supplier = ?";
         $params[] = $supplier;
+    }
+
+    if ($stockOnly) {
+        $sql .= " AND quantity > 0";
     }
 
     if ($q !== '') {

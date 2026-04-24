@@ -37,7 +37,7 @@ if ($page == 'reports.php') {
 }
 ?>
 <!DOCTYPE html>
-<html lang="ru" data-bs-theme="dark">
+<html lang="<?php echo e(crm_get_language()); ?>" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -104,19 +104,19 @@ if ($page == 'reports.php') {
         <div class="mt-2">
             <?php
                 $roleLabel = match (getCurrentStaffRole()) {
-                    'admin' => 'Admin',
-                    'manager' => 'Manager',
-                    'engineer' => 'Technik',
+                    'admin' => __('role_admin'),
+                    'manager' => __('role_manager'),
+                    'engineer' => __('role_engineer'),
                     default => ucfirst((string)getCurrentStaffRole()),
                 };
             ?>
-            <span class="badge bg-primary bg-opacity-75 text-white"><?php echo e($roleLabel ?: 'Zaměstnanec'); ?></span>
+            <span class="badge bg-primary bg-opacity-75 text-white"><?php echo e($roleLabel ?: __('role_employee')); ?></span>
         </div>
     </div>
     <nav class="nav flex-column">
         <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="index.php"><i class="fas fa-home me-2"></i> <?php echo __('dashboard'); ?></a>
         <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'orders.php' ? 'active' : ''; ?>" href="orders.php"><i class="fas fa-tools me-2"></i> <?php echo __('orders'); ?></a>
-        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading me-2"></i> Nákupy</a>
+        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading me-2"></i> <?php echo __('procurement'); ?></a>
         <?php if (hasPermission('edit_customers')): ?>
             <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'customers.php' ? 'active' : ''; ?>" href="customers.php"><i class="fas fa-users me-2"></i> <?php echo __('customers'); ?></a>
         <?php endif; ?>
@@ -135,12 +135,13 @@ if ($page == 'reports.php') {
         <?php endif; ?>
     </nav>
 </div>
+<div id="sidebarBackdrop" class="sidebar-backdrop" aria-hidden="true"></div>
 
 <div id="content">
-    <nav class="navbar navbar-expand-lg navbar-dark mb-4 rounded shadow-sm">
-        <div class="container-fluid d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center">
-                <button class="btn btn-sm btn-outline-secondary me-3 d-lg-none" id="sidebarCollapse">
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4 rounded shadow-sm crm-topbar">
+        <div class="container-fluid d-flex align-items-center justify-content-between crm-topbar-inner">
+            <div class="d-flex align-items-center crm-topbar-left">
+                <button class="btn btn-sm btn-outline-secondary me-3 d-lg-none" id="sidebarCollapse" aria-label="Toggle menu">
                     <i class="fas fa-bars"></i>
                 </button>
                 <span class="navbar-brand mb-0 h1 d-none d-sm-inline-block"><?php echo get_setting('company_name', 'Repair CRM'); ?></span>
@@ -172,32 +173,44 @@ if ($page == 'reports.php') {
             }
             ?>
             <?php if ($show_search): ?>
-            <form action="<?php echo $search_action; ?>" method="GET" class="d-flex mx-auto" style="max-width: 400px; width: 100%;">
+            <form action="<?php echo $search_action; ?>" method="GET" class="d-flex mx-auto crm-navbar-search" style="max-width: 400px; width: 100%;">
                 <div class="input-group">
                     <input type="text" name="search" class="form-control" placeholder="<?php echo e($search_placeholder); ?>" value="<?php echo e($_GET['search'] ?? ''); ?>">
-                    <button class="btn btn-outline-primary" type="submit">
+                    <button class="btn btn-outline-primary" type="submit" aria-label="Search">
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
             </form>
             <?php else: ?>
-                <div class="mx-auto" style="max-width: 400px; width: 100%;"></div>
+                <div class="mx-auto crm-navbar-search crm-navbar-search--placeholder" style="max-width: 400px; width: 100%;"></div>
             <?php endif; ?>
 
-            <div class="d-flex align-items-center">
+            <div class="d-flex align-items-center crm-navbar-actions">
                 <?php
                     $roleLabel = match (getCurrentStaffRole()) {
-                        'admin' => 'Admin',
-                        'manager' => 'Manager',
-                        'engineer' => 'Technik',
+                        'admin' => __('role_admin'),
+                        'manager' => __('role_manager'),
+                        'engineer' => __('role_engineer'),
                         default => ucfirst((string)getCurrentStaffRole()),
                     };
+                    $currentLang = crm_get_language();
+                    $langRedirect = $_SERVER['REQUEST_URI'] ?? basename($_SERVER['PHP_SELF']);
                 ?>
-                <span class="badge bg-secondary bg-opacity-75 text-white me-2"><?php echo e($roleLabel ?: 'Zaměstnanec'); ?></span>
-                <span class="navbar-text me-3">
+                <div class="dropdown me-2">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle crm-lang-switch" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="<?php echo e(__('language_switch')); ?>">
+                        <i class="fas fa-language me-1"></i><?php echo strtoupper($currentLang); ?>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item <?php echo $currentLang === 'cs' ? 'active' : ''; ?>" href="set_language.php?lang=cs&amp;redirect=<?php echo rawurlencode($langRedirect); ?>"><?php echo __('lang_cs'); ?> (CS)</a></li>
+                        <li><a class="dropdown-item <?php echo $currentLang === 'en' ? 'active' : ''; ?>" href="set_language.php?lang=en&amp;redirect=<?php echo rawurlencode($langRedirect); ?>"><?php echo __('lang_en'); ?> (EN)</a></li>
+                        <li><a class="dropdown-item <?php echo $currentLang === 'ru' ? 'active' : ''; ?>" href="set_language.php?lang=ru&amp;redirect=<?php echo rawurlencode($langRedirect); ?>"><?php echo __('lang_ru'); ?> (RU)</a></li>
+                    </ul>
+                </div>
+                <span class="badge bg-secondary bg-opacity-75 text-white me-2 crm-role-badge"><?php echo e($roleLabel ?: __('role_employee')); ?></span>
+                <span class="navbar-text me-3 crm-user-name">
                     <i class="fas fa-user-circle me-1"></i> <?php echo e($_SESSION['full_name'] ?? __('technician')); ?>
                 </span>
-                <a href="logout.php" class="btn btn-outline-danger btn-sm"><?php echo __('logout'); ?></a>
+                <a href="logout.php" class="btn btn-outline-danger btn-sm"><i class="fas fa-sign-out-alt"></i><span class="ms-1 d-none d-sm-inline"><?php echo __('logout'); ?></span></a>
             </div>
         </div>
     </nav>

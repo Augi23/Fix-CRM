@@ -20,7 +20,7 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 if (!hasPermission('admin_access')) {
     echo json_encode([
         'success' => false,
-        'message' => 'Nemáš oprávnění spouštět update.',
+        'message' => 'You do not have permission to run update.',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -31,7 +31,7 @@ $info = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : [];
 if (empty($info) || empty($info['local_commit'])) {
     echo json_encode([
         'success' => false,
-        'message' => 'Nepodařilo se načíst git informace repozitáře.',
+        'message' => 'Failed to load repository git information.',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -39,7 +39,7 @@ if (empty($info) || empty($info['local_commit'])) {
 if (!empty($info['dirty'])) {
     echo json_encode([
         'success' => false,
-        'message' => 'Nejprve ulož nebo zahoď lokální změny, pracovní strom není čistý.',
+        'message' => 'Please commit or discard local changes first, working tree is not clean.',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -47,7 +47,7 @@ if (!empty($info['dirty'])) {
 if ((int)($info['behind_by'] ?? 0) <= 0) {
     echo json_encode([
         'success' => true,
-        'message' => 'Jsi už na aktuálním gitu.',
+        'message' => 'Repository is already up to date.',
         'updated' => false,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -56,19 +56,20 @@ if ((int)($info['behind_by'] ?? 0) <= 0) {
 if (empty($info['remote_slug'])) {
     echo json_encode([
         'success' => false,
-        'message' => 'Repozitář nemá GitHub remote, update nejde spustit.',
+        'message' => 'Repository has no GitHub remote, update cannot be started.',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
 $remoteUrl = 'https://github.com/' . $info['remote_slug'] . '.git';
 $exitCode = 0;
-$pullOutput = runGitCommand($repoRoot, 'pull --ff-only ' . escapeshellarg($remoteUrl) . ' main', $exitCode);
+$targetBranch = $info['branch'] ?: 'main';
+$pullOutput = runGitCommand($repoRoot, 'pull --ff-only ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($targetBranch), $exitCode);
 
 if ($exitCode !== 0) {
     echo json_encode([
         'success' => false,
-        'message' => 'Update selhal: ' . ($pullOutput ?: 'neznámá chyba'),
+        'message' => 'Update failed: ' . ($pullOutput ?: 'unknown error'),
         'output' => $pullOutput,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -78,7 +79,7 @@ $newInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : $info
 
 echo json_encode([
     'success' => true,
-    'message' => 'Repozitář byl aktualizován z gitu.',
+    'message' => 'Repository was updated from git.',
     'updated' => true,
     'previous_version' => trim(($info['branch'] ?? 'main') . ' @ ' . ($info['local_short'] ?? '—')),
     'new_version' => trim(($newInfo['branch'] ?? $info['branch']) . ' @ ' . ($newInfo['local_short'] ?? $info['local_short'])),

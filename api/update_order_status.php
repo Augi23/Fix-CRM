@@ -8,14 +8,19 @@ header('Content-Type: application/json');
 
 checkApiRateLimit('order_status', 30, 60);
 
+$ui_lang = $_REQUEST['ui_lang'] ?? null;
+$t = static function(string $key) use ($ui_lang): string {
+    return __($key, is_string($ui_lang) ? $ui_lang : null);
+};
+
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => __('unauthorized')]);
+    echo json_encode(['success' => false, 'message' => $t('unauthorized')]);
     exit;
 }
 
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'message' => __('csrf_token_invalid')]);
+    echo json_encode(['success' => false, 'message' => $t('csrf_token_invalid')]);
     exit;
 }
 
@@ -27,23 +32,23 @@ $technician_id = $_REQUEST['technician_id'] ?? null;
 ensureOrderWorkTrackingSchema();
 
 if (!$order_id || !$new_status) {
-    echo json_encode(['success' => false, 'message' => __('missing_data')]);
+    echo json_encode(['success' => false, 'message' => $t('missing_data')]);
     exit;
 }
 
 try {
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('SELECT status, technician_id, estimated_cost, final_cost FROM orders WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT status, technician_id, estimated_cost, final_cost, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $order_data = $stmt->fetch();
 
     if (!$order_data) {
-        throw new Exception('Order not found');
+        throw new Exception($t('order_not_found'));
     }
 
     if (!hasPermission('edit_orders') && ($order_data['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)) {
-        throw new Exception(__('access_denied_msg'));
+        throw new Exception($t('access_denied_msg'));
     }
 
     $current_status = $order_data['status'];
@@ -53,21 +58,23 @@ try {
     $target_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
 
     if ($current_status === 'Collected' && $new_status !== 'Collected') {
-        throw new Exception('Cannot change status after Collected');
+        throw new Exception($t('status_locked_after_collected'));
     }
 
     $finishing_statuses = ['Completed', 'Collected'];
     $was_finished = in_array($current_status, $finishing_statuses, true);
     $is_finishing = in_array($new_status, $finishing_statuses, true);
     $is_starting = ($new_status === 'In Progress' && $current_status !== 'In Progress');
+    $technician_changed = ((int)$target_tech_id !== (int)$current_tech_id);
+    $is_reassigning_in_progress = ($current_status === 'In Progress' && $new_status === 'In Progress' && $technician_changed);
 
     if ($new_status === 'In Progress') {
         if (!$target_tech_id) {
-            throw new Exception('Pro stav Provádí se musí být zakázka přiřazená technikovi.');
+            throw new Exception($t('in_progress_requires_technician'));
         }
         $active_count = getTechnicianInProgressCount($target_tech_id, (int)$order_id);
         if ($active_count >= 2 && !$was_finished) {
-            throw new Exception('Technik může mít současně maximálně 2 rozdělané zakázky.');
+            throw new Exception($t('technician_in_progress_limit_reached'));
         }
     }
 
@@ -75,12 +82,17 @@ try {
     $params = [$new_status];
 
     if ($is_starting) {
-        $sql .= ', work_started_at = CURRENT_TIMESTAMP, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL, work_duration_seconds = 0';
+        $sql .= ', work_started_at = CASE WHEN work_started_at IS NULL OR work_finished_at IS NOT NULL THEN CURRENT_TIMESTAMP ELSE work_started_at END, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL';
+        $params[] = $target_tech_id;
+    }
+
+    if ($is_reassigning_in_progress) {
+        $sql .= ', work_duration_seconds = COALESCE(work_duration_seconds, 0) + CASE WHEN work_started_at IS NOT NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, work_started_at, CURRENT_TIMESTAMP)) ELSE 0 END, work_started_at = CURRENT_TIMESTAMP, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL';
         $params[] = $target_tech_id;
     }
 
     if ($current_status === 'In Progress' && $is_finishing) {
-        $sql .= ', work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = CASE WHEN work_started_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP)) ELSE work_duration_seconds END';
+        $sql .= ', work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = COALESCE(work_duration_seconds, 0) + CASE WHEN work_started_at IS NOT NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP))) ELSE 0 END';
         $params[] = $target_tech_id;
     }
 
@@ -97,8 +109,9 @@ try {
         $params[] = $final_cost;
     }
 
+    $updated_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
     $sql .= ', technician_id = ?';
-    $params[] = ($technician_id && $technician_id !== '') ? $technician_id : $current_tech_id;
+    $params[] = $updated_tech_id;
 
     if (isset($_REQUEST['extra_expenses']) && ($_SESSION['role'] ?? '') === 'admin') {
         $sql .= ', extra_expenses = ?';
@@ -121,28 +134,27 @@ try {
         processOrderInventoryChange($order_id, $is_finishing, $was_finished);
     }
 
+    $status_changed = ($current_status !== $new_status);
+    $technician_changed = ((int)$current_tech_id !== (int)$updated_tech_id);
+
     $pdo->commit();
 
-    $notify_id = $technician_id ? $technician_id : $current_tech_id;
-    if ($notify_id) {
-        $tech = $pdo->prepare('SELECT telegram_id, name FROM technicians WHERE id = ?');
-        $tech->execute([$notify_id]);
-        $techData = $tech->fetch();
-
-        if ($techData && $techData['telegram_id']) {
-            $msg = sprintf(__('tg_order_update_title'), $order_id) . "\n";
-            $msg .= sprintf(__('tg_new_status'), $new_status) . "\n";
-            if ($final_cost !== null) {
-                $msg .= sprintf(__('tg_cost'), formatMoney($final_cost)) . "\n";
-            }
-            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-            $link = $protocol . $_SERVER['HTTP_HOST'] . '/view_order.php?id=' . $order_id;
-            $msg .= sprintf(__('tg_open_crm'), $link);
-            sendTelegramNotification($techData['telegram_id'], $msg);
-        }
+    if ($status_changed || $technician_changed) {
+        crmNotifyOrderLifecycleEvent([
+            'type' => 'order_status_changed',
+            'order_id' => (int)$order_id,
+            'old_status' => (string)$current_status,
+            'new_status' => (string)$new_status,
+            'technician_id' => (int)$updated_tech_id,
+            'previous_technician_id' => (int)$current_tech_id,
+            'final_cost' => $final_cost,
+            'actor_role' => (string)($_SESSION['role'] ?? ''),
+            'actor_tech_id' => (int)($_SESSION['tech_id'] ?? 0),
+            'actor_name' => (string)($_SESSION['full_name'] ?? ''),
+        ]);
     }
 
-    echo json_encode(['success' => true, 'message' => 'Status updated']);
+    echo json_encode(['success' => true, 'message' => $t('status_updated')]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

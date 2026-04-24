@@ -2,7 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("ID zakázky není zadáno");
+if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
 
 $id = $_GET['id'] ?? $_GET['order_id'];
 $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, t.name as tech_name 
@@ -27,7 +27,7 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Pracovní příkaz #<?php echo $order['id']; ?></title>
+    <title>Work order #<?php echo $order['id']; ?></title>
     <style>
         body { font-family: Arial, sans-serif; font-size: 14px; color: #333; margin: 0; padding: 20px; }
         .work-order { max-width: 800px; margin: auto; border: 2px solid #000; padding: 20px; }
@@ -51,13 +51,13 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
 <body>
 
 <div class="no-print" style="text-align: center; margin-bottom: 20px;">
-    <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #000; color: white; border: none; font-weight: bold;">Tisk pracovního příkazu</button>
+    <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #000; color: white; border: none; font-weight: bold;">Print work order</button>
 </div>
 
 <div class="work-order">
     <div class="header">
         <div>
-            <h1><?php echo mb_strtoupper(_l('work_order')); ?> č. <?php echo $order['id']; ?></h1>
+            <h1><?php echo mb_strtoupper(_l('work_order')); ?> No. <?php echo $order['id']; ?></h1>
             <div><?php echo _l('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?></div>
         </div>
         <div class="qr-section">
@@ -119,7 +119,7 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
     <?php endif; ?>
 
     <div class="section">
-        <div class="section-title"><?php echo mb_strtoupper(_l('action')); ?> (doplní technik)</div>
+        <div class="section-title"><?php echo mb_strtoupper(_l('action')); ?> (to be completed by technician)</div>
         <div style="border: 1px solid #000; height: 150px;"></div>
     </div>
 
@@ -135,8 +135,8 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
     </div>
 
     <div class="footer">
-        * Pracovní příkaz je interní dokument servisního centra.
-        * QR kód vede na elektronickou kartu zakázky.
+        * Work order is an internal service center document.
+        * QR code links to the electronic order card.
     </div>
 </div>
 

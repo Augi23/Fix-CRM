@@ -58,10 +58,30 @@ if (isset($pdo) && $selectedOrder) {
     try {
         $stmt = $pdo->prepare("SELECT file_path, file_type, file_name FROM order_attachments WHERE order_id = ? ORDER BY id DESC");
         $stmt->execute([(int)$selectedOrder['id']]);
-        $orderMedia = array_values(array_filter($stmt->fetchAll(), static function ($item) {
-            $type = strtolower((string)($item['file_type'] ?? ''));
-            return str_starts_with($type, 'image/');
-        }));
+        $orderMedia = [];
+        foreach ($stmt->fetchAll() as $item) {
+            $path = trim((string)($item['file_path'] ?? ''));
+            if ($path === '') {
+                continue;
+            }
+
+            $type = strtolower(trim((string)($item['file_type'] ?? '')));
+            if ($type === '') {
+                $ext = strtolower((string)pathinfo($path, PATHINFO_EXTENSION));
+                if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+                    $type = 'image/' . ($ext === 'jpg' ? 'jpeg' : $ext);
+                } elseif (in_array($ext, ['mp4', 'mov', 'avi', 'webm'], true)) {
+                    $type = 'video/' . $ext;
+                }
+            }
+
+            if (!str_starts_with($type, 'image/') && !str_starts_with($type, 'video/')) {
+                continue;
+            }
+
+            $item['file_type'] = $type;
+            $orderMedia[] = $item;
+        }
     } catch (Exception $e) {
         $orderMedia = [];
     }
@@ -69,23 +89,66 @@ if (isset($pdo) && $selectedOrder) {
 
 function clientStatusMeta(string $status): array {
     $map = [
-        'New' => ['Přijato', 'primary'],
-        'Pending Approval' => ['Čeká na schválení', 'info'],
-        'In Progress' => ['V procesu', 'warning'],
-        'Waiting for Parts' => ['Čeká na díly', 'secondary'],
-        'Completed' => ['Připraveno k vyzvednutí', 'success'],
-        'Collected' => ['Vydáno', 'dark'],
-        'Cancelled' => ['Zrušeno', 'danger'],
+        'New' => ['client_status_new', 'primary'],
+        'Новый' => ['client_status_new', 'primary'],
+        'Nová' => ['client_status_new', 'primary'],
+        'Pending Approval' => ['client_status_pending_approval', 'info'],
+        'На согласовании' => ['client_status_pending_approval', 'info'],
+        'K odsouhlasení' => ['client_status_pending_approval', 'info'],
+        'Čeká na schválení' => ['client_status_pending_approval', 'info'],
+        'In Progress' => ['client_status_in_progress', 'warning'],
+        'В работе' => ['client_status_in_progress', 'warning'],
+        'V práci' => ['client_status_in_progress', 'warning'],
+        'V procesu' => ['client_status_in_progress', 'warning'],
+        'Provádí se' => ['client_status_in_progress', 'warning'],
+        'Waiting for Parts' => ['client_status_waiting_parts', 'secondary'],
+        'Ожидание запчастей' => ['client_status_waiting_parts', 'secondary'],
+        'Čeká na díly' => ['client_status_waiting_parts', 'secondary'],
+        'Completed' => ['client_status_completed', 'success'],
+        'Готов' => ['client_status_completed', 'success'],
+        'Hotovo' => ['client_status_completed', 'success'],
+        'Collected' => ['client_status_collected', 'dark'],
+        'Выдан' => ['client_status_collected', 'dark'],
+        'Vydáno' => ['client_status_collected', 'dark'],
+        'Cancelled' => ['client_status_cancelled', 'danger'],
+        'Отменен' => ['client_status_cancelled', 'danger'],
+        'Zrušeno' => ['client_status_cancelled', 'danger'],
     ];
 
-    return $map[$status] ?? [trim((string)$status), 'light'];
+    if (!isset($map[$status])) {
+        return [trim((string)$status), 'light'];
+    }
+
+    [$labelKey, $class] = $map[$status];
+    return [__($labelKey), $class];
+}
+
+function clientMediaUrl(string $path): string {
+    $path = trim($path);
+    if ($path === '') {
+        return '';
+    }
+
+    if (preg_match('#^https?://#i', $path)) {
+        return $path;
+    }
+
+    $normalized = ltrim($path, '/');
+    while (str_starts_with($normalized, '../')) {
+        $normalized = substr($normalized, 3);
+    }
+    return '../' . ltrim($normalized, '/');
 }
 
 function clientMoney($amount): string {
     if ($amount === null || $amount === '') {
         return '—';
     }
-    return number_format((float)$amount, 2, ',', ' ') . ' Kč';
+
+    $lang = crm_get_language();
+    $decimal = $lang === 'en' ? '.' : ',';
+    $thousands = $lang === 'en' ? ',' : ' ';
+    return number_format((float)$amount, 2, $decimal, $thousands) . ' ' . get_setting('currency', 'Kč');
 }
 
 function clientOrderAmount(array $order): ?float {
@@ -100,12 +163,12 @@ function clientOrderAmount(array $order): ?float {
 
 function clientOrderAmountLabel(array $order): string {
     if (isset($order['final_cost']) && $order['final_cost'] !== null && $order['final_cost'] !== '') {
-        return 'Konečná cena opravy';
+        return __('client_amount_final');
     }
     if (isset($order['estimated_cost']) && $order['estimated_cost'] !== null && $order['estimated_cost'] !== '') {
-        return 'Orientační cena opravy';
+        return __('client_amount_estimated');
     }
-    return 'Cena';
+    return __('client_amount_generic');
 }
 
 $customerDisplayName = trim((string)($_SESSION['client_full_name'] ?? ''));
@@ -119,11 +182,11 @@ if ($customerDisplayName === '' && !empty($customer['company'])) {
 $today = date('d.m.Y');
 ?>
 <!DOCTYPE html>
-<html lang="<?php echo e($_SESSION['lang'] ?? 'cs'); ?>" data-bs-theme="dark">
+<html lang="<?php echo e(crm_get_language()); ?>" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Klientská sekce - AppleFix</title>
+    <title><?php echo e(__('client_section_title')); ?> - AppleFix</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -462,24 +525,27 @@ $today = date('d.m.Y');
             <div class="client-topbar-brand">
                 <img src="../assets/img/applefix-logo.png" alt="AppleFix logo">
                 <div>
-                    <div class="client-chip mb-2"><i class="fas fa-user-shield"></i> Klientská sekce</div>
+                    <div class="client-chip mb-2"><i class="fas fa-user-shield"></i> <?php echo __('client_section_title'); ?></div>
                 </div>
             </div>
             <div class="client-meta">
+                <?php $currentLang = crm_get_language(); ?>
+                <div class="d-flex gap-1" title="<?php echo e(__('language_switch')); ?>">
+                    <a class="btn btn-sm rounded-pill px-3 <?php echo $currentLang === 'cs' ? 'btn-light text-dark' : 'btn-outline-light'; ?>" href="../set_language.php?lang=cs&amp;redirect=<?php echo rawurlencode($_SERVER['REQUEST_URI'] ?? 'klient/dashboard.php'); ?>">CS</a>
+                    <a class="btn btn-sm rounded-pill px-3 <?php echo $currentLang === 'en' ? 'btn-light text-dark' : 'btn-outline-light'; ?>" href="../set_language.php?lang=en&amp;redirect=<?php echo rawurlencode($_SERVER['REQUEST_URI'] ?? 'klient/dashboard.php'); ?>">EN</a>
+                    <a class="btn btn-sm rounded-pill px-3 <?php echo $currentLang === 'ru' ? 'btn-light text-dark' : 'btn-outline-light'; ?>" href="../set_language.php?lang=ru&amp;redirect=<?php echo rawurlencode($_SERVER['REQUEST_URI'] ?? 'klient/dashboard.php'); ?>">RU</a>
+                </div>
                 <span class="client-chip"><i class="fas fa-calendar-day"></i> <?php echo e($today); ?></span>
-                <span class="client-chip"><i class="fas fa-user"></i> <?php echo e($customerDisplayName ?: 'Klient'); ?></span>
-                <a href="logout.php" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-right-from-bracket me-2"></i>Odhlásit</a>
+                <span class="client-chip"><i class="fas fa-user"></i> <?php echo e($customerDisplayName ?: __('client_default_name')); ?></span>
+                <a href="logout.php" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-right-from-bracket me-2"></i><?php echo __('logout'); ?></a>
             </div>
         </div>
 
         <div class="client-grid">
             <section class="client-card client-hero">
                 <div class="client-card-inner">
-                    <h1>Stav opravy<br>a cena na jednom místě.</h1>
-                    <p>
-                        Tohle je oddělená klientská sekce pro AppleFix. Přihlašuješ se přes číslo zakázky a PIN kód z protokolu,
-                        takže admin login zůstává čistě pro servis.
-                    </p>
+                    <h1><?php echo __('client_hero_title'); ?></h1>
+                    <p><?php echo __('client_hero_subtitle'); ?></p>
 
                     <?php if ($selectedOrder): ?>
                         <?php [$statusLabel, $statusClass] = clientStatusMeta((string)$selectedOrder['status']); ?>
@@ -490,13 +556,13 @@ $today = date('d.m.Y');
                             </span>
                             <span class="status-badge-large light">
                                 <i class="fas fa-hashtag"></i>
-                                Zakázka #<?php echo (int)$selectedOrder['id']; ?>
+                                <?php echo __('client_order_label'); ?> #<?php echo (int)$selectedOrder['id']; ?>
                             </span>
                         </div>
 
                         <div class="stats-grid">
                             <div class="stat-box">
-                                <div class="label">Zařízení</div>
+                                <div class="label"><?php echo __('client_label_device'); ?></div>
                                 <div class="value"><?php echo e(trim(($selectedOrder['device_brand'] ?? '') . ' ' . ($selectedOrder['device_model'] ?? '')) ?: '—'); ?></div>
                             </div>
                             <div class="stat-box">
@@ -504,26 +570,26 @@ $today = date('d.m.Y');
                                 <div class="value"><?php echo e(clientMoney(clientOrderAmount($selectedOrder))); ?></div>
                             </div>
                             <div class="stat-box">
-                                <div class="label">Poslední změna</div>
+                                <div class="label"><?php echo __('client_label_last_change'); ?></div>
                                 <div class="value"><?php echo e(date('d.m.Y H:i', strtotime((string)($selectedOrder['updated_at'] ?? $selectedOrder['created_at'] ?? 'now')))); ?></div>
                             </div>
                         </div>
 
                         <div class="repair-details-grid">
                             <div class="detail-row">
-                                <div class="label">Popis závady</div>
+                                <div class="label"><?php echo __('client_label_problem_desc'); ?></div>
                                 <div class="value"><?php echo e($selectedOrder['problem_description'] ?: '—'); ?></div>
                             </div>
                             <div class="detail-row">
-                                <div class="label">Sériové číslo / IMEI</div>
+                                <div class="label"><?php echo __('client_label_serial_number'); ?></div>
                                 <div class="value"><?php echo e($selectedOrder['serial_number'] ?: '—'); ?></div>
                             </div>
                             <div class="detail-row">
-                                <div class="label">Druhé číslo / IMEI 2</div>
+                                <div class="label"><?php echo __('client_label_serial_number_2'); ?></div>
                                 <div class="value"><?php echo e($selectedOrder['serial_number_2'] ?: '—'); ?></div>
                             </div>
                             <div class="detail-row">
-                                <div class="label">Přijato</div>
+                                <div class="label"><?php echo __('client_label_received'); ?></div>
                                 <div class="value"><?php echo e(date('d.m.Y', strtotime((string)($selectedOrder['created_at'] ?? 'now')))); ?></div>
                             </div>
                         </div>
@@ -531,47 +597,58 @@ $today = date('d.m.Y');
                         <div class="media-section">
                             <div class="media-section-title">
                                 <div>
-                                    <h4><i class="fas fa-camera me-2"></i>Fotky od technika</h4>
-                                    <p>Přehled stavu zařízení a průběhu opravy.</p>
+                                    <h4><i class="fas fa-camera me-2"></i><?php echo __('client_media_title'); ?></h4>
+                                    <p><?php echo __('client_media_desc'); ?></p>
                                 </div>
                             </div>
 
                             <?php if (!empty($orderMedia)): ?>
                                 <div class="media-grid">
                                     <?php foreach ($orderMedia as $media): ?>
-                                        <a class="media-card" href="../<?php echo e(ltrim((string)$media['file_path'], '/')); ?>" target="_blank" rel="noopener noreferrer">
-                                            <img src="../<?php echo e(ltrim((string)$media['file_path'], '/')); ?>" alt="Fotka zakázky">
-                                            <div class="media-card-caption"><?php echo e($media['file_name'] ?: 'Fotka technika'); ?></div>
+                                        <?php
+                                            $mediaType = strtolower((string)($media['file_type'] ?? ''));
+                                            $isVideo = str_starts_with($mediaType, 'video/');
+                                            $mediaUrl = clientMediaUrl((string)($media['file_path'] ?? ''));
+                                        ?>
+                                        <a class="media-card" href="<?php echo e($mediaUrl); ?>" target="_blank" rel="noopener noreferrer">
+                                            <?php if ($isVideo): ?>
+                                                <div class="d-flex align-items-center justify-content-center" style="height:150px;background:rgba(255,255,255,0.04);">
+                                                    <i class="fas fa-video fa-lg"></i>
+                                                </div>
+                                            <?php else: ?>
+                                                <img src="<?php echo e($mediaUrl); ?>" alt="<?php echo e(__('client_media_alt')); ?>">
+                                            <?php endif; ?>
+                                            <div class="media-card-caption"><?php echo e($media['file_name'] ?: ($isVideo ? 'Video' : __('client_media_caption_default'))); ?></div>
                                         </a>
                                     <?php endforeach; ?>
                                 </div>
                             <?php else: ?>
                                 <div class="empty-state py-3 px-0 text-start">
-                                    Zatím tu nejsou žádné fotografie k této zakázce.
+                                    <?php echo __('client_media_empty'); ?>
                                 </div>
                             <?php endif; ?>
                         </div>
 
-                        <?php if (in_array($selectedOrder['status'], ['Completed', 'Collected'], true)): ?>
+                        <?php if (in_array($selectedOrder['status'], getOrderStatusList('done'), true)): ?>
                             <div class="order-notice">
                                 <i class="fas fa-box-open me-2"></i>
-                                Zařízení je připravené k vyzvednutí nebo už bylo vydáno.
+                                <?php echo __('client_notice_ready'); ?>
                             </div>
-                        <?php elseif ($selectedOrder['status'] === 'Waiting for Parts'): ?>
+                        <?php elseif (in_array($selectedOrder['status'], getOrderStatusList('waiting_parts'), true)): ?>
                             <div class="order-notice" style="background: rgba(255,193,7,0.12); border-color: rgba(255,193,7,0.25); color: #ffe08a;">
                                 <i class="fas fa-screwdriver-wrench me-2"></i>
-                                Oprava čeká na díly.
+                                <?php echo __('client_notice_waiting_parts'); ?>
                             </div>
-                        <?php elseif ($selectedOrder['status'] === 'In Progress'): ?>
+                        <?php elseif (in_array($selectedOrder['status'], getOrderStatusList('in_progress'), true)): ?>
                             <div class="order-notice" style="background: rgba(13,202,240,0.12); border-color: rgba(13,202,240,0.25); color: #8be8ff;">
                                 <i class="fas fa-gears me-2"></i>
-                                Technik na zakázce pracuje.
+                                <?php echo __('client_notice_in_progress'); ?>
                             </div>
                         <?php endif; ?>
                     <?php else: ?>
                         <div class="empty-state">
                             <i class="fas fa-folder-open fa-2x mb-3"></i>
-                            <div>Pro tento účet zatím nemáme žádnou aktivní zakázku.</div>
+                            <div><?php echo __('client_no_active_order'); ?></div>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -581,20 +658,20 @@ $today = date('d.m.Y');
                 <div class="client-card-inner">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
-                            <div class="client-chip mb-2"><i class="fas fa-list-check"></i> Moje zakázky</div>
-                            <h3 class="mb-0 text-white fw-bold" style="letter-spacing: -0.04em;">Přehled oprav</h3>
+                            <div class="client-chip mb-2"><i class="fas fa-list-check"></i> <?php echo __('client_my_orders'); ?></div>
+                            <h3 class="mb-0 text-white fw-bold" style="letter-spacing: -0.04em;"><?php echo __('client_repairs_overview'); ?></h3>
                         </div>
                     </div>
 
                     <div class="repair-list">
                         <?php if (empty($orders)): ?>
-                            <div class="empty-state">Zatím žádné zakázky.</div>
+                            <div class="empty-state"><?php echo __('client_no_orders'); ?></div>
                         <?php else: ?>
                             <?php foreach ($orders as $order): ?>
                                 <?php [$statusLabel, $statusClass] = clientStatusMeta((string)$order['status']); ?>
                                 <a class="repair-item <?php echo (int)$order['id'] === (int)$selectedOrderId ? 'active' : ''; ?>" href="?order=<?php echo (int)$order['id']; ?>">
                                     <div>
-                                        <div class="title">#<?php echo (int)$order['id']; ?> · <?php echo e(trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? '')) ?: 'Zařízení'); ?></div>
+                                        <div class="title">#<?php echo (int)$order['id']; ?> · <?php echo e(trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? '')) ?: __('client_device_fallback')); ?></div>
                                         <div class="sub">
                                             <?php echo e($statusLabel); ?> · <?php echo e(clientMoney(clientOrderAmount($order))); ?>
                                         </div>

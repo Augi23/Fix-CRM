@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <?php if (!empty($item['source_supplier']) || !empty($item['supplier_availability'])): ?>
     <div class="alert alert-info">
-        <div class="fw-semibold">Dodavatelský zdroj</div>
+        <div class="fw-semibold">Supplier source</div>
         <div class="small mb-1">
             <?php echo !empty($item['source_supplier']) ? htmlspecialchars(supplierLabel((string)$item['source_supplier'])) : '—'; ?>
         </div>

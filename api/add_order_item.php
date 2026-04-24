@@ -5,7 +5,7 @@ require_once '../includes/functions.php';
 ob_clean(); // discard any output/warnings
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) {
     echo json_encode(['success' => false, 'message' => __('unauthorized')]);
     exit;
 }
@@ -42,13 +42,17 @@ try {
     }
     $price = $inventory['sale_price'];
 
+    if (getCurrentStaffRole() === 'engineer' && (int)($inventory['quantity'] ?? 0) <= 0) {
+        throw new Exception('Technician can select only items that are in stock.');
+    }
+
     $stmt = $pdo->prepare("INSERT INTO order_items (order_id, inventory_id, quantity, price) VALUES (?, ?, ?, ?)");
     $stmt->execute([$order_id, $inventory_id, $qty, $price]);
 
     $autoProcurementQueued = false;
     if ((int)($inventory['quantity'] ?? 0) <= 0) {
         try {
-            $autoProcurementQueued = queueProcurementRequestFromOrder((int)$order_id, (int)$inventory_id, $qty, 'Automaticky přidáno při vložení do zakázky.');
+            $autoProcurementQueued = queueProcurementRequestFromOrder((int)$order_id, (int)$inventory_id, $qty, 'Automatically added while inserting into order.');
         } catch (Throwable $autoQueueError) {
             log_error('Auto procurement queue failed', 'procurement', $autoQueueError->getMessage());
         }
@@ -67,12 +71,12 @@ try {
         $msg = sprintf(__('tg_part_added'), $order_id) . "\n";
         $msg .= sprintf(__('tg_part_added_detail'), $notify['part_name'], $qty) . "\n";
         if ($autoProcurementQueued) {
-            $msg .= "Automaticky jsem díl dala i do nákupu, protože skladem je 0 ks.\n";
+            $msg .= "I also added the part to procurement automatically because stock is 0 pcs.\n";
         }
         sendTelegramNotification($notify['telegram_id'], $msg);
     }
 
-    echo json_encode(['success' => true, 'auto_procurement_queued' => $autoProcurementQueued, 'message' => $autoProcurementQueued ? 'Díl byl přidán a automaticky zařazen do nákupu.' : 'Díl byl přidán do zakázky.']);
+    echo json_encode(['success' => true, 'auto_procurement_queued' => $autoProcurementQueued, 'message' => $autoProcurementQueued ? 'Part was added and automatically queued for procurement.' : 'Part was added to order.']);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }

@@ -1,5 +1,5 @@
     <footer class="mt-5 pt-3 border-top text-center text-muted">
-        <p>&copy; 2026 Fix CRM - Servis se vším všudy</p>
+        <p>&copy; 2026 Fix CRM - Service done right</p>
     </footer>
 </div> <!-- /#content -->
 

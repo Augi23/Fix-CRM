@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     try {
         // First get current status to see if it changed to Collected
-        $stmt_curr = $pdo->prepare("SELECT status, shipping_date FROM orders WHERE id = ?");
+        $stmt_curr = $pdo->prepare("SELECT status, shipping_date, technician_id FROM orders WHERE id = ?");
         $stmt_curr->execute([$id]);
         $current_order = $stmt_curr->fetch();
         
@@ -52,13 +52,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $is_starting = ($status === 'In Progress' && ($current_order['status'] ?? '') !== 'In Progress');
         $is_finishing = in_array($status, ['Completed', 'Collected'], true) && ($current_order['status'] ?? '') === 'In Progress';
+        $technician_changed = (int)$technician_id !== (int)($current_order['technician_id'] ?? 0);
+        $is_reassigning_in_progress = (($current_order['status'] ?? '') === 'In Progress' && $status === 'In Progress' && $technician_changed);
         if ($status === 'In Progress') {
             if (!$technician_id) {
                 throw new Exception('Pro stav Provádí se musí být zakázka přiřazená technikovi.');
             }
-            $active_count = getTechnicianInProgressCount((int)$technician_id, (int)$id);
-            if ($active_count >= 2) {
-                throw new Exception('Technik může mít současně maximálně 2 rozdělané zakázky.');
+            if ($is_starting || $technician_changed) {
+                $active_count = getTechnicianInProgressCount((int)$technician_id, (int)$id);
+                if ($active_count >= 2) {
+                    throw new Exception('Technik může mít současně maximálně 2 rozdělané zakázky.');
+                }
             }
         }
 
@@ -91,12 +95,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         ];
 
         if ($is_starting) {
-            $updateSql .= ", work_started_at = CURRENT_TIMESTAMP, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL, work_duration_seconds = 0";
+            $updateSql .= ", work_started_at = CASE WHEN work_started_at IS NULL OR work_finished_at IS NOT NULL THEN CURRENT_TIMESTAMP ELSE work_started_at END, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL";
+            $updateParams[] = $technician_id;
+        }
+
+        if ($is_reassigning_in_progress) {
+            $updateSql .= ", work_duration_seconds = COALESCE(work_duration_seconds, 0) + CASE WHEN work_started_at IS NOT NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, work_started_at, CURRENT_TIMESTAMP)) ELSE 0 END, work_started_at = CURRENT_TIMESTAMP, work_started_by = ?, work_finished_at = NULL, work_finished_by = NULL";
             $updateParams[] = $technician_id;
         }
 
         if ($is_finishing) {
-            $updateSql .= ", work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = CASE WHEN work_started_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP)) ELSE work_duration_seconds END";
+            $updateSql .= ", work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = COALESCE(work_duration_seconds, 0) + CASE WHEN work_started_at IS NOT NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP))) ELSE 0 END";
             $updateParams[] = $technician_id;
         }
 
@@ -107,31 +116,71 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $update->execute($updateParams);
 
         // Handle File Uploads during Edit
-        if (isset($_FILES['files'])) {
+        if (isset($_FILES['files']) && !empty($_FILES['files']['name'][0])) {
             $files = $_FILES['files'];
-            $upload_dir = 'uploads/';
+            $upload_dir = __DIR__ . '/uploads/';
             if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
+                mkdir($upload_dir, 0755, true);
             }
-            $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/quicktime', 'video/x-msvideo'];
 
-                    foreach ($files['name'] as $key => $name) {
-                        if ($files['error'][$key] == 0) {
-                            $type = $files['type'][$key];
-                            if (in_array($type, $allowed_types)) {
-                                $ext = pathinfo($name, PATHINFO_EXTENSION);
-                                $new_name = uniqid('order_' . $id . '_') . '.' . $ext;
-                                $path = $upload_dir . $new_name;
-                                
-                                if (move_uploaded_file($files['tmp_name'][$key], $path)) {
-                                    $db_path = 'uploads/' . $new_name;
-                                    $stmt_file = $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name) VALUES (?, ?, ?, ?)");
-                                    $stmt_file->execute([$id, $db_path, $type, $name]);
-                                }
-                            }
-                        }
-                    }
+            $htaccess = $upload_dir . '.htaccess';
+            if (!file_exists($htaccess)) {
+                file_put_contents($htaccess,
+                    "# Deny PHP execution in uploads\n" .
+                    "<FilesMatch \"\\.php$\">\n    Require all denied\n</FilesMatch>\n" .
+                    "RemoveHandler .php .phtml .php3 .php4 .php5\n" .
+                    "RemoveType .php .phtml .php3 .php4 .php5\n"
+                );
+            }
+
+            $allowed_mime_to_ext = [
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/gif' => 'gif',
+                'image/webp' => 'webp',
+                'video/mp4' => 'mp4',
+                'video/quicktime' => 'mov',
+                'video/x-msvideo' => 'avi',
+            ];
+            $allowed_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi'];
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+
+            foreach ($files['name'] as $key => $name) {
+                if (($files['error'][$key] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                    continue;
+                }
+
+                $tmp = $files['tmp_name'][$key] ?? '';
+                if (!$tmp) {
+                    continue;
+                }
+
+                $real_type = finfo_file($finfo, $tmp);
+                if (!isset($allowed_mime_to_ext[$real_type])) {
+                    continue;
+                }
+                if (strpos($real_type, 'image/') === 0 && getimagesize($tmp) === false) {
+                    continue;
+                }
+
+                $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                if (!in_array($ext, $allowed_exts, true)) {
+                    $ext = $allowed_mime_to_ext[$real_type];
+                }
+
+                $new_name = uniqid('order_' . $id . '_', true) . '.' . $ext;
+                $path = $upload_dir . $new_name;
+
+                if (move_uploaded_file($tmp, $path)) {
+                    $db_path = 'uploads/' . $new_name;
+                    $stmt_file = $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name) VALUES (?, ?, ?, ?)");
+                    $stmt_file->execute([$id, $db_path, $real_type, basename($name)]);
+                }
+            }
+
+            finfo_close($finfo);
         }
+
 
         $success = __('order_updated_success');
         // Refresh order data
@@ -165,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <div class="card">
     <div class="card-body">
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST" enctype="multipart/form-data" class="edit-order-form">
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label"><i class="fas fa-user me-2 text-primary"></i><?php echo __('client'); ?></label>
@@ -271,11 +320,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-1" style="z-index: 10; font-size: 0.6rem;" onclick="deleteMedia(<?php echo $file['id']; ?>)">
                                             <i class="fas fa-times"></i>
                                         </button>
-                                        <div class="ratio ratio-1x1 bg-dark bg-opacity-25">
+                                        <div class="ratio ratio-1x1 bg-dark bg-opacity-25 overflow-hidden">
                                             <?php if ($isVideo): ?>
-                                                <div class="d-flex align-items-center justify-content-center bg-dark"><i class="fas fa-video text-white"></i></div>
+                                                <div class="w-100 h-100 d-flex align-items-center justify-content-center bg-dark"><i class="fas fa-video text-white"></i></div>
                                             <?php else: ?>
-                                                <img src="<?php echo $file['file_path']; ?>" class="object-fit-cover" alt="Photo">
+                                                <img src="<?php echo $file['file_path']; ?>" class="w-100 h-100 object-fit-cover d-block" alt="Photo">
                                             <?php endif; ?>
                                         </div>
                                     </div>

@@ -2,10 +2,10 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("ID zakázky není zadáno");
+if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
 
 $id = $_GET['id'] ?? $_GET['order_id'];
-$target_lang = $_GET['lang'] ?? 'cs';
+$target_lang = crm_normalize_language((string)($_GET['lang'] ?? 'cs')) ?? 'cs';
 
 // Helper for local translations
 function _l($key) {
@@ -121,13 +121,10 @@ $currency = get_setting('currency', 'Kč');
 
     <div class="text-center qr-code">
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode('https://servis.expert/status/?id='.$order['id']); ?>" alt="QR">
-        <div style="font-size: 10px; margin-top: 3px;">Status: servis.expert/status</div>
+        <div style="font-size: 10px; margin-top: 3px;"><?php echo _l('status_page_label'); ?>: servis.expert/status</div>
     </div>
 
-    <div class="terms text-center">
-        Zakázka je přijata k opravě. Diagnostika může být zpoplatněna. 
-        Záruka na práci je 6 měsíců. Skladování nad 30 dní je zpoplatněno.
-    </div>
+    <div class="terms text-center"><?php echo _l('print_reception_terms'); ?></div>
 
     <div class="footer text-center">
         <?php echo _l('reception_act'); ?> #<?php echo $order['id']; ?><br>
@@ -136,8 +133,8 @@ $currency = get_setting('currency', 'Kč');
 </div>
 
 <div class="no-print text-center" style="margin-top: 20px; padding-bottom: 30px;">
-    <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px;">Tisk</button>
-    <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; margin-left: 10px;">Zavřít</button>
+    <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px;"><?php echo _l('print'); ?></button>
+    <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; margin-left: 10px;"><?php echo _l('close'); ?></button>
 </div>
 
 </body>
