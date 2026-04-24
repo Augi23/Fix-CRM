@@ -61,6 +61,38 @@
 </div>
 
 
+<div id="crmNotificationsPanel" class="crm-notifications-panel" aria-hidden="true">
+    <div class="crm-notifications-head d-flex justify-content-between align-items-center">
+        <strong>Upozornění</strong>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="notificationsPanelClose"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="crm-notifications-list">
+        <div class="crm-notifications-item">
+            <span class="crm-notifications-icon warning"><i class="fas fa-clock"></i></span>
+            <div>
+                <div class="small text-white">Zakázka #8741 čeká déle než SLA.</div>
+                <div class="small text-white-75">Před 6 min</div>
+            </div>
+        </div>
+        <div class="crm-notifications-item">
+            <span class="crm-notifications-icon success"><i class="fas fa-check"></i></span>
+            <div>
+                <div class="small text-white">Import katalogu dokončen.</div>
+                <div class="small text-white-75">Před 12 min</div>
+            </div>
+        </div>
+        <div class="crm-notifications-item">
+            <span class="crm-notifications-icon info"><i class="fas fa-info"></i></span>
+            <div>
+                <div class="small text-white">Nový zákazník byl přidán.</div>
+                <div class="small text-white-75">Před 24 min</div>
+            </div>
+        </div>
+    </div>
+    <div class="crm-notifications-foot">
+        <button type="button" class="btn btn-sm btn-outline-secondary w-100">Označit vše jako přečtené</button>
+    </div>
+</div>
 
 </body>
 </html>

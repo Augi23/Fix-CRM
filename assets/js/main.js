@@ -59,6 +59,34 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const notificationsToggle = document.getElementById('notificationsToggle');
+    const notificationsPanel = document.getElementById('crmNotificationsPanel');
+    const notificationsPanelClose = document.getElementById('notificationsPanelClose');
+
+    const closeNotificationsPanel = function() {
+        if (!notificationsPanel) return;
+        notificationsPanel.classList.remove('is-open');
+        notificationsPanel.setAttribute('aria-hidden', 'true');
+    };
+
+    if (notificationsToggle && notificationsPanel) {
+        notificationsToggle.addEventListener('click', function() {
+            const nextOpen = !notificationsPanel.classList.contains('is-open');
+            notificationsPanel.classList.toggle('is-open', nextOpen);
+            notificationsPanel.setAttribute('aria-hidden', nextOpen ? 'false' : 'true');
+        });
+    }
+
+    if (notificationsPanelClose) {
+        notificationsPanelClose.addEventListener('click', closeNotificationsPanel);
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeNotificationsPanel();
+        }
+    });
+
     // Keep modal accessibility fix minimal and avoid fighting Bootstrap layering
     $(document).on('show.bs.modal shown.bs.modal', '.modal', function() {
         this.removeAttribute('aria-hidden');
