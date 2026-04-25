@@ -409,13 +409,34 @@ function openPreviewInNewTab() {
         if (prevBtn) prevBtn.addEventListener('click', function(e){ e.preventDefault(); if(cur>1){ cur--; render(); }});
         if (nextBtn) nextBtn.addEventListener('click', function(e){
             e.preventDefault();
-            var active = modal.querySelector('.crm-wizard-step[data-step="'+cur+'"]');
-            if (active) {
-                var required = active.querySelectorAll('[required]');
-                for (var i=0; i<required.length; i++) {
-                    if (!required[i].checkValidity()) { required[i].reportValidity(); return; }
+
+            if (cur === 1) {
+                var customerSelect = modal.querySelector('select[name="customer_id"]');
+                if (!customerSelect || !customerSelect.value) {
+                    if (typeof window.showAlert === 'function') {
+                        window.showAlert('Vyber prosím klienta ze seznamu nebo nejdřív ulož nového klienta.');
+                    }
+                    return;
                 }
             }
+
+            if (cur === 2) {
+                var form = modal.querySelector('form');
+                var fd = form ? new FormData(form) : null;
+                var requiredKeys = ['device_type', 'order_type', 'device_brand', 'device_model', 'problem_description'];
+                for (var k = 0; k < requiredKeys.length; k++) {
+                    var key = requiredKeys[k];
+                    var val = fd ? (fd.get(key) || '').toString().trim() : '';
+                    if (!val) {
+                        var field = modal.querySelector('[name="' + key + '"]');
+                        if (field && typeof field.reportValidity === 'function') {
+                            field.reportValidity();
+                        }
+                        return;
+                    }
+                }
+            }
+
             if (cur < total) { cur++; render(); }
         });
 

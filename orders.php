@@ -1041,7 +1041,7 @@ $(document).ready(function() {
 
     function initNewOrderModalSelects() {
         const $modal = $('#newOrderModal');
-        const $dropdownParent = $modal.find('.modal-content');
+        const $dropdownParent = $modal;
 
         const $customerSelect = $modal.find('.select2-customer');
         if ($customerSelect.length) {
