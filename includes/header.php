@@ -218,7 +218,11 @@ try {
                     <span class="crm-v2-alert-dot"></span>
                 </button>
 
-                <a href="orders.php#newOrderModal" class="btn btn-sm btn-primary crm-v2-cta-new-order"><i class="fas fa-plus me-1"></i><?php echo __('new_order'); ?></a>
+                <?php if ($current_page === 'orders.php'): ?>
+                    <button type="button" class="btn btn-sm btn-primary crm-v2-cta-new-order" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-1"></i><?php echo __('new_order'); ?></button>
+                <?php else: ?>
+                    <a href="orders.php" class="btn btn-sm btn-primary crm-v2-cta-new-order"><i class="fas fa-plus me-1"></i><?php echo __('new_order'); ?></a>
+                <?php endif; ?>
 
                 <div class="dropdown me-1">
                     <button class="btn btn-outline-secondary btn-sm dropdown-toggle crm-lang-switch" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="<?php echo e(__('language_switch')); ?>">

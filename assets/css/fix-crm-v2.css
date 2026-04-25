@@ -2258,3 +2258,63 @@ html, body { font-size: 14px !important; }
   background: rgba(0,0,0,0.25) !important;
   border: 1px solid var(--b2) !important;
 }
+
+/* ===== HOTFIX 2026-04-25 ===== */
+/* 1) Global font bump (+3 až +4 px) */
+html, body { font-size: 17px !important; }
+
+h1 { font-size: 26px !important; }
+h2 { font-size: 24px !important; }
+h3 { font-size: 21px !important; }
+h4 { font-size: 19px !important; }
+h5 { font-size: 18px !important; }
+h6 { font-size: 17px !important; }
+
+p, span, label, .small, small,
+.table td, .table th,
+.form-control, .form-select,
+.btn, .nav-link, .dropdown-item,
+.badge, .navbar-brand {
+  font-size: 16px !important;
+}
+
+/* 2) Levé menu - nadpisy sekcí bíle */
+.crm-nav-group-title {
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+/* 3) Topbar Nová zakázka - klikatelnost */
+.crm-topbar-inner,
+.crm-v2-topbar .container-fluid {
+  overflow: visible !important;
+}
+
+.crm-v2-search {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.crm-navbar-actions {
+  position: relative !important;
+  z-index: 20 !important;
+}
+
+.crm-v2-cta-new-order {
+  position: relative !important;
+  z-index: 25 !important;
+  pointer-events: auto !important;
+}
+
+/* 4) Wizard modal dropdown - aby se nevykresloval mimo viditelnou část */
+.crm-wizard-modal .modal-dialog,
+.crm-wizard-modal .modal-content,
+.crm-wizard-modal .modal-body {
+  overflow: visible !important;
+}
+
+.crm-wizard-modal .select2-container,
+.crm-wizard-modal .select2-container--open,
+.crm-wizard-modal .select2-dropdown {
+  z-index: 4000 !important;
+}
