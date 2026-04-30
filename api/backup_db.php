@@ -1,12 +1,12 @@
 <?php
 ob_start();
-require_once '../includes/config.php';
-require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/functions.php';
 
 if (ob_get_length()) ob_clean();
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
+if (!isset($_SESSION['user_id']) || !hasPermission('admin_access')) {
     die(json_encode(['success' => false, 'message' => __('access_denied_msg')]));
 }
 
@@ -15,14 +15,28 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     die(json_encode(['success' => false, 'message' => __('csrf_token_invalid')]));
 }
 
-$backupDir = '../backup_db/';
+$projectRoot = realpath(__DIR__ . '/..');
+if ($projectRoot === false) {
+    echo json_encode(['success' => false, 'message' => 'Invalid project root']);
+    exit;
+}
+
+$backupDir = $projectRoot . '/backup_db';
+$persistToDisk = true;
+
 if (!is_dir($backupDir)) {
-    mkdir($backupDir, 0755, true);
+    if (!mkdir($backupDir, 0755, true) && !is_dir($backupDir)) {
+        $persistToDisk = false;
+    }
+}
+
+if (!is_writable($backupDir)) {
+    $persistToDisk = false;
 }
 
 // Generate filename
 $filename = 'backup_' . DB_NAME . '_' . date('Y-m-d_H-i-s') . '.sql';
-$filePath = $backupDir . $filename;
+$filePath = rtrim($backupDir, '/') . '/' . $filename;
 
 try {
     $tables = [];
@@ -67,10 +81,21 @@ try {
 
     $sqlScript .= "\nSET FOREIGN_KEY_CHECKS=1;";
 
-    if (file_put_contents($filePath, $sqlScript)) {
-        echo json_encode(['success' => true, 'filename' => $filename, 'path' => 'backup_db/' . $filename]);
+    if ($persistToDisk && file_put_contents($filePath, $sqlScript)) {
+        echo json_encode([
+            'success' => true,
+            'filename' => $filename,
+            'path' => 'backup_db/' . $filename,
+            'inline' => false,
+        ]);
     } else {
-        throw new Exception("Failed to write backup file");
+        echo json_encode([
+            'success' => true,
+            'filename' => $filename,
+            'inline' => true,
+            'content_base64' => base64_encode($sqlScript),
+            'message' => 'Backup directory is not writable, using direct download fallback.',
+        ]);
     }
 
 } catch (Exception $e) {

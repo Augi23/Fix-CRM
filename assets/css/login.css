@@ -228,11 +228,13 @@ body::after {
     color: #fff;
     padding-left: 16px;
     padding-right: 16px;
+    font-size: 1.08rem;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .login-form .form-control::placeholder {
     color: rgba(255, 255, 255, 0.42);
+    font-size: 1.02rem;
 }
 
 .login-form .form-control:focus {

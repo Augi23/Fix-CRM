@@ -197,7 +197,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <tr>
                             <th><?php echo __('technician'); ?></th>
                             <th class="text-center"><?php echo __('repaired_count'); ?></th>
-                            <th class="text-end">Worked</th>
+                            <th class="text-end"><?php echo __('worked'); ?></th>
                             <th class="text-end"><?php echo __('total_revenue'); ?></th>
                             <th class="text-end text-muted small"><?php echo __('parts_cost'); ?></th>
                             <th class="text-end text-muted small"><?php echo __('expenses_label'); ?></th>
@@ -232,7 +232,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <tr>
                             <td>
                                 <strong><?php echo htmlspecialchars($t['name']); ?></strong>
-                                <?php if ((int)($t['is_active'] ?? 1) !== 1): ?><span class="badge bg-secondary ms-2">inactive</span><?php endif; ?>
+                                <?php if ((int)($t['is_active'] ?? 1) !== 1): ?><span class="badge bg-secondary ms-2"><?php echo __('inactive'); ?></span><?php endif; ?>
                                 <a href="?tab=individual_stats&tech_id=<?php echo $t['id']; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>" class="ms-2 small text-primary"><i class="fas fa-external-link-alt"></i></a>
                             </td>
                             <td class="text-center">
@@ -362,7 +362,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <?php 
                             $techs_list = $pdo->query("SELECT id, name, is_active FROM technicians ORDER BY is_active DESC, name ASC")->fetchAll();
                             foreach($techs_list as $tl): ?>
-                                <option value="<?php echo $tl['id']; ?>" <?php echo $selected_tech_id == $tl['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($tl['name']); ?><?php echo ((int)($tl['is_active'] ?? 1) !== 1) ? ' (inactive)' : ''; ?></option>
+                                <option value="<?php echo $tl['id']; ?>" <?php echo $selected_tech_id == $tl['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($tl['name']); ?><?php echo ((int)($tl['is_active'] ?? 1) !== 1) ? ' (' . __('inactive') . ')' : ''; ?></option>
                             <?php endforeach; ?>
                         </select>
                     </form>
@@ -388,7 +388,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     </div>
                     <div class="col-md-3">
                         <div class="card p-3 border shadow-none text-center">
-                            <div class="small text-muted mb-1">Worked</div>
+                            <div class="small text-muted mb-1"><?php echo __('worked'); ?></div>
                             <h3 class="mb-0 text-warning"><?php echo formatWorkDuration($is['work_seconds']); ?></h3>
                         </div>
                     </div>
@@ -415,7 +415,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <tr>
                                 <th><?php echo __('order_id'); ?></th>
                                 <th><?php echo __('issue_date'); ?></th>
-                                <th>Doba</th>
+                                <th><?php echo __('duration'); ?></th>
                                 <th><?php echo __('device'); ?></th>
                                 <th><?php echo __('client'); ?></th>
                                 <th class="text-end"><?php echo __('sum'); ?></th>

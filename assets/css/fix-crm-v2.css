@@ -2074,8 +2074,8 @@ html, body { font-size: 14px !important; }
   border-bottom: 1px solid var(--b1) !important;
 }
 .crm-queue-title {
-  font-size: 13px !important;
-  font-weight: 600 !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
   color: var(--fg1) !important;
 }
 .crm-queue-date {
@@ -2259,29 +2259,106 @@ html, body { font-size: 14px !important; }
   border: 1px solid var(--b2) !important;
 }
 
-/* ===== HOTFIX 2026-04-25 ===== */
-/* 1) Global font bump (+3 až +4 px) */
-html, body { font-size: 17px !important; }
+/* ===== HOTFIX 2026-04-25 (v2) ===== */
+/* 1) Global font bump */
+html, body { font-size: 18px !important; }
 
-h1 { font-size: 26px !important; }
-h2 { font-size: 24px !important; }
-h3 { font-size: 21px !important; }
-h4 { font-size: 19px !important; }
-h5 { font-size: 18px !important; }
-h6 { font-size: 17px !important; }
+h1 { font-size: 28px !important; }
+h2 { font-size: 26px !important; }
+h3 { font-size: 23px !important; }
+h4 { font-size: 21px !important; }
+h5 { font-size: 20px !important; }
+h6 { font-size: 19px !important; }
 
 p, span, label, .small, small,
-.table td, .table th,
 .form-control, .form-select,
 .btn, .nav-link, .dropdown-item,
 .badge, .navbar-brand {
-  font-size: 16px !important;
+  font-size: 18px !important;
 }
 
-/* 2) Levé menu - nadpisy sekcí bíle */
-.crm-nav-group-title {
-  color: #ffffff !important;
+/* 2) Sidebar: větší centrované logo, oddělené skupiny, barevnější ikony */
+#sidebar .sidebar-brand {
+  text-align: center !important;
+  padding: 16px 16px 18px !important;
+}
+
+#sidebar .sidebar-logo {
+  height: 36px !important;
+  max-height: 36px !important;
+  max-width: 190px !important;
+  margin: 0 auto !important;
   opacity: 1 !important;
+}
+
+#sidebar .nav.flex-column {
+  padding: 14px 12px !important;
+}
+
+.crm-nav-group-title {
+  margin: 18px 0 8px !important;
+  padding: 0 8px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  background: linear-gradient(90deg, #8ab4ff 0%, #9c7bff 55%, #bf5af2 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  opacity: 1 !important;
+}
+
+#sidebar .nav-link {
+  color: #e6e9f2 !important;
+  font-size: 15px !important;
+  gap: 12px !important;
+}
+
+#sidebar .nav-link i,
+#sidebar .nav-link .fas,
+#sidebar .nav-link .far,
+#sidebar .nav-link .fab {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 7px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 13px !important;
+  background: rgba(94, 92, 230, 0.16) !important;
+  color: #9fb0ff !important;
+}
+
+#sidebar .nav-link:nth-of-type(4n+1) i,
+#sidebar .nav-link:nth-of-type(4n+1) .fas,
+#sidebar .nav-link:nth-of-type(4n+1) .far,
+#sidebar .nav-link:nth-of-type(4n+1) .fab {
+  background: rgba(10, 132, 255, 0.16) !important;
+  color: #8fd0ff !important;
+}
+
+#sidebar .nav-link:nth-of-type(4n+2) i,
+#sidebar .nav-link:nth-of-type(4n+2) .fas,
+#sidebar .nav-link:nth-of-type(4n+2) .far,
+#sidebar .nav-link:nth-of-type(4n+2) .fab {
+  background: rgba(94, 92, 230, 0.16) !important;
+  color: #b0a7ff !important;
+}
+
+#sidebar .nav-link:nth-of-type(4n+3) i,
+#sidebar .nav-link:nth-of-type(4n+3) .fas,
+#sidebar .nav-link:nth-of-type(4n+3) .far,
+#sidebar .nav-link:nth-of-type(4n+3) .fab {
+  background: rgba(191, 90, 242, 0.16) !important;
+  color: #e0b0ff !important;
+}
+
+#sidebar .nav-link:nth-of-type(4n+4) i,
+#sidebar .nav-link:nth-of-type(4n+4) .fas,
+#sidebar .nav-link:nth-of-type(4n+4) .far,
+#sidebar .nav-link:nth-of-type(4n+4) .fab {
+  background: rgba(52, 199, 89, 0.16) !important;
+  color: #9be8b0 !important;
 }
 
 /* 3) Topbar Nová zakázka - klikatelnost */
@@ -2306,7 +2383,29 @@ p, span, label, .small, small,
   pointer-events: auto !important;
 }
 
-/* 4) Wizard modal dropdown - aby se nevykresloval mimo viditelnou část */
+.crm-v2-cta-new-order--big {
+  font-size: 14px !important;
+  padding: 9px 18px !important;
+}
+
+.crm-topbar-cta-wrap {
+  flex-shrink: 0 !important;
+}
+
+.crm-topbar-center {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+}
+
+.crm-topbar-center .crm-v2-search {
+  margin: 0 !important;
+}
+
+/* 4) Wizard modal dropdown */
 .crm-wizard-modal .modal-dialog,
 .crm-wizard-modal .modal-content,
 .crm-wizard-modal .modal-body {
@@ -2317,4 +2416,279 @@ p, span, label, .small, small,
 .crm-wizard-modal .select2-container--open,
 .crm-wizard-modal .select2-dropdown {
   z-index: 4000 !important;
+}
+
+/* 5) Dashboard vzhled + velikosti */
+.crm-stat-card::after {
+  display: none !important;
+}
+
+.crm-stat-card::before {
+  z-index: 2 !important;
+  height: 2px !important;
+  opacity: 1 !important;
+}
+
+.crm-stat-label,
+.crm-revenue-label,
+.crm-queue-title,
+.card .card-header h5 {
+  font-size: 14px !important;
+  letter-spacing: 0.06em !important;
+}
+
+/* horní zakroužkovaná čísla mají být jasně bílá */
+.crm-stat-value {
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  -webkit-text-fill-color: #ffffff !important;
+  color: #ffffff !important;
+  font-size: 34px !important;
+}
+
+.crm-stat-sub { font-size: 14px !important; }
+
+/* střední tabulka (dashboard) */
+.dashboard-main-row .table thead th,
+.dashboard-main-row .table thead tr th {
+  font-size: 13px !important;
+  color: #a9b6d7 !important;
+  padding: 12px 18px !important;
+}
+
+.dashboard-main-row .table tbody td {
+  font-size: 16px !important;
+  padding: 14px 18px !important;
+}
+
+@media (min-width: 1200px) {
+  .dashboard-main-row .table thead th,
+  .dashboard-main-row .table thead tr th {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  .dashboard-main-row .table tbody td {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+}
+
+.dashboard-main-row .table tbody td:first-child a {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+
+.dashboard-main-row .table tbody td strong {
+  font-size: 17px !important;
+  font-weight: 600 !important;
+}
+
+.dashboard-main-row .table tbody td small,
+.dashboard-main-row .table tbody td .text-white-75 {
+  font-size: 14px !important;
+}
+
+/* model zařízení větší */
+.dashboard-main-row .table tbody td:nth-child(3) strong {
+  font-size: 18px !important;
+}
+
+.dashboard-main-row .table tbody td:nth-child(3) .text-white-75 {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  color: #c8d2e9 !important;
+}
+
+/* technik jako samostatný sloupec */
+.dashboard-tech-name {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 14px !important;
+  color: #bcc8e1 !important;
+  white-space: nowrap !important;
+}
+
+/* stavy zakázky lehce menší */
+.dashboard-main-row .table tbody td:nth-child(6) .badge {
+  font-size: 14px !important;
+  padding: 6px 10px !important;
+  line-height: 1.1 !important;
+}
+
+/* pravý sloupec */
+.crm-queue-name {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+.crm-queue-device {
+  font-size: 13px !important;
+  color: #acb6cc !important;
+}
+
+/* IMEI badge v headeru byl odebrán dle požadavku */
+
+/* větší oddělení mezi IMEI a Fronta dnes */
+.imei-check-card + .crm-queue-card {
+  margin-top: 28px !important;
+}
+
+/* revenue chart přes celou šířku karty */
+.crm-revenue-chart {
+  width: 100% !important;
+}
+
+/* 6) Statusy zakázek – sladěné s referenčním vizuálem */
+.badge {
+  border: 1px solid transparent !important;
+  font-weight: 600 !important;
+}
+
+.status-pill {
+  border-radius: 10px !important;
+  padding: 6px 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.status-pill::before {
+  content: '' !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 999px !important;
+  background: currentColor !important;
+  opacity: 0.9 !important;
+  box-shadow: 0 0 6px currentColor !important;
+}
+
+/* odstíny nasáté z referenčního vizuálu (2. obrázek, sampled) */
+.status-pill--new {
+  background: #0d2041 !important;
+  border-color: #2b79e6 !important;
+  color: #0082ff !important;
+}
+
+.status-pill--pending {
+  background: #0d2041 !important;
+  border-color: #2b79e6 !important;
+  color: #0082ff !important;
+}
+
+.status-pill--progress {
+  background: #1f123e !important;
+  border-color: #7b49ff !important;
+  color: #6530fe !important;
+}
+
+.status-pill--waiting {
+  background: #3a2409 !important;
+  border-color: #d78617 !important;
+  color: #ff9b00 !important;
+}
+
+.status-pill--completed {
+  background: #123224 !important;
+  border-color: #2d9c5b !important;
+  color: #2cc85c !important;
+}
+
+.status-pill--collected {
+  background: #2b2736 !important;
+  border-color: #6a6678 !important;
+  color: #a5a2b4 !important;
+}
+
+.status-pill--cancelled {
+  background: #3d1222 !important;
+  border-color: #cf3a5d !important;
+  color: #ff3255 !important;
+}
+
+.status-pill--default {
+  background: #2b2736 !important;
+  border-color: #6a6678 !important;
+  color: #a5a2b4 !important;
+}
+
+/* 7) Zakázky: stejné formátování střední tabulky jako na Nástěnce */
+.orders-center-table thead th,
+.orders-center-table thead tr th {
+  font-size: 13px !important;
+  color: #a9b6d7 !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+.orders-center-table tbody td {
+  font-size: 16px !important;
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+}
+
+.orders-center-table tbody td:first-child a {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+
+.orders-center-table tbody td strong,
+.orders-center-table tbody td .fw-medium {
+  font-size: 17px !important;
+  font-weight: 600 !important;
+}
+
+.orders-center-table tbody td small,
+.orders-center-table tbody td .text-white-75,
+.orders-center-table tbody td .small {
+  font-size: 14px !important;
+}
+
+.orders-center-table tbody td:nth-child(3) .text-white-75 {
+  font-size: 15px !important;
+  color: #c8d2e9 !important;
+}
+
+.orders-center-table tbody td:nth-child(5) .badge {
+  font-size: 14px !important;
+  line-height: 1.1 !important;
+}
+
+/* sjednocení velikosti telefonu Nástěnka + Zakázky */
+.crm-phone-text {
+  font-size: 14px !important;
+  color: var(--fg3) !important;
+  font-weight: 500 !important;
+}
+
+/* Zakázky: lepší viditelnost dropdown menu akcí */
+.orders-table-wrap,
+.orders-table-wrap .table,
+.orders-table-wrap tbody,
+.orders-table-wrap tr,
+.orders-table-wrap td {
+  overflow: visible !important;
+}
+
+.orders-center-table .dropdown-menu {
+  min-width: 220px !important;
+  background: #151934 !important;
+  border: 1px solid rgba(129, 102, 255, 0.45) !important;
+  box-shadow: 0 20px 42px rgba(0,0,0,0.55), 0 0 0 1px rgba(129,102,255,0.20) inset !important;
+  z-index: 5005 !important;
+}
+
+.orders-center-table .dropdown-item {
+  color: #e8edff !important;
+  font-weight: 500 !important;
+}
+
+.orders-center-table .dropdown-item i {
+  opacity: 1 !important;
 }

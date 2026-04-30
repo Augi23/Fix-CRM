@@ -84,7 +84,7 @@ if (isset($pdo)) {
                         <th>ID</th>
                         <th><?php echo __('name_col'); ?></th>
                         <th><?php echo __('phone'); ?></th>
-                        <th>Email</th>
+                        <th><?php echo __('email'); ?></th>
                         <th><?php echo __('address'); ?></th>
                         <th><?php echo __('orders'); ?></th>
                         <th><?php echo __('actions'); ?></th>
@@ -314,7 +314,7 @@ function showCustomerOrders(id, name) {
                             <input type="tel" name="phone" class="form-control" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Email</label>
+                            <label class="form-label"><?php echo __('email'); ?></label>
                             <input type="email" name="email" class="form-control">
                         </div>
                         <div class="col-12">

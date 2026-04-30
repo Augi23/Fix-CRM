@@ -181,7 +181,7 @@ function getOrderStatusAliases(): array {
         'new' => ['New', 'Новый', 'Nová'],
         'pending_approval' => ['Pending Approval', 'На согласовании', 'K odsouhlasení', 'Čeká na schválení'],
         'in_progress' => ['In Progress', 'В работе', 'V práci', 'V procesu', 'Provádí se'],
-        'waiting_parts' => ['Waiting for Parts', 'Ожидание запчастей', 'Čeká na díly'],
+        'waiting_parts' => ['Waiting for Parts', 'Ожидание запчастей', 'Čeká na díly', 'Čeká na díl', 'Ceka na dil', 'Čeká na diel'],
         'completed' => ['Completed', 'Готов', 'Hotovo'],
         'collected' => ['Collected', 'Выдан', 'Vydáno'],
         'cancelled' => ['Cancelled', 'Отменен', 'Zrušeno'],
@@ -203,36 +203,39 @@ function getStatusBadge($status) {
         case 'New':
         case 'Новый':
         case 'Nová':
-            return '<span class="badge bg-primary">'.__('new').'</span>';
+            return '<span class="badge status-pill status-pill--new">'.__('new').'</span>';
         case 'Pending Approval':
         case 'На согласовании':
         case 'K odsouhlasení':
         case 'Čeká na schválení':
-            return '<span class="badge bg-info text-dark">'.__('pending_approval').'</span>';
+            return '<span class="badge status-pill status-pill--pending">'.__('pending_approval').'</span>';
         case 'In Progress':
         case 'В работе':
         case 'V práci':
         case 'V procesu':
         case 'Provádí se':
-            return '<span class="badge bg-warning">'.__('in_progress').'</span>';
+            return '<span class="badge status-pill status-pill--progress">'.__('in_progress').'</span>';
         case 'Waiting for Parts':
         case 'Ожидание запчастей':
         case 'Čeká na díly':
-            return '<span class="badge bg-secondary">'.__('waiting_parts').'</span>';
+        case 'Čeká na díl':
+        case 'Ceka na dil':
+        case 'Čeká na diel':
+            return '<span class="badge status-pill status-pill--waiting">'.__('waiting_parts').'</span>';
         case 'Completed':
         case 'Готов':
         case 'Hotovo':
-            return '<span class="badge bg-success">'.__('status_completed').'</span>';
+            return '<span class="badge status-pill status-pill--completed">'.__('status_completed').'</span>';
         case 'Collected':
         case 'Выдан':
         case 'Vydáno':
-            return '<span class="badge bg-info text-dark">'.__('status_collected').'</span>';
+            return '<span class="badge status-pill status-pill--collected">'.__('status_collected').'</span>';
         case 'Cancelled':
         case 'Отменен':
         case 'Zrušeno':
-            return '<span class="badge bg-danger">'.__('status_cancelled').'</span>';
+            return '<span class="badge status-pill status-pill--cancelled">'.__('status_cancelled').'</span>';
         default:
-            return '<span class="badge bg-dark">' . $status . '</span>';
+            return '<span class="badge status-pill status-pill--default">' . $status . '</span>';
     }
 }
 
@@ -524,10 +527,23 @@ function runGitCommand(string $repoRoot, string $command, ?int &$exitCode = null
     return trim(implode("\n", $output));
 }
 
-function gitRemoteSlug(string $repoRoot): ?string {
+function gitRemoteUrl(string $repoRoot, string $remoteName = 'origin'): ?string {
+    $remoteName = trim($remoteName);
+    if (!preg_match('/^[A-Za-z0-9_.-]+$/', $remoteName)) {
+        $remoteName = 'origin';
+    }
+
     $code = 0;
-    $url = runGitCommand($repoRoot, 'config --get remote.origin.url', $code);
+    $url = runGitCommand($repoRoot, 'config --get remote.' . $remoteName . '.url', $code);
     if ($code !== 0 || $url === '') {
+        return null;
+    }
+    return trim($url);
+}
+
+function gitRemoteSlugFromUrl(?string $url): ?string {
+    $url = trim((string)$url);
+    if ($url === '') {
         return null;
     }
     if (preg_match('~github\.com[:/](.+?)(?:\.git)?$~', $url, $m)) {
@@ -536,8 +552,15 @@ function gitRemoteSlug(string $repoRoot): ?string {
     return null;
 }
 
+function gitRemoteSlug(string $repoRoot): ?string {
+    return gitRemoteSlugFromUrl(gitRemoteUrl($repoRoot, 'origin'));
+}
+
 function getGitRepoInfo(string $repoRoot): array {
     $repoRoot = rtrim($repoRoot, '/');
+    $remoteName = 'origin';
+    $remoteUrl = gitRemoteUrl($repoRoot, $remoteName);
+
     $info = [
         'repo_root' => $repoRoot,
         'branch' => 'unknown',
@@ -545,6 +568,8 @@ function getGitRepoInfo(string $repoRoot): array {
         'local_short' => '',
         'local_date' => '',
         'dirty' => false,
+        'remote_name' => $remoteName,
+        'remote_url' => $remoteUrl,
         'remote_commit' => '',
         'remote_short' => '',
         'remote_date' => '',
@@ -552,7 +577,7 @@ function getGitRepoInfo(string $repoRoot): array {
         'behind_by' => null,
         'update_available' => null,
         'changelog' => [],
-        'remote_slug' => gitRemoteSlug($repoRoot),
+        'remote_slug' => gitRemoteSlugFromUrl($remoteUrl),
         'error' => null,
     ];
 
@@ -581,47 +606,59 @@ function getGitRepoInfo(string $repoRoot): array {
     $dirty = runGitCommand($repoRoot, 'status --porcelain', $code);
     $info['dirty'] = ($code === 0 && $dirty !== '');
 
-    $remoteSlug = $info['remote_slug'];
-    if ($remoteSlug) {
-        $remoteUrl = 'https://github.com/' . $remoteSlug . '.git';
-        $fetchCode = 0;
-        $remoteBranch = $branch !== '' ? $branch : 'main';
-        runGitCommand($repoRoot, 'fetch --quiet ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($remoteBranch), $fetchCode);
-        if ($fetchCode === 0) {
+    $remoteName = $info['remote_name'] ?: 'origin';
+    $remoteBranch = $branch !== '' ? $branch : 'main';
+    $fetchCode = 0;
+    runGitCommand($repoRoot, 'fetch --quiet ' . escapeshellarg($remoteName) . ' ' . escapeshellarg($remoteBranch), $fetchCode);
+
+    if ($fetchCode === 0) {
+        $remoteRef = $remoteName . '/' . $remoteBranch;
+
+        $remote = runGitCommand($repoRoot, 'rev-parse ' . escapeshellarg($remoteRef), $code);
+        if ($code !== 0 || $remote === '') {
             $remote = runGitCommand($repoRoot, 'rev-parse FETCH_HEAD', $code);
-            if ($code === 0 && $remote !== '') {
-                $info['remote_commit'] = $remote;
-                $info['remote_short'] = substr($remote, 0, 7);
-            }
+        }
+
+        if ($code === 0 && $remote !== '') {
+            $info['remote_commit'] = $remote;
+            $info['remote_short'] = substr($remote, 0, 7);
+        }
+
+        $remoteDate = runGitCommand($repoRoot, 'show -s --format=%cI ' . escapeshellarg($remoteRef), $code);
+        if ($code !== 0 || $remoteDate === '') {
             $remoteDate = runGitCommand($repoRoot, 'show -s --format=%cI FETCH_HEAD', $code);
-            if ($code === 0 && $remoteDate !== '') {
-                $info['remote_date'] = $remoteDate;
-            }
+        }
+        if ($code === 0 && $remoteDate !== '') {
+            $info['remote_date'] = $remoteDate;
+        }
+
+        $counts = runGitCommand($repoRoot, 'rev-list --left-right --count HEAD...' . escapeshellarg($remoteRef), $code);
+        if ($code !== 0 || !preg_match('/^(\d+)\s+(\d+)$/', $counts, $m)) {
             $counts = runGitCommand($repoRoot, 'rev-list --left-right --count HEAD...FETCH_HEAD', $code);
-            if ($code === 0 && preg_match('/^(\d+)\s+(\d+)$/', $counts, $m)) {
-                $info['ahead_by'] = (int)$m[1];
-                $info['behind_by'] = (int)$m[2];
-                $info['update_available'] = ((int)$m[2]) > 0;
-            }
-            $log = runGitCommand($repoRoot, "log --format='%H|%h|%cI|%s' -n 8 HEAD", $code);
-            if ($code === 0 && $log !== '') {
-                foreach (explode("\n", $log) as $row) {
-                    $parts = explode('|', $row, 4);
-                    if (count($parts) === 4) {
-                        $info['changelog'][] = [
-                            'hash' => $parts[0],
-                            'short' => $parts[1],
-                            'date' => $parts[2],
-                            'message' => $parts[3],
-                        ];
-                    }
+        }
+        if ($code === 0 && preg_match('/^(\d+)\s+(\d+)$/', $counts, $m)) {
+            $info['ahead_by'] = (int)$m[1];
+            $info['behind_by'] = (int)$m[2];
+            $info['update_available'] = ((int)$m[2]) > 0;
+        }
+
+        $log = runGitCommand($repoRoot, "log --format='%H|%h|%cI|%an|%s' -n 8 HEAD", $code);
+        if ($code === 0 && $log !== '') {
+            foreach (explode("\n", $log) as $row) {
+                $parts = explode('|', $row, 5);
+                if (count($parts) === 5) {
+                    $info['changelog'][] = [
+                        'hash' => $parts[0],
+                        'short' => $parts[1],
+                        'date' => $parts[2],
+                        'author' => $parts[3],
+                        'message' => $parts[4],
+                    ];
                 }
             }
-        } else {
-            $info['error'] = $fetchCode === 128 ? 'GitHub access denied or repository unavailable' : 'Git fetch failed';
         }
     } else {
-        $info['error'] = 'Origin remote is not a GitHub repository';
+        $info['error'] = $fetchCode === 128 ? 'Git access denied or repository unavailable' : 'Git fetch failed';
     }
 
     return $info;

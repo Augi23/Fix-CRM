@@ -235,8 +235,8 @@ if (isset($pdo)) {
 
 <div class="card glass-card shadow-sm border-0">
     <div class="card-body p-0">
-        <div class="table-responsive" style="max-height: 700px; overflow-y: auto;">
-            <table class="table table-hover align-middle mb-0">
+        <div class="table-responsive orders-table-wrap">
+            <table class="table table-hover align-middle mb-0 orders-center-table">
                 <thead class="bg-transparent sticky-top" style="z-index: 10;">
                     <tr>
                         <th class="ps-4">ID / <?php echo __('created'); ?></th>
@@ -277,14 +277,14 @@ if (isset($pdo)) {
                                 <div><?php echo e($order['first_name'] . ' ' . $order['last_name']); ?></div>
                                 <?php if($client_phone): ?>
                                     <?php if ($phone_clean !== ''): ?>
-                                    <a class="phone-qr-trigger small text-white-75 text-decoration-none"
+                                    <a class="phone-qr-trigger small text-white-75 text-decoration-none crm-phone-text"
                                        href="tel:<?php echo e($phone_clean); ?>"
                                        data-phone="<?php echo e($phone_clean); ?>"
                                        onclick="event.stopPropagation();">
                                         <i class="fas fa-phone me-1 text-success"></i><?php echo e($client_phone); ?>
                                     </a>
                                     <?php else: ?>
-                                    <div class="small text-white-75">
+                                    <div class="small text-white-75 crm-phone-text">
                                         <i class="fas fa-phone me-1 text-success"></i><?php echo e($client_phone); ?>
                                     </div>
                                     <?php endif; ?>
@@ -336,9 +336,9 @@ if (isset($pdo)) {
                                     );
                                 ?>
                                 <?php // inline quick-status buttons removed; using dropdown only ?>
-                                <div class="btn-group btn-group-sm shadow-sm dropup">
+                                <div class="btn-group btn-group-sm shadow-sm">
                                     <?php if ($show_quick): ?>
-                                    <div class="dropdown dropup">
+                                    <div class="dropdown">
                                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" title="<?php echo __('quick_status'); ?>">
                                             <i class="fas fa-bolt text-primary"></i>
                                         </button>
@@ -356,7 +356,7 @@ if (isset($pdo)) {
                                         </ul>
                                     </div>
                                     <?php endif; ?>
-                                    <div class="dropdown dropup">
+                                    <div class="dropdown">
                                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" title="<?php echo __('print'); ?>">
                                             <i class="fas fa-print text-white-75"></i>
                                         </button>
@@ -500,289 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<!-- New Order Modal -->
-<div class="modal fade crm-wizard-modal" id="newOrderModal" tabindex="-1" data-bs-focus="false">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content glass-card border-secondary text-white shadow-lg">
-            <form action="api/add_order.php" method="POST" enctype="multipart/form-data" id="newOrderForm">
-                <?php echo csrfField(); ?>
-                <div class="modal-header bg-transparent border-secondary py-3">
-                    <div class="w-100">
-                        <h5 class="modal-title crm-grad-text mb-1">Nová zakázka</h5>
-                        <div class="crm-wizard-step-label">Krok <span data-wizard-current>1</span> ze 3</div>
-                    </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="crm-wizard-progress">
-                        <div class="crm-wizard-seg" data-seg="1"></div>
-                        <div class="crm-wizard-seg" data-seg="2"></div>
-                        <div class="crm-wizard-seg" data-seg="3"></div>
-                    </div>
-                    <div class="crm-wizard-step" data-step="1">
-                    <!-- ═══ 1. KLIENT ═══ -->
-                    <div class="mb-2">
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="fas fa-user text-primary me-2"></i>
-                            <span class="fw-semibold small text-uppercase"><?php echo __('client'); ?></span>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <select name="customer_id" class="form-select select2-customer" style="width: 100%;" required>
-                                    <option value=""><?php echo __('enter_name_or_phone'); ?></option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 d-flex align-items-end">
-                                <button type="button" class="btn btn-outline-secondary w-100" id="toggleNewCustomerPanelBtn" data-bs-toggle="collapse" data-bs-target="#inlineNewCustomerPanel" aria-expanded="false">
-                                    <i class="fas fa-user-plus me-1"></i> <?php echo __('new_customer_btn'); ?>
-                                </button>
-                            </div>
-                            <!-- Inline New Customer Panel (collapsible, inside the same modal) -->
-                            <div class="col-12">
-                                <div class="collapse" id="inlineNewCustomerPanel">
-                                    <div class="card border-secondary bg-dark bg-opacity-25 mt-2">
-                                        <div class="card-body">
-                                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <h6 class="mb-0 text-white"><i class="fas fa-user-plus me-2 text-primary"></i><?php echo __('add_customer'); ?></h6>
-                                                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#inlineNewCustomerPanel">
-                                                    <i class="fas fa-times"></i>
-                                                </button>
-                                            </div>
-                                            <div id="newCustomerInlineForm">
-                                                <div class="mb-3">
-                                                    <div class="btn-group w-100" role="group">
-                                                        <input type="radio" class="btn-check" name="customer_type" id="inline_type_private" value="private" checked>
-                                                        <label class="btn btn-outline-primary" for="inline_type_private"><?php echo __('private_person'); ?></label>
-                                                        <input type="radio" class="btn-check" name="customer_type" id="inline_type_company" value="company">
-                                                        <label class="btn btn-outline-primary" for="inline_type_company"><?php echo __('company_entity'); ?></label>
-                                                    </div>
-                                                </div>
-                                                <div id="inline_company_fields" class="d-none border border-secondary p-3 rounded bg-transparent mb-3">
-                                                    <div class="mb-3">
-                                                        <label class="form-label"><?php echo __('ico'); ?></label>
-                                                        <div class="input-group">
-                                                            <input type="text" name="ico" id="inline_ico_input" class="form-control" placeholder="12345678">
-                                                            <button class="btn btn-info text-white" type="button" id="inline_btn_fetch_ares">
-                                                                <i class="fas fa-search me-1"></i> <?php echo __('fetch_ares'); ?>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label"><?php echo __('company_name'); ?></label>
-                                                        <input type="text" name="company_name" id="inline_ares_name" class="form-control">
-                                                    </div>
-                                                </div>
-                                                <div class="row g-3">
-                                                    <div class="col-md-6">
-                                                        <label class="form-label"><?php echo __('client'); ?> (<?php echo __('name_col'); ?>)</label>
-                                                        <input type="text" name="first_name" id="inline_first_name" class="form-control">
-                                                    </div>
-                                                    <div class="col-md-6">
-                                                        <label class="form-label"><?php echo __('client'); ?> (<?php echo __('last_name_label'); ?>)</label>
-                                                        <input type="text" name="last_name" id="inline_last_name" class="form-control">
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <label class="form-label"><?php echo __('phone'); ?></label>
-                                                        <input type="tel" name="phone" id="inline_phone" class="form-control">
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <label class="form-label">Email</label>
-                                                        <input type="email" name="inline_email" class="form-control">
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <label class="form-label"><?php echo __('address'); ?></label>
-                                                        <textarea name="address" id="inline_address" class="form-control" rows="2"></textarea>
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <button type="button" class="btn btn-success w-100" id="saveNewCustomerBtn">
-                                                            <i class="fas fa-check me-2"></i><?php echo __('save'); ?>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    </div><!-- /step 1 -->
-                    <div class="crm-wizard-step" data-step="2" hidden>
-                    <!-- ═══ 2. ZAŘÍZENÍ ═══ -->
-                    <div class="mb-2">
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="fas fa-laptop text-info me-2"></i>
-                            <span class="fw-semibold small text-uppercase"><?php echo __('section_device'); ?></span>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-12 col-sm-6 col-md-3">
-                                <label class="form-label"><?php echo __('device_type'); ?></label>
-                                <select name="device_type" class="form-select select2-device-type" style="width: 100%;" required>
-                                    <option value="Phone">📱 <?php echo __('Phone'); ?></option>
-                                    <option value="Notebook">💻 <?php echo __('Notebook'); ?></option>
-                                    <option value="PC">🖥️ <?php echo __('PC'); ?></option>
-                                    <option value="Tablet">📟 <?php echo __('Tablet'); ?></option>
-                                    <option value="HDD">💾 <?php echo __('HDD'); ?></option>
-                                    <option value="Other">❓ <?php echo __('Other'); ?></option>
-                                </select>
-                            </div>
-                            <div class="col-12 col-sm-6 col-md-3">
-                                <label class="form-label"><?php echo __('warranty_type'); ?></label>
-                                <select name="order_type" class="form-select select2-order-type" style="width: 100%;" required>
-                                    <option value="Non-Warranty">🛠 <?php echo __('warranty_no'); ?></option>
-                                    <option value="Warranty">📜 <?php echo __('warranty_yes'); ?></option>
-                                </select>
-                            </div>
-                            <div class="col-12 col-sm-6 col-md-3">
-                                <label class="form-label"><?php echo __('device_brand'); ?></label>
-                                <select name="device_brand" class="form-select select2-brand" style="width: 100%;" required>
-                                    <option value=""><?php echo __('brand_placeholder'); ?></option>
-                                    <?php foreach(getDeviceBrands() as $brand): ?>
-                                        <option value="<?php echo $brand; ?>"><?php echo $brand; ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-12 col-sm-6 col-md-3">
-                                <label class="form-label"><?php echo __('device_model'); ?></label>
-                                <input type="text" name="device_model" class="form-control" placeholder="<?php echo __('model_placeholder'); ?>" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label"><?php echo __('serial'); ?></label>
-                                <input type="text" name="serial_number" class="form-control">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label"><?php echo __('serial_2'); ?></label>
-                                <input type="text" name="serial_number_2" class="form-control">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label"><?php echo __('pin'); ?></label>
-                                <input type="text" name="pin_code" class="form-control">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label"><?php echo __('appearance'); ?></label>
-                                <input type="text" name="appearance" class="form-control">
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr class="border-secondary my-3 opacity-50">
-
-                    <!-- ═══ 3. ПРОБЛЕМА ═══ -->
-                    <div class="mb-2">
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
-                            <span class="fw-semibold small text-uppercase"><?php echo __('section_problem'); ?></span>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label"><?php echo __('priority'); ?></label>
-                                <div class="form-check mt-2">
-                                    <input class="form-check-input" type="checkbox" name="priority" value="High" id="priorityHighOrders">
-                                    <label class="form-check-label" for="priorityHighOrders"><?php echo __('high'); ?></label>
-                                </div>
-                            </div>
-                            <?php if (!empty($order_templates)): ?>
-                            <div class="col-md-<?php echo !empty($order_note_templates) ? '4' : '9'; ?>">
-                                <label class="form-label"><?php echo __('templates'); ?></label>
-                                <select class="form-select order-template-select" data-target="problem_description">
-                                    <option value=""><?php echo __('template_select'); ?></option>
-                                    <?php foreach ($order_templates as $tpl): ?>
-                                        <option value="<?php echo e($tpl); ?>"><?php echo e($tpl); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <?php endif; ?>
-                            <?php if (!empty($order_note_templates)): ?>
-                            <div class="col-md-<?php echo !empty($order_templates) ? '5' : '9'; ?>">
-                                <label class="form-label"><?php echo __('templates_notes'); ?></label>
-                                <select class="form-select order-template-select" data-target="technician_notes">
-                                    <option value=""><?php echo __('template_select'); ?></option>
-                                    <?php foreach ($order_note_templates as $tpl): ?>
-                                        <option value="<?php echo e($tpl); ?>"><?php echo e($tpl); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <?php endif; ?>
-                            <div class="col-12">
-                                <label class="form-label"><?php echo __('problem'); ?></label>
-                                <textarea name="problem_description" class="form-control" rows="2" required></textarea>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label"><?php echo __('notes'); ?> <?php echo __('comment_suffix'); ?></label>
-                                <textarea name="technician_notes" class="form-control" rows="2" placeholder="<?php echo __('notes_placeholder'); ?>"></textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    </div><!-- /step 2 -->
-                    <div class="crm-wizard-step" data-step="3" hidden>
-                    <div class="crm-wizard-summary">
-                        <div class="crm-wizard-summary-label">Přehled zakázky</div>
-                        <div class="crm-wizard-summary-grid">
-                            <div><span>Zákazník:</span> <strong data-summary="customer">—</strong></div>
-                            <div><span>Zařízení:</span> <strong data-summary="device">—</strong></div>
-                            <div><span>Typ opravy:</span> <strong data-summary="service">—</strong></div>
-                            <div><span>Priorita:</span> <strong data-summary="priority">Normální</strong></div>
-                        </div>
-                    </div>
-                    <!-- ═══ 3. FINANCE / PŘIŘAZENÍ ═══ -->
-                    <div class="mb-2">
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="fas fa-coins text-success me-2"></i>
-                            <span class="fw-semibold small text-uppercase"><?php echo __('section_financial'); ?></span>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label"><?php echo __('cost_est'); ?></label>
-                                <div class="input-group">
-                                    <input type="number" name="estimated_cost" class="form-control" step="0.01">
-                                    <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr class="border-secondary my-3 opacity-50">
-
-                    <!-- ═══ 5. ИСПОЛНИТЕЛЬ ═══ -->
-                    <div class="mb-0">
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="fas fa-user-cog text-secondary me-2"></i>
-                            <span class="fw-semibold small text-uppercase"><?php echo __('section_execution'); ?></span>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label"><?php echo __('technician'); ?></label>
-                                <select name="technician_id" class="form-select">
-                                    <option value="">-- <?php echo __('technician'); ?> --</option>
-                                    <?php
-                                    // FIX #5: use pre-loaded $techs_list instead of re-querying
-                                    foreach ($techs_list as $t): ?>
-                                        <option value="<?php echo (int)$t['id']; ?>" <?php echo (($_SESSION['role'] ?? '') !== 'admin' && $t['id'] == ($_SESSION['tech_id'] ?? 0)) ? 'selected' : ''; ?>><?php echo e($t['name']); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label"><?php echo __('media_files'); ?></label>
-                                <input type="file" name="files[]" class="form-control" multiple accept="image/*,video/*">
-                                <div class="form-text"><?php echo __('upload_multiple_hint'); ?></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                    </div><!-- /step 3 -->
-                </div>
-                <div class="modal-footer bg-transparent border-secondary crm-wizard-footer">
-                    <button type="button" class="btn btn-secondary" data-wizard-prev hidden>← Zpět</button>
-                    <button type="button" class="btn btn-primary" data-wizard-next>Pokračovat →</button>
-                    <button type="submit" class="btn btn-primary" data-wizard-submit hidden>Vytvořit zakázku</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
+<!-- New Order Modal moved to includes/modals/new_order_modal.php and included via footer.php -->
 
 <!-- Quick View & Edit Modal -->
 <div class="modal fade" id="quickOrderModal" tabindex="-1" data-bs-focus="false">
@@ -1028,106 +746,7 @@ $(document).ready(function() {
         });
     });
 
-    let currentCustomerSearch = '';
-    function escapeHtml(text) {
-        return $('<div>').text(text).html();
-    }
-    function highlightMatch(text, term) {
-        if (!term) return escapeHtml(text);
-        const safe = escapeHtml(text);
-        const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
-        return safe.replace(re, '<span class="match">$1</span>');
-    }
-
-    function initNewOrderModalSelects() {
-        const $modal = $('#newOrderModal');
-        const $dropdownParent = $modal;
-
-        const $customerSelect = $modal.find('.select2-customer');
-        if ($customerSelect.length) {
-            if ($customerSelect.data('select2')) {
-                $customerSelect.select2('destroy');
-            }
-
-            $customerSelect.select2({
-                dropdownParent: $dropdownParent,
-                width: '100%',
-                placeholder: "<?php echo __('search_client_placeholder'); ?>",
-                allowClear: true,
-                minimumInputLength: 0,
-                ajax: {
-                    url: 'api/search_customers.php',
-                    dataType: 'json',
-                    delay: 250,
-                    data: function(params) {
-                        currentCustomerSearch = params.term || '';
-                        return { q: params.term, page: params.page || 1 };
-                    },
-                    processResults: function(data, params) {
-                        params.page = params.page || 1;
-                        return { results: data.results, pagination: { more: data.pagination.more } };
-                    }
-                },
-                templateResult: function(item) {
-                    if (item.loading) return item.text;
-                    const name = item.name || item.text || '';
-                    const phone = item.phone || '';
-                    const title = highlightMatch(name, currentCustomerSearch);
-                    const meta = phone ? '<span class="meta">' + highlightMatch(phone, currentCustomerSearch) + '</span>' : '';
-                    return $('<div class="customer-option"><div>' + title + '</div>' + meta + '</div>');
-                },
-                templateSelection: function(item) {
-                    return item.text || item.name || '';
-                },
-                escapeMarkup: function(markup) { return markup; }
-            });
-        }
-
-        const $brandSelect = $modal.find('.select2-brand');
-        if ($brandSelect.length) {
-            if ($brandSelect.data('select2')) {
-                $brandSelect.select2('destroy');
-            }
-
-            $brandSelect.select2({
-                dropdownParent: $dropdownParent,
-                width: '100%',
-                placeholder: "<?php echo __('brand'); ?>",
-                tags: true,
-                dropdownAutoWidth: false
-            });
-        }
-
-        const $deviceTypeSelect = $modal.find('.select2-device-type');
-        if ($deviceTypeSelect.length) {
-            if ($deviceTypeSelect.data('select2')) {
-                $deviceTypeSelect.select2('destroy');
-            }
-
-            $deviceTypeSelect.select2({
-                dropdownParent: $dropdownParent,
-                width: '100%',
-                minimumResultsForSearch: Infinity,
-                dropdownAutoWidth: false
-            });
-        }
-
-        const $orderTypeSelect = $modal.find('.select2-order-type');
-        if ($orderTypeSelect.length) {
-            if ($orderTypeSelect.data('select2')) {
-                $orderTypeSelect.select2('destroy');
-            }
-
-            $orderTypeSelect.select2({
-                dropdownParent: $dropdownParent,
-                width: '100%',
-                minimumResultsForSearch: Infinity,
-                dropdownAutoWidth: false
-            });
-        }
-    }
-
-    $('#newOrderModal').on('shown.bs.modal', initNewOrderModalSelects);
+    // (Helpers moved to main.js)
 
     $('.order-template-select').on('change', function() {
         const value = $(this).val();

@@ -68,19 +68,19 @@ foreach ($requests as $request) {
 
 function procurementPriorityLabel(string $priority): string {
     return match ($priority) {
-        'today' => 'Today',
-        'this_week' => 'This week',
-        'later' => 'Later',
+        'today' => __('today_priority'),
+        'this_week' => __('this_week_priority'),
+        'later' => __('later_priority'),
         default => $priority,
     };
 }
 
 function procurementStatusLabel(string $status): string {
     return match ($status) {
-        'pending' => 'Pending',
-        'ordered' => 'Ordered',
-        'received' => 'Received',
-        'cancelled' => 'Cancelled',
+        'pending' => __('pending_status'),
+        'ordered' => __('ordered_status'),
+        'received' => __('received_status'),
+        'cancelled' => __('cancelled_status_proc'),
         default => $status,
     };
 }
@@ -111,24 +111,24 @@ $can_add_procurement = $can_manage_procurement || (($_SESSION['role'] ?? '') ===
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
-        <h2 class="mb-1">Procurement Queue</h2>
-        <div class="text-white-75 small">All part requests in one place. A technician adds requests from orders, then purchasing handles supplier ordering.</div>
+        <h2 class="mb-1"><?php echo __('procurement_queue'); ?></h2>
+        <div class="text-white-75 small"><?php echo __('proc_desc'); ?></div>
     </div>
     <div class="d-flex gap-2">
         <?php if ($can_add_procurement): ?>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestModal">
-            <i class="fas fa-plus me-2"></i>Add request
+            <i class="fas fa-plus me-2"></i><?php echo __('add_btn_proc'); ?>
         </button>
         <?php endif; ?>
-        <a href="orders.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Back to orders</a>
+        <a href="orders.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i><?php echo __('back_to_orders'); ?></a>
     </div>
 </div>
 
 <?php if ($selectedOrderId > 0 && !empty($pendingOrders)): ?>
     <div class="alert alert-info border-0 shadow-sm mb-4">
-        <div class="fw-bold">Request linked to order #<?php echo $selectedOrderId; ?></div>
+        <div class="fw-bold"><?php echo __('linked_to_order'); ?><?php echo $selectedOrderId; ?></div>
         <?php foreach ($pendingOrders as $order): ?>
-            <div class="small text-dark-emphasis">Order: <?php echo htmlspecialchars(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? '')); ?></div>
+            <div class="small text-dark-emphasis"><?php echo __('order_col'); ?>: <?php echo htmlspecialchars(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? '')); ?></div>
         <?php endforeach; ?>
     </div>
 <?php endif; ?>
@@ -141,23 +141,23 @@ $can_add_procurement = $can_manage_procurement || (($_SESSION['role'] ?? '') ===
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         <div>
-                            <div class="text-white-75 small">Supplier</div>
+                            <div class="text-white-75 small"><?php echo __('supplier_col'); ?></div>
                             <h5 class="mb-0"><?php echo htmlspecialchars($supplier['name']); ?></h5>
                         </div>
-                        <span class="badge bg-primary bg-opacity-75"><?php echo (int)$s['total_qty']; ?> pcs</span>
+                        <span class="badge bg-primary bg-opacity-75"><?php echo (int)$s['total_qty']; ?> <?php echo __('pieces_short'); ?></span>
                     </div>
                     <div class="d-flex flex-wrap gap-2 mb-3 small">
-                        <span class="badge bg-warning text-dark">Pending: <?php echo (int)$s['pending']; ?></span>
-                        <span class="badge bg-primary">Ordered: <?php echo (int)$s['ordered']; ?></span>
-                        <span class="badge bg-success">Received: <?php echo (int)$s['received']; ?></span>
+                        <span class="badge bg-warning text-dark"><?php echo __('pending_status'); ?>: <?php echo (int)$s['pending']; ?></span>
+                        <span class="badge bg-primary"><?php echo __('ordered_status'); ?>: <?php echo (int)$s['ordered']; ?></span>
+                        <span class="badge bg-success"><?php echo __('received_status'); ?>: <?php echo (int)$s['received']; ?></span>
                     </div>
                     <?php if ($can_add_procurement): ?>
                     <div class="d-flex gap-2 flex-wrap">
                         <button class="btn btn-sm btn-outline-primary copy-supplier-list" data-supplier="<?php echo htmlspecialchars($supplierKey); ?>">
-                            <i class="fas fa-copy me-1"></i>Copy list
+                            <i class="fas fa-copy me-1"></i><?php echo __('copy_list'); ?>
                         </button>
                         <button class="btn btn-sm btn-outline-success open-supplier-request" data-supplier="<?php echo htmlspecialchars($supplierKey); ?>">
-                            <i class="fas fa-plus me-1"></i>Add
+                            <i class="fas fa-plus me-1"></i><?php echo __('add_btn_proc'); ?>
                         </button>
                     </div>
                     <?php endif; ?>
@@ -170,28 +170,28 @@ $can_add_procurement = $can_manage_procurement || (($_SESSION['role'] ?? '') ===
 <div class="card glass-card border-0 shadow-sm mb-4">
     <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center py-3">
         <div>
-            <h5 class="mb-0">Request overview</h5>
-            <div class="small text-white-75">Default order: pending → ordered → received → cancelled.</div>
+            <h5 class="mb-0"><?php echo __('request_overview'); ?></h5>
+            <div class="small text-white-75"><?php echo __('default_order_hint'); ?></div>
         </div>
-        <div class="text-white-75 small"><?php echo count($openRequests); ?> open requests</div>
+        <div class="text-white-75 small"><?php echo count($openRequests); ?> <?php echo __('open_requests'); ?></div>
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
-                    <th>Supplier</th>
-                    <th>Part</th>
-                    <th class="text-center">Qty</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Order</th>
-                    <th>Note</th>
-                    <th class="text-end">Actions</th>
+                    <th><?php echo __('supplier_col'); ?></th>
+                    <th><?php echo __('part_col'); ?></th>
+                    <th class="text-center"><?php echo __('qty_col'); ?></th>
+                    <th><?php echo __('priority_col'); ?></th>
+                    <th><?php echo __('status_col'); ?></th>
+                    <th><?php echo __('order_col'); ?></th>
+                    <th><?php echo __('note_col'); ?></th>
+                    <th class="text-end"><?php echo __('actions_col'); ?></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($requests)): ?>
-                    <tr><td colspan="8" class="text-center text-white-75 py-5">Nothing here yet.</td></tr>
+                    <tr><td colspan="8" class="text-center text-white-75 py-5"><?php echo __('no_requests'); ?></td></tr>
                 <?php else: ?>
                     <?php foreach ($requests as $request): ?>
                         <?php
@@ -265,56 +265,56 @@ $can_add_procurement = $can_manage_procurement || (($_SESSION['role'] ?? '') ===
                 <input type="hidden" name="action" value="add">
                 <input type="hidden" name="order_id" value="<?php echo $selectedOrderId; ?>">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Add part request</h5>
+                    <h5 class="modal-title"><?php echo __('add_part_request'); ?></h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label">Supplier</label>
+                            <label class="form-label"><?php echo __('supplier_col'); ?></label>
                             <select name="supplier_key" id="requestSupplier" class="form-select" required>
-                                <option value="">Select supplier</option>
+                                <option value=""><?php echo __('proc_select_supplier'); ?></option>
                                 <?php foreach ($suppliers as $key => $supplier): ?>
                                     <option value="<?php echo htmlspecialchars($key); ?>" <?php echo $selectedSupplier === $key ? 'selected' : ''; ?>><?php echo htmlspecialchars($supplier['name']); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-8">
-                            <label class="form-label">Catalog part</label>
+                            <label class="form-label"><?php echo __('part_col'); ?></label>
                             <select name="inventory_id" id="requestInventory" class="form-select">
-                                <option value="">Enter part manually</option>
+                                <option value=""><?php echo __('proc_manual_entry'); ?></option>
                             </select>
-                            <div class="form-text text-white-75">Search by supplier. If you cannot find the part, enter it manually below.</div>
+                            <div class="form-text text-white-75"><?php echo __('proc_catalog_hint'); ?></div>
                         </div>
                         <div class="col-md-8">
-                            <label class="form-label">Part name</label>
-                            <input type="text" name="item_name" id="requestItemName" class="form-control" placeholder="e.g. iPhone 14 OLED display" required>
+                            <label class="form-label"><?php echo __('item_name'); ?></label>
+                            <input type="text" name="item_name" id="requestItemName" class="form-control" placeholder="<?php echo __('part_desc_placeholder'); ?>" required>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">SKU / kód</label>
-                            <input type="text" name="sku" id="requestSku" class="form-control" placeholder="Optional">
+                            <input type="text" name="sku" id="requestSku" class="form-control" placeholder="<?php echo __('proc_optional'); ?>">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Quantity</label>
+                            <label class="form-label"><?php echo __('qty_col'); ?></label>
                             <input type="number" name="quantity" class="form-control" value="1" min="1" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Priority</label>
+                            <label class="form-label"><?php echo __('priority_col'); ?></label>
                             <select name="priority" class="form-select">
-                                <option value="today">Today</option>
-                                <option value="this_week" selected>This week</option>
-                                <option value="later">Later</option>
+                                <option value="today"><?php echo __('today_priority'); ?></option>
+                                <option value="this_week" selected><?php echo __('this_week_priority'); ?></option>
+                                <option value="later"><?php echo __('later_priority'); ?></option>
                             </select>
                         </div>
                         <div class="col-md-12">
-                            <label class="form-label">Note</label>
-                            <textarea name="notes" class="form-control" rows="3" placeholder="e.g. for order, color variant, urgent..."></textarea>
+                            <label class="form-label"><?php echo __('note_col'); ?></label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="<?php echo __('proc_note_placeholder'); ?>"></textarea>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success"><i class="fas fa-save me-2"></i>Save to queue</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-save me-2"></i><?php echo __('proc_save_queue'); ?></button>
                 </div>
             </form>
         </div>
@@ -330,21 +330,21 @@ $can_add_procurement = $can_manage_procurement || (($_SESSION['role'] ?? '') ===
                 <input type="hidden" name="action" value="assign_order">
                 <input type="hidden" name="request_id" id="assignRequestId">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title">Assign part to order</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title"><?php echo __('proc_assign_title'); ?></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?php echo __('close'); ?>"></button>
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info border-0 mb-3">
-                        <div class="small text-dark-emphasis mb-1">Selected part</div>
+                        <div class="small text-dark-emphasis mb-1"><?php echo __('proc_sel_part'); ?></div>
                         <div class="fw-semibold" id="assignRequestItemName"></div>
                         <div class="small text-dark-emphasis mt-1" id="assignRequestStatus"></div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Order</label>
+                        <label class="form-label"><?php echo __('order_col'); ?></label>
                         <select name="order_id" id="assignProcurementOrder" class="form-select" required></select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Quantity</label>
+                        <label class="form-label"><?php echo __('proc_qty'); ?></label>
                         <input type="number" name="quantity" id="assignProcurementQty" class="form-control" value="1" min="1" required>
                     </div>
                 </div>

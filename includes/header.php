@@ -113,7 +113,7 @@ try {
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/main.js"></script>
+    <script src="assets/js/main.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/main.js'); ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js"></script>
     <script>
@@ -134,6 +134,11 @@ try {
     window.LANG_NOTICE = '<?php echo __("notice_title"); ?>';
     window.LANG_CONFIRM = '<?php echo __("confirm_title"); ?>';
     window.LANG_PREVIEW = '<?php echo __("preview_btn"); ?>';
+    window.LANG_HIGH = '<?php echo __("high"); ?>';
+    window.LANG_NORMAL = '<?php echo __("normal"); ?>';
+    window.LANG_SEARCH_CLIENT = '<?php echo __("search_client_placeholder"); ?>';
+    window.LANG_BRAND = '<?php echo __("brand"); ?>';
+    window.LANG_MODEL = '<?php echo __("model_placeholder"); ?>';
     </script>
 </head>
 <body>
@@ -147,15 +152,15 @@ try {
     <nav class="nav flex-column crm-v2-nav">
         <a class="nav-link <?php echo $current_page == 'index.php' ? 'active' : ''; ?>" href="index.php"><i class="fas fa-home me-2"></i><span><?php echo __('dashboard'); ?></span></a>
 
-        <div class="crm-nav-group-title">PRÁCE</div>
+        <div class="crm-nav-group-title"><?php echo __('nav_work'); ?></div>
         <a class="nav-link <?php echo $current_page == 'orders.php' ? 'active' : ''; ?>" href="orders.php">
             <i class="fas fa-tools me-2"></i><span><?php echo __('orders'); ?></span>
             <?php if ($ordersBadgeCount > 0): ?><span class="crm-nav-pill"><?php echo $ordersBadgeCount; ?></span><?php endif; ?>
         </a>
-        <a class="nav-link" href="orders.php#newOrderModal"><i class="fas fa-plus me-2"></i><span><?php echo __('new_order'); ?></span></a>
+        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-2"></i><span><?php echo __('new_order'); ?></span></a>
         <a class="nav-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading me-2"></i><span><?php echo __('procurement'); ?></span></a>
 
-        <div class="crm-nav-group-title">DATABÁZE</div>
+        <div class="crm-nav-group-title"><?php echo __('nav_database'); ?></div>
         <?php if (hasPermission('edit_customers')): ?>
             <a class="nav-link <?php echo $current_page == 'customers.php' ? 'active' : ''; ?>" href="customers.php"><i class="fas fa-users me-2"></i><span><?php echo __('customers'); ?></span></a>
         <?php endif; ?>
@@ -163,12 +168,12 @@ try {
             <a class="nav-link <?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>" href="inventory.php"><i class="fas fa-boxes me-2"></i><span><?php echo __('inventory'); ?></span></a>
         <?php endif; ?>
 
-        <div class="crm-nav-group-title">SYSTÉM</div>
+        <div class="crm-nav-group-title"><?php echo __('nav_system'); ?></div>
         <a class="nav-link <?php echo $current_page == 'reports.php' ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line me-2"></i><span><?php echo __('reports'); ?></span></a>
         <?php if (hasPermission('admin_access') || getCurrentStaffRole() === 'manager'): ?>
             <a class="nav-link <?php echo $current_page == 'accounting.php' ? 'active' : ''; ?>" href="accounting.php"><i class="fas fa-file-invoice-dollar me-2"></i><span><?php echo __('accounting'); ?></span></a>
             <a class="nav-link <?php echo $current_page == 'settings.php' ? 'active' : ''; ?>" href="settings.php"><i class="fas fa-cog me-2"></i><span><?php echo __('settings'); ?></span></a>
-            <a class="nav-link" href="fixer_chat.php"><i class="fab fa-telegram-plane me-2"></i><span>Fixer Chat</span></a>
+            <a class="nav-link" href="fixer_chat.php"><i class="fab fa-telegram-plane me-2"></i><span><?php echo __('fixer_chat'); ?></span></a>
         <?php else: ?>
             <a class="nav-link <?php echo $current_page == 'settings.php' ? 'active' : ''; ?>" href="settings.php"><i class="fas fa-user-circle me-2"></i><span><?php echo __('settings'); ?></span></a>
         <?php endif; ?>
@@ -194,35 +199,36 @@ try {
     <nav class="navbar navbar-expand-lg navbar-dark crm-topbar crm-v2-topbar">
         <div class="container-fluid d-flex align-items-center justify-content-between crm-topbar-inner">
             <div class="d-flex align-items-center crm-topbar-left">
-                <button class="btn btn-sm btn-outline-secondary me-3 d-lg-none" id="sidebarCollapse" aria-label="Toggle menu">
+                <button class="btn btn-sm btn-outline-secondary me-3 d-lg-none" id="sidebarCollapse" aria-label="<?php echo e(__('toggle_menu')); ?>">
                     <i class="fas fa-bars"></i>
                 </button>
                 <span class="navbar-brand mb-0 h1 d-none d-sm-inline-block"><?php echo e($topbarTitle); ?></span>
             </div>
 
-            <?php if ($show_search): ?>
-            <form action="<?php echo $search_action; ?>" method="GET" class="d-flex mx-auto crm-navbar-search crm-v2-search">
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-search"></i></span>
-                    <input type="text" name="search" class="form-control" placeholder="<?php echo e($search_placeholder); ?>" value="<?php echo e($_GET['search'] ?? ''); ?>">
-                    <span class="input-group-text crm-kbd-hint">⌘K</span>
+            <div class="d-flex align-items-center crm-topbar-center">
+                <div class="d-flex align-items-center me-2 crm-topbar-cta-wrap">
+                    <button type="button" class="btn btn-sm btn-primary crm-v2-cta-new-order crm-v2-cta-new-order--big" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-1"></i><?php echo __('new_order'); ?></button>
                 </div>
-            </form>
-            <?php else: ?>
-                <div class="mx-auto crm-navbar-search crm-navbar-search--placeholder"></div>
-            <?php endif; ?>
+
+                <?php if ($show_search): ?>
+                <form action="<?php echo $search_action; ?>" method="GET" class="d-flex crm-navbar-search crm-v2-search">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" name="search" class="form-control" placeholder="<?php echo e($search_placeholder); ?>" value="<?php echo e($_GET['search'] ?? ''); ?>">
+                        <span class="input-group-text crm-kbd-hint">⌘K</span>
+                    </div>
+                </form>
+                <?php else: ?>
+                    <div class="crm-navbar-search crm-navbar-search--placeholder"></div>
+                <?php endif; ?>
+            </div>
 
             <div class="d-flex align-items-center gap-2 crm-navbar-actions">
-                <button class="btn btn-sm crm-v2-icon-btn" type="button" id="notificationsToggle" aria-label="Notifications">
+                <button class="btn btn-sm crm-v2-icon-btn" type="button" id="notificationsToggle" aria-label="<?php echo e(__('notifications')); ?>">
                     <i class="fas fa-bell"></i>
                     <span class="crm-v2-alert-dot"></span>
                 </button>
 
-                <?php if ($current_page === 'orders.php'): ?>
-                    <button type="button" class="btn btn-sm btn-primary crm-v2-cta-new-order" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-1"></i><?php echo __('new_order'); ?></button>
-                <?php else: ?>
-                    <a href="orders.php" class="btn btn-sm btn-primary crm-v2-cta-new-order"><i class="fas fa-plus me-1"></i><?php echo __('new_order'); ?></a>
-                <?php endif; ?>
 
                 <div class="dropdown me-1">
                     <button class="btn btn-outline-secondary btn-sm dropdown-toggle crm-lang-switch" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="<?php echo e(__('language_switch')); ?>">

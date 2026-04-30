@@ -8,6 +8,134 @@ let globalAlertModal = null;
 let globalConfirmModal = null;
 let activePreviewUrl = null;
 
+// Apple model catalogs for New Order model dropdown (fetched from public release lists)
+const CRM_APPLE_MODELS_BY_TYPE = {
+    Phone: [
+        'iPhone (1st generation)', 'iPhone 3G', 'iPhone 3GS', 'iPhone 4', 'iPhone 4s', 'iPhone 5', 'iPhone 5c', 'iPhone 5s',
+        'iPhone 6', 'iPhone 6 Plus', 'iPhone 6s', 'iPhone 6s Plus',
+        'iPhone SE (1st generation)',
+        'iPhone 7', 'iPhone 7 Plus',
+        'iPhone 8', 'iPhone 8 Plus',
+        'iPhone X', 'iPhone XR', 'iPhone XS', 'iPhone XS Max',
+        'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
+        'iPhone SE (2nd generation)',
+        'iPhone 12 mini', 'iPhone 12', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
+        'iPhone 13 mini', 'iPhone 13', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
+        'iPhone SE (3rd generation)',
+        'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
+        'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
+        'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max', 'iPhone 16e',
+        'iPhone 17', 'iPhone Air', 'iPhone 17 Pro', 'iPhone 17 Pro Max', 'iPhone 17e'
+    ],
+    Notebook: [
+        'MacBook (13-inch, A1181 / A1278 / A1342)', 'MacBook (Retina, 12-inch, A1534)',
+        'MacBook Air (11-inch, A1370 / A1465)', 'MacBook Air (13-inch, A1237 / A1304 / A1369 / A1466)', 'MacBook Air (Retina, 13-inch, A1932 / A2179)',
+        'MacBook Air (M1, 2020, A2337)', 'MacBook Air (M2, 13-inch, A2681)', 'MacBook Air (M2, 15-inch, A2941)',
+        'MacBook Air (M3, 13-inch, A3113)', 'MacBook Air (M3, 15-inch, A3114)',
+        'MacBook Air (M4, 13-inch, A3402)', 'MacBook Air (M4, 15-inch, A3403)',
+        'MacBook Air (M5, 13-inch)', 'MacBook Air (M5, 15-inch)',
+        'MacBook Pro (13-inch, A1278)', 'MacBook Pro (15-inch, A1286)', 'MacBook Pro (17-inch, A1151 / A1212 / A1229 / A1261 / A1297)',
+        'MacBook Pro (Retina, 13-inch, A1425 / A1502)', 'MacBook Pro (Retina, 15-inch, A1398)',
+        'MacBook Pro (13-inch, Touch Bar, A1706 / A1989 / A2159 / A2289 / A2251)', 'MacBook Pro (15-inch, Touch Bar, A1707 / A1990)',
+        'MacBook Pro (13-inch, M1, A2338)', 'MacBook Pro (13-inch, M2, A2338)',
+        'MacBook Pro (14-inch, M1 Pro/Max, A2442)', 'MacBook Pro (16-inch, M1 Pro/Max, A2485)',
+        'MacBook Pro (14-inch, M2 Pro/Max, A2779)', 'MacBook Pro (16-inch, M2 Pro/Max, A2780)',
+        'MacBook Pro (14-inch, M3, A2918 / A2992)', 'MacBook Pro (14-inch, M3 Pro/Max, A2918 / A2992)', 'MacBook Pro (16-inch, M3 Pro/Max, A2991)',
+        'MacBook Pro (14-inch, M4, A3112 / A3401)', 'MacBook Pro (14-inch, M4 Pro/Max, A3112 / A3401)', 'MacBook Pro (16-inch, M4 Pro/Max, A3185)',
+        'MacBook Pro (14-inch, M5 Pro/Max)', 'MacBook Pro (16-inch, M5 Pro/Max)'
+    ],
+    Tablet: [
+        'iPad (1st generation)', 'iPad 2', 'iPad (3rd generation)', 'iPad (4th generation)',
+        'iPad (5th generation)', 'iPad (6th generation)', 'iPad (7th generation)', 'iPad (8th generation)',
+        'iPad (9th generation)', 'iPad (10th generation)', 'iPad (11th generation)',
+        'iPad mini (1st generation)', 'iPad mini 2', 'iPad mini 3', 'iPad mini 4',
+        'iPad mini (5th generation)', 'iPad mini (6th generation)', 'iPad mini (7th generation)',
+        'iPad Air (1st generation)', 'iPad Air 2', 'iPad Air (3rd generation)',
+        'iPad Air (4th generation)', 'iPad Air (5th generation)', 'iPad Air (6th generation)',
+        'iPad Air (7th generation)', 'iPad Air (8th generation)',
+        'iPad Pro (1st generation)', 'iPad Pro (2nd generation)', 'iPad Pro (3rd generation)',
+        'iPad Pro (4th generation)', 'iPad Pro (5th generation)', 'iPad Pro (6th generation)',
+        'iPad Pro (7th generation)', 'iPad Pro (8th generation)'
+    ],
+    PC: [
+        'iMac G3', 'iMac G4', 'iMac G5',
+        'iMac (Intel)', 'iMac (Retina 4K)', 'iMac (Retina 5K)', 'iMac (24-inch, M1)', 'iMac (24-inch, M3)', 'iMac (24-inch, M4)',
+        'iMac Pro',
+        'Mac mini (Intel)', 'Mac mini (M1)', 'Mac mini (M2)', 'Mac mini (M2 Pro)', 'Mac mini (M4)', 'Mac mini (M4 Pro)',
+        'Mac Studio (M1 Max)', 'Mac Studio (M1 Ultra)', 'Mac Studio (M2 Max)', 'Mac Studio (M2 Ultra)', 'Mac Studio (M4 Max)', 'Mac Studio (M3 Ultra)',
+        'Mac Pro (Tower)', 'Mac Pro (2013 Cylinder)', 'Mac Pro (2019 Tower/Rack)', 'Mac Pro (M2 Ultra)'
+    ],
+    HDD: [
+        'AirPort Time Capsule', 'AirPort Extreme'
+    ],
+    Other: [
+        'Apple Watch (1st generation)',
+        'Apple Watch Series 1', 'Apple Watch Series 2', 'Apple Watch Series 3', 'Apple Watch Series 4', 'Apple Watch Series 5',
+        'Apple Watch Series 6', 'Apple Watch Series 7', 'Apple Watch Series 8', 'Apple Watch Series 9', 'Apple Watch Series 10', 'Apple Watch Series 11',
+        'Apple Watch SE (1st generation)', 'Apple Watch SE (2nd generation)', 'Apple Watch SE (3rd generation)',
+        'Apple Watch Ultra', 'Apple Watch Ultra 2', 'Apple Watch Ultra 3',
+        'AirPods (1st generation)', 'AirPods (2nd generation)', 'AirPods (3rd generation)', 'AirPods (4th generation)',
+        'AirPods Pro (1st generation)', 'AirPods Pro (2nd generation)', 'AirPods Pro (3rd generation)',
+        'AirPods Max (Lightning)', 'AirPods Max (USB-C)',
+        'Apple TV HD', 'Apple TV 4K (1st generation)', 'Apple TV 4K (2nd generation)', 'Apple TV 4K (3rd generation)', 'Apple TV 4K (4th generation)',
+        'HomePod (1st generation)', 'HomePod (2nd generation)', 'HomePod mini',
+        'iPod touch (7th generation)', 'Apple Vision Pro'
+    ]
+};
+
+function crmIsAppleBrand(value) {
+    const normalized = String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return normalized === 'apple' || normalized.includes('apple');
+}
+
+window.crmUpdateAppleModelOptions = function(modalEl) {
+    if (!modalEl || typeof window.jQuery === 'undefined') return;
+
+    const $modal = window.jQuery(modalEl);
+    const $brand = $modal.find('[name="device_brand"]').first();
+    const $type = $modal.find('[name="device_type"]').first();
+    const $model = $modal.find('[name="device_model"]').first();
+    if (!$model.length) return;
+
+    const brand = String($brand.val() || '').trim();
+    const type = String($type.val() || '').trim();
+    const isApple = crmIsAppleBrand(brand);
+    const models = (isApple && CRM_APPLE_MODELS_BY_TYPE[type]) ? CRM_APPLE_MODELS_BY_TYPE[type] : [];
+    const current = String($model.val() || '').trim();
+    const placeholder = String($model.attr('data-placeholder') || 'Model');
+
+    const hasOption = (val) => $model.find('option').filter(function() {
+        return String(this.value) === String(val);
+    }).length > 0;
+
+    $model.empty();
+    $model.append(new Option(placeholder, '', false, false));
+
+    if (models.length > 0) {
+        models.forEach((m) => $model.append(new Option(m, m, false, false)));
+        $model.data('appleLocked', '1');
+        if (current && hasOption(current)) {
+            $model.val(current);
+        } else {
+            $model.val('');
+        }
+    } else {
+        $model.data('appleLocked', '0');
+        if (current) {
+            if (!hasOption(current)) {
+                $model.append(new Option(current, current, true, true));
+            }
+            $model.val(current);
+        } else {
+            $model.val('');
+        }
+    }
+
+    if ($model.data('select2')) {
+        $model.trigger('change.select2');
+    }
+};
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     // Sidebar toggle
@@ -143,6 +271,36 @@ document.addEventListener('DOMContentLoaded', function() {
             // Your custom options
         });
     }
+
+    // New Order modal helpers (open from #newOrderModal links across pages)
+    const openNewOrderModal = () => {
+        const modalEl = document.getElementById('newOrderModal');
+        if (!modalEl || typeof bootstrap === 'undefined') return false;
+        const instance = bootstrap.Modal.getOrCreateInstance(modalEl);
+        instance.show();
+        return true;
+    };
+
+    // If user came via orders.php#newOrderModal, open modal automatically
+    if (window.location.hash === '#newOrderModal') {
+        setTimeout(() => {
+            if (openNewOrderModal()) {
+                try {
+                    history.replaceState(null, '', window.location.pathname + window.location.search);
+                } catch (e) {}
+            }
+        }, 120);
+    }
+
+    // On current page, intercept anchor links to #newOrderModal and open modal directly
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('a[href$="#newOrderModal"]');
+        if (!link) return;
+        if (document.getElementById('newOrderModal')) {
+            e.preventDefault();
+            openNewOrderModal();
+        }
+    });
 });
 
 /**
@@ -398,7 +556,7 @@ function openPreviewInNewTab() {
             var model = (fd.get('device_model')||'').toString();
             var device = (brand+' '+model).trim() || '—';
             var type = (fd.get('device_type')||'').toString() || '—';
-            var prio = fd.get('priority') === 'High' ? 'Urgentní' : 'Normální';
+            var prio = fd.get('priority') === 'High' ? (window.LANG_HIGH || 'Urgentní') : (window.LANG_NORMAL || 'Normální');
             var set = function(k,v){ var el = modal.querySelector('[data-summary="'+k+'"]'); if(el) el.textContent = v || '—'; };
             set('customer', cname || '—');
             set('device', device);
@@ -406,15 +564,53 @@ function openPreviewInNewTab() {
             set('priority', prio);
         }
 
-        if (prevBtn) prevBtn.addEventListener('click', function(e){ e.preventDefault(); if(cur>1){ cur--; render(); }});
+        if (prevBtn) prevBtn.addEventListener('click', function(e){ 
+            e.preventDefault(); 
+            e.stopPropagation();
+            if(cur>1){ cur--; render(); }
+        });
         if (nextBtn) nextBtn.addEventListener('click', function(e){
             e.preventDefault();
-
-            if (cur === 1) {
+            e.stopPropagation();
+            
+            // Critical check: ensure we don't trigger form submit
+            if (this.type === 'submit') {
+                this.type = 'button';
+            }
                 var customerSelect = modal.querySelector('select[name="customer_id"]');
-                if (!customerSelect || !customerSelect.value) {
-                    if (typeof window.showAlert === 'function') {
-                        window.showAlert('Vyber prosím klienta ze seznamu nebo nejdřív ulož nového klienta.');
+                var customerValue = customerSelect ? String(customerSelect.value || '').trim() : '';
+
+                if ((!customerValue) && customerSelect && typeof window.jQuery !== 'undefined') {
+                    try {
+                        var $customerSelect = window.jQuery(customerSelect);
+                        if ($customerSelect.length && typeof $customerSelect.select2 === 'function') {
+                            var selected = $customerSelect.select2('data') || [];
+                            if (selected.length && selected[0] && selected[0].id) {
+                                customerValue = String(selected[0].id).trim();
+                                if (customerValue) {
+                                    var option = null;
+                                    for (var i = 0; i < customerSelect.options.length; i++) {
+                                        if (String(customerSelect.options[i].value) === customerValue) {
+                                            option = customerSelect.options[i];
+                                            break;
+                                        }
+                                    }
+                                    if (!option) {
+                                        var optionLabel = selected[0].text || selected[0].name || customerValue;
+                                        option = new Option(optionLabel, customerValue, true, true);
+                                        customerSelect.add(option);
+                                    }
+                                    customerSelect.value = customerValue;
+                                    $customerSelect.trigger('change');
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                }
+
+                if (!customerSelect || !customerValue) {
+                    if (customerSelect && typeof window.jQuery !== 'undefined') {
+                        try { window.jQuery(customerSelect).select2('open'); } catch (e) {}
                     }
                     return;
                 }
@@ -448,6 +644,241 @@ function openPreviewInNewTab() {
         document.querySelectorAll('.crm-wizard-modal').forEach(initWizard);
     });
 })();
+
+/* ═══════════════════════════════════════════════════════════
+   NEW ORDER MODAL & CUSTOMER HELPERS
+   ═══════════════════════════════════════════════════════════ */
+let currentCustomerSearch = '';
+window.escapeHtml = function(text) {
+    return $('<div>').text(text).html();
+};
+function highlightMatch(text, term) {
+    if (!term) return escapeHtml(text);
+    const safe = escapeHtml(text);
+    const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+    return safe.replace(re, '<span class="match">$1</span>');
+}
+
+function initNewOrderModalSelects() {
+    const $modal = $('#newOrderModal');
+    if (!$modal.length) return;
+    const $dropdownParent = $modal;
+
+    const $customerSelect = $modal.find('.select2-customer');
+    if ($customerSelect.length) {
+        if ($customerSelect.data('select2')) {
+            $customerSelect.select2('destroy');
+        }
+
+        $customerSelect.select2({
+            dropdownParent: $dropdownParent,
+            width: '100%',
+            placeholder: $customerSelect.data('placeholder') || window.LANG_SEARCH_CLIENT || "Search client...",
+            allowClear: true,
+            minimumInputLength: 0,
+            ajax: {
+                url: 'api/search_customers.php',
+                dataType: 'json',
+                delay: 250,
+                data: function(params) {
+                    currentCustomerSearch = params.term || '';
+                    return { q: params.term, page: params.page || 1 };
+                },
+                processResults: function(data, params) {
+                    params.page = params.page || 1;
+                    return { results: data.results, pagination: { more: data.pagination.more } };
+                }
+            },
+            templateResult: function(item) {
+                if (item.loading) return item.text;
+                const name = item.name || item.text || '';
+                const phone = item.phone || '';
+                const title = highlightMatch(name, currentCustomerSearch);
+                const meta = phone ? '<span class="meta">' + highlightMatch(phone, currentCustomerSearch) + '</span>' : '';
+                return $('<div class="customer-option"><div>' + title + '</div>' + meta + '</div>');
+            },
+            templateSelection: function(item) {
+                return item.text || item.name || '';
+            },
+            escapeMarkup: function(markup) { return markup; }
+        });
+    }
+
+    const $brandSelect = $modal.find('.select2-brand');
+    if ($brandSelect.length) {
+        if ($brandSelect.data('select2')) $brandSelect.select2('destroy');
+        $brandSelect.select2({
+            dropdownParent: $dropdownParent,
+            width: '100%',
+            tags: true,
+            dropdownAutoWidth: false
+        });
+    }
+
+    const $deviceTypeSelect = $modal.find('.select2-device-type');
+    if ($deviceTypeSelect.length) {
+        if ($deviceTypeSelect.data('select2')) $deviceTypeSelect.select2('destroy');
+        $deviceTypeSelect.select2({
+            dropdownParent: $dropdownParent,
+            width: '100%',
+            minimumResultsForSearch: Infinity,
+            dropdownAutoWidth: false
+        });
+    }
+
+    const $orderTypeSelect = $modal.find('.select2-order-type');
+    if ($orderTypeSelect.length) {
+        if ($orderTypeSelect.data('select2')) $orderTypeSelect.select2('destroy');
+        $orderTypeSelect.select2({
+            dropdownParent: $dropdownParent,
+            width: '100%',
+            minimumResultsForSearch: Infinity,
+            dropdownAutoWidth: false
+        });
+    }
+
+    const $modelSelect = $modal.find('.select2-model');
+    if ($modelSelect.length) {
+        if ($modelSelect.data('select2')) $modelSelect.select2('destroy');
+        $modelSelect.select2({
+            dropdownParent: $dropdownParent,
+            width: '100%',
+            placeholder: $modelSelect.data('placeholder') || "Model",
+            tags: true,
+            dropdownAutoWidth: false,
+            createTag: function(params) {
+                const term = $.trim(params.term || '');
+                if (!term) return null;
+                if (String($modelSelect.data('appleLocked') || '0') === '1') return null;
+                return { id: term, text: term, newTag: true };
+            }
+        });
+    }
+
+    if (typeof window.crmUpdateAppleModelOptions === 'function') {
+        window.crmUpdateAppleModelOptions($modal[0]);
+        $brandSelect.off('change.crmModel').on('change.crmModel', function() {
+            window.crmUpdateAppleModelOptions($modal[0]);
+        });
+        $deviceTypeSelect.off('change.crmModel').on('change.crmModel', function() {
+            window.crmUpdateAppleModelOptions($modal[0]);
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // New Order Modal Init
+    const $newOrderModal = $('#newOrderModal');
+    if ($newOrderModal.length) {
+        $newOrderModal.on('shown.bs.modal', initNewOrderModalSelects);
+
+        $newOrderModal.find('.order-template-select').on('change', function() {
+            const value = $(this).val();
+            if (!value) return;
+            const targetName = $(this).data('target');
+            const $area = $(this).closest('form').find('textarea[name="' + targetName + '"]');
+            if (!$area.length) return;
+            const current = $area.val().trim();
+            $area.val(current ? (current + "\n" + value) : value).trigger('input');
+            $(this).val('');
+        });
+
+        // Inline New Customer: company/private toggle
+        $newOrderModal.find('input[name="customer_type"]').on('change', function() {
+            if ($(this).val() === 'company') {
+                $('#inline_company_fields').removeClass('d-none');
+                $('#inline_first_name').val('Firma');
+                $('#inline_last_name').val('');
+            } else {
+                $('#inline_company_fields').addClass('d-none');
+                $('#inline_first_name').val('');
+                $('#inline_last_name').val('');
+            }
+        });
+
+        // Inline New Customer: ARES fetch
+        $('#inline_btn_fetch_ares').on('click', function() {
+            const ico = $('#inline_ico_input').val().trim();
+            if (!ico) return typeof showAlert === 'function' ? showAlert('Enter ICO') : alert('Enter ICO');
+            
+            const btn = $(this);
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+            $.ajax({
+                url: `https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${ico}`,
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    btn.prop('disabled', false).html('<i class="fas fa-search me-1"></i> ARES');
+                    if (data && data.obchodniJmeno) {
+                        $('#inline_ares_name').val(data.obchodniJmeno);
+                        $('#inline_last_name').val(data.obchodniJmeno);
+                        $('#inline_first_name').val('Firma');
+                        if (data.dic) $('#inline_ares_dic').val(data.dic);
+                        if (data.sidlo) {
+                            const s = data.sidlo;
+                            const addr = `${s.nazevUlice || ''} ${s.cisloDomovni || ''}${s.cisloOrientacni ? '/' + s.cisloOrientacni : ''}, ${s.psc || ''} ${s.nazevObce || ''}`;
+                            $('#inline_address').val(addr.trim());
+                        }
+                    }
+                },
+                error: function() {
+                    btn.prop('disabled', false).html('<i class="fas fa-search me-1"></i> ARES');
+                }
+            });
+        });
+
+        // Inline New Customer: AJAX submit
+        $('#saveNewCustomerBtn').on('click', function() {
+            const $panel = $('#newCustomerInlineForm');
+            const firstName = $('#inline_first_name').val().trim();
+            const lastName = $('#inline_last_name').val().trim();
+            const phone = $('#inline_phone').val().trim();
+            
+            if (!firstName || !lastName || !phone) return;
+            
+            const btn = $(this);
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+            const formData = {
+                first_name: firstName,
+                last_name: lastName,
+                phone: phone,
+                email: $panel.find('input[name="inline_email"]').val() || '',
+                address: $('#inline_address').val() || '',
+                customer_type: $panel.find('input[name="customer_type"]:checked').val() || 'private',
+                ico: $('#inline_ico_input').val() || '',
+                company_name: $('#inline_ares_name').val() || '',
+                dic: $('#inline_ares_dic').val() || '',
+                csrf_token: $('meta[name="csrf-token"]').attr('content')
+            };
+
+            $.post('api/add_customer.php', formData, function(res) {
+                btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i> Save');
+                if (res.success) {
+                    const id = res.id;
+                    const label = (lastName + ' ' + firstName).trim() + (phone ? ' (' + phone + ')' : '');
+                    const $select = $('.select2-customer');
+                    if ($select.length) {
+                        const newOption = new Option(label, id, true, true);
+                        $select.append(newOption).trigger('change');
+                    }
+                    // Reset
+                    $('#inline_first_name, #inline_last_name, #inline_phone, #inline_ares_name, #inline_ares_dic, #inline_ico_input').val('');
+                    $panel.find('input[name="inline_email"]').val('');
+                    $('#inline_address').val('');
+                    $('#inline_company_fields').addClass('d-none');
+                    $panel.find('#inline_type_private').prop('checked', true);
+                    const collapseEl = document.getElementById('inlineNewCustomerPanel');
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                        const bsCollapse = bootstrap.Collapse.getInstance(collapseEl) || new bootstrap.Collapse(collapseEl);
+                        bsCollapse.hide();
+                    }
+                }
+            }, 'json');
+        });
+    }
+});
 
 /* Sidebar avatar: 2 initials */
 document.addEventListener('DOMContentLoaded', function() {

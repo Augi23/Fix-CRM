@@ -6,7 +6,7 @@
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header border-secondary py-2">
-                <h6 class="modal-title mb-0" id="universalPreviewTitle"><i class="fas fa-file-alt me-2 text-primary"></i>Preview</h6>
+                <h6 class="modal-title mb-0" id="universalPreviewTitle"><i class="fas fa-file-alt me-2 text-primary"></i><?php echo __('preview'); ?></h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0" style="max-height: 85vh; overflow-y: auto; background: #f5f5f5;">
@@ -35,7 +35,7 @@
             </div>
             <div class="modal-body" id="globalAlertBody"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal"><?php echo __('ok'); ?></button>
             </div>
         </div>
     </div>
@@ -61,36 +61,37 @@
 
 <div id="crmNotificationsPanel" class="crm-notifications-panel" aria-hidden="true">
     <div class="crm-notifications-head d-flex justify-content-between align-items-center">
-        <strong>Upozornění</strong>
+        <strong><?php echo __('notifications'); ?></strong>
         <button type="button" class="btn btn-sm btn-outline-secondary" id="notificationsPanelClose"><i class="fas fa-times"></i></button>
     </div>
     <div class="crm-notifications-list">
         <div class="crm-notifications-item">
             <span class="crm-notifications-icon warning"><i class="fas fa-clock"></i></span>
             <div>
-                <div class="small text-white">Zakázka #8741 čeká déle než SLA.</div>
-                <div class="small text-white-75">Před 6 min</div>
+                <div class="small text-white"><?php echo __('sample_sla_waiting'); ?></div>
+                <div class="small text-white-75"><?php echo __('sample_6_min_ago'); ?></div>
             </div>
         </div>
         <div class="crm-notifications-item">
             <span class="crm-notifications-icon success"><i class="fas fa-check"></i></span>
             <div>
-                <div class="small text-white">Import katalogu dokončen.</div>
-                <div class="small text-white-75">Před 12 min</div>
+                <div class="small text-white"><?php echo __('sample_import_done'); ?></div>
+                <div class="small text-white-75"><?php echo __('sample_12_min_ago'); ?></div>
             </div>
         </div>
         <div class="crm-notifications-item">
             <span class="crm-notifications-icon info"><i class="fas fa-info"></i></span>
             <div>
-                <div class="small text-white">Nový zákazník byl přidán.</div>
-                <div class="small text-white-75">Před 24 min</div>
+                <div class="small text-white"><?php echo __('sample_new_customer_added'); ?></div>
+                <div class="small text-white-75"><?php echo __('sample_24_min_ago'); ?></div>
             </div>
         </div>
     </div>
     <div class="crm-notifications-foot">
-        <button type="button" class="btn btn-sm btn-outline-secondary w-100">Označit vše jako přečtené</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary w-100"><?php echo __('mark_all_read'); ?></button>
     </div>
 </div>
 
+<?php require_once __DIR__ . '/modals/new_order_modal.php'; ?>
 </body>
 </html>

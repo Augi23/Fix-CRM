@@ -3,11 +3,11 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 ?>
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="<?php echo crm_get_language(); ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buyout Sheet / Purchase Agreement</title>
+    <title><?php echo __('buyout_title'); ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -254,7 +254,7 @@ require_once 'includes/functions.php';
                 <div class="brand">
                     <img src="assets/img/applefix-logo.png" alt="AppleFix logo">
                     <div class="title">
-                        <h1>Buyout Sheet / Purchase Agreement</h1>
+                        <h1><?php echo __('buyout_title'); ?></h1>
                         <p>Fill in the form, check the details, and print the final document.</p>
                     </div>
                 </div>
@@ -300,7 +300,7 @@ require_once 'includes/functions.php';
                     <div class="legal-helper text-muted small mb-0">Text under this heading is shown only in print version.</div>
                     <div class="print-only legal-block">
                         <ol>
-                            <li>The seller declares they are the sole owner of the item and no third-party rights exist on it.</li>
+                            <li><?php echo __('buyout_agreement_text'); ?></li>
                             <li>The buyer purchases the item into ownership for the agreed price listed above.</li>
                             <li>Both parties confirm they have read the agreement, agree with its content, and sign it as proof.</li>
                         </ol>

@@ -20,6 +20,14 @@ if (empty($info) || empty($info['local_commit'])) {
     exit;
 }
 
+if (!empty($info['error'])) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Git repository check failed: ' . $info['error'],
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 $branch = $info['branch'] ?: 'main';
 $localLabel = trim($branch . ' @ ' . ($info['local_short'] ?: '—'));
 $remoteLabel = $info['remote_short'] ? trim($branch . ' @ ' . $info['remote_short']) : $localLabel;
@@ -50,13 +58,25 @@ $response = [
     'branch' => $branch,
     'ahead_by' => (int)($info['ahead_by'] ?? 0),
     'behind_by' => (int)($info['behind_by'] ?? 0),
+    'remote_name' => (string)($info['remote_name'] ?? 'origin'),
+    'remote_url' => (string)($info['remote_url'] ?? ''),
     'remote_commit' => $info['remote_commit'] ?: '',
     'remote_version' => $remoteLabel,
     'changelog' => array_map(static function (array $commit): array {
+        $sha = $commit['short'] ?? substr((string)($commit['hash'] ?? ''), 0, 7);
+        $date = $commit['date'] ?? '';
+        $message = $commit['message'] ?? '';
+        $author = $commit['author'] ?? '';
         return [
-            'version' => $commit['short'] ?? substr((string)($commit['hash'] ?? ''), 0, 7),
-            'release_date' => $commit['date'] ?? '',
-            'description' => $commit['message'] ?? '',
+            // New schema (used by settings.php JS)
+            'sha' => $sha,
+            'date' => $date,
+            'message' => $message,
+            'author' => $author,
+            // Backward-compatible aliases
+            'version' => $sha,
+            'release_date' => $date,
+            'description' => $message,
         ];
     }, $info['changelog'] ?? []),
 ];

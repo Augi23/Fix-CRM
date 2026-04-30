@@ -463,7 +463,7 @@ require_once 'includes/header.php';
                 <div class="col-md-6 border-end border-secondary">
                     <h5 class="mb-3 text-white"><i class="fas fa-database me-2 text-secondary"></i><?php echo __('database_header'); ?></h5>
                     <div class="d-grid gap-2 mb-4">
-                        <button type="button" class="btn btn-success" onclick="runBackup()"><i class="fas fa-file-download me-2"></i><?php echo __('create_backup'); ?></button>
+                        <button type="button" class="btn btn-success" onclick="runBackup(this)"><i class="fas fa-file-download me-2"></i><?php echo __('create_backup'); ?></button>
                         <div id="backupResult" class="small"></div>
                     </div>
                     <h5 class="mb-3 text-white"><i class="fas fa-globe me-2 text-info"></i><?php echo __('system_langs'); ?></h5>
@@ -573,6 +573,8 @@ require_once 'includes/header.php';
                         $branchLabel = $gitInfo['branch'] ?? 'main';
                         $localShort = $gitInfo['local_short'] ?? '—';
                         $remoteShort = $gitInfo['remote_short'] ?? '—';
+                        $remoteLabel = ($gitInfo['remote_slug'] ?? '') ?: (($gitInfo['remote_name'] ?? '') ?: 'origin');
+                        $remoteUrl = (string)($gitInfo['remote_url'] ?? '');
                         ?>
                         <div class="d-flex align-items-center mb-3">
                             <div class="rounded-circle bg-primary bg-opacity-25 p-3 me-3">
@@ -582,10 +584,19 @@ require_once 'includes/header.php';
                                 <h5 class="mb-1 text-white"><?php echo __('updates_title'); ?></h5>
                                 <div class="text-white-75 small"><?php echo __('update_server_hint'); ?></div>
                                 <div class="text-white-50 small mt-1">
-                                    <?php echo htmlspecialchars(($gitInfo['remote_slug'] ?? 'origin') . ' · ' . ($gitInfo['branch'] ?? 'main')); ?>
+                                    <?php echo htmlspecialchars($remoteLabel . ' · ' . ($gitInfo['branch'] ?? 'main')); ?>
                                 </div>
+                                <?php if ($remoteUrl !== ''): ?>
+                                    <div class="text-white-50 small" style="word-break: break-all;"><?php echo htmlspecialchars($remoteUrl); ?></div>
+                                <?php endif; ?>
                             </div>
                         </div>
+
+                        <?php if (!empty($gitInfo['error'])): ?>
+                            <div class="alert alert-warning border-0 bg-warning bg-opacity-10 small mb-3">
+                                <i class="fas fa-exclamation-triangle me-2 text-warning"></i><?php echo htmlspecialchars((string)$gitInfo['error']); ?>
+                            </div>
+                        <?php endif; ?>
 
                         <div class="row g-3 mb-4">
                             <div class="col-6">
@@ -661,7 +672,7 @@ require_once 'includes/header.php';
             <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Email</label><input type="email" name="tech_email" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('phone_label'); ?></label><input type="text" name="tech_phone" class="form-control"></div></div>
             <div class="mb-3">
                 <label class="form-label">Telegram ID nebo @username</label>
-                <input type="text" name="tech_tg" class="form-control" value="" placeholder="123456789 nebo @uzivatel">
+                <input type="text" name="tech_tg" class="form-control" value="" placeholder="<?php echo __('tg_placeholder'); ?>">
                 <div class="form-text small">You can enter numeric ID or @username. If you enter username, the employee must message the bot first and CRM will auto-pair the ID.</div>
             </div>
             <hr><h6 class="mb-3"><?php echo __('system_access_header'); ?></h6>
@@ -794,13 +805,67 @@ require_once 'includes/header.php';
 
 <script>
 function testTechTG(id) { if (!id) return; $.post('api/test_tech_tg.php', {id: id, csrf_token: $('meta[name="csrf-token"]').attr('content')}, function(res) { if (res.success) { showAlert('OK'); } else { showAlert(res.message); } }); }
-function runBackup() {
-    const btn = event.target.closest('button'); const resultDiv = document.getElementById('backupResult');
-    btn.disabled = true; btn.innerHTML = '...';
-    $.post('api/backup_db.php', {csrf_token: $('meta[name="csrf-token"]').attr('content')}, function(res) {
-        btn.disabled = false; btn.innerHTML = '<?php echo __('create_backup'); ?>';
-        if (res.success) { resultDiv.innerHTML = `<div class="alert alert-success p-2 mt-2"><?php echo __('done_js'); ?><a href="javascript:void(0)" onclick="triggerDownload('${res.path}')">${res.filename}</a></div>`; triggerDownload(res.path); }
-        else { resultDiv.innerHTML = `<div class="alert alert-danger p-2 mt-2"><?php echo __('error_js'); ?></div>`; }
+function triggerDownload(path, filename) {
+    if (!path) return;
+    const a = document.createElement('a');
+    a.href = path;
+    a.setAttribute('download', filename || 'backup.sql');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+function triggerDownloadBase64(base64Content, filename) {
+    if (!base64Content) return;
+    const binary = atob(base64Content);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: 'application/sql;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    triggerDownload(url, filename || 'backup.sql');
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function runBackup(btnEl) {
+    const btn = btnEl && btnEl.closest ? btnEl.closest('button') : document.querySelector('button[onclick*="runBackup"]');
+    const resultDiv = document.getElementById('backupResult');
+    if (!btn || !resultDiv) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i><?php echo __('create_backup'); ?>';
+
+    $.post('api/backup_db.php', { csrf_token: $('meta[name="csrf-token"]').attr('content') }, function(res) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-file-download me-2"></i><?php echo __('create_backup'); ?>';
+
+        if (res && res.success) {
+            const filenameRaw = String(res.filename || 'backup.sql');
+            const safeName = escapeHtml(filenameRaw);
+            const safeFilenameJs = filenameRaw.replace(/'/g, "\\'");
+
+            if (res.inline && res.content_base64) {
+                resultDiv.innerHTML = `<div class="alert alert-success p-2 mt-2"><?php echo __('done_js'); ?> ${safeName}</div>`;
+                triggerDownloadBase64(res.content_base64, filenameRaw);
+                return;
+            }
+
+            const safePath = String(res.path || '').replace(/'/g, "\\'");
+            resultDiv.innerHTML = `<div class="alert alert-success p-2 mt-2"><?php echo __('done_js'); ?> <a href="javascript:void(0)" onclick="triggerDownload('${safePath}', '${safeFilenameJs}')">${safeName}</a></div>`;
+            if (res.path) triggerDownload(res.path, filenameRaw);
+            return;
+        }
+
+        const msg = (res && res.message) ? escapeHtml(res.message) : '<?php echo __('error_js'); ?>';
+        resultDiv.innerHTML = `<div class="alert alert-danger p-2 mt-2">${msg}</div>`;
+    }, 'json').fail(function(xhr) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-file-download me-2"></i><?php echo __('create_backup'); ?>';
+        const raw = (xhr && xhr.responseJSON && xhr.responseJSON.message)
+            ? xhr.responseJSON.message
+            : ((xhr && xhr.responseText) ? xhr.responseText : '<?php echo __('error_js'); ?>');
+        resultDiv.innerHTML = `<div class="alert alert-danger p-2 mt-2">${escapeHtml(String(raw))}</div>`;
     });
 }
 </script>
@@ -917,20 +982,27 @@ function checkForUpdates(force = false) {
 
 function renderChangelog(commits) {
     const area = document.getElementById('changelogArea');
+    if (!area) return;
+
     if (!commits || commits.length === 0) {
         area.innerHTML = `<div class="text-muted small">${UPDATE_TRANSLATIONS.no_changelog}</div>`;
         return;
     }
+
     let html = '';
     commits.forEach(c => {
-        const date = c.date ? new Date(c.date).toLocaleString() : '';
-        const msg = (c.message || '').split('\n')[0];
+        const sha = c.sha || c.version || '';
+        const rawDate = c.date || c.release_date || '';
+        const date = rawDate ? new Date(rawDate).toLocaleString() : '';
+        const msgRaw = c.message || c.description || '';
+        const msg = String(msgRaw).split('\n')[0];
         const shortMsg = msg.length > 120 ? msg.slice(0, 117) + '…' : msg;
+
         html += `<div class="d-flex align-items-start mb-2 pb-2 border-bottom border-secondary">
-            <code class="text-info me-2 flex-shrink-0" style="font-size:0.75rem;">${c.sha}</code>
+            <code class="text-info me-2 flex-shrink-0" style="font-size:0.75rem;">${escapeHtml(sha)}</code>
             <div class="flex-grow-1">
                 <div class="text-white small">${escapeHtml(shortMsg)}</div>
-                <div class="text-muted" style="font-size:0.7rem;">${date} · ${escapeHtml(c.author || '')}</div>
+                <div class="text-muted" style="font-size:0.7rem;">${escapeHtml(date)}${c.author ? ' · ' + escapeHtml(c.author) : ''}</div>
             </div>
         </div>`;
     });

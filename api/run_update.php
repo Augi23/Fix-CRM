@@ -36,6 +36,14 @@ if (empty($info) || empty($info['local_commit'])) {
     exit;
 }
 
+if (!empty($info['error'])) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Git repository check failed: ' . $info['error'],
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 if (!empty($info['dirty'])) {
     echo json_encode([
         'success' => false,
@@ -53,18 +61,10 @@ if ((int)($info['behind_by'] ?? 0) <= 0) {
     exit;
 }
 
-if (empty($info['remote_slug'])) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'Repository has no GitHub remote, update cannot be started.',
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
-$remoteUrl = 'https://github.com/' . $info['remote_slug'] . '.git';
+$remoteName = (string)($info['remote_name'] ?? 'origin');
 $exitCode = 0;
 $targetBranch = $info['branch'] ?: 'main';
-$pullOutput = runGitCommand($repoRoot, 'pull --ff-only ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($targetBranch), $exitCode);
+$pullOutput = runGitCommand($repoRoot, 'pull --ff-only ' . escapeshellarg($remoteName) . ' ' . escapeshellarg($targetBranch), $exitCode);
 
 if ($exitCode !== 0) {
     echo json_encode([

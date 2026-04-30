@@ -13,7 +13,7 @@ if (!hasPermission('admin_access')) {
 // Handle Settings Update
 if (isset($_POST['save_acc_settings'])) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
-        die('<div class="alert alert-danger">Security token invalid.</div>');
+        die('<div class="alert alert-danger">' . __('security_token_invalid') . '</div>');
     }
     set_setting('acc_company_name', $_POST['acc_company_name']);
     set_setting('acc_address', $_POST['acc_address']);
@@ -82,16 +82,16 @@ $customers = $stmt->fetchAll();
                         </thead>
                         <tbody>
                             <?php if (empty($invoices)): ?>
-                                <tr><td colspan="7" class="text-center py-5 text-muted">No invoices found.</td></tr>
+                                <tr><td colspan="7" class="text-center py-5 text-muted"><?php echo __('no_invoices_found'); ?></td></tr>
                             <?php else: ?>
                                 <?php foreach ($invoices as $inv): ?>
                                 <tr>
                                     <td class="fw-bold">
-                                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', 'Invoice <?php echo $inv['invoice_number']; ?>')" class="text-decoration-underline">
+                                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" class="text-decoration-underline">
                                             <?php echo htmlspecialchars($inv['invoice_number']); ?>
                                         </a>
                                         <?php if($inv['order_id']): ?>
-                                            <div class="small text-muted fw-normal"><i class="fas fa-link me-1"></i>Order #<?php echo $inv['order_id']; ?></div>
+                                            <div class="small text-muted fw-normal"><i class="fas fa-link me-1"></i><?php echo __('order'); ?> #<?php echo $inv['order_id']; ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td><?php echo date('d.m.Y', strtotime($inv['date_issue'])); ?></td>
@@ -101,13 +101,13 @@ $customers = $stmt->fetchAll();
                                     <td class="fw-bold"><?php echo number_format($inv['total_amount'], 2, '.', ' ') . ' ' . $inv['currency']; ?></td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', 'Invoice <?php echo $inv['invoice_number']; ?>')" title="Preview"><i class="fas fa-eye"></i></button>
-                                            <button class="btn btn-outline-success" onclick="openUniversalPreview('print_invoice_thermal.php?id=<?php echo $inv['id']; ?>', 'Receipt <?php echo $inv['invoice_number']; ?>')" title="Thermal"><i class="fas fa-receipt"></i></button>
+                                            <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" title="<?php echo __('preview'); ?>"><i class="fas fa-eye"></i></button>
+                                            <button class="btn btn-outline-success" onclick="openUniversalPreview('print_invoice_thermal.php?id=<?php echo $inv['id']; ?>', '<?php echo __('thermal_receipt'); ?> <?php echo $inv['invoice_number']; ?>')" title="<?php echo __('thermal_receipt'); ?>"><i class="fas fa-receipt"></i></button>
                                             <button class="btn btn-outline-primary" onclick="editInvoice(<?php echo $inv['id']; ?>)" title="<?php echo __('edit'); ?>"><i class="fas fa-edit"></i></button>
-                                            <button class="btn btn-outline-warning" onclick="createCreditNote(<?php echo $inv['id']; ?>)" title="Credit Note"><i class="fas fa-undo"></i></button>
+                                            <button class="btn btn-outline-warning" onclick="createCreditNote(<?php echo $inv['id']; ?>)" title="<?php echo __('credit_note'); ?>"><i class="fas fa-undo"></i></button>
                                             <button class="btn btn-outline-info" onclick="exportPohoda(<?php echo $inv['id']; ?>)" title="Pohoda"><i class="fas fa-file-export"></i></button>
                                             <button class="btn btn-outline-secondary" onclick="exportS3(<?php echo $inv['id']; ?>)" title="S3 Money"><i class="fas fa-file-csv"></i></button>
-                                            <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', 'Print Invoice')"><i class="fas fa-print"></i></button>
+                                            <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('print'); ?> <?php echo __('invoice'); ?>')"><i class="fas fa-print"></i></button>
                                             <button class="btn btn-outline-danger" onclick="deleteInvoice(<?php echo $inv['id']; ?>)"><i class="fas fa-trash"></i></button>
                                         </div>
                                     </td>
@@ -129,7 +129,7 @@ $customers = $stmt->fetchAll();
                         <div class="card bg-dark bg-opacity-25 border-0 text-center p-3">
                             <h6 class="text-muted text-uppercase mb-2"><?php echo __('status_' . $s['status']); ?></h6>
                             <h3 class="mb-0"><?php echo number_format($s['total'], 2, '.', ' '); ?> <small>Kč</small></h3>
-                            <div class="text-primary small mt-1"><?php echo $s['count']; ?> ks</div>
+                            <div class="text-primary small mt-1"><?php echo $s['count']; ?> <?php echo __('pieces_short'); ?></div>
                         </div>
                     </div>
                     <?php endforeach; ?>
@@ -174,26 +174,26 @@ $customers = $stmt->fetchAll();
                         
                         <div id="customer_override_fields" style="display:none;" class="row g-3 mt-1 border border-secondary rounded p-3 bg-dark bg-opacity-25">
                             <div class="col-md-6">
-                                <label class="form-label">Customer Name (Override)</label>
+                                <label class="form-label"><?php echo __('customer_name_override'); ?></label>
                                 <input type="text" name="cust_name" id="inv_cust_name" class="form-control">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">ICO (Override)</label>
+                                <label class="form-label"><?php echo __('company_id_override'); ?></label>
                                 <input type="text" name="cust_ico" id="inv_cust_ico" class="form-control">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label">DIC (Override)</label>
+                                <label class="form-label"><?php echo __('vat_id_override'); ?></label>
                                 <input type="text" name="cust_dic" id="inv_cust_dic" class="form-control">
                             </div>
                             <div class="col-md-12">
-                                <label class="form-label">Address (Override)</label>
+                                <label class="form-label"><?php echo __('address_override'); ?></label>
                                 <textarea name="cust_address" id="inv_cust_address" class="form-control" rows="2"></textarea>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Create from Order ID</label>
+                            <label class="form-label"><?php echo __('create_from_order_id'); ?></label>
                             <div class="input-group">
-                                <input type="number" id="from_order_id" class="form-control" placeholder="Order ID">
+                                <input type="number" id="from_order_id" class="form-control" placeholder="<?php echo __('order_id'); ?>">
                                 <button type="button" class="btn btn-outline-primary" onclick="loadFromOrder()"><i class="fas fa-download"></i></button>
                             </div>
                         </div>
@@ -221,7 +221,7 @@ $customers = $stmt->fetchAll();
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Payment Method</label>
+                            <label class="form-label"><?php echo __('payment_method'); ?></label>
                             <select name="payment_method" id="inv_payment_method" class="form-select">
                                 <option value="bank_transfer"><?php echo __('bank_transfer'); ?></option>
                                 <option value="cash"><?php echo __('cash'); ?></option>
@@ -258,7 +258,7 @@ $customers = $stmt->fetchAll();
                     
                     <div class="row mt-3">
                         <div class="col-md-8">
-                            <label class="form-label">Notes (internal or footer)</label>
+                            <label class="form-label"><?php echo __('notes_internal_footer'); ?></label>
                             <textarea name="notes" id="inv_notes" class="form-control" rows="3"></textarea>
                         </div>
                         <div class="col-md-4">
@@ -268,7 +268,7 @@ $customers = $stmt->fetchAll();
                                     <span id="subtotal_val">0.00 Kč</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2">
-                                    <span>VAT:</span>
+                                    <span><?php echo __('vat_short'); ?>:</span>
                                     <span id="vat_val">0.00 Kč</span>
                                 </div>
                                 <hr>
@@ -331,11 +331,11 @@ $customers = $stmt->fetchAll();
                             <input type="text" name="acc_bank_account" class="form-control" value="<?php echo get_setting('acc_bank_account'); ?>">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">IBAN</label>
+                            <label class="form-label"><?php echo __('iban'); ?></label>
                             <input type="text" name="acc_iban" class="form-control" value="<?php echo get_setting('acc_iban'); ?>">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">SWIFT</label>
+                            <label class="form-label"><?php echo __('swift'); ?></label>
                             <input type="text" name="acc_swift" class="form-control" value="<?php echo get_setting('acc_swift'); ?>">
                         </div>
                         <hr>
