@@ -459,3 +459,20 @@ document.addEventListener('DOMContentLoaded', function() {
         else if (parts.length === 1 && parts[0].length >= 2) av.textContent = parts[0].substring(0,2).toUpperCase();
     }
 });
+
+/* Smart topbar "Nová zakázka": open modal if present, else navigate */
+document.addEventListener('DOMContentLoaded', function() {
+    var top = document.getElementById('crmTopbarNewOrder');
+    var modalEl = document.getElementById('newOrderModal');
+    if (top && modalEl && typeof bootstrap !== 'undefined') {
+        top.addEventListener('click', function(e){
+            e.preventDefault();
+            var m = bootstrap.Modal.getOrCreateInstance(modalEl);
+            m.show();
+        });
+    }
+    /* Auto-open if URL hash points to #newOrderModal */
+    if (modalEl && (window.location.hash === '#newOrderModal') && typeof bootstrap !== 'undefined') {
+        setTimeout(function(){ bootstrap.Modal.getOrCreateInstance(modalEl).show(); }, 150);
+    }
+});
