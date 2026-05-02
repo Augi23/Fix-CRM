@@ -775,8 +775,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="modal-footer bg-transparent border-secondary crm-wizard-footer">
                     <button type="button" class="btn btn-secondary" data-wizard-prev hidden>← Zpět</button>
-                    <button type="button" class="btn btn-primary" data-wizard-next>Pokračovat →</button>
-                    <button type="submit" class="btn btn-primary" data-wizard-submit hidden>Vytvořit zakázku</button>
+                    <button type="button" class="btn btn-primary" data-wizard-action>Pokračovat →</button>
                 </div>
             </form>
         </div>

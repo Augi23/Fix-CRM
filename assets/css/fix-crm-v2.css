@@ -2307,14 +2307,26 @@ p, span, label, .small, small,
 }
 
 /* 4) Wizard modal dropdown - aby se nevykresloval mimo viditelnou část */
-.crm-wizard-modal .modal-dialog,
-.crm-wizard-modal .modal-content,
-.crm-wizard-modal .modal-body {
+.crm-wizard-modal .modal-dialog {
   overflow: visible !important;
 }
 
+.crm-wizard-modal .modal-content {
+  overflow: visible !important;
+}
+
+.crm-wizard-modal .modal-body {
+  overflow: visible !important;
+  position: relative;
+}
+
 .crm-wizard-modal .select2-container,
-.crm-wizard-modal .select2-container--open,
-.crm-wizard-modal .select2-dropdown {
+.crm-wizard-modal .select2-container--open {
   z-index: 4000 !important;
+  position: relative !important;
+}
+
+.crm-wizard-modal .select2-dropdown {
+  z-index: 4001 !important;
+  position: absolute !important;
 }

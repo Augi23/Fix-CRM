@@ -367,9 +367,9 @@ function openPreviewInNewTab() {
         var steps = modal.querySelectorAll('.crm-wizard-step');
         var segs  = modal.querySelectorAll('.crm-wizard-seg');
         var prevBtn = modal.querySelector('[data-wizard-prev]');
-        var nextBtn = modal.querySelector('[data-wizard-next]');
-        var subBtn  = modal.querySelector('[data-wizard-submit]');
+        var actionBtn = modal.querySelector('[data-wizard-action]');
         var curEl   = modal.querySelector('[data-wizard-current]');
+        var form = modal.querySelector('form');
         var cur = 1;
         var total = steps.length || 3;
 
@@ -378,13 +378,13 @@ function openPreviewInNewTab() {
             segs.forEach(function(s){ s.classList.toggle('active', parseInt(s.dataset.seg,10) <= cur); });
             if (curEl) curEl.textContent = cur;
             if (prevBtn) prevBtn.hidden = (cur === 1);
-            if (nextBtn) nextBtn.hidden = (cur === total);
-            if (subBtn)  subBtn.hidden  = (cur !== total);
+            if (actionBtn) {
+                actionBtn.textContent = (cur === total) ? 'Vytvořit zakázku' : 'Pokračovat →';
+            }
             if (cur === total) fillSummary();
         }
 
         function fillSummary() {
-            var form = modal.querySelector('form');
             if (!form) return;
             var fd = new FormData(form);
             var fn = (fd.get('first_name')||'').toString().trim();
@@ -407,7 +407,7 @@ function openPreviewInNewTab() {
         }
 
         if (prevBtn) prevBtn.addEventListener('click', function(e){ e.preventDefault(); if(cur>1){ cur--; render(); }});
-        if (nextBtn) nextBtn.addEventListener('click', function(e){
+        if (actionBtn) actionBtn.addEventListener('click', function(e){
             e.preventDefault();
 
             if (cur === 1) {
@@ -418,10 +418,8 @@ function openPreviewInNewTab() {
                     }
                     return;
                 }
-            }
-
-            if (cur === 2) {
-                var form = modal.querySelector('form');
+                cur++; render();
+            } else if (cur === 2) {
                 var fd = form ? new FormData(form) : null;
                 var requiredKeys = ['device_type', 'order_type', 'device_brand', 'device_model', 'problem_description'];
                 for (var k = 0; k < requiredKeys.length; k++) {
@@ -435,9 +433,10 @@ function openPreviewInNewTab() {
                         return;
                     }
                 }
+                cur++; render();
+            } else if (cur === total) {
+                if (form) form.submit();
             }
-
-            if (cur < total) { cur++; render(); }
         });
 
         modal.addEventListener('hidden.bs.modal', function(){ cur = 1; render(); });
