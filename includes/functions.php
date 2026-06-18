@@ -1520,6 +1520,7 @@ function ensureOrderWorkLogSchema(): void {
             started_at DATETIME NOT NULL,
             ended_at DATETIME NULL,
             duration_minutes INT NOT NULL DEFAULT 0,
+            rate_snapshot DECIMAL(10,2) NULL DEFAULT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_owl_order (order_id),
             INDEX idx_owl_tech (technician_id),
@@ -1528,6 +1529,9 @@ function ensureOrderWorkLogSchema(): void {
     } catch (Throwable $e) {
         // best-effort schema guard
     }
+    // Add rate_snapshot to an already-existing table (earnings are priced at the rate in effect
+    // when the segment was worked, so editing a rate later does not re-price past payroll).
+    try { $pdo->exec("ALTER TABLE order_work_log ADD COLUMN rate_snapshot DECIMAL(10,2) NULL DEFAULT NULL"); } catch (Throwable $e) {}
 
     // One-time backfill: seed a single segment per historical order from its cumulative total,
     // credited to its (current) technician, so existing reports keep their numbers. Going forward,
@@ -1535,11 +1539,12 @@ function ensureOrderWorkLogSchema(): void {
     try {
         if (get_setting('work_log_backfilled', '') !== '1') {
             // NOT EXISTS makes the backfill idempotent (safe against a concurrent double-run).
-            $pdo->exec("INSERT INTO order_work_log (order_id, technician_id, started_at, ended_at, duration_minutes)
+            $pdo->exec("INSERT INTO order_work_log (order_id, technician_id, started_at, ended_at, duration_minutes, rate_snapshot)
                 SELECT o.id, o.technician_id,
                        COALESCE(o.work_started_at, o.work_finished_at, o.updated_at, o.created_at),
                        COALESCE(o.work_finished_at, o.updated_at, o.created_at),
-                       COALESCE(o.work_duration_seconds, 0)
+                       COALESCE(o.work_duration_seconds, 0),
+                       COALESCE((SELECT t.engineer_rate FROM technicians t WHERE t.id = o.technician_id), 0)
                 FROM orders o
                 WHERE COALESCE(o.work_duration_seconds, 0) > 0
                   AND NOT EXISTS (SELECT 1 FROM order_work_log w2 WHERE w2.order_id = o.id)");
@@ -1559,9 +1564,14 @@ function workSegmentClose(int $orderId): void {
     global $pdo;
     if ($orderId <= 0) return;
     try {
-        $pdo->prepare("UPDATE order_work_log
-            SET ended_at = NOW(), duration_minutes = GREATEST(0, TIMESTAMPDIFF(MINUTE, started_at, NOW()))
-            WHERE order_id = ? AND ended_at IS NULL")->execute([$orderId]);
+        // Snapshot the technician's rate in effect right now, so this segment's pay is fixed
+        // even if the rate is edited later.
+        $pdo->prepare("UPDATE order_work_log owl
+            LEFT JOIN technicians t ON t.id = owl.technician_id
+            SET owl.ended_at = NOW(),
+                owl.duration_minutes = GREATEST(0, TIMESTAMPDIFF(MINUTE, owl.started_at, NOW())),
+                owl.rate_snapshot = COALESCE(t.engineer_rate, owl.rate_snapshot, 0)
+            WHERE owl.order_id = ? AND owl.ended_at IS NULL")->execute([$orderId]);
     } catch (Throwable $e) {
         // best-effort
     }

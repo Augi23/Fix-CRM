@@ -137,18 +137,22 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
         $seg_params[] = $tech_id;
     }
     try {
+        // Earnings priced at each segment's snapshot rate (rate when worked), falling back to the
+        // technician's current rate for any segment recorded before snapshots existed.
         $seg_stmt = $pdo->prepare(
-            "SELECT wl.technician_id AS tech, COALESCE(SUM(wl.duration_minutes), 0) AS mins
+            "SELECT wl.technician_id AS tech,
+                    COALESCE(SUM(wl.duration_minutes), 0) AS mins,
+                    COALESCE(SUM((wl.duration_minutes / 60.0) * COALESCE(wl.rate_snapshot, t.engineer_rate, 0)), 0) AS earn
              FROM order_work_log wl
              JOIN orders o ON o.id = wl.order_id
+             LEFT JOIN technicians t ON t.id = wl.technician_id
              WHERE wl.ended_at BETWEEN ? AND ? AND o.status IN (" . sqlPlaceholders($doneStatuses) . ")" . $seg_cond . "
              GROUP BY wl.technician_id"
         );
         $seg_stmt->execute($seg_params);
         while ($seg = $seg_stmt->fetch(PDO::FETCH_ASSOC)) {
-            $mins = (int)$seg['mins'];
-            $work_minutes += $mins;
-            $engineer_earnings += ($mins / 60) * ($rates[$seg['tech']] ?? 0);
+            $work_minutes += (int)$seg['mins'];
+            $engineer_earnings += (float)$seg['earn'];
         }
     } catch (Throwable $e) {
         // order_work_log may not exist yet on a freshly migrated DB → no labour stats this run
@@ -162,7 +166,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
         'in_progress' => $in_progress,
         'completed' => $completed,
         'cancelled' => $cancelled,
-        'work_seconds' => $work_minutes,
+        'work_minutes' => $work_minutes,
         'revenue' => $revenue,
         'expenses' => $expenses,
         'parts_cost' => $parts_cost,
@@ -232,7 +236,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         $lastBranchId = null;
                         $totals = [
                             'received' => 0, 'in_progress' => 0, 'completed' => 0, 'cancelled' => 0,
-                            'work_seconds' => 0,
+                            'work_minutes' => 0,
                             'revenue' => 0, 'parts_cost' => 0, 'expenses' => 0,
                             'earnings' => 0, 'profit' => 0
                         ];
@@ -251,7 +255,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             $totals['in_progress'] += $s['in_progress'];
                             $totals['completed'] += $s['completed'];
                             $totals['cancelled'] += $s['cancelled'];
-                            $totals['work_seconds'] += $s['work_seconds'];
+                            $totals['work_minutes'] += $s['work_minutes'];
                             $totals['revenue'] += $s['revenue'];
                             $totals['parts_cost'] += $s['parts_cost'];
                             $totals['expenses'] += $s['expenses'];
@@ -270,7 +274,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                     <?php echo $s['completed']; ?>
                                 </a>
                             </td>
-                            <td class="text-end"><?php echo formatWorkDuration($s['work_seconds']); ?></td>
+                            <td class="text-end"><?php echo formatWorkDuration($s['work_minutes']); ?></td>
                             <td class="text-end"><?php echo formatMoney($s['revenue']); ?></td>
                             <td class="text-end text-muted small"><?php echo $s['parts_cost'] > 0 ? '-'.formatMoney($s['parts_cost']) : '—'; ?></td>
                             <td class="text-end text-muted small"><?php echo $s['expenses'] > 0 ? '-'.formatMoney($s['expenses']) : '—'; ?></td>
@@ -284,7 +288,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <tr>
                             <td><?php echo __('total_period'); ?></td>
                             <td class="text-center"><?php echo $totals['completed']; ?></td>
-                            <td class="text-end"><?php echo formatWorkDuration($totals['work_seconds']); ?></td>
+                            <td class="text-end"><?php echo formatWorkDuration($totals['work_minutes']); ?></td>
                             <td class="text-end"><?php echo formatMoney($totals['revenue']); ?></td>
                             <td class="text-end text-muted small">-<?php echo formatMoney($totals['parts_cost']); ?></td>
                             <td class="text-end text-muted small">-<?php echo formatMoney($totals['expenses']); ?></td>
@@ -419,7 +423,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     <div class="col-md-3">
                         <div class="card p-3 border shadow-none text-center">
                             <div class="small text-muted mb-1"><?php echo __('worked'); ?></div>
-                            <h3 class="mb-0 text-warning"><?php echo formatWorkDuration($is['work_seconds']); ?></h3>
+                            <h3 class="mb-0 text-warning"><?php echo formatWorkDuration($is['work_minutes']); ?></h3>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -462,7 +466,8 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 SELECT o.*, c.first_name, c.last_name,
                                     COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) AS finance_date,
                                     (SELECT SUM(oi.quantity * invt.cost_price) FROM order_items oi JOIN inventory invt ON oi.inventory_id = invt.id WHERE oi.order_id = o.id) as inventory_cost,
-                                    (SELECT COALESCE(SUM(wl.duration_minutes), 0) FROM order_work_log wl WHERE wl.order_id = o.id AND wl.technician_id = ? AND wl.ended_at BETWEEN ? AND ?) AS tech_minutes
+                                    (SELECT COALESCE(SUM(wl.duration_minutes), 0) FROM order_work_log wl WHERE wl.order_id = o.id AND wl.technician_id = ? AND wl.ended_at BETWEEN ? AND ?) AS tech_minutes,
+                                    (SELECT COALESCE(SUM((wl.duration_minutes / 60.0) * COALESCE(wl.rate_snapshot, ?)), 0) FROM order_work_log wl WHERE wl.order_id = o.id AND wl.technician_id = ? AND wl.ended_at BETWEEN ? AND ?) AS tech_earn
                                 FROM orders o
                                 JOIN customers c ON o.customer_id = c.id
                                 LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'
@@ -470,7 +475,11 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                   AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
                                 ORDER BY finance_date DESC
                             ");
-                            $stmt->execute(array_merge([$selected_tech_id, $start_date . ' 00:00:00', $end_date . ' 23:59:59', $selected_tech_id], $doneStatuses, [$start_date, $end_date]));
+                            $stmt->execute(array_merge(
+                                [$selected_tech_id, $start_date . ' 00:00:00', $end_date . ' 23:59:59'],
+                                [(float)$is['engineer_rate'], $selected_tech_id, $start_date . ' 00:00:00', $end_date . ' 23:59:59'],
+                                [$selected_tech_id], $doneStatuses, [$start_date, $end_date]
+                            ));
                             
                             while($r = $stmt->fetch()): 
                                 $rev = $r['final_cost'] !== null ? $r['final_cost'] : $r['estimated_cost'];
@@ -480,7 +489,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 $net = $rev - $p_cost - $e_cost;
                                 if ($net < 0) $net = 0;
                                 $techMinutes = (int)($r['tech_minutes'] ?? 0);
-                                $earn = ($techMinutes / 60) * (float)$is['engineer_rate'];
+                                $earn = (float)($r['tech_earn'] ?? 0);
                             ?>
                             <tr>
                                 <td><a href="view_order.php?id=<?php echo $r['id']; ?>&return=<?php echo $current_url; ?>" class="fw-bold">#<?php echo $r['id']; ?></a></td>

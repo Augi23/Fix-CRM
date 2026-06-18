@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS `order_work_log` (
     `started_at`       DATETIME NOT NULL,
     `ended_at`         DATETIME NULL,
     `duration_minutes` INT NOT NULL DEFAULT 0,
+    `rate_snapshot`    DECIMAL(10,2) NULL DEFAULT NULL,
     `created_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX `idx_owl_order` (`order_id`),
     INDEX `idx_owl_tech`  (`technician_id`),
