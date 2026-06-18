@@ -1,8 +1,9 @@
 <?php
 /**
  * Label print for Brother QL-810W — 62×38 mm.
- * Big bold order number + QR code (opens the order when scanned), problem description, optional PIN.
- * Auto-fits the code to width and triggers the browser print dialog (pick the Brother QL-810W there).
+ * Big bold order number + a single 1D Code128 barcode (the order id) — readable by the
+ * X-9100 desk laser scanner AND by the in-app phone scanner (one code for everything),
+ * plus problem description and optional PIN. Auto-fits the number, then prints.
  */
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
@@ -29,18 +30,14 @@ if (!canAccessOrderBranch($order)) {
 $code    = orderDisplayCode($order);
 $problem = trim((string)($order['problem_description'] ?? ''));
 $pin     = trim((string)($order['pin_code'] ?? ''));
-
-// Absolute URL of the order — encoded into the QR so a scan opens the order.
-$scheme   = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
-$host     = (string)($_SERVER['HTTP_HOST'] ?? '');
-$orderUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/view_order.php?id=' . (int)$order['id'];
+$orderId = (int)$order['id'];
 ?>
 <!DOCTYPE html>
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
 <title>Štítek <?php echo htmlspecialchars($code); ?></title>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
     @page { size: 62mm 38mm; margin: 0; }
     html, body { margin: 0; padding: 0; }
@@ -48,38 +45,36 @@ $orderUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/view_order.php?i
     .label {
         box-sizing: border-box;
         width: 62mm; height: 38mm;
-        padding: 2mm 2.5mm;
+        padding: 1.6mm 2.5mm;
         display: flex; flex-direction: column;
         overflow: hidden;
     }
-    .top { display: flex; align-items: flex-start; gap: 1.5mm; }
-    .top .code-wrap { flex: 1 1 auto; min-width: 0; }
     .code {
         display: inline-block;
         font-weight: 900;
         line-height: 1;
         letter-spacing: -0.3px;
         white-space: nowrap;
-        font-size: 9mm; /* JS shrinks to fit width */
+        font-size: 8mm; /* JS shrinks to fit width */
     }
-    .qr { flex: 0 0 auto; width: 14mm; height: 14mm; }
-    .qr svg, .qr img { width: 14mm; height: 14mm; display: block; }
+    .barcode { text-align: center; line-height: 0; margin-top: 0.8mm; }
+    .barcode svg { display: inline-block; }
     .problem {
-        font-size: 3mm;
-        line-height: 1.15;
-        margin-top: 1.2mm;
+        font-size: 2.9mm;
+        line-height: 1.12;
+        margin-top: 1mm;
         flex: 1 1 auto;
         overflow: hidden;
         display: -webkit-box;
-        -webkit-line-clamp: 3;
+        -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
     }
     .pin {
-        font-size: 3.6mm;
-        margin-top: 0.8mm;
+        font-size: 3.4mm;
+        margin-top: 0.6mm;
         font-weight: bold;
         border-top: 0.3mm solid #000;
-        padding-top: 0.7mm;
+        padding-top: 0.6mm;
         white-space: nowrap;
     }
     .pin b { font-weight: 900; }
@@ -95,10 +90,8 @@ $orderUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/view_order.php?i
 </head>
 <body>
 <div class="label">
-    <div class="top">
-        <div class="code-wrap"><div class="code" id="labelCode"><?php echo htmlspecialchars($code); ?></div></div>
-        <div class="qr" id="qr"></div>
-    </div>
+    <div><span class="code" id="labelCode"><?php echo htmlspecialchars($code); ?></span></div>
+    <div class="barcode" id="barcode"></div>
     <?php if ($problem !== ''): ?>
         <div class="problem"><?php echo nl2br(htmlspecialchars($problem)); ?></div>
     <?php endif; ?>
@@ -108,34 +101,41 @@ $orderUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/view_order.php?i
 </div>
 <div class="toolbar"><button onclick="window.print()">Vytisknout štítek</button></div>
 <script>
-    var ORDER_URL = <?php echo json_encode($orderUrl, JSON_UNESCAPED_SLASHES); ?>;
+    var ORDER_ID = <?php echo json_encode((string)$orderId); ?>;
 
     function fitCode() {
         var el = document.getElementById('labelCode');
         if (!el) return;
-        var avail = el.parentElement.clientWidth - 1;
-        var size = 56;
+        var avail = (el.parentElement.clientWidth) - 1;
+        var size = 50;
         el.style.fontSize = size + 'px';
-        // .code is inline-block → offsetWidth is the actual text width
         while (el.offsetWidth > avail && size > 8) { size -= 1; el.style.fontSize = size + 'px'; }
     }
 
-    function doPrint() {
-        fitCode();
-        setTimeout(function() { window.print(); }, 150);
+    function renderBarcode() {
+        var box = document.getElementById('barcode');
+        if (!box || typeof window.JsBarcode !== 'function') return;
+        try {
+            var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            box.appendChild(svg);
+            JsBarcode(svg, ORDER_ID, { format: 'CODE128', displayValue: false, margin: 0, height: 60, width: 2 });
+            // Uniform-scale to fit the label width and ~10mm height (no aspect distortion → stays scannable).
+            var w = parseFloat(svg.getAttribute('width')) || 1;
+            var h = parseFloat(svg.getAttribute('height')) || 1;
+            var maxW = box.clientWidth;
+            var maxH = Math.round(10 * (96 / 25.4)); // ~10mm in px
+            var scale = Math.min(maxW / w, maxH / h);
+            if (scale > 0 && isFinite(scale)) {
+                svg.setAttribute('width', Math.floor(w * scale) + 'px');
+                svg.setAttribute('height', Math.floor(h * scale) + 'px');
+            }
+        } catch (e) {}
     }
 
     window.addEventListener('load', function() {
-        var qrBox = document.getElementById('qr');
-        try {
-            if (window.qrcode && qrBox) {
-                var qr = qrcode(0, 'M'); // auto type, medium error correction
-                qr.addData(ORDER_URL);
-                qr.make();
-                qrBox.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
-            }
-        } catch (e) {}
-        doPrint();
+        fitCode();
+        renderBarcode();
+        setTimeout(function() { window.print(); }, 200);
     });
 </script>
 </body>

@@ -456,26 +456,22 @@ function localizedOrderStatusLabel(string $status): string {
             </div>
         </div>
 
-        <!-- QR kód: naskenuj (Foťákem nebo skenerem v CRM) → otevře tuto zakázku -->
+        <!-- Čárový kód zakázky (Code128): X-9100 i mobil přes náš skener → otevře tuto zakázku -->
         <div class="card glass-card border-0 mb-4">
             <div class="card-body text-center py-3">
-                <div class="text-white-75 small mb-2"><i class="fas fa-qrcode me-1"></i> <?php echo __('scan_to_open_order'); ?></div>
-                <div id="orderQr" style="display:inline-block; background:#fff; padding:8px; border-radius:8px; line-height:0;"></div>
+                <div class="text-white-75 small mb-2"><i class="fas fa-barcode me-1"></i> <?php echo __('scan_to_open_order'); ?></div>
+                <div id="orderBarcode" style="display:inline-block; background:#fff; padding:8px 10px; border-radius:8px; line-height:0;"></div>
             </div>
         </div>
-        <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
         <script>
         (function() {
-            var box = document.getElementById('orderQr');
-            if (!box || typeof window.qrcode !== 'function') { if (box) box.style.display = 'none'; return; }
+            var box = document.getElementById('orderBarcode');
+            if (!box || typeof window.JsBarcode !== 'function') { if (box) box.style.display = 'none'; return; }
             try {
-                var url = window.location.origin + '/view_order.php?id=<?php echo (int)$order['id']; ?>';
-                var qr = qrcode(0, 'M');
-                qr.addData(url);
-                qr.make();
-                box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
-                var svg = box.querySelector('svg');
-                if (svg) { svg.style.width = '128px'; svg.style.height = '128px'; }
+                var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                box.appendChild(svg);
+                JsBarcode(svg, '<?php echo (int)$order['id']; ?>', { format: 'CODE128', displayValue: true, fontSize: 14, margin: 0, height: 56, width: 2 });
             } catch (e) { box.style.display = 'none'; }
         })();
         </script>

@@ -1070,10 +1070,18 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.show();
 
         loadLib().then(function() {
-            scanner = new Html5Qrcode('qrReader');
+            // Read both QR and 1D Code128 — jeden štítek (Code128) pro stolní čtečku i mobil.
+            var qrCfg = {};
+            if (window.Html5QrcodeSupportedFormats) {
+                qrCfg.formatsToSupport = [
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.CODE_128
+                ];
+            }
+            scanner = new Html5Qrcode('qrReader', qrCfg);
             return scanner.start(
                 { facingMode: 'environment' },
-                { fps: 10, qrbox: { width: 220, height: 220 } },
+                { fps: 10, qrbox: { width: 240, height: 160 } },
                 function onSuccess(decodedText) {
                     if (navigateToScanned(decodedText)) { stopScan(); }
                     else if (msgEl) { msgEl.textContent = window.LANG_SCAN_NOT_FOUND || 'Neznámý kód'; }
@@ -1090,5 +1098,47 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('DOMContentLoaded', function() {
         var btn = document.getElementById('scanOrderBtn');
         if (btn) btn.addEventListener('click', startScan);
+    });
+}());
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Stolní 1D čtečka (keyboard-wedge, např. X-9100) + české rozložení klávesnice:
+   čtečka „napíše" číslice horní řadou → na CZ layoutu z nich vzniknou háčky (+ě š č ř ž ý á í é).
+   Globálně zachytíme rychlý sken (mimo editovatelná pole), znaky dekódujeme zpět na čísla
+   a otevřeme danou zakázku. Funguje i když čtečka posílá čísla správně (mapuje jen háčky).
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function() {
+    var MAP = { '+': '1', 'ě': '2', 'š': '3', 'č': '4', 'ř': '5', 'ž': '6', 'ý': '7', 'á': '8', 'í': '9', 'é': '0' };
+    function demangle(s) {
+        var out = '';
+        for (var i = 0; i < s.length; i++) { out += (MAP[s[i]] || s[i]); }
+        return out;
+    }
+    var buf = '', lastTs = 0, flushTimer = null;
+
+    function flush() {
+        if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+        var raw = buf; buf = '';
+        if (raw.length < 3) return;
+        var digits = demangle(raw).replace(/\D/g, '');
+        if (digits) { window.location.href = 'view_order.php?id=' + encodeURIComponent(digits); }
+    }
+
+    document.addEventListener('keydown', function(e) {
+        var ae = document.activeElement;
+        var editable = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' ||
+                              ae.tagName === 'SELECT' || ae.isContentEditable);
+        if (editable) { buf = ''; return; } // nepleť se do běžného psaní
+
+        var now = Date.now();
+        if (now - lastTs > 120) { buf = ''; } // pomalý vstup = nový sken
+        lastTs = now;
+
+        if (e.key === 'Enter') { flush(); return; }
+        if (e.key && e.key.length === 1) {
+            buf += e.key;
+            if (flushTimer) clearTimeout(flushTimer);
+            flushTimer = setTimeout(flush, 250); // fallback, když čtečka neposílá Enter
+        }
     });
 }());
