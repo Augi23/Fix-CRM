@@ -1043,14 +1043,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function navigateToScanned(text) {
         text = (text || '').toString().trim();
+        if (!text) return false;
+        // celý odkaz na zakázku
         var m = text.match(/view_order\.php\?id=(\d+)/i);
-        var id = m ? m[1] : (/^\d+$/.test(text) ? text : null);
-        if (id) { window.location.href = 'view_order.php?id=' + encodeURIComponent(id); return true; }
+        if (m) { window.location.href = 'view_order.php?id=' + m[1]; return true; }
         try {
             var u = new URL(text);
             if (u.host === window.location.host) { window.location.href = text; return true; }
         } catch (e) {}
-        return false;
+        // jinak = číslo zakázky (APFAZ… nebo id) → resolver ho přeloží na zakázku
+        window.location.href = 'view_order.php?scan=' + encodeURIComponent(text);
+        return true;
     }
 
     function stopScan() {
@@ -1108,7 +1111,11 @@ document.addEventListener('DOMContentLoaded', function() {
    a otevřeme danou zakázku. Funguje i když čtečka posílá čísla správně (mapuje jen háčky).
    ═══════════════════════════════════════════════════════════════════════════ */
 (function() {
-    var MAP = { '+': '1', 'ě': '2', 'š': '3', 'č': '4', 'ř': '5', 'ž': '6', 'ý': '7', 'á': '8', 'í': '9', 'é': '0' };
+    // Číslice horní řady → háčky; navíc CZ QWERTZ prohazuje Y↔Z (proto i písmena v APFAZ…).
+    var MAP = {
+        '+': '1', 'ě': '2', 'š': '3', 'č': '4', 'ř': '5', 'ž': '6', 'ý': '7', 'á': '8', 'í': '9', 'é': '0',
+        'y': 'z', 'z': 'y', 'Y': 'Z', 'Z': 'Y'
+    };
     function demangle(s) {
         var out = '';
         for (var i = 0; i < s.length; i++) { out += (MAP[s[i]] || s[i]); }
@@ -1120,8 +1127,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
         var raw = buf; buf = '';
         if (raw.length < 3) return;
-        var digits = demangle(raw).replace(/\D/g, '');
-        if (digits) { window.location.href = 'view_order.php?id=' + encodeURIComponent(digits); }
+        // dekóduj celé číslo zakázky (APFAZ… i čísla) a nech ho přeložit resolverem
+        var value = demangle(raw).replace(/[^0-9A-Za-z\-]/g, '');
+        if (value) { window.location.href = 'view_order.php?scan=' + encodeURIComponent(value); }
     }
 
     document.addEventListener('keydown', function(e) {

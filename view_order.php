@@ -1,6 +1,24 @@
 <?php
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+
+// Čárový kód / QR → otevři zakázku: ?scan=<číslo zakázky nebo id> se přeloží na konkrétní zakázku.
+// (Musí proběhnout PŘED includes/header.php, který už posílá výstup.)
+if (!isset($_GET['id']) && !isset($_GET['order_id']) && isset($_GET['scan'])) {
+    $scanVal = trim((string)$_GET['scan']);
+    if ($scanVal !== '') {
+        $stmtScan = $pdo->prepare("SELECT id FROM orders WHERE order_code = ? OR id = ? ORDER BY id DESC LIMIT 1");
+        $stmtScan->execute([$scanVal, ctype_digit($scanVal) ? (int)$scanVal : 0]);
+        $resolvedId = $stmtScan->fetchColumn();
+        if ($resolvedId) {
+            header('Location: view_order.php?id=' . (int)$resolvedId);
+        } else {
+            header('Location: orders.php?search=' . urlencode($scanVal));
+        }
+        exit;
+    }
+}
+
 require_once 'includes/header.php';
 
 $id = $_GET['id'] ?? $_GET['order_id'] ?? null;
