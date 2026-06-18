@@ -991,3 +991,30 @@ document.addEventListener('DOMContentLoaded', function() {
         build();
     }
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Select2 + UI zoom: CSS zoom rozhází Select2 pozicování dropdownu (počítá z .offset(),
+   které zoom nezohledňuje → dropdown vyskočí mimo pole). Po otevření dropdown
+   přepozicujeme přes getBoundingClientRect s korekcí na zoom. Při zoomu 100 % no-op.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function() {
+    function repositionSelect2Dropdown() {
+        var z = parseFloat(document.documentElement.style.zoom) || 1;
+        if (Math.abs(z - 1) < 0.001) return;
+        var dd = document.querySelector('.select2-container--open .select2-dropdown')
+              || document.querySelector('.select2-dropdown');
+        if (!dd) return;
+        var ddContainer = dd.parentElement;
+        var field = document.querySelector('.select2-container--open .select2-selection');
+        if (!field || !ddContainer) return;
+        var op = ddContainer.offsetParent || document.body;
+        var fr = field.getBoundingClientRect();
+        var or = op.getBoundingClientRect();
+        ddContainer.style.top   = ((fr.bottom - or.top) / z) + 'px';
+        ddContainer.style.left  = ((fr.left - or.left) / z) + 'px';
+        ddContainer.style.width = (fr.width / z) + 'px';
+    }
+    if (window.jQuery) {
+        jQuery(document).on('select2:open', function() { setTimeout(repositionSelect2Dropdown, 0); });
+    }
+}());
