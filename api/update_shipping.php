@@ -27,7 +27,7 @@ if (!$order_id) {
 }
 
 try {
-    $stmt = $pdo->prepare('SELECT technician_id FROM orders WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT technician_id, branch_id FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $order = $stmt->fetch();
 
@@ -36,7 +36,7 @@ try {
         exit;
     }
 
-    if (!hasPermission('edit_orders') && ($order['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)) {
+    if (!canAccessOrderBranch($order) || (!hasPermission('edit_orders') && ($order['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0))) {
         echo json_encode(['success' => false, 'message' => __('access_denied_msg')]);
         exit;
     }

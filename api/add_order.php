@@ -18,6 +18,7 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 // ── Input validation ──────────────────────────────────────────────────────────
 $customer_id      = filter_input(INPUT_POST, 'customer_id', FILTER_VALIDATE_INT);
 $technician_id    = filter_input(INPUT_POST, 'technician_id', FILTER_VALIDATE_INT) ?: null;
+$branch_id        = isBranchGlobalViewer() ? (filter_input(INPUT_POST, 'branch_id', FILTER_VALIDATE_INT) ?: getDefaultBranchId()) : getCurrentStaffBranchId();
 $device_type      = trim($_POST['device_type'] ?? 'Other');
 $order_type       = trim($_POST['order_type'] ?? 'Non-Warranty');
 $device_brand     = trim($_POST['device_brand'] ?? '');
@@ -31,27 +32,41 @@ $appearance       = trim($_POST['appearance'] ?? '');
 $priority         = in_array($_POST['priority'] ?? '', ['High', 'Normal']) ? $_POST['priority'] : 'Normal';
 $estimated_cost   = max(0, filter_input(INPUT_POST, 'estimated_cost', FILTER_VALIDATE_FLOAT) ?: 0);
 $shipping_method  = trim($_POST['shipping_method'] ?? '') ?: null;
+$status           = getDefaultOrderStatus();
 
 if (!$customer_id || !$device_model) {
     die(__('missing_fields'));
+}
+
+if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
+    die('Vybraný technik nepatří do zvolené pobočky.');
+}
+
+if ($technician_id) {
+    $stmtTechBranch = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? LIMIT 1');
+    $stmtTechBranch->execute([$technician_id]);
+    $techBranchId = (int)$stmtTechBranch->fetchColumn();
+    if ($techBranchId > 0) {
+        $branch_id = $techBranchId;
+    }
 }
 
 try {
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare(
-        "INSERT INTO orders (customer_id, technician_id, device_type, order_type, device_brand, device_model,
-         problem_description, technician_notes, serial_number, serial_number_2, pin_code, appearance, priority, estimated_cost, shipping_method)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO orders (customer_id, technician_id, branch_id, device_type, order_type, device_brand, device_model,
+         problem_description, technician_notes, serial_number, serial_number_2, pin_code, appearance, priority, estimated_cost, shipping_method, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->execute([
-        $customer_id, $technician_id, $device_type, $order_type, $device_brand, $device_model,
+        $customer_id, $technician_id, $branch_id, $device_type, $order_type, $device_brand, $device_model,
         $problem_description, $technician_notes, $serial_number, $serial_number_2,
-        $pin_code, $appearance, $priority, $estimated_cost, $shipping_method
+        $pin_code, $appearance, $priority, $estimated_cost, $shipping_method, $status
     ]);
     $order_id = (int)$pdo->lastInsertId();
 
-    logOrderStatusChange($order_id, '', 'New');
+    logOrderStatusChange($order_id, '', $status);
 
     // ── Secure file upload ────────────────────────────────────────────────────
     if (!empty($_FILES['files']['name'][0])) {
@@ -108,7 +123,7 @@ try {
         'type' => 'order_created',
         'order_id' => (int)$order_id,
         'technician_id' => (int)($technician_id ?? 0),
-        'new_status' => 'New',
+        'new_status' => $status,
         'actor_role' => (string)($_SESSION['role'] ?? ''),
         'actor_tech_id' => (int)($_SESSION['tech_id'] ?? 0),
         'actor_name' => (string)($_SESSION['full_name'] ?? ''),

@@ -2569,53 +2569,68 @@ p, span, label, .small, small,
   box-shadow: 0 0 6px currentColor !important;
 }
 
-/* odstíny nasáté z referenčního vizuálu (2. obrázek, sampled) */
+/* kontrastní a jasně odlišená paleta statusů (dashboard + zakázky) */
 .status-pill--new {
-  background: #0d2041 !important;
-  border-color: #2b79e6 !important;
-  color: #0082ff !important;
+  background: #0b3b78 !important;
+  border-color: #60a5fa !important;
+  color: #eff6ff !important;
+  font-weight: 700 !important;
 }
 
 .status-pill--pending {
-  background: #0d2041 !important;
-  border-color: #2b79e6 !important;
-  color: #0082ff !important;
+  background: #5b3a00 !important;
+  border-color: #f59e0b !important;
+  color: #fff7db !important;
+  font-weight: 700 !important;
 }
 
 .status-pill--progress {
-  background: #1f123e !important;
-  border-color: #7b49ff !important;
-  color: #6530fe !important;
+  background: #3b0764 !important;
+  border-color: #a78bfa !important;
+  color: #f5f3ff !important;
+  font-weight: 700 !important;
 }
 
 .status-pill--waiting {
-  background: #3a2409 !important;
-  border-color: #d78617 !important;
-  color: #ff9b00 !important;
+  background: #7c2d12 !important;
+  border-color: #fb923c !important;
+  color: #fff3e8 !important;
+  font-weight: 700 !important;
 }
 
 .status-pill--completed {
-  background: #123224 !important;
-  border-color: #2d9c5b !important;
-  color: #2cc85c !important;
+  background: #14532d !important;
+  border-color: #4ade80 !important;
+  color: #ecfdf3 !important;
+  font-weight: 700 !important;
+}
+
+.status-pill--uncollected {
+  background: #713f12 !important;
+  border-color: #facc15 !important;
+  color: #fffbe8 !important;
+  font-weight: 700 !important;
 }
 
 .status-pill--collected {
-  background: #2b2736 !important;
-  border-color: #6a6678 !important;
-  color: #a5a2b4 !important;
+  background: #0f4c5c !important;
+  border-color: #22d3ee !important;
+  color: #ecfeff !important;
+  font-weight: 700 !important;
 }
 
 .status-pill--cancelled {
-  background: #3d1222 !important;
-  border-color: #cf3a5d !important;
-  color: #ff3255 !important;
+  background: #7f1d1d !important;
+  border-color: #f87171 !important;
+  color: #fff1f2 !important;
+  font-weight: 700 !important;
 }
 
 .status-pill--default {
-  background: #2b2736 !important;
-  border-color: #6a6678 !important;
-  color: #a5a2b4 !important;
+  background: #334155 !important;
+  border-color: #94a3b8 !important;
+  color: #f1f5f9 !important;
+  font-weight: 700 !important;
 }
 
 /* 7) Zakázky: stejné formátování střední tabulky jako na Nástěnce */

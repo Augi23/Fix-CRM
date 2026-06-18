@@ -27,7 +27,7 @@ try {
     $pdo->beginTransaction();
 
     // Fetch the item and order status
-    $stmt = $pdo->prepare("SELECT oi.*, o.status, o.technician_id FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE oi.id = ?");
+    $stmt = $pdo->prepare("SELECT oi.*, o.status, o.technician_id, o.branch_id FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE oi.id = ?");
     $stmt->execute([$id]);
     $item = $stmt->fetch();
 
@@ -36,12 +36,12 @@ try {
     }
 
     // Check permissions
-    if (!hasPermission('edit_orders') && ($item['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)) {
+    if (!canAccessOrderBranch($item) || (!hasPermission('edit_orders') && ($item['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0))) {
         throw new Exception(__('access_denied_msg'));
     }
 
     // If order is already completed/collected, return parts to stock
-    if (in_array($item['status'], ['Completed', 'Collected'])) {
+    if (in_array($item['status'], getOrderStatusList('done'), true)) {
         changeInventoryQuantity($item['inventory_id'], $item['quantity']);
     }
 

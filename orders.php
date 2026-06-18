@@ -9,7 +9,7 @@ $page   = max(1, (int)($_GET['p'] ?? 1));
 $offset = ($page - 1) * $limit;
 
 // FIX #7: Whitelist filter values to prevent unexpected SQL behavior
-$allowed_statuses = ['New','Pending Approval','In Progress','Waiting for Parts','Completed','Collected','Cancelled'];
+$allowed_statuses = getAllowedOrderFilterStatuses();
 $filter_status    = in_array($_GET['filter'] ?? '', $allowed_statuses, true) ? $_GET['filter'] : null;
 
 $orders       = [];
@@ -22,30 +22,35 @@ if (isset($pdo)) {
         $where_clauses = [];
         $sql_params    = []; // FIX #9: renamed from $params to avoid collision with pagination block
 
-        // FIX #1: permission filter via PDO parameter, not concatenation
-        if (($_SESSION['role'] ?? '') === 'technician' && !hasPermission('view_all_orders')) {
-            $where_clauses[] = 'o.technician_id = ?';
-            $sql_params[]    = (int)($_SESSION['tech_id'] ?? 0);
+        addOrderBranchScope($where_clauses, $sql_params, 'o');
+        $branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) : 0;
+        if ($branch_filter > 0) {
+            $where_clauses[] = 'o.branch_id = ?';
+            $sql_params[] = $branch_filter;
         }
 
         // FIX #1: exact ID match also via PDO parameter
         if ($search !== '') {
             $term = "%$search%";
             if (is_numeric($search)) {
-                $where_clauses[] = '(o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ? OR o.id = ?)';
-                for ($i = 0; $i < 8; $i++) $sql_params[] = $term;
+                $where_clauses[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ? OR o.id = ?)';
+                for ($i = 0; $i < 9; $i++) $sql_params[] = $term;
                 $sql_params[] = (int)$search;
             } else {
-                $where_clauses[] = '(o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ?)';
-                for ($i = 0; $i < 8; $i++) $sql_params[] = $term;
+                $where_clauses[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ?)';
+                for ($i = 0; $i < 9; $i++) $sql_params[] = $term;
             }
         }
 
-        if ($filter_status === 'Completed') {
-            $where_clauses[] = "o.status IN ('Completed', 'Collected')";
-        } elseif ($filter_status) {
-            $where_clauses[] = 'o.status = ?';
-            $sql_params[]    = $filter_status;
+        if ($filter_status) {
+            $filter_group = getOrderStatusGroup($filter_status);
+            if ($filter_group !== null) {
+                $filter_key = $filter_group === 'completed' ? 'done' : $filter_group;
+                $where_clauses[] = 'o.status IN (' . orderStatusSqlIn($pdo, $filter_key) . ')';
+            } else {
+                $where_clauses[] = 'o.status = ?';
+                $sql_params[]    = $filter_status;
+            }
         }
 
         $where_sql = $where_clauses ? ' WHERE ' . implode(' AND ', $where_clauses) : '';
@@ -68,8 +73,8 @@ if (isset($pdo)) {
              JOIN customers c ON o.customer_id = c.id
              LEFT JOIN technicians t ON o.technician_id = t.id'
             . $where_sql
-            . ' ORDER BY (CASE WHEN o.id = ? THEN 1 ELSE 2 END), o.created_at DESC
-              LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset
+            . ' ORDER BY ' . orderSortSql('o', 'o.id = ?') . "
+              LIMIT " . (int)$limit . ' OFFSET ' . (int)$offset
         );
         $stmt->execute($fetch_params);
         $orders = $stmt->fetchAll();
@@ -92,7 +97,6 @@ if (isset($pdo)) {
 }
 
 $total_pages = $total_orders > 0 ? (int)ceil($total_orders / $limit) : 1;
-
 $order_templates_raw = trim((string)get_setting('order_templates', ''));
 $order_templates = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $order_templates_raw))));
 
@@ -109,16 +113,19 @@ if (isset($pdo)) {
     try {
         $stats_where  = '';
         $stats_params = [];
-        if (($_SESSION['role'] ?? '') === 'technician' && !hasPermission('view_all_orders')) {
-            $stats_where  = ' AND technician_id = ?';
-            $stats_params[] = (int)($_SESSION['tech_id'] ?? 0);
+        if (!isBranchGlobalViewer()) {
+            $stats_where  = ' AND branch_id = ?';
+            $stats_params[] = getCurrentStaffBranchId();
+        } elseif ((int)($_GET['branch_id'] ?? 0) > 0) {
+            $stats_where = ' AND branch_id = ?';
+            $stats_params[] = (int)$_GET['branch_id'];
         }
         $s = $pdo->prepare(
             "SELECT
-                SUM(status = 'New') as cnt_new,
-                SUM(status = 'Pending Approval') as cnt_pending,
-                SUM(status = 'In Progress') as cnt_progress,
-                SUM(status IN ('Completed','Collected')) as cnt_ready
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'new') . ")) as cnt_new,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'pending_approval') . ")) as cnt_pending,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'in_progress') . ")) as cnt_progress,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'done') . ")) as cnt_ready
              FROM orders WHERE 1=1" . $stats_where
         );
         $s->execute($stats_params);
@@ -133,20 +140,15 @@ if (isset($pdo)) {
 }
 
 // FIX #5: Load technicians once (used in both New Order and Quick Edit modals)
-$techs_list = [];
-if (isset($pdo)) {
-    try {
-        $techs_list = $pdo->query(
-            'SELECT id, name FROM technicians WHERE is_active = 1 ORDER BY name ASC'
-        )->fetchAll();
-    } catch (PDOException $e) {}
-}
+$techs_list = getActiveTechnicians();
+$branches = getBranches();
+$active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) : getCurrentStaffBranchId();
 ?>
 
 <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-md-3">
-        <a href="?filter=New" class="text-decoration-none">
-            <div class="card bg-primary bg-opacity-10 border-0 p-3 <?php echo $filter_status == 'New' ? 'ring-2 ring-primary border-primary border-1 shadow-sm' : ''; ?>">
+        <a href="?filter=<?php echo urlencode('Přijato'); ?>" class="text-decoration-none">
+            <div class="card bg-primary bg-opacity-10 border-0 p-3 <?php echo isOrderStatusIn($filter_status, 'new') ? 'ring-2 ring-primary border-primary border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-clipboard-list text-primary fa-2x me-3"></i>
                     <div>
@@ -158,8 +160,8 @@ if (isset($pdo)) {
         </a>
     </div>
     <div class="col-12 col-sm-6 col-md-3">
-        <a href="?filter=Pending Approval" class="text-decoration-none">
-            <div class="card bg-info bg-opacity-10 border-0 p-3 <?php echo $filter_status == 'Pending Approval' ? 'ring-2 ring-info border-info border-1 shadow-sm' : ''; ?>">
+        <a href="?filter=<?php echo urlencode('Čeká na zákazníka'); ?>" class="text-decoration-none">
+            <div class="card bg-info bg-opacity-10 border-0 p-3 <?php echo isOrderStatusIn($filter_status, 'pending_approval') ? 'ring-2 ring-info border-info border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-handshake text-info fa-2x me-3"></i>
                     <div>
@@ -171,8 +173,8 @@ if (isset($pdo)) {
         </a>
     </div>
     <div class="col-12 col-sm-6 col-md-3">
-        <a href="?filter=In Progress" class="text-decoration-none">
-            <div class="card bg-warning bg-opacity-10 border-0 p-3 <?php echo $filter_status == 'In Progress' ? 'ring-2 ring-warning border-warning border-1 shadow-sm' : ''; ?>">
+        <a href="?filter=<?php echo urlencode('V opravě'); ?>" class="text-decoration-none">
+            <div class="card bg-warning bg-opacity-10 border-0 p-3 <?php echo isOrderStatusIn($filter_status, 'in_progress') ? 'ring-2 ring-warning border-warning border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-spinner text-warning fa-2x me-3"></i>
                     <div>
@@ -184,8 +186,8 @@ if (isset($pdo)) {
         </a>
     </div>
     <div class="col-12 col-sm-6 col-md-3">
-        <a href="?filter=Completed" class="text-decoration-none">
-            <div class="card bg-success bg-opacity-10 border-0 p-3 <?php echo ($filter_status == 'Completed' || $filter_status == 'Collected') ? 'ring-2 ring-success border-success border-1 shadow-sm' : ''; ?>">
+        <a href="?filter=<?php echo urlencode('Připraveno k převzetí'); ?>" class="text-decoration-none">
+            <div class="card bg-success bg-opacity-10 border-0 p-3 <?php echo (isOrderStatusIn($filter_status, 'done')) ? 'ring-2 ring-success border-success border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-check-double text-success fa-2x me-3"></i>
                     <div>
@@ -202,25 +204,24 @@ if (isset($pdo)) {
     <div>
         <h2 class="mb-0"><?php echo __('orders'); ?></h2>
         <?php if($filter_status): ?>
-            <?php
-            // FIX #7: explicit status→key map (strtolower breaks 'In Progress' → 'in progress')
-            $status_key_map = [
-                'New'               => 'new',
-                'Pending Approval'  => 'pending_approval',
-                'In Progress'       => 'in_progress',
-                'Waiting for Parts' => 'waiting_parts',
-                'Completed'         => 'completed',
-                'Collected'         => 'collected',
-                'Cancelled'         => 'cancelled',
-            ];
-            $status_label = __($status_key_map[$filter_status] ?? $filter_status);
-            ?>
+            <?php $status_label = getOrderStatusLabel($filter_status); ?>
             <div class="mt-1">
                 <span class="badge bg-secondary text-white"><?php echo e(__('status')); ?>: <?php echo e($status_label); ?></span>
                 <a href="orders.php" class="text-danger small ms-2"><i class="fas fa-times me-1"></i><?php echo e(__('cancel')); ?></a>
             </div>
         <?php else: ?>
             <small class="text-white-75"><?php echo __('all_orders'); ?>: <?php echo $total_orders; ?></small>
+        <?php endif; ?>
+        <?php if (isBranchGlobalViewer() && !empty($branches)): ?>
+            <div class="mt-2 d-flex flex-wrap gap-2">
+                <a class="badge rounded-pill text-decoration-none <?php echo $active_branch_filter === 0 ? 'bg-primary' : 'bg-secondary'; ?>" href="orders.php<?php echo $filter_status ? '?filter=' . urlencode($filter_status) : ''; ?>">Všechny pobočky</a>
+                <?php foreach ($branches as $branch): ?>
+                    <?php $qs = http_build_query(array_filter(['filter' => $filter_status, 'branch_id' => (int)$branch['id']])); ?>
+                    <a class="badge rounded-pill text-decoration-none <?php echo $active_branch_filter === (int)$branch['id'] ? 'bg-primary' : 'bg-secondary'; ?>" href="orders.php?<?php echo e($qs); ?>"><?php echo e($branch['name']); ?></a>
+                <?php endforeach; ?>
+            </div>
+        <?php elseif (!isBranchGlobalViewer()): ?>
+            <div class="mt-1"><span class="badge bg-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel(getCurrentStaffBranchId())); ?></span></div>
         <?php endif; ?>
     </div>
     <div class="d-flex gap-2">
@@ -267,7 +268,10 @@ if (isset($pdo)) {
                         ?>
                         <tr class="order-row" data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
                             <td class="ps-4">
-                                <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none">#<?php echo (int)$order['id']; ?></a>
+                                <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none"><?php echo e(orderDisplayCode($order)); ?></a>
+                                <?php if (!empty($order['order_code'])): ?>
+                                    <div class="small text-white-50">ID #<?php echo (int)$order['id']; ?></div>
+                                <?php endif; ?>
                                 <?php if($has_media): ?>
                                     <i class="fas fa-camera text-info ms-1" title="<?php echo __('media_files'); ?>"></i>
                                 <?php endif; ?>
@@ -321,6 +325,9 @@ if (isset($pdo)) {
                                     <i class="fas fa-user-cog me-1"></i><?php echo htmlspecialchars($order['tech_name']); ?>
                                 </div>
                                 <?php endif; ?>
+                                <?php if (isBranchGlobalViewer() && !empty($order['branch_id'])): ?>
+                                <div class="small mt-1"><span class="badge bg-dark border border-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)$order['branch_id'])); ?></span></div>
+                                <?php endif; ?>
                             </td>
                             <td class="fw-bold text-white"><?php echo formatMoney($order['final_cost'] ?: $order['estimated_cost']); ?></td>
                             <td class="text-end pe-4">
@@ -330,9 +337,9 @@ if (isset($pdo)) {
                                             && (int)($order['technician_id'] ?? 0) === (int)($_SESSION['tech_id'] ?? 0));
                                 ?>
                                 <?php
-                                    $can_cancel = !in_array($order['status'], ['Cancelled', 'Collected'], true);
+                                    $can_cancel = !isOrderStatusIn($order['status'], 'cancelled') && !isOrderStatusIn($order['status'], 'collected');
                                     $show_quick = $can_quick && (
-                                        in_array($order['status'], ['New', 'Pending Approval', 'Waiting for Parts', 'In Progress', 'Completed'], true) || $can_cancel
+                                        !isOrderStatusIn($order['status'], 'terminal') || $can_cancel
                                     );
                                 ?>
                                 <?php // inline quick-status buttons removed; using dropdown only ?>
@@ -343,15 +350,15 @@ if (isset($pdo)) {
                                             <i class="fas fa-bolt text-primary"></i>
                                         </button>
                                         <ul class="dropdown-menu shadow dropdown-menu-end">
-                                            <?php if ($order['status'] === 'New'): ?>
-                                                <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="In Progress"><i class="fas fa-play me-2 text-primary"></i><?php echo __('move_to_in_progress'); ?></a></li>
-                                            <?php elseif (in_array($order['status'], ['Pending Approval', 'Waiting for Parts', 'In Progress'], true)): ?>
-                                                <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="Completed"><i class="fas fa-check me-2 text-success"></i><?php echo __('move_to_completed'); ?></a></li>
-                                            <?php elseif ($order['status'] === 'Completed'): ?>
-                                                <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="Collected"><i class="fas fa-box me-2 text-info"></i><?php echo __('move_to_collected'); ?></a></li>
+                                            <?php if (isOrderStatusIn($order['status'], 'new')): ?>
+                                                <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="V opravě"><i class="fas fa-play me-2 text-primary"></i><?php echo __('move_to_in_progress'); ?></a></li>
+                                            <?php elseif (isOrderStatusIn($order['status'], 'pending_approval') || isOrderStatusIn($order['status'], 'waiting_parts') || isOrderStatusIn($order['status'], 'in_progress')): ?>
+                                                <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="Připraveno k převzetí"><i class="fas fa-check me-2 text-success"></i><?php echo __('move_to_completed'); ?></a></li>
+                                            <?php elseif (isOrderStatusIn($order['status'], 'completed') || isOrderStatusIn($order['status'], 'uncollected')): ?>
+                                                <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="Vydáno"><i class="fas fa-box me-2 text-info"></i><?php echo __('move_to_collected'); ?></a></li>
                                             <?php endif; ?>
                                             <?php if ($can_cancel): ?>
-                                                <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="Cancelled"><i class="fas fa-ban me-2 text-danger"></i><?php echo __('cancel'); ?></a></li>
+                                                <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="Stornováno"><i class="fas fa-ban me-2 text-danger"></i><?php echo __('cancel'); ?></a></li>
                                             <?php endif; ?>
                                         </ul>
                                     </div>
@@ -620,13 +627,9 @@ $(document).ready(function() {
                             <div class="col-12 col-sm-6 col-md-3">
                                 <label class="form-label"><?php echo __('status'); ?></label>
                                 <select name="status" class="form-select">
-                                    <option value="New" ${o.status=='New' ? 'selected':''}><?php echo __('new'); ?></option>
-                                    <option value="Pending Approval" ${o.status=='Pending Approval' ? 'selected':''}><?php echo __('pending_approval'); ?></option>
-                                    <option value="In Progress" ${o.status=='In Progress' ? 'selected':''}><?php echo __('in_progress'); ?></option>
-                                    <option value="Waiting for Parts" ${o.status=='Waiting for Parts' ? 'selected':''}><?php echo __('waiting_parts'); ?></option>
-                                    <option value="Completed" ${o.status=='Completed' ? 'selected':''}><?php echo __('completed'); ?></option>
-                                    <option value="Collected" ${o.status=='Collected' ? 'selected':''}><?php echo __('collected'); ?></option>
-                                    <option value="Cancelled" ${o.status=='Cancelled' ? 'selected':''}><?php echo __('cancelled'); ?></option>
+                                    <?php foreach (getOrderStatusOptions() as $statusValue => $statusLabel): ?>
+                                    <option value="<?php echo e($statusValue); ?>" ${o.status==<?php echo json_encode($statusValue, JSON_UNESCAPED_UNICODE); ?> ? 'selected':''}><?php echo e($statusLabel); ?></option>
+                                    <?php endforeach; ?>
                                 </select>
                             </div>
                             <div class="col-12 col-sm-6 col-md-3">
@@ -792,7 +795,7 @@ $(document).ready(function() {
         const btn = $(this);
         btn.prop('disabled', true);
 
-        if (status === 'Cancelled') {
+        if (status === 'Stornováno') {
             return showConfirm('<?php echo __('delete_confirm'); ?>', function() {
                 performQuickStatusUpdate(id, status, btn);
             });

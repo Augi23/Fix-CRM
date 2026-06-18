@@ -170,18 +170,18 @@ try {
             throw new Exception('This request is not linked to a catalog part.');
         }
 
-        $stmt = $pdo->prepare("SELECT id, technician_id, status FROM orders WHERE id = ? LIMIT 1");
+        $stmt = $pdo->prepare("SELECT id, technician_id, branch_id, status FROM orders WHERE id = ? LIMIT 1");
         $stmt->execute([$orderId]);
         $order = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$order) {
             throw new Exception('Order not found.');
         }
 
-        if (in_array((string)($order['status'] ?? ''), ['Collected', 'Cancelled'], true)) {
+        if (isOrderStatusIn((string)($order['status'] ?? ''), 'collected') || isOrderStatusIn((string)($order['status'] ?? ''), 'cancelled')) {
             throw new Exception('Part can only be assigned to the current order.');
         }
 
-        if (($_SESSION['role'] ?? '') === 'technician' && !hasPermission('view_all_orders') && (int)($order['technician_id'] ?? 0) !== (int)($_SESSION['tech_id'] ?? 0)) {
+        if (!canAccessOrderBranch($order) || (($_SESSION['role'] ?? '') === 'technician' && !hasPermission('edit_orders') && (int)($order['technician_id'] ?? 0) !== (int)($_SESSION['tech_id'] ?? 0))) {
             throw new Exception(__('access_denied_msg'));
         }
 

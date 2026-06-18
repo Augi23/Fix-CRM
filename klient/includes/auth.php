@@ -132,7 +132,7 @@ function clientLookupCustomerAndOrders($pdo, string $identifier): array {
                 "SELECT *
                  FROM orders
                  WHERE customer_id = ?
-                 ORDER BY created_at DESC"
+                 ORDER BY created_at DESC, id DESC"
             );
             $stmt->execute([$customerId]);
             $orders = $stmt->fetchAll();

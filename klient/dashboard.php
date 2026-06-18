@@ -16,7 +16,7 @@ if (isset($pdo) && $customerId > 0) {
         $stmt->execute([$customerId]);
         $customer = $stmt->fetch();
 
-        $stmt = $pdo->prepare('SELECT * FROM orders WHERE customer_id = ? ORDER BY created_at DESC');
+        $stmt = $pdo->prepare('SELECT * FROM orders WHERE customer_id = ? ORDER BY created_at DESC, id DESC');
         $stmt->execute([$customerId]);
         $orders = $stmt->fetchAll();
 
@@ -88,40 +88,29 @@ if (isset($pdo) && $selectedOrder) {
 }
 
 function clientStatusMeta(string $status): array {
+    if (isOrderStatusIn($status, 'uncollected')) {
+        return [__('client_status_uncollected'), 'warning'];
+    }
+
+    $group = getOrderStatusGroup($status);
     $map = [
-        'New' => ['client_status_new', 'primary'],
-        'Новый' => ['client_status_new', 'primary'],
-        'Nová' => ['client_status_new', 'primary'],
-        'Pending Approval' => ['client_status_pending_approval', 'info'],
-        'На согласовании' => ['client_status_pending_approval', 'info'],
-        'K odsouhlasení' => ['client_status_pending_approval', 'info'],
-        'Čeká na schválení' => ['client_status_pending_approval', 'info'],
-        'In Progress' => ['client_status_in_progress', 'warning'],
-        'В работе' => ['client_status_in_progress', 'warning'],
-        'V práci' => ['client_status_in_progress', 'warning'],
-        'V procesu' => ['client_status_in_progress', 'warning'],
-        'Provádí se' => ['client_status_in_progress', 'warning'],
-        'Waiting for Parts' => ['client_status_waiting_parts', 'secondary'],
-        'Ожидание запчастей' => ['client_status_waiting_parts', 'secondary'],
-        'Čeká na díly' => ['client_status_waiting_parts', 'secondary'],
-        'Completed' => ['client_status_completed', 'success'],
-        'Готов' => ['client_status_completed', 'success'],
-        'Hotovo' => ['client_status_completed', 'success'],
-        'Collected' => ['client_status_collected', 'dark'],
-        'Выдан' => ['client_status_collected', 'dark'],
-        'Vydáno' => ['client_status_collected', 'dark'],
-        'Cancelled' => ['client_status_cancelled', 'danger'],
-        'Отменен' => ['client_status_cancelled', 'danger'],
-        'Zrušeno' => ['client_status_cancelled', 'danger'],
+        'new' => ['client_status_new', 'primary'],
+        'pending_approval' => ['client_status_pending_approval', 'info'],
+        'in_progress' => ['client_status_in_progress', 'warning'],
+        'waiting_parts' => ['client_status_waiting_parts', 'secondary'],
+        'completed' => ['client_status_completed', 'success'],
+        'collected' => ['client_status_collected', 'dark'],
+        'cancelled' => ['client_status_cancelled', 'danger'],
     ];
 
-    if (!isset($map[$status])) {
+    if (!$group || !isset($map[$group])) {
         return [trim((string)$status), 'light'];
     }
 
-    [$labelKey, $class] = $map[$status];
+    [$labelKey, $class] = $map[$group];
     return [__($labelKey), $class];
 }
+
 
 function clientMediaUrl(string $path): string {
     $path = trim($path);

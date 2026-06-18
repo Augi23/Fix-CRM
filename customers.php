@@ -57,6 +57,34 @@ if (isset($pdo)) {
 
     } catch (PDOException $e) { }
 }
+
+function customersNormalizeDisplayText(?string $value): string
+{
+    $value = trim((string)($value ?? ''));
+    $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+
+    // Ignore placeholder-only values often used in legacy imports
+    if (in_array($value, ['-', '–', '—'], true)) {
+        return '';
+    }
+
+    return $value;
+}
+
+function customersOrdersStyleDisplayName(array $customer): string
+{
+    // Keep the same first_name + last_name order used in orders.php.
+    $first = customersNormalizeDisplayText($customer['first_name'] ?? '');
+    $last = customersNormalizeDisplayText($customer['last_name'] ?? '');
+    $nameParts = array_values(array_filter([$first, $last], static fn($v) => $v !== ''));
+    $name = implode(' ', $nameParts);
+    if ($name !== '') {
+        return $name;
+    }
+
+    $company = customersNormalizeDisplayText($customer['company'] ?? '');
+    return $company !== '' ? $company : '-';
+}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -100,18 +128,21 @@ if (isset($pdo)) {
                         <tr>
                             <td>#<?php echo $customer['id']; ?></td>
                             <td>
+                                <?php
+                                $primaryName = customersOrdersStyleDisplayName($customer);
+                                $companyName = customersNormalizeDisplayText($customer['company'] ?? '');
+                                ?>
                                 <strong>
-                                    <?php 
-                                    if ($customer['customer_type'] == 'company') {
-                                        echo htmlspecialchars($customer['company'] ?: $customer['last_name']);
-                                        echo ' <small class="text-muted">(Firma)</small>';
-                                    } else {
-                                        echo htmlspecialchars($customer['last_name'] . ' ' . $customer['first_name']);
-                                    }
-                                    ?>
+                                    <?php echo e($primaryName); ?>
+                                    <?php if (($customer['customer_type'] ?? 'private') === 'company'): ?>
+                                        <small class="text-muted">(Firma)</small>
+                                    <?php endif; ?>
                                 </strong>
+                                <?php if (($customer['customer_type'] ?? 'private') === 'company' && $companyName !== '' && $companyName !== $primaryName): ?>
+                                    <div class="small text-muted">Firma: <?php echo e($companyName); ?></div>
+                                <?php endif; ?>
                                 <?php if ($customer['ico']): ?>
-                                    <div class="small text-muted">IČO: <?php echo htmlspecialchars($customer['ico']); ?></div>
+                                    <div class="small text-muted">IČO: <?php echo e($customer['ico']); ?></div>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -140,7 +171,7 @@ if (isset($pdo)) {
                                 $count = $order_counts[$customer['id']] ?? 0;
                                 ?>
                                 <button class="btn btn-sm <?php echo $count > 0 ? 'btn-primary' : 'btn-outline-secondary'; ?> rounded-pill px-3" 
-                                        onclick="showCustomerOrders(<?php echo $customer['id']; ?>, '<?php echo htmlspecialchars($customer['first_name'] . ' ' . $customer['last_name']); ?>')"
+                                        onclick='showCustomerOrders(<?php echo (int)$customer['id']; ?>, <?php echo e(json_encode($primaryName, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT)); ?>)'
                                         <?php echo $count == 0 ? 'disabled' : ''; ?>>
                                     <?php echo $count; ?>
                                 </button>

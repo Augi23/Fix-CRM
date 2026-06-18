@@ -57,6 +57,25 @@ INSERT INTO `users` (`username`, `password`, `full_name`, `role`) VALUES
 ('admin', '$2y$10$qafwiLAk9Osoxr.4UX/YCuO6m6TejA377VwyxMP1zakKWOIdV89Ay', 'Administrator', 'admin');
 
 -- ═══════════════════════════════════════════════════════════════════════════════
+-- Branches
+-- ═══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS `branches` (
+    `id`         INT(11)      NOT NULL AUTO_INCREMENT,
+    `code`       VARCHAR(50)  NOT NULL,
+    `name`       VARCHAR(120) NOT NULL,
+    `address`    VARCHAR(255) DEFAULT NULL,
+    `is_active`  TINYINT(1)   NOT NULL DEFAULT 1,
+    `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uniq_branch_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `branches` (`code`, `name`, `address`, `is_active`) VALUES
+('karlin', 'Praha 8 - Karlín', 'Praha 8 - Karlín', 1),
+('prikope', 'Praha 1 - Na Příkopě', 'Praha 1 - Na Příkopě', 1)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `address` = VALUES(`address`), `is_active` = VALUES(`is_active`);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
 -- Technicians
 -- ═══════════════════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS `technicians` (
@@ -69,6 +88,7 @@ CREATE TABLE IF NOT EXISTS `technicians` (
     `telegram_id`    VARCHAR(50)   DEFAULT NULL,
     `specialization` VARCHAR(100)  DEFAULT NULL,
     `role`           VARCHAR(50)   DEFAULT 'engineer',
+    `branch_id`      INT(11)       DEFAULT 1,
     `is_active`      TINYINT(1)    DEFAULT 1,
     `created_at`     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `last_seen`      TIMESTAMP     NULL DEFAULT NULL,
@@ -112,6 +132,7 @@ CREATE TABLE IF NOT EXISTS `customers` (
 -- ═══════════════════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS `orders` (
     `id`                   INT(11)       NOT NULL AUTO_INCREMENT,
+    `order_code`           VARCHAR(32)   DEFAULT NULL,
     `customer_id`          INT(11)       NOT NULL,
     `device_type`          ENUM('Phone','Notebook','PC','Tablet','HDD','Computer','Other') NOT NULL,
     `order_type`           ENUM('Non-Warranty','Warranty') DEFAULT 'Non-Warranty',
@@ -127,8 +148,9 @@ CREATE TABLE IF NOT EXISTS `orders` (
     `estimated_cost`       DECIMAL(10,2) DEFAULT NULL,
     `final_cost`           DECIMAL(10,2) DEFAULT NULL,
     `extra_expenses`       DECIMAL(10,2) DEFAULT 0.00,
-    `status`               ENUM('New','In Progress','Waiting for Parts','Pending Approval','Completed','Collected','Cancelled') DEFAULT 'New',
+    `status`               ENUM('Přijato','Zakládá se','V opravě','V opravě zák. desky','V externím servisu','V aut. servisu','Čeká na díl','Čeká na zákazníka','Čeká na platbu','Připraveno k převzetí','Nevyzvednuto','Vydáno','Vydáno - ČR','Stornováno','Černá růže') DEFAULT 'Přijato',
     `technician_id`        INT(11)       DEFAULT NULL,
+    `branch_id`            INT(11)       DEFAULT 1,
     `created_at`           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `shipping_method`      VARCHAR(50)   DEFAULT NULL,
@@ -137,8 +159,10 @@ CREATE TABLE IF NOT EXISTS `orders` (
     PRIMARY KEY (`id`),
     KEY `customer_id` (`customer_id`),
     KEY `technician_id` (`technician_id`),
+    KEY `idx_orders_branch` (`branch_id`),
     KEY `status` (`status`),
     KEY `created_at` (`created_at`),
+    UNIQUE KEY `idx_orders_order_code` (`order_code`),
     CONSTRAINT `orders_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`),
     CONSTRAINT `orders_ibfk_2` FOREIGN KEY (`technician_id`) REFERENCES `technicians` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

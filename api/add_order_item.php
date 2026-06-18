@@ -21,7 +21,7 @@ if (!$order_id || !$inventory_id) {
 
 try {
     // Check permissions
-    $stmt = $pdo->prepare("SELECT technician_id FROM orders WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT technician_id, branch_id FROM orders WHERE id = ?");
     $stmt->execute([$order_id]);
     $order = $stmt->fetch();
     
@@ -29,7 +29,7 @@ try {
         throw new Exception("Order not found");
     }
     
-    if (($_SESSION['role'] ?? '') == 'technician' && !hasPermission('view_all_orders') && $order['technician_id'] != ($_SESSION['tech_id'] ?? 0)) {
+    if (!canAccessOrderBranch($order) || (($_SESSION['role'] ?? '') == 'technician' && !hasPermission('edit_orders') && $order['technician_id'] != ($_SESSION['tech_id'] ?? 0))) {
         throw new Exception(__('access_denied_msg'));
     }
 

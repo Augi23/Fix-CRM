@@ -46,7 +46,9 @@ $lang_overrides = [
         'client_status_in_progress' => 'V procesu',
         'client_status_waiting_parts' => 'Čeká na díly',
         'client_status_completed' => 'Připraveno k vyzvednutí',
+        'client_status_uncollected' => 'Nevyzvednuto',
         'client_status_collected' => 'Vydáno',
+        'status_uncollected' => 'Nevyzvednuto',
         'client_status_cancelled' => 'Zrušeno',
 
         'login_fill_user_pass' => 'Vyplň uživatele a heslo.',
@@ -374,7 +376,9 @@ $lang_overrides = [
         'client_status_in_progress' => 'В работе',
         'client_status_waiting_parts' => 'Ожидание запчастей',
         'client_status_completed' => 'Готов к выдаче',
+        'client_status_uncollected' => 'Не забран',
         'client_status_collected' => 'Выдан',
+        'status_uncollected' => 'Не забран',
         'client_status_cancelled' => 'Отменен',
 
         'procurement' => 'Закупки',
@@ -492,7 +496,9 @@ $lang_overrides = [
         'client_status_in_progress' => 'In progress',
         'client_status_waiting_parts' => 'Waiting for parts',
         'client_status_completed' => 'Ready for pickup',
+        'client_status_uncollected' => 'Uncollected',
         'client_status_collected' => 'Collected',
+        'status_uncollected' => 'Uncollected',
         'client_status_cancelled' => 'Cancelled',
 
         // Print / misc

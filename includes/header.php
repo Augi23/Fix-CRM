@@ -84,7 +84,7 @@ $langRedirect = $_SERVER['REQUEST_URI'] ?? basename($_SERVER['PHP_SELF']);
 
 $ordersBadgeCount = 0;
 try {
-    $ordersBadgeCount = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ('New', 'Pending Approval', 'In Progress', 'Waiting for Parts')")->fetchColumn() ?: 0);
+    $ordersBadgeCount = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE status IN (" . orderStatusSqlIn($pdo, 'active') . ")" . orderBranchScopeSql('branch_id'))->fetchColumn() ?: 0);
 } catch (Throwable $e) {
     $ordersBadgeCount = 0;
 }
@@ -157,6 +157,7 @@ try {
             <i class="fas fa-tools me-2"></i><span><?php echo __('orders'); ?></span>
             <?php if ($ordersBadgeCount > 0): ?><span class="crm-nav-pill"><?php echo $ordersBadgeCount; ?></span><?php endif; ?>
         </a>
+        <a class="nav-link <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php"><i class="fas fa-rotate-left me-2"></i><span>Reklamace</span></a>
         <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-2"></i><span><?php echo __('new_order'); ?></span></a>
         <a class="nav-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading me-2"></i><span><?php echo __('procurement'); ?></span></a>
 

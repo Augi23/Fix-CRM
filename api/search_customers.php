@@ -53,9 +53,14 @@ try {
 
     $results = [];
     foreach ($rows as $r) {
-        $name = trim(($r['last_name'] ?? '') . ' ' . ($r['first_name'] ?? ''));
-        $company = trim($r['company'] ?? '');
-        if ($company !== '') {
+        $first = trim((string)($r['first_name'] ?? ''));
+        $last = trim((string)($r['last_name'] ?? ''));
+        if (in_array($first, ['-', '–', '—'], true)) $first = '';
+        if (in_array($last, ['-', '–', '—'], true)) $last = '';
+
+        $name = trim($first . ' ' . $last);
+        $company = trim((string)($r['company'] ?? ''));
+        if (!in_array($company, ['-', '–', '—'], true) && $company !== '') {
             $name = $company . ($name !== '' ? ' (' . $name . ')' : '');
         }
         $phone = $r['phone'] ?? '';

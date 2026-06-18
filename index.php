@@ -3,39 +3,45 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
-// Filter for Dashboard
-$filter_status = $_GET['filter'] ?? null;
+// Filter for Dashboard - keep same accepted statuses as orders.php
+$allowed_statuses = getAllowedOrderFilterStatuses();
+$filter_status = in_array($_GET['filter'] ?? '', $allowed_statuses, true) ? $_GET['filter'] : null;
 
-// Permission check for stats - technicians only see their orders unless they have view_all_orders
-$tech_cond = "";
-if ($_SESSION['role'] == 'technician' && !hasPermission('view_all_orders')) {
-    $tech_cond = " AND technician_id = " . (int)$_SESSION['tech_id'];
-}
+// Branch scope for stats: managers/admins see all, branch staff see only their branch.
+$tech_cond = orderBranchScopeSql('branch_id');
+$tech_cond_o = orderBranchScopeSql('o.branch_id');
 
 // Count for Stats
-$new_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'New'" . $tech_cond)->fetchColumn();
-$pending_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'Pending Approval'" . $tech_cond)->fetchColumn();
-$progress_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'In Progress'" . $tech_cond)->fetchColumn();
-$ready_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ('Completed', 'Collected')" . $tech_cond)->fetchColumn();
+$newStatuses = orderStatusSqlIn($pdo, 'new');
+$pendingStatuses = orderStatusSqlIn($pdo, 'pending_approval');
+$progressStatuses = orderStatusSqlIn($pdo, 'in_progress');
+$waitingStatuses = orderStatusSqlIn($pdo, 'waiting_parts');
+$doneStatuses = orderStatusSqlIn($pdo, 'done');
+$activeStatuses = orderStatusSqlIn($pdo, 'active');
+
+$new_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($newStatuses)" . $tech_cond)->fetchColumn();
+$pending_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($pendingStatuses)" . $tech_cond)->fetchColumn();
+$progress_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($progressStatuses)" . $tech_cond)->fetchColumn();
+$ready_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($doneStatuses)" . $tech_cond)->fetchColumn();
 
 // Design-system stats
-$waiting_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'Waiting for Parts'" . $tech_cond)->fetchColumn();
+$waiting_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($waitingStatuses)" . $tech_cond)->fetchColumn();
 $active_count = (int)$new_count + (int)$pending_count + (int)$progress_count + $waiting_count;
-$urgent_waiting = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'Waiting for Parts' AND priority = 'High'" . $tech_cond)->fetchColumn();
+$urgent_waiting = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($waitingStatuses) AND priority = 'High'" . $tech_cond)->fetchColumn();
 try {
-    $completed_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ('Completed','Collected') AND DATE(updated_at) = CURDATE()" . $tech_cond)->fetchColumn();
+    $completed_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE()" . $tech_cond)->fetchColumn();
     $planned_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()" . $tech_cond)->fetchColumn();
-    $new_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'New' AND DATE(created_at) = CURDATE()" . $tech_cond)->fetchColumn();
-    $revenue_today = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ('Completed','Collected') AND DATE(updated_at) = CURDATE()" . $tech_cond)->fetchColumn();
-    $revenue_yesterday = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ('Completed','Collected') AND DATE(updated_at) = CURDATE() - INTERVAL 1 DAY" . $tech_cond)->fetchColumn();
+    $new_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($newStatuses) AND DATE(created_at) = CURDATE()" . $tech_cond)->fetchColumn();
+    $revenue_today = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE()" . $tech_cond)->fetchColumn();
+    $revenue_yesterday = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE() - INTERVAL 1 DAY" . $tech_cond)->fetchColumn();
     $revenue_today_trend = $revenue_yesterday > 0 ? round((($revenue_today - $revenue_yesterday) / $revenue_yesterday) * 100) : 0;
 
-    $revenue_month = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ('Completed','Collected') AND MONTH(updated_at) = MONTH(CURDATE()) AND YEAR(updated_at) = YEAR(CURDATE())" . $tech_cond)->fetchColumn();
-    $revenue_prev = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ('Completed','Collected') AND MONTH(updated_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(updated_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)" . $tech_cond)->fetchColumn();
+    $revenue_month = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND MONTH(updated_at) = MONTH(CURDATE()) AND YEAR(updated_at) = YEAR(CURDATE())" . $tech_cond)->fetchColumn();
+    $revenue_prev = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND MONTH(updated_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(updated_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)" . $tech_cond)->fetchColumn();
     $revenue_trend = $revenue_prev > 0 ? round((($revenue_month - $revenue_prev) / $revenue_prev) * 100) : 0;
     $revenue_12m = [];
     for ($i = 11; $i >= 0; $i--) {
-        $m = $pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ('Completed','Collected') AND YEAR(updated_at)*12+MONTH(updated_at) = YEAR(CURDATE())*12+MONTH(CURDATE()) - $i" . $tech_cond)->fetchColumn();
+        $m = $pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND YEAR(updated_at)*12+MONTH(updated_at) = YEAR(CURDATE())*12+MONTH(CURDATE()) - $i" . $tech_cond)->fetchColumn();
         $revenue_12m[] = (float)$m;
     }
 } catch (Throwable $e) {
@@ -46,6 +52,24 @@ try {
 $month_labels = ['D','L','Ú','B','D','Č','Č','S','Z','Ř','L','D'];
 $rev_max = max(1, max($revenue_12m));
 
+$branch_overview = [];
+if (isBranchGlobalViewer()) {
+    try {
+        $branch_overview = $pdo->query("SELECT b.id, b.name,
+                COUNT(o.id) AS total_orders,
+                SUM(o.status IN ($activeStatuses)) AS active_orders,
+                SUM(o.status IN ($doneStatuses)) AS done_orders,
+                COALESCE(SUM(CASE WHEN o.status IN ($doneStatuses) THEN o.final_cost ELSE 0 END), 0) AS revenue
+            FROM branches b
+            LEFT JOIN orders o ON o.branch_id = b.id
+            WHERE b.is_active = 1
+            GROUP BY b.id, b.name
+            ORDER BY b.id ASC")->fetchAll();
+    } catch (Throwable $e) {
+        $branch_overview = [];
+    }
+}
+
 // Online Techs (Last 5 minutes) - Admin or those with admin_access
 $online_count = 0;
 if (hasPermission('admin_access')) {
@@ -55,7 +79,7 @@ if (hasPermission('admin_access')) {
 // Load technicians list once for new order modal
 $techs_list = [];
 try {
-    $techs_list = $pdo->query("SELECT id, name FROM technicians WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
+    $techs_list = getActiveTechnicians();
 } catch (PDOException $e) {
     $techs_list = [];
 }
@@ -76,14 +100,14 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             <?php if ($new_today > 0): ?>↑ <?php echo $new_today; ?> <?php echo __('today'); ?><?php else: ?><?php echo __('no_change'); ?><?php endif; ?>
         </div>
     </a>
-    <a href="?filter=Waiting for Parts" class="crm-stat-card crm-stat-2 text-decoration-none">
+    <a href="?filter=<?php echo urlencode('Čeká na díl'); ?>" class="crm-stat-card crm-stat-2 text-decoration-none">
         <div class="crm-stat-label"><?php echo __('waiting_parts'); ?></div>
         <div class="crm-stat-value"><?php echo (int)$waiting_count; ?></div>
         <div class="crm-stat-sub <?php echo $urgent_waiting > 0 ? 'down' : ''; ?>">
             <?php echo $urgent_waiting > 0 ? $urgent_waiting.' '.__('urgent') : __('in_queue'); ?>
         </div>
     </a>
-    <a href="?filter=Completed" class="crm-stat-card crm-stat-3 text-decoration-none">
+    <a href="?filter=<?php echo urlencode('Připraveno k převzetí'); ?>" class="crm-stat-card crm-stat-3 text-decoration-none">
         <div class="crm-stat-label"><?php echo __('repaired_today'); ?></div>
         <div class="crm-stat-value"><?php echo (int)$completed_today; ?></div>
         <div class="crm-stat-sub"><?php echo __('of'); ?> <?php echo (int)$planned_today; ?> <?php echo __('planned'); ?></div>
@@ -97,17 +121,39 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
     </div>
 </div>
 
+<?php if (!empty($branch_overview)): ?>
+<div class="row g-3 mb-4">
+    <?php foreach ($branch_overview as $branch): ?>
+    <div class="col-12 col-md-6">
+        <div class="card glass-card border-0 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                    <div class="text-white fw-semibold"><i class="fas fa-store me-2 text-primary"></i><?php echo e($branch['name']); ?></div>
+                    <div class="small text-white-75 mt-1">Aktivní zakázky: <?php echo (int)$branch['active_orders']; ?> · Hotovo: <?php echo (int)$branch['done_orders']; ?></div>
+                </div>
+                <div class="text-end">
+                    <div class="h4 mb-0 text-white"><?php echo (int)$branch['total_orders']; ?></div>
+                    <div class="small text-white-75"><?php echo number_format((float)$branch['revenue'], 0, ',', ' '); ?> Kč</div>
+                </div>
+            </div>
+            <a class="stretched-link" href="orders.php?branch_id=<?php echo (int)$branch['id']; ?>" aria-label="Pobočka <?php echo e($branch['name']); ?>"></a>
+        </div>
+    </div>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <div class="row g-4 align-items-start dashboard-main-row">
     <div class="col-12 col-lg-10">
         <div class="card glass-card border-0">
             <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <?php 
-                    if ($filter_status == 'New') echo __('new_orders');
-                    elseif ($filter_status == 'Pending Approval') echo __('pending_approval_orders');
-                    elseif ($filter_status == 'In Progress') echo __('in_progress_orders');
-                    elseif ($filter_status == 'Completed') echo __('completed_orders');
-                    else echo __('recent_orders'); 
+                    <?php
+                    if ($filter_status === null) {
+                        echo __('recent_orders');
+                    } else {
+                        echo e(getOrderStatusLabel($filter_status));
+                    }
                     ?>
                 </h5>
                 <?php if ($filter_status): ?>
@@ -121,7 +167,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>ID</th>
+                                <th>ID / <?php echo __('created'); ?></th>
                                 <th><?php echo __('client'); ?></th>
                                 <th><?php echo __('device_model'); ?></th>
                                 <th><?php echo __('problem'); ?></th>
@@ -132,50 +178,50 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                         </thead>
                         <tbody>
                             <?php
-                            $search = $_GET['search'] ?? '';
-                            
-                            // Permission check for technicians
-                            $tech_filter = "";
-                            if ($_SESSION['role'] == 'technician' && !hasPermission('view_all_orders')) {
-                                $tech_filter = " AND o.technician_id = " . (int)$_SESSION['tech_id'];
-                            }
-                            
-                            $where_clause = " WHERE (1=1)" . $tech_filter;
+                            $search = trim($_GET['search'] ?? '');
+
+                            $where_clauses = [];
                             $params = [];
 
-                            if ($search) {
-                                $search = trim($search);
-                                $exact_id_filter = is_numeric($search) ? " OR o.id = ?" : "";
-                                $where_clause .= " AND (o.id LIKE ? OR o.device_model LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ?$exact_id_filter)";
+                            addOrderBranchScope($where_clauses, $params, 'o');
+
+                            // Same search fields as orders.php
+                            if ($search !== '') {
                                 $searchTerm = "%$search%";
-                                array_push($params, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm);
                                 if (is_numeric($search)) {
+                                    $where_clauses[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ? OR o.id = ?)';
+                                    for ($i = 0; $i < 9; $i++) $params[] = $searchTerm;
                                     $params[] = (int)$search;
+                                } else {
+                                    $where_clauses[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ?)';
+                                    for ($i = 0; $i < 9; $i++) $params[] = $searchTerm;
                                 }
                             }
 
                             if ($filter_status) {
-                                if ($filter_status == 'Completed') {
-                                    $where_clause .= " AND o.status IN ('Completed', 'Collected')";
+                                $filter_group = getOrderStatusGroup($filter_status);
+                                if ($filter_group !== null) {
+                                    $filter_key = $filter_group === 'completed' ? 'done' : $filter_group;
+                                    $where_clauses[] = 'o.status IN (' . orderStatusSqlIn($pdo, $filter_key) . ')';
                                 } else {
-                                    $where_clause .= " AND o.status = ?";
+                                    $where_clauses[] = 'o.status = ?';
                                     $params[] = $filter_status;
                                 }
                             }
 
-                            $search_id = ($search && is_numeric($search)) ? (int)$search : 0;
-                            $sql = "SELECT o.*, c.first_name, c.last_name, c.phone, c.company, c.customer_type, t.name as tech_name 
-                                    FROM orders o 
-                                    JOIN customers c ON o.customer_id = c.id 
-                                    LEFT JOIN technicians t ON o.technician_id = t.id" . 
-                                    $where_clause . 
-                                    " ORDER BY (CASE WHEN o.id = ? THEN 1 ELSE 2 END), o.created_at DESC LIMIT 15";
-                            
+                            $where_clause = $where_clauses ? ' WHERE ' . implode(' AND ', $where_clauses) : '';
+                            $search_id = is_numeric($search) ? (int)$search : 0;
+                            $sql = "SELECT o.*, c.first_name, c.last_name, c.phone, c.company, c.customer_type, t.name as tech_name
+                                    FROM orders o
+                                    JOIN customers c ON o.customer_id = c.id
+                                    LEFT JOIN technicians t ON o.technician_id = t.id" .
+                                    $where_clause .
+                                    " ORDER BY " . orderSortSql('o', 'o.id = ?') . " LIMIT 15";
+
                             $stmt = $pdo->prepare($sql);
-                            // Add search_id to params for the ORDER BY clause
                             $exec_params = array_merge($params, [$search_id]);
                             $stmt->execute($exec_params);
-                            
+
                             $orders_list = $stmt->fetchAll();
                             
                             $has_media_ids = [];
@@ -194,13 +240,18 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                 $phone_href = normalizePhoneForTel($r['phone'] ?? '');
 
                                 $has_media = isset($has_media_ids[$r['id']]);
+                                $display_code = orderDisplayCode($r);
                             ?>
                             <tr class="clickable-order-row<?php echo !empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''; ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
                                 <td>
-                                    <a href="view_order.php?id=<?php echo $r['id']; ?>" class="fw-bold text-decoration-none">#<?php echo $r['id']; ?></a>
+                                    <a href="view_order.php?id=<?php echo (int)$r['id']; ?>" class="fw-bold text-decoration-none"><?php echo e($display_code); ?></a>
+                                    <?php if(!empty($r['order_code'])): ?>
+                                        <div class="small text-white-50">ID #<?php echo (int)$r['id']; ?></div>
+                                    <?php endif; ?>
                                     <?php if($has_media): ?>
                                         <i class="fas fa-camera text-info ms-1" title="<?php echo __('has_media'); ?>"></i>
                                     <?php endif; ?>
+                                    <div class="small text-white-75"><?php echo date('d.m.Y', strtotime($r['created_at'])); ?></div>
                                 </td>
                                 <td>
                                     <strong><?php echo htmlspecialchars($r['first_name'].' '.$r['last_name']); ?></strong><br>
@@ -215,6 +266,12 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                 <td>
                                     <?php echo $icon; ?> <strong><?php echo htmlspecialchars($r['device_brand']); ?></strong><br>
                                     <small class="text-white-75"><?php echo htmlspecialchars($r['device_model']); ?></small>
+                                    <?php if(!empty($r['serial_number'])): ?>
+                                        <div class="small text-white-75"><i class="fas fa-barcode me-1"></i><?php echo __('sn1'); ?>: <?php echo htmlspecialchars($r['serial_number']); ?></div>
+                                    <?php endif; ?>
+                                    <?php if(!empty($r['serial_number_2'])): ?>
+                                        <div class="small text-white-75"><i class="fas fa-barcode me-1"></i><?php echo __('sn2'); ?>: <?php echo htmlspecialchars($r['serial_number_2']); ?></div>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <small><?php echo htmlspecialchars(mb_strimwidth($r['problem_description'], 0, 40, "...")); ?></small>
@@ -222,8 +279,16 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                 <td>
                                     <span class="dashboard-tech-name"><i class="fas fa-user-cog me-1"></i><?php echo htmlspecialchars($r['tech_name'] ?? '---'); ?></span>
                                 </td>
-                                <td><?php echo getStatusBadge($r['status']); ?></td>
-                                <td><strong><?php echo formatMoney($r['final_cost'] ?? $r['estimated_cost']); ?></strong></td>
+                                <td>
+                                    <?php echo getStatusBadge($r['status']); ?>
+                                    <?php if(!empty($r['shipping_method'])): ?>
+                                        <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars($r['shipping_method']); ?></div>
+                                    <?php endif; ?>
+                                    <div class="small text-white-75 mt-1">
+                                        <i class="far fa-clock me-1"></i><?php echo date('d.m.Y H:i', strtotime($r['updated_at'])); ?>
+                                    </div>
+                                </td>
+                                <td><strong><?php echo formatMoney($r['final_cost'] ?: $r['estimated_cost']); ?></strong></td>
                             </tr>
                             <?php endforeach; 
                             
@@ -291,7 +356,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
         <!-- Fronta dnes (design-system) -->
         <?php
         try {
-            $queue_today = $pdo->query("SELECT o.id, o.device_model, o.device_brand, o.status, c.first_name, c.last_name, t.name AS tech_name FROM orders o JOIN customers c ON o.customer_id=c.id LEFT JOIN technicians t ON o.technician_id=t.id WHERE o.status IN ('New','Pending Approval','In Progress','Waiting for Parts')" . $tech_cond . " ORDER BY o.priority='High' DESC, o.created_at DESC LIMIT 6")->fetchAll();
+            $queue_today = $pdo->query("SELECT o.id, o.order_code, o.device_model, o.device_brand, o.status, c.first_name, c.last_name, t.name AS tech_name FROM orders o JOIN customers c ON o.customer_id=c.id LEFT JOIN technicians t ON o.technician_id=t.id WHERE o.status IN ($activeStatuses)" . $tech_cond_o . " ORDER BY o.priority='High' DESC, " . orderSortSql('o') . " LIMIT 6")->fetchAll();
         } catch (Throwable $e) { $queue_today = []; }
         ?>
         <div class="crm-queue-card mb-4 mt-5">

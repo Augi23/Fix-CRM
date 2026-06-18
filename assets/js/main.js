@@ -614,7 +614,6 @@ function openPreviewInNewTab() {
                     }
                     return;
                 }
-            }
 
             if (cur === 2) {
                 var form = modal.querySelector('form');

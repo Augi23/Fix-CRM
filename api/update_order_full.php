@@ -42,23 +42,31 @@ try {
         throw new Exception($t('order_not_found'));
     }
 
-    if (($_SESSION['role'] ?? '') === 'technician'
-        && !hasPermission('edit_orders')
-        && ($current['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)
-    ) {
+    if (!canAccessOrderBranch($current)) {
         throw new Exception($t('access_denied_msg'));
     }
 
-    $new_status = $_POST['status'] ?? $current['status'];
+    $new_status = normalizeOrderStatus($_POST['status'] ?? $current['status']);
     $technician_id = ($_POST['technician_id'] ?? '') !== '' ? (int)$_POST['technician_id'] : (int)$current['technician_id'];
-    $is_starting = ($new_status === 'In Progress' && $current['status'] !== 'In Progress');
-    $finishing_statuses = ['Completed', 'Collected'];
-    $was_finished = in_array($current['status'], $finishing_statuses, true);
-    $is_finishing = in_array($new_status, $finishing_statuses, true);
+    $branch_id = (int)($current['branch_id'] ?? getCurrentStaffBranchId());
+    if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
+        throw new Exception('Vybraný technik nepatří do pobočky zakázky.');
+    }
+    if ($technician_id) {
+        $stmtTechBranch = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? LIMIT 1');
+        $stmtTechBranch->execute([$technician_id]);
+        $techBranchId = (int)$stmtTechBranch->fetchColumn();
+        if ($techBranchId > 0) {
+            $branch_id = $techBranchId;
+        }
+    }
+    $is_starting = (isOrderStatusIn($new_status, 'in_progress') && !isOrderStatusIn($current['status'], 'in_progress'));
+    $was_finished = isOrderStatusIn($current['status'], 'done');
+    $is_finishing = isOrderStatusIn($new_status, 'done');
     $technician_changed = (int)$technician_id !== (int)($current['technician_id'] ?? 0);
-    $is_reassigning_in_progress = ($current['status'] === 'In Progress' && $new_status === 'In Progress' && $technician_changed);
+    $is_reassigning_in_progress = (isOrderStatusIn($current['status'], 'in_progress') && isOrderStatusIn($new_status, 'in_progress') && $technician_changed);
 
-    if ($new_status === 'In Progress') {
+    if (isOrderStatusIn($new_status, 'in_progress')) {
         if (!$technician_id) {
             throw new Exception($t('in_progress_requires_technician'));
         }
@@ -79,6 +87,7 @@ try {
         order_type = ?,
         status = ?,
         technician_id = ?,
+        branch_id = ?,
         estimated_cost = ?,
         final_cost = ?,
         extra_expenses = ?,
@@ -96,8 +105,9 @@ try {
         isset($_POST['device_brand']) ? $_POST['device_brand'] : $current['device_brand'],
         isset($_POST['device_type']) ? $_POST['device_type'] : $current['device_type'],
         isset($_POST['order_type']) ? $_POST['order_type'] : $current['order_type'],
-        isset($_POST['status']) ? $_POST['status'] : $current['status'],
+        $new_status,
         $technician_id,
+        $branch_id,
         isset($_POST['estimated_cost']) ? $_POST['estimated_cost'] : $current['estimated_cost'],
         isset($_POST['final_cost']) ? $_POST['final_cost'] : $current['final_cost'],
         isset($_POST['extra_expenses']) ? $_POST['extra_expenses'] : $current['extra_expenses'],
@@ -120,7 +130,7 @@ try {
         $params[] = $technician_id;
     }
 
-    if ($current['status'] === 'In Progress' && $is_finishing) {
+    if (isOrderStatusIn($current['status'], 'in_progress') && $is_finishing) {
         $sql .= ", work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = COALESCE(work_duration_seconds, 0) + CASE WHEN work_started_at IS NOT NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP))) ELSE 0 END";
         $params[] = $technician_id;
     }
@@ -212,14 +222,13 @@ try {
     }
 
 
-    $new_status = $_POST['status'] ?? $current['status'];
+    $new_status = normalizeOrderStatus($_POST['status'] ?? $current['status']);
     $final_cost = isset($_POST['final_cost']) ? (float)$_POST['final_cost'] : (float)$current['final_cost'];
 
-    $finishing_statuses = ['Completed', 'Collected'];
-    $was_finished = in_array($current['status'], $finishing_statuses, true);
-    $is_finishing = in_array($new_status, $finishing_statuses, true);
+    $was_finished = isOrderStatusIn($current['status'], 'done');
+    $is_finishing = isOrderStatusIn($new_status, 'done');
 
-    if ($current['status'] === 'Collected' && $new_status !== 'Collected') {
+    if (isOrderStatusIn($current['status'], 'collected') && !isOrderStatusIn($new_status, 'collected')) {
         throw new Exception($t('status_locked_after_collected'));
     }
 
@@ -230,7 +239,7 @@ try {
         if (!$was_finished && $is_finishing) {
             processOrderInventoryChange($order_id, $is_finishing, $was_finished);
 
-            if ($new_status === 'Completed' && get_setting('acc_auto_create_invoice', '0') == '1') {
+            if (isOrderStatusIn($new_status, 'completed') && get_setting('acc_auto_create_invoice', '0') == '1') {
                 require_once '../models/InvoiceManager.php';
                 $manager = new InvoiceManager($pdo);
                 $check = $pdo->prepare('SELECT id FROM invoices WHERE order_id = ?');

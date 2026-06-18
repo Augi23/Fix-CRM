@@ -26,6 +26,10 @@ $end = $end_date . ' 23:59:59';
 
 $where = "WHERE 1=1";
 $params = [];
+if (!isBranchGlobalViewer()) {
+    $where .= " AND o.branch_id = ?";
+    $params[] = getCurrentStaffBranchId();
+}
 $joins = "JOIN customers c ON o.customer_id = c.id";
 $selectExtra = "";
 $orderBy = "o.id DESC";

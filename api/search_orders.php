@@ -14,28 +14,30 @@ $q = trim((string)($_GET['q'] ?? $_GET['term'] ?? ''));
 $limit = max(1, min(30, (int)($_GET['limit'] ?? 20)));
 
 try {
-    $where = ["o.status NOT IN ('Collected', 'Cancelled')"];
+    $closedStatuses = implode(',', array_map(static fn($status) => $pdo->quote($status), array_merge(getOrderStatusList('collected'), getOrderStatusList('cancelled'))));
+    $where = ["o.status NOT IN ($closedStatuses)"];
     $params = [];
 
-    if (($_SESSION['role'] ?? '') === 'technician' && !hasPermission('view_all_orders')) {
-        $where[] = 'o.technician_id = ?';
-        $params[] = (int)($_SESSION['tech_id'] ?? 0);
-    }
+    addOrderBranchScope($where, $params, 'o');
 
     if ($q !== '') {
-        $where[] = '(o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_brand LIKE ? OR o.device_model LIKE ?)';
+        $where[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_brand LIKE ? OR o.device_model LIKE ?)';
         $like = '%' . $q . '%';
-        for ($i = 0; $i < 6; $i++) {
+        for ($i = 0; $i < 7; $i++) {
             $params[] = $like;
         }
     }
 
-    $sql = "SELECT o.id, o.status, o.device_brand, o.device_model, c.first_name, c.last_name, t.name AS tech_name
+    $sql = "SELECT o.id, o.order_code, o.status, o.device_brand, o.device_model, c.first_name, c.last_name, t.name AS tech_name
             FROM orders o
             JOIN customers c ON c.id = o.customer_id
             LEFT JOIN technicians t ON t.id = o.technician_id
             WHERE " . implode(' AND ', $where) . "
-            ORDER BY o.updated_at DESC
+            ORDER BY
+                (CASE WHEN o.order_code REGEXP '^[A-Za-z]+[0-9]+$' THEN 0 ELSE 1 END),
+                CAST(NULLIF(REGEXP_REPLACE(COALESCE(o.order_code, ''), '[^0-9]', ''), '') AS UNSIGNED) DESC,
+                o.updated_at DESC,
+                o.id DESC
             LIMIT {$limit}";
 
     $stmt = $pdo->prepare($sql);
@@ -44,7 +46,8 @@ try {
 
     $results = [];
     foreach ($rows as $row) {
-        $label = '#' . (int)$row['id'] . ' ' . trim((string)($row['device_brand'] ?? '') . ' ' . (string)($row['device_model'] ?? ''));
+        $displayCode = trim((string)($row['order_code'] ?? ''));
+        $label = ($displayCode !== '' ? $displayCode : '#' . (int)$row['id']) . ' ' . trim((string)($row['device_brand'] ?? '') . ' ' . (string)($row['device_model'] ?? ''));
         $client = trim((string)($row['first_name'] ?? '') . ' ' . (string)($row['last_name'] ?? ''));
         if ($client !== '') {
             $label .= ' · ' . $client;

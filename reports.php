@@ -11,7 +11,7 @@ $end_date = $_GET['end_date'] ?? date('Y-m-d', strtotime('sunday this week'));
 $active_tab = $_GET['tab'] ?? 'staff_stats';
 $selected_tech_id = $_GET['tech_id'] ?? null;
 
-$is_admin = hasPermission('admin_access') || hasPermission('view_reports_all');
+$is_admin = hasPermission('admin_access') || hasPermission('view_reports_all') || isBranchGlobalViewer();
 $is_tech = ($_SESSION['role'] ?? '') == 'technician';
 
 // If technician without elevated reporting permission, force them to see only their own stats and only the individual tab
@@ -23,7 +23,8 @@ if (!$is_admin && $is_tech) {
 // Helper to get stats for a specific period and optional technician
 function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     $params = [$start . ' 00:00:00', $end . ' 23:59:59'];
-    $tech_cond = $tech_id ? " AND technician_id = ?" : "";
+    $branch_cond = orderBranchScopeSql('branch_id');
+    $tech_cond = ($tech_id ? " AND technician_id = ?" : "") . $branch_cond;
     if ($tech_id) $params[] = $tech_id;
 
     $inProgressStatuses = getOrderStatusList('in_progress');
@@ -52,9 +53,9 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
 
     // Work time in minutes (only counted when the order is finished)
     $work_params = [$start . ' 00:00:00', $end . ' 23:59:59'];
-    $work_tech_cond = "";
+    $work_tech_cond = $branch_cond;
     if ($tech_id) {
-        $work_tech_cond = " AND technician_id = ?";
+        $work_tech_cond = " AND technician_id = ?" . $branch_cond;
         $work_params[] = $tech_id;
     }
     $stmt = $pdo->prepare("SELECT COALESCE(SUM(COALESCE(work_duration_seconds, 0)), 0) FROM orders WHERE status IN (" . sqlPlaceholders($doneStatuses) . ") AND work_finished_at BETWEEN ? AND ?" . $work_tech_cond);
@@ -67,9 +68,10 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     // Therefore we count both Completed + Collected and primarily date them by
     // work_finished_at, with invoice / shipping / updated_at only as fallbacks.
     $fin_params = [$start, $end];
-    $fin_tech_cond = "";
+    $fin_branch_cond = orderBranchScopeSql('o.branch_id');
+    $fin_tech_cond = $fin_branch_cond;
     if ($tech_id) {
-        $fin_tech_cond = " AND o.technician_id = ?";
+        $fin_tech_cond = " AND o.technician_id = ?" . $fin_branch_cond;
         $fin_params[] = $tech_id;
     }
 
@@ -208,7 +210,8 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     </thead>
                     <tbody>
                         <?php
-                        $techs = $pdo->query("SELECT id, name, is_active FROM technicians ORDER BY is_active DESC, name ASC")->fetchAll();
+                        $techs = $pdo->query("SELECT t.id, t.name, t.is_active, t.branch_id, b.name AS branch_name FROM technicians t LEFT JOIN branches b ON b.id = t.branch_id " . (isBranchGlobalViewer() ? "" : "WHERE t.branch_id = " . (int)getCurrentStaffBranchId()) . " ORDER BY b.id ASC, t.is_active DESC, t.name ASC")->fetchAll();
+                        $lastBranchId = null;
                         $totals = [
                             'received' => 0, 'in_progress' => 0, 'completed' => 0, 'cancelled' => 0,
                             'work_seconds' => 0,
@@ -217,6 +220,14 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         ];
 
                         foreach ($techs as $t):
+                            if (isBranchGlobalViewer() && $lastBranchId !== (int)($t['branch_id'] ?? 0)):
+                                $lastBranchId = (int)($t['branch_id'] ?? 0);
+                        ?>
+                        <tr class="table-secondary text-dark">
+                            <td colspan="9" class="fw-bold"><i class="fas fa-store me-2"></i><?php echo e($t['branch_name'] ?? getBranchLabel($lastBranchId)); ?></td>
+                        </tr>
+                        <?php
+                            endif;
                             $s = getDetailedStats($pdo, $start_date, $end_date, $t['id']);
                             $totals['received'] += $s['received'];
                             $totals['in_progress'] += $s['in_progress'];
@@ -232,6 +243,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <tr>
                             <td>
                                 <strong><?php echo htmlspecialchars($t['name']); ?></strong>
+                                <?php if (isBranchGlobalViewer()): ?><span class="badge bg-dark border border-secondary ms-2"><?php echo e($t['branch_name'] ?? getBranchLabel((int)($t['branch_id'] ?? 0))); ?></span><?php endif; ?>
                                 <?php if ((int)($t['is_active'] ?? 1) !== 1): ?><span class="badge bg-secondary ms-2"><?php echo __('inactive'); ?></span><?php endif; ?>
                                 <a href="?tab=individual_stats&tech_id=<?php echo $t['id']; ?>&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>" class="ms-2 small text-primary"><i class="fas fa-external-link-alt"></i></a>
                             </td>
@@ -327,7 +339,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                 <div class="col-md-6">
                     <h5 class="mb-3 border-bottom pb-2"><?php echo __('device_types_stats'); ?></h5>
                     <?php
-                    $stmt = $pdo->prepare("SELECT device_type, COUNT(*) as count FROM orders WHERE (created_at BETWEEN ? AND ?) GROUP BY device_type ORDER BY count DESC");
+                    $stmt = $pdo->prepare("SELECT device_type, COUNT(*) as count FROM orders WHERE (created_at BETWEEN ? AND ?)" . orderBranchScopeSql('branch_id') . " GROUP BY device_type ORDER BY count DESC");
                     $stmt->execute([$start_date . ' 00:00:00', $end_date . ' 23:59:59']);
                     $types = $stmt->fetchAll();
                     foreach ($types as $t):
@@ -435,7 +447,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 FROM orders o
                                 JOIN customers c ON o.customer_id = c.id
                                 LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'
-                                WHERE o.technician_id = ? AND o.status IN (" . sqlPlaceholders($doneStatuses) . ")
+                                WHERE o.technician_id = ? AND o.status IN (" . sqlPlaceholders($doneStatuses) . ")" . orderBranchScopeSql('o.branch_id') . "
                                   AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
                                 ORDER BY finance_date DESC
                             ");
@@ -633,38 +645,31 @@ function formatDurationMinutes(totalMinutes) {
     return parts.join(' ');
 }
 
-function getStatusBadgeClass(status) {
-    switch(status) {
-        case 'New': return 'bg-primary';
-        case 'Pending Approval': return 'bg-info text-dark';
-        case 'In Progress': return 'bg-warning';
-        case 'Waiting for Parts': return 'bg-secondary';
-        case 'Completed': return 'bg-success';
-        case 'Collected': return 'bg-info text-dark';
-        case 'Cancelled': return 'bg-danger';
-        default: return 'bg-secondary';
+const reportStatusClasses = <?php
+    $statusClassMap = [];
+    foreach (['new' => 'bg-primary', 'pending_approval' => 'bg-info text-dark', 'in_progress' => 'bg-warning', 'waiting_parts' => 'bg-secondary', 'completed' => 'bg-success', 'uncollected' => 'bg-warning text-dark', 'collected' => 'bg-info text-dark', 'cancelled' => 'bg-danger'] as $group => $class) {
+        foreach (getOrderStatusList($group) as $statusValue) {
+            $statusClassMap[$statusValue] = $class;
+        }
     }
+    echo json_encode($statusClassMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+?>;
+const reportStatusLabels = <?php
+    $statusLabelMap = [];
+    foreach (array_unique(array_merge(getOrderCanonicalStatuses(), getOrderStatusList('active'), getOrderStatusList('terminal'))) as $statusValue) {
+        $statusLabelMap[$statusValue] = getOrderStatusLabel($statusValue);
+    }
+    echo json_encode($statusLabelMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+?>;
+
+function getStatusBadgeClass(status) {
+    return reportStatusClasses[status] || 'bg-secondary';
 }
 
 function getStatusLabel(status) {
-    const labels = {
-        'New': '<?php echo __('new'); ?>',
-        'Новый': '<?php echo __('new'); ?>',
-        'Pending Approval': '<?php echo __('pending_approval'); ?>',
-        'На согласовании': '<?php echo __('pending_approval'); ?>',
-        'In Progress': '<?php echo __('in_progress'); ?>',
-        'В работе': '<?php echo __('in_progress'); ?>',
-        'Waiting for Parts': '<?php echo __('waiting_parts'); ?>',
-        'Ожидание запчастей': '<?php echo __('waiting_parts'); ?>',
-        'Completed': '<?php echo __('status_completed'); ?>',
-        'Готов': '<?php echo __('status_completed'); ?>',
-        'Collected': '<?php echo __('status_collected'); ?>',
-        'Выдан': '<?php echo __('status_collected'); ?>',
-        'Cancelled': '<?php echo __('status_cancelled'); ?>',
-        'Отменен': '<?php echo __('status_cancelled'); ?>'
-    };
-    return labels[status] || status;
+    return reportStatusLabels[status] || status;
 }
+
 
 // Reload page if returned from order edit to ensure fresh data
 window.addEventListener('pageshow', function(event) {

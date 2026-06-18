@@ -113,6 +113,7 @@ if (isset($_POST['login'])) {
                 $_SESSION['role']      = 'admin';
                 $_SESSION['full_name'] = $user['full_name'];
                 $_SESSION['tech_id']   = null;
+                $_SESSION['branch_id'] = null;
                 invalidatePermissionsCache();
                 recordLoginAttempt($pdo, true);
                 header('Location: index.php');
@@ -131,6 +132,7 @@ if (isset($_POST['login'])) {
                 $_SESSION['role']      = (($tech['role'] ?? 'engineer') === 'admin') ? 'admin' : 'technician';
                 $_SESSION['full_name'] = $tech['name'];
                 $_SESSION['tech_id']   = $tech['id'];
+                $_SESSION['branch_id'] = $tech['branch_id'] ?? null;
                 if ($_SESSION['role'] === 'technician') {
                     $_SESSION['internal_role'] = $tech['role'] ?? 'engineer';
                 }

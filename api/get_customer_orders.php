@@ -18,8 +18,14 @@ if (!$customer_id) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, device_brand, device_model, status, created_at FROM orders WHERE customer_id = ? ORDER BY created_at DESC");
-    $stmt->execute([$customer_id]);
+    $where = ['customer_id = ?'];
+    $params = [$customer_id];
+    if (!isBranchGlobalViewer()) {
+        $where[] = 'branch_id = ?';
+        $params[] = getCurrentStaffBranchId();
+    }
+    $stmt = $pdo->prepare('SELECT id, device_brand, device_model, status, created_at FROM orders WHERE ' . implode(' AND ', $where) . ' ORDER BY created_at DESC, id DESC');
+    $stmt->execute($params);
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'orders' => $orders]);
 } catch (Exception $e) {

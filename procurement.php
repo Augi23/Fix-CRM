@@ -12,13 +12,20 @@ $selectedSupplier = trim((string)($_GET['supplier'] ?? ''));
 $pendingOrders = [];
 $requests = [];
 try {
-    $stmt = $pdo->query(
-        "SELECT pr.*, o.device_brand, o.device_model, o.status AS order_status, o.technician_id, t.name AS tech_name
+    $requestWhere = '';
+    $requestParams = [];
+    if (!isBranchGlobalViewer()) {
+        $requestWhere = ' WHERE o.branch_id = ?';
+        $requestParams[] = getCurrentStaffBranchId();
+    }
+    $stmt = $pdo->prepare(
+        "SELECT pr.*, o.device_brand, o.device_model, o.status AS order_status, o.technician_id, o.branch_id, t.name AS tech_name
          FROM purchase_requests pr
          LEFT JOIN orders o ON o.id = pr.order_id
-         LEFT JOIN technicians t ON t.id = o.technician_id
+         LEFT JOIN technicians t ON t.id = o.technician_id" . $requestWhere . "
          ORDER BY FIELD(pr.status, 'pending', 'ordered', 'received', 'cancelled'), FIELD(pr.priority, 'today', 'this_week', 'later'), pr.created_at DESC"
     );
+    $stmt->execute($requestParams);
     $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     $requests = [];
@@ -26,8 +33,14 @@ try {
 
 try {
     if ($selectedOrderId > 0) {
-        $stmt = $pdo->prepare("SELECT o.id, o.device_brand, o.device_model, c.first_name, c.last_name FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id = ? LIMIT 1");
-        $stmt->execute([$selectedOrderId]);
+        $where = ['o.id = ?'];
+        $params = [$selectedOrderId];
+        if (!isBranchGlobalViewer()) {
+            $where[] = 'o.branch_id = ?';
+            $params[] = getCurrentStaffBranchId();
+        }
+        $stmt = $pdo->prepare('SELECT o.id, o.device_brand, o.device_model, c.first_name, c.last_name FROM orders o JOIN customers c ON c.id = o.customer_id WHERE ' . implode(' AND ', $where) . ' LIMIT 1');
+        $stmt->execute($params);
         $pendingOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (Throwable $e) {

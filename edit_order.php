@@ -12,8 +12,8 @@ $order = $stmt->fetch();
 
 if (!$order) die(__('order_not_found'));
 
-// Access Control for technicians
-if ($_SESSION['role'] == 'technician' && !hasPermission('edit_orders') && $order['technician_id'] != $_SESSION['tech_id']) {
+// Branch access control: staff see only orders from their branch; managers/admins see all.
+if (!canAccessOrderBranch($order)) {
     die(__('no_edit_permission'));
 }
 
@@ -27,7 +27,8 @@ $error = false;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $customer_id = $_POST['customer_id'];
-    $technician_id = $_POST['technician_id'];
+    $technician_id = ($_POST['technician_id'] ?? '') !== '' ? (int)$_POST['technician_id'] : null;
+    $branch_id = (int)($order['branch_id'] ?? getCurrentStaffBranchId());
     $device_type = $_POST['device_type'];
     $order_type = $_POST['order_type'];
     $device_brand = $_POST['device_brand'];
@@ -37,24 +38,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $problem_description = $_POST['problem_description'];
     $technician_notes = $_POST['technician_notes'];
     $estimated_cost = $_POST['estimated_cost'];
-    $status = $_POST['status'];
+    $status = normalizeOrderStatus($_POST['status'] ?? ($order['status'] ?? null));
 
     try {
+        if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
+            throw new Exception('Vybraný technik nepatří do pobočky zakázky.');
+        }
+        if ($technician_id) {
+            $stmtTechBranch = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? LIMIT 1');
+            $stmtTechBranch->execute([$technician_id]);
+            $techBranchId = (int)$stmtTechBranch->fetchColumn();
+            if ($techBranchId > 0) {
+                $branch_id = $techBranchId;
+            }
+        }
+
         // First get current status to see if it changed to Collected
         $stmt_curr = $pdo->prepare("SELECT status, shipping_date, technician_id FROM orders WHERE id = ?");
         $stmt_curr->execute([$id]);
         $current_order = $stmt_curr->fetch();
         
         $shipping_date_sql = "";
-        if ($status === 'Collected' && !$current_order['shipping_date']) {
+        if (isOrderStatusIn($status, 'collected') && !$current_order['shipping_date']) {
             $shipping_date_sql = ", shipping_date = NOW()";
         }
 
-        $is_starting = ($status === 'In Progress' && ($current_order['status'] ?? '') !== 'In Progress');
-        $is_finishing = in_array($status, ['Completed', 'Collected'], true) && ($current_order['status'] ?? '') === 'In Progress';
+        $is_starting = (isOrderStatusIn($status, 'in_progress') && !isOrderStatusIn($current_order['status'] ?? '', 'in_progress'));
+        $is_finishing = isOrderStatusIn($status, 'done') && isOrderStatusIn($current_order['status'] ?? '', 'in_progress');
         $technician_changed = (int)$technician_id !== (int)($current_order['technician_id'] ?? 0);
-        $is_reassigning_in_progress = (($current_order['status'] ?? '') === 'In Progress' && $status === 'In Progress' && $technician_changed);
-        if ($status === 'In Progress') {
+        $is_reassigning_in_progress = (isOrderStatusIn($current_order['status'] ?? '', 'in_progress') && isOrderStatusIn($status, 'in_progress') && $technician_changed);
+        if (isOrderStatusIn($status, 'in_progress')) {
             if (!$technician_id) {
                 throw new Exception('Pro stav Provádí se musí být zakázka přiřazená technikovi.');
             }
@@ -69,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $updateSql = "UPDATE orders SET
             customer_id = ?, 
             technician_id = ?,
+            branch_id = ?,
             device_type = ?, 
             order_type = ?,
             device_brand = ?,
@@ -82,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $updateParams = [
             $customer_id, 
             $technician_id,
+            $branch_id,
             $device_type, 
             $order_type,
             $device_brand,
@@ -221,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <select name="customer_id" class="form-select" required>
                         <?php foreach ($customers as $c): ?>
                             <option value="<?php echo $c['id']; ?>" <?php echo ($c['id'] == $order['customer_id']) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($c['last_name'] . ' ' . $c['first_name']); ?>
+                                <?php echo htmlspecialchars($c['first_name'] . ' ' . $c['last_name']); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -231,7 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <select name="technician_id" class="form-select">
                         <option value="">-- <?php echo __('technician'); ?> --</option>
                         <?php 
-                        $techs = $pdo->query("SELECT id, name FROM technicians WHERE is_active = 1 ORDER BY name ASC")->fetchAll();
+                        $techs = getActiveTechnicians();
                         foreach($techs as $t): ?>
                             <option value="<?php echo $t['id']; ?>" <?php if($order['technician_id']==$t['id']) echo 'selected'; ?>>
                                 <?php echo htmlspecialchars($t['name']); ?>
@@ -242,13 +257,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="col-md-4">
                     <label class="form-label"><i class="fas fa-tasks me-2 text-warning"></i><?php echo __('status'); ?></label>
                     <select name="status" class="form-select">
-                        <option value="New" <?php if($order['status']=='New') echo 'selected'; ?>><?php echo __('new'); ?></option>
-                        <option value="Pending Approval" <?php if($order['status']=='Pending Approval') echo 'selected'; ?>><?php echo __('pending_approval'); ?></option>
-                        <option value="In Progress" <?php if($order['status']=='In Progress') echo 'selected'; ?>><?php echo __('in_progress'); ?></option>
-                        <option value="Waiting for Parts" <?php if($order['status']=='Waiting for Parts') echo 'selected'; ?>><?php echo __('waiting_parts'); ?></option>
-                        <option value="Completed" <?php if($order['status']=='Completed') echo 'selected'; ?>><?php echo __('completed'); ?></option>
-                        <option value="Collected" <?php if($order['status']=='Collected') echo 'selected'; ?>><?php echo __('collected'); ?></option>
-                        <option value="Cancelled" <?php if($order['status']=='Cancelled') echo 'selected'; ?>><?php echo __('cancelled'); ?></option>
+                        <?php foreach (getOrderStatusOptions() as $statusValue => $statusLabel): ?>
+                            <option value="<?php echo e($statusValue); ?>" <?php if($order['status'] === $statusValue) echo 'selected'; ?>><?php echo e($statusLabel); ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-4">

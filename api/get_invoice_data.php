@@ -28,6 +28,9 @@ try {
     if (!$order) {
         throw new Exception('Order not found');
     }
+    if (!canAccessOrderBranch($order)) {
+        throw new Exception(__('access_denied_msg'));
+    }
 
     $prefix = get_setting('acc_invoice_prefix', date('Y'));
     $next_num = get_setting('acc_invoice_next_number', '1');

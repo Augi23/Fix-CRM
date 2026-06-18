@@ -27,9 +27,9 @@ if (!$attachment_id || !$created_at) {
 
 try {
     // Check permissions: only admin or responsible technician can edit
-    $stmt = $pdo->prepare("SELECT o.technician_id 
-                           FROM order_attachments a 
-                           JOIN orders o ON a.order_id = o.id 
+    $stmt = $pdo->prepare("SELECT o.technician_id, o.branch_id 
+                           FROM order_attachments a
+                           JOIN orders o ON a.order_id = o.id
                            WHERE a.id = ?");
     $stmt->execute([$attachment_id]);
     $data = $stmt->fetch();
@@ -38,7 +38,7 @@ try {
         throw new Exception('Attachment not found');
     }
 
-    if (!hasPermission('edit_orders') && ($data['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)) {
+    if (!canAccessOrderBranch($data) || (!hasPermission('edit_orders') && ($data['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0))) {
         throw new Exception(__('access_denied_msg'));
     }
 

@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/config.php';
+require_once 'includes/functions.php';
 
 $sync_token = getenv('SYNC_TOKEN') ?: 'DEFAULT_SECURE_TOKEN_REPLACE_ME';
 if (php_sapi_name() !== 'cli' && (!isset($_GET['token']) || $_GET['token'] !== $sync_token)) {
@@ -53,8 +54,8 @@ function sync_orders($data) {
             
             // 2. Status & Shipping Date
             if ($shipping_date) {
-                if ($local['status'] !== 'Collected') {
-                    $upd_fields[] = "status = 'Collected'";
+                if (!isOrderStatusIn((string)$local['status'], 'collected')) {
+                    $upd_fields[] = "status = 'Vydáno'";
                     $needs_update = true;
                 }
                 // Only update shipping_date if it differs significantly

@@ -25,15 +25,15 @@ if (!$id) {
 
 try {
     // Get file info and order info to check permissions
-    $stmt = $pdo->prepare("SELECT a.file_path, o.technician_id 
-                           FROM order_attachments a 
-                           JOIN orders o ON a.order_id = o.id 
+    $stmt = $pdo->prepare("SELECT a.file_path, o.technician_id, o.branch_id 
+                           FROM order_attachments a
+                           JOIN orders o ON a.order_id = o.id
                            WHERE a.id = ?");
     $stmt->execute([$id]);
     $data = $stmt->fetch();
 
     if ($data) {
-        if (!hasPermission('edit_orders') && ($data['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)) {
+        if (!canAccessOrderBranch($data) || (!hasPermission('edit_orders') && ($data['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0))) {
             throw new Exception(__('access_denied_msg'));
         }
 
@@ -41,7 +41,7 @@ try {
         if ($data['file_path'] && file_exists($full_path)) {
             unlink($full_path);
         }
-        
+
         $del = $pdo->prepare("DELETE FROM order_attachments WHERE id = ?");
         $del->execute([$id]);
         echo json_encode(['success' => true]);

@@ -69,6 +69,7 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     $phone = $_POST['tech_phone'] ?? '';
     $spec = $_POST['tech_spec'];
     $role = $_POST['role'] ?? 'engineer';
+    $branch_id = filter_input(INPUT_POST, 'branch_id', FILTER_VALIDATE_INT) ?: getDefaultBranchId();
     $telegramContact = parseTelegramContactInput($_POST['tech_tg'] ?? '');
     if (!$telegramContact['valid']) {
         header("Location: settings.php?tab=staff&error=telegram_contact_invalid");
@@ -84,8 +85,8 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     }
     $username_val = !empty($username) ? $username : null;
     $hashed_password = !empty($password) ? password_hash($password, PASSWORD_DEFAULT) : '';
-    $stmt = $pdo->prepare("INSERT INTO technicians (name, email, phone, specialization, role, telegram_id, telegram_username, username, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$name, $email, $phone, $spec, $role, $telegramContact['id'], $telegramContact['username'], $username_val, $hashed_password]);
+    $stmt = $pdo->prepare("INSERT INTO technicians (name, email, phone, specialization, role, branch_id, telegram_id, telegram_username, username, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $username_val, $hashed_password]);
     header("Location: settings.php?tab=staff&tech_added=1");
     exit;
 }
@@ -106,6 +107,7 @@ if (isset($_POST['edit_tech'])) {
     $phone = $_POST['tech_phone'] ?? '';
     $spec = $_POST['tech_spec'];
     $role = $_POST['role'] ?? 'engineer';
+    $branch_id = filter_input(INPUT_POST, 'branch_id', FILTER_VALIDATE_INT) ?: getDefaultBranchId();
     $telegramContact = parseTelegramContactInput($_POST['tech_tg'] ?? '');
     if (!$telegramContact['valid']) {
         header("Location: settings.php?tab=staff&error=telegram_contact_invalid");
@@ -118,10 +120,11 @@ if (isset($_POST['edit_tech'])) {
 
     // Re-verify important fields if NOT admin
     if (!$is_admin_check) {
-        $stmt = $pdo->prepare("SELECT role, is_active, username, engineer_rate, name, specialization, email, phone, telegram_id, telegram_username FROM technicians WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT role, branch_id, is_active, username, engineer_rate, name, specialization, email, phone, telegram_id, telegram_username FROM technicians WHERE id = ?");
         $stmt->execute([$id]);
         $current = $stmt->fetch();
         $role = $current['role'];
+        $branch_id = (int)($current['branch_id'] ?? getDefaultBranchId());
         $active = $current['is_active'];
         $username = $current['username'];
         $engineer_rate = $current['engineer_rate'];
@@ -151,14 +154,17 @@ if (isset($_POST['edit_tech'])) {
     
     $username_val = !empty($username) ? $username : null;
     if (!empty($password)) {
-        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, password = ?, engineer_rate = ? WHERE id = ?";
-        $params = [$name, $email, $phone, $spec, $role, $telegramContact['id'], $telegramContact['username'], $active, $username_val, password_hash($password, PASSWORD_DEFAULT), $engineer_rate, $id];
+        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, branch_id = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, password = ?, engineer_rate = ? WHERE id = ?";
+        $params = [$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $active, $username_val, password_hash($password, PASSWORD_DEFAULT), $engineer_rate, $id];
     } else {
-        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, engineer_rate = ? WHERE id = ?";
-        $params = [$name, $email, $phone, $spec, $role, $telegramContact['id'], $telegramContact['username'], $active, $username_val, $engineer_rate, $id];
+        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, branch_id = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, engineer_rate = ? WHERE id = ?";
+        $params = [$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $active, $username_val, $engineer_rate, $id];
     }
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
+    if ($is_admin_check) {
+        $pdo->prepare('UPDATE orders SET branch_id = ? WHERE technician_id = ?')->execute([$branch_id, $id]);
+    }
     settingsDebugLog([
         'event' => 'edit_tech_saved',
         'tech_id' => $id,
@@ -167,6 +173,7 @@ if (isset($_POST['edit_tech'])) {
         'telegram_id' => $telegramContact['id'] ?? null,
         'telegram_username' => $telegramContact['username'] ?? null,
         'role' => $role,
+        'branch_id' => $branch_id,
         'username' => $username_val,
         'time' => date('c')
     ]);
@@ -406,7 +413,7 @@ require_once 'includes/header.php';
             </div>
             <div class="table-responsive">
                 <table class="table table-dark table-hover align-middle border-secondary">
-                    <thead class="table-dark"><tr><th><?php echo __('name_col'); ?></th><th><?php echo __('login_col'); ?></th><th><?php echo __('role_col'); ?></th><th><?php echo __('spec_col'); ?></th><th>Telegram</th><th><?php echo __('status_col'); ?></th><th class="text-end"><?php echo __('actions_col'); ?></th></tr></thead>
+                    <thead class="table-dark"><tr><th><?php echo __('name_col'); ?></th><th><?php echo __('login_col'); ?></th><th><?php echo __('role_col'); ?></th><th>Pobočka</th><th><?php echo __('spec_col'); ?></th><th>Telegram</th><th><?php echo __('status_col'); ?></th><th class="text-end"><?php echo __('actions_col'); ?></th></tr></thead>
                     <tbody>
                         <?php 
                         $techs_query = $can_view_all_staff ? "SELECT * FROM technicians ORDER BY name ASC" : "SELECT * FROM technicians WHERE id = " . intval($_SESSION['tech_id'] ?? 0);
@@ -423,6 +430,7 @@ require_once 'includes/header.php';
                                 else echo '<span class="badge bg-info-glow">'.__('role_engineer').'</span>';
                                 ?>
                             </td>
+                            <td><span class="badge bg-dark border border-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)($t['branch_id'] ?? 0))); ?></span></td>
                             <td><span class="badge glass-panel text-white border-secondary"><?php echo htmlspecialchars($t['specialization']); ?></span></td>
                             <td>
                                 <?php if (!empty($t['telegram_id'])): ?>
@@ -649,6 +657,7 @@ require_once 'includes/header.php';
 </div>
 
 <!-- MODALS -->
+<?php $branches_settings = getBranches(); ?>
 <div class="modal fade" id="addTechModal" tabindex="-1">
     <div class="modal-dialog"><div class="modal-content border-secondary text-white"><form method="POST">
         <?php echo csrfField(); ?>
@@ -667,6 +676,14 @@ require_once 'includes/header.php';
                 <div class="col-md-6 mb-3">
                     <label class="form-label"><?php echo __('spec_col'); ?></label>
                     <input type="text" name="tech_spec" class="form-control" placeholder="<?php echo __('spec_placeholder'); ?>">
+                </div>
+                <div class="col-md-12 mb-3">
+                    <label class="form-label"><i class="fas fa-store me-1"></i>Pobočka</label>
+                    <select name="branch_id" class="form-select">
+                        <?php foreach ($branches_settings as $branch): ?>
+                            <option value="<?php echo (int)$branch['id']; ?>"><?php echo e($branch['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
             </div>
             <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Email</label><input type="email" name="tech_email" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('phone_label'); ?></label><input type="text" name="tech_phone" class="form-control"></div></div>
@@ -719,6 +736,19 @@ require_once 'includes/header.php';
                     <?php else: ?>
                         <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo htmlspecialchars($t['specialization'] ?? ''); ?></div>
                         <input type="hidden" name="tech_spec" value="<?php echo htmlspecialchars($t['specialization'] ?? ''); ?>">
+                    <?php endif; ?>
+                </div>
+                <div class="col-md-12 mb-3">
+                    <label class="form-label"><i class="fas fa-store me-1"></i>Pobočka</label>
+                    <?php if ($is_admin_user): ?>
+                    <select name="branch_id" class="form-select">
+                        <?php foreach ($branches_settings as $branch): ?>
+                            <option value="<?php echo (int)$branch['id']; ?>" <?php echo (int)($t['branch_id'] ?? 0) === (int)$branch['id'] ? 'selected' : ''; ?>><?php echo e($branch['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php else: ?>
+                        <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo e(getBranchLabel((int)($t['branch_id'] ?? 0))); ?></div>
+                        <input type="hidden" name="branch_id" value="<?php echo (int)($t['branch_id'] ?? getCurrentStaffBranchId()); ?>">
                     <?php endif; ?>
                 </div>
             </div>

@@ -75,20 +75,139 @@ function invalidatePermissionsCache(): void {
  * Return all active technicians.
  * Result is statically cached for the lifetime of the current PHP request.
  */
-function getActiveTechnicians(): array {
+function getBranches(bool $activeOnly = true): array {
     global $pdo;
-    static $cache = null;
-    if ($cache !== null) {
-        return $cache;
+    static $cache = [];
+    $key = $activeOnly ? 'active' : 'all';
+    if (isset($cache[$key])) {
+        return $cache[$key];
     }
     try {
-        $cache = $pdo->query(
-            'SELECT id, name FROM technicians WHERE is_active = 1 ORDER BY name ASC'
-        )->fetchAll();
-    } catch (Exception $e) {
-        $cache = [];
+        $where = $activeOnly ? ' WHERE is_active = 1' : '';
+        $cache[$key] = $pdo->query('SELECT id, code, name, address, is_active FROM branches' . $where . ' ORDER BY id ASC')->fetchAll();
+    } catch (Throwable $e) {
+        $cache[$key] = [];
     }
-    return $cache;
+    return $cache[$key];
+}
+
+function getBranchLabel(?int $branchId): string {
+    foreach (getBranches(false) as $branch) {
+        if ((int)$branch['id'] === (int)$branchId) {
+            return (string)$branch['name'];
+        }
+    }
+    return '';
+}
+
+function getDefaultBranchId(): int {
+    foreach (getBranches(false) as $branch) {
+        if (($branch['code'] ?? '') === 'karlin') {
+            return (int)$branch['id'];
+        }
+    }
+    $branches = getBranches(false);
+    return (int)($branches[0]['id'] ?? 0);
+}
+
+function getCurrentStaffBranchId(): int {
+    global $pdo;
+    if (!empty($_SESSION['branch_id'])) {
+        return (int)$_SESSION['branch_id'];
+    }
+    if (!empty($_SESSION['tech_id'])) {
+        try {
+            $stmt = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? LIMIT 1');
+            $stmt->execute([(int)$_SESSION['tech_id']]);
+            $branchId = (int)$stmt->fetchColumn();
+            if ($branchId > 0) {
+                $_SESSION['branch_id'] = $branchId;
+                return $branchId;
+            }
+        } catch (Throwable $e) {}
+    }
+    return getDefaultBranchId();
+}
+
+function isBranchGlobalViewer(): bool {
+    return hasPermission('admin_access') || getCurrentStaffRole() === 'manager';
+}
+
+function addOrderBranchScope(array &$whereClauses, array &$params, string $orderAlias = 'o'): void {
+    if (isBranchGlobalViewer()) {
+        return;
+    }
+    $branchId = getCurrentStaffBranchId();
+    if ($branchId > 0) {
+        $whereClauses[] = $orderAlias . '.branch_id = ?';
+        $params[] = $branchId;
+    }
+}
+
+function orderBranchScopeSql(string $column = 'branch_id'): string {
+    if (isBranchGlobalViewer()) {
+        return '';
+    }
+    $branchId = getCurrentStaffBranchId();
+    return $branchId > 0 ? ' AND ' . $column . ' = ' . (int)$branchId : '';
+}
+
+function canAccessOrderBranch(array $order): bool {
+    if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
+        return false;
+    }
+    if (isBranchGlobalViewer()) {
+        return true;
+    }
+    $orderBranchId = (int)($order['branch_id'] ?? 0);
+    return $orderBranchId > 0 && $orderBranchId === getCurrentStaffBranchId();
+}
+
+function canAssignTechnicianToOrder(?int $technicianId, ?int $branchId = null): bool {
+    global $pdo;
+    if (!$technicianId) {
+        return true;
+    }
+    if (isBranchGlobalViewer()) {
+        return true;
+    }
+    try {
+        $stmt = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? AND is_active = 1 LIMIT 1');
+        $stmt->execute([(int)$technicianId]);
+        $techBranchId = (int)$stmt->fetchColumn();
+        return $techBranchId > 0 && $techBranchId === ($branchId ?: getCurrentStaffBranchId());
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * Return active technicians visible for the current staff member.
+ * Managers/admins see all branches; branch staff only see their branch colleagues.
+ */
+function getActiveTechnicians(): array {
+    global $pdo;
+    static $cache = [];
+    $key = isBranchGlobalViewer() ? 'all' : ('branch_' . getCurrentStaffBranchId());
+    if (isset($cache[$key])) {
+        return $cache[$key];
+    }
+    try {
+        if (isBranchGlobalViewer()) {
+            $cache[$key] = $pdo->query(
+                'SELECT t.id, t.name, t.branch_id, b.name AS branch_name FROM technicians t LEFT JOIN branches b ON b.id = t.branch_id WHERE t.is_active = 1 ORDER BY b.id ASC, t.name ASC'
+            )->fetchAll();
+        } else {
+            $stmt = $pdo->prepare(
+                'SELECT t.id, t.name, t.branch_id, b.name AS branch_name FROM technicians t LEFT JOIN branches b ON b.id = t.branch_id WHERE t.is_active = 1 AND t.branch_id = ? ORDER BY t.name ASC'
+            );
+            $stmt->execute([getCurrentStaffBranchId()]);
+            $cache[$key] = $stmt->fetchAll();
+        }
+    } catch (Throwable $e) {
+        $cache[$key] = [];
+    }
+    return $cache[$key];
 }
 
 
@@ -176,17 +295,54 @@ function normalizeEmailForMailto(?string $email): string {
     return str_replace(["\r", "\n"], '', $email);
 }
 
-function getOrderStatusAliases(): array {
+function getOrderStatusDefinitions(): array {
+    return [
+        'Přijato' => ['group' => 'new', 'badge' => 'new'],
+        'Zakládá se' => ['group' => 'new', 'badge' => 'new'],
+        'V opravě' => ['group' => 'in_progress', 'badge' => 'progress'],
+        'V opravě zák. desky' => ['group' => 'in_progress', 'badge' => 'progress'],
+        'V externím servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
+        'V aut. servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
+        'Čeká na díl' => ['group' => 'waiting_parts', 'badge' => 'waiting'],
+        'Čeká na zákazníka' => ['group' => 'pending_approval', 'badge' => 'pending'],
+        'Čeká na platbu' => ['group' => 'pending_approval', 'badge' => 'pending'],
+        'Připraveno k převzetí' => ['group' => 'completed', 'badge' => 'completed'],
+        'Nevyzvednuto' => ['group' => 'uncollected', 'badge' => 'uncollected'],
+        'Vydáno' => ['group' => 'collected', 'badge' => 'collected'],
+        'Vydáno - ČR' => ['group' => 'collected', 'badge' => 'collected'],
+        'Stornováno' => ['group' => 'cancelled', 'badge' => 'cancelled'],
+        'Černá růže' => ['group' => 'new', 'badge' => 'new'],
+    ];
+}
+
+function getLegacyOrderStatusAliases(): array {
     return [
         'new' => ['New', 'Новый', 'Nová'],
         'pending_approval' => ['Pending Approval', 'На согласовании', 'K odsouhlasení', 'Čeká na schválení'],
         'in_progress' => ['In Progress', 'В работе', 'V práci', 'V procesu', 'Provádí se'],
         'waiting_parts' => ['Waiting for Parts', 'Ожидание запчастей', 'Čeká na díly', 'Čeká na díl', 'Ceka na dil', 'Čeká na diel'],
         'completed' => ['Completed', 'Готов', 'Hotovo'],
+        'uncollected' => ['Uncollected'],
         'collected' => ['Collected', 'Выдан', 'Vydáno'],
         'cancelled' => ['Cancelled', 'Отменен', 'Zrušeno'],
-        'done' => ['Completed', 'Collected', 'Готов', 'Выдан', 'Hotovo', 'Vydáno'],
     ];
+}
+
+function getOrderStatusAliases(): array {
+    $aliases = getLegacyOrderStatusAliases();
+    foreach (getOrderStatusDefinitions() as $status => $meta) {
+        $aliases[$meta['group']][] = $status;
+        if (($meta['badge'] ?? '') === 'uncollected') {
+            $aliases['uncollected'][] = $status;
+        }
+    }
+    foreach ($aliases as $key => $values) {
+        $aliases[$key] = array_values(array_unique($values));
+    }
+    $aliases['done'] = array_values(array_unique(array_merge($aliases['completed'], $aliases['uncollected'], $aliases['collected'])));
+    $aliases['active'] = array_values(array_unique(array_merge($aliases['new'], $aliases['pending_approval'], $aliases['in_progress'], $aliases['waiting_parts'])));
+    $aliases['terminal'] = array_values(array_unique(array_merge($aliases['done'], $aliases['cancelled'])));
+    return $aliases;
 }
 
 function getOrderStatusList(string $key): array {
@@ -194,50 +350,163 @@ function getOrderStatusList(string $key): array {
     return $aliases[$key] ?? [$key];
 }
 
+function getOrderStatusOptions(): array {
+    return array_combine(array_keys(getOrderStatusDefinitions()), array_keys(getOrderStatusDefinitions())) ?: [];
+}
+
+function getOrderCanonicalStatuses(): array {
+    return array_keys(getOrderStatusDefinitions());
+}
+
+function getAllowedOrderFilterStatuses(): array {
+    $statuses = getOrderCanonicalStatuses();
+
+    foreach (getOrderStatusAliases() as $items) {
+        foreach ($items as $status) {
+            if (is_string($status) && trim($status) !== '') {
+                $statuses[] = $status;
+            }
+        }
+    }
+
+    return array_values(array_unique($statuses));
+}
+
+function getDefaultOrderStatus(): string {
+    return 'Přijato';
+}
+
+function getCanonicalOrderStatusByGroup(string $group): ?string {
+    return [
+        'new' => 'Přijato',
+        'pending_approval' => 'Čeká na zákazníka',
+        'in_progress' => 'V opravě',
+        'waiting_parts' => 'Čeká na díl',
+        'completed' => 'Připraveno k převzetí',
+        'uncollected' => 'Nevyzvednuto',
+        'collected' => 'Vydáno',
+        'cancelled' => 'Stornováno',
+    ][$group] ?? null;
+}
+
+function normalizeOrderStatus(?string $status): string {
+    $status = trim((string)$status);
+    if ($status === '') {
+        return getDefaultOrderStatus();
+    }
+    if (isset(getOrderStatusDefinitions()[$status])) {
+        return $status;
+    }
+    if (isOrderStatusIn($status, 'uncollected')) {
+        return getCanonicalOrderStatusByGroup('uncollected') ?? getDefaultOrderStatus();
+    }
+    $group = getOrderStatusGroup($status);
+    return $group ? (getCanonicalOrderStatusByGroup($group) ?? $status) : $status;
+}
+
+function getOrderStatusGroup(string $status): ?string {
+    foreach (getOrderStatusAliases() as $group => $statuses) {
+        if (in_array($group, ['done', 'active', 'terminal'], true)) {
+            continue;
+        }
+        if (in_array($status, $statuses, true)) {
+            return $group;
+        }
+    }
+    return null;
+}
+
+function isOrderStatusIn(?string $status, string $key): bool {
+    return in_array((string)$status, getOrderStatusList($key), true);
+}
+
+function orderStatusSqlIn(PDO $pdo, string $key): string {
+    return implode(',', array_map(static fn($status) => $pdo->quote($status), getOrderStatusList($key)));
+}
+
+function getOrderStatusLabel(string $status): string {
+    if (isset(getOrderStatusDefinitions()[$status])) {
+        return $status;
+    }
+    $legacyLabels = [
+        'New' => __('new'),
+        'Новый' => __('new'),
+        'Nová' => __('new'),
+        'Pending Approval' => __('pending_approval'),
+        'На согласовании' => __('pending_approval'),
+        'K odsouhlasení' => __('pending_approval'),
+        'Čeká na schválení' => __('pending_approval'),
+        'In Progress' => __('in_progress'),
+        'В работе' => __('in_progress'),
+        'V práci' => __('in_progress'),
+        'V procesu' => __('in_progress'),
+        'Provádí se' => __('in_progress'),
+        'Waiting for Parts' => __('waiting_parts'),
+        'Ожидание запчастей' => __('waiting_parts'),
+        'Čeká na díly' => __('waiting_parts'),
+        'Čeká na díl' => __('waiting_parts'),
+        'Ceka na dil' => __('waiting_parts'),
+        'Čeká na diel' => __('waiting_parts'),
+        'Completed' => __('status_completed'),
+        'Готов' => __('status_completed'),
+        'Hotovo' => __('status_completed'),
+        'Uncollected' => __('status_uncollected'),
+        'Collected' => __('status_collected'),
+        'Выдан' => __('status_collected'),
+        'Vydáno' => __('status_collected'),
+        'Cancelled' => __('status_cancelled'),
+        'Отменен' => __('status_cancelled'),
+        'Zrušeno' => __('status_cancelled'),
+    ];
+    return $legacyLabels[$status] ?? $status;
+}
+
+function orderDisplayCode(array $order): string
+{
+    $orderCode = trim((string)($order['order_code'] ?? ''));
+    return $orderCode !== '' ? $orderCode : '#' . (int)($order['id'] ?? 0);
+}
+
+function orderSortSql(string $alias = 'o', ?string $exactIdExpression = null): string
+{
+    if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $alias)) {
+        $alias = 'o';
+    }
+
+    $parts = [];
+    if ($exactIdExpression !== null && trim($exactIdExpression) !== '') {
+        $parts[] = '(CASE WHEN ' . $exactIdExpression . ' THEN 0 ELSE 1 END)';
+    }
+    $parts[] = "(CASE WHEN {$alias}.order_code REGEXP '^[A-Za-z]+[0-9]+$' THEN 0 ELSE 1 END)";
+    $parts[] = "CAST(NULLIF(REGEXP_REPLACE(COALESCE({$alias}.order_code, ''), '[^0-9]', ''), '') AS UNSIGNED) DESC";
+    $parts[] = "{$alias}.created_at DESC";
+    $parts[] = "{$alias}.id DESC";
+
+    return implode(",\n                ", $parts);
+}
+
 function sqlPlaceholders(array $values): string {
     return implode(',', array_fill(0, count($values), '?'));
 }
 
 function getStatusBadge($status) {
-    switch ($status) {
-        case 'New':
-        case 'Новый':
-        case 'Nová':
-            return '<span class="badge status-pill status-pill--new">'.__('new').'</span>';
-        case 'Pending Approval':
-        case 'На согласовании':
-        case 'K odsouhlasení':
-        case 'Čeká na schválení':
-            return '<span class="badge status-pill status-pill--pending">'.__('pending_approval').'</span>';
-        case 'In Progress':
-        case 'В работе':
-        case 'V práci':
-        case 'V procesu':
-        case 'Provádí se':
-            return '<span class="badge status-pill status-pill--progress">'.__('in_progress').'</span>';
-        case 'Waiting for Parts':
-        case 'Ожидание запчастей':
-        case 'Čeká na díly':
-        case 'Čeká na díl':
-        case 'Ceka na dil':
-        case 'Čeká na diel':
-            return '<span class="badge status-pill status-pill--waiting">'.__('waiting_parts').'</span>';
-        case 'Completed':
-        case 'Готов':
-        case 'Hotovo':
-            return '<span class="badge status-pill status-pill--completed">'.__('status_completed').'</span>';
-        case 'Collected':
-        case 'Выдан':
-        case 'Vydáno':
-            return '<span class="badge status-pill status-pill--collected">'.__('status_collected').'</span>';
-        case 'Cancelled':
-        case 'Отменен':
-        case 'Zrušeno':
-            return '<span class="badge status-pill status-pill--cancelled">'.__('status_cancelled').'</span>';
-        default:
-            return '<span class="badge status-pill status-pill--default">' . $status . '</span>';
+    $definitions = getOrderStatusDefinitions();
+    $badge = $definitions[(string)$status]['badge'] ?? null;
+    if ($badge === null) {
+        $group = getOrderStatusGroup((string)$status);
+        $badge = [
+            'new' => 'new',
+            'pending_approval' => 'pending',
+            'in_progress' => 'progress',
+            'waiting_parts' => 'waiting',
+            'completed' => isOrderStatusIn((string)$status, 'uncollected') ? 'uncollected' : 'completed',
+            'collected' => 'collected',
+            'cancelled' => 'cancelled',
+        ][$group] ?? 'default';
     }
+    return '<span class="badge status-pill status-pill--'.$badge.'">' . e(getOrderStatusLabel((string)$status)) . '</span>';
 }
+
 
 function formatMoney($amount) {
     global $pdo;
@@ -730,7 +999,7 @@ function crmGetOrderNotificationContext(int $orderId): ?array {
     $stmt = $pdo->prepare(
         "SELECT o.id, o.status, o.technician_id, o.device_brand, o.device_model, o.problem_description,
                 o.final_cost, o.estimated_cost,
-                TRIM(CONCAT(COALESCE(c.last_name, ''), ' ', COALESCE(c.first_name, ''))) AS customer_name,
+                TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS customer_name,
                 COALESCE(t.name, '') AS technician_name
          FROM orders o
          LEFT JOIN customers c ON c.id = o.customer_id
@@ -1102,7 +1371,7 @@ function ensureOrderWorkTrackingSchema() {
 function getTechnicianInProgressCount($technicianId, $excludeOrderId = null) {
     global $pdo;
     if (!$technicianId) return 0;
-    $sql = "SELECT COUNT(*) FROM orders WHERE technician_id = ? AND status = 'In Progress'";
+    $sql = "SELECT COUNT(*) FROM orders WHERE technician_id = ? AND status IN (" . orderStatusSqlIn($pdo, 'in_progress') . ")";
     $params = [$technicianId];
     if ($excludeOrderId) {
         $sql .= " AND id <> ?";

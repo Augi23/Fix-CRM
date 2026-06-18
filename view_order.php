@@ -16,8 +16,8 @@ $order = $stmt->fetch();
 
 if (!$order) die(__('order_not_found'));
 
-// Access Control for technicians
-if ($_SESSION['role'] == 'technician' && !hasPermission('view_all_orders') && $order['technician_id'] != $_SESSION['tech_id']) {
+// Branch access control: staff see only orders from their branch; managers/admins see all.
+if (!canAccessOrderBranch($order)) {
     die(__('no_edit_permission'));
 }
 
@@ -35,24 +35,24 @@ $customers_list = $pdo->query("SELECT id, first_name, last_name, phone FROM cust
 // Fetch active technicians for edit modal
 $techs = getActiveTechnicians();
 
-$status = $order['status'] ?? 'New';
-$next_status_map = [
-    'New' => 'In Progress',
-    'Pending Approval' => 'In Progress',
-    'Waiting for Parts' => 'In Progress',
-    'In Progress' => 'Completed',
-    'Completed' => 'Collected'
-];
-$next_status = $next_status_map[$status] ?? null;
+$status = $order['status'] ?? getDefaultOrderStatus();
+$next_status = null;
+if (isOrderStatusIn($status, 'new') || isOrderStatusIn($status, 'pending_approval') || isOrderStatusIn($status, 'waiting_parts')) {
+    $next_status = 'V opravě';
+} elseif (isOrderStatusIn($status, 'in_progress')) {
+    $next_status = 'Připraveno k převzetí';
+} elseif (isOrderStatusIn($status, 'completed') || isOrderStatusIn($status, 'uncollected')) {
+    $next_status = 'Vydáno';
+}
 $next_label_map = [
-    'In Progress' => __('move_to_in_progress'),
-    'Completed' => __('move_to_completed'),
-    'Collected' => __('move_to_collected')
+    'V opravě' => __('move_to_in_progress'),
+    'Připraveno k převzetí' => __('move_to_completed'),
+    'Vydáno' => __('move_to_collected')
 ];
 $next_label = $next_status ? ($next_label_map[$next_status] ?? __('next_step')) : '';
-$show_shipping = in_array($status, ['Completed', 'Collected'], true);
+$show_shipping = isOrderStatusIn($status, 'done');
 $show_invoice = hasPermission('admin_access')
-    && in_array($status, ['Completed', 'Collected'], true)
+    && isOrderStatusIn($status, 'done')
     && (($order['final_cost'] ?? 0) > 0 || ($order['estimated_cost'] ?? 0) > 0);
 $can_change_technician = hasPermission('admin_access') || hasPermission('edit_orders');
 $ui_lang = crm_get_language();
@@ -76,36 +76,9 @@ try {
 }
 
 function localizedOrderStatusLabel(string $status): string {
-    static $map = [
-        'New' => 'new',
-        'Новый' => 'new',
-        'Nová' => 'new',
-        'Pending Approval' => 'pending_approval',
-        'На согласовании' => 'pending_approval',
-        'K odsouhlasení' => 'pending_approval',
-        'Čeká na schválení' => 'pending_approval',
-        'In Progress' => 'in_progress',
-        'В работе' => 'in_progress',
-        'V práci' => 'in_progress',
-        'V procesu' => 'in_progress',
-        'Provádí se' => 'in_progress',
-        'Waiting for Parts' => 'waiting_parts',
-        'Ожидание запчастей' => 'waiting_parts',
-        'Čeká na díly' => 'waiting_parts',
-        'Completed' => 'status_completed',
-        'Готов' => 'status_completed',
-        'Hotovo' => 'status_completed',
-        'Collected' => 'status_collected',
-        'Выдан' => 'status_collected',
-        'Vydáno' => 'status_collected',
-        'Cancelled' => 'status_cancelled',
-        'Отменен' => 'status_cancelled',
-        'Zrušeno' => 'status_cancelled',
-    ];
-
-    $key = $map[$status] ?? null;
-    return $key ? __($key) : $status;
+    return getOrderStatusLabel($status);
 }
+
 ?>
 
 <div class="row">
@@ -445,13 +418,9 @@ function localizedOrderStatusLabel(string $status): string {
                                 </span>
                             </label>
                             <select name="status" class="form-select mb-2">
-                                <option value="New" <?php if($order['status']=='New') echo 'selected'; ?>><?php echo __('new'); ?></option>
-                                <option value="Pending Approval" <?php if($order['status']=='Pending Approval') echo 'selected'; ?>><?php echo __('pending_approval'); ?></option>
-                                <option value="In Progress" <?php if($order['status']=='In Progress') echo 'selected'; ?>><?php echo __('in_progress'); ?></option>
-                                <option value="Waiting for Parts" <?php if($order['status']=='Waiting for Parts') echo 'selected'; ?>><?php echo __('waiting_parts'); ?></option>
-                                <option value="Completed" <?php if($order['status']=='Completed') echo 'selected'; ?>><?php echo __('completed'); ?></option>
-                                <option value="Collected" <?php if($order['status']=='Collected') echo 'selected'; ?>><?php echo __('collected'); ?></option>
-                                <option value="Cancelled" <?php if($order['status']=='Cancelled') echo 'selected'; ?>><?php echo __('cancelled'); ?></option>
+                                <?php foreach (getOrderStatusOptions() as $statusValue => $statusLabel): ?>
+                                    <option value="<?php echo e($statusValue); ?>" <?php if($order['status'] === $statusValue) echo 'selected'; ?>><?php echo e($statusLabel); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -490,7 +459,7 @@ function localizedOrderStatusLabel(string $status): string {
         <div class="card glass-card border-0 mb-4">
             <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><?php echo __('shipping'); ?></h5>
-                <?php if($order['status'] === 'Collected'): ?>
+                <?php if(isOrderStatusIn($order['status'], 'collected')): ?>
                     <span class="badge bg-success small"><?php echo __('collected'); ?></span>
                 <?php endif; ?>
             </div>
@@ -769,13 +738,14 @@ $(document).ready(function() {
         const form = $(this);
         const status = form.find('select[name="status"]').val();
         const shippingMethod = $('select[name="shipping_method"]').val();
+        const collectedStatuses = <?php echo json_encode(getOrderStatusList('collected'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
         
-        if (status === 'Collected' && (!shippingMethod || shippingMethod === '')) {
+        if (collectedStatuses.includes(status) && (!shippingMethod || shippingMethod === '')) {
             showShippingRequiredModal();
             return false;
         }
         
-        if (status === 'Collected') {
+        if (collectedStatuses.includes(status)) {
             const shippingForm = $('#shippingForm');
             $.post('api/update_shipping.php', shippingForm.serialize(), function(res) {
                 if (res.success) {
@@ -1058,15 +1028,7 @@ function showShippingRequiredModal() {
 function showStatusConfirmModal(form) {
     const modal = $('#statusConfirmModal');
     const status = form.find('select[name="status"]').val();
-    const statusLabels = {
-        'New': '<?php echo __("new"); ?>',
-        'Pending Approval': '<?php echo __("pending_approval"); ?>',
-        'In Progress': '<?php echo __("in_progress"); ?>',
-        'Waiting for Parts': '<?php echo __("waiting_parts"); ?>',
-        'Completed': '<?php echo __("completed"); ?>',
-        'Collected': '<?php echo __("collected"); ?>',
-        'Cancelled': '<?php echo __("cancelled"); ?>'
-    };
+    const statusLabels = <?php echo json_encode(getOrderStatusOptions(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
     
     $('#confirmStatusText').text(statusLabels[status] || status);
     modal.modal('show');
@@ -1211,7 +1173,7 @@ function deleteOrder(id) {
                             <select name="customer_id" class="form-select select2-modal">
                                 <?php foreach($customers_list as $cl): ?>
                                     <option value="<?php echo $cl['id']; ?>" <?php echo ($cl['id'] == $order['customer_id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($cl['last_name'] . ' ' . $cl['first_name'] . ' (' . $cl['phone'] . ')'); ?>
+                                        <?php echo htmlspecialchars($cl['first_name'] . ' ' . $cl['last_name'] . ' (' . $cl['phone'] . ')'); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>

@@ -25,7 +25,8 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 $order_id = $_REQUEST['order_id'] ?? null;
-$new_status = $_REQUEST['status'] ?? null;
+$requested_status = $_REQUEST['status'] ?? null;
+$new_status = $requested_status !== null ? normalizeOrderStatus($requested_status) : null;
 $final_cost = $_REQUEST['final_cost'] ?? null;
 $technician_id = $_REQUEST['technician_id'] ?? null;
 
@@ -39,7 +40,7 @@ if (!$order_id || !$new_status) {
 try {
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('SELECT status, technician_id, estimated_cost, final_cost, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT status, technician_id, branch_id, estimated_cost, final_cost, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $order_data = $stmt->fetch();
 
@@ -47,7 +48,7 @@ try {
         throw new Exception($t('order_not_found'));
     }
 
-    if (!hasPermission('edit_orders') && ($order_data['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0)) {
+    if (!canAccessOrderBranch($order_data)) {
         throw new Exception($t('access_denied_msg'));
     }
 
@@ -56,19 +57,31 @@ try {
     $current_estimated = $order_data['estimated_cost'];
     $current_final = $order_data['final_cost'];
     $target_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
+    $target_branch_id = (int)($order_data['branch_id'] ?? getCurrentStaffBranchId());
+    if (!canAssignTechnicianToOrder($target_tech_id, $target_branch_id)) {
+        throw new Exception('Vybraný technik nepatří do pobočky zakázky.');
+    }
+    if ($target_tech_id) {
+        $stmtTechBranch = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? LIMIT 1');
+        $stmtTechBranch->execute([$target_tech_id]);
+        $techBranchId = (int)$stmtTechBranch->fetchColumn();
+        if ($techBranchId > 0) {
+            $target_branch_id = $techBranchId;
+        }
+    }
 
-    if ($current_status === 'Collected' && $new_status !== 'Collected') {
+    if (isOrderStatusIn($current_status, 'collected') && !isOrderStatusIn($new_status, 'collected')) {
         throw new Exception($t('status_locked_after_collected'));
     }
 
-    $finishing_statuses = ['Completed', 'Collected'];
+    $finishing_statuses = getOrderStatusList('done');
     $was_finished = in_array($current_status, $finishing_statuses, true);
     $is_finishing = in_array($new_status, $finishing_statuses, true);
-    $is_starting = ($new_status === 'In Progress' && $current_status !== 'In Progress');
+    $is_starting = (isOrderStatusIn($new_status, 'in_progress') && !isOrderStatusIn($current_status, 'in_progress'));
     $technician_changed = ((int)$target_tech_id !== (int)$current_tech_id);
-    $is_reassigning_in_progress = ($current_status === 'In Progress' && $new_status === 'In Progress' && $technician_changed);
+    $is_reassigning_in_progress = (isOrderStatusIn($current_status, 'in_progress') && isOrderStatusIn($new_status, 'in_progress') && $technician_changed);
 
-    if ($new_status === 'In Progress') {
+    if (isOrderStatusIn($new_status, 'in_progress')) {
         if (!$target_tech_id) {
             throw new Exception($t('in_progress_requires_technician'));
         }
@@ -91,16 +104,16 @@ try {
         $params[] = $target_tech_id;
     }
 
-    if ($current_status === 'In Progress' && $is_finishing) {
+    if (isOrderStatusIn($current_status, 'in_progress') && $is_finishing) {
         $sql .= ', work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = COALESCE(work_duration_seconds, 0) + CASE WHEN work_started_at IS NOT NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP))) ELSE 0 END';
         $params[] = $target_tech_id;
     }
 
-    if ($new_status === 'Collected') {
+    if (isOrderStatusIn($new_status, 'collected')) {
         $sql .= ', shipping_date = IFNULL(shipping_date, CURRENT_TIMESTAMP)';
     }
 
-    if ($new_status === 'Collected' && ($final_cost === null || $final_cost === '')) {
+    if (isOrderStatusIn($new_status, 'collected') && ($final_cost === null || $final_cost === '')) {
         $final_cost = ($current_final !== null && $current_final !== '') ? $current_final : $current_estimated;
     }
 
@@ -110,8 +123,9 @@ try {
     }
 
     $updated_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
-    $sql .= ', technician_id = ?';
+    $sql .= ', technician_id = ?, branch_id = ?';
     $params[] = $updated_tech_id;
+    $params[] = $target_branch_id;
 
     if (isset($_REQUEST['extra_expenses']) && ($_SESSION['role'] ?? '') === 'admin') {
         $sql .= ', extra_expenses = ?';

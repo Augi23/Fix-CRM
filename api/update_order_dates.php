@@ -27,6 +27,14 @@ if (!$order_id || !$created_at || !$updated_at) {
 }
 
 try {
+    $check = $pdo->prepare('SELECT technician_id, branch_id FROM orders WHERE id = ? LIMIT 1');
+    $check->execute([$order_id]);
+    $order = $check->fetch();
+    if (!$order || !canAccessOrderBranch($order)) {
+        echo json_encode(['success' => false, 'message' => __('access_denied_msg')]);
+        exit;
+    }
+
     $stmt = $pdo->prepare("UPDATE orders SET created_at = ?, updated_at = ? WHERE id = ?");
     $stmt->execute([$created_at, $updated_at, $order_id]);
 

@@ -5,6 +5,7 @@
  */
 require_once __DIR__ . '/../functions.php';
 $techs_list_modal = getActiveTechnicians();
+$branches_modal = getBranches();
 $order_templates_modal = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)get_setting('order_templates', '')))));
 $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)get_setting('order_note_templates', '')))));
 ?>
@@ -265,12 +266,24 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                 <span class="fw-semibold small text-uppercase"><?php echo __('section_execution'); ?></span>
                             </div>
                             <div class="row g-3">
+                                <?php if (isBranchGlobalViewer()): ?>
+                                <div class="col-md-6">
+                                    <label class="form-label"><i class="fas fa-store me-1"></i>Pobočka</label>
+                                    <select name="branch_id" class="form-select">
+                                        <?php foreach ($branches_modal as $branch): ?>
+                                            <option value="<?php echo (int)$branch['id']; ?>"><?php echo e($branch['name']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <?php else: ?>
+                                    <input type="hidden" name="branch_id" value="<?php echo (int)getCurrentStaffBranchId(); ?>">
+                                <?php endif; ?>
                                 <div class="col-md-6">
                                     <label class="form-label"><?php echo __('technician'); ?></label>
                                     <select name="technician_id" class="form-select">
                                         <option value="">-- <?php echo __('technician'); ?> --</option>
                                         <?php foreach ($techs_list_modal as $t): ?>
-                                            <option value="<?php echo (int)$t['id']; ?>" <?php echo (($_SESSION['role'] ?? '') !== 'admin' && $t['id'] == ($_SESSION['tech_id'] ?? 0)) ? 'selected' : ''; ?>><?php echo e($t['name']); ?></option>
+                                            <option value="<?php echo (int)$t['id']; ?>" <?php echo (($_SESSION['role'] ?? '') !== 'admin' && $t['id'] == ($_SESSION['tech_id'] ?? 0)) ? 'selected' : ''; ?>><?php echo e($t['name']); ?><?php echo isBranchGlobalViewer() && !empty($t['branch_name']) ? ' · ' . e($t['branch_name']) : ''; ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
