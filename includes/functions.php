@@ -1052,7 +1052,12 @@ function getGitRepoInfo(string $repoRoot): array {
         }
     } else {
         $detail = sanitizeGitText($fetchOut !== '' ? $fetchOut : 'git fetch exited with code ' . $fetchCode);
-        if ($info['token_present']) {
+        // Filesystem-permission failures (web user can't write to .git) also exit 128 — detect them
+        // first so we don't mislabel them as a missing token.
+        $looksLikePerm = (bool)preg_match('~permission denied|insufficient permission|cannot lock|unable to create|operation not permitted|failed to write|unpack-objects failed~i', $fetchOut);
+        if ($looksLikePerm) {
+            $info['error'] = 'Souborová práva: webový uživatel nemá zápis do .git (sjednoťte vlastníka/práva repozitáře na serveru)';
+        } elseif ($info['token_present']) {
             $info['error'] = 'Git fetch failed (check the GITHUB_TOKEN scope/validity)';
         } elseif ($fetchCode === 128) {
             $info['error'] = 'Git access denied — private repo needs a GITHUB_TOKEN in .env';
