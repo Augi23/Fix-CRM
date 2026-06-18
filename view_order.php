@@ -456,6 +456,30 @@ function localizedOrderStatusLabel(string $status): string {
             </div>
         </div>
 
+        <!-- QR kód: naskenuj (Foťákem nebo skenerem v CRM) → otevře tuto zakázku -->
+        <div class="card glass-card border-0 mb-4">
+            <div class="card-body text-center py-3">
+                <div class="text-white-75 small mb-2"><i class="fas fa-qrcode me-1"></i> <?php echo __('scan_to_open_order'); ?></div>
+                <div id="orderQr" style="display:inline-block; background:#fff; padding:8px; border-radius:8px; line-height:0;"></div>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+        <script>
+        (function() {
+            var box = document.getElementById('orderQr');
+            if (!box || typeof window.qrcode !== 'function') { if (box) box.style.display = 'none'; return; }
+            try {
+                var url = window.location.origin + '/view_order.php?id=<?php echo (int)$order['id']; ?>';
+                var qr = qrcode(0, 'M');
+                qr.addData(url);
+                qr.make();
+                box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+                var svg = box.querySelector('svg');
+                if (svg) { svg.style.width = '128px'; svg.style.height = '128px'; }
+            } catch (e) { box.style.display = 'none'; }
+        })();
+        </script>
+
         <?php if ($show_shipping): ?>
         <div class="card glass-card border-0 mb-4">
             <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">

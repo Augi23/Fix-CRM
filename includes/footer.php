@@ -92,6 +92,23 @@
     </div>
 </div>
 
+<!-- QR skener zakázky -->
+<div class="modal fade" id="scanOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-secondary text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="fas fa-qrcode me-2"></i><?php echo __('scan_order_title'); ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?php echo e(__('close')); ?>"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-white-75 mb-2"><?php echo __('scan_hint'); ?></div>
+                <div id="qrReader" style="width:100%; border-radius:10px; overflow:hidden;"></div>
+                <div id="qrReaderMsg" class="small mt-2 text-warning"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php require_once __DIR__ . '/modals/new_order_modal.php'; ?>
 </body>
 </html>

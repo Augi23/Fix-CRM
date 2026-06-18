@@ -24,6 +24,12 @@ $lang_overrides = [
         'new_items' => 'Nové položky',
         'updated' => 'Aktualizováno',
         'print_label' => 'Štítek (Brother QL)',
+        'scan_to_open_order' => 'Naskenuj pro otevření zakázky',
+        'scan_order' => 'Skenovat',
+        'scan_order_title' => 'Skenovat QR zakázky',
+        'scan_hint' => 'Namiř kameru na QR kód štítku — zakázka se otevře.',
+        'scan_not_found' => 'Naskenovaný kód neodpovídá žádné zakázce.',
+        'scan_camera_error' => 'Nepodařilo se spustit kameru (povol přístup ke kameře).',
 
         'role_admin' => 'Admin',
         'role_manager' => 'Manažer',

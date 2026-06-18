@@ -1018,3 +1018,77 @@ document.addEventListener('DOMContentLoaded', function() {
         jQuery(document).on('select2:open', function() { setTimeout(repositionSelect2Dropdown, 0); });
     }
 }());
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   QR skener zakázky — tlačítko v topbaru otevře kameru (html5-qrcode, lazy-load),
+   po naskenování QR štítku otevře danou zakázku. Knihovna se načte až při použití.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function() {
+    var SCANNER_LIB = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    var libPromise = null;
+    var scanner = null;
+
+    function loadLib() {
+        if (window.Html5Qrcode) return Promise.resolve();
+        if (libPromise) return libPromise;
+        libPromise = new Promise(function(resolve, reject) {
+            var s = document.createElement('script');
+            s.src = SCANNER_LIB;
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+        });
+        return libPromise;
+    }
+
+    function navigateToScanned(text) {
+        text = (text || '').toString().trim();
+        var m = text.match(/view_order\.php\?id=(\d+)/i);
+        var id = m ? m[1] : (/^\d+$/.test(text) ? text : null);
+        if (id) { window.location.href = 'view_order.php?id=' + encodeURIComponent(id); return true; }
+        try {
+            var u = new URL(text);
+            if (u.host === window.location.host) { window.location.href = text; return true; }
+        } catch (e) {}
+        return false;
+    }
+
+    function stopScan() {
+        if (!scanner) return;
+        try {
+            scanner.stop().then(function() { try { scanner.clear(); } catch (e) {} scanner = null; })
+                          .catch(function() { scanner = null; });
+        } catch (e) { scanner = null; }
+    }
+
+    function startScan() {
+        var modalEl = document.getElementById('scanOrderModal');
+        var msgEl = document.getElementById('qrReaderMsg');
+        if (!modalEl || typeof bootstrap === 'undefined') return;
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        if (msgEl) msgEl.textContent = '';
+        modal.show();
+
+        loadLib().then(function() {
+            scanner = new Html5Qrcode('qrReader');
+            return scanner.start(
+                { facingMode: 'environment' },
+                { fps: 10, qrbox: { width: 220, height: 220 } },
+                function onSuccess(decodedText) {
+                    if (navigateToScanned(decodedText)) { stopScan(); }
+                    else if (msgEl) { msgEl.textContent = window.LANG_SCAN_NOT_FOUND || 'Neznámý kód'; }
+                },
+                function onError() {}
+            );
+        }).catch(function() {
+            if (msgEl) msgEl.textContent = window.LANG_SCAN_CAMERA_ERROR || 'Chyba kamery';
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', stopScan, { once: true });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('scanOrderBtn');
+        if (btn) btn.addEventListener('click', startScan);
+    });
+}());

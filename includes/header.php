@@ -139,6 +139,8 @@ try {
     window.LANG_SEARCH_CLIENT = '<?php echo __("search_client_placeholder"); ?>';
     window.LANG_BRAND = '<?php echo __("brand"); ?>';
     window.LANG_MODEL = '<?php echo __("model_placeholder"); ?>';
+    window.LANG_SCAN_NOT_FOUND = '<?php echo __("scan_not_found"); ?>';
+    window.LANG_SCAN_CAMERA_ERROR = '<?php echo __("scan_camera_error"); ?>';
     </script>
 </head>
 <body>
@@ -225,6 +227,9 @@ try {
             </div>
 
             <div class="d-flex align-items-center gap-2 crm-navbar-actions">
+                <button class="btn btn-sm crm-v2-icon-btn" type="button" id="scanOrderBtn" title="<?php echo e(__('scan_order_title')); ?>" aria-label="<?php echo e(__('scan_order_title')); ?>">
+                    <i class="fas fa-qrcode"></i>
+                </button>
                 <button class="btn btn-sm crm-v2-icon-btn" type="button" id="notificationsToggle" aria-label="<?php echo e(__('notifications')); ?>">
                     <i class="fas fa-bell"></i>
                     <span class="crm-v2-alert-dot"></span>
