@@ -489,7 +489,8 @@ function sqlPlaceholders(array $values): string {
     return implode(',', array_fill(0, count($values), '?'));
 }
 
-function getStatusBadge($status) {
+/** Returns the colour token for a status (new|pending|progress|waiting|completed|uncollected|collected|cancelled|default). */
+function getOrderStatusBadgeToken($status): string {
     $definitions = getOrderStatusDefinitions();
     $badge = $definitions[(string)$status]['badge'] ?? null;
     if ($badge === null) {
@@ -504,6 +505,11 @@ function getStatusBadge($status) {
             'cancelled' => 'cancelled',
         ][$group] ?? 'default';
     }
+    return (string)$badge;
+}
+
+function getStatusBadge($status) {
+    $badge = getOrderStatusBadgeToken($status);
     return '<span class="badge status-pill status-pill--'.$badge.'">' . e(getOrderStatusLabel((string)$status)) . '</span>';
 }
 

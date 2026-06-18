@@ -910,6 +910,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function apply(scale) {
         // zoom na <html> škáluje celé UI uniformně (Chromium)
         document.documentElement.style.zoom = (scale === 100) ? '' : (scale / 100);
+        // Ovladač sám drž v konstantní velikosti (kontra-zoom), ať při zvětšení nezmizí ani nenaroste.
+        var w = document.getElementById('crmUiZoom');
+        if (w) w.style.zoom = (scale === 100) ? '' : (100 / scale);
     }
 
     // Aplikuj uložené měřítko co nejdřív (skript běží v <head>) — minimalizuje probliknutí
@@ -955,13 +958,12 @@ document.addEventListener('DOMContentLoaded', function() {
             else if (act === 'reset') set(DEF);
         });
 
-        var sidebar = document.getElementById('sidebar');
-        if (sidebar) {
-            sidebar.appendChild(wrap);
-        } else {
-            wrap.classList.add('crm-ui-zoom--floating');
-            document.body.appendChild(wrap);
-        }
+        // Vždy fixně ukotvit do rohu viewportu (mimo sidebar, který se při zoomu posune a ovladač
+        // by zmizel z dohledu). Tím je tlačítko +/− vždy dostupné.
+        wrap.classList.add('crm-ui-zoom--floating');
+        document.body.appendChild(wrap);
+        // hned aplikuj kontra-zoom dle aktuálního měřítka
+        wrap.style.zoom = (scale === 100) ? '' : (100 / scale);
 
         // počáteční stav disabled tlačítek
         if (outBtn) outBtn.disabled = (scale <= MIN);

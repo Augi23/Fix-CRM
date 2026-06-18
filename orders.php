@@ -266,7 +266,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
                             $client_phone = $order['phone'] ?? '';
                             $phone_clean  = normalizePhoneForTel($client_phone);
                         ?>
-                        <tr class="order-row" data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
+                        <tr class="order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($order['status'])); ?>" data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
                             <td class="ps-4">
                                 <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none"><?php echo e(orderDisplayCode($order)); ?></a>
                                 <?php if (!empty($order['order_code'])): ?>

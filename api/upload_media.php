@@ -29,6 +29,21 @@ if (!$order_id) {
     exit;
 }
 
+// Branch authorization: only staff who can access the order's branch may attach media to it
+// (mirrors view_order.php / edit_order.php; prevents cross-branch IDOR via a forged order_id).
+$orderStmt = $pdo->prepare('SELECT id, branch_id FROM orders WHERE id = ? LIMIT 1');
+$orderStmt->execute([$order_id]);
+$orderRow = $orderStmt->fetch(PDO::FETCH_ASSOC);
+if (!$orderRow) {
+    echo json_encode(['success' => false, 'message' => $t('missing_id')]);
+    exit;
+}
+if (!canAccessOrderBranch($orderRow)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => $t('access_denied_msg')]);
+    exit;
+}
+
 if (empty($_FILES['files']['name'][0])) {
     echo json_encode(['success' => false, 'message' => $t('upload_no_files')]);
     exit;
