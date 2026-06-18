@@ -1127,8 +1127,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
         var raw = buf; buf = '';
         if (raw.length < 3) return;
-        // dekóduj celé číslo zakázky (APFAZ… i čísla) a nech ho přeložit resolverem
-        var value = demangle(raw).replace(/[^0-9A-Za-z\-]/g, '');
+        // Dekóduj jen když je vstup opravdu přepsaný CZ klávesnicí (obsahuje háčky / '+').
+        // Když čtečka píše správně (žádné háčky), nech to být — jinak by se Z↔Y chybně prohodilo.
+        var mangled = /[+ěščřžýáíé]/.test(raw);
+        var value = (mangled ? demangle(raw) : raw).replace(/[^0-9A-Za-z\-]/g, '');
         if (value) { window.location.href = 'view_order.php?scan=' + encodeURIComponent(value); }
     }
 
