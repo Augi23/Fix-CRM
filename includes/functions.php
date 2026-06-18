@@ -788,12 +788,67 @@ function telegramContactDisplayValue($telegramId, $telegramUsername = null): str
 }
 
 function runGitCommand(string $repoRoot, string $command, ?int &$exitCode = null): string {
-    $cmd = 'git -C ' . escapeshellarg($repoRoot) . ' ' . $command . ' 2>&1';
+    // exec() is frequently disabled on shared hosting via disable_functions.
+    if (!function_exists('exec')) {
+        $exitCode = 127;
+        return 'exec() is disabled on this server (cannot run git)';
+    }
+    // Bypass git's "dubious ownership" refusal (exit 128) when the repo is owned by a
+    // different user than the PHP/web process. safe.directory=* covers git 2.36+; the explicit
+    // path also covers git 2.35.2 (where "*" is not yet honored). Per-invocation only — never persisted.
+    $cmd = 'git -c ' . escapeshellarg('safe.directory=*')
+         . ' -c ' . escapeshellarg('safe.directory=' . $repoRoot)
+         . ' -C ' . escapeshellarg($repoRoot) . ' ' . $command . ' 2>&1';
     $output = [];
     $code = 0;
     exec($cmd, $output, $code);
     $exitCode = $code;
     return trim(implode("\n", $output));
+}
+
+/**
+ * GitHub access token for private-repo fetch/pull.
+ * Source order: .env GITHUB_TOKEN → system_settings 'github_token'. Never persisted to git config.
+ */
+function githubAccessToken(): string {
+    $tok = trim((string)(getenv('GITHUB_TOKEN') ?: ''));
+    if ($tok === '' && function_exists('get_setting') && !empty($GLOBALS['pdo'])) {
+        $tok = trim((string)get_setting('github_token', ''));
+    }
+    return $tok;
+}
+
+/**
+ * Activates token auth for the NEXT git fetch/pull by injecting an HTTP Authorization
+ * header via GIT_CONFIG_* environment variables (git 2.31+). This keeps the token OUT of
+ * the command line (argv / process listing) — unlike embedding it in the remote URL, which
+ * is readable by other local users via `ps`/`/proc` on shared hosting. Pair with gitEndAuth().
+ * Returns true if auth was activated (token present + HTTPS github remote).
+ */
+function gitBeginAuth(string $repoRoot, string $remoteName = 'origin'): bool {
+    $tok = githubAccessToken();
+    if ($tok === '') {
+        return false;
+    }
+    $url = (string)(gitRemoteUrl($repoRoot, $remoteName) ?? '');
+    if (!preg_match('~^https://github\.com/~i', $url)) {
+        return false; // SSH / non-github remote → rely on normal credential resolution
+    }
+    putenv('GIT_CONFIG_COUNT=1');
+    putenv('GIT_CONFIG_KEY_0=http.https://github.com/.extraHeader');
+    putenv('GIT_CONFIG_VALUE_0=Authorization: Basic ' . base64_encode('x-access-token:' . $tok));
+    return true;
+}
+
+function gitEndAuth(): void {
+    putenv('GIT_CONFIG_COUNT');
+    putenv('GIT_CONFIG_KEY_0');
+    putenv('GIT_CONFIG_VALUE_0');
+}
+
+/** Strip any embedded HTTPS credentials before surfacing git output to UI/logs (defense in depth). */
+function sanitizeGitText(string $text): string {
+    return (string)preg_replace('~https://[^@/\s]+@~i', 'https://***@', $text);
 }
 
 function gitRemoteUrl(string $repoRoot, string $remoteName = 'origin'): ?string {
@@ -847,11 +902,20 @@ function getGitRepoInfo(string $repoRoot): array {
         'update_available' => null,
         'changelog' => [],
         'remote_slug' => gitRemoteSlugFromUrl($remoteUrl),
+        'token_present' => githubAccessToken() !== '',
         'error' => null,
+        'error_detail' => null,
     ];
+
+    if (!function_exists('exec')) {
+        $info['error'] = 'exec() is disabled on this server';
+        $info['error_detail'] = 'PHP exec() is blocked (disable_functions). Git-based self-update cannot run on this host.';
+        return $info;
+    }
 
     if (!is_dir($repoRoot . '/.git')) {
         $info['error'] = 'Repository not found';
+        $info['error_detail'] = 'No .git directory at ' . $repoRoot . ' — the code was likely deployed without git (FTP/zip). Self-update needs a git clone.';
         return $info;
     }
 
@@ -865,6 +929,12 @@ function getGitRepoInfo(string $repoRoot): array {
     if ($code === 0 && $head !== '') {
         $info['local_commit'] = $head;
         $info['local_short'] = substr($head, 0, 7);
+    } else {
+        // Local rev-parse failing means git itself can't read the repo (dubious ownership,
+        // broken repo, git missing). Capture the real reason for diagnostics.
+        $info['error'] = 'Git cannot read local repository';
+        $info['error_detail'] = sanitizeGitText($head !== '' ? $head : 'git rev-parse HEAD returned no output (exit ' . $code . ')');
+        return $info;
     }
 
     $localDate = runGitCommand($repoRoot, "show -s --format=%cI HEAD", $code);
@@ -878,7 +948,14 @@ function getGitRepoInfo(string $repoRoot): array {
     $remoteName = $info['remote_name'] ?: 'origin';
     $remoteBranch = $branch !== '' ? $branch : 'main';
     $fetchCode = 0;
-    runGitCommand($repoRoot, 'fetch --quiet ' . escapeshellarg($remoteName) . ' ' . escapeshellarg($remoteBranch), $fetchCode);
+    // Fetch by remote NAME with an explicit refspec so refs/remotes/<remote>/<branch> is
+    // actually updated (a bare `fetch <url> <branch>` only moves FETCH_HEAD, leaving the
+    // tracking ref stale → ahead/behind would be computed from outdated data). Token auth,
+    // when configured, is injected via env header (gitBeginAuth) — never in the URL/argv.
+    $refspec = '+' . $remoteBranch . ':refs/remotes/' . $remoteName . '/' . $remoteBranch;
+    $authActive = gitBeginAuth($repoRoot, $remoteName);
+    $fetchOut = runGitCommand($repoRoot, 'fetch --quiet ' . escapeshellarg($remoteName) . ' ' . escapeshellarg($refspec), $fetchCode);
+    if ($authActive) { gitEndAuth(); }
 
     if ($fetchCode === 0) {
         $remoteRef = $remoteName . '/' . $remoteBranch;
@@ -927,7 +1004,15 @@ function getGitRepoInfo(string $repoRoot): array {
             }
         }
     } else {
-        $info['error'] = $fetchCode === 128 ? 'Git access denied or repository unavailable' : 'Git fetch failed';
+        $detail = sanitizeGitText($fetchOut !== '' ? $fetchOut : 'git fetch exited with code ' . $fetchCode);
+        if ($info['token_present']) {
+            $info['error'] = 'Git fetch failed (check the GITHUB_TOKEN scope/validity)';
+        } elseif ($fetchCode === 128) {
+            $info['error'] = 'Git access denied — private repo needs a GITHUB_TOKEN in .env';
+        } else {
+            $info['error'] = 'Git fetch failed';
+        }
+        $info['error_detail'] = $detail;
     }
 
     return $info;

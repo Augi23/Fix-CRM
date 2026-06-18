@@ -15,7 +15,8 @@ $info = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : [];
 if (empty($info) || empty($info['local_commit'])) {
     echo json_encode([
         'success' => false,
-        'message' => 'Failed to load repository git information.',
+        'message' => !empty($info['error']) ? $info['error'] : 'Failed to load repository git information.',
+        'detail'  => (string)($info['error_detail'] ?? ''),
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -23,7 +24,8 @@ if (empty($info) || empty($info['local_commit'])) {
 if (!empty($info['error'])) {
     echo json_encode([
         'success' => false,
-        'message' => 'Git repository check failed: ' . $info['error'],
+        'message' => $info['error'],
+        'detail'  => (string)($info['error_detail'] ?? ''),
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }

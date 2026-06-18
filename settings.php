@@ -603,6 +603,9 @@ require_once 'includes/header.php';
                         <?php if (!empty($gitInfo['error'])): ?>
                             <div class="alert alert-warning border-0 bg-warning bg-opacity-10 small mb-3">
                                 <i class="fas fa-exclamation-triangle me-2 text-warning"></i><?php echo htmlspecialchars((string)$gitInfo['error']); ?>
+                                <?php if (!empty($gitInfo['error_detail'])): ?>
+                                    <div class="mt-1 text-white-50" style="font-family:monospace;font-size:.72rem;word-break:break-all;"><?php echo htmlspecialchars((string)$gitInfo['error_detail']); ?></div>
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
 
@@ -632,7 +635,11 @@ require_once 'includes/header.php';
                             <button type="button" class="btn btn-success" id="btnInstallUpdate" onclick="installUpdate()" style="display:none;">
                                 <i class="fas fa-cloud-download-alt me-2"></i><?php echo __('install_update'); ?>
                             </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnUpdateDiag" onclick="runUpdateDiagnostics()">
+                                <i class="fas fa-stethoscope me-2"></i>Diagnostika serveru
+                            </button>
                         </div>
+                        <div id="updateDiagArea" class="mb-3" style="display:none;"></div>
 
                         <div id="updateStatusArea" class="mb-4" style="display:none;"></div>
                         <div class="small text-white-75 mt-2"><?php echo __('update_server_hint'); ?></div>
@@ -949,7 +956,8 @@ function checkForUpdates(force = false) {
             if (!data.success) {
                 statusArea.style.display = 'block';
                 statusArea.innerHTML = `<div class="alert alert-danger border-0 bg-danger bg-opacity-10 small mb-0">
-                    <i class="fas fa-exclamation-circle me-2"></i>${data.message || UPDATE_TRANSLATIONS.update_error}
+                    <i class="fas fa-exclamation-circle me-2"></i>${escapeHtml(data.message || UPDATE_TRANSLATIONS.update_error)}
+                    ${data.detail ? `<div class="mt-1 text-white-50" style="font-family:monospace;font-size:.72rem;word-break:break-all;">${escapeHtml(data.detail)}</div>` : ''}
                 </div>`;
                 if (installBtn) installBtn.style.display = 'none';
                 return;
@@ -1043,6 +1051,55 @@ function escapeHtml(s) {
     const div = document.createElement('div');
     div.textContent = s;
     return div.innerHTML;
+}
+
+function runUpdateDiagnostics() {
+    const btn = document.getElementById('btnUpdateDiag');
+    const area = document.getElementById('updateDiagArea');
+    if (!btn || !area) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Diagnostika…';
+    fetch('api/update_diagnostics.php')
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-stethoscope me-2"></i>Diagnostika serveru';
+            if (!data.success) {
+                area.style.display = 'block';
+                area.innerHTML = `<div class="alert alert-danger border-0 bg-danger bg-opacity-10 small mb-0">${escapeHtml(data.message || 'Chyba')}</div>`;
+                return;
+            }
+            const c = data.checks || {};
+            const yn = v => v ? '<span class="text-success">✓</span>' : '<span class="text-danger">✗</span>';
+            const blocked = /^BLOCKED/.test(data.verdict || '');
+            let rows = '';
+            const add = (label, val) => { rows += `<tr><td class="text-white-75 pe-3">${escapeHtml(label)}</td><td class="text-white" style="font-family:monospace;word-break:break-all;">${val}</td></tr>`; };
+            add('exec() povolen', yn(c.exec_available));
+            add('git nalezen', yn(c.git_found) + ' <span class="text-muted">' + escapeHtml(c.git_version || '') + '</span>');
+            add('je git repo (.git)', yn(c.is_git_repo));
+            add('PHP uživatel', escapeHtml(c.php_user || '?'));
+            add('vlastník repa', escapeHtml(c.repo_owner || '?') + (c.ownership_match ? '' : ' <span class="text-muted">(jiný než PHP — řešeno přes safe.directory)</span>'));
+            add('lokální commit', escapeHtml(c.local_commit || '—'));
+            add('remote', escapeHtml(c.remote_url || '—'));
+            add('token v .env', yn(c.token_present));
+            add('fetch funguje', yn(c.fetch_ok));
+            add('stav vůči GitHubu', c.update_available
+                ? '<span class="text-info">aktualizace dostupná (behind ' + escapeHtml(String(c.behind_by)) + ')</span>'
+                : '<span class="text-success">aktuální</span>');
+            if (c.error_detail) add('detail chyby', '<span class="text-warning">' + escapeHtml(c.error_detail) + '</span>');
+            area.style.display = 'block';
+            area.innerHTML = `
+                <div class="alert ${blocked ? 'alert-warning bg-warning' : 'alert-success bg-success'} border-0 bg-opacity-10 small mb-2">
+                    <i class="fas ${blocked ? 'fa-triangle-exclamation' : 'fa-circle-check'} me-2"></i><strong>${escapeHtml(data.verdict || '')}</strong>
+                </div>
+                <div class="glass-panel p-3 border-secondary"><table class="table table-sm table-borderless mb-0 small">${rows}</table></div>`;
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-stethoscope me-2"></i>Diagnostika serveru';
+            area.style.display = 'block';
+            area.innerHTML = `<div class="alert alert-danger border-0 bg-danger bg-opacity-10 small mb-0">${escapeHtml(err.message || 'Chyba')}</div>`;
+        });
 }
 
 function installUpdate() {

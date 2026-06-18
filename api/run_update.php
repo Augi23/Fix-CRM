@@ -64,7 +64,12 @@ if ((int)($info['behind_by'] ?? 0) <= 0) {
 $remoteName = (string)($info['remote_name'] ?? 'origin');
 $exitCode = 0;
 $targetBranch = $info['branch'] ?: 'main';
+// Pull by remote NAME; token auth (when configured) is injected via env header (gitBeginAuth),
+// keeping it out of argv. Stays fast-forward-only.
+$authActive = function_exists('gitBeginAuth') ? gitBeginAuth($repoRoot, $remoteName) : false;
 $pullOutput = runGitCommand($repoRoot, 'pull --ff-only ' . escapeshellarg($remoteName) . ' ' . escapeshellarg($targetBranch), $exitCode);
+if ($authActive && function_exists('gitEndAuth')) { gitEndAuth(); }
+$pullOutput = function_exists('sanitizeGitText') ? sanitizeGitText($pullOutput) : $pullOutput;
 
 if ($exitCode !== 0) {
     echo json_encode([
