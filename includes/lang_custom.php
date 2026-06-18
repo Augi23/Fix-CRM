@@ -8,6 +8,22 @@ $lang_overrides = [
     'cs' => [
         'lang_en' => 'Angličtina',
         'procurement' => 'Nákupy',
+
+        // Sklad / Nákupy oddělení (katalog vs reálný sklad)
+        'nakupy_catalog_title' => 'Katalog dílů k objednání',
+        'nakupy_catalog_desc' => 'Díly od dodavatelů, které lze objednat. Po naskladnění se objeví ve Skladu.',
+        'procurement_queue_section' => 'Fronta objednávek',
+        'order_part' => 'Objednat',
+        'order_part_title' => 'Objednat díl',
+        'order_qty' => 'Počet',
+        'use_in_repair' => 'Použít k opravě',
+        'in_stock_col' => 'Skladem',
+        'manager_only_short' => 'Jen manažer',
+        'stock_real_empty' => 'Sklad je prázdný. Díly se sem přidají ručně nebo po naskladnění objednávky.',
+        'order_created' => 'Díl byl přidán do objednávek.',
+        'new_items' => 'Nové položky',
+        'updated' => 'Aktualizováno',
+
         'role_admin' => 'Admin',
         'role_manager' => 'Manažer',
         'role_engineer' => 'Technik',

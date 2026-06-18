@@ -30,7 +30,9 @@ if (empty($part_name)) {
 }
 
 try {
-    $stmt = $pdo->prepare("INSERT INTO inventory (part_name, sku, quantity, cost_price, sale_price, min_stock) VALUES (?, ?, ?, ?, ?, ?)");
+    ensureInventoryStockedSchema();
+    // Manually added parts are real warehouse stock → always visible in Sklad.
+    $stmt = $pdo->prepare("INSERT INTO inventory (part_name, sku, quantity, cost_price, sale_price, min_stock, is_stocked) VALUES (?, ?, ?, ?, ?, ?, 1)");
     $stmt->execute([$part_name, $sku, $quantity, $cost_price, $sale_price, $min_stock]);
     
     // Check if called from form (AJAX) or direct

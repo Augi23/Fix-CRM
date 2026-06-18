@@ -19,8 +19,9 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 set_time_limit(300);
 
 function redirectToInventory(array $params = []): void {
+    // Catalog now lives on the Nákupy page — return there so the user sees the result and rows.
     $query = $params ? ('?' . http_build_query($params)) : '';
-    header('Location: ../inventory.php' . $query);
+    header('Location: ../procurement.php' . $query);
     exit;
 }
 

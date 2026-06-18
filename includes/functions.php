@@ -649,6 +649,47 @@ function ensureProcurementSchema(): bool {
     return true;
 }
 
+/**
+ * Ensures the inventory.is_stocked flag exists and runs a one-time backfill.
+ *
+ * Model:
+ *  - Sklad (warehouse)  = real stock: parts manually added OR received via procurement.
+ *                         Query rule: is_stocked = 1 OR quantity > 0.
+ *  - Nákupy (catalog)   = supplier catalog parts you can order (source_supplier set).
+ * Backfill marks manually-added items (no supplier source) as stocked; catalog items stay
+ * is_stocked = 0 and only surface in Sklad while they actually have quantity > 0.
+ */
+function ensureInventoryStockedSchema(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM inventory LIKE 'is_stocked'")->fetch();
+        if (!$col) {
+            $pdo->exec("ALTER TABLE inventory ADD COLUMN is_stocked TINYINT(1) NOT NULL DEFAULT 0");
+            try { $pdo->exec("ALTER TABLE inventory ADD INDEX idx_inventory_stocked (is_stocked)"); } catch (Throwable $e) {}
+        }
+        if (get_setting('inv_stocked_backfilled', '') !== '1') {
+            // Manually-added parts (no catalog source) are real stock from the start.
+            // Guard against the catalog column not existing yet (don't depend on migration order):
+            // if source_supplier is absent, treat every existing row as real stock.
+            $hasSupplierCol = (bool)$pdo->query("SHOW COLUMNS FROM inventory LIKE 'source_supplier'")->fetch();
+            $where = $hasSupplierCol ? "(source_supplier IS NULL OR source_supplier = '')" : "1=1";
+            $pdo->exec("UPDATE inventory SET is_stocked = 1 WHERE is_stocked = 0 AND " . $where);
+            set_setting('inv_stocked_backfilled', '1');
+        }
+    } catch (Throwable $e) {
+        // best-effort schema guard
+    }
+}
+
+/** SQL fragment for "this part belongs in the warehouse view" (real stock). */
+function inventoryStockedWhereSql(): string {
+    return '(is_stocked = 1 OR quantity > 0)';
+}
+
 function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $quantity, string $notes = ''): bool {
     global $pdo;
 

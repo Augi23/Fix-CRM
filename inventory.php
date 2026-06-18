@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
+ensureInventoryStockedSchema();
 
 // Pagination and Filters
 $limit = 50;
@@ -12,10 +13,9 @@ $offset = ($page - 1) * $limit;
 $search = $_GET['search'] ?? '';
 $min_price = $_GET['min_price'] ?? '';
 $max_price = $_GET['max_price'] ?? '';
-$supplier_filter = trim((string)($_GET['supplier'] ?? ''));
-$suppliers = getSupplierCatalogs();
 
-$where_clauses = [];
+// Real-stock base condition: only stocked items (manually added, received, or with quantity).
+$where_clauses = [inventoryStockedWhereSql()];
 $params = [];
 
 if (!empty($search)) {
@@ -34,12 +34,7 @@ if ($max_price !== '') {
     $params[] = floatval($max_price);
 }
 
-if ($supplier_filter !== '' && isset($suppliers[$supplier_filter])) {
-    $where_clauses[] = "source_supplier = ?";
-    $params[] = $supplier_filter;
-}
-
-$where_sql = $where_clauses ? " WHERE " . implode(" AND ", $where_clauses) : "";
+$where_sql = " WHERE " . implode(" AND ", $where_clauses);
 
 $total_items = $pdo->prepare("SELECT COUNT(*) FROM inventory" . $where_sql);
 $total_items->execute($params);
@@ -51,44 +46,13 @@ $stmt = $pdo->prepare("SELECT * FROM inventory" . $where_sql . " ORDER BY part_n
 $stmt->execute($params);
 $inventory = $stmt->fetchAll();
 
-$inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity <= min_stock THEN 1 ELSE 0 END) as low_stock FROM inventory")->fetch();
-$default_catalog_url = 'https://www.mobilnidily.cz/nahradni-dily-apple/';
-$catalog_url = trim((string)get_setting('inventory_catalog_url', $default_catalog_url));
-$catalog_host = '';
-$catalog_supplier_key = '';
-if ($catalog_url !== '') {
-    $catalog_host = (string)parse_url($catalog_url, PHP_URL_HOST);
-    $catalog_supplier_key = supplierKeyFromUrl($catalog_url);
-}
-
-$catalog_error_key = $_GET['catalog_error'] ?? '';
-$catalog_error_detail = trim((string)($_GET['catalog_error_detail'] ?? ''));
-$catalog_error_message = '';
-if ($catalog_error_key !== '') {
-    $catalog_error_map = [
-        'invalid_url' => 'Invalid catalog URL.',
-        'fetch_failed' => 'Failed to load catalog.',
-        'no_products' => 'No products were found in the catalog.',
-        'processing_failed' => 'Failed to process catalog.',
-    ];
-    $catalog_error_message = $catalog_error_map[$catalog_error_key] ?? 'Failed to process catalog.';
-    if ($catalog_error_detail !== '') {
-        $catalog_error_message .= ' (' . $catalog_error_detail . ')';
-    }
-}
-
-$catalog_added = isset($_GET['catalog_added']) ? max(0, (int)$_GET['catalog_added']) : 0;
-$catalog_updated = isset($_GET['catalog_updated']) ? max(0, (int)$_GET['catalog_updated']) : 0;
-$catalog_import_success = isset($_GET['catalog_imported']);
+$inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity <= min_stock THEN 1 ELSE 0 END) as low_stock FROM inventory WHERE " . inventoryStockedWhereSql())->fetch();
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="mb-0"><?php echo __('inventory'); ?></h2>
         <small class="text-muted"><?php echo __('total_items'); ?>: <?php echo $total_count; ?></small>
-        <?php if ($catalog_supplier_key !== '' || $catalog_host !== ''): ?>
-            <div class="small text-muted mt-1">Catalog source: <?php echo htmlspecialchars($catalog_supplier_key !== '' ? supplierLabel($catalog_supplier_key) : $catalog_host); ?></div>
-        <?php endif; ?>
     </div>
     <div class="d-flex gap-2 align-items-center">
         <?php if($inventory_stats['low_stock'] > 0): ?>
@@ -100,63 +64,15 @@ $catalog_import_success = isset($_GET['catalog_imported']);
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newPartModal">
             <i class="fas fa-plus me-2"></i> <?php echo __('add_part'); ?>
         </button>
-        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#catalogUpdateModal">
-            <i class="fas fa-sync me-2"></i> <?php echo __('update_catalog'); ?>
-        </button>
     </div>
 </div>
-
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body py-3">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div>
-                <div class="fw-semibold">Supplier catalogs</div>
-                <div class="small text-muted">Quick links to supplier catalogs you can filter by or import from directly.</div>
-            </div>
-            <div class="d-flex flex-wrap gap-2">
-                <?php foreach ($suppliers as $supplierKey => $supplier): ?>
-                    <a href="<?php echo htmlspecialchars($supplier['default_url']); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-external-link-alt me-1"></i><?php echo htmlspecialchars($supplier['name']); ?>
-                    </a>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </div>
-</div>
-
-<?php if ($catalog_import_success): ?>
-    <div class="alert alert-success shadow-sm border-0">
-        <div class="fw-bold mb-2">Catalog updated</div>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <span class="badge bg-success-subtle text-success border">New items: <?php echo $catalog_added; ?></span>
-            <span class="badge bg-primary-subtle text-primary border">Updated: <?php echo $catalog_updated; ?></span>
-            <span class="badge bg-dark-subtle text-dark border">Celkem: <?php echo (int)$catalog_added + (int)$catalog_updated; ?></span>
-        </div>
-        <div class="small text-muted mt-2">Only a short import summary is shown. Items with images were saved when provided by the catalog.</div>
-    </div>
-<?php endif; ?>
-
-<?php if ($catalog_error_message !== ''): ?>
-    <div class="alert alert-danger shadow-sm border-0">
-        <?php echo htmlspecialchars($catalog_error_message); ?>
-    </div>
-<?php endif; ?>
 
 <div class="collapse mb-4 <?php echo (!empty($search) || !empty($min_price) || !empty($max_price)) ? 'show' : ''; ?>" id="filterPanel">
     <div class="card card-body shadow-sm">
         <form action="inventory.php" method="GET" class="row g-3">
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <label class="form-label small"><?php echo __('search_sku_placeholder'); ?></label>
                 <input type="text" name="search" class="form-control form-control-sm" value="<?php echo htmlspecialchars($search); ?>" placeholder="<?php echo __('name_or_sku'); ?>">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label small">Supplier</label>
-                <select name="supplier" class="form-select form-select-sm">
-                    <option value="">All suppliers</option>
-                    <?php foreach ($suppliers as $supplierKey => $supplier): ?>
-                        <option value="<?php echo htmlspecialchars($supplierKey); ?>" <?php echo $supplier_filter === $supplierKey ? 'selected' : ''; ?>><?php echo htmlspecialchars($supplier['name']); ?></option>
-                    <?php endforeach; ?>
-                </select>
             </div>
             <div class="col-md-2">
                 <label class="form-label small"><?php echo __('price_from'); ?></label>
@@ -199,7 +115,7 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                                 <tr>
                                     <td colspan="10" class="text-center py-5 text-muted">
                                         <i class="fas fa-boxes fa-3x mb-3 d-block opacity-25"></i>
-                                        <?php echo __('stock_empty'); ?>
+                                        <?php echo __('stock_real_empty'); ?>
                                     </td>
                                 </tr>
                             <?php else: ?>
@@ -207,8 +123,8 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                                 <tr>
                                     <td class="ps-4">
                                         <?php if(!empty($item['image_path'] ?? '')): ?>
-                                            <a href="<?php echo $item['image_path']; ?>" data-fancybox="inventory">
-                                                <img src="<?php echo $item['image_path']; ?>" class="rounded shadow-sm" style="width: 40px; height: 40px; object-fit: cover;">
+                                            <a href="<?php echo e($item['image_path']); ?>" data-fancybox="inventory">
+                                                <img src="<?php echo e($item['image_path']); ?>" class="rounded shadow-sm" style="width: 40px; height: 40px; object-fit: cover;">
                                             </a>
                                         <?php else: ?>
                                             <div class="bg-dark bg-opacity-25 rounded d-flex align-items-center justify-content-center shadow-sm border border-secondary" style="width: 40px; height: 40px;">
@@ -267,7 +183,7 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm">
                                             <a href="edit_inventory.php?id=<?php echo $item['id']; ?>" class="btn btn-white border" title="<?php echo __('edit'); ?>"><i class="fas fa-edit text-warning"></i></a>
-                                            <button type="button" class="btn btn-white border text-success assign-order-btn" data-id="<?php echo $item['id']; ?>" data-name="<?php echo htmlspecialchars($item['part_name']); ?>" title="Assign to order"><i class="fas fa-link"></i></button>
+                                            <button type="button" class="btn btn-white border text-success assign-order-btn" data-id="<?php echo $item['id']; ?>" data-name="<?php echo htmlspecialchars($item['part_name']); ?>" title="<?php echo __('use_in_repair'); ?>"><i class="fas fa-link"></i></button>
                                             <button type="button" class="btn btn-white border text-danger" onclick="deletePart(<?php echo $item['id']; ?>)" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>
                                         </div>
                                     </td>
@@ -395,7 +311,7 @@ $catalog_import_success = isset($_GET['catalog_imported']);
                 <?php echo csrfField(); ?>
                 <input type="hidden" name="inventory_id" id="assignInventoryId">
                 <div class="modal-header">
-                    <h5 class="modal-title">Assign part to order</h5>
+                    <h5 class="modal-title"><?php echo __('use_in_repair'); ?></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -421,67 +337,8 @@ $catalog_import_success = isset($_GET['catalog_imported']);
     </div>
 </div>
 
-<div class="modal fade" id="catalogUpdateModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form id="catalogUpdateForm" action="api/parse_catalog.php" method="POST" onsubmit="return confirmCatalogUpdate(this);">
-                <?php echo csrfField(); ?>
-                <div class="modal-header">
-                    <h5 class="modal-title"><?php echo __('update_catalog'); ?></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="catalogPreset" class="form-label">Quick supplier preset</label>
-                        <select id="catalogPreset" class="form-select">
-                            <option value="">Custom URL</option>
-                            <?php foreach ($suppliers as $supplierKey => $supplier): ?>
-                                <option value="<?php echo htmlspecialchars($supplierKey); ?>" data-url="<?php echo htmlspecialchars($supplier['default_url']); ?>">
-                                    <?php echo htmlspecialchars($supplier['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <div class="form-text">Pick a supplier and the URL will autofill.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="catalogUrl" class="form-label">URL katalogu</label>
-                        <input
-                            type="url"
-                            id="catalogUrl"
-                            name="catalog_url"
-                            class="form-control"
-                            value="<?php echo htmlspecialchars($catalog_url); ?>"
-                            placeholder="e.g. https://www.mobilnidily.cz/nahradni-dily-apple-iphone/"
-                            required
-                        >
-                        <div class="form-text">Enter a public catalog URL to import prices, names, SKU, images, and availability.</div>
-                    </div>
-                    <div class="d-flex flex-wrap gap-2">
-                        <?php foreach ($suppliers as $supplierKey => $supplier): ?>
-                            <a class="btn btn-sm btn-outline-secondary" href="<?php echo htmlspecialchars($supplier['default_url']); ?>" target="_blank" rel="noopener noreferrer">
-                                <i class="fas fa-external-link-alt me-1"></i><?php echo htmlspecialchars($supplier['name']); ?>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-sync me-2"></i><?php echo __('update_catalog'); ?>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
 <script>
 $(document).ready(function() {
-    $('.select2-filter').select2({
-        width: '100%',
-        dropdownParent: $('#filterPanel')
-    });
-
     const assignModalEl = document.getElementById('assignToOrderModal');
     const assignModal = assignModalEl ? new bootstrap.Modal(assignModalEl) : null;
 
@@ -520,27 +377,6 @@ $(document).ready(function() {
             }
         });
     });
-
-    const presets = {
-        <?php foreach ($suppliers as $supplierKey => $supplier): ?>
-        <?php echo json_encode($supplierKey); ?>: <?php echo json_encode($supplier['default_url']); ?>,
-        <?php endforeach; ?>
-    };
-
-    $('#catalogPreset').on('change', function() {
-        const url = presets[$(this).val()];
-        if (url) {
-            $('#catalogUrl').val(url);
-        }
-    });
-
-    const currentUrl = $('#catalogUrl').val() || '';
-    const matchedPreset = Object.keys(presets).find(function(key) {
-        return presets[key] === currentUrl;
-    });
-    if (matchedPreset) {
-        $('#catalogPreset').val(matchedPreset);
-    }
 });
 
 function deletePart(id) {
@@ -553,19 +389,6 @@ function deletePart(id) {
             }
         });
     });
-}
-
-function confirmCatalogUpdate(form) {
-    const urlInput = form.querySelector('[name="catalog_url"]');
-    if (!urlInput || !urlInput.value.trim()) {
-        return false;
-    }
-
-    showConfirm('<?php echo __('parse_confirm'); ?>', function() {
-        form.submit();
-    });
-
-    return false;
 }
 </script>
 

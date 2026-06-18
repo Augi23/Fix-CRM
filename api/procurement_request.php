@@ -28,6 +28,10 @@ $action = trim((string)($_POST['action'] ?? 'add'));
 
 try {
     if ($action === 'add') {
+        // Ordering parts is a manager/admin action.
+        if (!hasPermission('procurement_manage') && !hasPermission('admin_access')) {
+            throw new Exception('Objednávat díly smí pouze manažer.');
+        }
         $orderId = (int)($_POST['order_id'] ?? 0);
         $supplierKey = trim((string)($_POST['supplier_key'] ?? ''));
         $inventoryId = (int)($_POST['inventory_id'] ?? 0);
@@ -134,6 +138,8 @@ try {
 
         if (!$wasReceived && $isNowReceived && $inventoryId > 0) {
             changeInventoryQuantity($inventoryId, $quantity);
+            // Received parts become real warehouse stock → show in Sklad even after they run out.
+            $pdo->prepare("UPDATE inventory SET is_stocked = 1 WHERE id = ?")->execute([$inventoryId]);
         }
 
         $pdo->commit();
