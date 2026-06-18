@@ -31,6 +31,7 @@ try {
     // DDL checks can trigger implicit commits on MySQL/MariaDB,
     // so run schema/bootstrap guard before starting explicit transaction.
     ensureOrderWorkTrackingSchema();
+    ensureOrderWorkLogSchema(); // DDL — must run before beginTransaction()
 
     $pdo->beginTransaction();
 
@@ -140,6 +141,14 @@ try {
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
+
+    // Per-technician work segments (mirror the orders.work_* transitions above).
+    if ($is_starting || $is_reassigning_in_progress) {
+        workSegmentOpen((int)$order_id, (int)$technician_id);
+    }
+    if (isOrderStatusIn($current['status'], 'in_progress') && $is_finishing) {
+        workSegmentClose((int)$order_id);
+    }
 
     if (isset($_FILES['files']) && !empty($_FILES['files']['name'][0])) {
         $upload_dir = __DIR__ . '/../uploads/';

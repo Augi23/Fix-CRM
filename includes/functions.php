@@ -1494,6 +1494,92 @@ function ensureOrderWorkTrackingSchema() {
     return true;
 }
 
+/**
+ * Per-technician work segments.
+ *
+ * orders.work_duration_seconds keeps the order's cumulative minutes (for the order detail view),
+ * but it is attributed wholly to the order's CURRENT technician — which mis-credits time when a
+ * job is reassigned. order_work_log records each continuous work segment (technician + minutes),
+ * so reports can credit time/earnings to whoever actually did each segment.
+ *
+ * Transitions (mirror the orders.work_* logic):
+ *   start    -> workSegmentOpen(order, tech)
+ *   reassign -> workSegmentOpen(order, newTech)   (closes the previous tech's open segment first)
+ *   finish   -> workSegmentClose(order)
+ */
+function ensureOrderWorkLogSchema(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS order_work_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            technician_id INT NULL,
+            started_at DATETIME NOT NULL,
+            ended_at DATETIME NULL,
+            duration_minutes INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_owl_order (order_id),
+            INDEX idx_owl_tech (technician_id),
+            INDEX idx_owl_ended (ended_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        // best-effort schema guard
+    }
+
+    // One-time backfill: seed a single segment per historical order from its cumulative total,
+    // credited to its (current) technician, so existing reports keep their numbers. Going forward,
+    // reassigned jobs are split correctly via live segments.
+    try {
+        if (get_setting('work_log_backfilled', '') !== '1') {
+            // NOT EXISTS makes the backfill idempotent (safe against a concurrent double-run).
+            $pdo->exec("INSERT INTO order_work_log (order_id, technician_id, started_at, ended_at, duration_minutes)
+                SELECT o.id, o.technician_id,
+                       COALESCE(o.work_started_at, o.work_finished_at, o.updated_at, o.created_at),
+                       COALESCE(o.work_finished_at, o.updated_at, o.created_at),
+                       COALESCE(o.work_duration_seconds, 0)
+                FROM orders o
+                WHERE COALESCE(o.work_duration_seconds, 0) > 0
+                  AND NOT EXISTS (SELECT 1 FROM order_work_log w2 WHERE w2.order_id = o.id)");
+            set_setting('work_log_backfilled', '1');
+        }
+    } catch (Throwable $e) {
+        // columns may not exist yet on a fresh DB → retry on a later call
+    }
+}
+
+/**
+ * Close the order's currently open work segment, crediting its elapsed minutes to its technician.
+ * NOTE: callers must have run ensureOrderWorkLogSchema() OUTSIDE any open transaction first — the
+ * CREATE TABLE there is DDL (implicit commit in MySQL) and must not run inside a transaction.
+ */
+function workSegmentClose(int $orderId): void {
+    global $pdo;
+    if ($orderId <= 0) return;
+    try {
+        $pdo->prepare("UPDATE order_work_log
+            SET ended_at = NOW(), duration_minutes = GREATEST(0, TIMESTAMPDIFF(MINUTE, started_at, NOW()))
+            WHERE order_id = ? AND ended_at IS NULL")->execute([$orderId]);
+    } catch (Throwable $e) {
+        // best-effort
+    }
+}
+
+/** Open a new work segment for the given technician (closing any previous open one first). */
+function workSegmentOpen(int $orderId, ?int $technicianId): void {
+    global $pdo;
+    if ($orderId <= 0) return;
+    workSegmentClose($orderId);
+    try {
+        $pdo->prepare("INSERT INTO order_work_log (order_id, technician_id, started_at, ended_at, duration_minutes)
+            VALUES (?, ?, NOW(), NULL, 0)")->execute([$orderId, ($technicianId ?: null)]);
+    } catch (Throwable $e) {
+        // best-effort
+    }
+}
+
 function getTechnicianInProgressCount($technicianId, $excludeOrderId = null) {
     global $pdo;
     if (!$technicianId) return 0;

@@ -51,16 +51,9 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     $stmt->execute(array_merge($cancelledStatuses, $params));
     $cancelled = $stmt->fetchColumn();
 
-    // Work time in minutes (only counted when the order is finished)
-    $work_params = [$start . ' 00:00:00', $end . ' 23:59:59'];
-    $work_tech_cond = $branch_cond;
-    if ($tech_id) {
-        $work_tech_cond = " AND technician_id = ?" . $branch_cond;
-        $work_params[] = $tech_id;
-    }
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(COALESCE(work_duration_seconds, 0)), 0) FROM orders WHERE status IN (" . sqlPlaceholders($doneStatuses) . ") AND work_finished_at BETWEEN ? AND ?" . $work_tech_cond);
-    $stmt->execute(array_merge($doneStatuses, $work_params));
-    $work_minutes = (int)$stmt->fetchColumn();
+    // Work time & earnings come from per-technician segments (order_work_log) so a reassigned
+    // job credits each technician for the minutes they actually worked — computed below.
+    $work_minutes = 0;
 
     // ─── Financials / performance ────────────────────────────────────────────
     // For staff reports we want results to appear immediately after a technician
@@ -126,14 +119,39 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
         $expenses   += $exp;
         $parts_cost += $p_cost;
 
-        // Net = revenue minus parts and extra expenses.
-        // Technician earns 0 if net is negative (does not 'pay' the SC back).
+        // Net = revenue minus parts and extra expenses (per order; labour handled via segments).
         $net  = $rev - $p_cost - $exp;
         if ($net < 0) $net = 0;
+    }
 
-        $rate = $rates[$o['technician_id']] ?? $hourly_wage;
-        $workMinutes = (int)($o['work_duration_seconds'] ?? 0);
-        $engineer_earnings += ($workMinutes / 60) * $rate;
+    // ─── Work time & earnings from per-technician segments (credits the actual worker) ──────
+    // Each segment's minutes are paid at the rate of the technician who worked it, so a job
+    // reassigned mid-repair splits correctly instead of crediting everything to the last tech.
+    ensureOrderWorkLogSchema();
+    // Count labour only for FINISHED orders (same basis as the per-order table below) so the
+    // headline 'worked'/'earned' totals reconcile with the order list.
+    $seg_params = array_merge([$start . ' 00:00:00', $end . ' 23:59:59'], $doneStatuses);
+    $seg_cond = orderBranchScopeSql('o.branch_id');
+    if ($tech_id) {
+        $seg_cond = " AND wl.technician_id = ?" . orderBranchScopeSql('o.branch_id');
+        $seg_params[] = $tech_id;
+    }
+    try {
+        $seg_stmt = $pdo->prepare(
+            "SELECT wl.technician_id AS tech, COALESCE(SUM(wl.duration_minutes), 0) AS mins
+             FROM order_work_log wl
+             JOIN orders o ON o.id = wl.order_id
+             WHERE wl.ended_at BETWEEN ? AND ? AND o.status IN (" . sqlPlaceholders($doneStatuses) . ")" . $seg_cond . "
+             GROUP BY wl.technician_id"
+        );
+        $seg_stmt->execute($seg_params);
+        while ($seg = $seg_stmt->fetch(PDO::FETCH_ASSOC)) {
+            $mins = (int)$seg['mins'];
+            $work_minutes += $mins;
+            $engineer_earnings += ($mins / 60) * ($rates[$seg['tech']] ?? 0);
+        }
+    } catch (Throwable $e) {
+        // order_work_log may not exist yet on a freshly migrated DB → no labour stats this run
     }
 
     $net_revenue = $revenue - $parts_cost - $expenses;
@@ -443,7 +461,8 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             $stmt = $pdo->prepare("
                                 SELECT o.*, c.first_name, c.last_name,
                                     COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) AS finance_date,
-                                    (SELECT SUM(oi.quantity * invt.cost_price) FROM order_items oi JOIN inventory invt ON oi.inventory_id = invt.id WHERE oi.order_id = o.id) as inventory_cost
+                                    (SELECT SUM(oi.quantity * invt.cost_price) FROM order_items oi JOIN inventory invt ON oi.inventory_id = invt.id WHERE oi.order_id = o.id) as inventory_cost,
+                                    (SELECT COALESCE(SUM(wl.duration_minutes), 0) FROM order_work_log wl WHERE wl.order_id = o.id AND wl.technician_id = ? AND wl.ended_at BETWEEN ? AND ?) AS tech_minutes
                                 FROM orders o
                                 JOIN customers c ON o.customer_id = c.id
                                 LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'
@@ -451,7 +470,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                   AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
                                 ORDER BY finance_date DESC
                             ");
-                            $stmt->execute(array_merge([$selected_tech_id], $doneStatuses, [$start_date, $end_date]));
+                            $stmt->execute(array_merge([$selected_tech_id, $start_date . ' 00:00:00', $end_date . ' 23:59:59', $selected_tech_id], $doneStatuses, [$start_date, $end_date]));
                             
                             while($r = $stmt->fetch()): 
                                 $rev = $r['final_cost'] !== null ? $r['final_cost'] : $r['estimated_cost'];
@@ -460,12 +479,13 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 $e_cost = floatval($r['extra_expenses'] ?: 0);
                                 $net = $rev - $p_cost - $e_cost;
                                 if ($net < 0) $net = 0;
-                                $earn = ((int)($r['work_duration_seconds'] ?? 0) / 60) * (float)$is['engineer_rate'];
+                                $techMinutes = (int)($r['tech_minutes'] ?? 0);
+                                $earn = ($techMinutes / 60) * (float)$is['engineer_rate'];
                             ?>
                             <tr>
                                 <td><a href="view_order.php?id=<?php echo $r['id']; ?>&return=<?php echo $current_url; ?>" class="fw-bold">#<?php echo $r['id']; ?></a></td>
                                 <td><?php echo date('d.m.Y', strtotime($r['finance_date'])); ?></td>
-                                <td><?php echo formatWorkDuration($r['work_duration_seconds'] ?? 0); ?></td>
+                                <td><?php echo formatWorkDuration($techMinutes); ?></td>
                                 <td><?php echo htmlspecialchars($r['device_brand'] . ' ' . $r['device_model']); ?></td>
                                 <td><?php echo htmlspecialchars($r['first_name'] . ' ' . $r['last_name']); ?></td>
                                 <td class="text-end fw-bold"><?php echo formatMoney($rev); ?></td>

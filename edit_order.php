@@ -21,6 +21,7 @@ if (!canAccessOrderBranch($order)) {
 $customers = $pdo->query("SELECT id, first_name, last_name FROM customers ORDER BY last_name ASC")->fetchAll();
 
 ensureOrderWorkTrackingSchema();
+ensureOrderWorkLogSchema(); // DDL — keep outside any transaction
 
 $success = false;
 $error = false;
@@ -129,6 +130,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $update = $pdo->prepare($updateSql);
         $update->execute($updateParams);
+
+        // Per-technician work segments (mirror the orders.work_* transitions above).
+        if ($is_starting || $is_reassigning_in_progress) {
+            workSegmentOpen((int)$id, $technician_id ? (int)$technician_id : null);
+        }
+        if ($is_finishing) {
+            workSegmentClose((int)$id);
+        }
 
         // Handle File Uploads during Edit
         if (isset($_FILES['files']) && !empty($_FILES['files']['name'][0])) {

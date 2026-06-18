@@ -31,6 +31,7 @@ $final_cost = $_REQUEST['final_cost'] ?? null;
 $technician_id = $_REQUEST['technician_id'] ?? null;
 
 ensureOrderWorkTrackingSchema();
+ensureOrderWorkLogSchema(); // DDL — must run before beginTransaction()
 
 if (!$order_id || !$new_status) {
     echo json_encode(['success' => false, 'message' => $t('missing_data')]);
@@ -137,6 +138,14 @@ try {
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
+
+    // Per-technician work segments (mirror the orders.work_* transitions above).
+    if ($is_starting || $is_reassigning_in_progress) {
+        workSegmentOpen((int)$order_id, (int)$target_tech_id);
+    }
+    if (isOrderStatusIn($current_status, 'in_progress') && $is_finishing) {
+        workSegmentClose((int)$order_id);
+    }
 
     if ($current_status !== $new_status) {
         logOrderStatusChange($order_id, $current_status, $new_status);
