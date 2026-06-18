@@ -26,7 +26,7 @@ CRM system for electronics repair service centers.
 ### 1. Clone repository
 
 ```bash
-git clone https://github.com/RichTechCZ/Repair-CRM.git
+git clone https://github.com/Augi23/Fix-CRM.git
 cd Repair-CRM
 ```
 

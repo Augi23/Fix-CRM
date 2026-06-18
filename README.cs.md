@@ -26,7 +26,7 @@ CRM systém pro servisní střediska elektroniky.
 ### 1. Klonování repozitáře
 
 ```bash
-git clone https://github.com/RichTechCZ/Repair-CRM.git
+git clone https://github.com/Augi23/Fix-CRM.git
 cd Repair-CRM
 ```
 
