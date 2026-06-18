@@ -23,6 +23,7 @@ $lang_overrides = [
         'order_created' => 'Díl byl přidán do objednávek.',
         'new_items' => 'Nové položky',
         'updated' => 'Aktualizováno',
+        'print_label' => 'Štítek (Brother QL)',
 
         'role_admin' => 'Admin',
         'role_manager' => 'Manažer',

@@ -1135,10 +1135,18 @@ function installUpdate() {
                 });
                 migrationsHtml += '</ul></div>';
             }
-            statusArea.innerHTML = `<div class="alert alert-success border-0 bg-success bg-opacity-10 small mb-0">
+            // Robust version labels (older builds may omit some keys → no "undefined")
+            const prevVer = (data.previous_version || '').toString().trim();
+            const newVer  = (data.new_version || data.current_version || '').toString().trim();
+            const updated = (data.updated !== false);
+            const verLine = newVer
+                ? `<div class="mt-1 fw-semibold">${(prevVer && prevVer !== newVer) ? escapeHtml(prevVer) + ' → ' : ''}${escapeHtml(newVer)}</div>`
+                : '';
+            const headline = updated ? UPDATE_TRANSLATIONS.update_success : (UPDATE_TRANSLATIONS.up_to_date || UPDATE_TRANSLATIONS.update_success);
+            statusArea.innerHTML = `<div class="alert alert-success border-0 bg-success bg-opacity-10 mb-0">
                 <i class="fas fa-check-circle me-2 text-success"></i>
-                <strong>${UPDATE_TRANSLATIONS.update_success}</strong>
-                <div class="mt-1">v${data.previous_version} → v${data.new_version}</div>
+                <strong>${escapeHtml(headline)}</strong>
+                ${verLine}
                 ${migrationsHtml}
                 <div class="mt-2"><a href="settings.php?tab=updates" class="btn btn-sm btn-outline-light"><i class="fas fa-redo me-1"></i> Reload</a></div>
             </div>`;
@@ -1146,8 +1154,11 @@ function installUpdate() {
             if (badge) badge.style.display = 'none';
             const installBtn = document.getElementById('btnInstallUpdate');
             if (installBtn) installBtn.style.display = 'none';
-            // Update local version display
-            document.getElementById('localVersion').textContent = data.new_version;
+            // Update the "current version" label only if we actually got a version (never blank it)
+            if (newVer) {
+                const lv = document.getElementById('localVersion');
+                if (lv) lv.textContent = newVer;
+            }
         } else {
             statusArea.innerHTML = `<div class="alert alert-danger border-0 bg-danger bg-opacity-10 small mb-0">
                 <i class="fas fa-exclamation-circle me-2"></i>

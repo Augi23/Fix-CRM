@@ -448,6 +448,7 @@ function localizedOrderStatusLabel(string $status): string {
                                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
                                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
                                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
+                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="window.open('print_label.php?id=<?php echo $order['id']; ?>', 'qllabel', 'width=440,height=360')"><i class="fas fa-tag me-2 text-info"></i> <?php echo __('print_label'); ?></a></li>
                             </ul>
                         </div>
                     </div>
