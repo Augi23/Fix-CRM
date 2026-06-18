@@ -2721,3 +2721,77 @@ p, span, label, .small, small,
 .orders-center-table .dropdown-item i {
   opacity: 1 !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI scale control — ovládání měřítka zobrazení (levý dolní roh sidebaru)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.crm-ui-zoom {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+  margin: 0 10px 10px !important;
+  padding: 4px !important;
+  background: var(--s2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 10px !important;
+  flex-shrink: 0 !important;
+}
+.crm-ui-zoom-btn,
+.crm-ui-zoom-val {
+  border: none !important;
+  background: transparent !important;
+  color: var(--fg2) !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+  border-radius: 7px !important;
+  transition: background .15s ease, color .15s ease, transform .05s ease !important;
+}
+.crm-ui-zoom-btn {
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 17px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+.crm-ui-zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.10) !important;
+  color: #fff !important;
+}
+.crm-ui-zoom-btn:active { transform: translateY(1px) !important; }
+.crm-ui-zoom-val {
+  flex: 1 !important;
+  height: 28px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+  letter-spacing: .2px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+}
+.crm-ui-zoom-val i { font-size: 10px !important; color: var(--fg3) !important; }
+.crm-ui-zoom-val:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--green) !important;
+}
+.crm-ui-zoom-val:hover i { color: var(--green) !important; }
+.crm-ui-zoom--floating {
+  position: fixed !important;
+  left: 12px !important;
+  bottom: 12px !important;
+  z-index: 1041 !important;
+  width: 150px !important;
+  background: var(--s1) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .35) !important;
+}
+.crm-ui-zoom-btn:disabled {
+  opacity: .3 !important;
+  cursor: default !important;
+  background: transparent !important;
+  color: var(--fg2) !important;
+}

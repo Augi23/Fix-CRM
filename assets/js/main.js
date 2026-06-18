@@ -889,3 +889,88 @@ document.addEventListener('DOMContentLoaded', function() {
         else if (parts.length === 1 && parts[0].length >= 2) av.textContent = parts[0].substring(0,2).toUpperCase();
     }
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI scale (zoom) control — měřítko zobrazení UI, levý dolní roh
+   Krok 5 %, rozsah 50–200 %, uloženo v localStorage, klik na hodnotu = 100 %.
+   Aplikuje se přes CSS zoom na <html> (uniformní škálování celého rozhraní).
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function() {
+    var KEY = 'crmUiScale';
+    var MIN = 50, MAX = 200, STEP = 5, DEF = 100;
+
+    function clamp(v) { return Math.max(MIN, Math.min(MAX, v)); }
+
+    function read() {
+        var v = parseInt(localStorage.getItem(KEY), 10);
+        if (isNaN(v)) v = DEF;
+        return clamp(Math.round(v / STEP) * STEP);
+    }
+
+    function apply(scale) {
+        // zoom na <html> škáluje celé UI uniformně (Chromium)
+        document.documentElement.style.zoom = (scale === 100) ? '' : (scale / 100);
+    }
+
+    // Aplikuj uložené měřítko co nejdřív (skript běží v <head>) — minimalizuje probliknutí
+    apply(read());
+
+    function build() {
+        if (document.getElementById('crmUiZoom')) return;
+        var scale = read();
+
+        var wrap = document.createElement('div');
+        wrap.className = 'crm-ui-zoom';
+        wrap.id = 'crmUiZoom';
+        wrap.setAttribute('role', 'group');
+        wrap.setAttribute('aria-label', 'Měřítko zobrazení');
+        wrap.innerHTML =
+            '<button type="button" class="crm-ui-zoom-btn" data-act="out" title="Zmenšit o 5 %" aria-label="Zmenšit">−</button>' +
+            '<button type="button" class="crm-ui-zoom-val" data-act="reset" title="Obnovit na 100 %">' +
+                '<i class="fas fa-magnifying-glass"></i><span class="crm-ui-zoom-num">' + scale + '%</span>' +
+            '</button>' +
+            '<button type="button" class="crm-ui-zoom-btn" data-act="in" title="Zvětšit o 5 %" aria-label="Zvětšit">+</button>';
+
+        var numEl = wrap.querySelector('.crm-ui-zoom-num');
+        var outBtn = wrap.querySelector('[data-act="out"]');
+        var inBtn  = wrap.querySelector('[data-act="in"]');
+
+        function set(next) {
+            next = clamp(next);
+            localStorage.setItem(KEY, next);
+            apply(next);
+            numEl.textContent = next + '%';
+            if (outBtn) outBtn.disabled = (next <= MIN);
+            if (inBtn)  inBtn.disabled  = (next >= MAX);
+        }
+
+        wrap.addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-act]');
+            if (!btn) return;
+            e.preventDefault();
+            var act = btn.getAttribute('data-act');
+            var cur = read();
+            if (act === 'in') set(cur + STEP);
+            else if (act === 'out') set(cur - STEP);
+            else if (act === 'reset') set(DEF);
+        });
+
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.appendChild(wrap);
+        } else {
+            wrap.classList.add('crm-ui-zoom--floating');
+            document.body.appendChild(wrap);
+        }
+
+        // počáteční stav disabled tlačítek
+        if (outBtn) outBtn.disabled = (scale <= MIN);
+        if (inBtn)  inBtn.disabled  = (scale >= MAX);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', build);
+    } else {
+        build();
+    }
+})();
