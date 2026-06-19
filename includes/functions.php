@@ -991,6 +991,9 @@ function getGitRepoInfo(string $repoRoot): array {
 
     $dirty = runGitCommand($repoRoot, 'status --porcelain', $code);
     $info['dirty'] = ($code === 0 && $dirty !== '');
+    // Keep the actual changed paths so the updater/diagnostics can show *what* is dirty
+    // (a non-conflicting local change should never be an opaque, permanent blocker).
+    $info['dirty_files'] = ($code === 0 && $dirty !== '') ? trim($dirty) : '';
 
     $remoteName = $info['remote_name'] ?: 'origin';
     $remoteBranch = $branch !== '' ? $branch : 'main';

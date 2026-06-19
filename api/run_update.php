@@ -44,13 +44,14 @@ if (!empty($info['error'])) {
     exit;
 }
 
-if (!empty($info['dirty'])) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'Please commit or discard local changes first, working tree is not clean.',
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
+// Do NOT hard-block on a "dirty" working tree. `git pull --ff-only` refuses on its own to
+// overwrite locally-modified TRACKED files (and untracked files never block it), so git is
+// the authority: a non-conflicting local change (e.g. a dev helper script tweaked on the
+// server) no longer permanently locks the in-app updater, while a real conflict is surfaced
+// verbatim from git below.
+$dirtyWarning = !empty($info['dirty'])
+    ? ('Local changes present (left untouched): ' . trim((string)($info['dirty_files'] ?? '')))
+    : '';
 
 if ((int)($info['behind_by'] ?? 0) <= 0) {
     echo json_encode([
@@ -72,9 +73,14 @@ if ($authActive && function_exists('gitEndAuth')) { gitEndAuth(); }
 $pullOutput = function_exists('sanitizeGitText') ? sanitizeGitText($pullOutput) : $pullOutput;
 
 if ($exitCode !== 0) {
+    $failMsg = 'Update failed: ' . ($pullOutput ?: 'unknown error');
+    // Most likely cause when a tracked file the update touches was edited on the server.
+    if ($dirtyWarning !== '') {
+        $failMsg .= ' — ' . $dirtyWarning . '. Discard or commit those changes, then retry.';
+    }
     echo json_encode([
         'success' => false,
-        'message' => 'Update failed: ' . ($pullOutput ?: 'unknown error'),
+        'message' => $failMsg,
         'output' => $pullOutput,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -90,4 +96,5 @@ echo json_encode([
     'new_version' => trim(($newInfo['branch'] ?? $info['branch']) . ' @ ' . ($newInfo['local_short'] ?? $info['local_short'])),
     'current_version' => trim(($newInfo['branch'] ?? $info['branch']) . ' @ ' . ($newInfo['local_short'] ?? $info['local_short'])),
     'build' => sprintf('ahead %d / behind %d', (int)($newInfo['ahead_by'] ?? 0), (int)($newInfo['behind_by'] ?? 0)),
+    'warning' => $dirtyWarning !== '' ? $dirtyWarning : null,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

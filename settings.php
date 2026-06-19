@@ -1086,6 +1086,9 @@ function runUpdateDiagnostics() {
             add('stav vůči GitHubu', c.update_available
                 ? '<span class="text-info">aktualizace dostupná (behind ' + escapeHtml(String(c.behind_by)) + ')</span>'
                 : '<span class="text-success">aktuální</span>');
+            add('lokální změny', c.dirty
+                ? '<span class="text-warning">' + escapeHtml(c.dirty_files || 'ano') + '</span> <span class="text-muted">(neblokuje aktualizaci)</span>'
+                : '<span class="text-success">žádné</span>');
             if (c.error_detail) add('detail chyby', '<span class="text-warning">' + escapeHtml(c.error_detail) + '</span>');
             area.style.display = 'block';
             area.innerHTML = `

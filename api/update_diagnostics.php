@@ -70,6 +70,8 @@ $checks = [
     'fetch_ok'          => $fetchOk,
     'behind_by'         => (int)($info['behind_by'] ?? 0),
     'ahead_by'          => (int)($info['ahead_by'] ?? 0),
+    'dirty'             => !empty($info['dirty']),
+    'dirty_files'       => (string)($info['dirty_files'] ?? ''),
     'update_available'  => !empty($info['update_available']),
     'error'             => (string)($info['error'] ?? ''),
     'error_detail'      => (string)($info['error_detail'] ?? ''),
@@ -91,6 +93,11 @@ if (!$checks['exec_available']) {
         : 'BLOCKED: cannot reach the remote. For a PRIVATE repo add GITHUB_TOKEN=... to .env.';
 } elseif ($checks['update_available']) {
     $verdict = 'OK — git works. Update available (behind ' . $checks['behind_by'] . '). Use “Install update”.';
+}
+
+// Non-blocking note: local changes no longer prevent the update (git --ff-only handles conflicts).
+if (!empty($checks['dirty']) && strpos($verdict, 'BLOCKED') !== 0) {
+    $verdict .= ' Note: local changes present — they will not block the update.';
 }
 
 echo json_encode([
