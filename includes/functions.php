@@ -1955,6 +1955,56 @@ function assignmentSegmentSync(int $orderId, ?int $technicianId, ?string $status
     }
 }
 
+/** Jednorázový import uvítacích zvuků z assets/greetings_import/ — přiřazení podle jmen. */
+function importGreetingSounds(): void
+{
+    global $pdo;
+    try {
+        if (get_setting('greeting_sounds_imported_v1', '') === '1') { return; }
+        $src = __DIR__ . '/../assets/greetings_import';
+        $dst = __DIR__ . '/../uploads/greetings';
+        if (!is_dir($src)) { return; }
+        if (!is_dir($dst)) { mkdir($dst, 0755, true); }
+
+        $translit = ['á'=>'a','č'=>'c','ď'=>'d','é'=>'e','ě'=>'e','í'=>'i','ň'=>'n','ó'=>'o','ř'=>'r',
+                     'š'=>'s','ť'=>'t','ú'=>'u','ů'=>'u','ý'=>'y','ž'=>'z','ä'=>'a','ö'=>'o','ü'=>'u'];
+        $slug = function (string $v) use ($translit): string {
+            $v = mb_strtolower(trim($v), 'UTF-8');
+            $v = strtr($v, $translit);
+            return trim(preg_replace('/[^a-z0-9]+/', '_', $v) ?? '', '_');
+        };
+        // přezdívky v názvech souborů -> křestní jména
+        $alias = ['zdenda' => 'zdenek', 'tonda' => 'antonin', 'pepa' => 'josef', 'honza' => 'jan'];
+
+        $people = [];
+        foreach ($pdo->query('SELECT username, full_name AS name FROM users')->fetchAll() as $r) { $people[] = $r; }
+        foreach ($pdo->query('SELECT username, name FROM technicians WHERE is_active = 1')->fetchAll() as $r) { $people[] = $r; }
+
+        foreach (glob($src . '/*.mp3') ?: [] as $file) {
+            $base = $slug(pathinfo($file, PATHINFO_FILENAME));
+            $firstTok = explode('_', $base)[0] ?? '';
+            $firstTok = $alias[$firstTok] ?? $firstTok;
+
+            $target = null;
+            foreach ($people as $pp) {
+                $uSlug = $slug((string)$pp['username']);
+                $nSlug = $slug((string)($pp['name'] ?? ''));
+                $nFirst = explode('_', $nSlug)[0] ?? '';
+                if ($base === $uSlug || $base === $nSlug) { $target = $pp; break; }           // přesná shoda
+                if ($firstTok !== '' && ($firstTok === $uSlug || $firstTok === $nFirst)) {    // křestní jméno
+                    $target = $pp; break;
+                }
+            }
+            if (!$target) { continue; }
+            $destName = preg_replace('/[^a-zA-Z0-9._-]/', '_', (string)$target['username']) . '.mp3';
+            if (!is_file($dst . '/' . $destName)) {
+                copy($file, $dst . '/' . $destName);
+            }
+        }
+        if (function_exists('set_setting')) { set_setting('greeting_sounds_imported_v1', '1'); }
+    } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
+}
+
 /** Jednorázově: stav "Černá růže" (historická značka 2. pobočky) -> Přijato + pobočka Na Příkopě. */
 function migrateCernaRuzeOrders(): void
 {
@@ -2013,6 +2063,7 @@ if (session_status() === PHP_SESSION_ACTIVE
         }
         migrateCernaRuzeOrders();
         ensureStatusEnum202607();
+        importGreetingSounds();
     } catch (Throwable $e) { /* ignore */ }
 }
 ?>
