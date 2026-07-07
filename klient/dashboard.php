@@ -181,6 +181,8 @@ $today = date('d.m.Y');
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/liquid-glass.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/liquid-glass.css'); ?>">
+    <script src="../assets/js/liquid-glass.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/liquid-glass.js'); ?>" defer></script>
     <style>
         body {
             min-height: 100vh;
@@ -509,6 +511,7 @@ $today = date('d.m.Y');
     </style>
 </head>
 <body>
+<?php require __DIR__ . '/../includes/liquid_glass_svg.php'; ?>
     <div class="client-shell">
         <div class="client-topbar">
             <div class="client-topbar-brand">

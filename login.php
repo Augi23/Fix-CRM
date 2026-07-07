@@ -199,6 +199,8 @@ if (isset($_SESSION['user_id'])) {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/login.css">
+    <link rel="stylesheet" href="assets/css/liquid-glass.css?v=<?php echo (int)@filemtime(__DIR__ . '/assets/css/liquid-glass.css'); ?>">
+    <script src="assets/js/liquid-glass.js?v=<?php echo (int)@filemtime(__DIR__ . '/assets/js/liquid-glass.js'); ?>" defer></script>
     <style>
         .login-copy {
             margin-top: 18px;
@@ -230,6 +232,7 @@ if (isset($_SESSION['user_id'])) {
     </style>
 </head>
 <body>
+<?php require __DIR__ . '/includes/liquid_glass_svg.php'; ?>
 <?php $currentLang = crm_get_language(); ?>
 <div class="login-lang-switcher d-flex gap-1" title="<?php echo e(__('language_switch')); ?>">
     <a class="btn btn-sm <?php echo $currentLang === 'cs' ? 'btn-light text-dark' : 'btn-outline-light'; ?>" href="set_language.php?lang=cs&amp;redirect=<?php echo rawurlencode($_SERVER['REQUEST_URI'] ?? 'login.php'); ?>">CS</a>
