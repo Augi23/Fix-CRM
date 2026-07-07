@@ -665,6 +665,80 @@ html[data-lg-theme="light"] .status-badge-large.danger { color: #C41E45 !importa
 html[data-lg-theme="light"] .status-badge-large.dark { color: #1d1d1f !important; background: rgba(0,0,0,0.08) !important; border-color: rgba(0,0,0,0.12) !important; }
 html[data-lg-theme="light"] .status-badge-large.light { color: #1d1d1f !important; background: rgba(0,0,0,0.05) !important; border-color: rgba(0,0,0,0.10) !important; }
 
+
+/* light: komponenty s natvrdo bílým textem / tmavým podkladem */
+/* dashboard stat čísla (v2 hotfix je nutí na bílou) */
+html[data-lg-theme="light"] .crm-stat-value { color: #1d1d1f !important; }
+/* fronta zakázek na dashboardu */
+html[data-lg-theme="light"] .crm-queue-device { color: rgba(0,0,0,0.55) !important; }
+/* UI zoom v topbaru */
+html[data-lg-theme="light"] .crm-ui-zoom-val { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .crm-ui-zoom-val:hover { background: rgba(0,0,0,0.05) !important; }
+/* icon buttony hover/active (v2 nutí bílou) */
+html[data-lg-theme="light"] .crm-v2-icon-btn:hover,
+html[data-lg-theme="light"] .crm-v2-icon-btn.active,
+html[data-lg-theme="light"] #notificationsToggle.active { color: #0A84FF !important; }
+/* zvýrazněné řádky tabulky (firma / priorita) — světlý tint + tmavý text */
+html[data-lg-theme="light"] .order-row--company > td,
+html[data-lg-theme="light"] .order-row--company td {
+  background: rgba(10,132,255,0.06) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .order-row--high > td,
+html[data-lg-theme="light"] .order-row--high td {
+  background: rgba(255,55,95,0.07) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .order-row--high a,
+html[data-lg-theme="light"] .order-row--high small,
+html[data-lg-theme="light"] .order-row--company .badge { color: #1d1d1f !important; }
+/* QR popover */
+html[data-lg-theme="light"] .qr-popover {
+  background: rgba(255,255,255,0.90) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .qr-popover .qr-phone-label { color: rgba(0,0,0,0.55) !important; }
+/* select2 — texty */
+html[data-lg-theme="light"] .select2-container--default .select2-selection__rendered,
+html[data-lg-theme="light"] .select2-container--default .select2-results__option,
+html[data-lg-theme="light"] .select2-container--default .select2-search--dropdown .select2-search__field {
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .select2-container--default .select2-search--dropdown .select2-search__field {
+  background: rgba(0,0,0,0.035) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+html[data-lg-theme="light"] .select2-container--default .select2-selection--multiple .select2-selection__choice {
+  background: rgba(10,132,255,0.12) !important;
+  color: #0055CC !important;
+  border-color: rgba(10,132,255,0.25) !important;
+}
+html[data-lg-theme="light"] .customer-option .meta { color: rgba(0,0,0,0.55) !important; }
+/* nav-tabs + paginace */
+html[data-lg-theme="light"] .nav-tabs .nav-link { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] .nav-tabs .nav-link.active { color: #0055CC !important; }
+html[data-lg-theme="light"] .pagination .page-link { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .pagination .page-item.active .page-link { color: #fff !important; }
+/* dropdown hover (v2 nutí bílou na světlém hoveru) */
+html[data-lg-theme="light"] .dropdown-item:hover,
+html[data-lg-theme="light"] .dropdown-item:focus { color: #1d1d1f !important; }
+/* nativní select options (edit_order nutí tmavé) */
+html[data-lg-theme="light"] .edit-order-form select option,
+html[data-lg-theme="light"] select option {
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+}
+/* wizard nové zakázky */
+html[data-lg-theme="light"] .crm-wizard-step .collapse,
+html[data-lg-theme="light"] .crm-wizard-step .collapsing {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+html[data-lg-theme="light"] .crm-wizard-step .mb-2 > .d-flex > i { color: #0A84FF !important; }
+/* kbd hint (⌘K) */
+html[data-lg-theme="light"] .crm-kbd-hint { background: rgba(0,0,0,0.05) !important; }
+
 /* sheen decentnější na světlé */
 html[data-lg-theme="light"] .lg-sheen::after {
   background: radial-gradient(
