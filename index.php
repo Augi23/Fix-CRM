@@ -144,7 +144,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 <?php endif; ?>
 
 <div class="row g-4 align-items-start dashboard-main-row">
-    <div class="col-12 col-lg-9 col-xxl-10">
+    <div class="col-12 col-lg-9 dashboard-main-col">
         <div class="card glass-card border-0">
             <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
@@ -300,7 +300,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             </div>
         </div>
     </div>
-    <div class="col-12 col-lg-3 col-xxl-2">
+    <div class="col-12 col-lg-3">
         <!-- Revenue chart (design-system) -->
         <div class="crm-revenue-card mb-4">
             <div class="crm-revenue-label"><?php echo __('revenue_by_months'); ?></div>
