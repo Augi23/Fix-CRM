@@ -1179,7 +1179,7 @@ window.printOrderLabel = function (orderId, opts) {
             return fetch(window.AFX_LABEL_BRIDGE + '/print', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: data.code, defect: data.defect, date: data.date })
+                body: JSON.stringify({ code: data.code, defect: data.defect, date: data.date, client: data.client })
             }).then(function (r) { return r.json(); }).then(function (res) {
                 if (!res.ok) { throw new Error(res.error || 'tisk selhal'); }
                 window.afxLabelToast('🏷️ Štítek ' + data.code + ' odeslán na tiskárnu', true);

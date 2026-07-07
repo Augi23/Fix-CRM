@@ -84,12 +84,13 @@ def _code128_image(code: str) -> Image.Image:
     return img.convert("L")
 
 
-def render_label(code: str, defect: str, date: str) -> Image.Image:
+def render_label(code: str, defect: str, date: str, client: str = "") -> Image.Image:
     """Štítek zakázky: velký Code128 (naskenování otevře zakázku v CRM),
-    číslo zakázky, krátký popis závady, datum přijetí."""
+    číslo zakázky, jméno klienta, krátký popis závady, datum přijetí."""
     code = re.sub(r"[^\x20-\x7E]", "", (code or "").strip()) or "?"
     defect = (defect or "").strip()
     date = (date or "").strip()
+    client = (client or "").strip()
 
     bar = _code128_image(code)
     bar_w = W - 36
@@ -100,15 +101,18 @@ def render_label(code: str, defect: str, date: str) -> Image.Image:
     f_txt = _font(34)
     f_date = _font(30)
 
+    f_client = _font(38, bold=True)
     defect_lines = textwrap.wrap(defect, width=38)[:2] if defect else []
+    client_line = textwrap.shorten(client, width=32, placeholder="…") if client else ""
 
     pad = 14
     y = pad
     h_bar = bar.height
     h_code = 52
+    h_client = 46 if client_line else 0
     h_defect = len(defect_lines) * 40
     h_date = 38 if date else 0
-    H = pad + h_bar + 8 + h_code + (8 + h_defect if defect_lines else 0) + (6 + h_date) + pad
+    H = pad + h_bar + 8 + h_code + (6 + h_client if client_line else 0) + (8 + h_defect if defect_lines else 0) + (6 + h_date) + pad
 
     img = Image.new("L", (W, H), 255)
     d = ImageDraw.Draw(img)
@@ -118,6 +122,10 @@ def render_label(code: str, defect: str, date: str) -> Image.Image:
     tw = d.textlength(code, font=f_code)
     d.text(((W - tw) // 2, y), code, font=f_code, fill=0)
     y += h_code
+    if client_line:
+        y += 6
+        d.text((pad + 4, y), client_line, font=f_client, fill=0)
+        y += 46
     if defect_lines:
         y += 8
         for line in defect_lines:
@@ -188,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/preview":
             q = {k: v[0] for k, v in parse_qs(url.query).items()}
             try:
-                img = render_label(q.get("code", "TEST123"), q.get("defect", ""), q.get("date", ""))
+                img = render_label(q.get("code", "TEST123"), q.get("defect", ""), q.get("date", ""), q.get("client", ""))
                 import io
                 buf = io.BytesIO()
                 img.save(buf, "PNG")
@@ -211,7 +219,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length") or 0)
             data = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
-            img = render_label(str(data.get("code", "")), str(data.get("defect", "")), str(data.get("date", "")))
+            img = render_label(str(data.get("code", "")), str(data.get("defect", "")), str(data.get("date", "")), str(data.get("client", "")))
             ok, err = print_image(img)
             self._json(200 if ok else 500, {"ok": ok, "error": err})
         except Exception as e:

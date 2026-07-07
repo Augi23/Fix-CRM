@@ -9,7 +9,7 @@ return [
         'date' => '2026-07-07',
         'title' => 'Automatický tisk štítků zakázek (Brother QL-810W)',
         'items' => [
-            'Po založení zakázky se hned automaticky vytiskne štítek: čárový kód s číslem zakázky + krátký popis závady + datum přijetí.',
+            'Po založení zakázky se hned automaticky vytiskne štítek: čárový kód s číslem zakázky + jméno a příjmení klienta + krátký popis závady + datum přijetí.',
             'Naskenování kódu (ruční skener nebo QR tlačítko v CRM) otevře zakázku.',
             'Tlačítko „Štítek — Brother QL" i v detailu zakázky (menu tisků).',
             'Tiskne stejná tiskárna a stejnou cestou jako aplikace Naskladnění produktů (lokální můstek na recepčním Macu).',
