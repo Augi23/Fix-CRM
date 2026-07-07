@@ -5,7 +5,22 @@ na Brother QL-810W **stejně jako aplikace „Naskladnění produktů"**
 (stejná tiskárna z `~/.naskladneni_produktu.json` → `printer_ip`,
 stejná knihovna `brother_ql`, 62mm role, stejné parametry rastru).
 
-## Instalace (jednorázově, na Macu u tiskárny)
+## Instalace na prodejním MacBooku (jeden příkaz v Terminálu)
+
+```bash
+mkdir -p ~/stitek-bridge && cd ~/stitek-bridge \
+&& curl -fsSL -o stitek_bridge.py https://raw.githubusercontent.com/Augi23/Fix-CRM/main/print-bridge/stitek_bridge.py \
+&& curl -fsSL -o install.sh https://raw.githubusercontent.com/Augi23/Fix-CRM/main/print-bridge/install.sh \
+&& chmod +x install.sh && ./install.sh
+```
+
+Předpoklady: na MacBooku běží aplikace „Naskladnění produktů" (tj. existuje
+`~/.naskladneni_produktu.json` s IP tiskárny). Pokud si macOS vyžádá instalaci
+Command Line Tools (kvůli python3), potvrď ji a příkaz spusť znovu.
+
+**Aktualizace můstku** = spustit tentýž příkaz znovu (stáhne novou verzi a restartuje službu).
+
+## Instalace z repa (vývojový Mac)
 
 ```bash
 cd ~/Fix-CRM/print-bridge && ./install.sh
