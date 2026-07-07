@@ -311,13 +311,12 @@ function getOrderStatusDefinitions(): array {
         'Vydáno' => ['group' => 'collected', 'badge' => 'collected'],
         'Vydáno - ČR' => ['group' => 'collected', 'badge' => 'collected'],
         'Stornováno' => ['group' => 'cancelled', 'badge' => 'cancelled'],
-        'Černá růže' => ['group' => 'new', 'badge' => 'new'],
     ];
 }
 
 function getLegacyOrderStatusAliases(): array {
     return [
-        'new' => ['New', 'Новый', 'Nová'],
+        'new' => ['New', 'Новый', 'Nová', 'Černá růže'],
         'pending_approval' => ['Pending Approval', 'На согласовании', 'K odsouhlasení', 'Čeká na schválení'],
         'in_progress' => ['In Progress', 'В работе', 'V práci', 'V procesu', 'Provádí se'],
         'waiting_parts' => ['Waiting for Parts', 'Ожидание запчастей', 'Čeká na díly', 'Čeká na díl', 'Ceka na dil', 'Čeká na diel'],
@@ -1864,6 +1863,23 @@ function assignmentSegmentSync(int $orderId, ?int $technicianId, ?string $status
     }
 }
 
+/** Jednorázově: stav "Černá růže" (historická značka 2. pobočky) -> Přijato + pobočka Na Příkopě. */
+function migrateCernaRuzeOrders(): void
+{
+    global $pdo;
+    try {
+        if (get_setting('cerna_ruze_migrated', '') === '1') { return; }
+        $bid = $pdo->query("SELECT id FROM branches WHERE code = 'prikope' LIMIT 1")->fetchColumn();
+        if ($bid) {
+            $pdo->prepare("UPDATE orders SET branch_id = ?, status = 'Přijato' WHERE status = 'Černá růže'")
+                ->execute([(int)$bid]);
+        } else {
+            $pdo->exec("UPDATE orders SET status = 'Přijato' WHERE status = 'Černá růže'");
+        }
+        if (function_exists('set_setting')) { set_setting('cerna_ruze_migrated', '1'); }
+    } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
+}
+
 // auto-hook: běží při každém načtení functions.php v kontextu přihlášeného zaměstnance
 if (session_status() === PHP_SESSION_ACTIVE
     && !empty($_SESSION['user_id'])
@@ -1876,6 +1892,7 @@ if (session_status() === PHP_SESSION_ACTIVE
         } elseif (is_numeric($_SESSION['user_id'])) {
             trackStaffPresence($pdo, 'user', (int)$_SESSION['user_id']);
         }
+        migrateCernaRuzeOrders();
     } catch (Throwable $e) { /* ignore */ }
 }
 ?>

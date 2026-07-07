@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-07',
+        'title' => 'Zrušen stav „Černá růže"',
+        'items' => [
+            'Historická značka zakázek druhé pobočky — dnes to řeší oddělené pobočky.',
+            'Staré zakázky s tímto stavem automaticky převedeny na „Přijato" + pobočku Praha 1 - Na Příkopě.',
+        ],
+    ],
+    [
+        'date' => '2026-07-07',
         'title' => 'Čas na zakázkách po technicích (Přehledy)',
         'items' => [
             'Čas technika na zakázce běží od přidělení/přijetí do předání jinému technikovi nebo dokončení — při předání se jednomu zastaví a druhému začne.',

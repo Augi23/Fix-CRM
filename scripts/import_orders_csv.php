@@ -253,7 +253,7 @@ function import_order_status_map(string $sourceStatus): string
         'vydano cr' => 'Vydáno - ČR',
         'stornovano' => 'Stornováno',
         // Unknown legacy marker; conservative mapping keeps the order open.
-        'cerna ruze' => 'Černá růže',
+        'cerna ruze' => 'Přijato',
     ];
     return $map[$key] ?? 'Přijato';
 }
@@ -643,7 +643,7 @@ function import_order_self_test(): void
         'Vydáno - ČR' => 'Vydáno - ČR',
         'V opravě zák. desky' => 'V opravě zák. desky',
         'Čeká na díl' => 'Čeká na díl',
-        'černá růže' => 'Černá růže',
+        'černá růže' => 'Přijato',
     ];
     foreach ($statusExpected as $source => $expected) {
         $actual = import_order_status_map($source);
