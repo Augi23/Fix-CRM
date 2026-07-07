@@ -1736,38 +1736,47 @@ function ensureStaffPresenceSchema(PDO $pdo): void
 {
     $pdo->exec("CREATE TABLE IF NOT EXISTS `staff_presence_daily` (
         `user_id`        INT(11)   NOT NULL,
+        `staff_type`     VARCHAR(8) NOT NULL DEFAULT 'user',
         `work_date`      DATE      NOT NULL,
         `seconds_active` INT(11)   NOT NULL DEFAULT 0,
         `first_seen`     DATETIME  DEFAULT NULL,
         `last_seen`      DATETIME  DEFAULT NULL,
-        PRIMARY KEY (`user_id`, `work_date`)
+        PRIMARY KEY (`staff_type`, `user_id`, `work_date`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    // upgrade starší verze tabulky (bez staff_type)
+    try {
+        $has = $pdo->query("SHOW COLUMNS FROM staff_presence_daily LIKE 'staff_type'")->fetchAll();
+        if (!$has) {
+            $pdo->exec("ALTER TABLE staff_presence_daily ADD COLUMN staff_type VARCHAR(8) NOT NULL DEFAULT 'user' AFTER user_id");
+            $pdo->exec("ALTER TABLE staff_presence_daily DROP PRIMARY KEY, ADD PRIMARY KEY (staff_type, user_id, work_date)");
+        }
+    } catch (Throwable $e) { /* best-effort */ }
 }
 
-function trackStaffPresence(PDO $pdo, int $userId): void
+function trackStaffPresence(PDO $pdo, string $staffType, int $staffId): void
 {
     static $done = false;
-    if ($done || $userId <= 0) { return; }
+    if ($done || $staffId <= 0 || !in_array($staffType, ['user', 'tech'], true)) { return; }
     $done = true; // max 1x za request
 
     $maxGapSeconds = 600; // aktivita s mezerou do 10 min se počítá vcelku
-    $attempt = function () use ($pdo, $userId, $maxGapSeconds): void {
+    $attempt = function () use ($pdo, $staffType, $staffId, $maxGapSeconds): void {
         $stmt = $pdo->prepare('SELECT seconds_active, UNIX_TIMESTAMP(last_seen) AS ls
-                               FROM staff_presence_daily WHERE user_id = ? AND work_date = CURDATE()');
-        $stmt->execute([$userId]);
+                               FROM staff_presence_daily WHERE staff_type = ? AND user_id = ? AND work_date = CURDATE()');
+        $stmt->execute([$staffType, $staffId]);
         $row = $stmt->fetch();
         if ($row) {
             $delta = time() - (int)$row['ls'];
             $add = ($delta > 0 && $delta <= $maxGapSeconds) ? $delta : 0;
             $upd = $pdo->prepare('UPDATE staff_presence_daily
                                   SET seconds_active = seconds_active + ?, last_seen = NOW()
-                                  WHERE user_id = ? AND work_date = CURDATE()');
-            $upd->execute([$add, $userId]);
+                                  WHERE staff_type = ? AND user_id = ? AND work_date = CURDATE()');
+            $upd->execute([$add, $staffType, $staffId]);
         } else {
             $ins = $pdo->prepare('INSERT IGNORE INTO staff_presence_daily
-                                  (user_id, work_date, seconds_active, first_seen, last_seen)
-                                  VALUES (?, CURDATE(), 0, NOW(), NOW())');
-            $ins->execute([$userId]);
+                                  (user_id, staff_type, work_date, seconds_active, first_seen, last_seen)
+                                  VALUES (?, ?, CURDATE(), 0, NOW(), NOW())');
+            $ins->execute([$staffId, $staffType]);
         }
     };
     try {
@@ -1785,11 +1794,88 @@ function formatPresenceDuration(int $seconds): string
     return intdiv($minutes, 60) . 'h ' . ($minutes % 60) . 'min';
 }
 
+
+/* ============================================================
+   SEGMENTY PŘIDĚLENÍ ZAKÁZKY (Přehledy → Čas na zakázkách)
+   Od přidělení/přijetí do předání jinému technikovi nebo dokončení.
+   Denní zobrazený čas = průnik segmentu s přítomností technika.
+   Nezávislé na order_work_log (ten dál řídí odpracováno/výdělky).
+   ============================================================ */
+function ensureOrderAssignmentLogSchema(): void
+{
+    global $pdo;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS order_assignment_log (
+            id            INT AUTO_INCREMENT PRIMARY KEY,
+            order_id      INT NOT NULL,
+            technician_id INT NULL,
+            started_at    DATETIME NOT NULL,
+            ended_at      DATETIME NULL,
+            created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_oal_order (order_id),
+            INDEX idx_oal_tech (technician_id),
+            INDEX idx_oal_ended (ended_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // jednorázově otevřít segmenty pro aktuálně aktivní přidělené zakázky
+        if (function_exists('get_setting') && get_setting('assignment_log_backfilled', '') !== '1') {
+            $pdo->exec("INSERT INTO order_assignment_log (order_id, technician_id, started_at)
+                        SELECT o.id, o.technician_id, NOW()
+                        FROM orders o
+                        WHERE o.technician_id IS NOT NULL
+                          AND o.status IN (" . orderStatusSqlIn($pdo, 'active') . ")
+                          AND NOT EXISTS (SELECT 1 FROM order_assignment_log a WHERE a.order_id = o.id AND a.ended_at IS NULL)");
+            if (function_exists('set_setting')) { set_setting('assignment_log_backfilled', '1'); }
+        }
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+/**
+ * Srovná segment přidělení se skutečností: aktivní zakázka s technikem má mít
+ * otevřený segment tohoto technika; předání zavře starý a otevře nový;
+ * dokončení/storno (i odebrání technika) segment zavře.
+ */
+function assignmentSegmentSync(int $orderId, ?int $technicianId, ?string $status): void
+{
+    global $pdo;
+    if ($orderId <= 0) { return; }
+    $attempt = function () use ($pdo, $orderId, $technicianId, $status): void {
+        $isActive = $status !== null && $status !== '' && isOrderStatusIn((string)$status, 'active');
+        $desiredTech = ($isActive && $technicianId) ? (int)$technicianId : null;
+
+        $stmt = $pdo->prepare('SELECT id, technician_id FROM order_assignment_log
+                               WHERE order_id = ? AND ended_at IS NULL ORDER BY id DESC LIMIT 1');
+        $stmt->execute([$orderId]);
+        $open = $stmt->fetch();
+
+        if ($open && ((int)$open['technician_id'] !== (int)$desiredTech || $desiredTech === null)) {
+            $pdo->prepare('UPDATE order_assignment_log SET ended_at = NOW() WHERE id = ?')
+                ->execute([(int)$open['id']]);
+            $open = false;
+        }
+        if ($desiredTech !== null && !$open) {
+            $pdo->prepare('INSERT INTO order_assignment_log (order_id, technician_id, started_at)
+                           VALUES (?, ?, NOW())')->execute([$orderId, $desiredTech]);
+        }
+    };
+    try {
+        $attempt();
+    } catch (Throwable $e) {
+        try { ensureOrderAssignmentLogSchema(); $attempt(); } catch (Throwable $e2) { /* ignore */ }
+    }
+}
+
 // auto-hook: běží při každém načtení functions.php v kontextu přihlášeného zaměstnance
 if (session_status() === PHP_SESSION_ACTIVE
     && !empty($_SESSION['user_id'])
     && isset($pdo) && $pdo instanceof PDO
     && (basename($_SERVER['PHP_SELF'] ?? '') !== 'login.php')) {
-    try { trackStaffPresence($pdo, (int)$_SESSION['user_id']); } catch (Throwable $e) { /* ignore */ }
+    try {
+        // technici se přihlašují z tabulky technicians (session user_id = 't<ID>')
+        if (!empty($_SESSION['tech_id'])) {
+            trackStaffPresence($pdo, 'tech', (int)$_SESSION['tech_id']);
+        } elseif (is_numeric($_SESSION['user_id'])) {
+            trackStaffPresence($pdo, 'user', (int)$_SESSION['user_id']);
+        }
+    } catch (Throwable $e) { /* ignore */ }
 }
 ?>

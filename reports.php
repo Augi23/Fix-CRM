@@ -449,28 +449,33 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                 $presence_rows = [];
                 $presence_totals = [];
                 try {
-                    $presence_sql = "SELECT p.work_date, p.seconds_active, u.id AS uid, u.full_name, u.username, u.role
+                    $presence_sql = "SELECT p.work_date, p.seconds_active, p.staff_type,
+                                            CONCAT(p.staff_type, ':', p.user_id) AS uid,
+                                            COALESCE(t.name, u.full_name, u.username) AS full_name,
+                                            COALESCE(t.name, u.username) AS username,
+                                            COALESCE(t.role, u.role) AS role
                                      FROM staff_presence_daily p
-                                     JOIN users u ON u.id = p.user_id
+                                     LEFT JOIN technicians t ON p.staff_type = 'tech' AND t.id = p.user_id
+                                     LEFT JOIN users u ON p.staff_type = 'user' AND u.id = p.user_id
                                      WHERE p.work_date BETWEEN ? AND ?";
                     $presence_params = [$start_date, $end_date];
                     if (!$is_admin) {
-                        $presence_sql .= " AND p.user_id = ?";
-                        $presence_params[] = (int)($_SESSION['user_id'] ?? 0);
+                        $presence_sql .= " AND p.staff_type = 'tech' AND p.user_id = ?";
+                        $presence_params[] = (int)($_SESSION['tech_id'] ?? 0);
                     }
-                    $presence_sql .= " ORDER BY p.work_date DESC, u.full_name ASC";
+                    $presence_sql .= " ORDER BY p.work_date DESC, full_name ASC";
                     $pstmt = $pdo->prepare($presence_sql);
                     $pstmt->execute($presence_params);
                     $presence_rows = $pstmt->fetchAll();
                     foreach ($presence_rows as $pr) {
-                        $puid = (int)$pr['uid'];
+                        $puid = (string)$pr['uid'];
                         if (!isset($presence_totals[$puid])) {
                             $presence_totals[$puid] = ['name' => ($pr['full_name'] ?: $pr['username']), 'seconds' => 0];
                         }
                         $presence_totals[$puid]['seconds'] += (int)$pr['seconds_active'];
                     }
                 } catch (Throwable $e) { $presence_rows = []; }
-                $presence_role_map = ['admin' => __('role_admin'), 'manager' => __('role_manager'), 'technician' => __('role_engineer')];
+                $presence_role_map = ['admin' => __('role_admin'), 'manager' => __('role_manager'), 'technician' => __('role_engineer'), 'engineer' => __('role_engineer')];
                 ?>
                 <div class="row g-3 mb-4">
                     <div class="col-lg-7">
@@ -512,6 +517,102 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <?php endforeach; endif; ?>
                         </div></div>
                     </div>
+                </div>
+
+                <h5 class="mb-3 mt-5"><?php echo __('worktime_title'); ?></h5>
+                <p class="small text-white-75 mb-2"><?php echo __('worktime_hint'); ?></p>
+                <?php
+                $wt_rows = [];
+                try {
+                    ensureOrderAssignmentLogSchema();
+                    $wt_sql = "SELECT al.order_id, al.technician_id,
+                                      UNIX_TIMESTAMP(al.started_at) AS seg_start,
+                                      UNIX_TIMESTAMP(COALESCE(al.ended_at, NOW())) AS seg_end,
+                                      o.order_code, o.id AS oid, t.name AS tech_name
+                               FROM order_assignment_log al
+                               JOIN orders o ON o.id = al.order_id
+                               LEFT JOIN technicians t ON t.id = al.technician_id
+                               WHERE al.technician_id IS NOT NULL
+                                 AND al.started_at <= ? AND COALESCE(al.ended_at, NOW()) >= ?";
+                    $wt_params = [$end_date . ' 23:59:59', $start_date . ' 00:00:00'];
+                    if (!$is_admin) {
+                        $wt_sql .= " AND al.technician_id = ?";
+                        $wt_params[] = (int)($_SESSION['tech_id'] ?? 0);
+                    }
+                    $wt_stmt = $pdo->prepare($wt_sql);
+                    $wt_stmt->execute($wt_params);
+                    $wt_segments = $wt_stmt->fetchAll();
+
+                    // přítomnost techniků v období (okno first/last + reálné sekundy)
+                    $wt_presence = [];
+                    $pp = $pdo->prepare("SELECT user_id, work_date, seconds_active,
+                                                UNIX_TIMESTAMP(first_seen) AS fs, UNIX_TIMESTAMP(last_seen) AS ls
+                                         FROM staff_presence_daily
+                                         WHERE staff_type = 'tech' AND work_date BETWEEN ? AND ?");
+                    $pp->execute([$start_date, $end_date]);
+                    foreach ($pp->fetchAll() as $prr) {
+                        $wt_presence[$prr['user_id'] . ':' . $prr['work_date']] = $prr;
+                    }
+
+                    $acc = []; // [date][tech][order] => sekundy
+                    $meta = [];
+                    $dayCursor = strtotime($start_date);
+                    $dayLast = strtotime($end_date);
+                    while ($dayCursor <= $dayLast) {
+                        $dKey = date('Y-m-d', $dayCursor);
+                        $dStart = $dayCursor;
+                        $dEnd = $dayCursor + 86400;
+                        foreach ($wt_segments as $seg) {
+                            $pKey = $seg['technician_id'] . ':' . $dKey;
+                            if (!isset($wt_presence[$pKey])) { continue; } // ten den nebyl v systému
+                            $pres = $wt_presence[$pKey];
+                            $from = max((int)$seg['seg_start'], $dStart, (int)$pres['fs']);
+                            $to   = min((int)$seg['seg_end'], $dEnd, (int)$pres['ls']);
+                            $sec  = max(0, $to - $from);
+                            $sec  = min($sec, (int)$pres['seconds_active']);
+                            if ($sec <= 0) { continue; }
+                            $tKey = (int)$seg['technician_id'];
+                            $oKey = (int)$seg['oid'];
+                            $cur = $acc[$dKey][$tKey][$oKey] ?? 0;
+                            $acc[$dKey][$tKey][$oKey] = min($cur + $sec, (int)$pres['seconds_active']);
+                            $meta[$tKey] = $seg['tech_name'] ?: ('#' . $tKey);
+                            $meta['o' . $oKey] = orderDisplayCode(['order_code' => $seg['order_code'], 'id' => $seg['oid']]);
+                        }
+                        $dayCursor = $dEnd;
+                    }
+                    foreach ($acc as $dK => $techs) {
+                        foreach ($techs as $tK => $ords) {
+                            foreach ($ords as $oK => $secv) {
+                                $wt_rows[] = ['date' => $dK, 'tech' => $meta[$tK], 'code' => $meta['o' . $oK], 'oid' => $oK, 'sec' => $secv];
+                            }
+                        }
+                    }
+                    usort($wt_rows, function ($a, $b) { return [$b['date'], $a['tech'], $a['code']] <=> [$a['date'], $b['tech'], $b['code']]; });
+                } catch (Throwable $e) { $wt_rows = []; }
+                ?>
+                <div class="table-responsive mb-4" style="max-height: 420px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th><?php echo __('date'); ?></th>
+                                <th><?php echo __('presence_employee'); ?></th>
+                                <th><?php echo __('order_no'); ?></th>
+                                <th class="text-end"><?php echo __('worktime_duration'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!$wt_rows): ?>
+                                <tr><td colspan="4" class="text-center text-white-75 py-3"><?php echo __('not_found'); ?></td></tr>
+                            <?php else: foreach ($wt_rows as $wr): ?>
+                                <tr>
+                                    <td><?php echo date('d.m.Y', strtotime($wr['date'])); ?></td>
+                                    <td><?php echo e($wr['tech']); ?></td>
+                                    <td><a href="view_order.php?id=<?php echo (int)$wr['oid']; ?>" class="fw-bold"><?php echo e($wr['code']); ?></a></td>
+                                    <td class="text-end fw-bold"><?php echo formatPresenceDuration((int)$wr['sec']); ?></td>
+                                </tr>
+                            <?php endforeach; endif; ?>
+                        </tbody>
+                    </table>
                 </div>
 
                 <h5 class="mb-3 mt-5"><?php echo __('completed_works_list'); ?></h5>

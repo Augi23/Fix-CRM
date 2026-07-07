@@ -66,6 +66,7 @@ try {
         $pin_code, $appearance, $priority, $estimated_cost, $shipping_method, $status, $new_order_code
     ]);
     $order_id = (int)$pdo->lastInsertId();
+    assignmentSegmentSync($order_id, $technician_id ? (int)$technician_id : null, (string)$status);
 
     logOrderStatusChange($order_id, '', $status);
 

@@ -7,6 +7,9 @@
 $lang_overrides = [
     'cs' => [
         'presence_title' => 'Přítomnost v systému',
+        'worktime_title' => 'Čas na zakázkách',
+        'worktime_hint' => 'Denní čas každého technika na zakázce: běží od přidělení/přijetí do předání či dokončení a započítává se jen doba, kdy byl technik ten den přítomný v systému.',
+        'worktime_duration' => 'Čas na zakázce',
         'presence_hint' => 'Informativní údaj — aktivní čas přihlášení v CRM (mezery delší než 10 minut se nepočítají).',
         'presence_duration' => 'Doba v systému',
         'presence_total_period' => 'Celkem za období',
@@ -255,6 +258,9 @@ $lang_overrides = [
     ],
     'ru' => [
         'presence_title' => 'Время в системе',
+        'worktime_title' => 'Время на заказах',
+        'worktime_hint' => 'Ежедневное время техника на заказе: идёт с момента назначения/принятия до передачи или завершения, засчитывается только время присутствия в системе в этот день.',
+        'worktime_duration' => 'Время на заказе',
         'presence_hint' => 'Информативно — активное время в CRM (паузы более 10 минут не учитываются).',
         'presence_duration' => 'Время в системе',
         'presence_total_period' => 'Итого за период',
@@ -478,6 +484,9 @@ $lang_overrides = [
     ],
     'en' => [
         'presence_title' => 'Time in system',
+        'worktime_title' => 'Time on orders',
+        'worktime_hint' => 'Daily per-technician time on an order: runs from assignment/acceptance until handover or completion, counting only time the technician was present in the system that day.',
+        'worktime_duration' => 'Time on order',
         'presence_hint' => 'Informational — active time logged into the CRM (gaps over 10 minutes are not counted).',
         'presence_duration' => 'Time in system',
         'presence_total_period' => 'Period total',

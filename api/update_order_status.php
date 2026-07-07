@@ -146,6 +146,7 @@ try {
     if (isOrderStatusIn($current_status, 'in_progress') && $is_finishing) {
         workSegmentClose((int)$order_id);
     }
+    assignmentSegmentSync((int)$order_id, (int)$updated_tech_id ?: null, (string)($new_status ?? $current_status));
 
     if ($current_status !== $new_status) {
         logOrderStatusChange($order_id, $current_status, $new_status);

@@ -138,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($is_finishing) {
             workSegmentClose((int)$id);
         }
+        assignmentSegmentSync((int)$id, $technician_id ? (int)$technician_id : null, (string)$status);
 
         // Handle File Uploads during Edit
         if (isset($_FILES['files']) && !empty($_FILES['files']['name'][0])) {

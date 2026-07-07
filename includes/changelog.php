@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-07',
+        'title' => 'Čas na zakázkách po technicích (Přehledy)',
+        'items' => [
+            'Čas technika na zakázce běží od přidělení/přijetí do předání jinému technikovi nebo dokončení — při předání se jednomu zastaví a druhému začne.',
+            'Denně se započítává jen doba, kdy byl technik skutečně přítomný v systému (žádné noci a víkendy).',
+            'V Přehledech nová tabulka: datum, pracovník, č. zakázky, čas — za zvolené období.',
+            'Oprava: evidence přítomnosti nyní správně počítá i techniky a manažery (dřív jen administrátory).',
+        ],
+    ],
+    [
+        'date' => '2026-07-07',
         'title' => 'Historie úprav přímo v sekci Aktualizace',
         'items' => [
             'Tenhle přehled — každé dokončené vylepšení systému tu bude poznamenané.',

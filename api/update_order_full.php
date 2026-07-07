@@ -149,6 +149,7 @@ try {
     if (isOrderStatusIn($current['status'], 'in_progress') && $is_finishing) {
         workSegmentClose((int)$order_id);
     }
+    assignmentSegmentSync((int)$order_id, (int)$technician_id ?: null, (string)$new_status);
 
     if (isset($_FILES['files']) && !empty($_FILES['files']['name'][0])) {
         $upload_dir = __DIR__ . '/../uploads/';
