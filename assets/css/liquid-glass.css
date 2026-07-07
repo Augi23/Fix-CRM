@@ -454,10 +454,46 @@ html[data-lg-theme="light"] .text-white-75 { color: rgba(0,0,0,0.65) !important;
 html[data-lg-theme="light"] .crm-v2-topbar .navbar-brand,
 html[data-lg-theme="light"] .crm-v2-user-name,
 html[data-lg-theme="light"] .sidebar-brand-kicker { color: #1d1d1f !important; }
+html[data-lg-theme="light"] #sidebar .nav-link,
+html[data-lg-theme="light"] #sidebar .nav-link > span,
 html[data-lg-theme="light"] .crm-v2-nav .nav-link { color: rgba(0,0,0,0.72) !important; }
+html[data-lg-theme="light"] #sidebar .nav-link i,
+html[data-lg-theme="light"] #sidebar .nav-link .fas,
+html[data-lg-theme="light"] #sidebar .nav-link .far,
+html[data-lg-theme="light"] #sidebar .nav-link .fab { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] #sidebar .nav-link:hover,
+html[data-lg-theme="light"] #sidebar .nav-link:hover > span,
 html[data-lg-theme="light"] .crm-v2-nav .nav-link:hover { color: #000 !important; }
+html[data-lg-theme="light"] #sidebar .nav-link:hover i,
+html[data-lg-theme="light"] #sidebar .nav-link:hover .fas,
+html[data-lg-theme="light"] #sidebar .nav-link:hover .far { color: #0A84FF !important; }
+html[data-lg-theme="light"] #sidebar .nav-link.active,
+html[data-lg-theme="light"] #sidebar .nav-link.active > span,
 html[data-lg-theme="light"] .crm-v2-nav .nav-link.active { color: #0055CC !important; }
-html[data-lg-theme="light"] .crm-nav-group-title { color: rgba(0,0,0,0.40) !important; }
+html[data-lg-theme="light"] #sidebar .nav-link.active i,
+html[data-lg-theme="light"] #sidebar .nav-link.active .fas,
+html[data-lg-theme="light"] #sidebar .nav-link.active .far { color: #0A84FF !important; }
+html[data-lg-theme="light"] #sidebar .crm-nav-group-title,
+html[data-lg-theme="light"] .crm-nav-group-title { color: rgba(0,0,0,0.45) !important; }
+html[data-lg-theme="light"] #sidebar .crm-v2-user-name { color: #1d1d1f !important; }
+html[data-lg-theme="light"] #sidebar .crm-v2-user-role { color: rgba(0,0,0,0.50) !important; }
+html[data-lg-theme="light"] #sidebar .sidebar-brand-kicker { color: rgba(0,0,0,0.45) !important; }
+html[data-lg-theme="light"] #sidebar .sidebar-logo,
+html[data-lg-theme="light"] .sidebar-brand .sidebar-logo,
+html[data-lg-theme="light"] .sidebar-logo {
+  filter: none !important;   /* originál loga je černý; v2 ho invertuje na bílé */
+}
+html[data-lg-theme="light"] .btn-close {
+  filter: none !important;   /* v2 invertuje na bílé — na světlé musí zůstat tmavý */
+}
+html[data-lg-theme="light"] .login-hero-logo,
+html[data-lg-theme="light"] .client-topbar-brand img {
+  filter: brightness(0.12) saturate(0);
+}
+html[data-lg-theme="light"] #sidebar .crm-nav-pill {
+  background: rgba(10,132,255,0.15) !important;
+  color: #0055CC !important;
+}
 html[data-lg-theme="light"] .crm-v2-user-role { color: rgba(0,0,0,0.50) !important; }
 
 /* formuláře */
