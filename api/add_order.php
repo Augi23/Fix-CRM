@@ -131,7 +131,7 @@ try {
         'actor_name' => (string)($_SESSION['full_name'] ?? ''),
     ]);
 
-    header("Location: ../orders.php");
+    header("Location: ../orders.php?created_order=" . (int)$order_id);
     exit;
 
 } catch (Exception $e) {

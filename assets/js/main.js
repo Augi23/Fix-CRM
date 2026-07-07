@@ -1152,3 +1152,55 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 }());
+
+/* ============================================================
+   TISK ŠTÍTKU ZAKÁZKY — Brother QL-810W přes lokální můstek
+   (print-bridge/stitek_bridge.py na recepčním Macu, port 9110).
+   Prohlížeč smí z HTTPS volat http://127.0.0.1 (localhost výjimka).
+   ============================================================ */
+window.AFX_LABEL_BRIDGE = 'http://127.0.0.1:9110';
+
+window.afxLabelToast = function (msg, ok) {
+    var el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:99999;padding:12px 18px;'
+        + 'border-radius:12px;font-weight:600;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,.35);'
+        + 'background:' + (ok ? 'rgba(52,199,89,.92)' : 'rgba(255,55,95,.92)');
+    document.body.appendChild(el);
+    setTimeout(function () { el.remove(); }, ok ? 3500 : 6000);
+};
+
+window.printOrderLabel = function (orderId, opts) {
+    opts = opts || {};
+    fetch('api/order_label_data.php?id=' + encodeURIComponent(orderId), { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.ok) { throw new Error(data.error || 'data štítku nedostupná'); }
+            return fetch(window.AFX_LABEL_BRIDGE + '/print', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: data.code, defect: data.defect, date: data.date })
+            }).then(function (r) { return r.json(); }).then(function (res) {
+                if (!res.ok) { throw new Error(res.error || 'tisk selhal'); }
+                window.afxLabelToast('🏷️ Štítek ' + data.code + ' odeslán na tiskárnu', true);
+            });
+        })
+        .catch(function (e) {
+            var msg = /Failed to fetch|NetworkError|Load failed/i.test(String(e))
+                ? 'Štítkový můstek neběží na tomto počítači (tisk štítků funguje z recepčního Macu)'
+                : 'Tisk štítku selhal: ' + e.message;
+            if (!opts.silentFail) { window.afxLabelToast('⚠️ ' + msg, false); }
+        });
+};
+
+// auto-tisk štítku hned po založení zakázky (redirect z api/add_order.php)
+(function () {
+    var params = new URLSearchParams(window.location.search);
+    var createdId = params.get('created_order');
+    if (!createdId) { return; }
+    params.delete('created_order');
+    var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    window.history.replaceState({}, '', clean);
+    window.printOrderLabel(createdId, {});
+})();
+
