@@ -1,0 +1,844 @@
+/* ============================================================
+   LIQUID GLASS LAYER — Fix-CRM redesign 2026
+   Apple Liquid Glass (WWDC25) webová aproximace.
+   Načítá se PO fix-crm-v2.css, pouze přepisuje materiál povrchů.
+   Refrakce: SVG filtr #lg-refract (feTurbulence+feDisplacementMap,
+   vložený v header.php) přes backdrop-filter: url() — Chromium.
+   Safari/Firefox degradují na blur+saturate (bez ohybu).
+   ============================================================ */
+
+:root {
+  /* materiál */
+  --lg-veil: rgba(255, 255, 255, 0.07);          /* tenký adaptivní závoj */
+  --lg-veil-strong: rgba(255, 255, 255, 0.10);
+  --lg-edge: rgba(255, 255, 255, 0.20);          /* hrana skla */
+  --lg-spec-top: rgba(255, 255, 255, 0.45);      /* horní specular */
+  --lg-spec-bot: rgba(255, 255, 255, 0.16);      /* spodní specular */
+  --lg-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  /* pozice odlesku řízená JS (pointer/scroll) */
+  --lg-mx: 30%;
+  --lg-my: 20%;
+  --lg-scroll-shift: 0deg;
+}
+
+/* ------------------------------------------------------------
+   AMBIENTNÍ POZADÍ — barevná pole, ze kterých si sklo bere tint.
+   Bez nich by refrakce neměla co ohýbat (černá zůstane černá).
+   Jemné, fixní, neruší čtení dat.
+   ------------------------------------------------------------ */
+html, body {
+  background:
+    radial-gradient(900px 600px at 12% -8%,  rgba(10, 132, 255, 0.22) 0%, transparent 55%),
+    radial-gradient(800px 620px at 105% 12%, rgba(100, 210, 255, 0.12) 0%, transparent 55%),
+    radial-gradient(700px 700px at 55% 115%, rgba(0, 113, 227, 0.14) 0%, transparent 60%),
+    #000 !important;
+  background-attachment: fixed, fixed, fixed, fixed !important;
+}
+
+/* ------------------------------------------------------------
+   ZÁKLADNÍ MATERIÁL — chrome povrchy S refrakcí (překrývají obsah):
+   sidebar, topbar, modaly, dropdowny, notifikace, offcanvas.
+   ------------------------------------------------------------ */
+#sidebar.crm-v2-sidebar,
+.crm-v2-sidebar,
+#sidebar {
+  background: linear-gradient(180deg, rgba(22, 22, 26, 0.62), rgba(10, 10, 12, 0.66)) !important;
+  -webkit-backdrop-filter: blur(3px) saturate(170%) !important;
+  backdrop-filter: blur(3px) saturate(170%) !important;
+  border-right: 1px solid var(--lg-edge) !important;
+  box-shadow:
+    inset -1px 0 0 rgba(255, 255, 255, 0.06),
+    inset 0 1px 1px var(--lg-spec-top),
+    8px 0 40px rgba(0, 0, 0, 0.35);
+}
+
+nav.navbar.crm-v2-topbar,
+.crm-v2-topbar,
+.crm-topbar,
+.client-topbar {
+  background: rgba(16, 16, 20, 0.55) !important;
+  -webkit-backdrop-filter: blur(3px) saturate(170%) !important;
+  backdrop-filter: blur(3px) saturate(170%) !important;
+  border-bottom: 1px solid var(--lg-edge) !important;
+  box-shadow:
+    inset 0 1px 1px var(--lg-spec-top),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 32px rgba(0, 0, 0, 0.30);
+}
+
+
+/* ------------------------------------------------------------
+   PLOVOUCÍ VRSTVY — modaly, dropdowny, panely
+   ------------------------------------------------------------ */
+.modal-content {
+  background: linear-gradient(165deg, rgba(28, 28, 34, 0.72), rgba(14, 14, 18, 0.78)) !important;
+  -webkit-backdrop-filter: blur(4px) saturate(165%) !important;
+  backdrop-filter: blur(4px) saturate(165%) !important;
+  border: 1px solid var(--lg-edge) !important;
+  border-radius: var(--r3) !important;
+  box-shadow:
+    inset 0 1px 1px var(--lg-spec-top),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.08),
+    var(--lg-shadow) !important;
+  overflow: hidden;
+}
+.modal-backdrop.show { opacity: 0.62; }
+
+.dropdown-menu,
+.crm-notifications-panel,
+.offcanvas,
+.select2-dropdown {
+  background: rgba(20, 20, 26, 0.72) !important;
+  -webkit-backdrop-filter: blur(4px) saturate(165%) !important;
+  backdrop-filter: blur(4px) saturate(165%) !important;
+  border: 1px solid var(--lg-edge) !important;
+  box-shadow:
+    inset 0 1px 1px var(--lg-spec-bot),
+    0 16px 48px rgba(0, 0, 0, 0.50) !important;
+}
+
+/* Chromium: opravdová refrakce na chrome vrstvách */
+@supports (backdrop-filter: url(#lg-refract)) {
+  #sidebar.crm-v2-sidebar, .crm-v2-sidebar, #sidebar,
+  nav.navbar.crm-v2-topbar, .crm-v2-topbar, .crm-topbar, .client-topbar {
+    -webkit-backdrop-filter: url(#lg-refract) blur(2px) saturate(170%) !important;
+    backdrop-filter: url(#lg-refract) blur(2px) saturate(170%) !important;
+  }
+  .modal-content,
+  .dropdown-menu,
+  .crm-notifications-panel,
+  .offcanvas,
+  .select2-dropdown {
+    -webkit-backdrop-filter: url(#lg-refract) blur(3px) saturate(165%) !important;
+    backdrop-filter: url(#lg-refract) blur(3px) saturate(165%) !important;
+  }
+}
+
+/* ------------------------------------------------------------
+   KARTY — materiál bez url() refrakce (výkon: karet jsou desítky),
+   ale s plným liquid podpisem: závoj, specular hrany, pointer-
+   reaktivní odlesk (přes --lg-mx/--lg-my z liquid-glass.js).
+   ------------------------------------------------------------ */
+.card,
+.glass-card,
+.glass-panel,
+.crm-queue-card,
+.crm-revenue-card,
+.login-panel,
+.client-card,
+.media-card {
+  position: relative;
+  background: linear-gradient(170deg, rgba(32, 32, 38, 0.55), rgba(14, 14, 18, 0.62)) !important;
+  -webkit-backdrop-filter: blur(3px) saturate(160%) !important;
+  backdrop-filter: blur(3px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: var(--r3) !important;
+  box-shadow:
+    inset 0 1px 1px var(--lg-spec-top),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.06),
+    0 10px 36px rgba(0, 0, 0, 0.38) !important;
+}
+
+/* pointer-reaktivní specular — jede přes CSS var, bez repaint filtru */
+.lg-sheen {
+  position: relative;
+}
+.lg-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    380px circle at var(--lg-mx) var(--lg-my),
+    rgba(255, 255, 255, 0.10),
+    rgba(255, 255, 255, 0.03) 42%,
+    transparent 68%
+  );
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  z-index: 1;
+}
+.lg-sheen:hover::after { opacity: 1; }
+
+/* horní lesklá hrana karet (edge highlight) */
+.card::before,
+.glass-card::before,
+.crm-queue-card::before,
+.crm-revenue-card::before,
+.login-panel::before,
+.client-card::before {
+  content: '' !important;
+  display: block !important;
+  position: absolute;
+  inset: 0 !important;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(133deg, rgba(255, 255, 255, 0.14), transparent 34%) !important;
+  mix-blend-mode: screen;
+  z-index: 0;
+}
+
+.card-header {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10) !important;
+}
+.card-footer {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ------------------------------------------------------------
+   TABULKY — ČITELNOST PŘEDEVŠÍM: řádky téměř plné, sklo jen okolo.
+   ------------------------------------------------------------ */
+.table,
+.table > :not(caption) > * > * {
+  background-color: transparent !important;
+}
+.table thead th {
+  background: rgba(16, 16, 20, 0.85) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  backdrop-filter: blur(6px) !important;
+  border-bottom: 1px solid var(--lg-edge) !important;
+}
+.table tbody tr {
+  background: rgba(16, 16, 20, 0.55);
+}
+.table tbody tr:hover {
+  background: rgba(10, 132, 255, 0.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
+.table-responsive {
+  border-radius: var(--r2);
+}
+
+/* ------------------------------------------------------------
+   STAVOVÉ ŘÁDKY — celý řádek nese barvu stavu (ne jen badge).
+   Musí být PO resetu .table pozadí (jinak by ho reset přebil).
+   Barvy = paleta status pillů (v2), vlevo barevný proužek.
+   ------------------------------------------------------------ */
+/* tmavý režim */
+.order-row--status-new         > td { background: rgba(59,130,246,0.16)  !important; }
+.order-row--status-pending     > td { background: rgba(249,115,22,0.16)  !important; }
+.order-row--status-progress    > td { background: rgba(139,92,246,0.16)  !important; }
+.order-row--status-waiting     > td { background: rgba(239,68,68,0.18)   !important; }
+.order-row--status-completed   > td { background: rgba(6,182,212,0.16)   !important; }
+.order-row--status-uncollected > td { background: rgba(234,179,8,0.16)   !important; }
+.order-row--status-collected   > td { background: rgba(34,197,94,0.18)   !important; }
+.order-row--status-cancelled   > td { background: rgba(156,163,175,0.14) !important; }
+.order-row--status-default     > td { background: rgba(148,163,184,0.12) !important; }
+/* hover = o stupeň sytější, ať klikatelnost zůstane čitelná */
+.order-row--status-new:hover         > td { background: rgba(59,130,246,0.26)  !important; }
+.order-row--status-pending:hover     > td { background: rgba(249,115,22,0.26)  !important; }
+.order-row--status-progress:hover    > td { background: rgba(139,92,246,0.26)  !important; }
+.order-row--status-waiting:hover     > td { background: rgba(239,68,68,0.28)   !important; }
+.order-row--status-completed:hover   > td { background: rgba(6,182,212,0.26)   !important; }
+.order-row--status-uncollected:hover > td { background: rgba(234,179,8,0.26)   !important; }
+.order-row--status-collected:hover   > td { background: rgba(34,197,94,0.28)   !important; }
+.order-row--status-cancelled:hover   > td { background: rgba(156,163,175,0.24) !important; }
+.order-row--status-default:hover     > td { background: rgba(148,163,184,0.22) !important; }
+
+/* světlý režim — jemnější tint, tmavý text zůstává */
+html[data-lg-theme="light"] .order-row--status-new         > td { background: #E8F0FE !important; }
+html[data-lg-theme="light"] .order-row--status-pending     > td { background: #FEEFE3 !important; }
+html[data-lg-theme="light"] .order-row--status-progress    > td { background: #F0EBFE !important; }
+html[data-lg-theme="light"] .order-row--status-waiting     > td { background: #FDEBEB !important; }
+html[data-lg-theme="light"] .order-row--status-completed   > td { background: #E5F6FA !important; }
+html[data-lg-theme="light"] .order-row--status-uncollected > td { background: #FBF4DC !important; }
+html[data-lg-theme="light"] .order-row--status-collected   > td { background: #E7F7EC !important; }
+html[data-lg-theme="light"] .order-row--status-cancelled   > td { background: #F0F1F3 !important; }
+html[data-lg-theme="light"] .order-row--status-default     > td { background: #F1F3F6 !important; }
+html[data-lg-theme="light"] .order-row--status-new:hover         > td { background: #D7E5FD !important; }
+html[data-lg-theme="light"] .order-row--status-pending:hover     > td { background: #FDE1CB !important; }
+html[data-lg-theme="light"] .order-row--status-progress:hover    > td { background: #E3D9FD !important; }
+html[data-lg-theme="light"] .order-row--status-waiting:hover     > td { background: #FBD9D9 !important; }
+html[data-lg-theme="light"] .order-row--status-completed:hover   > td { background: #D0EEF6 !important; }
+html[data-lg-theme="light"] .order-row--status-uncollected:hover > td { background: #F7EBBE !important; }
+html[data-lg-theme="light"] .order-row--status-collected:hover   > td { background: #D2F0DC !important; }
+html[data-lg-theme="light"] .order-row--status-cancelled:hover   > td { background: #E3E5E9 !important; }
+html[data-lg-theme="light"] .order-row--status-default:hover     > td { background: #E4E8ED !important; }
+
+/* Bootstrap kontextové řádky (reklamace.php: table-primary/-warning/...) */
+.table > tbody > tr.table-primary > td { background: rgba(59,130,246,0.16) !important; }
+.table > tbody > tr.table-warning > td { background: rgba(249,115,22,0.16) !important; }
+.table > tbody > tr.table-info    > td { background: rgba(6,182,212,0.16)  !important; }
+.table > tbody > tr.table-success > td { background: rgba(34,197,94,0.18)  !important; }
+.table > tbody > tr.table-danger  > td { background: rgba(239,68,68,0.18)  !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-primary > td { background: #E8F0FE !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-warning > td { background: #FEEFE3 !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-info    > td { background: #E5F6FA !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-success > td { background: #E7F7EC !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-danger  > td { background: #FDEBEB !important; }
+
+
+/* ------------------------------------------------------------
+   TLAČÍTKA — primární akce jako malé čočky
+   ------------------------------------------------------------ */
+.btn-primary,
+.crm-v2-cta-new-order {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.95), rgba(0, 113, 227, 0.95)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.15),
+    0 4px 18px rgba(10, 132, 255, 0.35) !important;
+}
+.btn-primary:hover,
+.crm-v2-cta-new-order:hover {
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.65),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.20),
+    0 6px 26px rgba(10, 132, 255, 0.50) !important;
+  transform: translateY(-1px);
+}
+.btn-outline-secondary,
+.btn-outline-primary,
+.btn-outline-light,
+.crm-v2-icon-btn {
+  -webkit-backdrop-filter: blur(3px) saturate(150%) !important;
+  backdrop-filter: blur(3px) saturate(150%) !important;
+  background: var(--lg-veil) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.20);
+}
+.btn-outline-secondary:hover,
+.btn-outline-primary:hover,
+.btn-outline-light:hover,
+.crm-v2-icon-btn:hover {
+  background: var(--lg-veil-strong) !important;
+  border-color: rgba(255, 255, 255, 0.30) !important;
+}
+
+/* ------------------------------------------------------------
+   FORMULÁŘE
+   ------------------------------------------------------------ */
+.form-control,
+.form-select,
+.input-group-text,
+.select2-container--default .select2-selection--single {
+  background: rgba(255, 255, 255, 0.06) !important;
+  -webkit-backdrop-filter: blur(2px) !important;
+  backdrop-filter: blur(2px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.30), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
+.form-control:focus,
+.form-select:focus {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(10, 132, 255, 0.65) !important;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.25),
+    0 0 0 3px rgba(10, 132, 255, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.10) !important;
+}
+
+/* ------------------------------------------------------------
+   NAV / TABS / PAGINACE / ALERTS / BADGES — sjednocení materiálu
+   ------------------------------------------------------------ */
+/* neaktivní tab — čitelnost (v2 literál byl pod 3:1) */
+html:not([data-lg-theme="light"]) .nav-tabs .nav-link:not(.active) {
+  color: rgba(255,255,255,0.55) !important;
+}
+.nav-tabs .nav-link.active,
+.nav-pills .nav-link.active {
+  background: var(--lg-veil-strong) !important;
+  -webkit-backdrop-filter: blur(3px) saturate(160%) !important;
+  backdrop-filter: blur(3px) saturate(160%) !important;
+  border: 1px solid var(--lg-edge) !important;
+  box-shadow: inset 0 1px 1px var(--lg-spec-bot);
+}
+.page-link {
+  background: var(--lg-veil) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+.alert {
+  -webkit-backdrop-filter: blur(3px) saturate(160%) !important;
+  backdrop-filter: blur(3px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.18);
+}
+.badge {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* aktivní položka v sidebaru = malá skleněná čočka */
+.crm-v2-nav .nav-link.active {
+  background: linear-gradient(135deg, rgba(10, 132, 255, 0.30), rgba(100, 210, 255, 0.16)) !important;
+  -webkit-backdrop-filter: blur(2px) saturate(160%) !important;
+  backdrop-filter: blur(2px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.35),
+    0 2px 14px rgba(10, 132, 255, 0.25);
+}
+
+/* ------------------------------------------------------------
+   FALLBACKY A OHLEDY
+   ------------------------------------------------------------ */
+/* Bez backdrop-filter podpory → plné povrchy */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  #sidebar.crm-v2-sidebar, .crm-v2-sidebar, #sidebar { background: #151518 !important; }
+  .crm-v2-topbar, .crm-topbar { background: #101013 !important; }
+  .card, .glass-card, .glass-panel, .modal-content,
+  .dropdown-menu, .crm-notifications-panel, .offcanvas {
+    background: #17171B !important;
+  }
+}
+
+/* Uživatel si nepřeje průhlednost → vypnout sklo úplně */
+@media (prefers-reduced-transparency: reduce) {
+  #sidebar.crm-v2-sidebar, .crm-v2-sidebar, #sidebar,
+  .crm-v2-topbar, .crm-topbar,
+  .card, .glass-card, .glass-panel, .modal-content,
+  .dropdown-menu, .crm-notifications-panel, .offcanvas,
+  .btn-outline-secondary, .btn-outline-primary, .crm-v2-icon-btn,
+  .form-control, .form-select, .alert, .nav-tabs .nav-link.active {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  #sidebar.crm-v2-sidebar, .crm-v2-sidebar, #sidebar { background: #151518 !important; }
+  .crm-v2-topbar, .crm-topbar { background: #101013 !important; }
+  .card, .glass-card, .glass-panel, .modal-content,
+  .dropdown-menu, .crm-notifications-panel, .offcanvas {
+    background: #17171B !important;
+  }
+  .lg-sheen::after { display: none; }
+}
+
+/* Bez animací pro reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .lg-sheen::after { transition: none; }
+  .btn-primary:hover, .crm-v2-cta-new-order:hover { transform: none; }
+}
+
+
+/* ============================================================
+   LIGHT MODE — Apple silver (přepínač lg-theme-toggle)
+   Aktivace: <html data-lg-theme="light"> (+ data-bs-theme="light")
+   ============================================================ */
+html[data-lg-theme="light"] {
+  /* v2 tokeny -> světlé */
+  --bg: #f5f5f7;
+  --s1: #ffffff; --s2: #f5f5f7; --s3: #e8e8ed; --s4: #d2d2d7;
+  --b1: rgba(0,0,0,0.06); --b2: rgba(0,0,0,0.10); --b3: rgba(0,0,0,0.16);
+  --fg1: #1d1d1f; --fg2: rgba(0,0,0,0.58); --fg3: rgba(0,0,0,0.45);
+  --card-bg: rgba(255,255,255,0.95);
+  --glow: 0 0 24px rgba(10,132,255,0.18); --glow-sm: 0 0 12px rgba(10,132,255,0.12);
+  /* lg tokeny -> světlé sklo */
+  --lg-veil: rgba(255,255,255,0.45);
+  --lg-veil-strong: rgba(255,255,255,0.62);
+  --lg-edge: rgba(0,0,0,0.10);
+  --lg-spec-top: rgba(255,255,255,0.95);
+  --lg-spec-bot: rgba(255,255,255,0.55);
+  --lg-shadow: 0 12px 40px rgba(31,38,135,0.14);
+}
+
+html[data-lg-theme="light"],
+html[data-lg-theme="light"] body {
+  background:
+    radial-gradient(900px 600px at 12% -8%,  rgba(10, 132, 255, 0.10) 0%, transparent 55%),
+    radial-gradient(800px 620px at 105% 12%, rgba(100, 210, 255, 0.09) 0%, transparent 55%),
+    radial-gradient(700px 700px at 55% 115%, rgba(0, 113, 227, 0.07) 0%, transparent 60%),
+    #f5f5f7 !important;
+  background-attachment: fixed, fixed, fixed, fixed !important;
+  color: #1d1d1f !important;
+}
+
+/* chrome povrchy — bílé sklo */
+html[data-lg-theme="light"] #sidebar.crm-v2-sidebar,
+html[data-lg-theme="light"] .crm-v2-sidebar,
+html[data-lg-theme="light"] #sidebar {
+  background: linear-gradient(180deg, rgba(255,255,255,0.60), rgba(248,248,250,0.66)) !important;
+  border-right: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow:
+    inset -1px 0 0 rgba(255,255,255,0.60),
+    inset 0 1px 1px rgba(255,255,255,0.95),
+    8px 0 40px rgba(31,38,135,0.10);
+}
+html[data-lg-theme="light"] nav.navbar.crm-v2-topbar,
+html[data-lg-theme="light"] .crm-v2-topbar,
+html[data-lg-theme="light"] .crm-topbar,
+html[data-lg-theme="light"] .client-topbar {
+  background: rgba(255,255,255,0.55) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.95),
+    0 8px 32px rgba(31,38,135,0.08);
+}
+
+/* karty a plovoucí vrstvy */
+html[data-lg-theme="light"] .card,
+html[data-lg-theme="light"] .glass-card,
+html[data-lg-theme="light"] .glass-panel,
+html[data-lg-theme="light"] .crm-queue-card,
+html[data-lg-theme="light"] .crm-revenue-card,
+html[data-lg-theme="light"] .login-panel,
+html[data-lg-theme="light"] .client-card,
+html[data-lg-theme="light"] .media-card {
+  background: linear-gradient(170deg, rgba(255,255,255,0.72), rgba(250,250,252,0.58)) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.95),
+    inset 0 -1px 1px rgba(255,255,255,0.40),
+    0 10px 36px rgba(31,38,135,0.10) !important;
+}
+html[data-lg-theme="light"] .modal-content {
+  background: linear-gradient(165deg, rgba(255,255,255,0.80), rgba(248,248,250,0.86)) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+}
+html[data-lg-theme="light"] .dropdown-menu,
+html[data-lg-theme="light"] .crm-notifications-panel,
+html[data-lg-theme="light"] .offcanvas,
+html[data-lg-theme="light"] .select2-dropdown {
+  background: rgba(255,255,255,0.78) !important;
+  border: 1px solid rgba(0,0,0,0.10) !important;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.90), 0 16px 48px rgba(31,38,135,0.16) !important;
+}
+html[data-lg-theme="light"] .card-header { background: rgba(0,0,0,0.025) !important; border-bottom: 1px solid rgba(0,0,0,0.08) !important; }
+html[data-lg-theme="light"] .card-footer { background: rgba(0,0,0,0.02) !important; border-top: 1px solid rgba(0,0,0,0.06) !important; }
+
+/* tabulky — tmavý text, bílé řádky */
+html[data-lg-theme="light"] .table { --bs-table-color: #1d1d1f; }
+html[data-lg-theme="light"] .table thead th {
+  background: rgba(255,255,255,0.85) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.12) !important;
+  color: rgba(0,0,0,0.55) !important;
+}
+html[data-lg-theme="light"] .table tbody tr { background: rgba(255,255,255,0.55); }
+html[data-lg-theme="light"] .table tbody tr:hover { background: rgba(10,132,255,0.08) !important; }
+html[data-lg-theme="light"] .table td,
+html[data-lg-theme="light"] .table th { color: #1d1d1f !important; }
+
+/* texty a utility */
+html[data-lg-theme="light"] .text-white { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .text-white-50 { color: rgba(0,0,0,0.50) !important; }
+html[data-lg-theme="light"] .text-white-75 { color: rgba(0,0,0,0.65) !important; }
+html[data-lg-theme="light"] .crm-v2-topbar .navbar-brand,
+html[data-lg-theme="light"] .crm-v2-user-name,
+html[data-lg-theme="light"] .sidebar-brand-kicker { color: #1d1d1f !important; }
+html[data-lg-theme="light"] #sidebar .nav-link,
+html[data-lg-theme="light"] #sidebar .nav-link > span,
+html[data-lg-theme="light"] .crm-v2-nav .nav-link { color: rgba(0,0,0,0.72) !important; }
+html[data-lg-theme="light"] #sidebar .nav-link i,
+html[data-lg-theme="light"] #sidebar .nav-link .fas,
+html[data-lg-theme="light"] #sidebar .nav-link .far,
+html[data-lg-theme="light"] #sidebar .nav-link .fab { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] #sidebar .nav-link:hover,
+html[data-lg-theme="light"] #sidebar .nav-link:hover > span,
+html[data-lg-theme="light"] .crm-v2-nav .nav-link:hover { color: #000 !important; }
+html[data-lg-theme="light"] #sidebar .nav-link:hover i,
+html[data-lg-theme="light"] #sidebar .nav-link:hover .fas,
+html[data-lg-theme="light"] #sidebar .nav-link:hover .far { color: #0A84FF !important; }
+html[data-lg-theme="light"] #sidebar .nav-link.active,
+html[data-lg-theme="light"] #sidebar .nav-link.active > span,
+html[data-lg-theme="light"] .crm-v2-nav .nav-link.active { color: #0055CC !important; }
+html[data-lg-theme="light"] #sidebar .nav-link.active i,
+html[data-lg-theme="light"] #sidebar .nav-link.active .fas,
+html[data-lg-theme="light"] #sidebar .nav-link.active .far { color: #0A84FF !important; }
+html[data-lg-theme="light"] #sidebar .crm-nav-group-title,
+html[data-lg-theme="light"] .crm-nav-group-title { color: rgba(0,0,0,0.45) !important; }
+html[data-lg-theme="light"] #sidebar .crm-v2-user-name { color: #1d1d1f !important; }
+html[data-lg-theme="light"] #sidebar .crm-v2-user-role { color: rgba(0,0,0,0.50) !important; }
+html[data-lg-theme="light"] #sidebar .sidebar-brand-kicker { color: rgba(0,0,0,0.45) !important; }
+html[data-lg-theme="light"] #sidebar .sidebar-logo,
+html[data-lg-theme="light"] .sidebar-brand .sidebar-logo,
+html[data-lg-theme="light"] .sidebar-logo {
+  filter: none !important;   /* originál loga je černý; v2 ho invertuje na bílé */
+}
+html[data-lg-theme="light"] .btn-close {
+  filter: none !important;   /* v2 invertuje na bílé — na světlé musí zůstat tmavý */
+}
+html[data-lg-theme="light"] .login-hero-logo,
+html[data-lg-theme="light"] .client-topbar-brand img {
+  filter: brightness(0.12) saturate(0);
+}
+html[data-lg-theme="light"] #sidebar .crm-nav-pill {
+  background: rgba(10,132,255,0.15) !important;
+  color: #0055CC !important;
+}
+html[data-lg-theme="light"] .crm-v2-user-role { color: rgba(0,0,0,0.50) !important; }
+
+/* formuláře */
+html[data-lg-theme="light"] .form-control,
+html[data-lg-theme="light"] .form-select,
+html[data-lg-theme="light"] .input-group-text,
+html[data-lg-theme="light"] .select2-container--default .select2-selection--single {
+  background: rgba(0,0,0,0.035) !important;
+  border: 1px solid rgba(0,0,0,0.12) !important;
+  color: #1d1d1f !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+html[data-lg-theme="light"] .form-control::placeholder { color: rgba(0,0,0,0.38); }
+html[data-lg-theme="light"] .form-control:focus,
+html[data-lg-theme="light"] .form-select:focus {
+  background: rgba(255,255,255,0.90) !important;
+  border-color: rgba(10,132,255,0.65) !important;
+}
+
+/* tlačítka (primary zůstává modré v obou režimech) */
+html[data-lg-theme="light"] .btn-outline-secondary,
+html[data-lg-theme="light"] .btn-outline-primary,
+html[data-lg-theme="light"] .btn-outline-light,
+html[data-lg-theme="light"] .crm-v2-icon-btn {
+  background: rgba(255,255,255,0.55) !important;
+  border: 1px solid rgba(0,0,0,0.14) !important;
+  color: #1d1d1f !important;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.80);
+}
+html[data-lg-theme="light"] .btn-outline-secondary:hover,
+html[data-lg-theme="light"] .btn-outline-primary:hover,
+html[data-lg-theme="light"] .btn-outline-light:hover,
+html[data-lg-theme="light"] .crm-v2-icon-btn:hover {
+  background: rgba(255,255,255,0.85) !important;
+  border-color: rgba(0,0,0,0.22) !important;
+}
+
+/* login stránka */
+html[data-lg-theme="light"] .login-headline,
+html[data-lg-theme="light"] .login-copy,
+html[data-lg-theme="light"] .login-note,
+html[data-lg-theme="light"] .login-section-note,
+html[data-lg-theme="light"] .login-point { color: #1d1d1f !important; }
+
+
+/* light: kontrast badge čipů a aktivních položek */
+html[data-lg-theme="light"] .badge.bg-primary,
+html[data-lg-theme="light"] .badge.bg-info {
+  background: rgba(10,132,255,0.15) !important;
+  color: #0055CC !important;
+}
+html[data-lg-theme="light"] .badge.bg-warning {
+  background: rgba(255,149,0,0.18) !important;
+  color: #B25000 !important;
+}
+html[data-lg-theme="light"] .badge.bg-success {
+  background: rgba(52,199,89,0.18) !important;
+  color: #1E7E38 !important;
+}
+html[data-lg-theme="light"] .badge.bg-danger {
+  background: rgba(255,55,95,0.15) !important;
+  color: #C41E45 !important;
+}
+html[data-lg-theme="light"] .badge.bg-secondary {
+  background: rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.65) !important;
+}
+html[data-lg-theme="light"] .dropdown-item { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .dropdown-item.active,
+html[data-lg-theme="light"] .dropdown-item:active {
+  background: rgba(10,132,255,0.92) !important;
+  color: #fff !important;
+}
+html[data-lg-theme="light"] .dropdown-item:hover { background: rgba(10,132,255,0.10) !important; }
+
+
+/* light: Bootstrap dark utility třídy používané ve stránkách */
+html[data-lg-theme="light"] .bg-dark,
+html[data-lg-theme="light"] .bg-black {
+  background: rgba(255,255,255,0.72) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .border-secondary { border-color: rgba(0,0,0,0.12) !important; }
+html[data-lg-theme="light"] .table-dark {
+  --bs-table-bg: rgba(255,255,255,0.72);
+  --bs-table-color: #1d1d1f;
+  --bs-table-border-color: rgba(0,0,0,0.10);
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .table-dark th,
+html[data-lg-theme="light"] .table-dark td { color: #1d1d1f !important; }
+
+/* light: LOGIN stránka (login.css je psané dark-only) */
+html[data-lg-theme="light"] .login-page,
+html[data-lg-theme="light"] .login-scene {
+  background: transparent !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .login-hero::before { opacity: 0.35; }
+html[data-lg-theme="light"] .login-quip,
+html[data-lg-theme="light"] .login-panel-kicker,
+html[data-lg-theme="light"] .login-form .form-label { color: rgba(0,0,0,0.60) !important; }
+html[data-lg-theme="light"] .login-panel-head h2 { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .login-point {
+  background: rgba(255,255,255,0.55) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.72) !important;
+}
+html[data-lg-theme="light"] .login-point-icon { color: #0A84FF !important; }
+html[data-lg-theme="light"] .login-form .form-control {
+  background: rgba(0,0,0,0.035) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .login-form .form-control::placeholder { color: rgba(0,0,0,0.38) !important; }
+html[data-lg-theme="light"] .login-form .form-control:focus { background: rgba(255,255,255,0.92) !important; }
+html[data-lg-theme="light"] .login-lang-switcher .btn-outline-light {
+  color: #1d1d1f !important;
+  border-color: rgba(0,0,0,0.20) !important;
+}
+html[data-lg-theme="light"] .login-lang-switcher .btn-light { background: #1d1d1f !important; color: #fff !important; }
+
+/* light: KLIENTSKÝ PORTÁL (inline styly v dashboard.php jsou dark-only) */
+html[data-lg-theme="light"] .client-shell { color: #1d1d1f; }
+html[data-lg-theme="light"] .client-meta { color: rgba(0,0,0,0.62) !important; }
+html[data-lg-theme="light"] .client-chip {
+  background: rgba(255,255,255,0.60) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .client-hero h1 { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .client-hero p { color: rgba(0,0,0,0.60) !important; }
+html[data-lg-theme="light"] .stat-box {
+  background: rgba(255,255,255,0.62) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+html[data-lg-theme="light"] .stat-box .label { color: rgba(0,0,0,0.50) !important; }
+html[data-lg-theme="light"] .stat-box .value { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .repair-item {
+  background: rgba(255,255,255,0.62) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.78) !important;
+}
+html[data-lg-theme="light"] .repair-item:hover { background: rgba(10,132,255,0.08) !important; }
+html[data-lg-theme="light"] .repair-item.active {
+  background: rgba(10,132,255,0.10) !important;
+  border-color: rgba(10,132,255,0.35) !important;
+}
+html[data-lg-theme="light"] .repair-item .title { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .repair-item .sub { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] .detail-row .label { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] .detail-row .value { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .order-notice {
+  background: rgba(52,199,89,0.14) !important;
+  border-color: rgba(52,199,89,0.30) !important;
+  color: #1E7E38 !important;
+}
+html[data-lg-theme="light"] .empty-state { color: rgba(0,0,0,0.50) !important; }
+html[data-lg-theme="light"] .media-section-title h4 { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .media-section-title p { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] .media-card-caption { color: rgba(0,0,0,0.65) !important; }
+/* status badge čipy v portálu — tmavší text na světlých čipech */
+html[data-lg-theme="light"] .status-badge-large.primary { color: #0055CC !important; background: rgba(13,110,253,0.12) !important; }
+html[data-lg-theme="light"] .status-badge-large.info { color: #087A99 !important; background: rgba(13,202,240,0.14) !important; }
+html[data-lg-theme="light"] .status-badge-large.warning { color: #8A6100 !important; background: rgba(255,193,7,0.18) !important; }
+html[data-lg-theme="light"] .status-badge-large.secondary { color: rgba(0,0,0,0.60) !important; background: rgba(0,0,0,0.07) !important; border-color: rgba(0,0,0,0.10) !important; }
+html[data-lg-theme="light"] .status-badge-large.success { color: #1E7E38 !important; background: rgba(25,135,84,0.14) !important; }
+html[data-lg-theme="light"] .status-badge-large.danger { color: #C41E45 !important; background: rgba(220,53,69,0.12) !important; }
+html[data-lg-theme="light"] .status-badge-large.dark { color: #1d1d1f !important; background: rgba(0,0,0,0.08) !important; border-color: rgba(0,0,0,0.12) !important; }
+html[data-lg-theme="light"] .status-badge-large.light { color: #1d1d1f !important; background: rgba(0,0,0,0.05) !important; border-color: rgba(0,0,0,0.10) !important; }
+
+
+/* light: komponenty s natvrdo bílým textem / tmavým podkladem */
+/* dashboard stat čísla (v2 hotfix je nutí na bílou) */
+html[data-lg-theme="light"] .crm-stat-value { color: #1d1d1f !important; }
+/* fronta zakázek na dashboardu */
+html[data-lg-theme="light"] .crm-queue-device { color: rgba(0,0,0,0.55) !important; }
+/* UI zoom v topbaru */
+html[data-lg-theme="light"] .crm-ui-zoom-val { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .crm-ui-zoom-val:hover { background: rgba(0,0,0,0.05) !important; }
+/* icon buttony hover/active (v2 nutí bílou) */
+html[data-lg-theme="light"] .crm-v2-icon-btn:hover,
+html[data-lg-theme="light"] .crm-v2-icon-btn.active,
+html[data-lg-theme="light"] #notificationsToggle.active { color: #0A84FF !important; }
+/* zvýrazněné řádky tabulky (firma / priorita) — světlý tint + tmavý text */
+html[data-lg-theme="light"] .order-row--company > td,
+html[data-lg-theme="light"] .order-row--company td {
+  background: rgba(10,132,255,0.06) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .order-row--high > td,
+html[data-lg-theme="light"] .order-row--high td {
+  background: rgba(255,55,95,0.07) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .order-row--high a,
+html[data-lg-theme="light"] .order-row--high small,
+html[data-lg-theme="light"] .order-row--company .badge { color: #1d1d1f !important; }
+/* QR popover */
+html[data-lg-theme="light"] .qr-popover {
+  background: rgba(255,255,255,0.90) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .qr-popover .qr-phone-label { color: rgba(0,0,0,0.55) !important; }
+/* select2 — texty */
+html[data-lg-theme="light"] .select2-container--default .select2-selection__rendered,
+html[data-lg-theme="light"] .select2-container--default .select2-results__option,
+html[data-lg-theme="light"] .select2-container--default .select2-search--dropdown .select2-search__field {
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .select2-container--default .select2-search--dropdown .select2-search__field {
+  background: rgba(0,0,0,0.035) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+html[data-lg-theme="light"] .select2-container--default .select2-selection--multiple .select2-selection__choice {
+  background: rgba(10,132,255,0.12) !important;
+  color: #0055CC !important;
+  border-color: rgba(10,132,255,0.25) !important;
+}
+html[data-lg-theme="light"] .customer-option .meta { color: rgba(0,0,0,0.55) !important; }
+/* nav-tabs + paginace */
+html[data-lg-theme="light"] .nav-tabs .nav-link { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] .nav-tabs .nav-link.active { color: #0055CC !important; }
+html[data-lg-theme="light"] .pagination .page-link { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .pagination .page-item.active .page-link { color: #fff !important; }
+/* dropdown hover (v2 nutí bílou na světlém hoveru) */
+html[data-lg-theme="light"] .dropdown-item:hover,
+html[data-lg-theme="light"] .dropdown-item:focus { color: #1d1d1f !important; }
+/* nativní select options (edit_order nutí tmavé) */
+html[data-lg-theme="light"] .edit-order-form select option,
+html[data-lg-theme="light"] select option {
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+}
+/* wizard nové zakázky */
+html[data-lg-theme="light"] .crm-wizard-step .collapse,
+html[data-lg-theme="light"] .crm-wizard-step .collapsing {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+html[data-lg-theme="light"] .crm-wizard-step .mb-2 > .d-flex > i { color: #0A84FF !important; }
+/* kbd hint (⌘K) */
+html[data-lg-theme="light"] .crm-kbd-hint { background: rgba(0,0,0,0.05) !important; }
+
+
+/* light: odkazy — cyan/fialová z v2 je na bílé nečitelná */
+html[data-lg-theme="light"] a:not(.btn):not(.nav-link):not(.dropdown-item):not(.page-link):not(.badge) {
+  color: #0A66CC !important;
+}
+html[data-lg-theme="light"] a:not(.btn):not(.nav-link):not(.dropdown-item):not(.page-link):not(.badge):hover {
+  color: #004999 !important;
+}
+/* light: alerty — v2 jim nechává tmavorežimové světlé texty */
+html[data-lg-theme="light"] .alert-primary   { background: #E8F0FE !important; color: #0A3D80 !important; border-color: rgba(10,102,204,0.25) !important; }
+html[data-lg-theme="light"] .alert-info      { background: #E5F6FA !important; color: #086A85 !important; border-color: rgba(6,182,212,0.30) !important; }
+html[data-lg-theme="light"] .alert-success   { background: #E7F7EC !important; color: #1E7E38 !important; border-color: rgba(52,199,89,0.30) !important; }
+html[data-lg-theme="light"] .alert-warning   { background: #FBF4DC !important; color: #8A5A00 !important; border-color: rgba(234,179,8,0.35) !important; }
+html[data-lg-theme="light"] .alert-danger    { background: #FDEBEB !important; color: #A31432 !important; border-color: rgba(239,68,68,0.30) !important; }
+html[data-lg-theme="light"] .alert .alert-link { color: inherit !important; text-decoration: underline; }
+/* light: notifikační panel — texty natvrdo přes .text-white v itemech */
+html[data-lg-theme="light"] .crm-notifications-item .text-white,
+html[data-lg-theme="light"] .crm-notifications-panel .text-white { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .crm-notifications-item .text-white-75,
+html[data-lg-theme="light"] .crm-notifications-panel .text-white-75 { color: rgba(0,0,0,0.60) !important; }
+
+/* sheen decentnější na světlé */
+html[data-lg-theme="light"] .lg-sheen::after {
+  background: radial-gradient(
+    380px circle at var(--lg-mx) var(--lg-my),
+    rgba(255,255,255,0.55),
+    rgba(255,255,255,0.15) 42%,
+    transparent 68%
+  );
+}
+
+/* Tisk: žádné sklo, žádné pozadí */
+@media print {
+  html, body { background: #fff !important; }
+  * {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+}
