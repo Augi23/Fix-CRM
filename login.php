@@ -332,14 +332,42 @@ if (!empty($_POST['ajax'])) {
     </div>
 </div>
 
-<div id="greetOverlay" style="display:none; position:fixed; inset:0; z-index:99999; backdrop-filter: blur(14px) saturate(160%); -webkit-backdrop-filter: blur(14px) saturate(160%); background: rgba(10,10,14,0.55); align-items:center; justify-content:center;">
-    <div style="text-align:center; color:#fff;">
-        <div id="greetWave" style="font-size:64px; animation: greetPulse 1.1s ease-in-out infinite;">👋</div>
-        <div id="greetName" style="font-size:30px; font-weight:700; margin-top:12px;"></div>
-        <div style="font-size:14px; opacity:.65; margin-top:8px;"><?php echo e(__('login_greeting_entering')); ?></div>
+<div id="greetOverlay" style="display:none; position:fixed; inset:0; z-index:99999; backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%); background: rgba(8,8,12,0.55); align-items:center; justify-content:center;">
+    <div class="apple-spinner" role="status" aria-label="Přihlašování">
+        <div style="transform: rotate(0deg) translate(0, -26px); animation-delay: -1.0000s;"></div>
+        <div style="transform: rotate(30deg) translate(0, -26px); animation-delay: -0.9167s;"></div>
+        <div style="transform: rotate(60deg) translate(0, -26px); animation-delay: -0.8333s;"></div>
+        <div style="transform: rotate(90deg) translate(0, -26px); animation-delay: -0.7500s;"></div>
+        <div style="transform: rotate(120deg) translate(0, -26px); animation-delay: -0.6667s;"></div>
+        <div style="transform: rotate(150deg) translate(0, -26px); animation-delay: -0.5833s;"></div>
+        <div style="transform: rotate(180deg) translate(0, -26px); animation-delay: -0.5000s;"></div>
+        <div style="transform: rotate(210deg) translate(0, -26px); animation-delay: -0.4167s;"></div>
+        <div style="transform: rotate(240deg) translate(0, -26px); animation-delay: -0.3333s;"></div>
+        <div style="transform: rotate(270deg) translate(0, -26px); animation-delay: -0.2500s;"></div>
+        <div style="transform: rotate(300deg) translate(0, -26px); animation-delay: -0.1667s;"></div>
+        <div style="transform: rotate(330deg) translate(0, -26px); animation-delay: -0.0833s;"></div>
     </div>
 </div>
-<style>@keyframes greetPulse { 0%,100% { transform: scale(1) rotate(-8deg); } 50% { transform: scale(1.15) rotate(10deg); } }</style>
+<style>
+.apple-spinner { position: relative; width: 72px; height: 72px; }
+.apple-spinner div {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 6px; height: 18px;
+    margin: -9px 0 0 -3px;
+    border-radius: 3px;
+    background: #fff;
+    opacity: 0.25;
+    animation: appleSpinnerFade 1s linear infinite;
+}
+@keyframes appleSpinnerFade {
+    0% { opacity: 1; }
+    100% { opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .apple-spinner div { animation: none; opacity: 0.7; }
+}
+</style>
 <script>
 (function () {
     var form = document.querySelector('.login-form');
@@ -368,7 +396,6 @@ if (!empty($_POST['ajax'])) {
                 var go = function () { window.location.href = d.redirect; };
                 if (d.greeting) {
                     var ov = document.getElementById('greetOverlay');
-                    document.getElementById('greetName').textContent = d.name || '';
                     ov.style.display = 'flex';
                     var done = false;
                     var finish = function () { if (!done) { done = true; go(); } };
