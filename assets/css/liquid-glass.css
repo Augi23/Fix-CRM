@@ -214,6 +214,65 @@ nav.navbar.crm-v2-topbar,
 }
 
 /* ------------------------------------------------------------
+   STAVOVÉ ŘÁDKY — celý řádek nese barvu stavu (ne jen badge).
+   Musí být PO resetu .table pozadí (jinak by ho reset přebil).
+   Barvy = paleta status pillů (v2), vlevo barevný proužek.
+   ------------------------------------------------------------ */
+/* tmavý režim */
+.order-row--status-new         > td { background: rgba(59,130,246,0.16)  !important; }
+.order-row--status-pending     > td { background: rgba(249,115,22,0.16)  !important; }
+.order-row--status-progress    > td { background: rgba(139,92,246,0.16)  !important; }
+.order-row--status-waiting     > td { background: rgba(239,68,68,0.18)   !important; }
+.order-row--status-completed   > td { background: rgba(6,182,212,0.16)   !important; }
+.order-row--status-uncollected > td { background: rgba(234,179,8,0.16)   !important; }
+.order-row--status-collected   > td { background: rgba(34,197,94,0.18)   !important; }
+.order-row--status-cancelled   > td { background: rgba(156,163,175,0.14) !important; }
+.order-row--status-default     > td { background: rgba(148,163,184,0.12) !important; }
+/* hover = o stupeň sytější, ať klikatelnost zůstane čitelná */
+.order-row--status-new:hover         > td { background: rgba(59,130,246,0.26)  !important; }
+.order-row--status-pending:hover     > td { background: rgba(249,115,22,0.26)  !important; }
+.order-row--status-progress:hover    > td { background: rgba(139,92,246,0.26)  !important; }
+.order-row--status-waiting:hover     > td { background: rgba(239,68,68,0.28)   !important; }
+.order-row--status-completed:hover   > td { background: rgba(6,182,212,0.26)   !important; }
+.order-row--status-uncollected:hover > td { background: rgba(234,179,8,0.26)   !important; }
+.order-row--status-collected:hover   > td { background: rgba(34,197,94,0.28)   !important; }
+.order-row--status-cancelled:hover   > td { background: rgba(156,163,175,0.24) !important; }
+.order-row--status-default:hover     > td { background: rgba(148,163,184,0.22) !important; }
+
+/* světlý režim — jemnější tint, tmavý text zůstává */
+html[data-lg-theme="light"] .order-row--status-new         > td { background: #E8F0FE !important; }
+html[data-lg-theme="light"] .order-row--status-pending     > td { background: #FEEFE3 !important; }
+html[data-lg-theme="light"] .order-row--status-progress    > td { background: #F0EBFE !important; }
+html[data-lg-theme="light"] .order-row--status-waiting     > td { background: #FDEBEB !important; }
+html[data-lg-theme="light"] .order-row--status-completed   > td { background: #E5F6FA !important; }
+html[data-lg-theme="light"] .order-row--status-uncollected > td { background: #FBF4DC !important; }
+html[data-lg-theme="light"] .order-row--status-collected   > td { background: #E7F7EC !important; }
+html[data-lg-theme="light"] .order-row--status-cancelled   > td { background: #F0F1F3 !important; }
+html[data-lg-theme="light"] .order-row--status-default     > td { background: #F1F3F6 !important; }
+html[data-lg-theme="light"] .order-row--status-new:hover         > td { background: #D7E5FD !important; }
+html[data-lg-theme="light"] .order-row--status-pending:hover     > td { background: #FDE1CB !important; }
+html[data-lg-theme="light"] .order-row--status-progress:hover    > td { background: #E3D9FD !important; }
+html[data-lg-theme="light"] .order-row--status-waiting:hover     > td { background: #FBD9D9 !important; }
+html[data-lg-theme="light"] .order-row--status-completed:hover   > td { background: #D0EEF6 !important; }
+html[data-lg-theme="light"] .order-row--status-uncollected:hover > td { background: #F7EBBE !important; }
+html[data-lg-theme="light"] .order-row--status-collected:hover   > td { background: #D2F0DC !important; }
+html[data-lg-theme="light"] .order-row--status-cancelled:hover   > td { background: #E3E5E9 !important; }
+html[data-lg-theme="light"] .order-row--status-default:hover     > td { background: #E4E8ED !important; }
+
+/* Bootstrap kontextové řádky (reklamace.php: table-primary/-warning/...) */
+.table > tbody > tr.table-primary > td { background: rgba(59,130,246,0.16) !important; }
+.table > tbody > tr.table-warning > td { background: rgba(249,115,22,0.16) !important; }
+.table > tbody > tr.table-info    > td { background: rgba(6,182,212,0.16)  !important; }
+.table > tbody > tr.table-success > td { background: rgba(34,197,94,0.18)  !important; }
+.table > tbody > tr.table-danger  > td { background: rgba(239,68,68,0.18)  !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-primary > td { background: #E8F0FE !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-warning > td { background: #FEEFE3 !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-info    > td { background: #E5F6FA !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-success > td { background: #E7F7EC !important; }
+html[data-lg-theme="light"] .table > tbody > tr.table-danger  > td { background: #FDEBEB !important; }
+
+
+/* ------------------------------------------------------------
    TLAČÍTKA — primární akce jako malé čočky
    ------------------------------------------------------------ */
 .btn-primary,
