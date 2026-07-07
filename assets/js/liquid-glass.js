@@ -7,6 +7,40 @@
 (function () {
   'use strict';
 
+  /* ---------- Přepínač světlý/tmavý režim ---------- */
+  var THEME_KEY = 'lg-theme';
+
+  function currentTheme() {
+    try { return localStorage.getItem(THEME_KEY) || 'dark'; } catch (e) { return 'dark'; }
+  }
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-lg-theme', t);
+    document.documentElement.setAttribute('data-bs-theme', t);
+    var icons = document.querySelectorAll('.lg-theme-toggle i');
+    for (var i = 0; i < icons.length; i++) {
+      icons[i].className = (t === 'light') ? 'fas fa-moon' : 'fas fa-sun';
+    }
+  }
+
+  function initTheme() {
+    applyTheme(currentTheme());
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('.lg-theme-toggle') : null;
+      if (!btn) return;
+      var next = currentTheme() === 'light' ? 'dark' : 'light';
+      try { localStorage.setItem(THEME_KEY, next); } catch (err) {}
+      applyTheme(next);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTheme);
+  } else {
+    initTheme();
+  }
+
+  /* ---------- Reaktivní odlesky ---------- */
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     return;
   }

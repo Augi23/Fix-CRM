@@ -349,6 +349,200 @@ nav.navbar.crm-v2-topbar,
   .btn-primary:hover, .crm-v2-cta-new-order:hover { transform: none; }
 }
 
+
+/* ============================================================
+   LIGHT MODE — Apple silver (přepínač lg-theme-toggle)
+   Aktivace: <html data-lg-theme="light"> (+ data-bs-theme="light")
+   ============================================================ */
+html[data-lg-theme="light"] {
+  /* v2 tokeny -> světlé */
+  --bg: #f5f5f7;
+  --s1: #ffffff; --s2: #f5f5f7; --s3: #e8e8ed; --s4: #d2d2d7;
+  --b1: rgba(0,0,0,0.06); --b2: rgba(0,0,0,0.10); --b3: rgba(0,0,0,0.16);
+  --fg1: #1d1d1f; --fg2: rgba(0,0,0,0.56); --fg3: rgba(0,0,0,0.30);
+  --card-bg: rgba(255,255,255,0.95);
+  --glow: 0 0 24px rgba(10,132,255,0.18); --glow-sm: 0 0 12px rgba(10,132,255,0.12);
+  /* lg tokeny -> světlé sklo */
+  --lg-veil: rgba(255,255,255,0.45);
+  --lg-veil-strong: rgba(255,255,255,0.62);
+  --lg-edge: rgba(0,0,0,0.10);
+  --lg-spec-top: rgba(255,255,255,0.95);
+  --lg-spec-bot: rgba(255,255,255,0.55);
+  --lg-shadow: 0 12px 40px rgba(31,38,135,0.14);
+}
+
+html[data-lg-theme="light"],
+html[data-lg-theme="light"] body {
+  background:
+    radial-gradient(900px 600px at 12% -8%,  rgba(10, 132, 255, 0.10) 0%, transparent 55%),
+    radial-gradient(800px 620px at 105% 12%, rgba(100, 210, 255, 0.09) 0%, transparent 55%),
+    radial-gradient(700px 700px at 55% 115%, rgba(0, 113, 227, 0.07) 0%, transparent 60%),
+    #f5f5f7 !important;
+  background-attachment: fixed, fixed, fixed, fixed !important;
+  color: #1d1d1f !important;
+}
+
+/* chrome povrchy — bílé sklo */
+html[data-lg-theme="light"] #sidebar.crm-v2-sidebar,
+html[data-lg-theme="light"] .crm-v2-sidebar,
+html[data-lg-theme="light"] #sidebar {
+  background: linear-gradient(180deg, rgba(255,255,255,0.60), rgba(248,248,250,0.66)) !important;
+  border-right: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow:
+    inset -1px 0 0 rgba(255,255,255,0.60),
+    inset 0 1px 1px rgba(255,255,255,0.95),
+    8px 0 40px rgba(31,38,135,0.10);
+}
+html[data-lg-theme="light"] nav.navbar.crm-v2-topbar,
+html[data-lg-theme="light"] .crm-v2-topbar,
+html[data-lg-theme="light"] .crm-topbar,
+html[data-lg-theme="light"] .client-topbar {
+  background: rgba(255,255,255,0.55) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.95),
+    0 8px 32px rgba(31,38,135,0.08);
+}
+
+/* karty a plovoucí vrstvy */
+html[data-lg-theme="light"] .card,
+html[data-lg-theme="light"] .glass-card,
+html[data-lg-theme="light"] .glass-panel,
+html[data-lg-theme="light"] .crm-queue-card,
+html[data-lg-theme="light"] .crm-revenue-card,
+html[data-lg-theme="light"] .login-panel,
+html[data-lg-theme="light"] .client-card,
+html[data-lg-theme="light"] .media-card {
+  background: linear-gradient(170deg, rgba(255,255,255,0.72), rgba(250,250,252,0.58)) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.95),
+    inset 0 -1px 1px rgba(255,255,255,0.40),
+    0 10px 36px rgba(31,38,135,0.10) !important;
+}
+html[data-lg-theme="light"] .modal-content {
+  background: linear-gradient(165deg, rgba(255,255,255,0.80), rgba(248,248,250,0.86)) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+}
+html[data-lg-theme="light"] .dropdown-menu,
+html[data-lg-theme="light"] .crm-notifications-panel,
+html[data-lg-theme="light"] .offcanvas,
+html[data-lg-theme="light"] .select2-dropdown {
+  background: rgba(255,255,255,0.78) !important;
+  border: 1px solid rgba(0,0,0,0.10) !important;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.90), 0 16px 48px rgba(31,38,135,0.16) !important;
+}
+html[data-lg-theme="light"] .card-header { background: rgba(0,0,0,0.025) !important; border-bottom: 1px solid rgba(0,0,0,0.08) !important; }
+html[data-lg-theme="light"] .card-footer { background: rgba(0,0,0,0.02) !important; border-top: 1px solid rgba(0,0,0,0.06) !important; }
+
+/* tabulky — tmavý text, bílé řádky */
+html[data-lg-theme="light"] .table { --bs-table-color: #1d1d1f; }
+html[data-lg-theme="light"] .table thead th {
+  background: rgba(255,255,255,0.85) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.12) !important;
+  color: rgba(0,0,0,0.55) !important;
+}
+html[data-lg-theme="light"] .table tbody tr { background: rgba(255,255,255,0.55); }
+html[data-lg-theme="light"] .table tbody tr:hover { background: rgba(10,132,255,0.08) !important; }
+html[data-lg-theme="light"] .table td,
+html[data-lg-theme="light"] .table th { color: #1d1d1f !important; }
+
+/* texty a utility */
+html[data-lg-theme="light"] .text-white { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .text-white-50 { color: rgba(0,0,0,0.50) !important; }
+html[data-lg-theme="light"] .text-white-75 { color: rgba(0,0,0,0.65) !important; }
+html[data-lg-theme="light"] .crm-v2-topbar .navbar-brand,
+html[data-lg-theme="light"] .crm-v2-user-name,
+html[data-lg-theme="light"] .sidebar-brand-kicker { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .crm-v2-nav .nav-link { color: rgba(0,0,0,0.72) !important; }
+html[data-lg-theme="light"] .crm-v2-nav .nav-link:hover { color: #000 !important; }
+html[data-lg-theme="light"] .crm-v2-nav .nav-link.active { color: #0055CC !important; }
+html[data-lg-theme="light"] .crm-nav-group-title { color: rgba(0,0,0,0.40) !important; }
+html[data-lg-theme="light"] .crm-v2-user-role { color: rgba(0,0,0,0.50) !important; }
+
+/* formuláře */
+html[data-lg-theme="light"] .form-control,
+html[data-lg-theme="light"] .form-select,
+html[data-lg-theme="light"] .input-group-text,
+html[data-lg-theme="light"] .select2-container--default .select2-selection--single {
+  background: rgba(0,0,0,0.035) !important;
+  border: 1px solid rgba(0,0,0,0.12) !important;
+  color: #1d1d1f !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+html[data-lg-theme="light"] .form-control::placeholder { color: rgba(0,0,0,0.38); }
+html[data-lg-theme="light"] .form-control:focus,
+html[data-lg-theme="light"] .form-select:focus {
+  background: rgba(255,255,255,0.90) !important;
+  border-color: rgba(10,132,255,0.65) !important;
+}
+
+/* tlačítka (primary zůstává modré v obou režimech) */
+html[data-lg-theme="light"] .btn-outline-secondary,
+html[data-lg-theme="light"] .btn-outline-primary,
+html[data-lg-theme="light"] .btn-outline-light,
+html[data-lg-theme="light"] .crm-v2-icon-btn {
+  background: rgba(255,255,255,0.55) !important;
+  border: 1px solid rgba(0,0,0,0.14) !important;
+  color: #1d1d1f !important;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.80);
+}
+html[data-lg-theme="light"] .btn-outline-secondary:hover,
+html[data-lg-theme="light"] .btn-outline-primary:hover,
+html[data-lg-theme="light"] .btn-outline-light:hover,
+html[data-lg-theme="light"] .crm-v2-icon-btn:hover {
+  background: rgba(255,255,255,0.85) !important;
+  border-color: rgba(0,0,0,0.22) !important;
+}
+
+/* login stránka */
+html[data-lg-theme="light"] .login-headline,
+html[data-lg-theme="light"] .login-copy,
+html[data-lg-theme="light"] .login-note,
+html[data-lg-theme="light"] .login-section-note,
+html[data-lg-theme="light"] .login-point { color: #1d1d1f !important; }
+
+
+/* light: kontrast badge čipů a aktivních položek */
+html[data-lg-theme="light"] .badge.bg-primary,
+html[data-lg-theme="light"] .badge.bg-info {
+  background: rgba(10,132,255,0.15) !important;
+  color: #0055CC !important;
+}
+html[data-lg-theme="light"] .badge.bg-warning {
+  background: rgba(255,149,0,0.18) !important;
+  color: #B25000 !important;
+}
+html[data-lg-theme="light"] .badge.bg-success {
+  background: rgba(52,199,89,0.18) !important;
+  color: #1E7E38 !important;
+}
+html[data-lg-theme="light"] .badge.bg-danger {
+  background: rgba(255,55,95,0.15) !important;
+  color: #C41E45 !important;
+}
+html[data-lg-theme="light"] .badge.bg-secondary {
+  background: rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.65) !important;
+}
+html[data-lg-theme="light"] .dropdown-item { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .dropdown-item.active,
+html[data-lg-theme="light"] .dropdown-item:active {
+  background: rgba(10,132,255,0.92) !important;
+  color: #fff !important;
+}
+html[data-lg-theme="light"] .dropdown-item:hover { background: rgba(10,132,255,0.10) !important; }
+
+/* sheen decentnější na světlé */
+html[data-lg-theme="light"] .lg-sheen::after {
+  background: radial-gradient(
+    380px circle at var(--lg-mx) var(--lg-my),
+    rgba(255,255,255,0.55),
+    rgba(255,255,255,0.15) 42%,
+    transparent 68%
+  );
+}
+
 /* Tisk: žádné sklo, žádné pozadí */
 @media print {
   html, body { background: #fff !important; }

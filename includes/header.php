@@ -96,6 +96,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo e(get_setting('company_name', 'Repair CRM')); ?> - <?php echo e(__('dashboard')); ?></title>
     <meta name="csrf-token" content="<?php echo e($_SESSION['csrf_token'] ?? ''); ?>">
+    <script>(function(){try{var t=localStorage.getItem('lg-theme')||'dark';document.documentElement.setAttribute('data-lg-theme',t);document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
 
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
@@ -236,6 +237,9 @@ try {
                 <button class="btn btn-sm crm-v2-icon-btn" type="button" id="notificationsToggle" aria-label="<?php echo e(__('notifications')); ?>">
                     <i class="fas fa-bell"></i>
                     <span class="crm-v2-alert-dot"></span>
+                </button>
+                <button class="btn btn-sm crm-v2-icon-btn lg-theme-toggle" type="button" title="Light / Dark" aria-label="Light / Dark">
+                    <i class="fas fa-sun"></i>
                 </button>
 
 
