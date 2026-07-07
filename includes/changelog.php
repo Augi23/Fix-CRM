@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-07',
+        'title' => 'Pravidlo pro import ze starého zakázkového listu',
+        'items' => [
+            'Budoucí importy převádí staré značky korektně na nový model: „černá růže" = stav Přijato + pobočka Praha 1 - Na Příkopě.',
+            'Původní hodnota se vždy uchová v poznámkách zakázky; import má vestavěný samotest převodů.',
+        ],
+    ],
+    [
+        'date' => '2026-07-07',
         'title' => 'Zrušen stav „Černá růže"',
         'items' => [
             'Historická značka zakázek druhé pobočky — dnes to řeší oddělené pobočky.',

@@ -234,6 +234,17 @@ function import_order_infer_brand(string $device): ?string
     return null;
 }
 
+/* ============================================================
+   PRAVIDLA PŘEVODU ZE STARÉHO SYSTÉMU „ZAKÁZKOVÝ LIST"
+   Staré značky se při importu VŽDY převádí na nový model CRM:
+   - stav  -> import_order_status_map()
+   - značka pobočky -> import_order_branch_code()
+   Konkrétně: „černá růže" NENÍ stav, ale historická značka zakázky
+   druhé pobočky (pasáž Černá růže) => stav 'Přijato' + pobočka
+   'prikope' (Praha 1 - Na Příkopě). Původní hodnota se vždy ukládá
+   do poznámek ("Původní stav: ..."), takže se nic neztrácí.
+   Při dalším rozšíření mapování doplnit i self-test níže!
+   ============================================================ */
 function import_order_status_map(string $sourceStatus): string
 {
     $key = import_order_name_key($sourceStatus);
@@ -252,10 +263,20 @@ function import_order_status_map(string $sourceStatus): string
         'vydano' => 'Vydáno',
         'vydano cr' => 'Vydáno - ČR',
         'stornovano' => 'Stornováno',
-        // Unknown legacy marker; conservative mapping keeps the order open.
+        // Historická značka 2. pobočky (viz PRAVIDLA výše) — stav Přijato, pobočku řeší import_order_branch_code().
         'cerna ruze' => 'Přijato',
     ];
     return $map[$key] ?? 'Přijato';
+}
+
+/** Značka pobočky ze starého zakázkového listu -> kód pobočky v novém systému (null = výchozí). */
+function import_order_branch_code(string $sourceStatus): ?string
+{
+    $key = import_order_name_key($sourceStatus);
+    $map = [
+        'cerna ruze' => 'prikope', // pasáž Černá růže = Praha 1 - Na Příkopě
+    ];
+    return $map[$key] ?? null;
 }
 
 function import_order_map_row(array $row, ?int $customerId = null): array
@@ -289,6 +310,7 @@ function import_order_map_row(array $row, ?int $customerId = null): array
         'status' => import_order_status_map($sourceStatus),
         'technician_id' => null,
         'work_duration_seconds' => 0,
+        '_branch_code' => import_order_branch_code($sourceStatus),
     ];
 }
 
@@ -561,15 +583,26 @@ function import_order_insert(PDO $pdo, array $resolved): int
 {
     $sql = 'INSERT INTO orders ('
         . 'customer_id, order_code, device_type, order_type, device_model, device_brand, serial_number, serial_number_2, appearance, pin_code, priority, '
-        . 'problem_description, technician_notes, estimated_cost, final_cost, extra_expenses, status, technician_id, work_duration_seconds'
+        . 'problem_description, technician_notes, estimated_cost, final_cost, extra_expenses, status, technician_id, work_duration_seconds, branch_id'
         . ') VALUES ('
         . ':customer_id, :order_code, :device_type, :order_type, :device_model, :device_brand, :serial_number, :serial_number_2, :appearance, :pin_code, :priority, '
-        . ':problem_description, :technician_notes, :estimated_cost, :final_cost, :extra_expenses, :status, :technician_id, :work_duration_seconds'
+        . ':problem_description, :technician_notes, :estimated_cost, :final_cost, :extra_expenses, :status, :technician_id, :work_duration_seconds, :branch_id'
         . ')';
+    // kódy poboček -> id (viz PRAVIDLA PŘEVODU u import_order_status_map)
+    $branchIds = [];
+    try {
+        foreach ($pdo->query('SELECT id, code FROM branches')->fetchAll() as $b) {
+            $branchIds[(string)$b['code']] = (int)$b['id'];
+        }
+    } catch (Throwable $e) { /* instalace bez poboček */ }
     $stmt = $pdo->prepare($sql);
     $count = 0;
     foreach ($resolved as $item) {
-        $stmt->execute($item['order']);
+        $order = $item['order'];
+        $branchCode = $order['_branch_code'] ?? null;
+        unset($order['_branch_code']);
+        $order['branch_id'] = ($branchCode !== null && isset($branchIds[$branchCode])) ? $branchIds[$branchCode] : null;
+        $stmt->execute($order);
         $count++;
     }
     return $count;
@@ -649,6 +682,19 @@ function import_order_self_test(): void
         $actual = import_order_status_map($source);
         if ($actual !== $expected) {
             throw new RuntimeException("Status self-test failed: {$source} expected {$expected}, got {$actual}");
+        }
+    }
+
+    $branchExpected = [
+        'černá růže' => 'prikope',
+        'cerna ruze' => 'prikope',
+        'Přijato' => null,
+        'Vydáno' => null,
+    ];
+    foreach ($branchExpected as $source => $expected) {
+        $actual = import_order_branch_code($source);
+        if ($actual !== $expected) {
+            throw new RuntimeException("Branch self-test failed: {$source} expected " . var_export($expected, true) . ", got " . var_export($actual, true));
         }
     }
 
