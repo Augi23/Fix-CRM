@@ -56,13 +56,14 @@ try {
 
     $stmt = $pdo->prepare(
         "INSERT INTO orders (customer_id, technician_id, branch_id, device_type, order_type, device_brand, device_model,
-         problem_description, technician_notes, serial_number, serial_number_2, pin_code, appearance, priority, estimated_cost, shipping_method, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+         problem_description, technician_notes, serial_number, serial_number_2, pin_code, appearance, priority, estimated_cost, shipping_method, status, order_code)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
+    $new_order_code = function_exists('generateNextOrderCode') ? generateNextOrderCode($pdo) : null;
     $stmt->execute([
         $customer_id, $technician_id, $branch_id, $device_type, $order_type, $device_brand, $device_model,
         $problem_description, $technician_notes, $serial_number, $serial_number_2,
-        $pin_code, $appearance, $priority, $estimated_cost, $shipping_method, $status
+        $pin_code, $appearance, $priority, $estimated_cost, $shipping_method, $status, $new_order_code
     ]);
     $order_id = (int)$pdo->lastInsertId();
 

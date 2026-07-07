@@ -240,7 +240,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
             <table class="table table-hover align-middle mb-0 orders-center-table">
                 <thead class="bg-transparent sticky-top" style="z-index: 10;">
                     <tr>
-                        <th class="ps-4">ID / <?php echo __('created'); ?></th>
+                        <th class="ps-4"><?php echo __('order_no'); ?> / <?php echo __('created'); ?></th>
                         <th><?php echo __('client'); ?></th>
                         <th><?php echo __('device_model'); ?></th>
                         <th><?php echo __('problem'); ?></th>
@@ -269,9 +269,6 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
                         <tr class="order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($order['status'])); ?>" data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
                             <td class="ps-4">
                                 <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none"><?php echo e(orderDisplayCode($order)); ?></a>
-                                <?php if (!empty($order['order_code'])): ?>
-                                    <div class="small text-white-50">ID #<?php echo (int)$order['id']; ?></div>
-                                <?php endif; ?>
                                 <?php if($has_media): ?>
                                     <i class="fas fa-camera text-info ms-1" title="<?php echo __('media_files'); ?>"></i>
                                 <?php endif; ?>

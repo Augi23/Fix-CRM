@@ -467,6 +467,43 @@ function orderDisplayCode(array $order): string
     return $orderCode !== '' ? $orderCode : '#' . (int)($order['id'] ?? 0);
 }
 
+/**
+ * Vygeneruje další číslo zakázky navazující na importovanou řadu
+ * (tvar PREFIX+číslo, např. APFAZ2600485 -> APFAZ2600486).
+ * Vrací null, pokud v DB žádný kód v tomto tvaru není (fallback = bez kódu).
+ */
+function generateNextOrderCode(PDO $pdo): ?string
+{
+    try {
+        $row = $pdo->query(
+            "SELECT order_code FROM orders
+             WHERE order_code REGEXP '^[A-Za-z]+[0-9]+$'
+             ORDER BY CAST(REGEXP_REPLACE(order_code, '[^0-9]', '') AS UNSIGNED) DESC
+             LIMIT 1"
+        )->fetch();
+    } catch (Throwable $e) {
+        return null;
+    }
+    if (!$row || !preg_match('/^([A-Za-z]+)([0-9]+)$/', (string)$row['order_code'], $m)) {
+        return null;
+    }
+    $prefix = $m[1];
+    $digits = $m[2];
+    $len = strlen($digits);
+    $next = (int)$digits + 1;
+    // pojistka proti kolizi (souběžné založení)
+    for ($i = 0; $i < 5; $i++) {
+        $candidate = $prefix . str_pad((string)$next, $len, '0', STR_PAD_LEFT);
+        $chk = $pdo->prepare('SELECT COUNT(*) FROM orders WHERE order_code = ?');
+        $chk->execute([$candidate]);
+        if ((int)$chk->fetchColumn() === 0) {
+            return $candidate;
+        }
+        $next++;
+    }
+    return null;
+}
+
 function orderSortSql(string $alias = 'o', ?string $exactIdExpression = null): string
 {
     if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $alias)) {

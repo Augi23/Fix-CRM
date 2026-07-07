@@ -6,6 +6,7 @@
 
 $lang_overrides = [
     'cs' => [
+        'order_no' => 'Č. zakázky',
         'lang_en' => 'Angličtina',
         'procurement' => 'Nákupy',
 
@@ -247,6 +248,7 @@ $lang_overrides = [
         'delete_customer_btn' => 'Smazat klienta',
     ],
     'ru' => [
+        'order_no' => '№ заказа',
         'lang_en' => 'Английский',
         'role_admin' => 'Админ',
         'role_manager' => 'Менеджер',
@@ -463,6 +465,7 @@ $lang_overrides = [
         'delete_customer_btn' => 'Удалить клиента',
     ],
     'en' => [
+        'order_no' => 'Order no.',
         'lang_cs' => 'Czech',
         'lang_en' => 'English',
         'lang_ru' => 'Russian',

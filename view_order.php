@@ -119,7 +119,7 @@ function localizedOrderStatusLabel(string $status): string {
                     </button>
                     <?php endif; ?>
                     <h5 class="mb-0">
-                        <?php echo __('order'); ?> #<?php echo $order['id']; ?> - <?php echo htmlspecialchars($order['device_model']); ?>
+                        <?php echo __('order'); ?> <?php echo e(orderDisplayCode($order)); ?> - <?php echo htmlspecialchars($order['device_model']); ?>
                         <span class="text-white-75 fw-normal ms-2" style="font-size: 0.9rem;">
                             (<?php echo __('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?>)
                         </span>
@@ -463,9 +463,9 @@ function localizedOrderStatusLabel(string $status): string {
                                 <i class="fas fa-print me-2"></i> <?php echo __('print'); ?>
                             </button>
                             <ul class="dropdown-menu w-100 shadow">
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
+                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
+                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
+                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
                                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="window.open('print_label.php?id=<?php echo $order['id']; ?>', 'qllabel', 'width=440,height=360')"><i class="fas fa-tag me-2 text-info"></i> <?php echo __('print_label'); ?></a></li>
                             </ul>
                         </div>
@@ -489,7 +489,7 @@ function localizedOrderStatusLabel(string $status): string {
             try {
                 var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 box.appendChild(svg);
-                JsBarcode(svg, '<?php echo (int)$order['id']; ?>', { format: 'CODE128', displayValue: true, fontSize: 14, margin: 0, height: 56, width: 2 });
+                JsBarcode(svg, '<?php echo e(orderDisplayCode($order)); ?>', { format: 'CODE128', displayValue: true, fontSize: 14, margin: 0, height: 56, width: 2 });
             } catch (e) { box.style.display = 'none'; }
         })();
         </script>
@@ -1202,7 +1202,7 @@ function deleteOrder(id) {
                 <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
                 <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">
                 <div class="modal-header border-secondary">
-                    <h5 class="modal-title"><?php echo __('edit_order_title'); ?> #<?php echo $order['id']; ?></h5>
+                    <h5 class="modal-title"><?php echo __('edit_order_title'); ?> <?php echo e(orderDisplayCode($order)); ?></h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">

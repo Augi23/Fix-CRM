@@ -29,7 +29,7 @@ function _l($key) {
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Order confirmation #<?php echo $order['id']; ?></title>
+    <title>Order confirmation <?php echo e(orderDisplayCode($order)); ?></title>
     <style>
         body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
         .receipt-box { max-width: 800px; margin: auto; border: 1px solid #eee; padding: 30px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); }
@@ -64,7 +64,7 @@ function _l($key) {
                <?php echo _l('phone'); ?>: <?php echo htmlspecialchars(get_setting('company_phone')); ?></p>
         </div>
         <div style="text-align: right;">
-            <h2><?php echo mb_strtoupper(_l('order')); ?> No. <?php echo $order['id']; ?></h2>
+            <h2><?php echo mb_strtoupper(_l('order')); ?> <?php echo e(orderDisplayCode($order)); ?></h2>
             <p><?php echo _l('created'); ?>: <?php echo date('d.m.Y', strtotime($order['created_at'])); ?></p>
         </div>
     </div>

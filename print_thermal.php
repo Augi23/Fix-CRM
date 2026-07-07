@@ -28,7 +28,7 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo __('print_title_receipt'); ?> #<?php echo $order['id']; ?></title>
+    <title><?php echo __('print_title_receipt'); ?> <?php echo e(orderDisplayCode($order)); ?></title>
     <style>
         body { 
             font-family: Arial, Helvetica, sans-serif; 
@@ -73,7 +73,7 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
         <div style="font-size: 12px;"><?php echo htmlspecialchars(get_setting('company_address')); ?></div>
         <div><?php echo _l('phone'); ?>: <?php echo htmlspecialchars(get_setting('company_phone')); ?></div>
         <div class="line"></div>
-        <div class="order-num bold"><?php echo mb_strtoupper(_l('order')); ?> No. <?php echo $order['id']; ?></div>
+        <div class="order-num bold"><?php echo mb_strtoupper(_l('order')); ?> <?php echo e(orderDisplayCode($order)); ?></div>
         <div class="bold"><?php echo mb_strtoupper(_l('collected')); ?></div>
         <div><?php echo date('d.m.Y H:i'); ?></div>
         <div class="line"></div>

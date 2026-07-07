@@ -167,7 +167,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>ID / <?php echo __('created'); ?></th>
+                                <th><?php echo __('order_no'); ?> / <?php echo __('created'); ?></th>
                                 <th><?php echo __('client'); ?></th>
                                 <th><?php echo __('device_model'); ?></th>
                                 <th><?php echo __('problem'); ?></th>
@@ -245,9 +245,6 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                             <tr class="clickable-order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($r['status'])); ?><?php echo !empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''; ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
                                 <td>
                                     <a href="view_order.php?id=<?php echo (int)$r['id']; ?>" class="fw-bold text-decoration-none"><?php echo e($display_code); ?></a>
-                                    <?php if(!empty($r['order_code'])): ?>
-                                        <div class="small text-white-50">ID #<?php echo (int)$r['id']; ?></div>
-                                    <?php endif; ?>
                                     <?php if($has_media): ?>
                                         <i class="fas fa-camera text-info ms-1" title="<?php echo __('has_media'); ?>"></i>
                                     <?php endif; ?>

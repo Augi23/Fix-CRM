@@ -28,7 +28,7 @@ $currency = get_setting('currency', 'Kč');
 <html lang="<?php echo $target_lang; ?>">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo _l('reception_act'); ?> #<?php echo $order['id']; ?></title>
+    <title><?php echo _l('reception_act'); ?> <?php echo e(orderDisplayCode($order)); ?></title>
     <style>
         body { 
             font-family: Arial, Helvetica, sans-serif; 
@@ -74,7 +74,7 @@ $currency = get_setting('currency', 'Kč');
         <div style="font-size: 11px;"><?php echo htmlspecialchars(get_setting('company_address')); ?></div>
         <div><?php echo _l('phone'); ?>: <?php echo htmlspecialchars(get_setting('company_phone')); ?></div>
         <div class="line"></div>
-        <div class="order-num bold"><?php echo mb_strtoupper(_l('order')); ?> №<?php echo $order['id']; ?></div>
+        <div class="order-num bold"><?php echo mb_strtoupper(_l('order')); ?> <?php echo e(orderDisplayCode($order)); ?></div>
         <div class="bold"><?php echo mb_strtoupper(_l('created')); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?></div>
         <div class="line"></div>
     </div>

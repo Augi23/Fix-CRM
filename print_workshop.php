@@ -27,7 +27,7 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Work order #<?php echo $order['id']; ?></title>
+    <title>Work order <?php echo e(orderDisplayCode($order)); ?></title>
     <style>
         body { font-family: Arial, sans-serif; font-size: 14px; color: #333; margin: 0; padding: 20px; }
         .work-order { max-width: 800px; margin: auto; border: 2px solid #000; padding: 20px; }
@@ -57,7 +57,7 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
 <div class="work-order">
     <div class="header">
         <div>
-            <h1><?php echo mb_strtoupper(_l('work_order')); ?> No. <?php echo $order['id']; ?></h1>
+            <h1><?php echo mb_strtoupper(_l('work_order')); ?> <?php echo e(orderDisplayCode($order)); ?></h1>
             <div><?php echo _l('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?></div>
         </div>
         <div class="qr-section">

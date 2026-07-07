@@ -71,6 +71,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     $sql_orders = "
         SELECT
             o.id,
+            o.order_code,
             o.final_cost,
             o.estimated_cost,
             o.extra_expenses,
@@ -492,7 +493,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 $earn = (float)($r['tech_earn'] ?? 0);
                             ?>
                             <tr>
-                                <td><a href="view_order.php?id=<?php echo $r['id']; ?>&return=<?php echo $current_url; ?>" class="fw-bold">#<?php echo $r['id']; ?></a></td>
+                                <td><a href="view_order.php?id=<?php echo $r['id']; ?>&return=<?php echo $current_url; ?>" class="fw-bold"><?php echo e(orderDisplayCode($r)); ?></a></td>
                                 <td><?php echo date('d.m.Y', strtotime($r['finance_date'])); ?></td>
                                 <td><?php echo formatWorkDuration($techMinutes); ?></td>
                                 <td><?php echo htmlspecialchars($r['device_brand'] . ' ' . $r['device_model']); ?></td>
