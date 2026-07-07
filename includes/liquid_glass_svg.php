@@ -8,4 +8,10 @@
     <feGaussianBlur in="noise" stdDeviation="2" result="blurred"/>
     <feDisplacementMap in="SourceGraphic" in2="blurred" scale="52" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
+  <!-- silnější „čočka" jen pro OKRAJOVÝ prstenec skla (edge refraction, macOS Liquid Glass) -->
+  <filter id="lg-refract-edge" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.0045 0.0045" numOctaves="2" seed="7" result="noise"/>
+    <feGaussianBlur in="noise" stdDeviation="3" result="blurred"/>
+    <feDisplacementMap in="SourceGraphic" in2="blurred" scale="110" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
 </svg>

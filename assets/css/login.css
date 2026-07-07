@@ -40,15 +40,17 @@ body::after {
    kde vystupují ze tmy). Obrázek sám mizí do čista vpravo, kde je formulář.
    Pravidlo je jen v login.css (načítá se pouze na login stránce). */
 html[data-lg-theme="light"] body::after {
-    background-image: url('../img/login-leaf-bg-light.png');
-    background-position: center left;
+    /* svěží zelené listy na bílé (reference od uživatele): plná sytost vlevo,
+       vpravo jen mírné ztišení — POD sklem panelu musí zůstat vidět,
+       aby je Liquid Glass refrakce měla co lámat */
+    background-image: url('../img/login-leaf-bg-light.jpg');
+    background-position: top center;
     background-size: cover;
-    opacity: 0.9;
+    opacity: 1;
     mix-blend-mode: normal;
-    filter: saturate(1.02) blur(0.15px);
-    /* listy sytě vlevo, ale slabě DOZNÍVAJÍ i za sklo panelu (aby měla Liquid Glass refrakce co lámat) */
-    -webkit-mask-image: linear-gradient(100deg, #000 0%, #000 40%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.2) 80%, transparent 97%);
-            mask-image: linear-gradient(100deg, #000 0%, #000 40%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.2) 80%, transparent 97%);
+    filter: none;
+    -webkit-mask-image: linear-gradient(100deg, #000 0%, #000 52%, rgba(0,0,0,0.8) 74%, rgba(0,0,0,0.62) 100%);
+            mask-image: linear-gradient(100deg, #000 0%, #000 52%, rgba(0,0,0,0.8) 74%, rgba(0,0,0,0.62) 100%);
 }
 
 .login-page {
