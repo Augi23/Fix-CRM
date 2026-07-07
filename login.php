@@ -116,6 +116,13 @@ if (isset($_POST['login'])) {
                 $_SESSION['branch_id'] = null;
                 invalidatePermissionsCache();
                 recordLoginAttempt($pdo, true);
+                if (!empty($_POST['ajax'])) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => true, 'redirect' => 'index.php',
+                        'greeting' => loginGreetingUrl((string)$user['username']),
+                        'name' => (string)($user['full_name'] ?: $user['username'])], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
                 header('Location: index.php');
                 exit;
             }
@@ -138,6 +145,13 @@ if (isset($_POST['login'])) {
                 }
                 invalidatePermissionsCache();
                 recordLoginAttempt($pdo, true);
+                if (!empty($_POST['ajax'])) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => true, 'redirect' => 'index.php',
+                        'greeting' => loginGreetingUrl((string)$tech['username']),
+                        'name' => (string)($tech['name'] ?: $tech['username'])], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
                 header('Location: index.php');
                 exit;
             }
@@ -165,6 +179,11 @@ if (isset($_POST['login'])) {
                 $_SESSION['client_company'] = $customer['company'] ?? '';
                 $_SESSION['client_last_login'] = time();
                 recordLoginAttempt($pdo, true);
+                if (!empty($_POST['ajax'])) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => true, 'redirect' => 'klient/dashboard.php', 'greeting' => null, 'name' => ''], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
                 header('Location: klient/dashboard.php');
                 exit;
             }
@@ -184,6 +203,13 @@ if (clientIsLoggedIn()) {
 
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
+    exit;
+}
+?>
+<?php
+if (!empty($_POST['ajax'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => false, 'error' => (string)($error ?: __('login_invalid_credentials'))], JSON_UNESCAPED_UNICODE);
     exit;
 }
 ?>
@@ -306,5 +332,59 @@ if (isset($_SESSION['user_id'])) {
     </div>
 </div>
 
+<div id="greetOverlay" style="display:none; position:fixed; inset:0; z-index:99999; backdrop-filter: blur(14px) saturate(160%); -webkit-backdrop-filter: blur(14px) saturate(160%); background: rgba(10,10,14,0.55); align-items:center; justify-content:center;">
+    <div style="text-align:center; color:#fff;">
+        <div id="greetWave" style="font-size:64px; animation: greetPulse 1.1s ease-in-out infinite;">👋</div>
+        <div id="greetName" style="font-size:30px; font-weight:700; margin-top:12px;"></div>
+        <div style="font-size:14px; opacity:.65; margin-top:8px;"><?php echo e(__('login_greeting_entering')); ?></div>
+    </div>
+</div>
+<style>@keyframes greetPulse { 0%,100% { transform: scale(1) rotate(-8deg); } 50% { transform: scale(1.15) rotate(10deg); } }</style>
+<script>
+(function () {
+    var form = document.querySelector('.login-form');
+    if (!form || !window.fetch) { return; }
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        var fd = new FormData(form);
+        fd.append('ajax', '1');
+        fetch('login.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.ok) {
+                    btn.disabled = false;
+                    var al = document.getElementById('loginAjaxError');
+                    if (!al) {
+                        al = document.createElement('div');
+                        al.id = 'loginAjaxError';
+                        al.className = 'alert alert-danger';
+                        form.parentNode.insertBefore(al, form);
+                    }
+                    al.textContent = d.error || 'Přihlášení selhalo';
+                    return;
+                }
+                var go = function () { window.location.href = d.redirect; };
+                if (d.greeting) {
+                    var ov = document.getElementById('greetOverlay');
+                    document.getElementById('greetName').textContent = d.name || '';
+                    ov.style.display = 'flex';
+                    var done = false;
+                    var finish = function () { if (!done) { done = true; go(); } };
+                    try {
+                        var audio = new Audio(d.greeting);
+                        audio.addEventListener('ended', finish);
+                        audio.addEventListener('error', finish);
+                        audio.play().then(function () { setTimeout(finish, 8000); }).catch(finish);
+                    } catch (err) { finish(); }
+                } else {
+                    go();
+                }
+            })
+            .catch(function () { form.removeEventListener('submit', arguments.callee); form.submit(); });
+    });
+})();
+</script>
 </body>
 </html>

@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-07',
+        'title' => 'Mluvené uvítání při přihlášení',
+        'items' => [
+            'Po kliknutí na Přihlásit se každému zaměstnanci přehraje jeho osobní uvítací zvuk (s uvítací obrazovkou), pak systém pokračuje dál.',
+            'Zvuky (mp3/m4a/wav, ~5 s) nahrává admin v Nastavení → Zaměstnanci → Uvítací zvuky, včetně poslechu a smazání.',
+            'Bez nahraného zvuku se přihlášení chová jako dřív; klientů se uvítání netýká.',
+        ],
+    ],
+    [
+        'date' => '2026-07-07',
         'title' => 'Nastavení → Tisk štítků (samoobslužná instalace)',
         'items' => [
             'Nová záložka v Nastavení dostupná všem zaměstnancům: ukáže, jestli na aktuálním počítači běží tiskový můstek.',

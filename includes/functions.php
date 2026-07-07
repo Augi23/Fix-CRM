@@ -1748,6 +1748,19 @@ function processOrderInventoryChange($order_id, $is_finishing, $was_finished) {
     }
 }
 
+/** URL uvítacího zvuku zaměstnance (uploads/greetings/<username>.<ext>), null pokud není nahraný. */
+function loginGreetingUrl(string $username): ?string
+{
+    $slug = preg_replace('/[^a-zA-Z0-9._-]/', '_', trim($username));
+    if ($slug === '') { return null; }
+    foreach (['mp3', 'm4a', 'wav', 'ogg'] as $ext) {
+        if (is_file(__DIR__ . '/../uploads/greetings/' . $slug . '.' . $ext)) {
+            return 'uploads/greetings/' . $slug . '.' . $ext;
+        }
+    }
+    return null;
+}
+
 /* ============================================================
    HLÍDÁNÍ ZAKÁZEK BEZ POHYBU (dim efekt řádků v seznamech)
    „Bez pohybu" = od poslední změny stavu NEBO jakékoli úpravy

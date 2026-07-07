@@ -243,6 +243,30 @@ $can_view_all_staff = $is_admin_user || getCurrentStaffRole() === 'manager' || h
 
 $active_tab = $_GET['tab'] ?? ($is_admin_user ? 'company' : 'staff');
 
+// Uvítací zvuky při přihlášení (admin)
+if (isset($_POST['upload_greeting']) && hasPermission('admin_access')) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { header('Location: settings.php?tab=staff&error=csrf'); exit; }
+    $gUser = preg_replace('/[^a-zA-Z0-9._-]/', '_', trim((string)($_POST['greeting_username'] ?? '')));
+    $gDir = __DIR__ . '/uploads/greetings/';
+    if ($gUser !== '' && !empty($_FILES['greeting_file']['tmp_name']) && is_uploaded_file($_FILES['greeting_file']['tmp_name'])) {
+        $ext = strtolower(pathinfo((string)$_FILES['greeting_file']['name'], PATHINFO_EXTENSION));
+        $allowed = ['mp3', 'm4a', 'wav', 'ogg'];
+        if (in_array($ext, $allowed, true) && (int)$_FILES['greeting_file']['size'] <= 3 * 1024 * 1024) {
+            if (!is_dir($gDir)) { mkdir($gDir, 0755, true); }
+            foreach ($allowed as $e) { @unlink($gDir . $gUser . '.' . $e); }
+            move_uploaded_file($_FILES['greeting_file']['tmp_name'], $gDir . $gUser . '.' . $ext);
+            header('Location: settings.php?tab=staff&greeting_updated=1'); exit;
+        }
+    }
+    header('Location: settings.php?tab=staff&error=greeting_invalid'); exit;
+}
+if (isset($_POST['delete_greeting']) && hasPermission('admin_access')) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { header('Location: settings.php?tab=staff&error=csrf'); exit; }
+    $gUser = preg_replace('/[^a-zA-Z0-9._-]/', '_', trim((string)($_POST['greeting_username'] ?? '')));
+    foreach (['mp3', 'm4a', 'wav', 'ogg'] as $e) { @unlink(__DIR__ . '/uploads/greetings/' . $gUser . '.' . $e); }
+    header('Location: settings.php?tab=staff&greeting_updated=1'); exit;
+}
+
 // Security for technicians
 if (!$is_admin_user) {
     if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'updates') {
@@ -466,6 +490,60 @@ require_once 'includes/header.php';
                     </tbody>
                 </table>
             </div>
+
+        <?php if ($is_admin_user && $active_tab == 'staff'): ?>
+        <?php
+            $greetingStaff = [];
+            try {
+                foreach ($pdo->query('SELECT username, full_name AS name FROM users ORDER BY full_name')->fetchAll() as $gu) { $greetingStaff[] = $gu; }
+                foreach ($pdo->query('SELECT username, name FROM technicians WHERE is_active = 1 ORDER BY name')->fetchAll() as $gt) { $greetingStaff[] = $gt; }
+            } catch (Throwable $e) { $greetingStaff = []; }
+        ?>
+        <?php if ($active_tab == 'staff'): ?>
+        <div class="glass-panel p-4 border-secondary mt-4" id="greetingSounds">
+            <h5 class="mb-1 text-white"><i class="fas fa-volume-high me-2 text-info"></i><?php echo __('greeting_title'); ?></h5>
+            <div class="small text-white-75 mb-3"><?php echo __('greeting_desc'); ?></div>
+            <?php if (isset($_GET['greeting_updated'])): ?><div class="alert alert-success py-2"><?php echo __('greeting_saved'); ?></div><?php endif; ?>
+            <?php if (($_GET['error'] ?? '') === 'greeting_invalid'): ?><div class="alert alert-danger py-2"><?php echo __('greeting_invalid'); ?></div><?php endif; ?>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th><?php echo __('presence_employee'); ?></th><th><?php echo __('greeting_state'); ?></th><th class="text-end"></th></tr></thead>
+                    <tbody>
+                    <?php foreach ($greetingStaff as $gs): $gUrl = loginGreetingUrl((string)$gs['username']); ?>
+                        <tr>
+                            <td><?php echo e($gs['name'] ?: $gs['username']); ?> <span class="text-white-50 small">(<?php echo e($gs['username']); ?>)</span></td>
+                            <td>
+                                <?php if ($gUrl): ?>
+                                    <audio controls preload="none" src="<?php echo e($gUrl); ?>" style="height:30px; max-width:220px;"></audio>
+                                <?php else: ?>
+                                    <span class="text-white-50 small"><?php echo __('greeting_none'); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-end">
+                                <form method="POST" enctype="multipart/form-data" class="d-inline-flex gap-1 align-items-center justify-content-end">
+                                    <?php echo csrfField(); ?>
+                                    <input type="hidden" name="greeting_username" value="<?php echo e($gs['username']); ?>">
+                                    <input type="file" name="greeting_file" accept=".mp3,.m4a,.wav,.ogg,audio/*" class="form-control form-control-sm" style="max-width:230px;" required>
+                                    <button type="submit" name="upload_greeting" value="1" class="btn btn-sm btn-primary"><i class="fas fa-upload"></i></button>
+                                </form>
+                                <?php if ($gUrl): ?>
+                                <form method="POST" class="d-inline">
+                                    <?php echo csrfField(); ?>
+                                    <input type="hidden" name="greeting_username" value="<?php echo e($gs['username']); ?>">
+                                    <button type="submit" name="delete_greeting" value="1" class="btn btn-sm btn-outline-danger" title="<?php echo e(__('delete')); ?>"><i class="fas fa-trash"></i></button>
+                                </form>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="small text-white-50"><?php echo __('greeting_note'); ?></div>
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
+
         </div>
 
         <!-- SYSTEM & DB TAB -->
