@@ -173,6 +173,7 @@ $today = date('d.m.Y');
 <!DOCTYPE html>
 <html lang="<?php echo e(crm_get_language()); ?>" data-bs-theme="dark">
 <head>
+    <script>(function(){try{var t=localStorage.getItem('lg-theme')||'dark';document.documentElement.setAttribute('data-lg-theme',t);document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo e(__('client_section_title')); ?> - AppleFix</title>
@@ -521,6 +522,7 @@ $today = date('d.m.Y');
                 </div>
             </div>
             <div class="client-meta">
+                <button type="button" class="btn btn-sm btn-outline-light lg-theme-toggle" title="Light / Dark" aria-label="Light / Dark"><i class="fas fa-sun"></i></button>
                 <?php $currentLang = crm_get_language(); ?>
                 <div class="d-flex gap-1" title="<?php echo e(__('language_switch')); ?>">
                     <a class="btn btn-sm rounded-pill px-3 <?php echo $currentLang === 'cs' ? 'btn-light text-dark' : 'btn-outline-light'; ?>" href="../set_language.php?lang=cs&amp;redirect=<?php echo rawurlencode($_SERVER['REQUEST_URI'] ?? 'klient/dashboard.php'); ?>">CS</a>

@@ -533,6 +533,102 @@ html[data-lg-theme="light"] .dropdown-item:active {
 }
 html[data-lg-theme="light"] .dropdown-item:hover { background: rgba(10,132,255,0.10) !important; }
 
+
+/* light: Bootstrap dark utility třídy používané ve stránkách */
+html[data-lg-theme="light"] .bg-dark,
+html[data-lg-theme="light"] .bg-black {
+  background: rgba(255,255,255,0.72) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .border-secondary { border-color: rgba(0,0,0,0.12) !important; }
+html[data-lg-theme="light"] .table-dark {
+  --bs-table-bg: rgba(255,255,255,0.72);
+  --bs-table-color: #1d1d1f;
+  --bs-table-border-color: rgba(0,0,0,0.10);
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .table-dark th,
+html[data-lg-theme="light"] .table-dark td { color: #1d1d1f !important; }
+
+/* light: LOGIN stránka (login.css je psané dark-only) */
+html[data-lg-theme="light"] .login-page,
+html[data-lg-theme="light"] .login-scene {
+  background: transparent !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .login-hero::before { opacity: 0.35; }
+html[data-lg-theme="light"] .login-quip,
+html[data-lg-theme="light"] .login-panel-kicker,
+html[data-lg-theme="light"] .login-form .form-label { color: rgba(0,0,0,0.60) !important; }
+html[data-lg-theme="light"] .login-panel-head h2 { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .login-point {
+  background: rgba(255,255,255,0.55) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.72) !important;
+}
+html[data-lg-theme="light"] .login-point-icon { color: #0A84FF !important; }
+html[data-lg-theme="light"] .login-form .form-control {
+  background: rgba(0,0,0,0.035) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .login-form .form-control::placeholder { color: rgba(0,0,0,0.38) !important; }
+html[data-lg-theme="light"] .login-form .form-control:focus { background: rgba(255,255,255,0.92) !important; }
+html[data-lg-theme="light"] .login-lang-switcher .btn-outline-light {
+  color: #1d1d1f !important;
+  border-color: rgba(0,0,0,0.20) !important;
+}
+html[data-lg-theme="light"] .login-lang-switcher .btn-light { background: #1d1d1f !important; color: #fff !important; }
+
+/* light: KLIENTSKÝ PORTÁL (inline styly v dashboard.php jsou dark-only) */
+html[data-lg-theme="light"] .client-shell { color: #1d1d1f; }
+html[data-lg-theme="light"] .client-meta { color: rgba(0,0,0,0.62) !important; }
+html[data-lg-theme="light"] .client-chip {
+  background: rgba(255,255,255,0.60) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .client-hero h1 { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .client-hero p { color: rgba(0,0,0,0.60) !important; }
+html[data-lg-theme="light"] .stat-box {
+  background: rgba(255,255,255,0.62) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+html[data-lg-theme="light"] .stat-box .label { color: rgba(0,0,0,0.50) !important; }
+html[data-lg-theme="light"] .stat-box .value { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .repair-item {
+  background: rgba(255,255,255,0.62) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  color: rgba(0,0,0,0.78) !important;
+}
+html[data-lg-theme="light"] .repair-item:hover { background: rgba(10,132,255,0.08) !important; }
+html[data-lg-theme="light"] .repair-item.active {
+  background: rgba(10,132,255,0.10) !important;
+  border-color: rgba(10,132,255,0.35) !important;
+}
+html[data-lg-theme="light"] .repair-item .title { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .repair-item .sub { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] .detail-row .label { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] .detail-row .value { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .order-notice {
+  background: rgba(52,199,89,0.14) !important;
+  border-color: rgba(52,199,89,0.30) !important;
+  color: #1E7E38 !important;
+}
+html[data-lg-theme="light"] .empty-state { color: rgba(0,0,0,0.50) !important; }
+html[data-lg-theme="light"] .media-section-title h4 { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .media-section-title p { color: rgba(0,0,0,0.55) !important; }
+html[data-lg-theme="light"] .media-card-caption { color: rgba(0,0,0,0.65) !important; }
+/* status badge čipy v portálu — tmavší text na světlých čipech */
+html[data-lg-theme="light"] .status-badge-large.primary { color: #0055CC !important; background: rgba(13,110,253,0.12) !important; }
+html[data-lg-theme="light"] .status-badge-large.info { color: #087A99 !important; background: rgba(13,202,240,0.14) !important; }
+html[data-lg-theme="light"] .status-badge-large.warning { color: #8A6100 !important; background: rgba(255,193,7,0.18) !important; }
+html[data-lg-theme="light"] .status-badge-large.secondary { color: rgba(0,0,0,0.60) !important; background: rgba(0,0,0,0.07) !important; border-color: rgba(0,0,0,0.10) !important; }
+html[data-lg-theme="light"] .status-badge-large.success { color: #1E7E38 !important; background: rgba(25,135,84,0.14) !important; }
+html[data-lg-theme="light"] .status-badge-large.danger { color: #C41E45 !important; background: rgba(220,53,69,0.12) !important; }
+html[data-lg-theme="light"] .status-badge-large.dark { color: #1d1d1f !important; background: rgba(0,0,0,0.08) !important; border-color: rgba(0,0,0,0.12) !important; }
+html[data-lg-theme="light"] .status-badge-large.light { color: #1d1d1f !important; background: rgba(0,0,0,0.05) !important; border-color: rgba(0,0,0,0.10) !important; }
+
 /* sheen decentnější na světlé */
 html[data-lg-theme="light"] .lg-sheen::after {
   background: radial-gradient(
