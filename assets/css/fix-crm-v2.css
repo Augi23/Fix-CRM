@@ -2424,7 +2424,18 @@ p, span, label, .small, small,
 .crm-wizard-modal .select2-container,
 .crm-wizard-modal .select2-container--open {
   z-index: 4000 !important;
-  position: relative !important;
+}
+
+/* OPRAVA (výběr klienta ve wizardu se rozbaloval MIMO – o stovky px níž):
+   select2 vkládá dropdown do dropdownParent (#newOrderModal) jako přímý potomek
+   a INLINE mu nastaví position:absolute + top/left. Dřívější
+   `position: relative !important` na .select2-container(--open) to přepisovalo,
+   takže z absolutního top:… se stal posun v toku → dropdown padal mimo.
+   Holder dropdownu (přímý potomek modalu) proto držíme absolutní; obal pole
+   (uvnitř .col-md-*) zůstává na select2 default (relative) a nerozbije se. */
+.crm-wizard-modal > .select2-container {
+  position: absolute !important;
+  width: auto !important;   /* holder nesmí zdědit width:100% (jinak plná šířka -> vodorovný scroll) */
 }
 
 .crm-wizard-modal .select2-dropdown {
