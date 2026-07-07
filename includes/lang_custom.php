@@ -6,6 +6,12 @@
 
 $lang_overrides = [
     'cs' => [
+        'presence_title' => 'Přítomnost v systému',
+        'presence_hint' => 'Informativní údaj — aktivní čas přihlášení v CRM (mezery delší než 10 minut se nepočítají).',
+        'presence_duration' => 'Doba v systému',
+        'presence_total_period' => 'Celkem za období',
+        'presence_employee' => 'Pracovník',
+        'role' => 'Role',
         'order_no' => 'Č. zakázky',
         'lang_en' => 'Angličtina',
         'procurement' => 'Nákupy',
@@ -248,6 +254,12 @@ $lang_overrides = [
         'delete_customer_btn' => 'Smazat klienta',
     ],
     'ru' => [
+        'presence_title' => 'Время в системе',
+        'presence_hint' => 'Информативно — активное время в CRM (паузы более 10 минут не учитываются).',
+        'presence_duration' => 'Время в системе',
+        'presence_total_period' => 'Итого за период',
+        'presence_employee' => 'Сотрудник',
+        'role' => 'Роль',
         'order_no' => '№ заказа',
         'lang_en' => 'Английский',
         'role_admin' => 'Админ',
@@ -465,6 +477,12 @@ $lang_overrides = [
         'delete_customer_btn' => 'Удалить клиента',
     ],
     'en' => [
+        'presence_title' => 'Time in system',
+        'presence_hint' => 'Informational — active time logged into the CRM (gaps over 10 minutes are not counted).',
+        'presence_duration' => 'Time in system',
+        'presence_total_period' => 'Period total',
+        'presence_employee' => 'Employee',
+        'role' => 'Role',
         'order_no' => 'Order no.',
         'lang_cs' => 'Czech',
         'lang_en' => 'English',

@@ -443,6 +443,77 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     <?php endif; ?>
                 </div>
 
+                <h5 class="mb-3 mt-5"><?php echo __('presence_title'); ?></h5>
+                <p class="small text-white-75 mb-2"><?php echo __('presence_hint'); ?></p>
+                <?php
+                $presence_rows = [];
+                $presence_totals = [];
+                try {
+                    $presence_sql = "SELECT p.work_date, p.seconds_active, u.id AS uid, u.full_name, u.username, u.role
+                                     FROM staff_presence_daily p
+                                     JOIN users u ON u.id = p.user_id
+                                     WHERE p.work_date BETWEEN ? AND ?";
+                    $presence_params = [$start_date, $end_date];
+                    if (!$is_admin) {
+                        $presence_sql .= " AND p.user_id = ?";
+                        $presence_params[] = (int)($_SESSION['user_id'] ?? 0);
+                    }
+                    $presence_sql .= " ORDER BY p.work_date DESC, u.full_name ASC";
+                    $pstmt = $pdo->prepare($presence_sql);
+                    $pstmt->execute($presence_params);
+                    $presence_rows = $pstmt->fetchAll();
+                    foreach ($presence_rows as $pr) {
+                        $puid = (int)$pr['uid'];
+                        if (!isset($presence_totals[$puid])) {
+                            $presence_totals[$puid] = ['name' => ($pr['full_name'] ?: $pr['username']), 'seconds' => 0];
+                        }
+                        $presence_totals[$puid]['seconds'] += (int)$pr['seconds_active'];
+                    }
+                } catch (Throwable $e) { $presence_rows = []; }
+                $presence_role_map = ['admin' => __('role_admin'), 'manager' => __('role_manager'), 'technician' => __('role_engineer')];
+                ?>
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-7">
+                        <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th><?php echo __('date'); ?></th>
+                                        <th><?php echo __('presence_employee'); ?></th>
+                                        <th><?php echo __('role'); ?></th>
+                                        <th class="text-end"><?php echo __('presence_duration'); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (!$presence_rows): ?>
+                                        <tr><td colspan="4" class="text-center text-white-75 py-3"><?php echo __('not_found'); ?></td></tr>
+                                    <?php else: foreach ($presence_rows as $pr): ?>
+                                        <tr>
+                                            <td><?php echo date('d.m.Y', strtotime($pr['work_date'])); ?></td>
+                                            <td><?php echo e($pr['full_name'] ?: $pr['username']); ?></td>
+                                            <td class="text-white-75 small"><?php echo e($presence_role_map[$pr['role']] ?? ucfirst((string)$pr['role'])); ?></td>
+                                            <td class="text-end fw-bold"><?php echo formatPresenceDuration((int)$pr['seconds_active']); ?></td>
+                                        </tr>
+                                    <?php endforeach; endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="card"><div class="card-body">
+                            <h6 class="text-uppercase small text-muted mb-3"><?php echo __('presence_total_period'); ?></h6>
+                            <?php if (!$presence_totals): ?>
+                                <div class="text-white-75 small"><?php echo __('not_found'); ?></div>
+                            <?php else: foreach ($presence_totals as $pt): ?>
+                                <div class="d-flex justify-content-between border-bottom py-2">
+                                    <span><?php echo e($pt['name']); ?></span>
+                                    <strong><?php echo formatPresenceDuration((int)$pt['seconds']); ?></strong>
+                                </div>
+                            <?php endforeach; endif; ?>
+                        </div></div>
+                    </div>
+                </div>
+
                 <h5 class="mb-3 mt-5"><?php echo __('completed_works_list'); ?></h5>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover align-middle">

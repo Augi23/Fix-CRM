@@ -1725,4 +1725,71 @@ function processOrderInventoryChange($order_id, $is_finishing, $was_finished) {
         }
     }
 }
+
+/* ============================================================
+   EVIDENCE PŘÍTOMNOSTI ZAMĚSTNANCŮ (informativní, sekce Přehledy)
+   Každý požadavek přihlášeného zaměstnance posune last_seen;
+   mezera do 10 minut se přičítá do denního součtu. Klientský
+   portál se neeviduje (klienti nemají $_SESSION['user_id']).
+   ============================================================ */
+function ensureStaffPresenceSchema(PDO $pdo): void
+{
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `staff_presence_daily` (
+        `user_id`        INT(11)   NOT NULL,
+        `work_date`      DATE      NOT NULL,
+        `seconds_active` INT(11)   NOT NULL DEFAULT 0,
+        `first_seen`     DATETIME  DEFAULT NULL,
+        `last_seen`      DATETIME  DEFAULT NULL,
+        PRIMARY KEY (`user_id`, `work_date`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+function trackStaffPresence(PDO $pdo, int $userId): void
+{
+    static $done = false;
+    if ($done || $userId <= 0) { return; }
+    $done = true; // max 1x za request
+
+    $maxGapSeconds = 600; // aktivita s mezerou do 10 min se počítá vcelku
+    $attempt = function () use ($pdo, $userId, $maxGapSeconds): void {
+        $stmt = $pdo->prepare('SELECT seconds_active, UNIX_TIMESTAMP(last_seen) AS ls
+                               FROM staff_presence_daily WHERE user_id = ? AND work_date = CURDATE()');
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch();
+        if ($row) {
+            $delta = time() - (int)$row['ls'];
+            $add = ($delta > 0 && $delta <= $maxGapSeconds) ? $delta : 0;
+            $upd = $pdo->prepare('UPDATE staff_presence_daily
+                                  SET seconds_active = seconds_active + ?, last_seen = NOW()
+                                  WHERE user_id = ? AND work_date = CURDATE()');
+            $upd->execute([$add, $userId]);
+        } else {
+            $ins = $pdo->prepare('INSERT IGNORE INTO staff_presence_daily
+                                  (user_id, work_date, seconds_active, first_seen, last_seen)
+                                  VALUES (?, CURDATE(), 0, NOW(), NOW())');
+            $ins->execute([$userId]);
+        }
+    };
+    try {
+        $attempt();
+    } catch (Throwable $e) {
+        try { ensureStaffPresenceSchema($pdo); $attempt(); } catch (Throwable $e2) { /* nikdy neshodit request */ }
+    }
+}
+
+/** 126 min -> "2h 6min", 42 min -> "42min" */
+function formatPresenceDuration(int $seconds): string
+{
+    $minutes = intdiv(max(0, $seconds), 60);
+    if ($minutes < 60) { return $minutes . 'min'; }
+    return intdiv($minutes, 60) . 'h ' . ($minutes % 60) . 'min';
+}
+
+// auto-hook: běží při každém načtení functions.php v kontextu přihlášeného zaměstnance
+if (session_status() === PHP_SESSION_ACTIVE
+    && !empty($_SESSION['user_id'])
+    && isset($pdo) && $pdo instanceof PDO
+    && (basename($_SERVER['PHP_SELF'] ?? '') !== 'login.php')) {
+    try { trackStaffPresence($pdo, (int)$_SESSION['user_id']); } catch (Throwable $e) { /* ignore */ }
+}
 ?>
