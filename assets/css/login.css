@@ -36,6 +36,20 @@ body::after {
     pointer-events: none;
 }
 
+/* SVĚTLÁ varianta — listy jemně VYSTUPUJÍ DO BÍLÉ (zrcadlo tmavé varianty,
+   kde vystupují ze tmy). Obrázek sám mizí do čista vpravo, kde je formulář.
+   Pravidlo je jen v login.css (načítá se pouze na login stránce). */
+html[data-lg-theme="light"] body::after {
+    background-image: url('../img/login-leaf-bg-light.png');
+    background-position: center left;
+    background-size: cover;
+    opacity: 0.9;
+    mix-blend-mode: normal;
+    filter: saturate(1.02) blur(0.15px);
+    -webkit-mask-image: linear-gradient(100deg, #000 0%, #000 34%, rgba(0,0,0,0.35) 58%, transparent 78%);
+            mask-image: linear-gradient(100deg, #000 0%, #000 34%, rgba(0,0,0,0.35) 58%, transparent 78%);
+}
+
 .login-page {
     width: 100%;
     position: relative;
