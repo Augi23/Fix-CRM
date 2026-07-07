@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-07',
+        'title' => 'Nastavení → Tisk štítků (samoobslužná instalace)',
+        'items' => [
+            'Nová záložka v Nastavení dostupná všem zaměstnancům: ukáže, jestli na aktuálním počítači běží tiskový můstek.',
+            'Když neběží, nabídne instalaci jedním zkopírovaným příkazem — instaluje se jednou, běží trvale.',
+            'Tlačítka Náhled štítku a Zkušební tisk pro ověření bez zakládání zakázky.',
+        ],
+    ],
+    [
+        'date' => '2026-07-07',
         'title' => 'Automatický tisk štítků zakázek (Brother QL-810W)',
         'items' => [
             'Po založení zakázky se hned automaticky vytiskne štítek: čárový kód s číslem zakázky + jméno a příjmení klienta + krátký popis závady + datum přijetí.',

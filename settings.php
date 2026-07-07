@@ -290,6 +290,9 @@ require_once 'includes/header.php';
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'staff' ? 'active' : 'text-white-75'; ?>" href="?tab=staff"><i class="fas fa-users me-2"></i><?php echo __('staff_tab'); ?></a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active_tab == 'tisk' ? 'active' : 'text-white-75'; ?>" href="?tab=tisk"><i class="fas fa-print me-2"></i><?php echo __('label_bridge_tab'); ?></a>
+        </li>
         <?php if ($is_admin_user): ?>
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'system' ? 'active' : 'text-white-75'; ?>" href="?tab=system"><i class="fas fa-server me-2"></i><?php echo __('system_db'); ?></a>
@@ -568,6 +571,104 @@ require_once 'includes/header.php';
             </div>
         </div>
         <?php endif; ?>
+
+        <!-- TISK ŠTÍTKŮ TAB (dostupný všem zaměstnancům) -->
+        <div class="tab-pane fade <?php echo $active_tab == 'tisk' ? 'show active' : ''; ?>">
+            <?php if ($active_tab == 'tisk'): ?>
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="glass-panel p-4 border-secondary mb-3">
+                        <h5 class="mb-1 text-white"><i class="fas fa-print me-2 text-info"></i><?php echo __('label_bridge_title'); ?></h5>
+                        <div class="small text-white-75 mb-3"><?php echo __('label_bridge_desc'); ?></div>
+
+                        <div id="bridgeStatus" class="alert alert-secondary py-2 mb-3">
+                            <i class="fas fa-circle-notch fa-spin me-2"></i><?php echo __('label_bridge_checking'); ?>
+                        </div>
+
+                        <div id="bridgeInstallBox" style="display:none;">
+                            <div class="small text-white-75 mb-2"><?php echo __('label_bridge_install_steps'); ?></div>
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control font-monospace" id="bridgeCmd" readonly
+                                       value="curl -fsSL https://admin.applefix.cloud/print-bridge/bootstrap.sh | bash">
+                                <button class="btn btn-primary" type="button" onclick="bridgeCopyCmd()"><i class="fas fa-copy me-1"></i><?php echo __('label_bridge_copy'); ?></button>
+                            </div>
+                            <div class="small text-white-50"><?php echo __('label_bridge_once_note'); ?></div>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="bridgeCheck()"><i class="fas fa-rotate me-1"></i><?php echo __('label_bridge_recheck'); ?></button>
+                            <button class="btn btn-outline-info btn-sm" type="button" id="bridgePreviewBtn" style="display:none;" onclick="bridgePreview()"><i class="fas fa-eye me-1"></i><?php echo __('label_bridge_preview'); ?></button>
+                            <button class="btn btn-outline-success btn-sm" type="button" id="bridgeTestBtn" style="display:none;" onclick="bridgeTestPrint()"><i class="fas fa-print me-1"></i><?php echo __('label_bridge_test'); ?></button>
+                        </div>
+                        <div id="bridgePreviewArea" class="mt-3" style="display:none;">
+                            <img id="bridgePreviewImg" src="" alt="náhled štítku" style="max-width:100%; background:#fff; border-radius:8px; padding:6px;">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="glass-panel p-4 border-secondary">
+                        <h6 class="text-uppercase small text-muted mb-3"><?php echo __('label_bridge_how_title'); ?></h6>
+                        <ul class="small text-white-75 mb-0">
+                            <li class="mb-2"><?php echo __('label_bridge_how_1'); ?></li>
+                            <li class="mb-2"><?php echo __('label_bridge_how_2'); ?></li>
+                            <li class="mb-2"><?php echo __('label_bridge_how_3'); ?></li>
+                            <li><?php echo __('label_bridge_how_4'); ?></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <script>
+            var BRIDGE = 'http://127.0.0.1:9110';
+            function bridgeCheck() {
+                var st = document.getElementById('bridgeStatus');
+                var box = document.getElementById('bridgeInstallBox');
+                st.className = 'alert alert-secondary py-2 mb-3';
+                st.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i><?php echo __('label_bridge_checking'); ?>';
+                var ctrl = new AbortController();
+                var t = setTimeout(function(){ ctrl.abort(); }, 1800);
+                fetch(BRIDGE + '/health', { signal: ctrl.signal })
+                    .then(function(r){ return r.json(); })
+                    .then(function(d){
+                        clearTimeout(t);
+                        st.className = 'alert alert-success py-2 mb-3';
+                        st.innerHTML = '<i class="fas fa-check-circle me-2"></i><?php echo __('label_bridge_running'); ?> <strong>' + (d.printer_ip || '?') + '</strong>';
+                        box.style.display = 'none';
+                        document.getElementById('bridgePreviewBtn').style.display = '';
+                        document.getElementById('bridgeTestBtn').style.display = '';
+                    })
+                    .catch(function(){
+                        clearTimeout(t);
+                        st.className = 'alert alert-warning py-2 mb-3';
+                        st.innerHTML = '<i class="fas fa-triangle-exclamation me-2"></i><?php echo __('label_bridge_not_running'); ?>';
+                        box.style.display = '';
+                        document.getElementById('bridgePreviewBtn').style.display = 'none';
+                        document.getElementById('bridgeTestBtn').style.display = 'none';
+                    });
+            }
+            function bridgeCopyCmd() {
+                var inp = document.getElementById('bridgeCmd');
+                inp.select(); inp.setSelectionRange(0, 999);
+                navigator.clipboard.writeText(inp.value).then(function(){
+                    window.afxLabelToast && window.afxLabelToast('📋 <?php echo __('label_bridge_copied'); ?>', true);
+                });
+            }
+            function bridgePreview() {
+                var area = document.getElementById('bridgePreviewArea');
+                document.getElementById('bridgePreviewImg').src = BRIDGE + '/preview?code=APFAZ0000000&client=' + encodeURIComponent('Jan Novák') + '&defect=' + encodeURIComponent('Ukázkový štítek — náhled') + '&date=<?php echo date('d.m.Y'); ?>&_=' + Date.now();
+                area.style.display = '';
+            }
+            function bridgeTestPrint() {
+                if (!confirm('<?php echo __('label_bridge_test_confirm'); ?>')) return;
+                fetch(BRIDGE + '/print', { method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ code: 'APFAZ0000000', client: 'Zkušební tisk', defect: 'Testovací štítek z Nastavení', date: '<?php echo date('d.m.Y'); ?>' }) })
+                    .then(function(r){ return r.json(); })
+                    .then(function(d){ window.afxLabelToast && window.afxLabelToast(d.ok ? '🏷️ <?php echo __('label_bridge_test_ok'); ?>' : ('⚠️ ' + (d.error || 'chyba')), !!d.ok); })
+                    .catch(function(e){ window.afxLabelToast && window.afxLabelToast('⚠️ ' + e.message, false); });
+            }
+            document.addEventListener('DOMContentLoaded', bridgeCheck);
+            </script>
+            <?php endif; ?>
+        </div>
 
         <!-- UPDATES TAB -->
         <?php if ($is_admin_user): ?>
