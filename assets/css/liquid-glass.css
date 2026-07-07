@@ -776,6 +776,70 @@ html[data-lg-theme="light"] .login-lang-switcher .btn-outline-light {
 }
 html[data-lg-theme="light"] .login-lang-switcher .btn-light { background: #1d1d1f !important; color: #fff !important; }
 
+/* =========================================================================
+   LIGHT — PŘESNÝ APPLE LIQUID GLASS na login panelu (macOS 26/iOS Liquid Glass).
+   Login má jediné sklo → můžeme dát PRAVOU refrakci (#lg-refract), na kartách
+   v appce se z výkonu nepoužívá. Vše scoped na světlé téma — TMAVÁ NEDOTČENA.
+   Podpis: refrakce (lensing) + specular hrany + translucence + adaptivní tint.
+   ========================================================================= */
+html[data-lg-theme="light"] .login-panel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.44), rgba(255,255,255,0.28)) !important;
+  border: 1px solid rgba(255,255,255,0.65) !important;
+  border-radius: 30px !important;
+  -webkit-backdrop-filter: blur(7px) saturate(185%) !important;
+          backdrop-filter: blur(7px) saturate(185%) !important;
+  box-shadow:
+    inset 0 1.5px 1px rgba(255,255,255,0.98),   /* horní specular hrana */
+    inset 0 -1px 1px rgba(255,255,255,0.55),    /* spodní specular */
+    inset 0 0 26px rgba(255,255,255,0.35),      /* vnitřní záře skla */
+    0 34px 80px rgba(20,45,90,0.18),            /* měkký hloubkový stín */
+    0 4px 14px rgba(20,45,90,0.08) !important;
+}
+/* Chromium: skutečná optická refrakce (láme listy/pozadí u okrajů skla) */
+@supports (backdrop-filter: url(#lg-refract)) {
+  html[data-lg-theme="light"] .login-panel {
+    -webkit-backdrop-filter: url(#lg-refract) blur(3px) saturate(190%) !important;
+            backdrop-filter: url(#lg-refract) blur(3px) saturate(190%) !important;
+  }
+}
+/* výraznější lesklá hrana (edge highlight / specular) */
+html[data-lg-theme="light"] .login-panel::before {
+  background: linear-gradient(133deg,
+    rgba(255,255,255,0.80), rgba(255,255,255,0.12) 30%, transparent 48%) !important;
+}
+/* silnější pointer-reaktivní odlesk právě na login skle (Liquid Glass = reaktivní) */
+html[data-lg-theme="light"] .login-panel.lg-sheen::after {
+  background: radial-gradient(460px circle at var(--lg-mx, 50%) var(--lg-my, 0%),
+    rgba(255,255,255,0.75), rgba(255,255,255,0.20) 40%, transparent 66%) !important;
+}
+/* vstupní pole = malé skleněné pilulky (frosted), čitelná i přes refrakci */
+html[data-lg-theme="light"] .login-form .form-control {
+  background: rgba(255,255,255,0.34) !important;
+  border: 1px solid rgba(255,255,255,0.72) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.95),
+    0 1px 2px rgba(20,45,90,0.05) !important;
+  -webkit-backdrop-filter: blur(3px) saturate(160%);
+          backdrop-filter: blur(3px) saturate(160%);
+}
+html[data-lg-theme="light"] .login-form .form-control:focus {
+  background: rgba(255,255,255,0.62) !important;
+  border-color: rgba(10,132,255,0.55) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.95),
+    0 0 0 0.22rem rgba(10,132,255,0.16) !important;
+}
+/* přihlašovací tlačítko = lesklá skleněná pilulka s modrým jádrem */
+html[data-lg-theme="light"] .login-form .btn-primary {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0) 40%),
+    linear-gradient(180deg, #2b98e0 0%, #0f78c8 100%) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.6),
+    0 8px 22px rgba(24,120,200,0.30) !important;
+}
+
 /* light: KLIENTSKÝ PORTÁL (inline styly v dashboard.php jsou dark-only) */
 html[data-lg-theme="light"] .client-shell { color: #1d1d1f; }
 html[data-lg-theme="light"] .client-meta { color: rgba(0,0,0,0.62) !important; }
