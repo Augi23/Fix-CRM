@@ -159,12 +159,12 @@ try {
         <a class="nav-link <?php echo $current_page == 'index.php' ? 'active' : ''; ?>" href="index.php"><i class="fas fa-home me-2"></i><span><?php echo __('dashboard'); ?></span></a>
 
         <div class="crm-nav-group-title"><?php echo __('nav_work'); ?></div>
+        <a class="nav-link crm-nav-new-order" href="#" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-2"></i><span><?php echo __('new_order'); ?></span></a>
         <a class="nav-link <?php echo $current_page == 'orders.php' ? 'active' : ''; ?>" href="orders.php">
             <i class="fas fa-tools me-2"></i><span><?php echo __('orders'); ?></span>
             <?php if ($ordersBadgeCount > 0): ?><span class="crm-nav-pill"><?php echo $ordersBadgeCount; ?></span><?php endif; ?>
         </a>
         <a class="nav-link <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php"><i class="fas fa-rotate-left me-2"></i><span>Reklamace</span></a>
-        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-2"></i><span><?php echo __('new_order'); ?></span></a>
         <a class="nav-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading me-2"></i><span><?php echo __('procurement'); ?></span></a>
 
         <div class="crm-nav-group-title"><?php echo __('nav_database'); ?></div>

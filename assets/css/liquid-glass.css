@@ -375,6 +375,64 @@ html:not([data-lg-theme="light"]) .nav-tabs .nav-link:not(.active) {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
+
+/* ------------------------------------------------------------
+   NOVÁ ZAKÁZKA v sidebaru — elegantní dýchající zvýraznění
+   (pomalé, nízká intenzita; hover = ustálený stav; respektuje
+   prefers-reduced-motion)
+   ------------------------------------------------------------ */
+#sidebar .nav-link.crm-nav-new-order {
+  background: linear-gradient(135deg, rgba(10,132,255,0.18), rgba(100,210,255,0.10)) !important;
+  border: 1px solid rgba(10,132,255,0.32) !important;
+  border-radius: 10px;
+  animation: lgNewOrderBreathe 3.2s ease-in-out infinite;
+}
+#sidebar .nav-link.crm-nav-new-order,
+#sidebar .nav-link.crm-nav-new-order > span { color: #7DBEFF !important; font-weight: 600; }
+#sidebar .nav-link.crm-nav-new-order i {
+  color: #0A84FF !important;
+  background: rgba(10,132,255,0.18) !important;
+  border-radius: 50%;
+}
+@keyframes lgNewOrderBreathe {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(10,132,255,0.10), inset 0 1px 1px rgba(255,255,255,0.14);
+    border-color: rgba(10,132,255,0.26);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(10,132,255,0.34), inset 0 1px 1px rgba(255,255,255,0.22);
+    border-color: rgba(10,132,255,0.55);
+  }
+}
+#sidebar .nav-link.crm-nav-new-order:hover {
+  animation-play-state: paused;
+  background: linear-gradient(135deg, rgba(10,132,255,0.30), rgba(100,210,255,0.16)) !important;
+  border-color: rgba(10,132,255,0.65) !important;
+  box-shadow: 0 0 20px rgba(10,132,255,0.40), inset 0 1px 1px rgba(255,255,255,0.30);
+}
+#sidebar .nav-link.crm-nav-new-order:hover,
+#sidebar .nav-link.crm-nav-new-order:hover > span { color: #fff !important; }
+
+/* light varianta — jemnější na bílém skle */
+html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-order {
+  background: linear-gradient(135deg, rgba(10,132,255,0.12), rgba(100,210,255,0.08)) !important;
+  border-color: rgba(10,132,255,0.35) !important;
+}
+html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-order,
+html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-order > span { color: #0055CC !important; }
+html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-order:hover,
+html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-order:hover > span { color: #003D99 !important; }
+html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-order:hover {
+  background: linear-gradient(135deg, rgba(10,132,255,0.20), rgba(100,210,255,0.12)) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #sidebar .nav-link.crm-nav-new-order {
+    animation: none;
+    box-shadow: 0 0 14px rgba(10,132,255,0.25), inset 0 1px 1px rgba(255,255,255,0.18);
+  }
+}
+
 /* aktivní položka v sidebaru = malá skleněná čočka */
 .crm-v2-nav .nav-link.active {
   background: linear-gradient(135deg, rgba(10, 132, 255, 0.30), rgba(100, 210, 255, 0.16)) !important;
