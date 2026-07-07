@@ -7,6 +7,7 @@
 $lang_overrides = [
     'cs' => [
         'presence_title' => 'Přítomnost v systému',
+        'client_status_history' => 'Historie zakázky',
         'worktime_title' => 'Čas na zakázkách',
         'worktime_hint' => 'Denní čas každého technika na zakázce: běží od přidělení/přijetí do předání či dokončení a započítává se jen doba, kdy byl technik ten den přítomný v systému.',
         'worktime_duration' => 'Čas na zakázce',
@@ -258,6 +259,7 @@ $lang_overrides = [
     ],
     'ru' => [
         'presence_title' => 'Время в системе',
+        'client_status_history' => 'История заказа',
         'worktime_title' => 'Время на заказах',
         'worktime_hint' => 'Ежедневное время техника на заказе: идёт с момента назначения/принятия до передачи или завершения, засчитывается только время присутствия в системе в этот день.',
         'worktime_duration' => 'Время на заказе',
@@ -484,6 +486,7 @@ $lang_overrides = [
     ],
     'en' => [
         'presence_title' => 'Time in system',
+        'client_status_history' => 'Order history',
         'worktime_title' => 'Time on orders',
         'worktime_hint' => 'Daily per-technician time on an order: runs from assignment/acceptance until handover or completion, counting only time the technician was present in the system that day.',
         'worktime_duration' => 'Time on order',

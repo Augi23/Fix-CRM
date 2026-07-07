@@ -267,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="col-md-4">
                     <label class="form-label"><i class="fas fa-tasks me-2 text-warning"></i><?php echo __('status'); ?></label>
                     <select name="status" class="form-select">
-                        <?php foreach (getOrderStatusOptions() as $statusValue => $statusLabel): ?>
+                        <?php foreach (getOrderStatusOptions(false, (string)($order['status'] ?? '')) as $statusValue => $statusLabel): ?>
                             <option value="<?php echo e($statusValue); ?>" <?php if($order['status'] === $statusValue) echo 'selected'; ?>><?php echo e($statusLabel); ?></option>
                         <?php endforeach; ?>
                     </select>

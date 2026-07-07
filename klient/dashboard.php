@@ -87,6 +87,23 @@ if (isset($pdo) && $selectedOrder) {
     }
 }
 
+$clientStatusHistory = [];
+if (!empty($selectedOrder['id'])) {
+    try {
+        $hstmt = $pdo->prepare(
+            "SELECT l.new_status, l.changed_at, st.name AS status_tech_name
+             FROM order_status_log l
+             LEFT JOIN technicians st ON st.id = l.technician_id
+             WHERE l.order_id = ?
+             ORDER BY l.changed_at ASC"
+        );
+        $hstmt->execute([(int)$selectedOrder['id']]);
+        $clientStatusHistory = $hstmt->fetchAll();
+    } catch (Throwable $e) {
+        $clientStatusHistory = [];
+    }
+}
+
 function clientStatusMeta(string $status): array {
     if (isOrderStatusIn($status, 'uncollected')) {
         return [__('client_status_uncollected'), 'warning'];
@@ -622,6 +639,20 @@ $today = date('d.m.Y');
                                 </div>
                             <?php endif; ?>
                         </div>
+
+                        <?php if (!empty($clientStatusHistory)): ?>
+                            <div class="media-section-title mt-4 mb-2">
+                                <h4><i class="fas fa-clock-rotate-left me-2"></i><?php echo __('client_status_history'); ?></h4>
+                            </div>
+                            <div class="repair-details-grid" style="display:block;">
+                                <?php foreach ($clientStatusHistory as $ch): ?>
+                                    <div class="detail-row d-flex justify-content-between py-1" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                                        <span class="label"><?php echo date('d.m.Y H:i', strtotime($ch['changed_at'])); ?></span>
+                                        <span class="value"><?php echo htmlspecialchars(orderStatusHistoryLabel((string)$ch['new_status'], $ch['status_tech_name'] ?? null)); ?></span>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
 
                         <?php if (in_array($selectedOrder['status'], getOrderStatusList('done'), true)): ?>
                             <div class="order-notice">

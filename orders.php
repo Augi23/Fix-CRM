@@ -624,7 +624,7 @@ $(document).ready(function() {
                             <div class="col-12 col-sm-6 col-md-3">
                                 <label class="form-label"><?php echo __('status'); ?></label>
                                 <select name="status" class="form-select">
-                                    <?php foreach (getOrderStatusOptions() as $statusValue => $statusLabel): ?>
+                                    <?php foreach (getOrderStatusOptions(true) as $statusValue => $statusLabel): ?>
                                     <option value="<?php echo e($statusValue); ?>" ${o.status==<?php echo json_encode($statusValue, JSON_UNESCAPED_UNICODE); ?> ? 'selected':''}><?php echo e($statusLabel); ?></option>
                                     <?php endforeach; ?>
                                 </select>

@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-07',
+        'title' => 'Nový stavový model zakázek',
+        'items' => [
+            'Nové zakázky používají 10 přehledných stavů: Přijato · V opravě · V opravě - v externím servisu · V opravě - v autorizovaném servisu · Čeká na díl · Připraveno k převzetí · Vydáno - čeká na platbu · Vydáno · Nevyzvednuto · Stornováno.',
+            'Starší a importované zakázky si ponechávají původní stavy — nic se nepřevádí, jen už je nelze nově vybrat.',
+            'Historie pohybu ukazuje u „V opravě" i jméno technika (V opravě: Martin) — v CRM i na klientském portálu.',
+            'Klientský portál nově zobrazuje celou historii zakázky (datum + stav).',
+        ],
+    ],
+    [
+        'date' => '2026-07-07',
         'title' => 'Pravidlo pro import ze starého zakázkového listu',
         'items' => [
             'Budoucí importy převádí staré značky korektně na nový model: „černá růže" = stav Přijato + pobočka Praha 1 - Na Příkopě.',

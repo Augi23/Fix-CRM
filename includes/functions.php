@@ -297,20 +297,25 @@ function normalizeEmailForMailto(?string $email): string {
 
 function getOrderStatusDefinitions(): array {
     return [
+        // ── Aktuální stavový model (od 7/2026) — jen tyto lze nově vybrat ──
         'Přijato' => ['group' => 'new', 'badge' => 'new'],
-        'Zakládá se' => ['group' => 'new', 'badge' => 'new'],
         'V opravě' => ['group' => 'in_progress', 'badge' => 'progress'],
-        'V opravě zák. desky' => ['group' => 'in_progress', 'badge' => 'progress'],
-        'V externím servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
-        'V aut. servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
+        'V opravě - v externím servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
+        'V opravě - v autorizovaném servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
         'Čeká na díl' => ['group' => 'waiting_parts', 'badge' => 'waiting'],
-        'Čeká na zákazníka' => ['group' => 'pending_approval', 'badge' => 'pending'],
-        'Čeká na platbu' => ['group' => 'pending_approval', 'badge' => 'pending'],
         'Připraveno k převzetí' => ['group' => 'completed', 'badge' => 'completed'],
-        'Nevyzvednuto' => ['group' => 'uncollected', 'badge' => 'uncollected'],
+        'Vydáno - čeká na platbu' => ['group' => 'collected', 'badge' => 'uncollected'],
         'Vydáno' => ['group' => 'collected', 'badge' => 'collected'],
-        'Vydáno - ČR' => ['group' => 'collected', 'badge' => 'collected'],
+        'Nevyzvednuto' => ['group' => 'uncollected', 'badge' => 'uncollected'],
         'Stornováno' => ['group' => 'cancelled', 'badge' => 'cancelled'],
+        // ── Legacy stavy: jen pro zobrazení starších/importovaných zakázek ──
+        'Zakládá se' => ['group' => 'new', 'badge' => 'new', 'legacy' => true],
+        'V opravě zák. desky' => ['group' => 'in_progress', 'badge' => 'progress', 'legacy' => true],
+        'V externím servisu' => ['group' => 'in_progress', 'badge' => 'progress', 'legacy' => true],
+        'V aut. servisu' => ['group' => 'in_progress', 'badge' => 'progress', 'legacy' => true],
+        'Čeká na zákazníka' => ['group' => 'pending_approval', 'badge' => 'pending', 'legacy' => true],
+        'Čeká na platbu' => ['group' => 'pending_approval', 'badge' => 'pending', 'legacy' => true],
+        'Vydáno - ČR' => ['group' => 'collected', 'badge' => 'collected', 'legacy' => true],
     ];
 }
 
@@ -349,8 +354,17 @@ function getOrderStatusList(string $key): array {
     return $aliases[$key] ?? [$key];
 }
 
-function getOrderStatusOptions(): array {
-    return array_combine(array_keys(getOrderStatusDefinitions()), array_keys(getOrderStatusDefinitions())) ?: [];
+function getOrderStatusOptions(bool $includeLegacy = false, ?string $ensureStatus = null): array {
+    $options = [];
+    foreach (getOrderStatusDefinitions() as $status => $meta) {
+        if (!$includeLegacy && !empty($meta['legacy'])) { continue; }
+        $options[$status] = $status;
+    }
+    // u starší zakázky nabídnout i její aktuální (legacy) stav, ať se formulářem nezmění omylem
+    if ($ensureStatus !== null && $ensureStatus !== '' && !isset($options[$ensureStatus])) {
+        $options = [$ensureStatus => $ensureStatus] + $options;
+    }
+    return $options;
 }
 
 function getOrderCanonicalStatuses(): array {
@@ -1490,9 +1504,11 @@ function ensureOrderStatusLogTable() {
             new_status VARCHAR(50) NOT NULL,
             changed_by INT NULL,
             changed_role VARCHAR(20) NULL,
+            technician_id INT NULL,
             changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )"
     );
+    try { $pdo->exec("ALTER TABLE order_status_log ADD COLUMN technician_id INT NULL AFTER changed_role"); } catch (Throwable $e) { /* už existuje */ }
 }
 
 function logOrderStatusChange($order_id, $old_status, $new_status) {
@@ -1504,11 +1520,18 @@ function logOrderStatusChange($order_id, $old_status, $new_status) {
         }
         $changed_by = $_SESSION['user_id'] ?? ($_SESSION['tech_id'] ?? null);
         $changed_role = $_SESSION['role'] ?? null;
+        // snímek přiděleného technika v okamžiku změny (pro „V opravě: <jméno>" v historii)
+        $log_tech_id = null;
+        try {
+            $ts = $pdo->prepare('SELECT technician_id FROM orders WHERE id = ?');
+            $ts->execute([$order_id]);
+            $log_tech_id = $ts->fetchColumn() ?: null;
+        } catch (Throwable $e) { /* ignore */ }
         $stmt = $pdo->prepare(
-            "INSERT INTO order_status_log (order_id, old_status, new_status, changed_by, changed_role)
-             VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO order_status_log (order_id, old_status, new_status, changed_by, changed_role, technician_id)
+             VALUES (?, ?, ?, ?, ?, ?)"
         );
-        $stmt->execute([$order_id, $old_status, $new_status, $changed_by, $changed_role]);
+        $stmt->execute([$order_id, $old_status, $new_status, $changed_by, $changed_role, $log_tech_id]);
     } catch (Exception $e) {
         // ignore logging errors
     }
@@ -1880,6 +1903,33 @@ function migrateCernaRuzeOrders(): void
     } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
 }
 
+/** Label stavu do historie pohybu: u „V opravě" doplní jméno technika (V opravě: Martin). */
+function orderStatusHistoryLabel(string $status, ?string $techName): string
+{
+    $label = function_exists('localizedOrderStatusLabel') ? localizedOrderStatusLabel($status) : getOrderStatusLabel($status);
+    if ($techName !== null && trim($techName) !== '' && isOrderStatusIn($status, 'in_progress')) {
+        return $label . ': ' . trim($techName);
+    }
+    return $label;
+}
+
+/** Jednorázově: rozšíření ENUM orders.status o nové stavy modelu 7/2026 (staré hodnoty zůstávají). */
+function ensureStatusEnum202607(): void
+{
+    global $pdo;
+    try {
+        if (get_setting('status_enum_2026_07', '') === '1') { return; }
+        $pdo->exec("ALTER TABLE `orders` MODIFY `status` ENUM(
+            'New','In Progress','Waiting for Parts','Pending Approval','Completed','Uncollected','Collected','Cancelled',
+            'Přijato','Zakládá se','V opravě','V opravě zák. desky','V externím servisu','V aut. servisu',
+            'V opravě - v externím servisu','V opravě - v autorizovaném servisu',
+            'Čeká na díl','Čeká na zákazníka','Čeká na platbu','Připraveno k převzetí',
+            'Vydáno - čeká na platbu','Nevyzvednuto','Vydáno','Vydáno - ČR','Stornováno'
+        ) DEFAULT 'Přijato'");
+        if (function_exists('set_setting')) { set_setting('status_enum_2026_07', '1'); }
+    } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
+}
+
 // auto-hook: běží při každém načtení functions.php v kontextu přihlášeného zaměstnance
 if (session_status() === PHP_SESSION_ACTIVE
     && !empty($_SESSION['user_id'])
@@ -1893,6 +1943,7 @@ if (session_status() === PHP_SESSION_ACTIVE
             trackStaffPresence($pdo, 'user', (int)$_SESSION['user_id']);
         }
         migrateCernaRuzeOrders();
+        ensureStatusEnum202607();
     } catch (Throwable $e) { /* ignore */ }
 }
 ?>

@@ -61,6 +61,8 @@ if (isOrderStatusIn($status, 'new') || isOrderStatusIn($status, 'pending_approva
     $next_status = 'Připraveno k převzetí';
 } elseif (isOrderStatusIn($status, 'completed') || isOrderStatusIn($status, 'uncollected')) {
     $next_status = 'Vydáno';
+} elseif ($status === 'Vydáno - čeká na platbu') {
+    $next_status = 'Vydáno';
 }
 $next_label_map = [
     'V opravě' => __('move_to_in_progress'),
@@ -80,10 +82,11 @@ $status_log = [];
 try {
     ensureOrderStatusLogTable();
     $stmt = $pdo->prepare(
-        "SELECT l.*, u.username, t.name AS tech_name
+        "SELECT l.*, u.username, t.name AS tech_name, st.name AS status_tech_name
          FROM order_status_log l
          LEFT JOIN users u ON (l.changed_role = 'admin' AND u.id = l.changed_by)
          LEFT JOIN technicians t ON (l.changed_role <> 'admin' AND t.id = l.changed_by)
+         LEFT JOIN technicians st ON st.id = l.technician_id
          WHERE l.order_id = ?
          ORDER BY l.changed_at DESC"
     );
@@ -253,7 +256,7 @@ function localizedOrderStatusLabel(string $status): string {
                                 <td>
                                     <span class="badge bg-transparent border border-secondary text-white-75"><?php echo htmlspecialchars(localizedOrderStatusLabel((string)$log['old_status'])); ?></span>
                                     <i class="fas fa-arrow-right mx-1 text-white-75"></i>
-                                    <span class="badge bg-primary text-white"><?php echo htmlspecialchars(localizedOrderStatusLabel((string)$log['new_status'])); ?></span>
+                                    <span class="badge bg-primary text-white"><?php echo htmlspecialchars(orderStatusHistoryLabel((string)$log['new_status'], $log['status_tech_name'] ?? null)); ?></span>
                                 </td>
                                 <td><?php echo htmlspecialchars($who); ?></td>
                             </tr>
@@ -436,7 +439,7 @@ function localizedOrderStatusLabel(string $status): string {
                                 </span>
                             </label>
                             <select name="status" class="form-select mb-2">
-                                <?php foreach (getOrderStatusOptions() as $statusValue => $statusLabel): ?>
+                                <?php foreach (getOrderStatusOptions(false, (string)($order['status'] ?? '')) as $statusValue => $statusLabel): ?>
                                     <option value="<?php echo e($statusValue); ?>" <?php if($order['status'] === $statusValue) echo 'selected'; ?>><?php echo e($statusLabel); ?></option>
                                 <?php endforeach; ?>
                             </select>
@@ -1067,7 +1070,7 @@ function showShippingRequiredModal() {
 function showStatusConfirmModal(form) {
     const modal = $('#statusConfirmModal');
     const status = form.find('select[name="status"]').val();
-    const statusLabels = <?php echo json_encode(getOrderStatusOptions(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+    const statusLabels = <?php echo json_encode(getOrderStatusOptions(true), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
     
     $('#confirmStatusText').text(statusLabels[status] || status);
     modal.modal('show');
