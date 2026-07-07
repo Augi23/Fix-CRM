@@ -272,6 +272,32 @@ html[data-lg-theme="light"] .order-row--status-collected:hover   > td { backgrou
 html[data-lg-theme="light"] .order-row--status-cancelled:hover   > td { background: #E3E5E9 !important; }
 html[data-lg-theme="light"] .order-row--status-default:hover     > td { background: #E4E8ED !important; }
 
+
+/* ------------------------------------------------------------
+   ZAKÁZKY BEZ POHYBU — decentní dýchání celého řádku v jeho
+   stavové barvě. Pomalé = dlouhá prodleva mezi pulzy (6.5s),
+   rychlé = naléhavější rytmus (2.2s). Řádek si nechává svou
+   stavovou barvu — dim jde přes opacity.
+   ------------------------------------------------------------ */
+@keyframes lgStaleDim {
+  0%, 62%, 100% { opacity: 1; }
+  80% { opacity: 0.52; }
+}
+tr.order-stale--slow {
+  animation: lgStaleDim 6.5s ease-in-out infinite;
+}
+tr.order-stale--fast {
+  animation: lgStaleDim 2.2s ease-in-out infinite;
+}
+tr.order-stale--slow:hover,
+tr.order-stale--fast:hover {
+  animation-play-state: paused;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  tr.order-stale--slow, tr.order-stale--fast { animation: none; }
+}
+
 /* Bootstrap kontextové řádky (reklamace.php: table-primary/-warning/...) */
 .table > tbody > tr.table-primary > td { background: rgba(59,130,246,0.16) !important; }
 .table > tbody > tr.table-warning > td { background: rgba(249,115,22,0.16) !important; }

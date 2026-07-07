@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-07',
+        'title' => 'Hlídání zakázek bez pohybu',
+        'items' => [
+            'Zakázka, u které se dlouho nic neděje, začne v seznamech decentně „dýchat" svou stavovou barvou — pomalu při první prodlevě, rychleji při delší.',
+            'Limity: Přijato 1h/2h · V opravě 1h/2h · Externí servis 24h · Autorizovaný servis 48h · Čeká na díl 1h/12h · Vydáno - čeká na platbu 24h.',
+            'Najetím myší se dýchání zastaví; popisek ukáže, jak dlouho zakázka stojí (např. „Bez pohybu: 3h 20min").',
+            'Jakákoli úprava zakázky nebo změna stavu časomíru vynuluje.',
+        ],
+    ],
+    [
+        'date' => '2026-07-07',
         'title' => 'Nový stavový model zakázek',
         'items' => [
             'Nové zakázky používají 10 přehledných stavů: Přijato · V opravě · V opravě - v externím servisu · V opravě - v autorizovaném servisu · Čeká na díl · Připraveno k převzetí · Vydáno - čeká na platbu · Vydáno · Nevyzvednuto · Stornováno.',

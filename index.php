@@ -211,7 +211,8 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
                             $where_clause = $where_clauses ? ' WHERE ' . implode(' AND ', $where_clauses) : '';
                             $search_id = is_numeric($search) ? (int)$search : 0;
-                            $sql = "SELECT o.*, c.first_name, c.last_name, c.phone, c.company, c.customer_type, t.name as tech_name
+                            $sql = "SELECT o.*, c.first_name, c.last_name, c.phone, c.company, c.customer_type, t.name as tech_name,
+                                           (SELECT MAX(l.changed_at) FROM order_status_log l WHERE l.order_id = o.id) AS last_status_change
                                     FROM orders o
                                     JOIN customers c ON o.customer_id = c.id
                                     LEFT JOIN technicians t ON o.technician_id = t.id" .
@@ -242,7 +243,8 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                 $has_media = isset($has_media_ids[$r['id']]);
                                 $display_code = orderDisplayCode($r);
                             ?>
-                            <tr class="clickable-order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($r['status'])); ?><?php echo !empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''; ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
+                            <?php [$staleCls, $staleTitle] = orderStaleRowAttrs($r); ?>
+                            <tr <?php echo $staleTitle ? 'title="' . e($staleTitle) . '" ' : ''; ?>class="clickable-order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($r['status'])); ?><?php echo $staleCls; ?><?php echo !empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''; ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
                                 <td>
                                     <a href="view_order.php?id=<?php echo (int)$r['id']; ?>" class="fw-bold text-decoration-none"><?php echo e($display_code); ?></a>
                                     <?php if($has_media): ?>

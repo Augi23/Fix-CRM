@@ -1749,6 +1749,62 @@ function processOrderInventoryChange($order_id, $is_finishing, $was_finished) {
 }
 
 /* ============================================================
+   HLÍDÁNÍ ZAKÁZEK BEZ POHYBU (dim efekt řádků v seznamech)
+   „Bez pohybu" = od poslední změny stavu NEBO jakékoli úpravy
+   zakázky (updated_at) — cokoli novějšího. Limity v hodinách:
+   [pomalé dýchání, rychlé dýchání|null].
+   ============================================================ */
+function getOrderStaleThresholds(): array
+{
+    return [
+        'Přijato' => [1, 2],
+        'V opravě' => [1, 2],
+        'V opravě - v externím servisu' => [24, null],
+        'V opravě - v autorizovaném servisu' => [48, null],
+        'Čeká na díl' => [1, 12],
+        'Vydáno - čeká na platbu' => [24, null],
+        // legacy ekvivalenty (staré zakázky si zaslouží stejnou pozornost)
+        'V opravě zák. desky' => [1, 2],
+        'V externím servisu' => [24, null],
+        'V aut. servisu' => [48, null],
+    ];
+}
+
+/** Vrátí 'fast' | 'slow' | null podle stavu a doby bez pohybu. */
+function getOrderStaleLevel(string $status, int $secondsSinceActivity): ?string
+{
+    $thresholds = getOrderStaleThresholds()[$status] ?? null;
+    if (!$thresholds || $secondsSinceActivity <= 0) { return null; }
+    [$slowH, $fastH] = $thresholds;
+    $hours = $secondsSinceActivity / 3600;
+    if ($fastH !== null && $hours >= $fastH) { return 'fast'; }
+    if ($hours >= $slowH) { return 'slow'; }
+    return null;
+}
+
+/** Sekundy bez pohybu z řádku zakázky (potřebuje last_status_change z dotazu, jinak updated_at/created_at). */
+function orderStaleSeconds(array $order): int
+{
+    $candidates = [];
+    foreach (['last_status_change', 'updated_at', 'created_at'] as $col) {
+        if (!empty($order[$col])) { $candidates[] = strtotime((string)$order[$col]); }
+    }
+    $last = $candidates ? max($candidates) : null;
+    return $last ? max(0, time() - $last) : 0;
+}
+
+/** CSS třída + title pro <tr> zakázky (prázdné, pokud je vše v pořádku). */
+function orderStaleRowAttrs(array $order): array
+{
+    $sec = orderStaleSeconds($order);
+    $level = getOrderStaleLevel((string)($order['status'] ?? ''), $sec);
+    if ($level === null) { return ['', '']; }
+    $cls = ' order-stale--' . $level;
+    $title = __('stale_since') . ' ' . formatPresenceDuration($sec);
+    return [$cls, $title];
+}
+
+/* ============================================================
    EVIDENCE PŘÍTOMNOSTI ZAMĚSTNANCŮ (informativní, sekce Přehledy)
    Každý požadavek přihlášeného zaměstnance posune last_seen;
    mezera do 10 minut se přičítá do denního součtu. Klientský
