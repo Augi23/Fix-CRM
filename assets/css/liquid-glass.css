@@ -34,6 +34,13 @@ html, body {
     #000 !important;
   background-attachment: fixed, fixed, fixed, fixed !important;
 }
+/* OPRAVA posunuté stránky: off-canvas notifikační panel (position:fixed, translateX(100%))
+   trčí ~320px vpravo za viewport a dělal vodorovný scroll → celá stránka posunutá.
+   body{overflow-x:hidden} to neclipne (panel je fixed → clipuje ho jen viewport/html). */
+html {
+  overflow-x: hidden;   /* fallback pro starší prohlížeče */
+  overflow-x: clip;     /* ořízne bez scroll-containeru (nerozbíjí sticky/fixed) */
+}
 
 /* ------------------------------------------------------------
    ZÁKLADNÍ MATERIÁL — chrome povrchy S refrakcí (překrývají obsah):
