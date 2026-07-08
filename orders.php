@@ -238,6 +238,25 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
     </div>
 </div>
 
+<?php
+// ── Filtr podle stavu (chips) — všechny aktuální stavy + „Vše" ──
+$status_defs = getOrderStatusDefinitions();
+$branch_qs   = ($active_branch_filter > 0 && isBranchGlobalViewer()) ? '&branch_id=' . (int)$active_branch_filter : '';
+$search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '';
+?>
+<div class="orders-status-filter d-flex flex-wrap gap-2 mb-3">
+    <a href="orders.php?<?php echo ltrim($branch_qs . $search_qs, '&'); ?>"
+       class="crm-filter-chip<?php echo $filter_status ? '' : ' active'; ?>">
+        <i class="fas fa-layer-group"></i> <?php echo __('all_orders'); ?>
+    </a>
+    <?php foreach ($status_defs as $st => $meta): if (!empty($meta['legacy'])) continue; ?>
+        <a href="orders.php?filter=<?php echo urlencode($st) . $branch_qs . $search_qs; ?>"
+           class="crm-filter-chip chip--<?php echo e($meta['badge']); ?><?php echo ($filter_status === $st) ? ' active' : ''; ?>">
+            <span class="chip-dot"></span><?php echo e(getOrderStatusLabel($st)); ?>
+        </a>
+    <?php endforeach; ?>
+</div>
+
 <div class="card glass-card shadow-sm border-0">
     <div class="card-body p-0">
         <div class="table-responsive orders-table-wrap">

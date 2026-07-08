@@ -2820,3 +2820,47 @@ p, span, label, .small, small,
 .crm-notifications-item .min-w-0 { min-width: 0 !important; flex: 1 1 auto !important; }
 .crm-notifications-icon { flex: 0 0 auto !important; }
 .crm-notifications-empty { color: rgba(255,255,255,0.75); }
+
+/* ============================================================
+   FILTR ZAKÁZEK PODLE STAVU — chips
+   ============================================================ */
+.crm-filter-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; text-decoration: none;
+  color: rgba(255,255,255,0.82);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: background 120ms, border-color 120ms, color 120ms;
+  white-space: nowrap;
+}
+.crm-filter-chip:hover { background: rgba(255,255,255,0.10); color: #fff; }
+.crm-filter-chip.active { background: rgba(10,132,255,0.20); border-color: rgba(10,132,255,0.55); color: #fff; }
+.crm-filter-chip .chip-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; opacity: 0.9; flex: 0 0 auto; }
+.crm-filter-chip.chip--new      { color: #7fb4ff; }
+.crm-filter-chip.chip--pending  { color: #ffc07a; }
+.crm-filter-chip.chip--progress { color: #c3aaff; }
+.crm-filter-chip.chip--waiting  { color: #ff9a9a; }
+.crm-filter-chip.chip--completed{ color: #7fe0f0; }
+.crm-filter-chip.chip--uncollected { color: #ffe08a; }
+.crm-filter-chip.chip--collected{ color: #86e6a6; }
+.crm-filter-chip.chip--cancelled{ color: #b9c0cc; }
+.crm-filter-chip.active .chip-dot { box-shadow: 0 0 0 3px rgba(10,132,255,0.18); }
+
+/* světlý motiv */
+html[data-lg-theme="light"] .crm-filter-chip {
+  color: rgba(0,0,0,0.70); background: rgba(0,0,0,0.035); border-color: rgba(0,0,0,0.12);
+}
+html[data-lg-theme="light"] .crm-filter-chip:hover { background: rgba(0,0,0,0.06); color: #000; }
+html[data-lg-theme="light"] .crm-filter-chip.active { background: rgba(10,132,255,0.14); border-color: rgba(10,132,255,0.45); color: #0055CC; }
+html[data-lg-theme="light"] .crm-filter-chip.chip--new { color: #1c6ed0; }
+html[data-lg-theme="light"] .crm-filter-chip.chip--pending { color: #b5670c; }
+html[data-lg-theme="light"] .crm-filter-chip.chip--progress { color: #6b46c1; }
+html[data-lg-theme="light"] .crm-filter-chip.chip--waiting { color: #c0392b; }
+html[data-lg-theme="light"] .crm-filter-chip.chip--completed { color: #0e7490; }
+html[data-lg-theme="light"] .crm-filter-chip.chip--uncollected { color: #a37800; }
+html[data-lg-theme="light"] .crm-filter-chip.chip--collected { color: #1e7e38; }
+html[data-lg-theme="light"] .crm-filter-chip.chip--cancelled { color: #556070; }
+@media (max-width: 767.98px) {
+  .orders-status-filter { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+}
