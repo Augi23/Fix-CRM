@@ -40,9 +40,11 @@ body::after {
    kde vystupují ze tmy). Obrázek sám mizí do čista vpravo, kde je formulář.
    Pravidlo je jen v login.css (načítá se pouze na login stránce). */
 html[data-lg-theme="light"] body::after {
-    /* svěží zelené listy na bílé (reference od uživatele): plná sytost vlevo,
+    /* svěží zelené listy na bílé (reference od uživatele): ODDÁLENÝ záběr
+       (malé listy, žádné zvětšování - inset 0 ruší -8% zvětšení z dark varianty);
        vpravo jen mírné ztišení — POD sklem panelu musí zůstat vidět,
        aby je Liquid Glass refrakce měla co lámat */
+    inset: 0;
     background-image: url('../img/login-leaf-bg-light.jpg');
     background-position: top center;
     background-size: cover;
