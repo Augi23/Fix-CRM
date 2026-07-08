@@ -614,6 +614,102 @@ function set_setting($key, $value) {
     return $stmt->execute([$key, $value]);
 }
 
+/**
+ * Odeslání HTML e-mailu přes SMTP (bez externí knihovny — socket klient,
+ * AUTH LOGIN, STARTTLS/SSL). Nastavení z system_settings (smtp_*).
+ * Vrací [bool ok, string error]. Volitelně příloha [filename, mime, data].
+ */
+function smtpSendMail(string $to, string $subject, string $htmlBody, ?array $attachment = null): array
+{
+    $host = trim((string) get_setting('smtp_host'));
+    $port = (int) (get_setting('smtp_port', '587') ?: 587);
+    $secure = get_setting('smtp_secure', 'tls');           // tls | ssl | none
+    $user = trim((string) get_setting('smtp_user'));
+    $pass = (string) get_setting('smtp_pass');
+    $fromEmail = trim((string) get_setting('smtp_from_email')) ?: $user;
+    $fromName  = trim((string) get_setting('smtp_from_name')) ?: get_setting('company_name', 'AppleFix');
+
+    if ($host === '' || $fromEmail === '') {
+        return [false, 'SMTP není nastavené (Nastavení → Integrace → E-mail).'];
+    }
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return [false, 'Neplatná e-mailová adresa klienta.'];
+    }
+
+    $eol = "\r\n";
+    $transport = ($secure === 'ssl') ? "ssl://$host" : $host;
+    $ctx = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);
+    $fp = @stream_socket_client("$transport:$port", $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
+    if (!$fp) { return [false, "Spojení k SMTP selhalo: $errstr ($errno)"]; }
+    stream_set_timeout($fp, 15);
+
+    $read = function () use ($fp) {
+        $data = '';
+        while (($line = fgets($fp, 515)) !== false) {
+            $data .= $line;
+            if (isset($line[3]) && $line[3] === ' ') break;
+        }
+        return $data;
+    };
+    $cmd = function ($c) use ($fp, $read) { fwrite($fp, $c . "\r\n"); return $read(); };
+    $code = fn($r) => (int) substr(trim((string)$r), 0, 3);
+
+    $err = null;
+    try {
+        if ($code($read()) !== 220) throw new Exception('SMTP nepozdravil (220).');
+        $ehloHost = preg_replace('/[^a-zA-Z0-9.\-]/', '', $_SERVER['SERVER_NAME'] ?? 'localhost');
+        $r = $cmd("EHLO $ehloHost");
+        if ($secure === 'tls') {
+            if ($code($cmd('STARTTLS')) !== 220) throw new Exception('STARTTLS odmítnut.');
+            if (!stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT)) {
+                throw new Exception('Nepodařilo se navázat TLS.');
+            }
+            $cmd("EHLO $ehloHost");
+        }
+        if ($user !== '') {
+            if ($code($cmd('AUTH LOGIN')) !== 334) throw new Exception('AUTH LOGIN odmítnut.');
+            if ($code($cmd(base64_encode($user))) !== 334) throw new Exception('SMTP nepřijal uživatele.');
+            if ($code($cmd(base64_encode($pass))) !== 235) throw new Exception('Přihlášení k SMTP selhalo (heslo?).');
+        }
+        if ($code($cmd("MAIL FROM:<$fromEmail>")) !== 250) throw new Exception('MAIL FROM odmítnut.');
+        if ($code($cmd("RCPT TO:<$to>")) !== 250) throw new Exception('Příjemce odmítnut.');
+        if ($code($cmd('DATA')) !== 354) throw new Exception('DATA odmítnuto.');
+
+        $boundary = 'afx_' . bin2hex(random_bytes(8));
+        $headers  = 'From: ' . mb_encode_mimeheader($fromName) . " <$fromEmail>" . $eol;
+        $headers .= "To: <$to>" . $eol;
+        $headers .= 'Subject: ' . mb_encode_mimeheader($subject) . $eol;
+        $headers .= 'MIME-Version: 1.0' . $eol;
+        $headers .= 'Date: ' . date('r') . $eol;
+        if ($attachment) {
+            $headers .= "Content-Type: multipart/mixed; boundary=\"$boundary\"" . $eol . $eol;
+            $body  = "--$boundary" . $eol;
+            $body .= 'Content-Type: text/html; charset=UTF-8' . $eol;
+            $body .= 'Content-Transfer-Encoding: base64' . $eol . $eol;
+            $body .= chunk_split(base64_encode($htmlBody)) . $eol;
+            $body .= "--$boundary" . $eol;
+            $body .= 'Content-Type: ' . $attachment['mime'] . '; name="' . $attachment['filename'] . '"' . $eol;
+            $body .= 'Content-Transfer-Encoding: base64' . $eol;
+            $body .= 'Content-Disposition: attachment; filename="' . $attachment['filename'] . '"' . $eol . $eol;
+            $body .= chunk_split(base64_encode($attachment['data'])) . $eol;
+            $body .= "--$boundary--" . $eol;
+        } else {
+            $headers .= 'Content-Type: text/html; charset=UTF-8' . $eol;
+            $headers .= 'Content-Transfer-Encoding: base64' . $eol . $eol;
+            $body = chunk_split(base64_encode($htmlBody));
+        }
+        // tečkování řádků začínajících tečkou (RFC 5321)
+        $data = preg_replace('/^\./m', '..', $headers . $body);
+        fwrite($fp, $data . $eol . '.' . $eol);
+        if ($code($read()) !== 250) throw new Exception('Server nepřijal zprávu.');
+        $cmd('QUIT');
+    } catch (Exception $e) {
+        $err = $e->getMessage();
+    }
+    fclose($fp);
+    return $err ? [false, $err] : [true, ''];
+}
+
 function getDeviceBrands() {
     global $pdo;
     try {

@@ -1193,7 +1193,49 @@ window.printOrderLabel = function (orderId, opts) {
         });
 };
 
-// auto-tisk štítku hned po založení zakázky (redirect z api/add_order.php)
+/* Zakázkový list — volba tisk / e-mail. Otevře modal #orderDocModal pro danou zakázku. */
+window.openOrderDocChoice = function (orderId, code) {
+    var el = document.getElementById('orderDocModal');
+    if (!el || typeof bootstrap === 'undefined') { window.open('print_order.php?id=' + orderId, '_blank'); return; }
+    document.getElementById('orderDocCode').textContent = code ? ('#' + code) : '';
+    var msg = document.getElementById('orderDocMsg'); if (msg) msg.textContent = '';
+    var printBtn = document.getElementById('orderDocPrintBtn');
+    var emailBtn = document.getElementById('orderDocEmailBtn');
+    printBtn.onclick = function () {
+        if (typeof openUniversalPreview === 'function') {
+            openUniversalPreview('print_order.php?id=' + orderId, 'Zakázkový list');
+        } else {
+            window.open('print_order.php?id=' + orderId, '_blank');
+        }
+    };
+    emailBtn.onclick = function () {
+        emailBtn.disabled = true;
+        var old = emailBtn.innerHTML;
+        emailBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Odesílám…';
+        var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        var fd = new FormData(); fd.append('id', orderId); fd.append('csrf_token', csrf);
+        fetch('api/send_order_email.php', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                emailBtn.disabled = false; emailBtn.innerHTML = old;
+                if (d.ok) {
+                    msg.className = 'small mt-3 text-success';
+                    msg.innerHTML = '<i class="fas fa-check-circle me-1"></i>Odesláno na ' + d.to;
+                } else {
+                    msg.className = 'small mt-3 text-warning';
+                    msg.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>' + (d.error || 'Nepodařilo se odeslat');
+                }
+            })
+            .catch(function () {
+                emailBtn.disabled = false; emailBtn.innerHTML = old;
+                msg.className = 'small mt-3 text-warning';
+                msg.textContent = 'Chyba spojení.';
+            });
+    };
+    bootstrap.Modal.getOrCreateInstance(el).show();
+};
+
+// po založení zakázky: štítek na tiskárnu + nabídka zakázkového listu (tisk / e-mail)
 (function () {
     var params = new URLSearchParams(window.location.search);
     var createdId = params.get('created_order');
@@ -1201,7 +1243,8 @@ window.printOrderLabel = function (orderId, opts) {
     params.delete('created_order');
     var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
     window.history.replaceState({}, '', clean);
-    window.printOrderLabel(createdId, {});
+    try { window.printOrderLabel(createdId, {}); } catch (e) {}
+    setTimeout(function () { window.openOrderDocChoice(createdId, ''); }, 400);
 })();
 
 

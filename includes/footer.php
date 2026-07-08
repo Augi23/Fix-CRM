@@ -107,5 +107,25 @@
 
 <?php require_once __DIR__ . '/modals/new_order_modal.php'; ?>
 <?php require_once __DIR__ . '/modals/new_complaint_modal.php'; ?>
+
+<!-- Zakázkový list: volba tisk / e-mail (po vytvoření zakázky i z menu) -->
+<div class="modal fade" id="orderDocModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content glass-card border-secondary text-white">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title"><i class="fas fa-file-invoice me-2 text-primary"></i>Zakázkový list <span id="orderDocCode"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-white-75 mb-3">Zakázkový list je připraven. Jak s ním chcete naložit?</p>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-outline-info btn-lg" id="orderDocPrintBtn"><i class="fas fa-print me-2"></i>Vytisknout</button>
+          <button type="button" class="btn btn-outline-primary btn-lg" id="orderDocEmailBtn"><i class="fas fa-envelope me-2"></i>Odeslat e-mailem klientovi</button>
+        </div>
+        <div id="orderDocMsg" class="small mt-3"></div>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

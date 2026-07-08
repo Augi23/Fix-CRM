@@ -46,6 +46,17 @@ if (isset($_POST['update_integrations']) && $is_admin_check) {
     set_setting('ifreeicloud_api_key', trim($_POST['ifreeicloud_api_key'] ?? ''));
     set_setting('ifreeicloud_service_id', (string) intval($_POST['ifreeicloud_service_id'] ?? 0));
 
+    // ── SMTP (odesílání zakázkových listů klientům e-mailem) ──
+    set_setting('smtp_host', trim($_POST['smtp_host'] ?? ''));
+    set_setting('smtp_port', (string) intval($_POST['smtp_port'] ?? 587));
+    set_setting('smtp_secure', in_array($_POST['smtp_secure'] ?? '', ['tls','ssl','none'], true) ? $_POST['smtp_secure'] : 'tls');
+    set_setting('smtp_user', trim($_POST['smtp_user'] ?? ''));
+    if (trim((string)($_POST['smtp_pass'] ?? '')) !== '') {   // prázdné = nechat stávající heslo
+        set_setting('smtp_pass', trim($_POST['smtp_pass']));
+    }
+    set_setting('smtp_from_email', trim($_POST['smtp_from_email'] ?? ''));
+    set_setting('smtp_from_name', trim($_POST['smtp_from_name'] ?? ''));
+
     if (!empty($_POST['tg_bot_token'])) {
         $token = trim($_POST['tg_bot_token']);
         $webhook_url = rtrim((string)get_setting("fixer_webhook_url", "https://admin.applefix.cloud"), "/") . "/tg_webhook.php";
@@ -423,6 +434,35 @@ require_once 'includes/header.php';
                         </div>
                         <div class="form-text small text-white-75"><?php echo __('ai_hint'); ?></div>
                     </div>
+
+                    <div class="mb-3 pt-3 border-top border-secondary">
+                        <h5 class="mb-3 text-info"><i class="fas fa-envelope me-2"></i>E-mail (SMTP) — odesílání zakázkových listů klientům</h5>
+                        <div class="row g-2">
+                            <div class="col-md-8"><label class="form-label small text-white-75">SMTP server (host)</label>
+                                <input type="text" name="smtp_host" class="form-control" value="<?php echo htmlspecialchars(get_setting('smtp_host')); ?>" placeholder="smtp.seznam.cz / smtp.gmail.com"></div>
+                            <div class="col-md-2"><label class="form-label small text-white-75">Port</label>
+                                <input type="number" name="smtp_port" class="form-control" value="<?php echo htmlspecialchars(get_setting('smtp_port', '587')); ?>" placeholder="587"></div>
+                            <div class="col-md-2"><label class="form-label small text-white-75">Zabezpečení</label>
+                                <?php $sec = get_setting('smtp_secure', 'tls'); ?>
+                                <select name="smtp_secure" class="form-select">
+                                    <option value="tls" <?php echo $sec==='tls'?'selected':''; ?>>TLS (587)</option>
+                                    <option value="ssl" <?php echo $sec==='ssl'?'selected':''; ?>>SSL (465)</option>
+                                    <option value="none" <?php echo $sec==='none'?'selected':''; ?>>Žádné</option>
+                                </select></div>
+                            <div class="col-md-6"><label class="form-label small text-white-75">Uživatel (login)</label>
+                                <input type="text" name="smtp_user" class="form-control" value="<?php echo htmlspecialchars(get_setting('smtp_user')); ?>" placeholder="servis@applefix.cz" autocomplete="off"></div>
+                            <div class="col-md-6"><label class="form-label small text-white-75">Heslo</label>
+                                <input type="password" name="smtp_pass" class="form-control" value="" placeholder="<?php echo get_setting('smtp_pass') ? '•••••••• (uloženo — nech prázdné pro zachování)' : 'heslo k e-mailu'; ?>" autocomplete="new-password"></div>
+                            <div class="col-md-6"><label class="form-label small text-white-75">Odesílatel — e-mail</label>
+                                <input type="email" name="smtp_from_email" class="form-control" value="<?php echo htmlspecialchars(get_setting('smtp_from_email')); ?>" placeholder="servis@applefix.cz"></div>
+                            <div class="col-md-6"><label class="form-label small text-white-75">Odesílatel — jméno</label>
+                                <input type="text" name="smtp_from_name" class="form-control" value="<?php echo htmlspecialchars(get_setting('smtp_from_name', get_setting('company_name', 'AppleFix'))); ?>" placeholder="AppleFix servis"></div>
+                        </div>
+                        <div class="form-text small text-white-75 mt-2">
+                            Heslo se ukládá jen do vaší databáze a v poli se nikdy nezobrazuje. Po uložení lze e-mail otestovat tlačítkem u kterékoli zakázky.
+                        </div>
+                    </div>
+
                     <div class="col-12 border-top border-secondary pt-3 integrations-save-row">
                         <button type="submit" name="update_integrations" class="btn btn-primary px-5"><?php echo __('save'); ?></button>
                     </div>
