@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+require_once 'includes/scan_resolver.php';
 require_once 'includes/header.php';
 
 // Filter for Dashboard - keep same accepted statuses as orders.php

@@ -870,7 +870,7 @@ td a.fw-bold[href*="order"] {
 .dashboard-main-row { align-items: flex-start !important; }
 /* prostřední část nástěnky (stůl zakázek) mírně zmenšená, pravý sloupec tím
    dostává relativně víc prostoru (přání uživatele 7.7.2026) */
-.dashboard-main-col > .card { zoom: 0.92; }
+@media (min-width: 992px) { .dashboard-main-col > .card { zoom: 0.92; } }
 
 /* ============================================================
    FORMULÁŘE

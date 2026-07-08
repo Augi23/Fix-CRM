@@ -2,26 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-// ── Sken štítku čtečkou ───────────────────────────────────────────────────────
-// HW čtečka „píše" jako klávesnice: s českým rozložením se číslice promění
-// v +ěščřžýáíé (APFAZ2600485 -> APFAZěžééčář). Tady patlanici přeložíme zpět
-// a při PŘESNÉ shodě kódu zakázky rovnou přesměrujeme do detailu (musí být
-// před includem headeru — ten už posílá HTML).
-if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '') {
-    $_scan_fixed = strtr($_scan, ['+' => '1', 'ě' => '2', 'š' => '3', 'č' => '4', 'ř' => '5',
-                                  'ž' => '6', 'ý' => '7', 'á' => '8', 'í' => '9', 'é' => '0']);
-    if (preg_match('/^[A-Za-z]{2,10}\d{4,}$/', $_scan_fixed)) {
-        try {
-            $_st = $pdo->prepare("SELECT id FROM orders WHERE order_code = ? LIMIT 1");
-            $_st->execute([strtoupper($_scan_fixed)]);
-            if ($_oid = $_st->fetchColumn()) {
-                header("Location: view_order.php?id=" . (int)$_oid);
-                exit;
-            }
-            $_GET['search'] = $_scan_fixed;   // kód nenalezen -> aspoň opravený výraz do výpisu
-        } catch (Throwable $e) { /* výpis níže */ }
-    }
-}
+require_once 'includes/scan_resolver.php';
 
 require_once 'includes/header.php';
 

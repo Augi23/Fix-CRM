@@ -1215,15 +1215,37 @@ window.printOrderLabel = function (orderId, opts) {
    Běžné psaní (jména s diakritikou, telefony) se NEmění.
    ═══════════════════════════════════════════════════════════ */
 (function () {
-    var MAP = { '+':'1', 'ě':'2', 'š':'3', 'č':'4', 'ř':'5', 'ž':'6', 'ý':'7', 'á':'8', 'í':'9', 'é':'0' };
-    function fix(v) { return v.replace(/[+ěščřžýáíé]/g, function (c) { return MAP[c]; }); }
+    // stejné mapování jako globální wedge výše: číslice horní řady → háčky
+    // a CZ QWERTZ prohazuje Y↔Z (APFAZ → APFAY). Aplikuje se JEN když vstup
+    // opravdu obsahuje háčky (= přepsáno českou klávesnicí) — běžné psaní nemění.
+    var MAP = { '+':'1', 'ě':'2', 'š':'3', 'č':'4', 'ř':'5', 'ž':'6', 'ý':'7', 'á':'8', 'í':'9', 'é':'0',
+                'y':'z', 'z':'y', 'Y':'Z', 'Z':'Y' };
+    function demangle(s) {
+        var out = '';
+        for (var i = 0; i < s.length; i++) { out += (MAP[s[i]] || s[i]); }
+        return out;
+    }
+    var PATTERN = /^[A-Za-z]{2,10}\d{4,}$/;
     function attach(inp) {
         if (!inp || inp.__scanFix) return;
         inp.__scanFix = true;
+        var lastT = 0, burst = 0, nav = null;
         inp.addEventListener('input', function () {
-            var f = fix(inp.value);
-            if (f !== inp.value && /^[A-Za-z]{2,10}\d{2,}$/.test(f)) {
-                inp.value = f;
+            var now = Date.now();
+            burst = (now - lastT < 90) ? burst + 1 : 0;   // čtečka sype znaky <90 ms po sobě
+            lastT = now;
+            var v = inp.value;
+            if (/[+ěščřžýáíé]/.test(v)) {                  // přepsáno CZ klávesnicí -> přeložit
+                var f = demangle(v);
+                if (PATTERN.test(f)) { inp.value = f; v = f; }
+            }
+            if (nav) { clearTimeout(nav); nav = null; }
+            // rychlá dávka + tvar kódu zakázky => po 200 ms klidu rovnou otevřít detail
+            // (resolver view_order.php?scan= při neshodě spadne do běžného hledání)
+            if (burst >= 4 && PATTERN.test(v)) {
+                nav = setTimeout(function () {
+                    window.location.href = 'view_order.php?scan=' + encodeURIComponent(inp.value);
+                }, 200);
             }
         });
     }

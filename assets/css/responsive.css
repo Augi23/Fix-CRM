@@ -1,0 +1,66 @@
+/* ============================================================
+   Fix-CRM — RESPONZIVNÍ doladění (iPhone / iPad / PC).
+   Načítá se jako poslední; jen layout, žádné barvy/materiály.
+   Základ už existuje: sidebar off-canvas + hamburger (<992px),
+   bootstrap gridy stackují. Tady se ladí topbar, tabulky,
+   modaly a dotykové pohodlí.
+   ============================================================ */
+
+/* ---------- tablety a menší (pod lg = 992px) ---------- */
+@media (max-width: 991.98px) {
+  #content { padding: 12px !important; }
+
+  /* topbar: hledání dostane vlastní celý řádek, nic se nemačká.
+     POZOR: topbar má fixní výšku (--topbar-h) — na mobilech musí růst. */
+  .crm-v2-topbar,
+  .crm-topbar.crm-v2-topbar,
+  .navbar.crm-v2-topbar,
+  nav.navbar.crm-v2-topbar {
+    height: auto !important;
+    max-height: none !important;
+    min-height: var(--topbar-h) !important;
+  }
+  .crm-v2-topbar .crm-topbar-inner { flex-wrap: wrap !important; row-gap: 8px; padding: 6px 0; }
+  .crm-topbar-center { flex: 1 1 100% !important; order: 3 !important; min-width: 100% !important; justify-content: flex-start !important; }
+  .crm-topbar-center .crm-topbar-cta-wrap { flex: 0 0 auto; }
+  .crm-navbar-search { flex: 1 1 auto !important; width: auto !important; min-width: 0 !important; }
+  .crm-navbar-search .input-group { width: 100% !important; }
+  .crm-kbd-hint { display: none !important; }   /* ⌘K na dotyku nedává smysl */
+
+  /* zmenšení stolu zakázek (zoom) je jen desktopová záležitost */
+  .dashboard-main-col > .card { zoom: 1; }
+}
+
+/* ---------- telefony (pod md = 768px) ---------- */
+@media (max-width: 767.98px) {
+  h2 { font-size: 1.35rem; }
+  .card-body { padding: 14px !important; }
+
+  /* tabulky: plynulý vodorovný posuv prstem + kompaktní buňky */
+  .table-responsive { -webkit-overflow-scrolling: touch; }
+  .table td, .table th { padding: 8px 10px; font-size: 0.86rem; white-space: nowrap; }
+
+  /* modaly téměř přes celý displej (vč. wizardu Nová zakázka a Nové reklamace) */
+  .modal-dialog { margin: 8px auto; max-width: calc(100vw - 16px); }
+  .modal-dialog-scrollable { max-height: calc(100dvh - 16px); }
+  .modal-body { padding: 14px; }
+  .modal-footer { flex-wrap: wrap; gap: 6px; }
+
+  /* akční skupiny tlačítek se smí lámat */
+  .card-header .d-flex, .d-flex.gap-2 { flex-wrap: wrap; }
+
+  /* dotyková velikost cílů v sidebaru */
+  #sidebar .nav-link { padding-top: 13px; padding-bottom: 13px; }
+
+  /* pohodlné dotykové ikony v topbaru (sken kamerou, oznámení) */
+  .crm-navbar-actions .btn,
+  .crm-v2-icon-btn { min-width: 42px; min-height: 42px; font-size: 1.05rem; }
+
+  /* skener kamerou přes celou šířku modalu */
+  #qrReader { width: 100% !important; }
+}
+
+/* ---------- iPad na výšku / úzký desktop ---------- */
+@media (min-width: 768px) and (max-width: 1180px) {
+  .crm-v2-topbar .navbar-brand { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
