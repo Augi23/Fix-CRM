@@ -1204,3 +1204,32 @@ window.printOrderLabel = function (orderId, opts) {
     window.printOrderLabel(createdId, {});
 })();
 
+
+/* ═══════════════════════════════════════════════════════════
+   SKEN ŠTÍTKU DO VYHLEDÁVÁNÍ — oprava „patlanice" ze čtečky
+   HW čtečka píše jako klávesnice; s ČESKÝM rozložením vyjdou
+   číslice jako +ěščřžýáíé (APFAZ2600485 → APFAZěžééčář).
+   Jakmile hodnota po překladu vypadá jako kód zakázky
+   (PREFIX+číslice), pole se samo opraví; Enter ze čtečky pak
+   formulář odešle a orders.php otevře detail zakázky rovnou.
+   Běžné psaní (jména s diakritikou, telefony) se NEmění.
+   ═══════════════════════════════════════════════════════════ */
+(function () {
+    var MAP = { '+':'1', 'ě':'2', 'š':'3', 'č':'4', 'ř':'5', 'ž':'6', 'ý':'7', 'á':'8', 'í':'9', 'é':'0' };
+    function fix(v) { return v.replace(/[+ěščřžýáíé]/g, function (c) { return MAP[c]; }); }
+    function attach(inp) {
+        if (!inp || inp.__scanFix) return;
+        inp.__scanFix = true;
+        inp.addEventListener('input', function () {
+            var f = fix(inp.value);
+            if (f !== inp.value && /^[A-Za-z]{2,10}\d{2,}$/.test(f)) {
+                inp.value = f;
+            }
+        });
+    }
+    function init() {
+        document.querySelectorAll('.crm-navbar-search input[name="search"], form input[name="search"]').forEach(attach);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();
