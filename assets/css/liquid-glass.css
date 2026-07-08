@@ -1019,11 +1019,27 @@ html[data-lg-theme="light"] .alert-success   { background: #E7F7EC !important; c
 html[data-lg-theme="light"] .alert-warning   { background: #FBF4DC !important; color: #8A5A00 !important; border-color: rgba(234,179,8,0.35) !important; }
 html[data-lg-theme="light"] .alert-danger    { background: #FDEBEB !important; color: #A31432 !important; border-color: rgba(239,68,68,0.30) !important; }
 html[data-lg-theme="light"] .alert .alert-link { color: inherit !important; text-decoration: underline; }
-/* light: notifikační panel — texty natvrdo přes .text-white v itemech */
+/* light: notifikační panel. POZOR: fix-crm-v2.css dává panelu tmavé pozadí
+   přes ID selektor (#crmNotificationsPanel) — musíme přebít taky ID-selektorem,
+   jinak zůstane tmavý a tmavý text na něm je nečitelný. */
+html[data-lg-theme="light"] #crmNotificationsPanel,
+html[data-lg-theme="light"] .crm-notifications-panel {
+  background: rgba(255,255,255,0.96) !important;
+  background-color: rgba(255,255,255,0.96) !important;
+  border-left: 1px solid rgba(0,0,0,0.10) !important;
+  box-shadow: -8px 0 32px rgba(31,38,135,0.14) !important;
+}
+html[data-lg-theme="light"] #crmNotificationsPanel .crm-notifications-head,
+html[data-lg-theme="light"] #crmNotificationsPanel .crm-notifications-foot { border-color: rgba(0,0,0,0.10) !important; }
+html[data-lg-theme="light"] #crmNotificationsPanel .crm-notifications-head strong { color: #1d1d1f !important; }
+html[data-lg-theme="light"] #crmNotificationsPanel .crm-notifications-item { border-bottom-color: rgba(0,0,0,0.07) !important; }
+html[data-lg-theme="light"] #crmNotificationsPanel .crm-notifications-item:hover { background: rgba(0,0,0,0.035) !important; }
 html[data-lg-theme="light"] .crm-notifications-item .text-white,
 html[data-lg-theme="light"] .crm-notifications-panel .text-white { color: #1d1d1f !important; }
 html[data-lg-theme="light"] .crm-notifications-item .text-white-75,
 html[data-lg-theme="light"] .crm-notifications-panel .text-white-75 { color: rgba(0,0,0,0.60) !important; }
+html[data-lg-theme="light"] #crmNotificationsPanel .crm-notifications-empty .text-white-50,
+html[data-lg-theme="light"] #crmNotificationsPanel .crm-notifications-empty .text-white-75 { color: rgba(0,0,0,0.55) !important; }
 
 /* sheen decentnější na světlé */
 html[data-lg-theme="light"] .lg-sheen::after {

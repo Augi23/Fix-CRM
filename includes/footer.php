@@ -65,30 +65,26 @@
         <button type="button" class="btn btn-sm btn-outline-secondary" id="notificationsPanelClose"><i class="fas fa-times"></i></button>
     </div>
     <div class="crm-notifications-list">
-        <div class="crm-notifications-item">
-            <span class="crm-notifications-icon warning"><i class="fas fa-clock"></i></span>
-            <div>
-                <div class="small text-white"><?php echo __('sample_sla_waiting'); ?></div>
-                <div class="small text-white-75"><?php echo __('sample_6_min_ago'); ?></div>
+        <?php $crm_notifs = function_exists('getCrmNotifications') ? getCrmNotifications(15) : []; ?>
+        <?php if (empty($crm_notifs)): ?>
+            <div class="crm-notifications-empty text-center py-5">
+                <i class="fas fa-bell-slash fa-lg mb-2 d-block text-white-50"></i>
+                <div class="small text-white-75">Žádná nová upozornění</div>
             </div>
-        </div>
-        <div class="crm-notifications-item">
-            <span class="crm-notifications-icon success"><i class="fas fa-check"></i></span>
-            <div>
-                <div class="small text-white"><?php echo __('sample_import_done'); ?></div>
-                <div class="small text-white-75"><?php echo __('sample_12_min_ago'); ?></div>
-            </div>
-        </div>
-        <div class="crm-notifications-item">
-            <span class="crm-notifications-icon info"><i class="fas fa-info"></i></span>
-            <div>
-                <div class="small text-white"><?php echo __('sample_new_customer_added'); ?></div>
-                <div class="small text-white-75"><?php echo __('sample_24_min_ago'); ?></div>
-            </div>
-        </div>
+        <?php else: foreach ($crm_notifs as $n): ?>
+            <a class="crm-notifications-item text-decoration-none" href="<?php echo e($n['url'] ?? '#'); ?>">
+                <span class="crm-notifications-icon <?php echo e($n['type']); ?>"><i class="fas <?php echo e($n['icon']); ?>"></i></span>
+                <div class="min-w-0">
+                    <div class="small text-white text-truncate"><?php echo e($n['title']); ?></div>
+                    <div class="small text-white-75 text-truncate">
+                        <?php echo e(trim($n['sub'] ?? '')); ?><?php if (!empty($n['sub']) && !empty($n['ts'])) echo ' · '; ?><?php echo e($n['ts'] ? crmTimeAgo($n['ts']) : ''); ?>
+                    </div>
+                </div>
+            </a>
+        <?php endforeach; endif; ?>
     </div>
     <div class="crm-notifications-foot">
-        <button type="button" class="btn btn-sm btn-outline-secondary w-100"><?php echo __('mark_all_read'); ?></button>
+        <a href="orders.php" class="btn btn-sm btn-outline-secondary w-100"><i class="fas fa-list me-1"></i> Otevřít zakázky</a>
     </div>
 </div>
 

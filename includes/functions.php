@@ -1806,15 +1806,134 @@ function orderStaleSeconds(array $order): int
     return $last ? max(0, time() - $last) : 0;
 }
 
-/** CSS třída + title pro <tr> zakázky (prázdné, pokud je vše v pořádku). */
+/** Datum spuštění „naostro" — zakázky vytvořené PŘED tímto dnem (import historie)
+ *  se nepovažují za zaseknuté a NEPULZUJÍ. Od tohoto dne jede pulzování dle pravidel.
+ *  Uloženo v nastavení (klíč pulse_golive_date), výchozí 2026-07-08. */
+function crmGoLiveTs(): int
+{
+    static $ts = null;
+    if ($ts !== null) return $ts;
+    $d = trim((string) get_setting('pulse_golive_date', '2026-07-08'));
+    $t = strtotime($d . ' 00:00:00');
+    $ts = $t ?: strtotime('2026-07-08 00:00:00');
+    return $ts;
+}
+
+/** CSS třída + title pro <tr> zakázky (prázdné, pokud je vše v pořádku).
+ *  Importované/historické zakázky (created_at < go-live) nikdy nepulzují. */
 function orderStaleRowAttrs(array $order): array
 {
+    if (!empty($order['created_at']) && strtotime((string)$order['created_at']) < crmGoLiveTs()) {
+        return ['', ''];   // historie / import — neblikat
+    }
     $sec = orderStaleSeconds($order);
     $level = getOrderStaleLevel((string)($order['status'] ?? ''), $sec);
     if ($level === null) { return ['', '']; }
     $cls = ' order-stale--' . $level;
     $title = __('stale_since') . ' ' . formatPresenceDuration($sec);
     return [$cls, $title];
+}
+
+/** Relativní čas „před X" (pro upozornění). */
+function crmTimeAgo($when): string
+{
+    $t = is_numeric($when) ? (int)$when : strtotime((string)$when);
+    if (!$t) return '';
+    $s = max(0, time() - $t);
+    if ($s < 60)    return 'právě teď';
+    if ($s < 3600)  return 'před ' . floor($s / 60) . ' min';
+    if ($s < 86400) return 'před ' . floor($s / 3600) . ' h';
+    $d = floor($s / 86400);
+    return 'před ' . $d . ' ' . ($d === 1.0 ? 'dnem' : ($d < 5 ? 'dny' : 'dny'));
+}
+
+/** Reálný feed do notifikačního panelu (od go-live dne dál).
+ *  Skládá: zaseknuté zakázky (SLA) + poslední změny stavu + nové reklamace. */
+function getCrmNotifications(int $limit = 15): array
+{
+    global $pdo;
+    if (!isset($pdo)) return [];
+    $golive = date('Y-m-d H:i:s', crmGoLiveTs());
+    $items = [];
+
+    // ikona + typ podle skupiny stavu
+    $iconFor = function (string $status): array {
+        switch (getOrderStatusGroup($status)) {
+            case 'waiting_parts':    return ['warning', 'fa-clock'];
+            case 'completed':        return ['success', 'fa-check'];
+            case 'collected':        return ['success', 'fa-box-open'];
+            case 'cancelled':        return ['info',    'fa-ban'];
+            case 'new':              return ['info',    'fa-clipboard-list'];
+            default:                 return ['info',    'fa-screwdriver-wrench'];
+        }
+    };
+
+    try {
+        // 1) zaseknuté zakázky (jen go-live+) — nahoře, vyžadují pozornost
+        $st = $pdo->query(
+            "SELECT o.id, o.order_code, o.status, o.device_model, o.created_at,
+                    GREATEST(COALESCE(o.updated_at, o.created_at), o.created_at) AS act,
+                    c.first_name, c.last_name
+             FROM orders o JOIN customers c ON c.id = o.customer_id
+             WHERE o.created_at >= " . $pdo->quote($golive) .
+            " ORDER BY act ASC LIMIT 60");
+        foreach ($st as $o) {
+            $sec = orderStaleSeconds(['last_status_change' => $o['act'], 'created_at' => $o['created_at']]);
+            $lvl = getOrderStaleLevel((string)$o['status'], $sec);
+            if ($lvl === null) continue;
+            $items[] = [
+                'type' => 'warning', 'icon' => 'fa-triangle-exclamation',
+                'title' => 'Bez pohybu: ' . $o['order_code'] . ' — ' . getOrderStatusLabel((string)$o['status']),
+                'sub' => trim(($o['device_model'] ?? '') . ' · ' . formatPresenceDuration($sec)),
+                'ts' => strtotime((string)$o['act']), 'url' => 'view_order.php?id=' . (int)$o['id'],
+            ];
+        }
+    } catch (Throwable $e) { /* skip */ }
+
+    try {
+        // 2) poslední změny stavu z logu (go-live+)
+        $st = $pdo->prepare(
+            "SELECT l.new_status, l.changed_at, o.id, o.order_code, o.device_model
+             FROM order_status_log l JOIN orders o ON o.id = l.order_id
+             WHERE l.changed_at >= ? ORDER BY l.changed_at DESC LIMIT 20");
+        $st->execute([$golive]);
+        foreach ($st as $r) {
+            [$type, $icon] = $iconFor((string)$r['new_status']);
+            $items[] = [
+                'type' => $type, 'icon' => $icon,
+                'title' => $r['order_code'] . ' → ' . getOrderStatusLabel((string)$r['new_status']),
+                'sub' => (string)($r['device_model'] ?? ''),
+                'ts' => strtotime((string)$r['changed_at']), 'url' => 'view_order.php?id=' . (int)$r['id'],
+            ];
+        }
+    } catch (Throwable $e) { /* log nemusí existovat */ }
+
+    try {
+        // 3) nové reklamace (go-live+)
+        $st = $pdo->prepare(
+            "SELECT id, complaint_code, device, created_at FROM complaints
+             WHERE created_at >= ? ORDER BY created_at DESC LIMIT 10");
+        $st->execute([$golive]);
+        foreach ($st as $r) {
+            $items[] = [
+                'type' => 'warning', 'icon' => 'fa-rotate-left',
+                'title' => 'Nová reklamace: ' . $r['complaint_code'],
+                'sub' => (string)($r['device'] ?? ''),
+                'ts' => strtotime((string)$r['created_at']), 'url' => 'reklamace.php',
+            ];
+        }
+    } catch (Throwable $e) { /* tabulka nemusí existovat */ }
+
+    // seřadit: nejnovější nahoře, deduplikovat podle title+ts, oříznout
+    usort($items, fn($a, $b) => ($b['ts'] ?? 0) <=> ($a['ts'] ?? 0));
+    $seen = []; $out = [];
+    foreach ($items as $it) {
+        $k = $it['title'] . '|' . ($it['ts'] ?? 0);
+        if (isset($seen[$k])) continue;
+        $seen[$k] = 1; $out[] = $it;
+        if (count($out) >= $limit) break;
+    }
+    return $out;
 }
 
 /* ============================================================
