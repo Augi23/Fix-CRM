@@ -160,6 +160,7 @@ try {
 
         <div class="crm-nav-group-title"><?php echo __('nav_work'); ?></div>
         <a class="nav-link crm-nav-new-order" href="#" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-2"></i><span><?php echo __('new_order'); ?></span></a>
+        <a class="nav-link crm-nav-new-complaint" href="#" data-bs-toggle="modal" data-bs-target="#newComplaintModal"><i class="fas fa-rotate-left me-2"></i><span>Nová reklamace</span></a>
         <a class="nav-link <?php echo $current_page == 'orders.php' ? 'active' : ''; ?>" href="orders.php">
             <i class="fas fa-tools me-2"></i><span><?php echo __('orders'); ?></span>
             <?php if ($ordersBadgeCount > 0): ?><span class="crm-nav-pill"><?php echo $ordersBadgeCount; ?></span><?php endif; ?>

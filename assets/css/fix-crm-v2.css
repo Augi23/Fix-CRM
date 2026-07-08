@@ -2791,3 +2791,26 @@ p, span, label, .small, small,
 .order-row--status-collected:hover   > td { background: rgba(34,197,94,0.28)   !important; }
 .order-row--status-cancelled:hover   > td { background: rgba(156,163,175,0.22) !important; }
 .order-row--status-default:hover     > td { background: rgba(148,163,184,0.20) !important; }
+
+/* ============================================================
+   NOVÁ REKLAMACE — oranžová položka v sidebaru + modal fotky
+   ============================================================ */
+#sidebar .nav-link.crm-nav-new-complaint i,
+#sidebar .nav-link.crm-nav-new-complaint span { color: #f97316 !important; }
+#sidebar .nav-link.crm-nav-new-complaint:hover i,
+#sidebar .nav-link.crm-nav-new-complaint:hover span { color: #fb923c !important; }
+
+/* náhledy fotek v modalu reklamace */
+.complaint-photo-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.complaint-photo-thumb {
+  position: relative; width: 88px; height: 88px;
+  border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.20);
+}
+.complaint-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.complaint-photo-thumb button {
+  position: absolute; top: 3px; right: 3px; width: 22px; height: 22px;
+  border: 0; border-radius: 50%; background: rgba(0,0,0,0.62); color: #fff;
+  font-size: 14px; line-height: 20px; padding: 0; cursor: pointer;
+}
+.complaint-photo-thumb button:hover { background: #dc3545; }

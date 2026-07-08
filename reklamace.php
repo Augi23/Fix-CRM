@@ -44,11 +44,33 @@ if (isset($pdo)) {
         $pages = 1;
     }
 }
+
+// počty fotek k reklamacím (tabulka na starších instalacích nemusí existovat)
+$complaint_photos = [];
+if (!empty($rows) && isset($pdo)) {
+    try {
+        $ids = array_map('intval', array_column($rows, 'id'));
+        $q = $pdo->query("SELECT complaint_id, COUNT(*) AS n, MIN(file_path) AS first_path
+                          FROM complaint_attachments WHERE complaint_id IN (" . implode(',', $ids) . ")
+                          GROUP BY complaint_id");
+        foreach ($q as $p) { $complaint_photos[(int)$p['complaint_id']] = $p; }
+    } catch (Throwable $e) { /* bez fotek */ }
+}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Reklamace</h2>
+    <button class="btn fw-semibold" style="background:#f97316;color:#fff" data-bs-toggle="modal" data-bs-target="#newComplaintModal">
+        <i class="fas fa-rotate-left me-1"></i> Nová reklamace
+    </button>
 </div>
+
+<?php if (!empty($_GET['created'])): ?>
+    <div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Reklamace <strong><?php echo e($_GET['created']); ?></strong> byla založena.</div>
+<?php endif; ?>
+<?php if (!empty($_GET['error'])): ?>
+    <div class="alert alert-danger"><i class="fas fa-triangle-exclamation me-2"></i><?php echo e($_GET['error']); ?></div>
+<?php endif; ?>
 
 <div class="card">
     <div class="card-body">
@@ -75,12 +97,20 @@ if (isset($pdo)) {
                 <?php foreach ($rows as $r): ?>
                     <?php $ui = complaintStatusUi($r['complaint_status'] ?? ''); ?>
                     <tr class="<?php echo e($ui['row']); ?>">
-                        <td><?php echo e($r['complaint_code']); ?></td>
+                        <td>
+                            <?php echo e($r['complaint_code']); ?>
+                            <?php if (!empty($complaint_photos[(int)$r['id']])): $cp = $complaint_photos[(int)$r['id']]; ?>
+                                <a href="<?php echo e($cp['first_path']); ?>" target="_blank" rel="noopener"
+                                   class="badge bg-secondary text-decoration-none ms-1" title="Fotodokumentace">
+                                    <i class="fas fa-camera"></i> <?php echo (int)$cp['n']; ?>
+                                </a>
+                            <?php endif; ?>
+                        </td>
                         <td><?php echo e(trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''))); ?></td>
                         <td><?php echo e($r['phone'] ?? ''); ?></td>
                         <td><?php echo e($r['device'] ?? ''); ?></td>
                         <td><?php echo e($r['serial_number'] ?? ''); ?></td>
-                        <td style="min-width:280px;"><?php echo e($r['complaint_reason'] ?? ''); ?></td>
+                        <td style="min-width:280px;"><?php echo nl2br(e($r['complaint_reason'] ?? '')); ?></td>
                         <td><span class="badge <?php echo e($ui['badge']); ?>"><?php echo e($ui['label']); ?></span></td>
                     </tr>
                 <?php endforeach; ?>

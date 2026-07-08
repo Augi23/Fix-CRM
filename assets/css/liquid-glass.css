@@ -1044,3 +1044,8 @@ html[data-lg-theme="light"] .lg-sheen::after {
     box-shadow: none !important;
   }
 }
+
+/* světlé téma: oranžová „Nová reklamace" v sidebaru + rámečky náhledů */
+html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-complaint i,
+html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-complaint span { color: #ea580c !important; }
+html[data-lg-theme="light"] .complaint-photo-thumb { border-color: rgba(0,0,0,0.14); }

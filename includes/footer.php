@@ -110,5 +110,6 @@
 </div>
 
 <?php require_once __DIR__ . '/modals/new_order_modal.php'; ?>
+<?php require_once __DIR__ . '/modals/new_complaint_modal.php'; ?>
 </body>
 </html>
