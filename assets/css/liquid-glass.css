@@ -811,38 +811,18 @@ html[data-lg-theme="light"] .login-panel {
   }
 }
 
-/* ---- OKRAJOVÁ REFRAKCE (edge lensing) — podpis Apple Liquid Glass:
-   po obvodu skla se pozadí ohýbá výrazně víc než uprostřed. Prstenec
-   je zvláštní element .lg-edge (pseudo-prvky panelu jsou obsazené),
-   maskou z něj zůstane jen ~26px pás po obvodu. Jen světlé téma. ---- */
-.login-panel .lg-edge { display: none; }
-html[data-lg-theme="light"] .login-panel .lg-edge {
-  display: block;
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 0;
-  -webkit-backdrop-filter: blur(6px) saturate(200%) brightness(1.06);
-          backdrop-filter: blur(6px) saturate(200%) brightness(1.06);
-  /* maska: plný obdélník XOR vnitřek => zůstane jen obvodový prstenec */
-  padding: 26px;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          mask-composite: exclude;
-  /* jemný lesk hrany navrch prstence */
+/* Okrajový lesk skla (rim highlight) — jemný, po CELÉM obvodu, BEZ tvrdého
+   vnitřního obdélníku. Nahradilo dřívější .lg-edge prstenec, který se přes
+   listy vykresloval jako ošklivý rámeček. Refrakci nese celý panel výše. */
+html[data-lg-theme="light"] .login-panel {
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.9),
-    inset 0 -1px 0 rgba(255,255,255,0.45);
+    inset 0 1px 1px rgba(255,255,255,0.98),
+    inset 0 -1px 1px rgba(255,255,255,0.55),
+    inset 0 0 0 1px rgba(255,255,255,0.35),      /* tenký skleněný rám po obvodu */
+    inset 0 0 30px rgba(255,255,255,0.28),       /* měkká vnitřní záře od hran */
+    0 34px 80px rgba(20,45,90,0.18),
+    0 4px 14px rgba(20,45,90,0.08) !important;
 }
-@supports (backdrop-filter: url(#lg-refract-edge)) {
-  html[data-lg-theme="light"] .login-panel .lg-edge {
-    -webkit-backdrop-filter: url(#lg-refract-edge) blur(2px) saturate(210%) brightness(1.05);
-            backdrop-filter: url(#lg-refract-edge) blur(2px) saturate(210%) brightness(1.05);
-  }
-}
-/* obsah panelu nad prstencem */
 html[data-lg-theme="light"] .login-panel-inner { position: relative; z-index: 1; }
 /* výraznější lesklá hrana (edge highlight / specular) */
 html[data-lg-theme="light"] .login-panel::before {

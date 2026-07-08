@@ -296,7 +296,6 @@ if (!empty($_POST['ajax'])) {
         </section>
 
         <section class="login-panel glass-card shadow-lg">
-            <div class="lg-edge" aria-hidden="true"></div><?php /* okrajová refrakce (Liquid Glass) — jen světlé téma */ ?>
             <div class="login-panel-inner">
                 <div class="login-panel-head">
                     <div>
