@@ -10,6 +10,25 @@ $suppliers = getSupplierCatalogs();
 $selectedOrderId = max(0, (int)($_GET['order_id'] ?? 0));
 $selectedSupplier = trim((string)($_GET['supplier'] ?? ''));
 
+// Předvyplnění zakázky v modalu „Objednat díl": z URL, jinak naposledy otevřená zakázka.
+$presetOrderId = $selectedOrderId > 0 ? $selectedOrderId : max(0, (int)($_SESSION['last_order_id'] ?? 0));
+$presetOrderLabel = '';
+if ($presetOrderId > 0 && isset($pdo)) {
+    try {
+        $__ps = $pdo->prepare("SELECT o.id, o.order_code, o.device_brand, o.device_model, c.first_name, c.last_name
+                               FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id = ? LIMIT 1");
+        $__ps->execute([$presetOrderId]);
+        if ($__pr = $__ps->fetch()) {
+            $__code = trim((string)($__pr['order_code'] ?? '')) !== '' ? (string)$__pr['order_code'] : ('#' . (int)$__pr['id']);
+            $__dev  = trim(((string)($__pr['device_brand'] ?? '')) . ' ' . ((string)($__pr['device_model'] ?? '')));
+            $__cli  = trim(((string)($__pr['first_name'] ?? '')) . ' ' . ((string)($__pr['last_name'] ?? '')));
+            $presetOrderLabel = trim($__code . ($__dev !== '' ? ' ' . $__dev : '') . ($__cli !== '' ? ' · ' . $__cli : ''));
+        } else {
+            $presetOrderId = 0;
+        }
+    } catch (Throwable $e) { $presetOrderId = 0; }
+}
+
 // Manager/admin gate for ordering parts (the add action requires it on the server).
 $can_order = hasPermission('procurement_manage') || hasPermission('admin_access');
 
@@ -797,9 +816,10 @@ $(function() {
         $('#orderPartPriority').val('this_week');
         $('#orderPartOrder').val(null).trigger('change');
 
-        <?php if ($selectedOrderId > 0): ?>
-        const presetOrder = <?php echo (int)$selectedOrderId; ?>;
-        const opt = new Option('#' + presetOrder, presetOrder, true, true);
+        <?php if ($presetOrderId > 0): ?>
+        const presetOrder = <?php echo (int)$presetOrderId; ?>;
+        const presetLabel = <?php echo json_encode($presetOrderLabel !== '' ? $presetOrderLabel : ('#' . (int)$presetOrderId), JSON_UNESCAPED_UNICODE); ?>;
+        const opt = new Option(presetLabel, presetOrder, true, true);
         $('#orderPartOrder').append(opt).trigger('change');
         <?php endif; ?>
 

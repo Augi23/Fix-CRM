@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Objednávka dílu: předvyplní naposledy otevřenou zakázku',
+        'items' => [
+            'Modal „Objednat díl" nově předvyplní naposledy otevřenou zakázku a zobrazuje správný kód zakázky (APFAZ…) místo interního čísla (#1236).',
+            'Dropdown zakázek je řazený od nejnovějších.',
+            'Opraven popisek „proc_optional" → „Nepovinné".',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Příjem zakázky: focení stavu + oprava tlačítka Dokončit',
         'items' => [
             'Tlačítko „Dokončit" se nově zobrazí až v posledním kroku po vyplnění všech údajů (dřív prosvítalo hned na 1. kroku).',

@@ -32,6 +32,9 @@ $order = $stmt->fetch();
 
 if (!$order) die(__('order_not_found'));
 
+// zapamatuj naposledy otevřenou zakázku (pro předvyplnění při objednávání dílu)
+$_SESSION['last_order_id'] = (int)$order['id'];
+
 // Branch access control: staff see only orders from their branch; managers/admins see all.
 if (!canAccessOrderBranch($order)) {
     die(__('no_edit_permission'));
