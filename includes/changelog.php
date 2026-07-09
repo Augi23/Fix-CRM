@@ -7,6 +7,19 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Nový vzhled: horní dok, Liquid Glass, saténové pozadí',
+        'items' => [
+            'Levé menu nahrazeno plovoucím skleněným dokem z buněk nahoře (Apple styl) + tenkým servisním řádkem s hledáním (⌘K), skenerem, notifikacemi, přepínačem vzhledu, jazykem a profilem.',
+            'Na mobilu a tabletu (do 1080 px) spodní tab bar ve stylu iOS s velkým ＋ (nová zakázka) a Menu, které otevře sheet zdola — s plnohodnotným hledáním (konečně i na mobilu), barevnými akcemi a všemi odkazy.',
+            'Nové pozadí: tmavý grafitovo-zelený satén (SVG vlny) — elegantní struktura, na které je vidět lom skla.',
+            'Nový Liquid Glass engine s fyzikální refrakcí (Snellův zákon): dok i modální okna reálně lámou pozadí (Chrome/Edge); Safari má matné sklo.',
+            'Sytější zářivá paleta: ledová azurová, mátový smaragd, mandarinka, orchidej.',
+            'Tlačítka mají „liquid press morph" — hloubkové kliknutí: stisk tlačítko zanoří do skla, puštění se pružně vrátí (jako iOS).',
+            'Záloha původního vzhledu: větev backup/pred-redesignem-2026-07-09 na GitHubu.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Typografie: SF Pro všude + váhová hierarchie',
         'items' => [
             'Celé CRM (včetně přihlášení a klientské sekce) nově píše jednotně fontem SF Pro Display z vlastních souborů — Google font Inter odstraněn (rychlejší načítání, žádná závislost na Google).',

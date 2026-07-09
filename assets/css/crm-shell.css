@@ -1,0 +1,367 @@
+/*
+ * Fix-CRM SHELL 2026 — horní dok z buněk + tenký servisní řádek + saténové pozadí
+ * + Liquid Glass engine (assets/js/liquid-glass-engine.js).
+ * Načítá se POSLEDNÍ — cíleně přebíjí fix-crm-v2.css (layout sidebaru → horní nav).
+ * Záloha starého vzhledu: větev backup/pred-redesignem-2026-07-09.
+ */
+
+/* ============================================================
+   1) AURORA PALETA — sytější, zářivější akcenty (ne AI klišé)
+   ledová azurová · mátový smaragd · mandarinka · orchidej
+   ============================================================ */
+:root {
+  --blue:   #00a8ff;
+  --indigo: #00a8ff;
+  --violet: #55d4ff;
+  --purple: #5fd2ff;
+  --green:  #3be8a8;
+  --orange: #ffb03d;
+  --red:    #ff5c7a;
+  --grad:      linear-gradient(135deg, #00b0ff 0%, #2bd9ff 60%, #22e0d0 100%);
+  --grad-text: linear-gradient(90deg,  #00b0ff 0%, #2bd9ff 50%, #22e0d0 95%);
+  --glow:    0 0 24px rgba(0,168,255,0.35);
+  --glow-sm: 0 0 12px rgba(0,168,255,0.25);
+  --afx-ice:    #55d4ff;
+  --afx-mint:   #3be8a8;
+  --afx-tanger: #ffb03d;
+  --afx-orchid: #e08dff;
+}
+
+/* Zářivé statistiky (jemný světelný dozvuk) */
+.crm-stat-value, .stat-value, .kpi-value, .sl-stat-num, .crm-grad-text {
+  text-shadow: 0 0 18px rgba(85,212,255,0.30);
+}
+.sl-stat-pending  .sl-stat-num { color: var(--afx-tanger) !important; text-shadow: 0 0 18px rgba(255,176,61,.4); }
+.sl-stat-ordered  .sl-stat-num { color: var(--afx-ice) !important;    text-shadow: 0 0 18px rgba(85,212,255,.4); }
+.sl-stat-received .sl-stat-num { color: var(--afx-mint) !important;   text-shadow: 0 0 18px rgba(59,232,168,.4); }
+
+/* ============================================================
+   2) POZADÍ — grafit × lesní zelená, saténové vlny (SVG .crm-bgfx)
+   ============================================================ */
+html, body {
+  background: #070a09 !important;
+  background-color: #070a09 !important;
+}
+.crm-bgfx {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  width: 100vw; height: 100vh;
+}
+#content, #content.crm-v2-content { position: relative; z-index: 1; }
+
+/* ============================================================
+   3) LAYOUT — pryč s levým sloupcem, obsah na plnou šířku
+   ============================================================ */
+#content, #content.crm-v2-content { margin-left: 0 !important; }
+html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { margin-left: 0 !important; }
+#sidebar, #sidebarBackdrop { display: none !important; }
+.crm-main-content { max-width: 1560px; margin: 0 auto; width: 100%; }
+
+/* ============================================================
+   4) TENKÝ SERVISNÍ ŘÁDEK
+   ============================================================ */
+.afx-utility {
+  position: relative; z-index: 901;
+  display: flex; align-items: center; gap: 12px;
+  height: 46px; padding: 0 18px;
+  font-size: 12.5px; color: rgba(255,255,255,.55);
+}
+.afx-brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 14px; color: #eef2f8; letter-spacing: -.01em; text-decoration: none; }
+.afx-brand:hover { color: #fff; }
+.afx-brand img { height: 24px; width: auto; display: block; }
+.afx-brand .afx-brand-fix { color: var(--afx-ice); }
+.afx-page-title { color: rgba(255,255,255,.45); font-size: 12.5px; font-weight: 500; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.12); max-width: 32vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.afx-utility-sep { flex: 1; }
+
+.afx-search { margin: 0; }
+.afx-search .input-group {
+  background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.09);
+  border-radius: 999px; overflow: hidden; flex-wrap: nowrap; min-width: 250px;
+}
+.afx-search .input-group-text { background: transparent !important; border: none !important; color: rgba(255,255,255,.4) !important; padding: 4px 4px 4px 12px !important; }
+.afx-search .form-control {
+  background: transparent !important; border: none !important; box-shadow: none !important;
+  color: #eef2f8 !important; font-size: 12.5px !important; padding: 6px 8px !important; min-height: 0 !important;
+}
+.afx-search .crm-kbd-hint { background: transparent !important; border: none !important; color: rgba(255,255,255,.3) !important; font-size: 10.5px !important; padding-right: 12px !important; }
+
+.afx-utility .crm-v2-icon-btn {
+  width: 32px; height: 32px; border-radius: 999px !important;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.05) !important; border: 1px solid rgba(255,255,255,.08) !important;
+  color: #c4cdda !important; padding: 0 !important;
+}
+.afx-utility .crm-v2-icon-btn:hover { background: rgba(255,255,255,.11) !important; color: #fff !important; }
+.afx-utility .crm-lang-switch { border-radius: 999px !important; font-size: 11.5px !important; padding: 5px 10px !important; }
+.afx-utility .afx-logout { border-radius: 999px !important; }
+.afx-user { display: flex; align-items: center; gap: 8px; }
+.afx-user .afx-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: linear-gradient(135deg, #00b0ff, #22e0d0);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(0,176,255,.35);
+}
+.afx-user b { font-size: 12.5px; font-weight: 500; color: #c7d0dd; white-space: nowrap; }
+
+/* ============================================================
+   5) PLOVOUCÍ DOK Z BUNĚK (Liquid Glass)
+   ============================================================ */
+.afx-dockwrap {
+  position: sticky; top: 10px; z-index: 900;
+  display: flex; justify-content: center; padding: 0 14px;
+}
+.afx-dock {
+  display: flex; align-items: stretch; gap: 2px;
+  padding: 7px; border-radius: 24px;
+  max-width: 100%; overflow-x: auto; scrollbar-width: none;
+}
+.afx-dock::-webkit-scrollbar { display: none; }
+.afx-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-width: 72px; padding: 9px 11px 7px; border-radius: 17px;
+  color: #a7b1c2; text-decoration: none; cursor: pointer; position: relative; z-index: 2;
+  transition: background .16s, color .16s, transform .16s; white-space: nowrap;
+}
+.afx-cell i { font-size: 16px; opacity: .9; }
+.afx-cell small { font-size: 10.5px; font-weight: 500; letter-spacing: .01em; }
+.afx-cell:hover { background: rgba(255,255,255,.07); color: #fff; transform: translateY(-1px); }
+.afx-cell.active { background: rgba(255,255,255,.12); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), 0 4px 14px rgba(0,0,0,.25); }
+.afx-cell.active small { font-weight: 600; }
+.afx-cell .afx-badge {
+  position: absolute; top: 4px; right: 8px;
+  background: #00a3ff; color: #fff; font-size: 9.5px; font-weight: 700;
+  border-radius: 999px; padding: 1px 5.5px; line-height: 13px;
+  box-shadow: 0 0 10px rgba(0,163,255,.55);
+  font-variant-numeric: tabular-nums;
+}
+.afx-dock .afx-div { flex: 0 0 1px; width: 1px; background: linear-gradient(180deg, transparent, rgba(255,255,255,.16), transparent); margin: 6px 5px; z-index: 2; }
+.afx-cell.act-blue   { color: #5fd2ff; text-shadow: 0 0 12px rgba(95,210,255,.5); }
+.afx-cell.act-blue:hover   { background: rgba(0,163,255,.17); color: #aee6ff; }
+.afx-cell.act-orange { color: #ffbe55; text-shadow: 0 0 12px rgba(255,190,85,.5); }
+.afx-cell.act-orange:hover { background: rgba(255,158,32,.15); color: #ffd699; }
+.afx-cell.act-green  { color: #4df0b8; text-shadow: 0 0 12px rgba(77,240,184,.5); }
+.afx-cell.act-green:hover  { background: rgba(16,226,155,.15); color: #a4f7d9; }
+.afx-cell.act-green .afx-badge { background: #10e29b; box-shadow: 0 0 10px rgba(16,226,155,.55); }
+
+/* ============================================================
+   6) LIQUID GLASS vrstvy (nastavuje engine přes --afx-*)
+   ::after = refrakce · obsah · ::before = tint + vnitřní lem
+   ============================================================ */
+.afx-glass {
+  position: relative;
+  border-radius: var(--afx-radius, 24px);
+  isolation: isolate;
+  box-shadow: 0 6px var(--afx-outer-shadow-blur, 34px) rgba(0,0,0,.34);
+}
+.afx-glass::before {
+  content: ''; position: absolute; inset: 0; z-index: 1; border-radius: inherit;
+  box-shadow: inset 0 0 var(--afx-shadow-blur, 10px) var(--afx-shadow-spread, -7px) var(--afx-shadow-color, rgba(255,255,255,.2));
+  background-color: rgba(var(--afx-tint-color, 13, 17, 25), var(--afx-tint-opacity, .13));
+  pointer-events: none;
+}
+.afx-glass::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+  /* Chromium: url(#…) refrakce (nastaví engine). Safari/FF: frosted fallback. */
+  backdrop-filter: var(--afx-filter, blur(16px) saturate(1.5));
+  -webkit-backdrop-filter: var(--afx-filter, blur(16px) saturate(1.5));
+  isolation: isolate;
+}
+.afx-glass > * { position: relative; z-index: 2; }
+
+/* ============================================================
+   7) MODÁLY = skleněná okna (engine attach v liquid-glass-engine.js)
+   ============================================================ */
+.modal-content.glass-card {
+  background: rgba(10, 14, 19, 0.42) !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  border-radius: 18px !important;
+  overflow: hidden;
+}
+.modal-content.glass-card:not(.afx-glass) {
+  /* než se připojí engine (nebo Safari): frosted sklo */
+  backdrop-filter: blur(18px) saturate(1.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+}
+.modal-content.glass-card .modal-header { background: rgba(0,0,0,.28) !important; }
+.modal-content.glass-card .modal-footer { background: rgba(0,0,0,.18) !important; }
+.modal-backdrop.show { opacity: .62 !important; }
+
+/* Notifikační panel: starý top počítal s odstraněným topbarem (52px) → plná výška */
+#crmNotificationsPanel, .crm-notifications-panel { top: 0 !important; }
+
+/* ============================================================
+   8) MOBIL + TABLET (≤1080px): spodní tab bar + sheet menu
+   ============================================================ */
+.afx-tabbar, .afx-sheet { display: none; }
+
+@media (max-width: 1080px) {
+  .afx-dockwrap { display: none; }
+  .afx-search { display: none !important; }
+  .afx-user b { display: none; }
+  .afx-utility .afx-hide-m { display: none !important; }
+  .crm-main-content { padding-bottom: 96px !important; }
+  .crm-ui-zoom--floating, #crmUiZoom { display: none !important; } /* koliduje s tab barem; zoom je desktop funkce */
+
+  .afx-tabbar {
+    display: flex; position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 1040;
+    border-radius: 26px; padding: 7px 8px; align-items: center; justify-content: space-around;
+    background: rgba(14, 19, 17, .74);
+    backdrop-filter: blur(26px) saturate(1.5); -webkit-backdrop-filter: blur(26px) saturate(1.5);
+    border: 1px solid rgba(255,255,255,.10);
+    box-shadow: 0 12px 34px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .afx-tb {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    color: #939eb0; text-decoration: none; font-size: 10px; font-weight: 500;
+    min-width: 54px; padding: 4px 0; position: relative; background: none; border: none;
+  }
+  .afx-tb i { font-size: 17px; }
+  .afx-tb.active, .afx-tb:hover { color: #fff; }
+  .afx-tb .afx-badge {
+    position: absolute; top: -2px; right: 6px;
+    background: #00a3ff; color: #fff; font-size: 9px; font-weight: 700;
+    border-radius: 999px; padding: 0 5px; line-height: 13px;
+  }
+  .afx-tb-plus {
+    width: 52px; height: 52px; border-radius: 50%; border: none;
+    background: linear-gradient(135deg, #00b0ff, #0066e8);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; margin-top: -24px; font-size: 20px;
+    box-shadow: 0 8px 22px rgba(0,163,255,.5), inset 0 1px 1px rgba(255,255,255,.3);
+  }
+
+  body.afx-sheet-open { overflow: hidden; }
+  body.afx-sheet-open .afx-sheet { display: block; }
+  .afx-sheet { position: fixed; inset: 0; z-index: 1045; }
+  .afx-sheet .afx-scrim { position: absolute; inset: 0; background: rgba(3,5,4,.55); backdrop-filter: blur(3px); }
+  .afx-sheet .afx-panel {
+    position: absolute; left: 10px; right: 10px; bottom: 10px; max-height: 84vh; overflow-y: auto;
+    border-radius: 26px; padding: 16px;
+    background: rgba(13, 18, 16, .88);
+    backdrop-filter: blur(30px) saturate(1.5); -webkit-backdrop-filter: blur(30px) saturate(1.5);
+    border: 1px solid rgba(255,255,255,.10);
+    box-shadow: 0 -8px 44px rgba(0,0,0,.5);
+  }
+  .afx-grab { width: 38px; height: 4.5px; border-radius: 3px; background: rgba(255,255,255,.22); margin: 0 auto 12px; }
+  .afx-sheet-search { margin-bottom: 12px; }
+  .afx-sheet-search .input-group {
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.09);
+    border-radius: 12px; overflow: hidden; flex-wrap: nowrap;
+  }
+  .afx-sheet-search .input-group-text { background: transparent !important; border: none !important; color: rgba(255,255,255,.4) !important; }
+  .afx-sheet-search .form-control { background: transparent !important; border: none !important; box-shadow: none !important; color: #eef2f8 !important; font-size: 14px !important; }
+  .afx-sheet-acts { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
+  .afx-sheet-act {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 13px 6px; border-radius: 14px; font-size: 11px; font-weight: 600; text-decoration: none;
+  }
+  .afx-sheet-act i { font-size: 16px; }
+  .afx-sheet-act.b { background: rgba(0,163,255,.14);  color: #5fd2ff; border: 1px solid rgba(0,163,255,.34);  text-shadow: 0 0 10px rgba(95,210,255,.45); }
+  .afx-sheet-act.o { background: rgba(255,158,32,.12); color: #ffbe55; border: 1px solid rgba(255,158,32,.32); text-shadow: 0 0 10px rgba(255,190,85,.45); }
+  .afx-sheet-act.g { background: rgba(16,226,155,.12); color: #4df0b8; border: 1px solid rgba(16,226,155,.32); text-shadow: 0 0 10px rgba(77,240,184,.45); }
+  .afx-sheet-act { position: relative; }
+  .afx-sheet-act .afx-badge {
+    position: absolute; top: 6px; right: 8px;
+    background: #10e29b; color: #04140d; font-size: 9.5px; font-weight: 700;
+    border-radius: 999px; padding: 1px 6px; line-height: 13px;
+    box-shadow: 0 0 10px rgba(16,226,155,.55); font-variant-numeric: tabular-nums;
+  }
+  .afx-sheet-act.active { box-shadow: inset 0 0 0 1.5px currentColor; }
+  .afx-sheet-user { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 4px 0; border-top: 1px solid rgba(255,255,255,.08); color: #c7d0dd; font-size: 12.5px; }
+  .afx-sheet-user .afx-avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#00b0ff,#22e0d0); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; }
+  .afx-sheet-user small { color: rgba(255,255,255,.4); display: block; font-size: 11px; }
+  .afx-sheet-langs { display: flex; gap: 6px; }
+  .afx-sheet-langs .btn.active { background: rgba(0,163,255,.2) !important; color: #5fd2ff !important; border-color: rgba(0,163,255,.4) !important; }
+  .afx-sheet-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px; }
+  .afx-sheet-link {
+    display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 12px;
+    color: #c4cdda; text-decoration: none; font-size: 13.5px; font-weight: 500;
+    background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.05);
+  }
+  .afx-sheet-link i { width: 18px; text-align: center; opacity: .85; }
+  .afx-sheet-link.active { background: rgba(0,163,255,.15); color: #5fd2ff; border-color: rgba(0,163,255,.34); }
+  .afx-sheet-foot { display: flex; gap: 8px; margin-top: 12px; }
+  .afx-sheet-foot .btn { flex: 1; border-radius: 12px !important; }
+}
+
+@media (max-width: 480px) {
+  .afx-utility { padding: 0 12px; gap: 8px; }
+}
+
+/* ============================================================
+   9) SVĚTLÝ REŽIM (lg-theme přepínač) — decentní úpravy shellu
+   ============================================================ */
+html[data-lg-theme="light"] body { background: #eef1f0 !important; }
+html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
+html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); }
+html[data-lg-theme="light"] .afx-brand { color: #10151d; }
+html[data-lg-theme="light"] .afx-cell { color: #46505e; }
+html[data-lg-theme="light"] .afx-cell:hover { color: #10151d; background: rgba(0,0,0,.06); }
+html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(255,255,255,.75); }
+
+/* ============================================================
+   10) LIQUID PRESS MORPH — hloubkové kliknutí (iOS pružina)
+   Stisk: rychlé zanoření do skla (scale ↓, hlubší vnitřní stín,
+   jemné zjasnění čočky). Puštění: pružný návrat s odskokem.
+   ============================================================ */
+.btn,
+.afx-cell,
+.afx-tb,
+.afx-tb-plus,
+.afx-sheet-act,
+.afx-sheet-link,
+.crm-v2-icon-btn,
+.sl-btn {
+  transition:
+    transform 320ms cubic-bezier(.34, 1.56, .64, 1),
+    box-shadow 320ms cubic-bezier(.34, 1.56, .64, 1),
+    filter 320ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease !important;
+  will-change: transform;
+}
+
+/* Zanoření — krátké a okamžité (60 ms), návrat jede přes pružinu výše */
+.btn:active,
+.afx-sheet-act:active,
+.afx-sheet-link:active,
+.sl-btn:active {
+  transform: scale(.955) translateY(.5px) !important;
+  box-shadow: inset 0 3px 9px rgba(0, 0, 0, .38), inset 0 1px 1px rgba(0, 0, 0, .25) !important;
+  filter: brightness(1.07) saturate(1.12);
+  transition-duration: 60ms !important;
+}
+.afx-cell:active {
+  transform: scale(.93) translateY(1px) !important;
+  background: rgba(255, 255, 255, .10);
+  box-shadow: inset 0 3px 12px rgba(0, 0, 0, .42), inset 0 0 0 1px rgba(255, 255, 255, .10) !important;
+  filter: brightness(1.1) saturate(1.15);
+  transition-duration: 60ms !important;
+}
+.afx-cell.act-blue:active   { background: rgba(0, 163, 255, .22); }
+.afx-cell.act-orange:active { background: rgba(255, 158, 32, .20); }
+.afx-cell.act-green:active  { background: rgba(16, 226, 155, .20); }
+.afx-tb:active { transform: scale(.9) !important; transition-duration: 60ms !important; }
+.afx-tb-plus:active {
+  transform: scale(.88) translateY(1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 163, 255, .4), inset 0 3px 8px rgba(0, 40, 90, .5) !important;
+  filter: brightness(1.12);
+  transition-duration: 60ms !important;
+}
+.crm-v2-icon-btn:active {
+  transform: scale(.9) !important;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .4) !important;
+  transition-duration: 60ms !important;
+}
+/* Primární (modrá) tlačítka: při stisku se čočka „prohne" — glow zúží a zesílí */
+.btn-primary:active, .btn-success:active {
+  filter: brightness(1.12) saturate(1.2);
+  box-shadow: 0 2px 10px rgba(0, 168, 255, .5), inset 0 3px 9px rgba(0, 30, 70, .45) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .afx-cell, .afx-tb, .afx-tb-plus, .afx-sheet-act, .afx-sheet-link, .crm-v2-icon-btn, .sl-btn {
+    transition: none !important;
+  }
+}
