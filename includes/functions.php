@@ -2686,4 +2686,43 @@ if (session_status() === PHP_SESSION_ACTIVE
         refreshZdendaGreetingVictor202607();
     } catch (Throwable $e) { /* ignore */ }
 }
-?>
+
+/**
+ * Rezervace z webu (RepairPlugin Pro na applefix.cz) — runtime schéma.
+ * Webhook: api/website_booking.php (klíč v settings 'web_booking_key').
+ */
+function ensureWebBookingsSchema(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS web_bookings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            wp_booking_id VARCHAR(64) DEFAULT NULL,
+            customer_name VARCHAR(190) NOT NULL DEFAULT '',
+            phone VARCHAR(60) DEFAULT NULL,
+            email VARCHAR(190) DEFAULT NULL,
+            device VARCHAR(190) DEFAULT NULL,
+            service VARCHAR(255) DEFAULT NULL,
+            notes TEXT NULL,
+            appointment_at DATETIME NULL,
+            delivery_method VARCHAR(80) DEFAULT NULL,
+            status ENUM('new','converted','dismissed') NOT NULL DEFAULT 'new',
+            order_id INT NULL,
+            raw_payload MEDIUMTEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_wp_booking (wp_booking_id),
+            INDEX idx_status_appt (status, appointment_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { /* tabulka už existuje */ }
+
+    // sdílený klíč pro webhook z WordPressu (vygeneruje se jednou)
+    try {
+        if (get_setting('web_booking_key', '') === '') {
+            set_setting('web_booking_key', bin2hex(random_bytes(24)));
+        }
+    } catch (Throwable $e) { /* settings nedostupné */ }
+}

@@ -70,6 +70,16 @@ try {
 
     logOrderStatusChange($order_id, '', $status);
 
+    // Zakázka vznikla z webové rezervace → označit rezervaci jako převzatou
+    $webBookingId = (int)($_POST['web_booking_id'] ?? 0);
+    if ($webBookingId > 0) {
+        try {
+            ensureWebBookingsSchema();
+            $pdo->prepare("UPDATE web_bookings SET status = 'converted', order_id = ? WHERE id = ?")
+                ->execute([$order_id, $webBookingId]);
+        } catch (Throwable $e) { /* rezervace zůstane v seznamu, nevadí */ }
+    }
+
     // ── Secure file upload ────────────────────────────────────────────────────
     if (!empty($_FILES['files']['name'][0])) {
         $upload_dir = __DIR__ . '/../uploads/';

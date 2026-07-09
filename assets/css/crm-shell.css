@@ -365,3 +365,74 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
     transition: none !important;
   }
 }
+
+/* ============================================================
+   11) REZERVACE Z WEBU (orders.php) — nahoře, jemné oddělení
+   ============================================================ */
+.afx-webres {
+  margin-bottom: 6px;
+  border: 1px solid rgba(85, 212, 255, .16);
+  background: linear-gradient(135deg, rgba(0, 163, 255, .06), rgba(34, 224, 208, .03));
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+.afx-webres-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: #5fd2ff; margin-bottom: 10px;
+}
+.afx-webres-head i { font-size: 12px; }
+.afx-webres-count {
+  background: rgba(0, 163, 255, .2); color: #aee6ff;
+  border-radius: 999px; padding: 1px 9px; font-size: 11px; font-variant-numeric: tabular-nums;
+}
+.afx-webres-list { display: flex; flex-direction: column; gap: 7px; }
+.afx-webres-item {
+  display: flex; align-items: center; gap: 14px;
+  background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 12px; padding: 9px 12px;
+}
+.afx-webres-when {
+  min-width: 58px; text-align: center; line-height: 1.15;
+  border-right: 1px solid rgba(255, 255, 255, .09); padding-right: 12px;
+}
+.afx-webres-when b { display: block; font-size: 15px; font-weight: 700; color: #eef2f8; font-variant-numeric: tabular-nums; }
+.afx-webres-when small { font-size: 10px; color: rgba(255, 255, 255, .45); font-weight: 500; }
+.afx-webres-when.today b { color: #5fd2ff; text-shadow: 0 0 12px rgba(95, 210, 255, .45); }
+.afx-webres-when.today small { color: #5fd2ff; }
+.afx-webres-body { flex: 1; min-width: 0; }
+.afx-webres-name { font-weight: 600; font-size: 13.5px; color: #eef2f8; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.afx-webres-tel { font-size: 12px; font-weight: 500; color: #9fb2c8; text-decoration: none; }
+.afx-webres-tel:hover { color: #5fd2ff; }
+.afx-webres-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 3px; font-size: 12px; color: rgba(255, 255, 255, .55); }
+.afx-webres-meta i { font-size: 11px; opacity: .7; margin-right: 4px; }
+.afx-webres-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+.afx-webres-acts { display: flex; gap: 6px; align-items: center; }
+.afx-webres-take {
+  background: linear-gradient(135deg, rgba(0, 163, 255, .2), rgba(34, 224, 208, .1)) !important;
+  border: 1px solid rgba(0, 163, 255, .4) !important;
+  color: #7fdcff !important; font-weight: 600 !important; white-space: nowrap;
+}
+.afx-webres-take:hover { color: #fff !important; border-color: rgba(0, 163, 255, .7) !important; box-shadow: 0 0 14px rgba(0, 163, 255, .3); }
+.afx-webres-done {
+  background: rgba(16, 226, 155, .1) !important; border: 1px solid rgba(16, 226, 155, .3) !important;
+  color: #4df0b8 !important; width: 32px;
+}
+.afx-webres-done:hover { background: rgba(16, 226, 155, .22) !important; color: #fff !important; }
+
+/* Jemný elegantní předěl mezi rezervacemi a běžnými zakázkami */
+.afx-webres-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 14px 0 12px; color: rgba(255, 255, 255, .35);
+  font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+}
+.afx-webres-divider::before, .afx-webres-divider::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .14), transparent);
+}
+
+@media (max-width: 640px) {
+  .afx-webres-item { flex-wrap: wrap; }
+  .afx-webres-acts { width: 100%; }
+  .afx-webres-acts .afx-webres-take { flex: 1; }
+}
