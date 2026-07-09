@@ -2259,6 +2259,23 @@ function refreshTomasGreeting202607(): void
     } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
 }
 
+/** Jednorázově (9.7.2026): NOVÝ uvítací zvuk pro admina — PŘEPÍŠE už nasazený
+ *  uploads/greetings/admin.mp3 (import sám existující soubor nepřepisuje). */
+function refreshAdminGreeting202607(): void
+{
+    global $pdo;
+    try {
+        if (get_setting('greeting_admin_v2_2026_07', '') === '1') { return; }
+        $src = __DIR__ . '/../assets/greetings_import/admin.mp3';
+        $dst = __DIR__ . '/../uploads/greetings';
+        if (!is_file($src)) { return; }
+        if (!is_dir($dst)) { mkdir($dst, 0755, true); }
+        if (@copy($src, $dst . '/admin.mp3') && function_exists('set_setting')) {
+            set_setting('greeting_admin_v2_2026_07', '1');
+        }
+    } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
+}
+
 /** Jednorázově: stav "Černá růže" (historická značka 2. pobočky) -> Přijato + pobočka Na Příkopě. */
 function migrateCernaRuzeOrders(): void
 {
@@ -2319,6 +2336,7 @@ if (session_status() === PHP_SESSION_ACTIVE
         ensureStatusEnum202607();
         importGreetingSounds();
         refreshTomasGreeting202607();
+        refreshAdminGreeting202607();
     } catch (Throwable $e) { /* ignore */ }
 }
 ?>
