@@ -17,6 +17,17 @@ function complaintStatusUi(?string $status): array
     return ['row' => '', 'badge' => 'bg-secondary', 'label' => $status];
 }
 
+$hasClientCols = false;
+if (isset($pdo)) {
+    ensureComplaintsClientColumns($pdo);
+    try {
+        $cc = $pdo->query("SHOW COLUMNS FROM complaints")->fetchAll(PDO::FETCH_COLUMN);
+        $hasClientCols = in_array('source', $cc, true) && in_array('staff_ack_at', $cc, true);
+    } catch (Throwable $e) { $hasClientCols = false; }
+}
+// Nové klientské reklamace (bez reakce servisu) drž nahoře; po reakci se řadí klasicky.
+$pinExpr = $hasClientCols ? "(c.source='client' AND c.staff_ack_at IS NULL) DESC, " : "";
+
 $rows = [];
 if (isset($pdo)) {
     try {
@@ -31,11 +42,11 @@ if (isset($pdo)) {
             $count->execute([$term,$term,$term,$term,$term,$term]);
             $total = (int)$count->fetchColumn();
 
-            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id WHERE c.complaint_code LIKE ? OR c.device LIKE ? OR c.complaint_reason LIKE ? OR cu.first_name LIKE ? OR cu.last_name LIKE ? OR cu.phone LIKE ? ORDER BY CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id WHERE c.complaint_code LIKE ? OR c.device LIKE ? OR c.complaint_reason LIKE ? OR cu.first_name LIKE ? OR cu.last_name LIKE ? OR cu.phone LIKE ? ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
             $stmt->execute([$term,$term,$term,$term,$term,$term]);
         } else {
             $total = (int)$pdo->query("SELECT COUNT(*) FROM complaints")->fetchColumn();
-            $stmt = $pdo->query("SELECT c.*, cu.first_name, cu.last_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id ORDER BY CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt = $pdo->query("SELECT c.*, cu.first_name, cu.last_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
         }
 
         $rows = $stmt->fetchAll();
@@ -90,15 +101,30 @@ if (!empty($rows) && isset($pdo)) {
                         <th>Zařízení</th>
                         <th>IMEI/SN</th>
                         <th>Důvod reklamace</th>
+                        <th>Zdroj / zakázka</th>
                         <th>Stav</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
+                <?php
+                    $statusOptions = ['Přijato', 'V řešení', 'Čeká na zákazníka', 'Vyřízeno', 'Zamítnuto'];
+                ?>
                 <?php foreach ($rows as $r): ?>
-                    <?php $ui = complaintStatusUi($r['complaint_status'] ?? ''); ?>
-                    <tr class="<?php echo e($ui['row']); ?>">
+                    <?php
+                        $ui = complaintStatusUi($r['complaint_status'] ?? '');
+                        $isNewClient = function_exists('complaintIsNewFromClient') && complaintIsNewFromClient($r);
+                        $rowClass = trim(($ui['row'] ?? '') . ($isNewClient ? ' complaint-row--new-client' : ''));
+                        $curStatus = (string)($r['complaint_status'] ?? '');
+                        $opts = $statusOptions;
+                        if ($curStatus !== '' && !in_array($curStatus, $opts, true)) { array_unshift($opts, $curStatus); }
+                    ?>
+                    <tr class="<?php echo e($rowClass); ?>" data-cid="<?php echo (int)$r['id']; ?>">
                         <td>
                             <?php echo e($r['complaint_code']); ?>
+                            <?php if ($isNewClient): ?>
+                                <span class="badge bg-warning text-dark ms-1" title="Nová reklamace z klientské sekce">NOVÁ</span>
+                            <?php endif; ?>
                             <?php if (!empty($complaint_photos[(int)$r['id']])): $cp = $complaint_photos[(int)$r['id']]; ?>
                                 <a href="<?php echo e($cp['first_path']); ?>" target="_blank" rel="noopener"
                                    class="badge bg-secondary text-decoration-none ms-1" title="Fotodokumentace">
@@ -111,7 +137,26 @@ if (!empty($rows) && isset($pdo)) {
                         <td><?php echo e($r['device'] ?? ''); ?></td>
                         <td><?php echo e($r['serial_number'] ?? ''); ?></td>
                         <td style="min-width:280px;"><?php echo nl2br(e($r['complaint_reason'] ?? '')); ?></td>
-                        <td><span class="badge <?php echo e($ui['badge']); ?>"><?php echo e($ui['label']); ?></span></td>
+                        <td class="text-nowrap">
+                            <?php if (($r['source'] ?? '') === 'client'): ?>
+                                <span class="badge" style="background:#f97316;color:#fff">Klient</span><br>
+                            <?php endif; ?>
+                            <?php if (!empty($r['order_code'])): ?>
+                                <span class="small text-muted"><?php echo e($r['order_code']); ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="min-width:170px;">
+                            <select class="form-select form-select-sm complaint-status-select" data-cid="<?php echo (int)$r['id']; ?>">
+                                <?php foreach ($opts as $st): ?>
+                                    <option value="<?php echo e($st); ?>" <?php echo $curStatus === $st ? 'selected' : ''; ?>><?php echo e($st); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </td>
+                        <td class="text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" href="print_complaint.php?id=<?php echo (int)$r['id']; ?>" target="_blank" rel="noopener" title="Reklamační protokol">
+                                <i class="fas fa-print"></i>
+                            </a>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -129,5 +174,46 @@ if (!empty($rows) && isset($pdo)) {
         <?php endif; ?>
     </div>
 </div>
+
+<style>
+@keyframes complaintNewPulse {
+    0%, 100% { box-shadow: inset 4px 0 0 #f97316; }
+    50%      { box-shadow: inset 4px 0 0 rgba(249,115,22,0.25); }
+}
+tr.complaint-row--new-client { animation: complaintNewPulse 2.2s ease-in-out infinite; }
+tr.complaint-row--new-client:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+    tr.complaint-row--new-client { animation: none; box-shadow: inset 4px 0 0 #f97316; }
+}
+</style>
+<script>
+(function(){
+    var CRM_CSRF = <?php echo json_encode(generateCsrfToken()); ?>;
+    document.querySelectorAll('.complaint-status-select').forEach(function(sel){
+        sel.addEventListener('change', function(){
+            var el = this;
+            var cid = el.getAttribute('data-cid');
+            var status = el.value;
+            el.disabled = true;
+            var fd = new FormData();
+            fd.append('csrf_token', CRM_CSRF);
+            fd.append('id', cid);
+            fd.append('status', status);
+            fetch('api/update_complaint_status.php', { method:'POST', body: fd, credentials:'same-origin' })
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    el.disabled = false;
+                    if (d.ok) {
+                        var tr = el.closest('tr');
+                        if (tr) tr.classList.remove('complaint-row--new-client');
+                    } else {
+                        alert('Nepodařilo se změnit stav reklamace.');
+                    }
+                })
+                .catch(function(){ el.disabled = false; alert('Chyba spojení.'); });
+        });
+    });
+})();
+</script>
 
 <?php require_once 'includes/footer.php'; ?>

@@ -1902,6 +1902,41 @@ function orderStaleSeconds(array $order): int
     return $last ? max(0, time() - $last) : 0;
 }
 
+/** Doplní do tabulky `complaints` sloupce pro klientský portál (idempotentně,
+ *  bez migrace — funguje i na starších instalacích). Volá se před prací s reklamacemi.
+ *  - order_id / order_code : napojení reklamace na konkrétní zakázku
+ *  - source                : 'client' = založeno z klientské sekce, jinak 'staff'
+ *  - updated_at            : bump při editaci
+ *  - staff_ack_at          : kdy technik/manažer poprvé zareagoval (uvolní „připíchnutí" nahoře) */
+function ensureComplaintsClientColumns(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $cols = $pdo->query("SHOW COLUMNS FROM complaints")->fetchAll(PDO::FETCH_COLUMN);
+        if (!$cols) return;
+        $add = [];
+        if (!in_array('order_id', $cols, true))     $add[] = "ADD COLUMN `order_id` INT(11) NULL";
+        if (!in_array('order_code', $cols, true))   $add[] = "ADD COLUMN `order_code` VARCHAR(30) NULL";
+        if (!in_array('source', $cols, true))       $add[] = "ADD COLUMN `source` VARCHAR(20) NOT NULL DEFAULT 'staff'";
+        if (!in_array('updated_at', $cols, true))   $add[] = "ADD COLUMN `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP";
+        if (!in_array('staff_ack_at', $cols, true)) $add[] = "ADD COLUMN `staff_ack_at` TIMESTAMP NULL DEFAULT NULL";
+        if ($add) {
+            $pdo->exec("ALTER TABLE `complaints` " . implode(', ', $add));
+        }
+    } catch (Throwable $e) {
+        // starší DB / chybějící oprávnění — reklamace fungují i bez těchto sloupců
+    }
+}
+
+/** True = reklamace založená klientem, na kterou zatím nikdo ze servisu nereagoval
+ *  (drží se nahoře v seznamu + pulzuje, dokud technik/manažer nezmění stav). */
+function complaintIsNewFromClient(array $row): bool
+{
+    return ($row['source'] ?? '') === 'client' && empty($row['staff_ack_at']);
+}
+
 /** Datum spuštění „naostro" — zakázky vytvořené PŘED tímto dnem (import historie)
  *  se nepovažují za zaseknuté a NEPULZUJÍ. Od tohoto dne jede pulzování dle pravidel.
  *  Uloženo v nastavení (klíč pulse_golive_date), výchozí 2026-07-08. */

@@ -1,28 +1,35 @@
 <?php
-require_once 'includes/config.php';
-require_once 'includes/functions.php';
+/* Účtenka (80mm termo). Lze vložit i z klientského portálu: includer nastaví
+   THERMAL_DOC_EMBED a připraví $order (s joinem zákazníka), $items, $currency,
+   $target_lang — tím se přeskočí načtení dle ?id. */
+if (!defined('THERMAL_DOC_EMBED')) {
+    require_once 'includes/config.php';
+    require_once 'includes/functions.php';
 
-if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
+    if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
 
-$id = $_GET['id'] ?? $_GET['order_id'];
-$stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address 
-                       FROM orders o 
-                       JOIN customers c ON o.customer_id = c.id 
-                       WHERE o.id = ?");
-$stmt->execute([$id]);
-$order = $stmt->fetch();
+    $id = $_GET['id'] ?? $_GET['order_id'];
+    $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address
+                           FROM orders o
+                           JOIN customers c ON o.customer_id = c.id
+                           WHERE o.id = ?");
+    $stmt->execute([$id]);
+    $order = $stmt->fetch();
 
-if (!$order) die(__("print_not_found"));
+    if (!$order) die(__("print_not_found"));
 
-// Fetch items (parts) used
-$stmt = $pdo->prepare("SELECT oi.*, i.part_name FROM order_items oi JOIN inventory i ON oi.inventory_id = i.id WHERE oi.order_id = ?");
-$stmt->execute([$id]);
-$items = $stmt->fetchAll();
+    // Fetch items (parts) used
+    $stmt = $pdo->prepare("SELECT oi.*, i.part_name FROM order_items oi JOIN inventory i ON oi.inventory_id = i.id WHERE oi.order_id = ?");
+    $stmt->execute([$id]);
+    $items = $stmt->fetchAll();
 
-$currency = get_setting('currency', 'Kč');
+    $currency = get_setting('currency', 'Kč');
 
-$target_lang = $_GET['lang'] ?? 'cs';
-function _l($key) { global $target_lang; return __($key, $target_lang); }
+    $target_lang = $_GET['lang'] ?? 'cs';
+}
+if (!function_exists('_l')) {
+    function _l($key) { global $target_lang; return __($key, $target_lang); }
+}
 ?>
 <!DOCTYPE html>
 <html lang="cs">

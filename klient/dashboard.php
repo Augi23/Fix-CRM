@@ -186,6 +186,49 @@ if ($customerDisplayName === '' && !empty($customer['company'])) {
 }
 
 $today = date('d.m.Y');
+
+/* ---- Dokumenty dostupné klientovi + stav reklamace k vybrané zakázce ---- */
+$clientDocs = [];
+$orderComplaint = null;
+$canComplain = false;
+$selectedOrderCode = '';
+if ($selectedOrder && isset($pdo)) {
+    $oid = (int)$selectedOrder['id'];
+    $selectedOrderCode = trim((string)($selectedOrder['order_code'] ?? '')) !== ''
+        ? (string)$selectedOrder['order_code'] : ('#' . $oid);
+
+    // Zakázkový list — vždy
+    $clientDocs[] = ['type' => 'order_sheet', 'label' => __('client_doc_order_sheet'), 'icon' => 'fa-file-lines'];
+
+    // Faktura — jen pokud byla vystavena
+    try {
+        $q = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND customer_id = ? AND status IN ('issued','paid') AND invoice_type = 'invoice' ORDER BY created_at DESC LIMIT 1");
+        $q->execute([$oid, $customerId]);
+        if ($q->fetchColumn()) {
+            $clientDocs[] = ['type' => 'invoice', 'label' => __('client_doc_invoice'), 'icon' => 'fa-file-invoice-dollar'];
+        }
+    } catch (Throwable $e) { /* faktura nedostupná */ }
+
+    // Účtenka — jen pokud má zakázka vyčíslenou finální cenu
+    if (isset($selectedOrder['final_cost']) && $selectedOrder['final_cost'] !== null
+        && $selectedOrder['final_cost'] !== '' && (float)$selectedOrder['final_cost'] > 0) {
+        $clientDocs[] = ['type' => 'receipt', 'label' => __('client_doc_receipt'), 'icon' => 'fa-receipt'];
+    }
+
+    // Reklamace k této zakázce
+    if (function_exists('ensureComplaintsClientColumns')) { ensureComplaintsClientColumns($pdo); }
+    try {
+        $q = $pdo->prepare("SELECT * FROM complaints WHERE order_id = ? AND customer_id = ? ORDER BY id DESC LIMIT 1");
+        $q->execute([$oid, $customerId]);
+        $orderComplaint = $q->fetch() ?: null;
+    } catch (Throwable $e) { $orderComplaint = null; }
+
+    if ($orderComplaint) {
+        $clientDocs[] = ['type' => 'complaint', 'label' => __('client_doc_complaint_protocol'), 'icon' => 'fa-clipboard-check', 'complaint' => (int)$orderComplaint['id']];
+    }
+
+    $canComplain = isOrderStatusIn((string)$selectedOrder['status'], 'collected') && !$orderComplaint;
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo e(crm_get_language()); ?>" data-bs-theme="dark">
@@ -506,6 +549,111 @@ $today = date('d.m.Y');
             color: rgba(243,247,255,0.68);
         }
 
+        .doc-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .doc-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 15px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.045);
+            border: 1px solid rgba(255,255,255,0.09);
+            color: #eef4ff;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform .15s ease, background .15s ease, border-color .15s ease;
+        }
+
+        .doc-link:hover {
+            transform: translateY(-1px);
+            background: rgba(255,255,255,0.07);
+            border-color: rgba(25,167,255,0.35);
+            color: #fff;
+        }
+
+        .doc-link-ico {
+            width: 34px; height: 34px; flex: 0 0 34px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 10px;
+            background: rgba(25,167,255,0.14);
+            color: #7ab2ff;
+        }
+
+        .doc-link-label { flex: 1; min-width: 0; }
+        .doc-link-ext { color: rgba(243,247,255,0.4); font-size: 0.82rem; }
+
+        .claim-box {
+            margin-top: 18px;
+            padding: 18px;
+            border-radius: 18px;
+            background: rgba(249,115,22,0.09);
+            border: 1px solid rgba(249,115,22,0.24);
+        }
+
+        .claim-head { font-weight: 800; color: #ffd0a8; font-size: 1.02rem; }
+        .claim-sub { margin-top: 6px; color: rgba(243,247,255,0.72); font-size: 0.92rem; }
+
+        .btn-claim {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 11px 18px; border: none; border-radius: 12px; cursor: pointer;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: #fff; font-weight: 700; font-size: 0.95rem;
+            transition: filter .15s ease, transform .15s ease;
+        }
+        .btn-claim:hover { filter: brightness(1.06); transform: translateY(-1px); }
+        .btn-claim:disabled { opacity: 0.6; cursor: default; transform: none; }
+
+        .btn-claim-ghost {
+            padding: 11px 18px; border-radius: 12px; cursor: pointer;
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+            color: #eef4ff; font-weight: 600;
+        }
+
+        .claim-modal {
+            position: fixed; inset: 0; z-index: 9999;
+            display: none; align-items: center; justify-content: center;
+            padding: 18px;
+            background: rgba(4,6,10,0.6);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        }
+
+        .claim-modal-card {
+            width: min(100%, 520px);
+            border-radius: 22px;
+            background: linear-gradient(180deg, #12171e, #0c1015);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 24px 70px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+
+        .claim-modal-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .claim-modal-head h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: #fff; }
+        .claim-x { background: none; border: none; color: rgba(255,255,255,0.6); font-size: 1.6rem; line-height: 1; cursor: pointer; }
+        .claim-modal-body { padding: 20px; display: grid; gap: 8px; }
+        .claim-modal-body label { font-size: 0.82rem; font-weight: 700; color: rgba(243,247,255,0.7); margin-top: 6px; }
+        .claim-modal-body textarea,
+        .claim-modal-body input {
+            width: 100%; padding: 11px 13px; border-radius: 12px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12);
+            color: #fff; font-size: 0.95rem; font-family: inherit;
+        }
+        .claim-modal-body textarea:focus,
+        .claim-modal-body input:focus { outline: none; border-color: rgba(249,115,22,0.5); }
+        .claim-order { color: rgba(243,247,255,0.72); font-size: 0.9rem; }
+        .claim-error { color: #ff9aa5; font-size: 0.88rem; }
+        .claim-modal-foot {
+            display: flex; justify-content: flex-end; gap: 10px;
+            padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08);
+        }
+
         @media (max-width: 1100px) {
             .client-grid {
                 grid-template-columns: 1fr;
@@ -670,6 +818,43 @@ $today = date('d.m.Y');
                                 <?php echo __('client_notice_in_progress'); ?>
                             </div>
                         <?php endif; ?>
+
+                        <div class="media-section">
+                            <div class="media-section-title">
+                                <div>
+                                    <h4><i class="fas fa-folder-open me-2"></i><?php echo __('client_documents_title'); ?></h4>
+                                    <p><?php echo __('client_documents_desc'); ?></p>
+                                </div>
+                            </div>
+                            <div class="doc-links">
+                                <?php foreach ($clientDocs as $d): ?>
+                                    <?php $href = 'document.php?type=' . rawurlencode($d['type']) . '&order=' . (int)$selectedOrder['id']
+                                        . (isset($d['complaint']) ? '&complaint=' . (int)$d['complaint'] : ''); ?>
+                                    <a class="doc-link" href="<?php echo e($href); ?>" target="_blank" rel="noopener noreferrer">
+                                        <span class="doc-link-ico"><i class="fas <?php echo e($d['icon']); ?>"></i></span>
+                                        <span class="doc-link-label"><?php echo e($d['label']); ?></span>
+                                        <i class="fas fa-arrow-up-right-from-square doc-link-ext"></i>
+                                    </a>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <?php if ($orderComplaint): ?>
+                            <div class="order-notice" style="background: rgba(249,115,22,0.12); border-color: rgba(249,115,22,0.28); color: #ffcfa1;">
+                                <i class="fas fa-rotate-left me-2"></i>
+                                <?php echo __('client_complaint_existing'); ?>
+                                <strong><?php echo e($orderComplaint['complaint_code']); ?></strong>
+                                — <?php echo e($orderComplaint['complaint_status'] ?? ''); ?>
+                            </div>
+                        <?php elseif ($canComplain): ?>
+                            <div class="claim-box">
+                                <div class="claim-head"><i class="fas fa-rotate-left me-2"></i><?php echo __('client_complaint_cta_title'); ?></div>
+                                <p class="claim-sub mb-0"><?php echo __('client_complaint_cta_desc'); ?></p>
+                                <button type="button" class="btn-claim mt-3" onclick="afxOpenClaim()">
+                                    <i class="fas fa-rotate-left me-2"></i><?php echo __('client_complaint_cta'); ?>
+                                </button>
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="empty-state">
                             <i class="fas fa-folder-open fa-2x mb-3"></i>
@@ -712,5 +897,59 @@ $today = date('d.m.Y');
             </section>
         </div>
     </div>
+
+    <?php if ($canComplain): ?>
+    <div id="claimModal" class="claim-modal" role="dialog" aria-modal="true">
+        <div class="claim-modal-card">
+            <div class="claim-modal-head">
+                <h3><i class="fas fa-rotate-left me-2" style="color:#f97316"></i><?php echo __('client_complaint_title'); ?></h3>
+                <button type="button" class="claim-x" onclick="afxCloseClaim()" aria-label="Zavřít">&times;</button>
+            </div>
+            <div class="claim-modal-body">
+                <div class="claim-order"><?php echo __('client_complaint_for_order'); ?> <strong><?php echo e($selectedOrderCode); ?></strong> · <?php echo e(trim(($selectedOrder['device_brand'] ?? '') . ' ' . ($selectedOrder['device_model'] ?? ''))); ?></div>
+                <label for="claimReason"><?php echo __('client_complaint_reason_label'); ?></label>
+                <textarea id="claimReason" rows="4" placeholder="<?php echo e(__('client_complaint_reason_ph')); ?>"></textarea>
+                <label for="claimResolution"><?php echo __('client_complaint_resolution_label'); ?></label>
+                <input id="claimResolution" type="text" placeholder="<?php echo e(__('client_complaint_resolution_ph')); ?>">
+                <div id="claimError" class="claim-error" style="display:none;"></div>
+            </div>
+            <div class="claim-modal-foot">
+                <button type="button" class="btn-claim-ghost" onclick="afxCloseClaim()"><?php echo __('client_complaint_cancel'); ?></button>
+                <button type="button" id="claimSubmit" class="btn-claim" onclick="afxSubmitClaim()"><i class="fas fa-paper-plane me-2"></i><?php echo __('client_complaint_submit'); ?></button>
+            </div>
+        </div>
+    </div>
+    <script>
+        var AFX_CSRF = <?php echo json_encode(generateCsrfToken()); ?>;
+        var AFX_ORDER_ID = <?php echo (int)$selectedOrder['id']; ?>;
+        function afxOpenClaim(){ document.getElementById('claimModal').style.display='flex'; }
+        function afxCloseClaim(){ document.getElementById('claimModal').style.display='none'; }
+        (function(){
+            var m = document.getElementById('claimModal');
+            if (m) m.addEventListener('click', function(e){ if (e.target === m) afxCloseClaim(); });
+        })();
+        function afxSubmitClaim(){
+            var btn = document.getElementById('claimSubmit');
+            var reason = document.getElementById('claimReason').value.trim();
+            var resolution = document.getElementById('claimResolution').value.trim();
+            var err = document.getElementById('claimError');
+            err.style.display = 'none';
+            if (!reason){ err.textContent = <?php echo json_encode(__('client_complaint_reason_required')); ?>; err.style.display='block'; return; }
+            btn.disabled = true;
+            var fd = new FormData();
+            fd.append('csrf_token', AFX_CSRF);
+            fd.append('order_id', AFX_ORDER_ID);
+            fd.append('reason', reason);
+            fd.append('resolution', resolution);
+            fetch('api/create_complaint.php', { method:'POST', body: fd, credentials:'same-origin' })
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    if (d.ok){ afxCloseClaim(); alert(d.message || <?php echo json_encode(__('client_complaint_sent')); ?>); location.reload(); }
+                    else { err.textContent = d.error || 'Chyba'; err.style.display='block'; btn.disabled=false; }
+                })
+                .catch(function(){ err.textContent = <?php echo json_encode(__('client_complaint_conn_error')); ?>; err.style.display='block'; btn.disabled=false; });
+        }
+    </script>
+    <?php endif; ?>
 </body>
 </html>

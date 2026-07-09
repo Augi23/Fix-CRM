@@ -1,27 +1,32 @@
 <?php
-require_once 'includes/config.php';
-require_once 'includes/functions.php';
+/* Faktura (A4). Lze vložit i z klientského portálu: includer nastaví
+   INVOICE_DOC_EMBED a připraví $invoice (s joinem zákazníka/zakázky), $items,
+   $is_vat_payer — tím se přeskočí staff auth i načtení dle ?id. */
+if (!defined('INVOICE_DOC_EMBED')) {
+    require_once 'includes/config.php';
+    require_once 'includes/functions.php';
 
-if (!isset($_SESSION['user_id'])) die(__("unauthorized"));
-if (!isset($_GET['id'])) die("<?php echo __('missing_id'); ?>");
+    if (!isset($_SESSION['user_id'])) die(__("unauthorized"));
+    if (!isset($_GET['id'])) die("<?php echo __('missing_id'); ?>");
 
-$id = (int)$_GET['id'];
-$stmt = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, o.device_brand, o.device_model, o.serial_number 
-                       FROM invoices i 
-                       JOIN customers c ON i.customer_id = c.id 
-                       LEFT JOIN orders o ON i.order_id = o.id
-                       WHERE i.id = ?");
-$stmt->execute([$id]);
-$invoice = $stmt->fetch();
+    $id = (int)$_GET['id'];
+    $stmt = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, o.device_brand, o.device_model, o.serial_number
+                           FROM invoices i
+                           JOIN customers c ON i.customer_id = c.id
+                           LEFT JOIN orders o ON i.order_id = o.id
+                           WHERE i.id = ?");
+    $stmt->execute([$id]);
+    $invoice = $stmt->fetch();
 
-if (!$invoice) die("<?php echo __('print_not_found'); ?>");
+    if (!$invoice) die("<?php echo __('print_not_found'); ?>");
 
-// Fetch invoice items
-$stmt = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC");
-$stmt->execute([$id]);
-$items = $stmt->fetchAll();
+    // Fetch invoice items
+    $stmt = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC");
+    $stmt->execute([$id]);
+    $items = $stmt->fetchAll();
 
-$is_vat_payer = $invoice['is_vat_payer'];
+    $is_vat_payer = $invoice['is_vat_payer'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="cs">
