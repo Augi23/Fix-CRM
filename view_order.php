@@ -425,9 +425,6 @@ function localizedOrderStatusLabel(string $status): string {
                         <?php else: ?>
                             <div class="text-white-75 small"><?php echo __('no_next_step'); ?></div>
                         <?php endif; ?>
-                        <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#actionsAdvanced" aria-expanded="false">
-                            <?php echo __('more_actions'); ?>
-                        </button>
                     </div>
 
                     <?php if (!$show_shipping): ?>
@@ -437,7 +434,7 @@ function localizedOrderStatusLabel(string $status): string {
                         <div class="text-white-75 small mb-2"><?php echo __('invoice_available_after_completed'); ?></div>
                     <?php endif; ?>
 
-                    <div class="collapse" id="actionsAdvanced">
+                    <div id="actionsAdvanced">
                         <div class="mb-3">
                             <label class="form-label"><?php echo __('technician'); ?></label>
                             <select name="technician_id" class="form-select mb-2" <?php echo !$can_change_technician ? 'disabled' : ''; ?>>

@@ -97,6 +97,7 @@ try {
     <title><?php echo e(get_setting('company_name', 'Repair CRM')); ?> - <?php echo e(__('dashboard')); ?></title>
     <meta name="csrf-token" content="<?php echo e($_SESSION['csrf_token'] ?? ''); ?>">
     <script>(function(){try{var t=localStorage.getItem('lg-theme')||'dark';document.documentElement.setAttribute('data-lg-theme',t);document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
+    <script>(function(){try{if(localStorage.getItem('crm-sidebar-hidden')==='1')document.documentElement.classList.add('sidebar-hidden');}catch(e){}})();</script>
 
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
@@ -208,7 +209,7 @@ try {
     <nav class="navbar navbar-expand-lg navbar-dark crm-topbar crm-v2-topbar">
         <div class="container-fluid d-flex align-items-center justify-content-between crm-topbar-inner">
             <div class="d-flex align-items-center crm-topbar-left">
-                <button class="btn btn-sm btn-outline-secondary me-3 d-lg-none" id="sidebarCollapse" aria-label="<?php echo e(__('toggle_menu')); ?>">
+                <button class="btn btn-sm btn-outline-secondary me-3" id="sidebarCollapse" aria-label="<?php echo e(__('toggle_menu')); ?>">
                     <i class="fas fa-bars"></i>
                 </button>
                 <span class="navbar-brand mb-0 h1 d-none d-sm-inline-block"><?php echo e($topbarTitle); ?></span>

@@ -154,11 +154,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (sidebarCollapse && sidebar) {
         sidebarCollapse.addEventListener('click', function() {
-            const isActive = sidebar.classList.toggle('active');
-            if (content) content.classList.toggle('active', isActive);
-
             if (mobileSidebarQuery.matches) {
+                // Mobil / iPad na výšku: výsuvný off-canvas panel
+                const isActive = sidebar.classList.toggle('active');
+                if (content) content.classList.toggle('active', isActive);
                 document.body.classList.toggle('sidebar-open', isActive);
+            } else {
+                // Desktop / iPad na šířku: skrýt celý boční panel a roztáhnout obsah (stav se pamatuje)
+                const hidden = document.documentElement.classList.toggle('sidebar-hidden');
+                try { localStorage.setItem('crm-sidebar-hidden', hidden ? '1' : '0'); } catch (e) {}
             }
         });
     }

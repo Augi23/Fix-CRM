@@ -2934,4 +2934,13 @@ html[data-lg-theme="light"] .crm-filter-chip.chip--cancelled { color: #556070; }
 /* Detail zakázky: karta s čárovým kódem nemá vyplňovat výšku sloupce
    (pravidlo .row > [class*='col-'] > .card { height:100% } ji jinak roztáhne).
    Má končit hned pod čárovým kódem. */
-.order-barcode-card { height: auto !important; align-self: flex-start !important; }
+.order-barcode-card { height: auto !important; align-self: flex-start !important; margin-bottom: 38px !important; }
+
+/* ── Skrývání bočního panelu tlačítkem ☰ na desktopu / iPadu na šířku ──
+   (na mobilu/iPadu na výšku zůstává původní výsuvný off-canvas). Stav se pamatuje. */
+#sidebar.crm-v2-sidebar { transition: transform 260ms ease !important; }
+@media (min-width: 992px) {
+  html.sidebar-hidden #sidebar.crm-v2-sidebar { transform: translateX(-100%) !important; }
+  html.sidebar-hidden #content,
+  html.sidebar-hidden #content.crm-v2-content { margin-left: 0 !important; }
+}

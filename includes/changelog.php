@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Skrývání bočního panelu + přehlednější Akce u zakázky',
+        'items' => [
+            'Tlačítko ☰ nahoře nově skryje/vysune celý boční panel i na iPadu a MacBooku (obsah se roztáhne). Stav se pamatuje.',
+            'V detailu zakázky je panel „Akce" rovnou rozbalený (technik, stav, cena, tisk) — tlačítko „Další akce" tím odpadlo.',
+            'Mezi čárovým kódem a panelem „Akce" přidán prostor.',
+            'Ve wizardu přidání zakázky vráceno tlačítko „Zpět" (pro opravu kroku).',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Automatický e-mail „Připraveno k vyzvednutí"',
         'items' => [
             'Jakmile zakázka přejde do stavu „Připraveno k vyzvednutí", pošle se klientovi automaticky e-mail (jen jednou) — hotovo, na které pobočce a otevírací doba.',

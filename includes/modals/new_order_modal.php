@@ -297,6 +297,7 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                     </div>
                 </div>
                 <div class="modal-footer bg-transparent border-secondary crm-wizard-footer">
+                    <button type="button" class="btn btn-secondary" data-wizard-prev hidden>← <?php echo __('back'); ?></button>
                     <button type="button" class="btn btn-primary" data-wizard-next><?php echo __('wizard_next_btn'); ?> →</button>
                     <button type="submit" class="btn btn-success" data-wizard-submit hidden><?php echo __('wizard_finish_btn'); ?></button>
                 </div>
