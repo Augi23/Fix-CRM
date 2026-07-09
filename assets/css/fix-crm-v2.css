@@ -2864,3 +2864,69 @@ html[data-lg-theme="light"] .crm-filter-chip.chip--cancelled { color: #556070; }
 @media (max-width: 767.98px) {
   .orders-status-filter { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
 }
+
+/* ============================================================
+   DETAIL ZAKÁZKY — zvýrazněné bloky Klient / Zařízení.
+   Prefix .card.glass-card kvůli specificitě (jinak .card.glass-card p
+   přebije text na 10px verzálky). Větší a přehlednější údaje.
+   ============================================================ */
+.card.glass-card .order-summary-panel {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px 18px;
+  height: 100%;
+}
+.card.glass-card .order-summary-hl h6 {
+  font-size: 12px !important;
+  letter-spacing: 0.10em !important;
+  text-transform: uppercase !important;
+  color: rgba(255,255,255,0.55) !important;
+  font-weight: 700 !important;
+  margin-bottom: 6px !important;
+}
+.card.glass-card .order-summary-hl .osh-title {
+  font-size: 1.55rem !important;
+  line-height: 1.2 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+  text-transform: none !important;
+  color: #fff !important;
+  margin-top: 0 !important;
+}
+.card.glass-card .order-summary-hl .osh-title strong {
+  font-size: inherit !important; font-weight: 700 !important; text-transform: none !important; letter-spacing: inherit !important;
+}
+.card.glass-card .order-summary-hl .osh-contact {
+  font-size: 1.06rem !important;
+  line-height: 1.55 !important;
+  font-weight: 500 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  color: rgba(255,255,255,0.85) !important;
+}
+.card.glass-card .order-summary-hl .osh-contact i { font-size: 1rem !important; }
+.card.glass-card .order-summary-hl .osh-meta {
+  font-size: 1rem !important; text-transform: none !important; letter-spacing: normal !important;
+  font-weight: 500 !important; color: rgba(255,255,255,0.70) !important;
+}
+.card.glass-card .order-summary-hl .osh-meta strong { font-size: inherit !important; }
+.card.glass-card .order-summary-hl .osh-serial {
+  font-size: 1.06rem !important;
+  line-height: 1.55 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-weight: 500 !important;
+  color: rgba(255,255,255,0.82) !important;
+}
+.card.glass-card .order-summary-hl .osh-serial span {
+  font-family: 'Fira Code', ui-monospace, monospace;
+  font-weight: 600 !important;
+  color: #fff !important;
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+}
+@media (max-width: 767.98px) {
+  .card.glass-card .order-summary-hl .col-md-6.text-md-end { text-align: left !important; }
+  .card.glass-card .order-summary-hl .osh-title { font-size: 1.3rem !important; }
+}

@@ -1045,3 +1045,24 @@ html[data-lg-theme="light"] .lg-sheen::after {
 html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-complaint i,
 html[data-lg-theme="light"] #sidebar .nav-link.crm-nav-new-complaint span { color: #ea580c !important; }
 html[data-lg-theme="light"] .complaint-photo-thumb { border-color: rgba(0,0,0,0.14); }
+
+/* světlé téma: panely Klient/Zařízení na detailu zakázky.
+   Prefix .card.glass-card kvůli specificitě (jinak vyhrají dark pravidla s #fff). */
+html[data-lg-theme="light"] .card.glass-card .order-summary-hl .order-summary-panel {
+  background: rgba(0,0,0,0.025) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+html[data-lg-theme="light"] .card.glass-card .order-summary-hl h6 {
+  color: rgba(0,0,0,0.50) !important;
+}
+html[data-lg-theme="light"] .card.glass-card .order-summary-hl .osh-title,
+html[data-lg-theme="light"] .card.glass-card .order-summary-hl .osh-title strong {
+  color: #1d1d1f !important;
+}
+html[data-lg-theme="light"] .card.glass-card .order-summary-hl .osh-contact,
+html[data-lg-theme="light"] .card.glass-card .order-summary-hl .osh-meta {
+  color: rgba(0,0,0,0.68) !important;
+}
+html[data-lg-theme="light"] .card.glass-card .order-summary-hl .osh-meta strong { color: #1d1d1f !important; }
+html[data-lg-theme="light"] .card.glass-card .order-summary-hl .osh-serial { color: rgba(0,0,0,0.66) !important; }
+html[data-lg-theme="light"] .card.glass-card .order-summary-hl .osh-serial span { color: #1d1d1f !important; }

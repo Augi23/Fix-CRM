@@ -131,15 +131,16 @@ function localizedOrderStatusLabel(string $status): string {
                 <?php echo getStatusBadge($order['status']); ?>
             </div>
             <div class="card-body">
-                <div class="row mb-4">
+                <div class="row g-3 mb-4 order-summary-hl">
                     <div class="col-md-6">
+                      <div class="order-summary-panel">
                         <h6><?php echo __('client'); ?></h6>
-                        <p class="mb-1"><strong><?php echo htmlspecialchars($order['first_name'].' '.$order['last_name']); ?></strong></p>
+                        <p class="osh-title mb-2"><strong><?php echo htmlspecialchars($order['first_name'].' '.$order['last_name']); ?></strong></p>
                         <?php
                             $order_phone_href = normalizePhoneForTel($order['phone'] ?? '');
                             $order_email_href = normalizeEmailForMailto($order['email'] ?? '');
                         ?>
-                        <p class="text-white-75 mb-1">
+                        <p class="osh-contact text-white-75 mb-2">
                             <i class="fas fa-phone me-2 text-success"></i>
                             <?php if ($order_phone_href !== ''): ?>
                                 <a href="tel:<?php echo e($order_phone_href); ?>" class="text-reset text-decoration-none"><?php echo htmlspecialchars($order['phone']); ?></a>
@@ -148,7 +149,7 @@ function localizedOrderStatusLabel(string $status): string {
                             <?php endif; ?>
                         </p>
                         <?php if (!empty($order['email'])): ?>
-                        <p class="text-white-75 mb-0">
+                        <p class="osh-contact text-white-75 mb-0">
                             <i class="fas fa-envelope me-2 text-info"></i>
                             <?php if ($order_email_href !== ''): ?>
                                 <a href="mailto:<?php echo e($order_email_href); ?>" class="text-reset text-decoration-none"><?php echo htmlspecialchars($order['email']); ?></a>
@@ -157,23 +158,26 @@ function localizedOrderStatusLabel(string $status): string {
                             <?php endif; ?>
                         </p>
                         <?php endif; ?>
+                      </div>
                     </div>
                     <div class="col-md-6 text-md-end">
+                      <div class="order-summary-panel">
                         <h6><?php echo __('device_model'); ?></h6>
-                        <p class="mb-1"><strong><?php echo htmlspecialchars($order['device_brand'] . ' ' . $order['device_model']); ?></strong></p>
-                        <p class="text-white-75 mb-1">
-                            <?php echo htmlspecialchars(__($order['device_type'])); ?> | 
+                        <p class="osh-title mb-2"><strong><?php echo htmlspecialchars($order['device_brand'] . ' ' . $order['device_model']); ?></strong></p>
+                        <p class="osh-meta mb-2">
+                            <?php echo htmlspecialchars(__($order['device_type'])); ?> ·
                             <strong><?php echo $order['order_type'] == 'Warranty' ? __('Warranty') : __('Non-Warranty'); ?></strong>
                         </p>
-                        <h6 class="mt-2 mb-1"><?php echo __('serial_numbers'); ?></h6>
-                        <p class="text-white-75 mb-0 small">
-                            <i class="fas fa-barcode me-1"></i><?php echo __('sn1'); ?>: <?php echo htmlspecialchars($order['serial_number'] ?: '---'); ?>
+                        <h6 class="mt-3 mb-1"><?php echo __('serial_numbers'); ?></h6>
+                        <p class="osh-serial mb-0">
+                            <i class="fas fa-barcode me-2"></i><?php echo __('sn1'); ?>: <span><?php echo htmlspecialchars($order['serial_number'] ?: '---'); ?></span>
                         </p>
                         <?php if(!empty($order['serial_number_2'])): ?>
-                        <p class="text-white-75 mb-0 small">
-                            <i class="fas fa-barcode me-1"></i><?php echo __('sn2'); ?>: <?php echo htmlspecialchars($order['serial_number_2']); ?>
+                        <p class="osh-serial mb-0">
+                            <i class="fas fa-barcode me-2"></i><?php echo __('sn2'); ?>: <span><?php echo htmlspecialchars($order['serial_number_2']); ?></span>
                         </p>
                         <?php endif; ?>
+                      </div>
                     </div>
                 </div>
 
