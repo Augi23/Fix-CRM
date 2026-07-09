@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Detail zakázky: Doprava/Výdej přesunuta do Akcí',
+        'items' => [
+            'Sekce „Doprava / Výdej" už není samostatná karta dole v pravém sloupci — je přímo v okně „Akce", hned nahoře nad tlačítkem „Označit jako vydané". Vše pro výdej je tak na jednom místě.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Nákupní seznam v levém menu',
         'items' => [
             'Nová položka „Nákupní seznam" v levém menu (zelené tlačítko). Objevují se v ní díly přidané ze stránky Nákupy — manažer/admin je jednoduše schválí a objedná, přijme na sklad, zamítne nebo smaže.',

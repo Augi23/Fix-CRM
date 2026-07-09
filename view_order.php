@@ -415,6 +415,50 @@ function localizedOrderStatusLabel(string $status): string {
                 <h5 class="mb-0"><?php echo __('actions'); ?></h5>
             </div>
             <div class="card-body">
+                <?php if ($show_shipping): ?>
+                <!-- Doprava / Výdej — přímo v Akcích, NAD tlačítkem „Označit jako vydané".
+                     Pozn.: #shippingForm nesmí být vnořený do #statusForm (nevalidní HTML),
+                     proto stojí samostatně před ním; všechna JS ID zůstávají. -->
+                <div class="order-shipping-inline mb-1">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0"><i class="fas fa-truck me-2 text-info"></i><?php echo __('shipping'); ?></h6>
+                        <?php if(isOrderStatusIn($order['status'], 'collected')): ?>
+                            <span class="badge bg-success small"><?php echo __('collected'); ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <form id="shippingForm">
+                        <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
+                        <div class="mb-2">
+                            <label class="form-label mb-1"><?php echo __('shipping_method'); ?></label>
+                            <select name="shipping_method" class="form-select">
+                                <option value="" <?php echo empty($order['shipping_method']) ? 'selected' : ''; ?>>-- <?php echo __('not_found'); ?> --</option>
+                                <option value="Self Pickup" <?php echo $order['shipping_method'] == 'Self Pickup' ? 'selected' : ''; ?>><?php echo __('self_pickup'); ?></option>
+                                <option value="Zasilkovna" <?php echo $order['shipping_method'] == 'Zasilkovna' ? 'selected' : ''; ?>>Zasilkovna</option>
+                                <option value="Ceska Posta" <?php echo $order['shipping_method'] == 'Ceska Posta' ? 'selected' : ''; ?>>Czech Post</option>
+                                <option value="PPL" <?php echo $order['shipping_method'] == 'PPL' ? 'selected' : ''; ?>>PPL</option>
+                                <option value="DPD" <?php echo $order['shipping_method'] == 'DPD' ? 'selected' : ''; ?>>DPD</option>
+                                <option value="GLS" <?php echo $order['shipping_method'] == 'GLS' ? 'selected' : ''; ?>>GLS</option>
+                                <option value="Courier" <?php echo $order['shipping_method'] == 'Courier' ? 'selected' : ''; ?>><?php echo __('courier'); ?></option>
+                            </select>
+                        </div>
+                        <div id="shippingDetails" class="<?php echo in_array($order['shipping_method'], ['Self Pickup', 'Courier', '']) ? 'd-none' : ''; ?>">
+                            <div class="mb-2">
+                                <label class="form-label mb-1"><?php echo __('shipping_tracking'); ?></label>
+                                <input type="text" name="shipping_tracking" class="form-control" value="<?php echo htmlspecialchars($order['shipping_tracking'] ?? ''); ?>" placeholder="<?php echo __('tracking_placeholder'); ?>">
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label mb-1"><?php echo __('shipping_date'); ?></label>
+                            <input type="datetime-local" name="shipping_date" class="form-control" value="<?php echo $order['shipping_date'] ? date('Y-m-d\TH:i', strtotime($order['shipping_date'])) : ''; ?>">
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary btn-sm w-100"><?php echo __('save'); ?></button>
+                    </form>
+                    <hr class="border-secondary my-3">
+                </div>
+                <?php else: ?>
+                    <div class="text-white-75 small mb-2"><?php echo __('shipping_available_after_completed'); ?></div>
+                <?php endif; ?>
+
                 <form id="statusForm">
                     <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
                     <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">
@@ -428,9 +472,6 @@ function localizedOrderStatusLabel(string $status): string {
                         <?php endif; ?>
                     </div>
 
-                    <?php if (!$show_shipping): ?>
-                        <div class="text-white-75 small mb-2"><?php echo __('shipping_available_after_completed'); ?></div>
-                    <?php endif; ?>
                     <?php if (!$show_invoice && hasPermission('admin_access')): ?>
                         <div class="text-white-75 small mb-2"><?php echo __('invoice_available_after_completed'); ?></div>
                     <?php endif; ?>
@@ -500,46 +541,6 @@ function localizedOrderStatusLabel(string $status): string {
                 </form>
             </div>
         </div>
-
-        <?php if ($show_shipping): ?>
-        <div class="card glass-card border-0 mb-4">
-            <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><?php echo __('shipping'); ?></h5>
-                <?php if(isOrderStatusIn($order['status'], 'collected')): ?>
-                    <span class="badge bg-success small"><?php echo __('collected'); ?></span>
-                <?php endif; ?>
-            </div>
-            <div class="card-body">
-                <form id="shippingForm">
-                    <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
-                    <div class="mb-3">
-                        <label class="form-label"><?php echo __('shipping_method'); ?></label>
-                        <select name="shipping_method" class="form-select">
-                            <option value="" <?php echo empty($order['shipping_method']) ? 'selected' : ''; ?>>-- <?php echo __('not_found'); ?> --</option>
-                            <option value="Self Pickup" <?php echo $order['shipping_method'] == 'Self Pickup' ? 'selected' : ''; ?>><?php echo __('self_pickup'); ?></option>
-                            <option value="Zasilkovna" <?php echo $order['shipping_method'] == 'Zasilkovna' ? 'selected' : ''; ?>>Zasilkovna</option>
-                            <option value="Ceska Posta" <?php echo $order['shipping_method'] == 'Ceska Posta' ? 'selected' : ''; ?>>Czech Post</option>
-                            <option value="PPL" <?php echo $order['shipping_method'] == 'PPL' ? 'selected' : ''; ?>>PPL</option>
-                            <option value="DPD" <?php echo $order['shipping_method'] == 'DPD' ? 'selected' : ''; ?>>DPD</option>
-                            <option value="GLS" <?php echo $order['shipping_method'] == 'GLS' ? 'selected' : ''; ?>>GLS</option>
-                            <option value="Courier" <?php echo $order['shipping_method'] == 'Courier' ? 'selected' : ''; ?>><?php echo __('courier'); ?></option>
-                        </select>
-                    </div>
-                    <div id="shippingDetails" class="<?php echo in_array($order['shipping_method'], ['Self Pickup', 'Courier', '']) ? 'd-none' : ''; ?>">
-                        <div class="mb-3">
-                            <label class="form-label"><?php echo __('shipping_tracking'); ?></label>
-                            <input type="text" name="shipping_tracking" class="form-control" value="<?php echo htmlspecialchars($order['shipping_tracking'] ?? ''); ?>" placeholder="<?php echo __('tracking_placeholder'); ?>">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><?php echo __('shipping_date'); ?></label>
-                        <input type="datetime-local" name="shipping_date" class="form-control" value="<?php echo $order['shipping_date'] ? date('Y-m-d\TH:i', strtotime($order['shipping_date'])) : ''; ?>">
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100"><?php echo __('save'); ?></button>
-                </form>
-            </div>
-        </div>
-        <?php endif; ?>
 
         <!-- Express Invoice Block -->
         <?php if ($show_invoice): 
