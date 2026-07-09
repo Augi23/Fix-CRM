@@ -389,6 +389,26 @@ function localizedOrderStatusLabel(string $status): string {
     </div>
 
     <div class="col-md-4">
+        <!-- Čárový kód zakázky (Code128): X-9100 i mobil přes náš skener → otevře tuto zakázku. Nahoře v pravém sloupci. -->
+        <div class="card glass-card border-0 mb-4">
+            <div class="card-body text-center py-3">
+                <div class="text-white-75 small mb-2"><i class="fas fa-barcode me-1"></i> <?php echo __('scan_to_open_order'); ?></div>
+                <div id="orderBarcode" style="display:inline-block; background:#fff; padding:8px 10px; border-radius:8px; line-height:0;"></div>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+        <script>
+        (function() {
+            var box = document.getElementById('orderBarcode');
+            if (!box || typeof window.JsBarcode !== 'function') { if (box) box.style.display = 'none'; return; }
+            try {
+                var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                box.appendChild(svg);
+                JsBarcode(svg, '<?php echo e(orderDisplayCode($order)); ?>', { format: 'CODE128', displayValue: true, fontSize: 14, margin: 0, height: 56, width: 2 });
+            } catch (e) { box.style.display = 'none'; }
+        })();
+        </script>
+
         <div class="card glass-card border-0 mb-4">
             <div class="card-header bg-transparent border-bottom-0">
                 <h5 class="mb-0"><?php echo __('actions'); ?></h5>
@@ -482,26 +502,6 @@ function localizedOrderStatusLabel(string $status): string {
                 </form>
             </div>
         </div>
-
-        <!-- Čárový kód zakázky (Code128): X-9100 i mobil přes náš skener → otevře tuto zakázku -->
-        <div class="card glass-card border-0 mb-4">
-            <div class="card-body text-center py-3">
-                <div class="text-white-75 small mb-2"><i class="fas fa-barcode me-1"></i> <?php echo __('scan_to_open_order'); ?></div>
-                <div id="orderBarcode" style="display:inline-block; background:#fff; padding:8px 10px; border-radius:8px; line-height:0;"></div>
-            </div>
-        </div>
-        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-        <script>
-        (function() {
-            var box = document.getElementById('orderBarcode');
-            if (!box || typeof window.JsBarcode !== 'function') { if (box) box.style.display = 'none'; return; }
-            try {
-                var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                box.appendChild(svg);
-                JsBarcode(svg, '<?php echo e(orderDisplayCode($order)); ?>', { format: 'CODE128', displayValue: true, fontSize: 14, margin: 0, height: 56, width: 2 });
-            } catch (e) { box.style.display = 'none'; }
-        })();
-        </script>
 
         <?php if ($show_shipping): ?>
         <div class="card glass-card border-0 mb-4">
