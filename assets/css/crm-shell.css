@@ -67,7 +67,7 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
 }
 .afx-brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 14px; color: #eef2f8; letter-spacing: -.01em; text-decoration: none; }
 .afx-brand:hover { color: #fff; }
-.afx-brand img { height: 24px; width: auto; display: block; }
+.afx-brand img { height: 26px; width: auto; display: block; filter: invert(1); } /* černý wordmark → bílý (tmavý motiv) */
 .afx-brand .afx-brand-fix { color: var(--afx-ice); }
 .afx-page-title { color: rgba(255,255,255,.45); font-size: 12.5px; font-weight: 500; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.12); max-width: 32vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .afx-utility-sep { flex: 1; }
@@ -124,7 +124,11 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
 }
 .afx-cell i { font-size: 16px; opacity: .9; }
 .afx-cell small { font-size: 10.5px; font-weight: 500; letter-spacing: .01em; }
-.afx-cell:hover { background: rgba(255,255,255,.07); color: #fff; transform: translateY(-1px); }
+.afx-cell:hover {
+  background: rgba(255,255,255,.09); color: #fff; transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(255,255,255,.13), inset 0 0 0 1px rgba(255,255,255,.10);
+  text-shadow: 0 0 10px rgba(255,255,255,.4);
+}
 .afx-cell.active { background: rgba(255,255,255,.12); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), 0 4px 14px rgba(0,0,0,.25); }
 .afx-cell.active small { font-weight: 600; }
 .afx-cell .afx-badge {
@@ -295,6 +299,7 @@ html[data-lg-theme="light"] body { background: #eef1f0 !important; }
 html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
 html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); }
 html[data-lg-theme="light"] .afx-brand { color: #10151d; }
+html[data-lg-theme="light"] .afx-brand img { filter: none; } /* světlý motiv → černé logo */
 html[data-lg-theme="light"] .afx-cell { color: #46505e; }
 html[data-lg-theme="light"] .afx-cell:hover { color: #10151d; background: rgba(0,0,0,.06); }
 html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(255,255,255,.75); }

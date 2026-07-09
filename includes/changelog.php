@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Doladění horního menu',
+        'items' => [
+            'Vlevo nahoře už jen logo AppleFix (bez textu) — bílé v tmavém motivu, černé ve světlém.',
+            'Horní dok má méně průhledné pozadí (lepší čitelnost nad obsahem).',
+            'Položky menu při najetí myší jemně bíle září.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Rezervace z webu (servis-online) v Zakázkách',
         'items' => [
             'Objednávky z rezervačního formuláře na applefix.cz (RepairPlugin) se nově zobrazují nahoře v Zakázkách — seřazené dle termínu vzestupně, s jemným oddělením od běžných zakázek.',

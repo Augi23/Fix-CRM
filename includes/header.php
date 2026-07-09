@@ -200,7 +200,6 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
 <header class="afx-utility">
     <a class="afx-brand" href="index.php">
         <img src="assets/img/logo-black.png" alt="AppleFix">
-        <span>Apple<span class="afx-brand-fix">Fix</span></span>
     </a>
     <span class="afx-page-title"><?php echo e($topbarTitle); ?></span>
     <span class="afx-utility-sep"></span>

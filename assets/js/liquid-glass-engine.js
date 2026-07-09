@@ -26,8 +26,8 @@
 
   // Presety odsouhlasené v náhledu (dok / okno-modál / jemný panel)
   var PRESETS = {
-    dock:  { radius: 24, ior: 1.7, thickness: 34, bezel: 16, scaleRatio: 0.8, blur: 2.4,
-             specularOpacity: 0.3, tintColor: '#10141d', tintOpacity: 22,
+    dock:  { radius: 24, ior: 1.7, thickness: 34, bezel: 16, scaleRatio: 0.8, blur: 3.2,
+             specularOpacity: 0.3, tintColor: '#0e1218', tintOpacity: 52,
              shadowColor: 'rgba(255,255,255,0.16)', shadowBlur: 9, shadowSpread: -7, outerShadowBlur: 30 },
     modal: { radius: 18, ior: 2.0, thickness: 52, bezel: 24, scaleRatio: 1.0, blur: 1.8,
              specularOpacity: 0.3, tintColor: '#0d1119', tintOpacity: 30,
