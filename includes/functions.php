@@ -567,7 +567,8 @@ function getStatusBadge($status) {
 function formatMoney($amount) {
     global $pdo;
     $currency = get_setting('currency', 'Kč');
-    return number_format($amount, 2, '.', ' ') . ' ' . $currency;
+    // Ceny v Kč zobrazujeme bez desetinných míst (zaokrouhleno na celé koruny).
+    return number_format((float)$amount, 0, ',', ' ') . ' ' . $currency;
 }
 
 function get_setting($key, $default = '') {

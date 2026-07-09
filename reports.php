@@ -791,7 +791,7 @@ function showOrdersModal(techId, type, title) {
 
                     const tdSum = document.createElement('td');
                     tdSum.className = 'text-end pe-4 fw-bold';
-                    tdSum.textContent = parseFloat(cost).toFixed(2) + ' <?php echo get_setting('currency', 'Kč'); ?>';
+                    tdSum.textContent = Math.round(parseFloat(cost) || 0).toLocaleString('cs-CZ') + ' <?php echo get_setting('currency', 'Kč'); ?>';
 
                     row.appendChild(tdId);
 

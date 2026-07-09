@@ -154,7 +154,7 @@ function clientMoney($amount): string {
     $lang = crm_get_language();
     $decimal = $lang === 'en' ? '.' : ',';
     $thousands = $lang === 'en' ? ',' : ' ';
-    return number_format((float)$amount, 2, $decimal, $thousands) . ' ' . get_setting('currency', 'Kč');
+    return number_format((float)$amount, 0, $decimal, $thousands) . ' ' . get_setting('currency', 'Kč');
 }
 
 function clientOrderAmount(array $order): ?float {

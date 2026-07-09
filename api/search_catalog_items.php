@@ -51,7 +51,7 @@ try {
             $label .= ' [' . $item['sku'] . ']';
         }
         if (!empty($item['sale_price'])) {
-            $label .= ' — ' . number_format((float)$item['sale_price'], 2, '.', ' ') . ' Kč';
+            $label .= ' — ' . number_format((float)$item['sale_price'], 0, ',', ' ') . ' Kč';
         }
 
         $results[] = [

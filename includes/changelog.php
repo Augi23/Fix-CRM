@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Ceny v Kč bez desetinných míst',
+        'items' => [
+            'Částky v Kč se všude zobrazují zaokrouhlené na celé koruny (bez haléřů) — nástěnka, zakázky, přehledy, účetnictví, klientský portál, e-maily.',
+            'Formální daňové doklady (faktura, účtenka) zatím ponechány s haléři kvůli DPH; lze upravit na vyžádání.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Popup o nově přidělené zakázce technikovi',
         'items' => [
             'Když technik dostane přidělenou zakázku, na zařízení s otevřeným CRM mu vyskočí popup se základními údaji o zakázce a zařízení (klient, závada, priorita, odkaz na otevření).',

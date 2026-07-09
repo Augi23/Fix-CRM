@@ -98,7 +98,7 @@ $customers = $stmt->fetchAll();
                                     <td><?php echo htmlspecialchars($inv['company'] ?: $inv['first_name'] . ' ' . $inv['last_name']); ?></td>
                                     <td class="small"><?php echo htmlspecialchars($inv['item_names'] ?: '—'); ?></td>
                                     <td><?php echo getInvoiceStatusBadge($inv['status']); ?></td>
-                                    <td class="fw-bold"><?php echo number_format($inv['total_amount'], 2, '.', ' ') . ' ' . $inv['currency']; ?></td>
+                                    <td class="fw-bold"><?php echo number_format((float)$inv['total_amount'], 0, ',', ' ') . ' ' . $inv['currency']; ?></td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
                                             <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" title="<?php echo __('preview'); ?>"><i class="fas fa-eye"></i></button>
@@ -128,7 +128,7 @@ $customers = $stmt->fetchAll();
                     <div class="col-md-3">
                         <div class="card bg-dark bg-opacity-25 border-0 text-center p-3">
                             <h6 class="text-muted text-uppercase mb-2"><?php echo __('status_' . $s['status']); ?></h6>
-                            <h3 class="mb-0"><?php echo number_format($s['total'], 2, '.', ' '); ?> <small>Kč</small></h3>
+                            <h3 class="mb-0"><?php echo number_format((float)$s['total'], 0, ',', ' '); ?> <small>Kč</small></h3>
                             <div class="text-primary small mt-1"><?php echo $s['count']; ?> <?php echo __('pieces_short'); ?></div>
                         </div>
                     </div>
