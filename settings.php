@@ -24,6 +24,22 @@ if (isset($_POST['set_lang']) && $is_admin_check) {
     exit;
 }
 
+if (isset($pdo) && function_exists('ensurePickupReadyColumns')) { ensurePickupReadyColumns($pdo); }
+
+if (isset($_POST['update_branches']) && $is_admin_check) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    if (function_exists('ensurePickupReadyColumns')) { ensurePickupReadyColumns($pdo); }
+    foreach ((array)($_POST['branch_address'] ?? []) as $bid => $addr) {
+        $bid = (int)$bid;
+        if ($bid <= 0) continue;
+        $hrs = trim((string)($_POST['branch_hours'][$bid] ?? ''));
+        $pdo->prepare("UPDATE branches SET address = ?, opening_hours = ? WHERE id = ?")
+            ->execute([trim((string)$addr), $hrs, $bid]);
+    }
+    header("Location: settings.php?tab=company&updated=1");
+    exit;
+}
+
 if (isset($_POST['update_company']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     set_setting('company_name', $_POST['company_name']);
@@ -370,6 +386,31 @@ require_once 'includes/header.php';
                                 <button type="submit" name="update_company" class="btn btn-primary px-5"><?php echo __('save'); ?></button>
                             </div>
                         </div>
+                    </form>
+
+                    <form method="POST" class="mt-5 pt-4 border-top border-secondary">
+                        <?php echo csrfField(); ?>
+                        <h6 class="text-white mb-1"><i class="fas fa-store me-2 text-info"></i>Pobočky — adresa a otevírací doba</h6>
+                        <div class="small text-white-50 mb-3">Zobrazuje se klientovi v e-mailu „Připraveno k vyzvednutí".</div>
+                        <?php
+                        $branchesEdit = [];
+                        try { $branchesEdit = $pdo->query("SELECT id, name, address, COALESCE(opening_hours,'') AS opening_hours FROM branches WHERE is_active = 1 ORDER BY id")->fetchAll(); } catch (Throwable $e) { $branchesEdit = []; }
+                        foreach ($branchesEdit as $b): ?>
+                            <div class="glass-panel p-3 mb-3 border-secondary">
+                                <div class="fw-semibold text-white mb-2"><i class="fas fa-location-dot me-2 text-info"></i><?php echo htmlspecialchars($b['name']); ?></div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label text-white-75 small">Adresa pobočky</label>
+                                        <textarea name="branch_address[<?php echo (int)$b['id']; ?>]" class="form-control" rows="3" placeholder="Ulice 123&#10;186 00 Praha 8 – Karlín"><?php echo htmlspecialchars($b['address']); ?></textarea>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label text-white-75 small">Otevírací doba</label>
+                                        <textarea name="branch_hours[<?php echo (int)$b['id']; ?>]" class="form-control" rows="3" placeholder="Po–Pá 10:00–19:00&#10;So 10:00–14:00&#10;Ne zavřeno"><?php echo htmlspecialchars($b['opening_hours']); ?></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                        <button type="submit" name="update_branches" class="btn btn-primary px-5"><?php echo __('save'); ?></button>
                     </form>
                 </div>
             </div>

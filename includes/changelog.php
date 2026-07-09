@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Automatický e-mail „Připraveno k vyzvednutí"',
+        'items' => [
+            'Jakmile zakázka přejde do stavu „Připraveno k vyzvednutí", pošle se klientovi automaticky e-mail (jen jednou) — hotovo, na které pobočce a otevírací doba.',
+            'Elegantní vzhled ve stylu Apple s liquid-glass panely.',
+            'Adresu a otevírací dobu poboček nastavíš v Nastavení → Údaje o společnosti.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Přidání zakázky: čistší tlačítka wizardu',
         'items' => [
             'Odebráno nadbytečné tlačítko „Zpět" ve spodní liště wizardu.',

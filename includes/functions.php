@@ -1375,6 +1375,12 @@ function crmNotifyOrderLifecycleEvent(array $event): void {
     $newStatus = trim((string)($event['new_status'] ?? ($ctx['status'] ?? '')));
     $statusChanged = ($oldStatus !== '' && $newStatus !== '' && $oldStatus !== $newStatus);
 
+    // Klientský e-mail „připraveno k vyzvednutí" — jen při přechodu DO skupiny 'completed'.
+    if ($type === 'order_status_changed' && $newStatus !== '' && isOrderStatusIn($newStatus, 'completed')
+        && !($oldStatus !== '' && isOrderStatusIn($oldStatus, 'completed'))) {
+        crmSendPickupReadyEmail($orderId);
+    }
+
     $assignedTechId = isset($event['technician_id'])
         ? (int)$event['technician_id']
         : (int)($ctx['technician_id'] ?? 0);
@@ -1935,6 +1941,161 @@ function ensureComplaintsClientColumns(PDO $pdo): void
 function complaintIsNewFromClient(array $row): bool
 {
     return ($row['source'] ?? '') === 'client' && empty($row['staff_ack_at']);
+}
+
+/** Doplní sloupce pro notifikaci „připraveno k vyzvednutí" (idempotentně, bez migrace):
+ *  orders.pickup_notified_at (guard proti opakovanému odeslání) + branches.opening_hours. */
+function ensurePickupReadyColumns(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $oc = $pdo->query("SHOW COLUMNS FROM orders")->fetchAll(PDO::FETCH_COLUMN);
+        if ($oc && !in_array('pickup_notified_at', $oc, true)) {
+            $pdo->exec("ALTER TABLE `orders` ADD COLUMN `pickup_notified_at` TIMESTAMP NULL DEFAULT NULL");
+        }
+        $bc = $pdo->query("SHOW COLUMNS FROM branches")->fetchAll(PDO::FETCH_COLUMN);
+        if ($bc && !in_array('opening_hours', $bc, true)) {
+            $pdo->exec("ALTER TABLE `branches` ADD COLUMN `opening_hours` VARCHAR(255) NULL DEFAULT NULL");
+        }
+    } catch (Throwable $e) { /* starší DB / bez oprávnění — funguje i bez těchto sloupců */ }
+}
+
+/** Odešle klientovi e-mail, že je zakázka připravena k vyzvednutí (jen jednou, přes guard
+ *  pickup_notified_at). Volá se při přechodu stavu do skupiny 'completed'. */
+function crmSendPickupReadyEmail(int $orderId): void
+{
+    global $pdo;
+    if ($orderId <= 0 || !isset($pdo)) return;
+    try {
+        ensurePickupReadyColumns($pdo);
+        $st = $pdo->prepare(
+            "SELECT o.id, o.order_code, o.status, o.device_brand, o.device_model, o.pin_code,
+                    o.pickup_notified_at, o.branch_id,
+                    c.first_name, c.last_name, c.email,
+                    b.name AS branch_name, b.address AS branch_address, b.opening_hours AS branch_hours
+             FROM orders o
+             JOIN customers c ON c.id = o.customer_id
+             LEFT JOIN branches b ON b.id = o.branch_id
+             WHERE o.id = ? LIMIT 1"
+        );
+        $st->execute([$orderId]);
+        $o = $st->fetch();
+        if (!$o) return;
+        if (!empty($o['pickup_notified_at'])) return;                      // už odesláno
+        if (!isOrderStatusIn((string)$o['status'], 'completed')) return;   // není připraveno
+        $to = trim((string)($o['email'] ?? ''));
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) return; // není kam poslat
+        if (!function_exists('smtpSendMail')) return;
+
+        $company = get_setting('company_name', 'AppleFix');
+        $code = trim((string)($o['order_code'] ?? '')) !== '' ? (string)$o['order_code'] : ('#' . $orderId);
+        $subject = $company . ' — vaše zakázka ' . $code . ' je připravena k vyzvednutí';
+        $html = crmPickupReadyEmailHtml($o);
+
+        [$ok, $err] = smtpSendMail($to, $subject, $html);
+        if ($ok) {
+            $pdo->prepare("UPDATE orders SET pickup_notified_at = NOW() WHERE id = ?")->execute([$orderId]);
+        }
+    } catch (Throwable $e) { /* best-effort — nesmí shodit změnu stavu */ }
+}
+
+/** HTML e-mailu „připraveno k vyzvednutí" — vzhled ve stylu Apple, s liquid-glass panely.
+ *  Odolné pro poštovní klienty (inline styly, translucentní vrstvení místo backdrop-filter). */
+function crmPickupReadyEmailHtml(array $o): string
+{
+    $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+
+    $company   = $e(get_setting('company_name', 'AppleFix'));
+    $firstName = trim((string)($o['first_name'] ?? ''));
+    $hello     = $firstName !== '' ? ('Dobrý den, ' . $e($firstName) . ',') : 'Dobrý den,';
+    $device    = trim(((string)($o['device_brand'] ?? '')) . ' ' . ((string)($o['device_model'] ?? '')));
+    $device    = $device !== '' ? $e($device) : 'Vaše zařízení';
+    $code      = trim((string)($o['order_code'] ?? '')) !== '' ? $e($o['order_code']) : ('#' . (int)$o['id']);
+
+    $branchName = trim((string)($o['branch_name'] ?? ''));
+    $branchAddr = trim((string)($o['branch_address'] ?? '')) ?: trim((string) get_setting('company_address', ''));
+    $branchHours = trim((string)($o['branch_hours'] ?? ''));
+    $webRaw    = trim((string) get_setting('company_web', '')) ?: 'www.applefix.cz';
+
+    $logoUrl   = 'https://admin.applefix.cloud/assets/img/applefix-logo.png';
+    $addrHtml  = nl2br($e($branchAddr));
+    $hoursHtml = $branchHours !== ''
+        ? nl2br($e($branchHours))
+        : ('Aktuální otevírací dobu najdete na ' . $e($webRaw) . '.');
+
+    // barvy / vrstvení
+    $bg      = 'linear-gradient(160deg,#0b0e13 0%,#0f1319 55%,#0a0c10 100%)';
+    $glass   = 'background:linear-gradient(180deg,rgba(255,255,255,0.10),rgba(255,255,255,0.045));border:1px solid rgba(255,255,255,0.12);border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.20);';
+    $font    = "-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+    $label   = 'font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(233,238,247,0.5);font-weight:700;';
+
+    $branchBlock = $branchName !== '' ? ('<div style="font-size:19px;font-weight:700;color:#fff;margin:2px 0 8px;">' . $e($branchName) . '</div>') : '';
+
+    return '<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"></head>'
+        . '<body style="margin:0;padding:0;background:#0a0c10;">'
+        . '<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Vaše zařízení ' . $device . ' je opravené a připravené k vyzvednutí.</div>'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . $bg . ';padding:32px 14px;font-family:' . $font . ';">'
+        . '<tr><td align="center">'
+        . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;">'
+
+        // logo
+        . '<tr><td align="center" style="padding:6px 0 24px;">'
+        . '<img src="' . $logoUrl . '" alt="' . $company . '" width="150" style="width:150px;height:auto;display:block;">'
+        . '</td></tr>'
+
+        // hero glass panel
+        . '<tr><td style="' . $glass . 'padding:34px 30px;">'
+        . '<div style="width:74px;height:74px;margin:0 auto 18px;border-radius:50%;'
+        .   'background:linear-gradient(180deg,rgba(48,209,88,0.30),rgba(48,209,88,0.12));border:1px solid rgba(48,209,88,0.5);'
+        .   'box-shadow:inset 0 1px 0 rgba(255,255,255,0.35),0 10px 30px rgba(48,209,88,0.25);text-align:center;line-height:74px;">'
+        .   '<span style="font-size:36px;color:#5ff08f;">&#10003;</span></div>'
+        . '<h1 style="margin:0 0 6px;text-align:center;font-size:26px;line-height:1.2;font-weight:800;letter-spacing:-0.02em;color:#f6f8fb;">Hotovo — je připraveno k vyzvednutí</h1>'
+        . '<p style="margin:0;text-align:center;font-size:15px;line-height:1.55;color:rgba(233,238,247,0.72);">' . $hello . '<br>vaše zařízení je opravené a čeká na vás na pobočce.</p>'
+
+        // device sub-card
+        . '<div style="margin-top:22px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10);border-radius:16px;padding:16px 18px;">'
+        .   '<div style="' . $label . '">Zařízení</div>'
+        .   '<div style="font-size:18px;font-weight:700;color:#fff;margin-top:3px;">' . $device . '</div>'
+        .   '<div style="margin-top:10px;">'
+        .     '<span style="' . $label . '">Číslo zakázky</span> '
+        .     '<span style="font-family:ui-monospace,Menlo,monospace;font-size:14px;font-weight:700;color:#7ab8ff;letter-spacing:.04em;">' . $code . '</span>'
+        .     '<span style="display:inline-block;margin-left:10px;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;'
+        .       'background:linear-gradient(180deg,rgba(48,209,88,0.22),rgba(48,209,88,0.10));border:1px solid rgba(48,209,88,0.45);color:#6bf09b;">&#9679; Připraveno k vyzvednutí</span>'
+        .   '</div>'
+        . '</div>'
+        . '</td></tr>'
+
+        // branch glass panel
+        . '<tr><td style="height:16px;line-height:16px;">&nbsp;</td></tr>'
+        . '<tr><td style="' . $glass . 'padding:24px 26px;">'
+        . '<div style="' . $label . '">Vyzvednutí na pobočce</div>'
+        . $branchBlock
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px;">'
+        .   '<tr><td valign="top" style="width:26px;font-size:16px;color:#7ab8ff;">&#128205;</td>'
+        .       '<td style="font-size:14px;line-height:1.55;color:rgba(233,238,247,0.85);">' . $addrHtml . '</td></tr>'
+        .   '<tr><td style="height:12px;"></td><td></td></tr>'
+        .   '<tr><td valign="top" style="width:26px;font-size:16px;color:#7ab8ff;">&#128336;</td>'
+        .       '<td style="font-size:14px;line-height:1.6;color:rgba(233,238,247,0.85);"><span style="' . $label . 'display:block;margin-bottom:2px;">Otevírací doba</span>' . $hoursHtml . '</td></tr>'
+        . '</table>'
+        . '</td></tr>'
+
+        // note
+        . '<tr><td style="padding:20px 26px 4px;">'
+        . '<p style="margin:0;font-size:13px;line-height:1.55;color:rgba(233,238,247,0.6);text-align:center;">'
+        .   'K vyzvednutí prosím uveďte číslo zakázky <b style="color:rgba(233,238,247,0.85);">' . $code . '</b>. Těšíme se na vás.</p>'
+        . '</td></tr>'
+
+        // footer
+        . '<tr><td style="padding:22px 20px 6px;text-align:center;">'
+        . '<div style="font-size:13px;font-weight:700;color:rgba(233,238,247,0.7);">' . $company . '</div>'
+        . '<div style="font-size:12px;color:rgba(233,238,247,0.45);margin-top:3px;">' . $e($webRaw) . '</div>'
+        . '<div style="font-size:11px;color:rgba(233,238,247,0.32);margin-top:14px;line-height:1.5;">Tento e-mail je automatické potvrzení o dokončení opravy.</div>'
+        . '</td></tr>'
+
+        . '</table></td></tr></table></body></html>';
 }
 
 /** Datum spuštění „naostro" — zakázky vytvořené PŘED tímto dnem (import historie)
