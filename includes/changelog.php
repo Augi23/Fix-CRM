@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Klientský portál: jednotné označení zakázek',
+        'items' => [
+            'V klientské sekci se u zakázek už nezobrazuje interní číslo (#ID) — všude je jednotný kód zakázky (APFAZ…, převzatý z importu a pokračující v číselné řadě).',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Ceny v Kč bez desetinných míst',
         'items' => [
             'Částky v Kč se všude zobrazují zaokrouhlené na celé koruny (bez haléřů) — nástěnka, zakázky, přehledy, účetnictví, klientský portál, e-maily.',

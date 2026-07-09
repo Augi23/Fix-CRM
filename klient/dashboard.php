@@ -194,8 +194,9 @@ $canComplain = false;
 $selectedOrderCode = '';
 if ($selectedOrder && isset($pdo)) {
     $oid = (int)$selectedOrder['id'];
-    $selectedOrderCode = trim((string)($selectedOrder['order_code'] ?? '')) !== ''
-        ? (string)$selectedOrder['order_code'] : ('#' . $oid);
+    // Jednotné označení zakázky = order_code (převzato z importu, pokračuje v číselné řadě).
+    // Interní ID klientovi nezobrazujeme.
+    $selectedOrderCode = trim((string)($selectedOrder['order_code'] ?? ''));
 
     // Zakázkový list — vždy
     $clientDocs[] = ['type' => 'order_sheet', 'label' => __('client_doc_order_sheet'), 'icon' => 'fa-file-lines'];
@@ -715,7 +716,7 @@ if ($selectedOrder && isset($pdo)) {
                             </span>
                             <span class="status-badge-large light">
                                 <i class="fas fa-hashtag"></i>
-                                <?php echo __('client_order_label'); ?> #<?php echo (int)$selectedOrder['id']; ?>
+                                <?php echo __('client_order_label'); ?> <?php echo e($selectedOrderCode); ?>
                             </span>
                         </div>
 
@@ -881,7 +882,7 @@ if ($selectedOrder && isset($pdo)) {
                                 <?php [$statusLabel, $statusClass] = clientStatusMeta((string)$order['status']); ?>
                                 <a class="repair-item <?php echo (int)$order['id'] === (int)$selectedOrderId ? 'active' : ''; ?>" href="?order=<?php echo (int)$order['id']; ?>">
                                     <div>
-                                        <div class="title"><?php echo htmlspecialchars(trim((string)($order['order_code'] ?? '')) !== '' ? $order['order_code'] : '#' . (int)$order['id'], ENT_QUOTES); ?> · <?php echo e(trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? '')) ?: __('client_device_fallback')); ?></div>
+                                        <div class="title"><?php echo htmlspecialchars(trim((string)($order['order_code'] ?? '')), ENT_QUOTES); ?> · <?php echo e(trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? '')) ?: __('client_device_fallback')); ?></div>
                                         <div class="sub">
                                             <?php echo e($statusLabel); ?> · <?php echo e(clientMoney(clientOrderAmount($order))); ?>
                                         </div>
