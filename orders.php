@@ -326,7 +326,7 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <div class="small text-truncate" style="max-width: 200px;" title="<?php echo htmlspecialchars($order['problem_description']); ?>">
+                                <div class="text-truncate" style="max-width: 240px; font-size: 0.92rem; line-height: 1.35;" title="<?php echo htmlspecialchars($order['problem_description']); ?>">
                                     <?php echo htmlspecialchars($order['problem_description']); ?>
                                 </div>
                             </td>

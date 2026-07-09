@@ -45,6 +45,10 @@ if (isset($_POST['update_company']) && $is_admin_check) {
     set_setting('company_name', $_POST['company_name']);
     set_setting('company_address', $_POST['company_address']);
     set_setting('company_phone', $_POST['company_phone']);
+    set_setting('company_ico', trim($_POST['company_ico'] ?? ''));
+    set_setting('company_dic', trim($_POST['company_dic'] ?? ''));
+    set_setting('company_email', trim($_POST['company_email'] ?? ''));
+    set_setting('company_web', trim($_POST['company_web'] ?? ''));
     set_setting('currency', $_POST['currency']);
     header("Location: settings.php?tab=company&updated=1");
     exit;
@@ -381,6 +385,22 @@ require_once 'includes/header.php';
                             <div class="col-md-6">
                                 <label class="form-label text-white-75 small"><?php echo __('currency'); ?></label>
                                 <input type="text" name="currency" class="form-control" value="<?php echo htmlspecialchars(get_setting('currency')); ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-white-75 small">IČO</label>
+                                <input type="text" name="company_ico" class="form-control" placeholder="24588571" value="<?php echo htmlspecialchars(get_setting('company_ico')); ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-white-75 small">DIČ</label>
+                                <input type="text" name="company_dic" class="form-control" placeholder="CZ24588571 (neplátce nechte prázdné)" value="<?php echo htmlspecialchars(get_setting('company_dic')); ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-white-75 small">E-mail firmy</label>
+                                <input type="text" name="company_email" class="form-control" placeholder="info@applefix.cz" value="<?php echo htmlspecialchars(get_setting('company_email')); ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-white-75 small">Web</label>
+                                <input type="text" name="company_web" class="form-control" placeholder="www.applefix.cz" value="<?php echo htmlspecialchars(get_setting('company_web')); ?>">
                             </div>
                             <div class="col-12 mt-4 pt-3 border-top border-secondary">
                                 <button type="submit" name="update_company" class="btn btn-primary px-5"><?php echo __('save'); ?></button>

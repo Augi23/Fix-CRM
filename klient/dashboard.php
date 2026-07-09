@@ -704,8 +704,6 @@ if ($selectedOrder && isset($pdo)) {
         <div class="client-grid">
             <section class="client-card client-hero">
                 <div class="client-card-inner">
-                    <h1><?php echo __('client_hero_title'); ?></h1>
-                    <p><?php echo __('client_hero_subtitle'); ?></p>
 
                     <?php if ($selectedOrder): ?>
                         <?php [$statusLabel, $statusClass] = clientStatusMeta((string)$selectedOrder['status']); ?>

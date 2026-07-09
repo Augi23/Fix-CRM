@@ -7,6 +7,17 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Vzhled + IČO/DIČ + barva stavu + čitelnost',
+        'items' => [
+            'Skutečnější Apple Liquid Glass na loginu i v klientské sekci — silnější refrakce (Chrome) a výrazné specular/edge odlesky (Safari fallback), zaoblenější karty.',
+            'V Nastavení → Údaje o společnosti nově pole IČO, DIČ, e-mail a web — propíšou se do zakázkového listu (IČO 24588571 doplněno).',
+            'Stav „Připraveno k převzetí" má novou živější jantarovou barvu místo azurové.',
+            'Popis závady v seznamu zakázek je větší a čitelnější.',
+            'Z klientské sekce odstraněn nadpis „Stav opravy a cena na jednom místě".',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Cenová pole zakázky bez haléřů',
         'items' => [
             'Vstupní pole Cena práce, Předpokládaná cena, Finální cena i Další výdaje se zobrazují jako celé koruny (bez „,00") — v detailu zakázky, editaci i rychlé úpravě.',

@@ -14,4 +14,11 @@
     <feGaussianBlur in="noise" stdDeviation="3" result="blurred"/>
     <feDisplacementMap in="SourceGraphic" in2="blurred" scale="110" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
+  <!-- KARTY (login panel, klientská sekce): střední refrakce dle Apple Liquid Glass
+       (baseFrequency 0.008, scale 72 = ideální střed — viditelný ohyb, ale čitelné). -->
+  <filter id="lg-glass" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.008" numOctaves="2" seed="42" result="noise"/>
+    <feGaussianBlur in="noise" stdDeviation="2" result="blurred"/>
+    <feDisplacementMap in="SourceGraphic" in2="blurred" scale="72" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
 </svg>
