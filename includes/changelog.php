@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Menu: barevné akce mají stálé pozadí',
+        'items' => [
+            'Tři barevné položky vpravo v horním menu (Nová zakázka, Reklamace, Nákupní seznam) mají nově trvale podbarvené pozadí s jemným barevným rámečkem; při najetí myší se rozsvítí o stupeň víc.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Správa administrátorů: přidání ze zaměstnanců',
         'items' => [
             'V Nastavení → Administrátoři lze nově povýšit stávajícího zaměstnance na administrátora — vybereš ho ze seznamu, přihlašovací jméno se předvyplní a nastavíš adminské heslo (min. 8 znaků).',
