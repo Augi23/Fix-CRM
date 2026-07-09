@@ -1,7 +1,7 @@
 <?php
 /* Zakázkový list (A4) — obsah dle firemního vzoru: typy polí + KOMPLETNÍ text
-   podmínek drobným písmem (sepsáno speciálně, NEMĚNIT — jen vzhled). Lze vložit i
-   pro e-mail: includer nastaví ORDER_DOC_EMBED ($order, $items, $target_lang) + $__EMAIL_MODE. */
+   podmínek drobným písmem (sepsáno speciálně, NEMĚNIT — jen vzhled/rozvržení).
+   Lze vložit i pro e-mail: includer nastaví ORDER_DOC_EMBED ($order,$items,$target_lang) + $__EMAIL_MODE. */
 if (!defined('ORDER_DOC_EMBED')) {
     require_once 'includes/config.php';
     require_once 'includes/functions.php';
@@ -42,6 +42,16 @@ $co_phone = trim((string) get_setting('company_phone', ''));
 $co_email = trim((string) get_setting('company_email', '')) ?: 'info@applefix.cz';
 $co_web   = trim((string) get_setting('company_web', '')) ?: 'www.applefix.cz';
 
+// firemní identita na JEDEN řádek do záhlaví
+$__co_parts = [];
+$__addr1 = trim(preg_replace('/\s*[\r\n]+\s*/u', ' ', $co_addr));
+if ($__addr1 !== '') $__co_parts[] = $__addr1;
+if ($co_ico !== '') $__co_parts[] = 'IČO: ' . $co_ico . ($co_dic !== '' ? ' · DIČ: ' . $co_dic : '');
+if ($co_phone !== '') $__co_parts[] = 'Tel.: ' . $co_phone;
+$__co_parts[] = $co_web;
+$__co_parts[] = $co_email;
+$co_line = implode('  ·  ', $__co_parts);
+
 $orderCode = orderDisplayCode($order);
 $custName  = trim(($order['first_name'] ?? '') . ' ' . ($order['last_name'] ?? ''));
 $deviceStr = trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? ''));
@@ -49,6 +59,21 @@ $pin       = trim((string)($order['pin_code'] ?? ''));
 $estimated = ($order['estimated_cost'] !== null && $order['estimated_cost'] !== '') ? (float)$order['estimated_cost'] : null;
 $receivedAt = !empty($order['created_at']) ? date('d.m.Y', strtotime((string)$order['created_at'])) : date('d.m.Y');
 $pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: 'Osobní předání na pobočce';
+
+// datum ukončení opravy (den) = kdy zakázka přešla do dokončeného stavu; prázdné při příjmu
+$completedAt = '';
+if (isset($pdo) && function_exists('getOrderStatusList')) {
+    try {
+        $doneList = getOrderStatusList('done');
+        if (!empty($doneList)) {
+            $ph = implode(',', array_fill(0, count($doneList), '?'));
+            $qc = $pdo->prepare("SELECT MAX(changed_at) FROM order_status_log WHERE order_id = ? AND new_status IN ($ph)");
+            $qc->execute(array_merge([(int)$order['id']], $doneList));
+            $ts = $qc->fetchColumn();
+            if ($ts) $completedAt = date('d.m.Y', strtotime((string)$ts));
+        }
+    } catch (Throwable $e) { $completedAt = ''; }
+}
 ?>
 <!DOCTYPE html>
 <html lang="cs">
@@ -67,54 +92,50 @@ $pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: 'Osobní pře
         .sheet { max-width: 840px; margin: auto; background: #fff; border-radius: 18px; overflow: hidden;
                  box-shadow: 0 24px 64px rgba(17,20,24,0.12); }
         .accent-bar { height: 5px; background: linear-gradient(90deg, #0a84ff, #5ac8fa 55%, #64d2ff); }
-        .pad { padding: 30px 34px 34px; }
+        .pad { padding: 28px 34px 34px; }
 
-        .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
-                padding-bottom: 20px; border-bottom: 1px solid var(--line); }
-        .brand { display: flex; flex-direction: column; gap: 9px; }
-        .brand img { height: 34px; width: auto; }
-        .brand .co { font-size: 15.5px; font-weight: 800; letter-spacing: -0.01em; }
-        .brand .meta { font-size: 10.5px; color: var(--muted); line-height: 1.6; }
+        .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+        .head img { height: 34px; width: auto; }
         .doc { text-align: right; }
         .doc .kick { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent-ink); font-weight: 800; }
-        .doc h1 { margin: 3px 0 0; font-size: 25px; font-weight: 800; letter-spacing: -0.03em; }
+        .doc h1 { margin: 3px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; font-family: ui-monospace, Menlo, monospace; }
         .doc .date { font-size: 11px; color: var(--muted); margin-top: 5px; }
 
-        .strip { display: flex; flex-wrap: wrap; margin: 22px 0 6px; border: 1px solid var(--line);
-                 border-radius: 14px; background: var(--soft); overflow: hidden; }
-        .strip .cell { flex: 1 1 22%; min-width: 132px; padding: 12px 16px; border-right: 1px solid var(--line); }
-        .strip .cell:last-child { border-right: none; }
-        .strip .k { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
-        .strip .v { font-size: 14px; font-weight: 700; margin-top: 4px; word-break: break-word; }
-        .strip .v.mono { font-family: ui-monospace, Menlo, monospace; letter-spacing: 0.01em; }
-        .strip .v.hl { color: var(--accent-ink); }
+        /* firemní identita — jeden řádek v záhlaví */
+        .co-line { margin-top: 16px; padding: 9px 0 15px; border-bottom: 1px solid var(--line);
+                   font-size: 10.5px; color: var(--sub); }
+        .co-line b { color: var(--ink); font-weight: 800; }
 
-        .rows { margin-top: 6px; }
-        .row { display: flex; gap: 24px; padding: 15px 2px; border-bottom: 1px solid var(--line); }
-        .row:last-of-type { border-bottom: none; }
-        .f { flex: 1; min-width: 0; }
-        .f .k { font-size: 9.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted);
-                font-weight: 700; margin-bottom: 5px; }
-        .f .v { font-size: 13.5px; font-weight: 500; color: var(--ink); }
-        .f .v.mono { font-family: ui-monospace, Menlo, monospace; font-weight: 700; }
-        .price { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
-        .note { font-size: 11.5px; color: #8a5a1a; background: #fff7ec; border: 1px solid #f6dcb4;
-                border-radius: 10px; padding: 9px 12px; line-height: 1.5; }
-        .repair-box { background: linear-gradient(180deg, #f2f8ff, #eef5ff); border: 1px solid #d6e6fb;
-                      border-radius: 12px; padding: 13px 16px; }
-        .repair-box .k { color: var(--accent-ink); }
-        .repair-box .v { font-size: 14.5px; font-weight: 600; }
+        /* dva sloupce: KLIENT | ZAŘÍZENÍ A OPRAVA */
+        .cols { display: flex; gap: 16px; margin-top: 18px; }
+        .panel { flex: 1; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+        .panel.client { flex: 0 0 40%; background: var(--soft); }
+        .panel .title { font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink);
+                        font-weight: 800; margin-bottom: 10px; }
+        .client .name { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+        .client .contact { margin-top: 8px; font-size: 12.5px; color: var(--sub); line-height: 1.7; }
+        .client .contact .ic { display: inline-block; width: 15px; color: var(--muted); }
 
-        .legal { margin-top: 22px; padding-top: 15px; border-top: 2px solid var(--line);
+        .kv { display: flex; justify-content: space-between; gap: 14px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+        .kv:last-child { border-bottom: none; }
+        .kv .k { font-size: 11px; color: var(--muted); flex: 0 0 auto; padding-top: 1px; }
+        .kv .v { font-size: 13px; font-weight: 700; text-align: right; word-break: break-word; }
+        .kv .v.mono { font-family: ui-monospace, Menlo, monospace; }
+        .kv .v.price { font-size: 15px; font-weight: 800; }
+        .kv .v.repair { color: var(--ink); }
+        .kv .v.done { color: var(--accent-ink); }
+        .note { margin-top: 8px; font-size: 11px; color: #8a5a1a; background: #fff7ec; border: 1px solid #f6dcb4;
+                border-radius: 9px; padding: 8px 10px; line-height: 1.5; }
+
+        .legal { margin-top: 20px; padding-top: 14px; border-top: 2px solid var(--line);
                  font-size: 8.4px; line-height: 1.6; color: #495059; text-align: justify; }
         .legal p { margin: 0 0 8px; }
 
-        .sigs { display: flex; gap: 44px; margin-top: 16px; }
+        .sigs { display: flex; gap: 44px; margin-top: 14px; }
         .sig { flex: 1; }
-        .sig .line { border-top: 1.4px solid var(--ink); margin-top: 42px; padding-top: 7px;
+        .sig .line { border-top: 1.4px solid var(--ink); margin-top: 40px; padding-top: 7px;
                      font-size: 10.5px; color: var(--muted); text-align: center; }
-
-        .pickup { margin-top: 26px; padding: 16px 18px 18px; background: var(--soft);
+        .pickup { margin-top: 24px; padding: 15px 18px 16px; background: var(--soft);
                   border: 1px solid var(--line); border-radius: 14px; }
         .pickup h3 { margin: 0; font-size: 13.5px; font-weight: 800; letter-spacing: -0.01em; }
         .pickup .sub { font-size: 11px; color: var(--sub); margin-top: 3px; }
@@ -128,8 +149,7 @@ $pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: 'Osobní pře
             body { background: #fff; padding: 0; font-size: 12px; }
             .sheet { box-shadow: none; border-radius: 0; max-width: none; }
             .pad { padding: 11mm 13mm 10mm; }
-            .accent-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .strip, .repair-box, .pickup, .note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .accent-bar, .panel.client, .pickup, .note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-print { display: none !important; }
             .legal { font-size: 8px; }
         }
@@ -147,19 +167,7 @@ $pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: 'Osobní pře
     <div class="accent-bar"></div>
     <div class="pad">
         <div class="head">
-            <div class="brand">
-                <?php if ($__logo_data): ?><img src="<?php echo $__logo_data; ?>" alt="<?php echo e($co_name); ?>"><?php endif; ?>
-                <div>
-                    <div class="co"><?php echo e($co_name); ?></div>
-                    <div class="meta">
-                        <?php echo nl2br(e($co_addr)); ?><?php if ($co_addr !== ''): ?><br><?php endif; ?>
-                        <?php if ($co_ico !== ''): ?>IČO: <?php echo e($co_ico); ?><?php if ($co_dic !== ''): ?> · DIČ: <?php echo e($co_dic); ?><?php endif; ?><br><?php endif; ?>
-                        <?php if ($co_phone !== ''): ?>Tel.: <?php echo e($co_phone); ?><br><?php endif; ?>
-                        <?php echo e($co_web); ?><br>
-                        <?php echo e($co_email); ?>
-                    </div>
-                </div>
-            </div>
+            <?php if ($__logo_data): ?><img src="<?php echo $__logo_data; ?>" alt="<?php echo e($co_name); ?>"><?php endif; ?>
             <div class="doc">
                 <div class="kick">Zakázkový list</div>
                 <h1><?php echo e($orderCode); ?></h1>
@@ -167,45 +175,34 @@ $pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: 'Osobní pře
             </div>
         </div>
 
-        <div class="strip">
-            <div class="cell"><div class="k">Číslo zakázky</div><div class="v mono hl"><?php echo e($orderCode); ?></div></div>
-            <div class="cell"><div class="k">PIN / heslo zařízení</div><div class="v mono"><?php echo e($pin !== '' ? $pin : '—'); ?></div></div>
-            <div class="cell"><div class="k">Zařízení</div><div class="v"><?php echo e($deviceStr ?: '—'); ?></div></div>
-            <div class="cell"><div class="k">Přijetí zařízení do opravy</div><div class="v"><?php echo e($receivedAt); ?></div></div>
-        </div>
+        <div class="co-line"><b><?php echo e($co_name); ?></b>  ·  <?php echo e($co_line); ?></div>
 
-        <div class="rows">
-            <div class="row">
-                <div class="f">
-                    <div class="k">Heslo zařízení / Kód obrazovky</div>
-                    <?php if ($pin !== ''): ?>
-                        <div class="v mono"><?php echo e($pin); ?></div>
-                    <?php else: ?>
-                        <div class="note">Zákazník heslo nesdělil a je si vědom toho, že zařízení není možné po opravě plně otestovat.</div>
-                    <?php endif; ?>
+        <div class="cols">
+            <div class="panel client">
+                <div class="title">Klient</div>
+                <div class="name"><?php echo e($custName ?: '—'); ?></div>
+                <div class="contact">
+                    <?php if (!empty($order['phone'])): ?><div><span class="ic">☎</span> <?php echo e($order['phone']); ?></div><?php endif; ?>
+                    <?php if (!empty($order['email'])): ?><div><span class="ic">✉</span> <?php echo e($order['email']); ?></div><?php endif; ?>
+                    <?php if (!empty($order['address'])): ?><div><span class="ic">⌂</span> <?php echo nl2br(e($order['address'])); ?></div><?php endif; ?>
                 </div>
-                <div class="f">
-                    <div class="k">Předpokládaná cena opravy</div>
-                    <div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : 'dle diagnostiky'; ?></div>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="f repair-box">
-                    <div class="k">Požadovaná oprava</div>
-                    <div class="v"><?php echo nl2br(e((string)($order['problem_description'] ?? '')) ?: '—'); ?></div>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="f">
-                    <div class="k">Kontakt na zákazníka</div>
-                    <div class="v"><?php echo e($custName ?: '—'); ?><?php if (!empty($order['phone'])): ?>, Tel.: <?php echo e($order['phone']); ?><?php endif; ?></div>
-                </div>
-                <div class="f">
+                <div class="kv" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;">
                     <div class="k">Převzetí zařízení zákazníkem</div>
                     <div class="v"><?php echo e($pickupMethod); ?></div>
                 </div>
+            </div>
+
+            <div class="panel">
+                <div class="title">Zařízení a oprava</div>
+                <div class="kv"><div class="k">Zařízení</div><div class="v"><?php echo e($deviceStr ?: '—'); ?></div></div>
+                <div class="kv"><div class="k">Heslo zařízení / Kód obrazovky</div><div class="v mono"><?php echo e($pin !== '' ? $pin : '—'); ?></div></div>
+                <div class="kv"><div class="k">Požadovaná oprava</div><div class="v repair"><?php echo e((string)($order['problem_description'] ?? '') ?: '—'); ?></div></div>
+                <div class="kv"><div class="k">Předpokládaná cena opravy</div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : 'dle diagnostiky'; ?></div></div>
+                <div class="kv"><div class="k">Přijetí zařízení do opravy</div><div class="v"><?php echo e($receivedAt); ?></div></div>
+                <div class="kv"><div class="k">Datum ukončení opravy</div><div class="v done"><?php echo e($completedAt !== '' ? $completedAt : '—'); ?></div></div>
+                <?php if ($pin === ''): ?>
+                    <div class="note">Zákazník heslo nesdělil a je si vědom toho, že zařízení není možné po opravě plně otestovat.</div>
+                <?php endif; ?>
             </div>
         </div>
 

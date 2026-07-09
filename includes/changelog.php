@@ -7,10 +7,11 @@
 return [
     [
         'date' => '2026-07-09',
-        'title' => 'Zakázkový list — modernější a elegantnější vzhled',
+        'title' => 'Zakázkový list — nové přehledné rozvržení',
         'items' => [
-            'Nový, čistší a elegantnější vzhled zakázkového listu (hlavička s číslem zakázky, přehledový pruh, zvýrazněná požadovaná oprava, kultivovaná typografie a podpisové řádky).',
-            'Obsah zůstává beze změny — všechna pole i kompletní text podmínek drobným písmem jsou zachovány doslovně.',
+            'Firemní údaje na jednom řádku v záhlaví; vlevo výrazný klient (velké jméno + kontakt), vpravo zařízení a oprava.',
+            'Přidáno pole „Datum ukončení opravy" (jen den).',
+            'Obsah i kompletní text podmínek drobným písmem zůstávají beze změny.',
         ],
     ],
     [
