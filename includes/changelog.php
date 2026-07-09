@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Menu: černější pozadí doku',
+        'items' => [
+            'Horní horizontální menu má výrazně černější, méně průhledné pozadí — lepší kontrast a čitelnost; skleněný lom na hranách zůstává.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Oprava: popup okna šla překrýt neprokliknutelnou vrstvou',
         'items' => [
             'Po redesignu mohla potvrzovací a další vyskakovací okna na stránkách (detail zakázky, zakázky, nákupy, nastavení, klienti, sklad, účetnictví, reporty) skončit pod ztmavovací vrstvou — nešlo kliknout na Potvrdit/Zrušit. Opraveno globálně pro celé CRM.',
