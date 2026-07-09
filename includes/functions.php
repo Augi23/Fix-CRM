@@ -2220,6 +2220,45 @@ function importGreetingSounds(): void
     } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
 }
 
+/** Jednorázově (9.7.2026): NOVÝ uvítací zvuk pro Tomáše Zahradníka — na rozdíl od
+ *  importGreetingSounds PŘEPÍŠE už nasazený soubor v uploads/greetings. */
+function refreshTomasGreeting202607(): void
+{
+    global $pdo;
+    try {
+        if (get_setting('greeting_tomas_v2_2026_07', '') === '1') { return; }
+        $src = __DIR__ . '/../assets/greetings_import/tomas_zahradnik.mp3';
+        $dst = __DIR__ . '/../uploads/greetings';
+        if (!is_file($src)) { return; }
+        if (!is_dir($dst)) { mkdir($dst, 0755, true); }
+
+        $norm = function (string $v): string {
+            $v = mb_strtolower($v, 'UTF-8');
+            return strtr($v, ['á'=>'a','č'=>'c','ď'=>'d','é'=>'e','ě'=>'e','í'=>'i','ň'=>'n',
+                              'ó'=>'o','ř'=>'r','š'=>'s','ť'=>'t','ú'=>'u','ů'=>'u','ý'=>'y','ž'=>'z']);
+        };
+        $people = [];
+        foreach ($pdo->query('SELECT username, full_name AS name FROM users')->fetchAll() as $r) { $people[] = $r; }
+        foreach ($pdo->query('SELECT username, name FROM technicians')->fetchAll() as $r) { $people[] = $r; }
+
+        // kandidáti se jménem tomas; když je mezi nimi zahradník, ber jen jeho
+        $matches = [];
+        foreach ($people as $pp) {
+            $hay = $norm(($pp['username'] ?? '') . ' ' . ($pp['name'] ?? ''));
+            if (str_contains($hay, 'tomas')) { $matches[] = $pp + ['hay' => $hay]; }
+        }
+        $zahradnik = array_values(array_filter($matches, fn($m) => str_contains($m['hay'], 'zahradn')));
+        if ($zahradnik) { $matches = $zahradnik; }
+
+        $done = false;
+        foreach ($matches as $pp) {
+            $destName = preg_replace('/[^a-zA-Z0-9._-]/', '_', (string)$pp['username']) . '.mp3';
+            if (@copy($src, $dst . '/' . $destName)) { $done = true; }
+        }
+        if ($done && function_exists('set_setting')) { set_setting('greeting_tomas_v2_2026_07', '1'); }
+    } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
+}
+
 /** Jednorázově: stav "Černá růže" (historická značka 2. pobočky) -> Přijato + pobočka Na Příkopě. */
 function migrateCernaRuzeOrders(): void
 {
@@ -2279,6 +2318,7 @@ if (session_status() === PHP_SESSION_ACTIVE
         migrateCernaRuzeOrders();
         ensureStatusEnum202607();
         importGreetingSounds();
+        refreshTomasGreeting202607();
     } catch (Throwable $e) { /* ignore */ }
 }
 ?>
