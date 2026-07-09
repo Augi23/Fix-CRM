@@ -2276,6 +2276,36 @@ function refreshAdminGreeting202607(): void
     } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
 }
 
+/** Zdenda: až bude jeho účet zase existovat (byl smazán), automaticky mu vrátí
+ *  uvítací zvuk zdenda_faceid.mp3 → uploads/greetings/<username>.mp3.
+ *  Guard se nastaví AŽ po úspěšném přiřazení, takže to zkouší, dokud účet není zpět. */
+function restoreZdendaGreeting(): void
+{
+    global $pdo;
+    try {
+        if (get_setting('greeting_zdenda_restored', '') === '1') { return; }
+        $src = __DIR__ . '/../assets/greetings_import/zdenda_faceid.mp3';
+        $dst = __DIR__ . '/../uploads/greetings';
+        if (!is_file($src)) { return; }
+        $norm = function (string $v): string {
+            return strtr(mb_strtolower($v, 'UTF-8'),
+                ['á'=>'a','č'=>'c','ď'=>'d','é'=>'e','ě'=>'e','í'=>'i','ň'=>'n','ó'=>'o',
+                 'ř'=>'r','š'=>'s','ť'=>'t','ú'=>'u','ů'=>'u','ý'=>'y','ž'=>'z']);
+        };
+        foreach ($pdo->query('SELECT username, name FROM technicians')->fetchAll() as $t) {
+            $hay = $norm(($t['username'] ?? '') . ' ' . ($t['name'] ?? ''));
+            if (str_contains($hay, 'zdend') || str_contains($hay, 'zdenek') || str_contains($hay, 'zdenek')) {
+                if (!is_dir($dst)) { mkdir($dst, 0755, true); }
+                $destName = preg_replace('/[^a-zA-Z0-9._-]/', '_', (string)$t['username']) . '.mp3';
+                if (@copy($src, $dst . '/' . $destName) && function_exists('set_setting')) {
+                    set_setting('greeting_zdenda_restored', '1');
+                }
+                break;
+            }
+        }
+    } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
+}
+
 /** Jednorázově: stav "Černá růže" (historická značka 2. pobočky) -> Přijato + pobočka Na Příkopě. */
 function migrateCernaRuzeOrders(): void
 {
@@ -2337,6 +2367,7 @@ if (session_status() === PHP_SESSION_ACTIVE
         importGreetingSounds();
         refreshTomasGreeting202607();
         refreshAdminGreeting202607();
+        restoreZdendaGreeting();
     } catch (Throwable $e) { /* ignore */ }
 }
 ?>
