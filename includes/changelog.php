@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Objednat díl: tlačítko reaguje + hlásí chyby',
+        'items' => [
+            'Tlačítko „Objednat" v modalu dílu nově vždy reaguje — při úspěchu potvrdí a přenačte, při chybě zobrazí konkrétní hlášku (dřív se při chybové odpovědi serveru nestalo nic).',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Objednávka dílu: předvyplní naposledy otevřenou zakázku',
         'items' => [
             'Modal „Objednat díl" nově předvyplní naposledy otevřenou zakázku a zobrazuje správný kód zakázky (APFAZ…) místo interního čísla (#1236).',

@@ -828,13 +828,30 @@ $(function() {
 
     $('#orderPartForm').on('submit', function(e) {
         e.preventDefault();
-        $.post('api/procurement_request.php', $(this).serialize(), function(res) {
-            if (res.success) {
+        e.stopPropagation();
+        var $form = $(this);
+        var $btn = $form.find('button[type="submit"]');
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: 'api/procurement_request.php',
+            method: 'POST',
+            data: $form.serialize(),
+            dataType: 'json'
+        }).done(function(res) {
+            if (res && res.success) {
+                if (window.afxLabelToast) window.afxLabelToast('🛒 Díl přidán do objednávek', true);
                 location.reload();
             } else {
-                showAlert('Error: ' + res.message);
+                $btn.prop('disabled', false);
+                showAlert('Objednávku se nepodařilo uložit: ' + ((res && res.message) || 'neznámá chyba'));
             }
+        }).fail(function(xhr) {
+            $btn.prop('disabled', false);
+            var msg = 'neznámá chyba';
+            try { msg = (JSON.parse(xhr.responseText) || {}).message || msg; } catch (e) {}
+            showAlert('Objednávku se nepodařilo uložit: ' + msg);
         });
+        return false;
     });
 
     $('.copy-supplier-list').on('click', function() {
