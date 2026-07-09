@@ -248,6 +248,35 @@ if (isset($_POST['change_admin_password']) && hasPermission('manage_passwords'))
     exit;
 }
 
+// Povýšení stávajícího zaměstnance na administrátora (vytvoří adminský login v users)
+if (isset($_POST['promote_staff_admin']) && $is_admin_check) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    $techId = (int)($_POST['staff_tech_id'] ?? 0);
+    $login  = trim((string)($_POST['staff_admin_username'] ?? ''));
+    $pwd    = (string)($_POST['staff_admin_password'] ?? '');
+
+    if ($techId <= 0 || $login === '') {
+        header("Location: settings.php?tab=admins&error=promote_missing"); exit;
+    }
+    if (strlen($pwd) < 8) {
+        header("Location: settings.php?tab=admins&error=short_password"); exit;
+    }
+    $stmt = $pdo->prepare("SELECT id, name FROM technicians WHERE id = ?");
+    $stmt->execute([$techId]);
+    $staffRow = $stmt->fetch();
+    if (!$staffRow) { header("Location: settings.php?tab=admins&error=promote_missing"); exit; }
+
+    // login nesmí kolidovat s existujícím adminem (technik smí mít stejný — rozliší je heslo)
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    $stmt->execute([$login]);
+    if ($stmt->fetch()) { header("Location: settings.php?tab=admins&error=admin_exists"); exit; }
+
+    $pdo->prepare("INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, 'admin')")
+        ->execute([$login, password_hash($pwd, PASSWORD_DEFAULT), (string)$staffRow['name']]);
+    header("Location: settings.php?tab=admins&admin_added=1");
+    exit;
+}
+
 if (isset($_POST['clear_logs']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     try { $pdo->query("DELETE FROM system_errors"); } catch (Exception $e) {}
@@ -746,6 +775,72 @@ require_once 'includes/header.php';
         <?php if ($is_admin_user): ?>
         <div class="tab-pane fade <?php echo $active_tab == 'admins' ? 'show active' : ''; ?>">
             <h5 class="mb-3"><?php echo __('admin_management_title'); ?></h5>
+
+            <?php if (isset($_GET['admin_added'])): ?>
+                <div class="alert alert-success py-2"><i class="fas fa-check me-2"></i>Administrátor přidán. Může se hned přihlásit.</div>
+            <?php elseif (($_GET['error'] ?? '') === 'admin_exists'): ?>
+                <div class="alert alert-danger py-2"><i class="fas fa-triangle-exclamation me-2"></i>Toto přihlašovací jméno už mezi administrátory existuje — zvol jiné.</div>
+            <?php elseif (($_GET['error'] ?? '') === 'promote_missing'): ?>
+                <div class="alert alert-danger py-2"><i class="fas fa-triangle-exclamation me-2"></i>Vyber zaměstnance a vyplň přihlašovací jméno.</div>
+            <?php elseif (($_GET['error'] ?? '') === 'short_password'): ?>
+                <div class="alert alert-danger py-2"><i class="fas fa-triangle-exclamation me-2"></i>Heslo musí mít alespoň 8 znaků.</div>
+            <?php endif; ?>
+
+            <!-- Přidat administrátora z aktuálních zaměstnanců -->
+            <?php
+            $adminLogins = array_column($pdo->query("SELECT username FROM users")->fetchAll(), 'username');
+            $staffCandidates = $pdo->query("SELECT id, name, username FROM technicians ORDER BY name ASC")->fetchAll();
+            ?>
+            <form method="POST" class="glass-panel p-3 border-secondary mb-4">
+                <?php echo csrfField(); ?>
+                <div class="small text-white-75 mb-2"><i class="fas fa-user-plus me-2 text-info"></i>Přidat administrátora z aktuálních zaměstnanců</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small text-white-75">Zaměstnanec</label>
+                        <select name="staff_tech_id" id="promoteStaffSelect" class="form-select" required>
+                            <option value="">— vyber —</option>
+                            <?php foreach ($staffCandidates as $sc): ?>
+                                <option value="<?php echo (int)$sc['id']; ?>" data-username="<?php echo htmlspecialchars((string)$sc['username']); ?>">
+                                    <?php echo htmlspecialchars($sc['name']); ?><?php if (!empty($sc['username'])): ?> (<?php echo htmlspecialchars($sc['username']); ?>)<?php endif; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-white-75">Přihlašovací jméno (admin)</label>
+                        <input type="text" name="staff_admin_username" id="promoteStaffUsername" class="form-control" required autocomplete="off">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-white-75">Heslo administrátora (min. 8 znaků)</label>
+                        <input type="password" name="staff_admin_password" class="form-control" minlength="8" required autocomplete="new-password">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" name="promote_staff_admin" value="1" class="btn btn-primary w-100"><i class="fas fa-user-shield me-1"></i>Přidat</button>
+                    </div>
+                </div>
+                <div class="form-text small text-white-75 mt-2">
+                    Zaměstnanci vznikne samostatný adminský přístup (účet zaměstnance zůstává beze změny).
+                    Může používat stejné přihlašovací jméno — role se pozná podle hesla.
+                </div>
+            </form>
+            <script>
+            (function () {
+                var sel = document.getElementById('promoteStaffSelect');
+                var usr = document.getElementById('promoteStaffUsername');
+                var taken = <?php echo json_encode(array_values($adminLogins), JSON_UNESCAPED_UNICODE); ?>;
+                if (!sel || !usr) return;
+                sel.addEventListener('change', function () {
+                    var opt = sel.options[sel.selectedIndex];
+                    var u = (opt && opt.getAttribute('data-username')) || '';
+                    if (!u && opt && opt.text) { u = opt.text.trim().toLowerCase().split(/\s+/)[0].normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+                    // koliduje-li s existujícím adminem, nabídni variantu
+                    var candidate = u, i = 2;
+                    while (candidate && taken.indexOf(candidate) !== -1) { candidate = u + i; i++; }
+                    usr.value = candidate;
+                });
+            })();
+            </script>
+
             <div class="table-responsive">
                 <table class="table table-dark table-hover align-middle border-secondary">
                     <thead class="table-dark"><tr><th><?php echo __('login_col'); ?></th><th><?php echo __('name_col'); ?></th><th><?php echo __('role_col'); ?></th><th class="text-end"><?php echo __('actions_col'); ?></th></tr></thead>
