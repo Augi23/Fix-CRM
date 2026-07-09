@@ -311,7 +311,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="col-md-6">
                     <label class="form-label"><i class="fas fa-money-bill-wave me-2 text-success"></i><?php echo __('cost_est'); ?></label>
                     <div class="input-group">
-                        <input type="number" name="estimated_cost" class="form-control" step="0.01" value="<?php echo $order['estimated_cost']; ?>">
+                        <input type="number" name="estimated_cost" class="form-control" step="1" value="<?php $v=$order['estimated_cost']; echo ($v===null||$v==='')?'':(int)round((float)$v); ?>">
                         <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                     </div>
                 </div>

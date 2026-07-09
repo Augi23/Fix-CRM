@@ -466,7 +466,7 @@ function localizedOrderStatusLabel(string $status): string {
                         <div class="mb-3">
                             <label class="form-label"><?php echo __('work_cost'); ?></label>
                             <div class="input-group">
-                                <input type="number" name="final_cost" class="form-control" value="<?php echo e($order['final_cost'] ?? $order['estimated_cost']); ?>">
+                                <input type="number" step="1" name="final_cost" class="form-control" value="<?php echo (int)round((float)($order['final_cost'] ?? $order['estimated_cost'] ?? 0)); ?>">
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>
@@ -474,7 +474,7 @@ function localizedOrderStatusLabel(string $status): string {
                         <div class="mb-3">
                             <label class="form-label"><?php echo __('extra_expenses'); ?></label>
                             <div class="input-group">
-                                <input type="number" name="extra_expenses" class="form-control" step="0.01" value="<?php echo e($order['extra_expenses'] ?? 0); ?>">
+                                <input type="number" name="extra_expenses" class="form-control" step="1" value="<?php echo (int)round((float)($order['extra_expenses'] ?? 0)); ?>">
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>
@@ -612,7 +612,7 @@ function localizedOrderStatusLabel(string $status): string {
                     <div class="mb-3">
                         <label class="form-label"><?php echo __('total_to_pay'); ?></label>
                         <div class="input-group">
-                            <input type="number" name="total_amount" class="form-control" step="0.01" value="<?php echo $existing_invoice ? $existing_invoice['total_amount'] : ($order['final_cost'] ?: $order['estimated_cost']); ?>" required>
+                            <input type="number" name="total_amount" class="form-control" step="0.01" value="<?php echo $existing_invoice ? $existing_invoice['total_amount'] : (int)round((float)($order['final_cost'] ?: $order['estimated_cost'])); ?>" required>
                             <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                         </div>
                     </div>
@@ -1295,14 +1295,14 @@ function deleteOrder(id) {
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('price_estimated'); ?></label>
                             <div class="input-group">
-                                <input type="number" name="estimated_cost" class="form-control" step="0.01" value="<?php echo e($order['estimated_cost']); ?>">
+                                <input type="number" name="estimated_cost" class="form-control" step="1" value="<?php $v=$order['estimated_cost']; echo ($v===null||$v==='')?'':(int)round((float)$v); ?>">
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('price_final'); ?></label>
                             <div class="input-group">
-                                <input type="number" name="final_cost" class="form-control" step="0.01" value="<?php echo e($order['final_cost']); ?>">
+                                <input type="number" name="final_cost" class="form-control" step="1" value="<?php $v=$order['final_cost']; echo ($v===null||$v==='')?'':(int)round((float)$v); ?>">
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>
@@ -1310,7 +1310,7 @@ function deleteOrder(id) {
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('extra_expenses'); ?></label>
                             <div class="input-group">
-                                <input type="number" name="extra_expenses" class="form-control" step="0.01" value="<?php echo e($order['extra_expenses']); ?>">
+                                <input type="number" name="extra_expenses" class="form-control" step="1" value="<?php $v=$order['extra_expenses']; echo ($v===null||$v==='')?'':(int)round((float)$v); ?>">
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>

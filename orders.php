@@ -667,21 +667,21 @@ $(document).ready(function() {
                             <div class="col-12 col-sm-6 col-md-3">
                                 <label class="form-label"><?php echo __('price_estimated'); ?></label>
                                 <div class="input-group">
-                                    <input type="number" name="estimated_cost" class="form-control" value="${o.estimated_cost || 0}">
+                                    <input type="number" step="1" name="estimated_cost" class="form-control" value="${Math.round(o.estimated_cost || 0)}">
                                     <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                                 </div>
                             </div>
                             <div class="col-12 col-sm-6 col-md-3">
                                 <label class="form-label"><?php echo __('price_final'); ?></label>
                                 <div class="input-group">
-                                    <input type="number" name="final_cost" class="form-control" value="${o.final_cost || o.estimated_cost || 0}">
+                                    <input type="number" step="1" name="final_cost" class="form-control" value="${Math.round(o.final_cost || o.estimated_cost || 0)}">
                                     <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                                 </div>
                             </div>
                             <div class="col-md-12 ${res.role == 'admin' ? '' : 'd-none'}">
                                 <label class="form-label"><?php echo __('extra_expenses_desc'); ?></label>
                                 <div class="input-group">
-                                    <input type="number" name="extra_expenses" class="form-control" step="0.01" value="${o.extra_expenses || 0}">
+                                    <input type="number" name="extra_expenses" class="form-control" step="1" value="${Math.round(o.extra_expenses || 0)}">
                                     <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                                 </div>
                             </div>

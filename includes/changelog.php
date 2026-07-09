@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Cenová pole zakázky bez haléřů',
+        'items' => [
+            'Vstupní pole Cena práce, Předpokládaná cena, Finální cena i Další výdaje se zobrazují jako celé koruny (bez „,00") — v detailu zakázky, editaci i rychlé úpravě.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Elegantnější Apple Liquid Glass (login + klientská sekce)',
         'items' => [
             'Přihlašovací obrazovka (tmavá) je více „liquid glass" — zaoblenější rohy, silnější sklo s refrakcí a lesklou hranou, zaoblené vstupy i tlačítko.',
