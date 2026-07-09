@@ -43,7 +43,6 @@ $co_email = trim((string) get_setting('company_email', '')) ?: 'info@applefix.cz
 $co_web   = trim((string) get_setting('company_web', '')) ?: 'www.applefix.cz';
 
 $orderCode = orderDisplayCode($order);
-$custCode  = 'APFC' . str_pad((string)(int)$order['customer_id'], 6, '0', STR_PAD_LEFT);
 $custName  = trim(($order['first_name'] ?? '') . ' ' . ($order['last_name'] ?? ''));
 $deviceStr = trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? ''));
 $pin       = trim((string)($order['pin_code'] ?? ''));
@@ -126,16 +125,15 @@ $pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: 'Osobní pře
         </div>
         <div class="doc">
             <h1>Zakázkový list</h1>
-            <div class="track">Stav zakázky můžete sledovat na mojeopravy.cz</div>
+            <div class="track">Vytvořeno: <?php echo e($receivedAt); ?></div>
         </div>
     </div>
 
     <div class="idbar">
-        <div class="cell"><div class="k">Číslo zákazníka</div><div class="v mono"><?php echo e($custCode); ?></div></div>
-        <div class="cell"><div class="k">Heslo</div><div class="v mono"><?php echo e($pin !== '' ? $pin : '—'); ?></div></div>
         <div class="cell"><div class="k">Číslo zakázky</div><div class="v mono"><?php echo e($orderCode); ?></div></div>
-        <div class="cell"><div class="k">PIN zakázky</div><div class="v mono"><?php echo e($pin !== '' ? $pin : '—'); ?></div></div>
+        <div class="cell"><div class="k">PIN / heslo zařízení</div><div class="v mono"><?php echo e($pin !== '' ? $pin : '—'); ?></div></div>
         <div class="cell"><div class="k">Zařízení</div><div class="v"><?php echo e($deviceStr ?: '—'); ?></div></div>
+        <div class="cell"><div class="k">Přijetí zařízení do opravy</div><div class="v"><?php echo e($receivedAt); ?></div></div>
     </div>
 
     <div class="grid2">
@@ -154,13 +152,9 @@ $pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: 'Osobní pře
     </div>
 
     <div class="grid2">
-        <div class="field" style="flex:2">
+        <div class="field">
             <div class="k">Požadovaná oprava</div>
             <div class="v"><?php echo nl2br(e((string)($order['problem_description'] ?? '')) ?: '—'); ?></div>
-        </div>
-        <div class="field">
-            <div class="k">Přijetí zařízení do opravy</div>
-            <div class="v"><?php echo e($receivedAt); ?></div>
         </div>
     </div>
 
