@@ -460,3 +460,34 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
   .afx-webres-acts { width: 100%; }
   .afx-webres-acts .afx-webres-take { flex: 1; }
 }
+
+/* ============================================================
+   12) DASHBOARD — 4 statistiky + pobočky na jednom řádku
+   Pobočky nad sebou, dohromady stejně vysoké jako stat dlaždice.
+   ============================================================ */
+.crm-stat-row { display: flex; gap: 14px; align-items: stretch; }
+.crm-stat-row .crm-stat-grid { flex: 1 1 auto; min-width: 0; margin-bottom: 0 !important; }
+.crm-branch-col { flex: 0 0 290px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.crm-branch-mini {
+  flex: 1 1 0; display: flex !important; align-items: center; gap: 12px;
+  padding: 12px 16px !important; position: relative;
+  border: 1px solid var(--b1) !important; border-radius: var(--r2) !important;
+  transition: border-color .15s, box-shadow .15s;
+}
+.crm-branch-mini:hover { border-color: rgba(0,163,255,.35) !important; box-shadow: 0 0 14px rgba(0,163,255,.14); }
+.crm-branch-mini-main { flex: 1; min-width: 0; }
+.crm-branch-mini-name { color: #fff; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crm-branch-mini-sub { color: var(--fg2); font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crm-branch-mini-num { text-align: right; line-height: 1.15; flex-shrink: 0; }
+.crm-branch-mini-num b { display: block; font-size: 19px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 14px rgba(85,212,255,.25); }
+.crm-branch-mini-num small { font-size: 10.5px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+
+/* Menší displeje: pobočky pod statistiky (vedle sebe), pak vše pod sebe */
+@media (max-width: 1280px) {
+  .crm-stat-row { flex-wrap: wrap; }
+  .crm-branch-col { flex: 1 1 100%; flex-direction: row; }
+  .crm-branch-mini { flex: 1 1 0; }
+}
+@media (max-width: 640px) {
+  .crm-branch-col { flex-direction: column; }
+}

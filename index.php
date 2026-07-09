@@ -93,7 +93,9 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
 ?>
 
-<div class="crm-stat-grid mb-4">
+<!-- 4 statistiky + pobočky na jednom řádku (pobočky nad sebou, stejná celková výška) -->
+<div class="crm-stat-row mb-4">
+<div class="crm-stat-grid">
     <a href="orders.php" class="crm-stat-card crm-stat-1 text-decoration-none">
         <div class="crm-stat-label"><?php echo __('active_orders'); ?></div>
         <div class="crm-stat-value"><?php echo (int)$active_count; ?></div>
@@ -123,26 +125,23 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 </div>
 
 <?php if (!empty($branch_overview)): ?>
-<div class="row g-3 mb-4">
+<div class="crm-branch-col">
     <?php foreach ($branch_overview as $branch): ?>
-    <div class="col-12 col-md-6">
-        <div class="card glass-card border-0 p-3 h-100">
-            <div class="d-flex justify-content-between align-items-start gap-3">
-                <div>
-                    <div class="text-white fw-semibold"><i class="fas fa-store me-2 text-primary"></i><?php echo e($branch['name']); ?></div>
-                    <div class="small text-white-75 mt-1">Aktivní zakázky: <?php echo (int)$branch['active_orders']; ?> · Hotovo: <?php echo (int)$branch['done_orders']; ?></div>
-                </div>
-                <div class="text-end">
-                    <div class="h4 mb-0 text-white"><?php echo (int)$branch['total_orders']; ?></div>
-                    <div class="small text-white-75"><?php echo number_format((float)$branch['revenue'], 0, ',', ' '); ?> Kč</div>
-                </div>
-            </div>
-            <a class="stretched-link" href="orders.php?branch_id=<?php echo (int)$branch['id']; ?>" aria-label="Pobočka <?php echo e($branch['name']); ?>"></a>
+    <div class="crm-branch-mini card glass-card border-0">
+        <div class="crm-branch-mini-main">
+            <div class="crm-branch-mini-name"><i class="fas fa-store me-2 text-primary"></i><?php echo e($branch['name']); ?></div>
+            <div class="crm-branch-mini-sub">Aktivní: <?php echo (int)$branch['active_orders']; ?> · Hotovo: <?php echo (int)$branch['done_orders']; ?></div>
         </div>
+        <div class="crm-branch-mini-num">
+            <b><?php echo (int)$branch['total_orders']; ?></b>
+            <small><?php echo number_format((float)$branch['revenue'], 0, ',', ' '); ?> Kč</small>
+        </div>
+        <a class="stretched-link" href="orders.php?branch_id=<?php echo (int)$branch['id']; ?>" aria-label="Pobočka <?php echo e($branch['name']); ?>"></a>
     </div>
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
+</div><!-- /.crm-stat-row -->
 
 <div class="row g-4 align-items-start dashboard-main-row">
     <div class="col-12 col-lg-9 dashboard-main-col">
