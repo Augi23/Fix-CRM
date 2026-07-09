@@ -580,7 +580,7 @@ if (isset($_GET['catalog_imported'])):
                 </div>
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
-                    <button type="submit" class="btn btn-success"><i class="fas fa-cart-plus me-2"></i><?php echo __('order_part'); ?></button>
+                    <button type="button" id="orderPartSubmitBtn" class="btn btn-success"><i class="fas fa-cart-plus me-2"></i><?php echo __('order_part'); ?></button>
                 </div>
             </form>
         </div>
@@ -826,16 +826,14 @@ $(function() {
         if (orderPartModal) orderPartModal.show();
     });
 
-    $('#orderPartForm').on('submit', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        var $form = $(this);
-        var $btn = $form.find('button[type="submit"]');
+    function afxSubmitOrderPart() {
+        var $btn = $('#orderPartSubmitBtn');
+        if ($btn.prop('disabled')) return;
         $btn.prop('disabled', true);
         $.ajax({
             url: 'api/procurement_request.php',
             method: 'POST',
-            data: $form.serialize(),
+            data: $('#orderPartForm').serialize(),
             dataType: 'json'
         }).done(function(res) {
             if (res && res.success) {
@@ -851,8 +849,11 @@ $(function() {
             try { msg = (JSON.parse(xhr.responseText) || {}).message || msg; } catch (e) {}
             showAlert('Objednávku se nepodařilo uložit: ' + msg);
         });
-        return false;
-    });
+    }
+    // Přímý click na tlačítko (type="button") — nezávislý na submit události, ať se vždy provede.
+    $('#orderPartSubmitBtn').on('click', function(e) { e.preventDefault(); afxSubmitOrderPart(); });
+    // Enter ve formuláři taky odešle (a nikdy se nedělá default reload stránky).
+    $('#orderPartForm').on('submit', function(e) { e.preventDefault(); afxSubmitOrderPart(); return false; });
 
     $('.copy-supplier-list').on('click', function() {
         const supplierKey = $(this).data('supplier');
