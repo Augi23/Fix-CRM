@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Zakázkový list dle firemního vzoru',
+        'items' => [
+            'Zakázkový list nově obsahuje kompletní text podmínek drobným písmem (odpovědnost, uskladnění, zadržovací právo dle §1395 obč. zák., souhlas s obchodními podmínkami) přesně dle firemního vzoru.',
+            'Struktura polí dle vzoru: Číslo zákazníka, Heslo, Číslo zakázky, PIN zakázky, Zařízení, Heslo zařízení / Kód obrazovky, Požadovaná oprava, Předpokládaná cena, Kontakt na zákazníka, Přijetí do opravy, Převzetí zařízení + podpisové řádky (přijetí i převzetí hotové zakázky).',
+            'Identita zhotovitele se bere z Nastavení → Údaje o společnosti.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Klientský portál: doklady a reklamace opravy',
         'items' => [
             'V otevřené zakázce klienta přibyla sekce „Dokumenty": zakázkový list (vždy), faktura a účtenka (jen když byly vystaveny), reklamační protokol (když existuje reklamace). Klient vidí výhradně své vlastní doklady.',
