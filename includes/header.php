@@ -88,6 +88,14 @@ try {
 } catch (Throwable $e) {
     $ordersBadgeCount = 0;
 }
+
+// Počet čekajících položek nákupního seznamu (badge v menu)
+$shoppingListBadgeCount = 0;
+try {
+    $shoppingListBadgeCount = (int)($pdo->query("SELECT COUNT(*) FROM purchase_requests WHERE status = 'pending'")->fetchColumn() ?: 0);
+} catch (Throwable $e) {
+    $shoppingListBadgeCount = 0;
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo e(crm_get_language()); ?>" data-bs-theme="dark">
@@ -164,6 +172,7 @@ try {
         <div class="crm-nav-group-title"><?php echo __('nav_work'); ?></div>
         <a class="nav-link crm-nav-new-order" href="#" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus me-2"></i><span><?php echo __('new_order'); ?></span></a>
         <a class="nav-link crm-nav-new-complaint" href="#" data-bs-toggle="modal" data-bs-target="#newComplaintModal"><i class="fas fa-rotate-left me-2"></i><span>Nová reklamace</span></a>
+        <a class="nav-link crm-nav-shopping-list <?php echo $current_page == 'nakupni-seznam.php' ? 'active' : ''; ?>" href="nakupni-seznam.php"><i class="fas fa-cart-shopping me-2"></i><span>Nákupní seznam</span><?php if (!empty($shoppingListBadgeCount) && $shoppingListBadgeCount > 0): ?><span class="crm-nav-pill"><?php echo (int)$shoppingListBadgeCount; ?></span><?php endif; ?></a>
         <a class="nav-link <?php echo $current_page == 'orders.php' ? 'active' : ''; ?>" href="orders.php">
             <i class="fas fa-tools me-2"></i><span><?php echo __('orders'); ?></span>
             <?php if ($ordersBadgeCount > 0): ?><span class="crm-nav-pill"><?php echo $ordersBadgeCount; ?></span><?php endif; ?>
