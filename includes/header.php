@@ -146,6 +146,7 @@ try {
     window.LANG_MODEL = '<?php echo __("model_placeholder"); ?>';
     window.LANG_SCAN_NOT_FOUND = '<?php echo __("scan_not_found"); ?>';
     window.LANG_SCAN_CAMERA_ERROR = '<?php echo __("scan_camera_error"); ?>';
+    window.LANG_SCAN_CAMERA_DENIED = '<?php echo __("scan_camera_denied"); ?>';
     </script>
 </head>
 <body>

@@ -7,9 +7,7 @@ require_once 'includes/functions.php';
 if (!isset($_GET['id']) && !isset($_GET['order_id']) && isset($_GET['scan'])) {
     $scanVal = trim((string)$_GET['scan']);
     if ($scanVal !== '') {
-        $stmtScan = $pdo->prepare("SELECT id FROM orders WHERE order_code = ? OR id = ? ORDER BY id DESC LIMIT 1");
-        $stmtScan->execute([$scanVal, ctype_digit($scanVal) ? (int)$scanVal : 0]);
-        $resolvedId = $stmtScan->fetchColumn();
+        $resolvedId = function_exists('resolveScannedOrderId') ? resolveScannedOrderId($pdo, $scanVal) : null;
         if ($resolvedId) {
             header('Location: view_order.php?id=' . (int)$resolvedId);
         } else {

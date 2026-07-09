@@ -1075,6 +1075,13 @@ document.addEventListener('DOMContentLoaded', function() {
         var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         if (msgEl) msgEl.textContent = '';
         modal.show();
+        modalEl.addEventListener('hidden.bs.modal', stopScan, { once: true });
+
+        // Kamera je dostupná jen v zabezpečeném kontextu (HTTPS / localhost).
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            if (msgEl) msgEl.textContent = window.LANG_SCAN_CAMERA_ERROR || 'Kamera není dostupná (nutné HTTPS).';
+            return;
+        }
 
         loadLib().then(function() {
             // Read both QR and 1D Code128 — jeden štítek (Code128) pro stolní čtečku i mobil.
@@ -1085,6 +1092,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     Html5QrcodeSupportedFormats.CODE_128
                 ];
             }
+            var readerEl = document.getElementById('qrReader');
+            if (readerEl) readerEl.innerHTML = '';   // po předchozím skenu ať je element čistý (jinak re-init selže)
             scanner = new Html5Qrcode('qrReader', qrCfg);
             return scanner.start(
                 { facingMode: 'environment' },
@@ -1095,16 +1104,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 function onError() {}
             );
-        }).catch(function() {
-            if (msgEl) msgEl.textContent = window.LANG_SCAN_CAMERA_ERROR || 'Chyba kamery';
+        }).catch(function(err) {
+            var m = ((err && (err.name || err.message)) || '') + '';
+            if (msgEl) msgEl.textContent = /NotAllowed|Permission|Denied/i.test(m)
+                ? (window.LANG_SCAN_CAMERA_DENIED || 'Přístup ke kameře byl odepřen — povolte kameru v prohlížeči.')
+                : (window.LANG_SCAN_CAMERA_ERROR || 'Chyba kamery');
         });
-
-        modalEl.addEventListener('hidden.bs.modal', stopScan, { once: true });
     }
 
     document.addEventListener('DOMContentLoaded', function() {
         var btn = document.getElementById('scanOrderBtn');
-        if (btn) btn.addEventListener('click', startScan);
+        if (!btn) return;
+        btn.addEventListener('click', startScan);
+        // Přednačti knihovnu skeneru, ať se getUserMedia při kliknutí spustí UVNITŘ user-gesta
+        // (jinak — hlavně iOS Safari při prvním použití — se nemusí zobrazit dotaz na kameru).
+        var warm = function(){ loadLib().catch(function(){}); };
+        if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 4000 });
+        else setTimeout(warm, 1500);
     });
 }());
 
@@ -1145,14 +1161,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (editable) { buf = ''; return; } // nepleť se do běžného psaní
 
         var now = Date.now();
-        if (now - lastTs > 120) { buf = ''; } // pomalý vstup = nový sken
+        if (now - lastTs > 250) { buf = ''; } // pomalý vstup = nový sken (tolerantnější, ať se dlouhý kód nerozdělí)
         lastTs = now;
 
         if (e.key === 'Enter') { flush(); return; }
         if (e.key && e.key.length === 1) {
             buf += e.key;
             if (flushTimer) clearTimeout(flushTimer);
-            flushTimer = setTimeout(flush, 250); // fallback, když čtečka neposílá Enter
+            flushTimer = setTimeout(flush, 300); // fallback, když čtečka neposílá Enter
         }
     });
 }());

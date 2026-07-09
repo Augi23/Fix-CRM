@@ -70,6 +70,7 @@ $lang_overrides = [
         'scan_hint' => 'Namiř kameru na QR kód štítku — zakázka se otevře.',
         'scan_not_found' => 'Naskenovaný kód neodpovídá žádné zakázce.',
         'scan_camera_error' => 'Nepodařilo se spustit kameru (povol přístup ke kameře).',
+        'scan_camera_denied' => 'Přístup ke kameře byl odepřen — povol kameru v nastavení prohlížeče.',
 
         'role_admin' => 'Admin',
         'role_manager' => 'Manažer',

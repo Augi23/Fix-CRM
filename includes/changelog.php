@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Spolehlivější skenování čárových kódů',
+        'items' => [
+            'Otevírání zakázky po skenu je odolnější — server zkusí víc variant přepisu (české QWERTZ: číslice↔háčky i Y↔Z), takže se zakázka najde, i když čtečka/klávesnice kód přepíše nekonzistentně.',
+            'Mobilní skener: knihovna se přednačte, aby se dotaz na kameru spolehlivě zobrazil (hlavně iPhone/iPad při prvním použití); jasnější hláška při odepření kamery i mimo HTTPS.',
+            'HW čtečka: tolerantnější časování, aby se dlouhý kód nerozdělil doprostřed skenu.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Klientský portál: jednotné označení zakázek',
         'items' => [
             'V klientské sekci se u zakázek už nezobrazuje interní číslo (#ID) — všude je jednotný kód zakázky (APFAZ…, převzatý z importu a pokračující v číselné řadě).',

@@ -1985,6 +1985,54 @@ function crmEnqueueTechAssignmentPopup(int $techId, int $orderId): void
     } catch (Throwable $e) { /* best-effort — nesmí shodit změnu zakázky */ }
 }
 
+/** Naskenovaný kód → kandidáti (řeší CZ QWERTZ: číslice↔háčky a Y↔Z, i nekonzistentní přepis).
+ *  Vrací unikátní varianty VELKÝMI písmeny, jen znaky [0-9A-Z-]. */
+function scanNormalizeCandidates(string $raw): array
+{
+    $raw = trim($raw);
+    if ($raw === '') return [];
+    $mapDigits = ['+'=>'1','ě'=>'2','š'=>'3','č'=>'4','ř'=>'5','ž'=>'6','ý'=>'7','á'=>'8','í'=>'9','é'=>'0',
+                  'Ě'=>'2','Š'=>'3','Č'=>'4','Ř'=>'5','Ž'=>'6','Ý'=>'7','Á'=>'8','Í'=>'9','É'=>'0'];
+    $mapYZ     = ['y'=>'z','z'=>'y','Y'=>'Z','Z'=>'Y'];
+    $variants = [
+        $raw,                                 // jak přišlo
+        strtr($raw, $mapDigits),              // háčky→číslice
+        strtr($raw, $mapYZ),                  // jen Y↔Z
+        strtr($raw, $mapDigits + $mapYZ),     // obojí (plný demangle)
+    ];
+    $out = [];
+    foreach ($variants as $v) {
+        $v = strtoupper(preg_replace('/[^0-9A-Za-z\-]/u', '', $v));
+        if ($v !== '' && !in_array($v, $out, true)) $out[] = $v;
+    }
+    return $out;
+}
+
+/** Přeloží naskenovaný kód na ID zakázky (zkusí víc variant demanglingu + holé číselné ID). null = nenalezeno. */
+function resolveScannedOrderId(PDO $pdo, string $raw): ?int
+{
+    $cands = scanNormalizeCandidates($raw);
+    if (!$cands) return null;
+    try {
+        $in = implode(',', array_fill(0, count($cands), '?'));
+        $st = $pdo->prepare("SELECT id FROM orders WHERE order_code IN ($in) ORDER BY id DESC LIMIT 1");
+        $st->execute($cands);
+        $id = $st->fetchColumn();
+        if ($id) return (int)$id;
+    } catch (Throwable $e) { /* ignore */ }
+    foreach ($cands as $c) {
+        if (ctype_digit($c)) {
+            try {
+                $st = $pdo->prepare("SELECT id FROM orders WHERE id = ? LIMIT 1");
+                $st->execute([(int)$c]);
+                $id = $st->fetchColumn();
+                if ($id) return (int)$id;
+            } catch (Throwable $e) { /* ignore */ }
+        }
+    }
+    return null;
+}
+
 /** Doplní sloupce pro notifikaci „připraveno k vyzvednutí" (idempotentně, bez migrace):
  *  orders.pickup_notified_at (guard proti opakovanému odeslání) + branches.opening_hours. */
 function ensurePickupReadyColumns(PDO $pdo): void
