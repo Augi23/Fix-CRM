@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Popup o nově přidělené zakázce technikovi',
+        'items' => [
+            'Když technik dostane přidělenou zakázku, na zařízení s otevřeným CRM mu vyskočí popup se základními údaji o zakázce a zařízení (klient, závada, priorita, odkaz na otevření).',
+            'Popup se NEzobrazí, pokud si zakázku přidělil technik sám sobě.',
+            'Doručuje se automaticky (kontrola každých ~20 s), ve stylu Apple / liquid glass.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Skrývání bočního panelu + přehlednější Akce u zakázky',
         'items' => [
             'Tlačítko ☰ nahoře nově skryje/vysune celý boční panel i na iPadu a MacBooku (obsah se roztáhne). Stav se pamatuje.',

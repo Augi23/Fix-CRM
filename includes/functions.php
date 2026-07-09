@@ -1401,6 +1401,12 @@ function crmNotifyOrderLifecycleEvent(array $event): void {
 
     $assignedTech = $assignedTechId > 0 ? crmGetTechnicianById($assignedTechId) : null;
 
+    // Popup „nová přidělená zakázka" pro technika (na zařízení s otevřeným CRM),
+    // ale NE pokud si zakázku přidělil sám sobě.
+    if ($technicianAssigned && $assignedTechId > 0 && $assignedTechId !== $actorTechId) {
+        crmEnqueueTechAssignmentPopup($assignedTechId, $orderId);
+    }
+
     $deviceLabel = crmTelegramEscape(crmFormatOrderDeviceLabel($ctx['device_brand'] ?? '', $ctx['device_model'] ?? ''));
     $customerLabel = crmTelegramEscape(trim((string)($ctx['customer_name'] ?? '')) ?: '-');
     $problemSnippet = crmTelegramEscape(crmFormatOrderProblemSnippet($ctx['problem_description'] ?? ''));
@@ -1941,6 +1947,41 @@ function ensureComplaintsClientColumns(PDO $pdo): void
 function complaintIsNewFromClient(array $row): bool
 {
     return ($row['source'] ?? '') === 'client' && empty($row['staff_ack_at']);
+}
+
+/** Tabulka pro popup „nová přidělená zakázka" (per technik, doručí se pollingem). */
+function ensureTechPopupTable(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS `tech_assignment_popups` (
+                `id` INT(11) NOT NULL AUTO_INCREMENT,
+                `technician_id` INT(11) NOT NULL,
+                `order_id` INT(11) NOT NULL,
+                `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `seen_at` TIMESTAMP NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `tech_unseen` (`technician_id`, `seen_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+/** Zařadí technikovi popup o nově přidělené zakázce (bez duplicit, dokud si ho nepřevezme). */
+function crmEnqueueTechAssignmentPopup(int $techId, int $orderId): void
+{
+    global $pdo;
+    if ($techId <= 0 || $orderId <= 0 || !isset($pdo)) return;
+    try {
+        ensureTechPopupTable($pdo);
+        $chk = $pdo->prepare("SELECT id FROM tech_assignment_popups WHERE technician_id = ? AND order_id = ? AND seen_at IS NULL LIMIT 1");
+        $chk->execute([$techId, $orderId]);
+        if ($chk->fetchColumn()) return; // už čeká nezobrazený popup
+        $pdo->prepare("INSERT INTO tech_assignment_popups (technician_id, order_id) VALUES (?, ?)")->execute([$techId, $orderId]);
+    } catch (Throwable $e) { /* best-effort — nesmí shodit změnu zakázky */ }
 }
 
 /** Doplní sloupce pro notifikaci „připraveno k vyzvednutí" (idempotentně, bez migrace):

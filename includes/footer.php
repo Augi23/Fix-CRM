@@ -142,5 +142,90 @@ window.AFX_AMBIENT_SOUNDS = [
 window.AFX_AMBIENT_INTERVAL_MIN = 10;
 </script>
 <?php endif; ?>
+
+<?php /* Popup „nová přidělená zakázka" — jen pro přihlášeného technika */ ?>
+<?php if (!empty($_SESSION['tech_id'])): ?>
+<div id="assignPopupOverlay" class="assign-popup-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="assign-popup-card">
+        <div class="assign-popup-head">
+            <span class="assign-popup-kicker"><i class="fas fa-user-check me-2"></i>Nová přidělená zakázka</span>
+            <button type="button" class="assign-popup-x" onclick="afxAssignClose()" aria-label="Zavřít">&times;</button>
+        </div>
+        <div class="assign-popup-device" id="assignPopupDevice">—</div>
+        <div class="assign-popup-codeline">
+            <span class="assign-popup-code" id="assignPopupCode">—</span>
+            <span class="assign-popup-prio" id="assignPopupPriority" style="display:none;"><i class="fas fa-bolt me-1"></i>Vysoká priorita</span>
+        </div>
+        <div class="assign-popup-rows">
+            <div class="assign-popup-row"><span class="k">Klient</span><span class="v" id="assignPopupClient">—</span></div>
+            <div class="assign-popup-row"><span class="k">Závada</span><span class="v" id="assignPopupProblem">—</span></div>
+        </div>
+        <a href="#" id="assignPopupOpen" class="assign-popup-btn"><i class="fas fa-arrow-right me-2"></i>Otevřít zakázku</a>
+    </div>
+</div>
+<style>
+.assign-popup-overlay{position:fixed;inset:0;z-index:12000;display:none;align-items:center;justify-content:center;padding:18px;
+    background:rgba(4,6,10,0.55);backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);opacity:0;transition:opacity .2s ease;}
+.assign-popup-overlay.show{opacity:1;}
+.assign-popup-card{position:relative;width:min(100%,440px);border-radius:26px;padding:24px 24px 22px;overflow:hidden;
+    background:linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.05));border:1px solid rgba(255,255,255,0.16);
+    box-shadow:0 30px 80px rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.22);
+    transform:translateY(10px) scale(0.98);transition:transform .22s cubic-bezier(.2,.8,.2,1);}
+.assign-popup-overlay.show .assign-popup-card{transform:translateY(0) scale(1);}
+.assign-popup-card::before{content:"";position:absolute;top:-40%;left:-20%;width:140%;height:120px;pointer-events:none;
+    background:radial-gradient(60% 100% at 50% 0%,rgba(10,132,255,0.35),transparent 70%);}
+.assign-popup-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;position:relative;}
+.assign-popup-kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:#7ab8ff;}
+.assign-popup-x{background:none;border:none;color:rgba(255,255,255,0.6);font-size:1.7rem;line-height:1;cursor:pointer;padding:0 4px;}
+.assign-popup-device{font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;color:#fff;line-height:1.2;position:relative;}
+.assign-popup-codeline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;}
+.assign-popup-code{font-family:ui-monospace,Menlo,monospace;font-size:.95rem;font-weight:700;color:#8fc0ff;letter-spacing:.03em;}
+.assign-popup-prio{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;
+    background:linear-gradient(180deg,rgba(255,69,58,0.24),rgba(255,69,58,0.12));border:1px solid rgba(255,69,58,0.5);color:#ff9aa2;}
+.assign-popup-rows{margin-top:16px;display:grid;gap:8px;}
+.assign-popup-row{display:flex;gap:12px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);}
+.assign-popup-row .k{flex:0 0 74px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:rgba(233,238,247,0.5);font-weight:700;padding-top:2px;}
+.assign-popup-row .v{flex:1;min-width:0;color:#eef4ff;font-weight:600;font-size:.95rem;}
+.assign-popup-btn{display:flex;align-items:center;justify-content:center;margin-top:18px;padding:13px 18px;border-radius:14px;
+    text-decoration:none;font-weight:800;color:#fff;background:linear-gradient(135deg,#0A84FF,#0060df);
+    box-shadow:0 10px 26px rgba(10,132,255,0.35);transition:filter .15s ease,transform .15s ease;}
+.assign-popup-btn:hover{filter:brightness(1.07);transform:translateY(-1px);color:#fff;}
+@media (prefers-reduced-motion:reduce){.assign-popup-overlay,.assign-popup-card{transition:none;}}
+</style>
+<script>
+(function(){
+    var overlay = document.getElementById('assignPopupOverlay');
+    if (!overlay) return;
+    var queue = [], showing = false;
+    function open(it){
+        document.getElementById('assignPopupDevice').textContent = it.device || 'Zařízení';
+        document.getElementById('assignPopupCode').textContent = it.order_code || ('#' + it.order_id);
+        var pr = document.getElementById('assignPopupPriority');
+        pr.style.display = it.priority_high ? '' : 'none';
+        document.getElementById('assignPopupClient').textContent = it.customer || '—';
+        document.getElementById('assignPopupProblem').textContent = it.problem || '—';
+        document.getElementById('assignPopupOpen').href = 'view_order.php?id=' + encodeURIComponent(it.order_id);
+        overlay.style.display = 'flex';
+        overlay.setAttribute('aria-hidden', 'false');
+        requestAnimationFrame(function(){ overlay.classList.add('show'); });
+    }
+    window.afxAssignClose = function(){
+        overlay.classList.remove('show');
+        overlay.setAttribute('aria-hidden', 'true');
+        setTimeout(function(){ overlay.style.display = 'none'; showing = false; next(); }, 200);
+    };
+    function next(){ if (showing) return; var it = queue.shift(); if (!it) return; showing = true; open(it); }
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) afxAssignClose(); });
+    function poll(){
+        fetch('api/tech_popups.php', { credentials: 'same-origin', cache: 'no-store' })
+            .then(function(r){ return r.json(); })
+            .then(function(d){ if (d && d.ok && d.items && d.items.length){ d.items.forEach(function(it){ queue.push(it); }); next(); } })
+            .catch(function(){});
+    }
+    setTimeout(poll, 3000);
+    setInterval(poll, 20000);
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>
