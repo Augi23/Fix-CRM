@@ -46,7 +46,11 @@ html, body {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   width: 100vw; height: 100vh;
 }
-#content, #content.crm-v2-content { position: relative; z-index: 1; }
+/* POZOR: #content NESMÍ mít z-index — vytvořil by stacking context a všechna
+   popup okna definovaná uvnitř stránek by skončila POD .modal-backdrop (1050,
+   připojuje se k <body>) = neprokliknutelná vrstva. Pořadí nad .crm-bgfx (z:0)
+   zajišťuje pořadí v DOM. */
+#content, #content.crm-v2-content { position: relative; }
 
 /* ============================================================
    3) LAYOUT — pryč s levým sloupcem, obsah na plnou šířku
