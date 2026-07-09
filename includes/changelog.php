@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Přidání zakázky: čistší tlačítka wizardu',
+        'items' => [
+            'Odebráno nadbytečné tlačítko „Zpět" ve spodní liště wizardu.',
+            'Na každém kroku je teď dole jen jedno tlačítko: „Další" v průběhu a „Dokončit" v posledním kroku (které zakázku založí a přesune do seznamu).',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Fronta dnes: dominantní název zařízení',
         'items' => [
             'V panelu „Fronta dnes" na nástěnce je nově dominantní název zařízení a jméno klienta menší pod ním — v servisu se řídíme hlavně tím, co se opravuje.',
