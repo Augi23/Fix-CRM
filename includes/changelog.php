@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Typografie: SF Pro všude + váhová hierarchie',
+        'items' => [
+            'Celé CRM (včetně přihlášení a klientské sekce) nově píše jednotně fontem SF Pro Display z vlastních souborů — Google font Inter odstraněn (rychlejší načítání, žádná závislost na Google).',
+            'Zavedena logická hierarchie tlouštěk: 400 běžný text · 500 labely a navigace · 600 nadpisy a tlačítka · 700 titulky a čísla. Labely ustoupí, hodnoty a titulky vyniknou.',
+            'Částky a počty v tabulkách používají tabulární číslice — čísla se zarovnají přesně pod sebe.',
+            'Monospace (kódy, ID) nově přes systémový SF Mono.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Detail zakázky: Doprava/Výdej přesunuta do Akcí',
         'items' => [
             'Sekce „Doprava / Výdej" už není samostatná karta dole v pravém sloupci — je přímo v okně „Akce", hned nahoře nad tlačítkem „Označit jako vydané". Vše pro výdej je tak na jednom místě.',

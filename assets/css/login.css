@@ -9,7 +9,7 @@ body {
     background:
         linear-gradient(135deg, #05070b 0%, #090d12 48%, #12161b 100%);
     color: #eef4ff;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 body::before {

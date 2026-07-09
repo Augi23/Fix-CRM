@@ -5,38 +5,9 @@
  */
 
 /* ============================================================
-   @FONT-FACE — SF Pro Display
+   @FONT-FACE — SF Pro Display: přesunuto do assets/css/sf-pro.css
+   (sdílené i pro login.php a klient/dashboard.php, načítá se první)
    ============================================================ */
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('../fonts/SF-Pro-Display-Light.otf') format('opentype');
-  font-weight: 300; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('../fonts/SF-Pro-Display-Regular.otf') format('opentype');
-  font-weight: 400; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('../fonts/SF-Pro-Display-Medium.otf') format('opentype');
-  font-weight: 500; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('../fonts/SF-Pro-Display-Semibold.otf') format('opentype');
-  font-weight: 600; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('../fonts/SF-Pro-Display-Bold.otf') format('opentype');
-  font-weight: 700; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'SF Pro Display';
-  src: url('../fonts/SF-Pro-Display-Black.otf') format('opentype');
-  font-weight: 900; font-style: normal; font-display: swap;
-}
 
 /* ============================================================
    DESIGN TOKENS
@@ -125,7 +96,7 @@ p { color: var(--fg2); }
 small, .small { font-size: 12px !important; }
 
 code, kbd, pre, samp, .font-mono, .crm-mono {
-  font-family: 'Fira Code', 'SF Mono', Menlo, monospace !important;
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace !important;
 }
 
 /* ============================================================
@@ -857,10 +828,10 @@ nav.crm-v2-topbar .navbar-brand {
 .table .text-white-75,
 .table small.text-white-75 { color: var(--fg3) !important; font-size: 11px !important; }
 
-/* ID buňka (Fira Code) */
+/* ID buňka (mono — SF Mono) */
 td a.fw-bold[href*="view_order"],
 td a.fw-bold[href*="order"] {
-  font-family: 'Fira Code', 'SF Mono', Menlo, monospace !important;
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace !important;
   font-size: 12px !important;
   color: var(--fg2) !important;
   font-weight: 500 !important;
@@ -2923,7 +2894,7 @@ html[data-lg-theme="light"] .crm-filter-chip.chip--cancelled { color: #556070; }
   color: rgba(255,255,255,0.82) !important;
 }
 .card.glass-card .order-summary-hl .osh-serial span {
-  font-family: 'Fira Code', ui-monospace, monospace;
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace;
   font-weight: 600 !important;
   color: #fff !important;
   letter-spacing: 0.02em !important;
@@ -2947,3 +2918,44 @@ html[data-lg-theme="light"] .crm-filter-chip.chip--cancelled { color: #556070; }
   html.sidebar-hidden #content,
   html.sidebar-hidden #content.crm-v2-content { margin-left: 0 !important; }
 }
+
+/* ============================================================
+   TYPOGRAFIE — SF Pro váhová hierarchie (jednotný systém)
+   400 tělo · 500 labely/navigace · 600 nadpisy/akce · 700 titulky/čísla
+   Cíl: labely a sekundární text ustoupí, titulky a hodnoty vyniknou.
+   ============================================================ */
+
+/* Titulky stránek — nejtěžší úroveň, těsnější prostrkání (SF Pro to snese) */
+h1 { font-weight: 700 !important; letter-spacing: -0.02em !important; }
+h2 { font-weight: 700 !important; letter-spacing: -0.015em !important; }
+h3, h4 { font-weight: 600 !important; }
+h5, h6 { font-weight: 600 !important; }
+.navbar-brand { font-weight: 700 !important; letter-spacing: -0.01em !important; }
+
+/* Labely formulářů: MEDIUM 500 — lehčí než nadpisy, hodnoty (400) pod nimi vyniknou */
+.form-label { font-weight: 500 !important; }
+.form-control, .form-select, .form-check-label { font-weight: 400 !important; }
+
+/* Navigace: klidná 500, aktivní položka 600 */
+#sidebar .nav-link { font-weight: 500; }
+#sidebar .nav-link.active,
+#sidebar .nav-link.active > span { font-weight: 600; }
+
+/* Sekundární / pomocný text: vždy regular 400 (nikdy ne bold šum) */
+p, small, .small, .form-text, .text-white-75, .text-muted { font-weight: 400 !important; }
+
+/* Data v tabulkách: 400; zvýrazněné buňky 600; hlavičky th zůstávají 700 uppercase */
+.table tbody td { font-weight: 400; }
+.table tbody td strong, .table tbody td .fw-semibold, .table tbody td .fw-bold { font-weight: 600; }
+
+/* Čísla: tabulární číslice = částky a počty se zarovnají pod sebe */
+.table, .crm-mono, .badge,
+input[type="number"], .input-group-text,
+.crm-nav-pill { font-variant-numeric: tabular-nums; }
+
+/* Statistiky / velká čísla na dlaždicích: BOLD 700 (klidně 900 u hero čísel) */
+.crm-stat-value, .stat-value, .kpi-value, .sl-stat-num { font-weight: 700 !important; font-variant-numeric: tabular-nums; }
+
+/* Dropdowny a menu: položky 400, nadpisy skupin 600 */
+.dropdown-item { font-weight: 400 !important; }
+.dropdown-header { font-weight: 600 !important; }

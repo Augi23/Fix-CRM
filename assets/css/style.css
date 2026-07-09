@@ -18,7 +18,7 @@ body {
         linear-gradient(180deg, #17191e 0%, #0d0f13 100%);
     background-attachment: fixed;
     color: #edf2f7;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     position: relative;
     overflow-x: hidden;
 }
