@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Zakázkový list — modernější a elegantnější vzhled',
+        'items' => [
+            'Nový, čistší a elegantnější vzhled zakázkového listu (hlavička s číslem zakázky, přehledový pruh, zvýrazněná požadovaná oprava, kultivovaná typografie a podpisové řádky).',
+            'Obsah zůstává beze změny — všechna pole i kompletní text podmínek drobným písmem jsou zachovány doslovně.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Vzhled + IČO/DIČ + barva stavu + čitelnost',
         'items' => [
             'Skutečnější Apple Liquid Glass na loginu i v klientské sekci — silnější refrakce (Chrome) a výrazné specular/edge odlesky (Safari fallback), zaoblenější karty.',
