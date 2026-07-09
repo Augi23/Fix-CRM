@@ -1184,7 +1184,7 @@ function getGitRepoInfo(string $repoRoot): array {
             $info['update_available'] = ((int)$m[2]) > 0;
         }
 
-        $log = runGitCommand($repoRoot, "log --format='%H|%h|%cI|%an|%s' -n 30 HEAD", $code);
+        $log = runGitCommand($repoRoot, "log --format='%H|%h|%cI|%an|%s' -n 50 HEAD", $code);
         if ($code === 0 && $log !== '') {
             foreach (explode("\n", $log) as $row) {
                 $parts = explode('|', $row, 5);

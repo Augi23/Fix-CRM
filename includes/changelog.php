@@ -6,6 +6,107 @@
  */
 return [
     [
+        'date' => '2026-07-09',
+        'title' => 'Klientský portál: doklady a reklamace opravy',
+        'items' => [
+            'V otevřené zakázce klienta přibyla sekce „Dokumenty": zakázkový list (vždy), faktura a účtenka (jen když byly vystaveny), reklamační protokol (když existuje reklamace). Klient vidí výhradně své vlastní doklady.',
+            'U dokončené a vydané zakázky je tlačítko „Reklamovat opravu" — reklamace se rovnou propíše do CRM a upozornění odejde na info@applefix.cz.',
+            'Nová klientská reklamace se v sekci Reklamace drží úplně nahoře a jemně pulzuje, dokud ji technik/manažer nepřevezme (změnou stavu); poté se řadí klasicky.',
+            'V sekci Reklamace přibyl zdroj (badge „Klient"), napojení na zakázku, změna stavu přímo v seznamu a tisk reklamačního protokolu.',
+            'Sekce fotek u klienta přejmenována z „Fotky od technika" na „Fotodokumentace".',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
+        'title' => 'Detail zakázky: přehlednější údaje a čárový kód nahoře',
+        'items' => [
+            'Základní údaje o klientovi i zařízení (jméno, kontakt, model, sériové číslo) jsou výrazně větší a čitelnější.',
+            'Čárový kód pro naskenování/otevření zakázky je nově úplně nahoře v pravém sloupci.',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Reklamace v CRM (nová sekce)',
+        'items' => [
+            'V levém menu přibyla položka „Nová reklamace" (oranžová) a přehled Reklamace.',
+            'Formulář reklamace včetně vyfocení reklamovaného kusu přímo z mobilu.',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Zakázkový list ke každé zakázce (tisk / e-mail)',
+        'items' => [
+            'Ke každé zakázce se generuje zakázkový list s volbou vytisknout nebo poslat e-mailem.',
+            'Vzhled dokumentu byl sjednocen; pole i drobný text podmínek zůstaly beze změny.',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Filtr zakázek podle stavu',
+        'items' => [
+            'Seznam zakázek lze nově filtrovat podle stavu.',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Skenování kódů (ruční skener i mobil)',
+        'items' => [
+            'Naskenování kódu, když je kurzor ve vyhledávacím poli, hned otevře příslušnou zakázku.',
+            'Nově lze zakázku naskenovat i mobilem přes fotoaparát (Code128).',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Responzivní CRM (mobil / iPad / počítač)',
+        'items' => [
+            'Celé CRM se přizpůsobí displeji telefonu, iPadu i počítače.',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Upozornění (zvoneček) — reálný přehled',
+        'items' => [
+            'Zvoneček ukazuje skutečné dění: zaseknuté zakázky, změny stavů a nové reklamace.',
+            'Opravená čitelnost panelu na světlém motivu.',
+            'Pulzování/„dýchání" se týká jen dění od spuštění naostro — importované zakázky neblikají.',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Přihlašovací obrazovka — světlý motiv',
+        'items' => [
+            'Světlá varianta přihlášení má nové pozadí a jemný „skleněný" efekt oken (styl macOS).',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Barevné řádky zakázek podle stavu',
+        'items' => [
+            'Řádky v seznamech jsou výrazněji barevně odlišené podle stavu zakázky.',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Odesílání e-mailů (SMTP)',
+        'items' => [
+            'Nastaveno odesílání e-mailů z adresy info@applefix.cz (zakázkové listy, upozornění na reklamace).',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Pravidelné zálohy CRM',
+        'items' => [
+            'Celé CRM včetně databáze se zálohuje 3× denně; zálohy starší než jeden měsíc se automaticky mažou.',
+        ],
+    ],
+    [
+        'date' => '2026-07-08',
+        'title' => 'Obnovení technika',
+        'items' => [
+            'Vrácen technik Zdenda (pobočka Karlín) včetně jeho uvítacího zvuku po přihlášení.',
+        ],
+    ],
+    [
         'date' => '2026-07-07',
         'title' => 'Mluvené uvítání při přihlášení',
         'items' => [

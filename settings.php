@@ -885,9 +885,9 @@ require_once 'includes/header.php';
                 <div class="col-12">
                     <div class="glass-panel p-4 border-secondary">
                         <h5 class="mb-1 text-white"><i class="fas fa-rocket me-2 text-success"></i>Historie úprav</h5>
-                        <div class="small text-white-75 mb-3">Přehled dokončených vylepšení — jak systém krok za krokem posouváme.</div>
+                        <div class="small text-white-75 mb-3">Přehled dokončených vylepšení (posledních 50) — jak systém krok za krokem posouváme.</div>
                         <div class="overflow-auto" style="max-height: 440px;">
-                            <?php foreach ($crm_history as $hz): ?>
+                            <?php foreach (array_slice($crm_history, 0, 50) as $hz): ?>
                                 <div class="mb-3 pb-2 border-bottom border-secondary">
                                     <div class="fw-bold text-white">
                                         <span class="badge bg-primary me-2"><?php echo e(date('d.m.Y', strtotime((string)$hz['date']))); ?></span>
