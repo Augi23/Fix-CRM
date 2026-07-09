@@ -2311,6 +2311,35 @@ function refreshAdminGreeting202607(): void
     } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
 }
 
+/** Jednorázově (9.7.2026): NOVÝ uvítací zvuk pro Zdendu (Victor) — PŘEPÍŠE už
+ *  nasazený uploads/greetings/<username>.mp3 (restore/import existující nepřepisují).
+ *  Zdroj zdenda_faceid.mp3 je verzovaný v gitu, takže se nasadí i po čistém pullu. */
+function refreshZdendaGreetingVictor202607(): void
+{
+    global $pdo;
+    try {
+        if (get_setting('greeting_zdenda_victor_2026_07', '') === '1') { return; }
+        $src = __DIR__ . '/../assets/greetings_import/zdenda_faceid.mp3';
+        $dst = __DIR__ . '/../uploads/greetings';
+        if (!is_file($src)) { return; }
+        if (!is_dir($dst)) { mkdir($dst, 0755, true); }
+        $norm = function (string $v): string {
+            return strtr(mb_strtolower($v, 'UTF-8'),
+                ['á'=>'a','č'=>'c','ď'=>'d','é'=>'e','ě'=>'e','í'=>'i','ň'=>'n','ó'=>'o',
+                 'ř'=>'r','š'=>'s','ť'=>'t','ú'=>'u','ů'=>'u','ý'=>'y','ž'=>'z']);
+        };
+        $done = false;
+        foreach ($pdo->query('SELECT username, name FROM technicians')->fetchAll() as $t) {
+            $hay = $norm(($t['username'] ?? '') . ' ' . ($t['name'] ?? ''));
+            if (str_contains($hay, 'zdend') || str_contains($hay, 'zdenek')) {
+                $destName = preg_replace('/[^a-zA-Z0-9._-]/', '_', (string)$t['username']) . '.mp3';
+                if (@copy($src, $dst . '/' . $destName)) { $done = true; }
+            }
+        }
+        if ($done && function_exists('set_setting')) { set_setting('greeting_zdenda_victor_2026_07', '1'); }
+    } catch (Throwable $e) { /* best-effort, zkusí se příště */ }
+}
+
 /** Zdenda: až bude jeho účet zase existovat (byl smazán), automaticky mu vrátí
  *  uvítací zvuk zdenda_faceid.mp3 → uploads/greetings/<username>.mp3.
  *  Guard se nastaví AŽ po úspěšném přiřazení, takže to zkouší, dokud účet není zpět. */
@@ -2403,6 +2432,7 @@ if (session_status() === PHP_SESSION_ACTIVE
         refreshTomasGreeting202607();
         refreshAdminGreeting202607();
         restoreZdendaGreeting();
+        refreshZdendaGreetingVictor202607();
     } catch (Throwable $e) { /* ignore */ }
 }
 ?>
