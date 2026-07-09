@@ -178,6 +178,11 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                     <label class="form-label"><?php echo __('appearance'); ?></label>
                                     <input type="text" name="appearance" class="form-control">
                                 </div>
+                                <div class="col-12">
+                                    <label class="form-label"><i class="fas fa-camera me-1 text-info"></i> Foto stavu zařízení při příjmu</label>
+                                    <input type="file" name="files[]" class="form-control" multiple accept="image/*,video/*">
+                                    <div class="form-text">Vyfoťte stav zařízení při příjmu (škrábance, praskliny, příslušenství) — předejde se pozdějším dohadům o stavu, v jakém k nám zařízení přišlo.</div>
+                                </div>
                             </div>
                         </div>
 
@@ -278,7 +283,7 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                 <?php else: ?>
                                     <input type="hidden" name="branch_id" value="<?php echo (int)getCurrentStaffBranchId(); ?>">
                                 <?php endif; ?>
-                                <div class="col-md-6">
+                                <div class="col-12">
                                     <label class="form-label"><?php echo __('technician'); ?></label>
                                     <select name="technician_id" class="form-select">
                                         <option value="">-- <?php echo __('technician'); ?> --</option>
@@ -286,11 +291,6 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                             <option value="<?php echo (int)$t['id']; ?>" <?php echo (($_SESSION['role'] ?? '') !== 'admin' && $t['id'] == ($_SESSION['tech_id'] ?? 0)) ? 'selected' : ''; ?>><?php echo e($t['name']); ?><?php echo isBranchGlobalViewer() && !empty($t['branch_name']) ? ' · ' . e($t['branch_name']) : ''; ?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label"><?php echo __('media_files'); ?></label>
-                                    <input type="file" name="files[]" class="form-control" multiple accept="image/*,video/*">
-                                    <div class="form-text"><?php echo __('upload_multiple_hint'); ?></div>
                                 </div>
                             </div>
                         </div>

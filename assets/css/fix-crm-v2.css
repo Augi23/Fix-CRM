@@ -2202,6 +2202,9 @@ html, body { font-size: 14px !important; }
 .crm-wizard-footer .btn[data-wizard-submit]:hover {
   opacity: 0.85 !important;
 }
+/* Skryté tlačítko (Zpět/Další/Dokončit dle kroku) musí SKUTEČNĚ zmizet —
+   Bootstrap .btn display jinak přebije atribut [hidden] a „Dokončit" prosvítá už na 1. kroku. */
+.crm-wizard-footer .btn[hidden] { display: none !important; }
 
 /* Summary box in step 3 */
 .crm-wizard-summary {
