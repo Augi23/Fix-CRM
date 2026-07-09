@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Fronta dnes: dominantní název zařízení',
+        'items' => [
+            'V panelu „Fronta dnes" na nástěnce je nově dominantní název zařízení a jméno klienta menší pod ním — v servisu se řídíme hlavně tím, co se opravuje.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Zakázkový list dle firemního vzoru',
         'items' => [
             'Zakázkový list nově obsahuje kompletní text podmínek drobným písmem (odpovědnost, uskladnění, zadržovací právo dle §1395 obč. zák., souhlas s obchodními podmínkami) přesně dle firemního vzoru.',

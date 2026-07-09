@@ -373,8 +373,9 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <a href="view_order.php?id=<?php echo (int)$q['id']; ?>" class="crm-queue-item text-decoration-none">
                         <div class="crm-queue-avatar"><?php echo e($init); ?></div>
                         <div class="crm-queue-meta">
-                            <div class="crm-queue-name"><?php echo e(trim($q['first_name'].' '.$q['last_name'])); ?></div>
-                            <div class="crm-queue-device"><?php echo e(trim($q['device_brand'].' '.$q['device_model'])); ?></div>
+                            <?php // v servisu je dominantní, CO se opravuje — zařízení nahoře, klient menší pod ním ?>
+                            <div class="crm-queue-name"><?php echo e(trim($q['device_brand'].' '.$q['device_model'])); ?></div>
+                            <div class="crm-queue-device"><?php echo e(trim($q['first_name'].' '.$q['last_name'])); ?></div>
                         </div>
                         <?php echo getStatusBadge($q['status']); ?>
                     </a>
