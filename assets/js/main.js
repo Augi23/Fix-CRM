@@ -1298,3 +1298,47 @@ window.openOrderDocChoice = function (orderId, code) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AMBIENTNÍ ZVUKY ZAMĚSTNANCE (např. Khalil): každých ~N minut náhodná hláška,
+   dokud je přihlášen. Konfiguraci vkládá footer.php (window.AFX_AMBIENT_SOUNDS,
+   AFX_AMBIENT_INTERVAL_MIN). Kadence se drží v localStorage, takže přežívá
+   přechody mezi stránkami. Když prohlížeč zablokuje autoplay, hláška se
+   přehraje při nejbližším kliknutí/klávese.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+    var SOUNDS = window.AFX_AMBIENT_SOUNDS;
+    if (!SOUNDS || !SOUNDS.length) { return; }
+    var EVERY_MS = (window.AFX_AMBIENT_INTERVAL_MIN || 10) * 60 * 1000;
+    var KEY = 'afx_ambient_next';
+    var pending = false;
+
+    function next(ts) { try { localStorage.setItem(KEY, String(ts)); } catch (e) {} }
+    function getNext() {
+        try { var v = parseInt(localStorage.getItem(KEY) || '0', 10); return isNaN(v) ? 0 : v; }
+        catch (e) { return 0; }
+    }
+    if (!getNext()) { next(Date.now() + EVERY_MS); }   // první hláška ~10 min po přihlášení
+
+    function playRandom() {
+        var url = SOUNDS[Math.floor(Math.random() * SOUNDS.length)];
+        var a = new Audio(url);
+        a.volume = 1.0;
+        a.play().then(function () { pending = false; })
+                .catch(function () { pending = true; });   // autoplay blok -> počkej na interakci
+    }
+
+    // po první interakci přehraj případnou čekající hlášku
+    ['click', 'keydown', 'touchstart'].forEach(function (ev) {
+        document.addEventListener(ev, function () {
+            if (pending) { pending = false; playRandom(); }
+        }, { passive: true });
+    });
+
+    setInterval(function () {
+        if (Date.now() >= getNext()) {
+            next(Date.now() + EVERY_MS);   // rezervuj další slot hned (víc otevřených karet = 1 přehrání)
+            playRandom();
+        }
+    }, 20000);
+}());
