@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Elegantnější Apple Liquid Glass (login + klientská sekce)',
+        'items' => [
+            'Přihlašovací obrazovka (tmavá) je více „liquid glass" — zaoblenější rohy, silnější sklo s refrakcí a lesklou hranou, zaoblené vstupy i tlačítko.',
+            'Klientská sekce zmodernizována: zaoblenější karty a topbar, jemná refrakce skla — svěžejší a elegantnější vzhled.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Spolehlivější skenování čárových kódů',
         'items' => [
             'Otevírání zakázky po skenu je odolnější — server zkusí víc variant přepisu (české QWERTZ: číslice↔háčky i Y↔Z), takže se zakázka najde, i když čtečka/klávesnice kód přepíše nekonzistentně.',
