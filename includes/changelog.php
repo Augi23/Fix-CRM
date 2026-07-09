@@ -22,6 +22,7 @@ return [
         'items' => [
             'Základní údaje o klientovi i zařízení (jméno, kontakt, model, sériové číslo) jsou výrazně větší a čitelnější.',
             'Čárový kód pro naskenování/otevření zakázky je nově úplně nahoře v pravém sloupci.',
+            'Okénko s čárovým kódem už není zbytečně vysoké — končí hned pod kódem.',
         ],
     ],
     [

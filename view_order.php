@@ -390,7 +390,7 @@ function localizedOrderStatusLabel(string $status): string {
 
     <div class="col-md-4">
         <!-- Čárový kód zakázky (Code128): X-9100 i mobil přes náš skener → otevře tuto zakázku. Nahoře v pravém sloupci. -->
-        <div class="card glass-card border-0 mb-4">
+        <div class="card glass-card border-0 mb-4 order-barcode-card">
             <div class="card-body text-center py-3">
                 <div class="text-white-75 small mb-2"><i class="fas fa-barcode me-1"></i> <?php echo __('scan_to_open_order'); ?></div>
                 <div id="orderBarcode" style="display:inline-block; background:#fff; padding:8px 10px; border-radius:8px; line-height:0;"></div>

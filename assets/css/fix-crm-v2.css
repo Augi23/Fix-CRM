@@ -2930,3 +2930,8 @@ html[data-lg-theme="light"] .crm-filter-chip.chip--cancelled { color: #556070; }
   .card.glass-card .order-summary-hl .col-md-6.text-md-end { text-align: left !important; }
   .card.glass-card .order-summary-hl .osh-title { font-size: 1.3rem !important; }
 }
+
+/* Detail zakázky: karta s čárovým kódem nemá vyplňovat výšku sloupce
+   (pravidlo .row > [class*='col-'] > .card { height:100% } ji jinak roztáhne).
+   Má končit hned pod čárovým kódem. */
+.order-barcode-card { height: auto !important; align-self: flex-start !important; }
