@@ -1327,38 +1327,49 @@ window.openOrderDocChoice = function (orderId, code) {
    přehraje při nejbližším kliknutí/klávese.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
-    var SOUNDS = window.AFX_AMBIENT_SOUNDS;
-    if (!SOUNDS || !SOUNDS.length) { return; }
-    var EVERY_MS = (window.AFX_AMBIENT_INTERVAL_MIN || 10) * 60 * 1000;
-    var KEY = 'afx_ambient_next';
-    var pending = false;
-
-    function next(ts) { try { localStorage.setItem(KEY, String(ts)); } catch (e) {} }
-    function getNext() {
-        try { var v = parseInt(localStorage.getItem(KEY) || '0', 10); return isNaN(v) ? 0 : v; }
-        catch (e) { return 0; }
-    }
-    if (!getNext()) { next(Date.now() + EVERY_MS); }   // první hláška ~10 min po přihlášení
-
-    function playRandom() {
-        var url = SOUNDS[Math.floor(Math.random() * SOUNDS.length)];
-        var a = new Audio(url);
-        a.volume = 1.0;
-        a.play().then(function () { pending = false; })
-                .catch(function () { pending = true; });   // autoplay blok -> počkej na interakci
+    // POZOR: main.js se načítá v <head>, ale konfiguraci (AFX_AMBIENT_SOUNDS)
+    // vypisuje až footer → inicializovat AŽ po načtení DOM. Okamžitý start
+    // viděl vždy undefined a funkce se nikdy nespustila (oprava 2026-07).
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAmbient);
+    } else {
+        initAmbient();
     }
 
-    // po první interakci přehraj případnou čekající hlášku
-    ['click', 'keydown', 'touchstart'].forEach(function (ev) {
-        document.addEventListener(ev, function () {
-            if (pending) { pending = false; playRandom(); }
-        }, { passive: true });
-    });
+    function initAmbient() {
+        var SOUNDS = window.AFX_AMBIENT_SOUNDS;
+        if (!SOUNDS || !SOUNDS.length) { return; }
+        var EVERY_MS = (window.AFX_AMBIENT_INTERVAL_MIN || 10) * 60 * 1000;
+        var KEY = 'afx_ambient_next';
+        var pending = false;
 
-    setInterval(function () {
-        if (Date.now() >= getNext()) {
-            next(Date.now() + EVERY_MS);   // rezervuj další slot hned (víc otevřených karet = 1 přehrání)
-            playRandom();
+        function next(ts) { try { localStorage.setItem(KEY, String(ts)); } catch (e) {} }
+        function getNext() {
+            try { var v = parseInt(localStorage.getItem(KEY) || '0', 10); return isNaN(v) ? 0 : v; }
+            catch (e) { return 0; }
         }
-    }, 20000);
+        if (!getNext()) { next(Date.now() + EVERY_MS); }   // první hláška ~10 min po přihlášení
+
+        function playRandom() {
+            var url = SOUNDS[Math.floor(Math.random() * SOUNDS.length)];
+            var a = new Audio(url);
+            a.volume = 1.0;
+            a.play().then(function () { pending = false; })
+                    .catch(function () { pending = true; });   // autoplay blok -> počkej na interakci
+        }
+
+        // po první interakci přehraj případnou čekající hlášku
+        ['click', 'keydown', 'touchstart'].forEach(function (ev) {
+            document.addEventListener(ev, function () {
+                if (pending) { pending = false; playRandom(); }
+            }, { passive: true });
+        });
+
+        setInterval(function () {
+            if (Date.now() >= getNext()) {
+                next(Date.now() + EVERY_MS);   // rezervuj další slot hned (víc otevřených karet = 1 přehrání)
+                playRandom();
+            }
+        }, 20000);
+    }
 }());

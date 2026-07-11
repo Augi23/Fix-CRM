@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Oprava: Khalilovy ambientní zvuky se nespouštěly',
+        'items' => [
+            'Náhodné hlášky po ~10 minutách se nikdy nespustily — přehrávač startoval dřív, než se stihla načíst konfigurace se seznamem zvuků (pořadí skriptů). Opraveno; první hláška zazní ~10 minut po přihlášení, pak každých ~10 minut.',
+            'Pokud prohlížeč blokuje automatické přehrání, hláška zazní při nejbližším kliknutí.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Menu: černější pozadí doku',
         'items' => [
             'Horní horizontální menu má výrazně černější, méně průhledné pozadí — lepší kontrast a čitelnost; skleněný lom na hranách zůstává.',
