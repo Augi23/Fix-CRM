@@ -358,11 +358,11 @@ function getOrderStatusOptions(bool $includeLegacy = false, ?string $ensureStatu
     $options = [];
     foreach (getOrderStatusDefinitions() as $status => $meta) {
         if (!$includeLegacy && !empty($meta['legacy'])) { continue; }
-        $options[$status] = $status;
+        $options[$status] = getOrderStatusLabel($status);   // value česky, popisek dle jazyka
     }
     // u starší zakázky nabídnout i její aktuální (legacy) stav, ať se formulářem nezmění omylem
     if ($ensureStatus !== null && $ensureStatus !== '' && !isset($options[$ensureStatus])) {
-        $options = [$ensureStatus => $ensureStatus] + $options;
+        $options = [$ensureStatus => getOrderStatusLabel($ensureStatus)] + $options;
     }
     return $options;
 }
@@ -437,8 +437,60 @@ function orderStatusSqlIn(PDO $pdo, string $key): string {
     return implode(',', array_map(static fn($status) => $pdo->quote($status), getOrderStatusList($key)));
 }
 
+/**
+ * Překlady kanonických stavů zakázek (DB hodnota zůstává VŽDY česky —
+ * překládá se jen zobrazený popisek dle zvoleného jazyka).
+ */
+function getOrderStatusTranslations(): array {
+    return [
+        'en' => [
+            'Přijato' => 'Received',
+            'V opravě' => 'In Repair',
+            'V opravě - v externím servisu' => 'In Repair — External Service',
+            'V opravě - v autorizovaném servisu' => 'In Repair — Authorized Service',
+            'Čeká na díl' => 'Waiting for Part',
+            'Připraveno k převzetí' => 'Ready for Pickup',
+            'Vydáno - čeká na platbu' => 'Collected — Awaiting Payment',
+            'Vydáno' => 'Collected',
+            'Nevyzvednuto' => 'Not Collected',
+            'Stornováno' => 'Cancelled',
+            'Zakládá se' => 'Being Created',
+            'V opravě zák. desky' => 'In Repair — Logic Board',
+            'V externím servisu' => 'External Service',
+            'V aut. servisu' => 'Authorized Service',
+            'Čeká na zákazníka' => 'Waiting for Customer',
+            'Čeká na platbu' => 'Awaiting Payment',
+            'Vydáno - ČR' => 'Collected (CZ)',
+        ],
+        'ru' => [
+            'Přijato' => 'Принято',
+            'V opravě' => 'В ремонте',
+            'V opravě - v externím servisu' => 'В ремонте — внешний сервис',
+            'V opravě - v autorizovaném servisu' => 'В ремонте — авторизованный сервис',
+            'Čeká na díl' => 'Ожидает запчасть',
+            'Připraveno k převzetí' => 'Готово к выдаче',
+            'Vydáno - čeká na platbu' => 'Выдано — ждёт оплаты',
+            'Vydáno' => 'Выдано',
+            'Nevyzvednuto' => 'Не забрано',
+            'Stornováno' => 'Отменено',
+            'Zakládá se' => 'Создаётся',
+            'V opravě zák. desky' => 'Ремонт платы',
+            'V externím servisu' => 'Внешний сервис',
+            'V aut. servisu' => 'Авторизованный сервис',
+            'Čeká na zákazníka' => 'Ожидание клиента',
+            'Čeká na platbu' => 'Ожидание оплаты',
+            'Vydáno - ČR' => 'Выдано (CZ)',
+        ],
+    ];
+}
+
 function getOrderStatusLabel(string $status): string {
     if (isset(getOrderStatusDefinitions()[$status])) {
+        $lang = crm_get_language();
+        if ($lang !== 'cs') {
+            $map = getOrderStatusTranslations();
+            return $map[$lang][$status] ?? $status;
+        }
         return $status;
     }
     $legacyLabels = [

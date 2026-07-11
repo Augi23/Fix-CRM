@@ -10,9 +10,9 @@ $can_manage = hasPermission('procurement_manage') || hasPermission('admin_access
 // ── Lokální popisky/badge (aby nekolidovaly s procurement.php) ───────────────
 function slPriorityLabel(string $p): string {
     return match ($p) {
-        'today' => 'Dnes',
-        'this_week' => 'Tento týden',
-        'later' => 'Později',
+        'today' => __('today_priority'),
+        'this_week' => __('this_week_priority'),
+        'later' => __('later_priority'),
         default => $p,
     };
 }
@@ -87,7 +87,7 @@ function slRenderItem(array $r, bool $can_manage): void {
                     <span class="<?php echo slPriorityBadge($priority); ?>"><?php echo slPriorityLabel($priority); ?></span>
                     <?php if ($orderId > 0): ?>
                         <a class="sl-chip sl-chip-link" href="view_order.php?id=<?php echo $orderId; ?>">
-                            <i class="fas fa-tools"></i> <?php echo e($orderCode !== '' ? $orderCode : ('Zakázka #' . $orderId)); ?><?php if ($device !== ''): ?> · <?php echo e($device); ?><?php endif; ?>
+                            <i class="fas fa-tools"></i> <?php echo e($orderCode !== '' ? $orderCode : (__('order_ref_prefix') . $orderId)); ?><?php if ($device !== ''): ?> · <?php echo e($device); ?><?php endif; ?>
                         </a>
                     <?php endif; ?>
                     <?php if ($created !== ''): ?><span class="sl-chip sl-chip-soft"><i class="far fa-calendar"></i> <?php echo e($created); ?></span><?php endif; ?>
@@ -99,15 +99,15 @@ function slRenderItem(array $r, bool $can_manage): void {
         <?php if ($can_manage): ?>
         <div class="sl-item-actions">
             <?php if ($status === 'pending'): ?>
-                <button class="sl-btn sl-btn-success" data-sl-action="ordered" data-sl-id="<?php echo $id; ?>"><i class="fas fa-check me-1"></i>Schválit a objednat</button>
-                <button class="sl-btn sl-btn-ghost" data-sl-action="cancelled" data-sl-id="<?php echo $id; ?>" title="Zamítnout"><i class="fas fa-ban"></i></button>
+                <button class="sl-btn sl-btn-success" data-sl-action="ordered" data-sl-id="<?php echo $id; ?>"><i class="fas fa-check me-1"></i><?php echo __('approve_and_order'); ?></button>
+                <button class="sl-btn sl-btn-ghost" data-sl-action="cancelled" data-sl-id="<?php echo $id; ?>" title="<?php echo e(__('reject')); ?>"><i class="fas fa-ban"></i></button>
             <?php elseif ($status === 'ordered'): ?>
-                <button class="sl-btn sl-btn-success" data-sl-action="received" data-sl-id="<?php echo $id; ?>"><i class="fas fa-box-open me-1"></i>Přijato na sklad</button>
-                <button class="sl-btn sl-btn-ghost" data-sl-action="pending" data-sl-id="<?php echo $id; ?>" title="Zpět na čekající"><i class="fas fa-rotate-left"></i></button>
+                <button class="sl-btn sl-btn-success" data-sl-action="received" data-sl-id="<?php echo $id; ?>"><i class="fas fa-box-open me-1"></i><?php echo __('received_to_stock'); ?></button>
+                <button class="sl-btn sl-btn-ghost" data-sl-action="pending" data-sl-id="<?php echo $id; ?>" title="<?php echo e(__('back_to_pending')); ?>"><i class="fas fa-rotate-left"></i></button>
             <?php elseif ($status === 'cancelled'): ?>
-                <button class="sl-btn sl-btn-ghost" data-sl-action="pending" data-sl-id="<?php echo $id; ?>" title="Obnovit"><i class="fas fa-rotate-left"></i></button>
+                <button class="sl-btn sl-btn-ghost" data-sl-action="pending" data-sl-id="<?php echo $id; ?>" title="<?php echo e(__('restore')); ?>"><i class="fas fa-rotate-left"></i></button>
             <?php endif; ?>
-            <button class="sl-btn sl-btn-danger" data-sl-action="delete" data-sl-id="<?php echo $id; ?>" title="Smazat"><i class="fas fa-trash"></i></button>
+            <button class="sl-btn sl-btn-danger" data-sl-action="delete" data-sl-id="<?php echo $id; ?>" title="<?php echo e(__('delete')); ?>"><i class="fas fa-trash"></i></button>
         </div>
         <?php endif; ?>
     </div>
@@ -119,37 +119,37 @@ function slRenderItem(array $r, bool $can_manage): void {
 
     <div class="sl-header">
         <div>
-            <h1 class="sl-title"><i class="fas fa-cart-shopping me-2"></i>Nákupní seznam</h1>
-            <p class="sl-subtitle">Položky přidané ze stránky <a href="procurement.php">Nákupy</a> ke schválení, objednání a příjmu na sklad.</p>
+            <h1 class="sl-title"><i class="fas fa-cart-shopping me-2"></i><?php echo __('shopping_list'); ?></h1>
+            <p class="sl-subtitle"><?php echo __('shopping_list_desc_1'); ?> <a href="procurement.php"><?php echo __('procurement'); ?></a> <?php echo __('shopping_list_desc_2'); ?></p>
         </div>
-        <a href="procurement.php" class="sl-btn sl-btn-outline"><i class="fas fa-plus me-1"></i>Přidat díl z Nákupů</a>
+        <a href="procurement.php" class="sl-btn sl-btn-outline"><i class="fas fa-plus me-1"></i><?php echo __('add_part_from_procurement'); ?></a>
     </div>
 
     <div class="sl-stats">
         <div class="sl-stat sl-stat-pending">
             <div class="sl-stat-num"><?php echo $countPending; ?></div>
-            <div class="sl-stat-label">Ke schválení</div>
+            <div class="sl-stat-label"><?php echo __('awaiting_approval'); ?></div>
         </div>
         <div class="sl-stat sl-stat-ordered">
             <div class="sl-stat-num"><?php echo $countOrdered; ?></div>
-            <div class="sl-stat-label">Objednáno</div>
+            <div class="sl-stat-label"><?php echo __('ordered_status'); ?></div>
         </div>
         <div class="sl-stat sl-stat-received">
             <div class="sl-stat-num"><?php echo $countReceived; ?></div>
-            <div class="sl-stat-label">Přijato na sklad</div>
+            <div class="sl-stat-label"><?php echo __('received_to_stock'); ?></div>
         </div>
     </div>
 
     <?php if (!$can_manage): ?>
-        <div class="sl-note"><i class="fas fa-circle-info me-2"></i>Položky můžete prohlížet. Schvalovat a objednávat může manažer nebo administrátor.</div>
+        <div class="sl-note"><i class="fas fa-circle-info me-2"></i><?php echo __('shopping_list_viewer_note'); ?></div>
     <?php endif; ?>
 
     <?php
     $sections = [
-        'pending'   => ['Ke schválení', 'fa-hourglass-half', 'sl-sec-pending'],
-        'ordered'   => ['Objednáno', 'fa-paper-plane', 'sl-sec-ordered'],
-        'received'  => ['Přijato na sklad', 'fa-box-open', 'sl-sec-received'],
-        'cancelled' => ['Zamítnuté', 'fa-ban', 'sl-sec-cancelled'],
+        'pending'   => [__('awaiting_approval'), 'fa-hourglass-half', 'sl-sec-pending'],
+        'ordered'   => [__('ordered_status'), 'fa-paper-plane', 'sl-sec-ordered'],
+        'received'  => [__('received_to_stock'), 'fa-box-open', 'sl-sec-received'],
+        'cancelled' => [__('rejected_items'), 'fa-ban', 'sl-sec-cancelled'],
     ];
     $anyItems = false;
     foreach ($sections as $key => $meta):
@@ -172,8 +172,8 @@ function slRenderItem(array $r, bool $can_manage): void {
     <?php if (!$anyItems): ?>
         <div class="sl-empty">
             <i class="fas fa-cart-shopping"></i>
-            <h3>Nákupní seznam je prázdný</h3>
-            <p>Otevřete <a href="procurement.php">Nákupy</a> a přidejte díl k objednání — objeví se tady ke schválení.</p>
+            <h3><?php echo __('shopping_list_empty'); ?></h3>
+            <p><?php echo __('shopping_empty_1'); ?> <a href="procurement.php"><?php echo __('procurement'); ?></a> <?php echo __('shopping_empty_2'); ?></p>
         </div>
     <?php endif; ?>
 
@@ -270,11 +270,11 @@ html[data-lg-theme="light"] .sl-item-qty { color: #10151d; }
 <script>
 $(function () {
     var LABELS = {
-        ordered:   { confirm: null, busy: 'Objednávám…' },
-        received:  { confirm: null, busy: 'Přijímám…' },
-        cancelled: { confirm: 'Opravdu zamítnout tuto položku?', busy: '…' },
+        ordered:   { confirm: null, busy: '<?php echo __('busy_ordering'); ?>' },
+        received:  { confirm: null, busy: '<?php echo __('busy_receiving'); ?>' },
+        cancelled: { confirm: '<?php echo __('confirm_reject_item'); ?>', busy: '…' },
         pending:   { confirm: null, busy: '…' },
-        'delete':  { confirm: 'Opravdu odstranit tuto položku z nákupního seznamu?', busy: '…' }
+        'delete':  { confirm: '<?php echo __('confirm_remove_item'); ?>', busy: '…' }
     };
 
     $('.sl-page').on('click', '[data-sl-action]', function () {
@@ -306,15 +306,15 @@ $(function () {
                         location.reload();
                     }
                 } else {
-                    alert('Chyba: ' + ((res && res.message) ? res.message : 'neznámá chyba'));
+                    alert('<?php echo __('error_label'); ?>: ' + ((res && res.message) ? res.message : '<?php echo __('unknown_error'); ?>'));
                     $row.find('.sl-btn').prop('disabled', false);
                     $btn.html(orig);
                 }
             })
             .fail(function (xhr) {
-                var msg = 'Požadavek selhal.';
+                var msg = '<?php echo __('request_failed'); ?>';
                 try { var j = JSON.parse(xhr.responseText); if (j && j.message) msg = j.message; } catch (e) {}
-                alert('Chyba: ' + msg);
+                alert('<?php echo __('error_label'); ?>: ' + msg);
                 $row.find('.sl-btn').prop('disabled', false);
                 $btn.html(orig);
             });

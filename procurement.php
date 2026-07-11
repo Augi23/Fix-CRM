@@ -220,12 +220,12 @@ if (isset($_GET['catalog_imported'])):
     </div>
 <?php elseif (!empty($_GET['catalog_error'])):
     $errMap = [
-        'invalid_url' => 'Neplatná URL katalogu.',
-        'fetch_failed' => 'Nepodařilo se načíst katalog.',
-        'no_products' => 'V katalogu nebyly nalezeny žádné produkty.',
-        'processing_failed' => 'Zpracování katalogu selhalo.',
+        'invalid_url' => __('invalid_catalog_url'),
+        'fetch_failed' => __('catalog_fetch_failed'),
+        'no_products' => __('catalog_no_products'),
+        'processing_failed' => __('catalog_processing_failed'),
     ];
-    $errMsg = $errMap[$_GET['catalog_error']] ?? 'Zpracování katalogu selhalo.';
+    $errMsg = $errMap[$_GET['catalog_error']] ?? __('catalog_processing_failed');
     $errDetail = trim((string)($_GET['catalog_error_detail'] ?? ''));
 ?>
     <div class="alert alert-danger border-0 shadow-sm">
@@ -262,9 +262,9 @@ if (isset($_GET['catalog_imported'])):
                 <input type="text" name="search" class="form-control form-control-sm" value="<?php echo e($catalogSearch); ?>" placeholder="<?php echo __('name_or_sku'); ?>">
             </div>
             <div class="col-md-3">
-                <label class="form-label small mb-1">Supplier</label>
+                <label class="form-label small mb-1"><?php echo __('supplier_col'); ?></label>
                 <select name="supplier" class="form-select form-select-sm">
-                    <option value="">All suppliers</option>
+                    <option value=""><?php echo __('all_suppliers'); ?></option>
                     <?php foreach ($suppliers as $supplierKey => $supplier): ?>
                         <option value="<?php echo e($supplierKey); ?>" <?php echo $selectedSupplier === $supplierKey ? 'selected' : ''; ?>><?php echo e($supplier['name']); ?></option>
                     <?php endforeach; ?>
@@ -283,8 +283,8 @@ if (isset($_GET['catalog_imported'])):
                         <th class="ps-2"><?php echo __('photo_col'); ?></th>
                         <th><?php echo __('part_name'); ?></th>
                         <th><?php echo __('sku'); ?></th>
-                        <th>Supplier</th>
-                        <th>Availability</th>
+                        <th><?php echo __('supplier_col'); ?></th>
+                        <th><?php echo __('availability_col'); ?></th>
                         <th><?php echo __('in_stock_col'); ?></th>
                         <th><?php echo __('buy_price'); ?></th>
                         <th><?php echo __('sell_price'); ?></th>
@@ -339,7 +339,7 @@ if (isset($_GET['catalog_imported'])):
                                 <?php if ($availabilityText !== ''): ?>
                                     <div class="fw-medium"><?php echo e($availabilityText); ?></div>
                                     <?php if ($availabilityQty !== null): ?>
-                                        <div class="small text-white-75"><?php echo $availabilityQty; ?> pcs</div>
+                                        <div class="small text-white-75"><?php echo $availabilityQty; ?> <?php echo __('pcs_short'); ?></div>
                                     <?php endif; ?>
                                 <?php else: ?>
                                     <span class="text-white-75">—</span>
@@ -510,26 +510,26 @@ if (isset($_GET['catalog_imported'])):
                                             data-quantity="<?php echo (int)($request['quantity'] ?? 1); ?>"
                                             data-order-id="<?php echo (int)($request['order_id'] ?? 0); ?>"
                                             data-status="<?php echo e((string)$status); ?>"
-                                            title="Assign to order"
+                                            title="<?php echo e(__('assign_to_order')); ?>"
                                         >
                                             <i class="fas fa-link"></i>
                                         </button>
                                     <?php endif; ?>
                                     <?php if ($can_manage_procurement): ?>
                                     <?php if ($status !== 'ordered'): ?>
-                                        <button class="btn btn-outline-primary procurement-status-btn" data-id="<?php echo (int)$request['id']; ?>" data-status="ordered" title="Ordered"><i class="fas fa-paper-plane"></i></button>
+                                        <button class="btn btn-outline-primary procurement-status-btn" data-id="<?php echo (int)$request['id']; ?>" data-status="ordered" title="<?php echo e(__('ordered_status')); ?>"><i class="fas fa-paper-plane"></i></button>
                                     <?php endif; ?>
                                     <?php if ($status !== 'received'): ?>
-                                        <button class="btn btn-outline-success procurement-status-btn" data-id="<?php echo (int)$request['id']; ?>" data-status="received" title="Received"><i class="fas fa-box-open"></i></button>
+                                        <button class="btn btn-outline-success procurement-status-btn" data-id="<?php echo (int)$request['id']; ?>" data-status="received" title="<?php echo e(__('received_status')); ?>"><i class="fas fa-box-open"></i></button>
                                     <?php endif; ?>
                                     <?php if ($status !== 'cancelled'): ?>
-                                        <button class="btn btn-outline-secondary procurement-status-btn" data-id="<?php echo (int)$request['id']; ?>" data-status="cancelled" title="Cancel"><i class="fas fa-ban"></i></button>
+                                        <button class="btn btn-outline-secondary procurement-status-btn" data-id="<?php echo (int)$request['id']; ?>" data-status="cancelled" title="<?php echo e(__('cancel')); ?>"><i class="fas fa-ban"></i></button>
                                     <?php endif; ?>
-                                    <button class="btn btn-outline-danger procurement-delete-btn" data-id="<?php echo (int)$request['id']; ?>" title="Delete"><i class="fas fa-trash"></i></button>
+                                    <button class="btn btn-outline-danger procurement-delete-btn" data-id="<?php echo (int)$request['id']; ?>" title="<?php echo e(__('delete')); ?>"><i class="fas fa-trash"></i></button>
                                     <?php endif; ?>
                                 </div>
                                 <?php else: ?>
-                                    <span class="text-white-50 small">Manager only</span>
+                                    <span class="text-white-50 small"><?php echo __('manager_only_short'); ?></span>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -622,7 +622,7 @@ if (isset($_GET['catalog_imported'])):
                             <input type="text" name="item_name" id="requestItemName" class="form-control" placeholder="<?php echo __('part_desc_placeholder'); ?>" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">SKU / kód</label>
+                            <label class="form-label"><?php echo __('sku_code'); ?></label>
                             <input type="text" name="sku" id="requestSku" class="form-control" placeholder="<?php echo __('proc_optional'); ?>">
                         </div>
                         <div class="col-md-3">
@@ -680,8 +680,8 @@ if (isset($_GET['catalog_imported'])):
                     </div>
                 </div>
                 <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success"><i class="fas fa-link me-2"></i>Assign to order</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-link me-2"></i><?php echo __('assign_to_order'); ?></button>
                 </div>
             </form>
         </div>
@@ -700,9 +700,9 @@ if (isset($_GET['catalog_imported'])):
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="catalogPreset" class="form-label">Quick supplier preset</label>
+                        <label for="catalogPreset" class="form-label"><?php echo __('quick_supplier_preset'); ?></label>
                         <select id="catalogPreset" class="form-select">
-                            <option value="">Custom URL</option>
+                            <option value=""><?php echo __('custom_url'); ?></option>
                             <?php foreach ($suppliers as $supplierKey => $supplier): ?>
                                 <option value="<?php echo e($supplierKey); ?>" data-url="<?php echo e($supplier['default_url']); ?>">
                                     <?php echo e($supplier['name']); ?>
@@ -712,7 +712,7 @@ if (isset($_GET['catalog_imported'])):
                         <div class="form-text text-white-75">Pick a supplier and the URL will autofill.</div>
                     </div>
                     <div class="mb-3">
-                        <label for="catalogUrl" class="form-label">URL katalogu</label>
+                        <label for="catalogUrl" class="form-label"><?php echo __('catalog_url'); ?></label>
                         <input
                             type="url"
                             id="catalogUrl"
@@ -721,7 +721,7 @@ if (isset($_GET['catalog_imported'])):
                             placeholder="e.g. https://www.mobilnidily.cz/nahradni-dily-apple-iphone/"
                             required
                         >
-                        <div class="form-text text-white-75">Enter a public catalog URL to import prices, names, SKU, images, and availability.</div>
+                        <div class="form-text text-white-75"><?php echo __('catalog_url_hint'); ?></div>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
                         <?php foreach ($suppliers as $supplierKey => $supplier): ?>
@@ -837,17 +837,17 @@ $(function() {
             dataType: 'json'
         }).done(function(res) {
             if (res && res.success) {
-                if (window.afxLabelToast) window.afxLabelToast('🛒 Díl přidán do objednávek', true);
+                if (window.afxLabelToast) window.afxLabelToast("🛒 <?php echo __('part_added_to_orders'); ?>", true);
                 location.reload();
             } else {
                 $btn.prop('disabled', false);
-                showAlert('Objednávku se nepodařilo uložit: ' + ((res && res.message) || 'neznámá chyba'));
+                showAlert('<?php echo __('order_save_failed'); ?>' + ((res && res.message) || '<?php echo __('unknown_error'); ?>'));
             }
         }).fail(function(xhr) {
             $btn.prop('disabled', false);
-            var msg = 'neznámá chyba';
+            var msg = '<?php echo __('unknown_error'); ?>';
             try { msg = (JSON.parse(xhr.responseText) || {}).message || msg; } catch (e) {}
-            showAlert('Objednávku se nepodařilo uložit: ' + msg);
+            showAlert('<?php echo __('order_save_failed'); ?>' + msg);
         });
     }
     // Přímý click na tlačítko (type="button") — nezávislý na submit události, ať se vždy provede.
@@ -858,7 +858,7 @@ $(function() {
     $('.copy-supplier-list').on('click', function() {
         const supplierKey = $(this).data('supplier');
         copyTextToClipboard(procurementCopyText(supplierKey)).then(function() {
-            showAlert('List copied.');
+            showAlert("<?php echo __('list_copied'); ?>");
         });
     });
 
@@ -875,7 +875,7 @@ $(function() {
     $('#requestInventory').select2({
         dropdownParent: $('#requestModal'),
         width: '100%',
-        placeholder: 'Search selected supplier catalog',
+        placeholder: '<?php echo __('search_supplier_catalog'); ?>',
         ajax: {
             url: 'api/search_catalog_items.php',
             dataType: 'json',
@@ -913,7 +913,7 @@ $(function() {
     $('#assignProcurementOrder').select2({
         dropdownParent: $('#assignProcurementModal'),
         width: '100%',
-        placeholder: 'Search order',
+        placeholder: '<?php echo __('search_order_placeholder'); ?>',
         ajax: {
             url: 'api/search_orders.php',
             dataType: 'json',
@@ -928,10 +928,10 @@ $(function() {
     });
 
     const statusLabels = {
-        pending: 'Pending ordering',
-        ordered: 'Ordered',
-        received: 'Received',
-        cancelled: 'Cancelled'
+        pending: '<?php echo __('pending_status'); ?>',
+        ordered: '<?php echo __('ordered_status'); ?>',
+        received: '<?php echo __('received_status'); ?>',
+        cancelled: '<?php echo __('cancelled_status_proc'); ?>'
     };
 
     $('.assign-procurement-btn').on('click', function() {
@@ -943,7 +943,7 @@ $(function() {
 
         $('#assignRequestId').val(requestId);
         $('#assignRequestItemName').text(itemName);
-        $('#assignRequestStatus').text('Procurement status: ' + (statusLabels[status] || status));
+        $('#assignRequestStatus').text('<?php echo __('procurement_status_label'); ?>' + (statusLabels[status] || status));
         $('#assignProcurementQty').val(qty);
 
         const $assignOrder = $('#assignProcurementOrder');
@@ -962,7 +962,7 @@ $(function() {
             if (res.success) {
                 location.reload();
             } else {
-                showAlert('Error: ' + res.message);
+                showAlert("<?php echo __('error_label'); ?>: " + res.message);
             }
         });
     });
@@ -973,7 +973,7 @@ $(function() {
             if (res.success) {
                 location.reload();
             } else {
-                showAlert('Error: ' + res.message);
+                showAlert("<?php echo __('error_label'); ?>: " + res.message);
             }
         });
     });
@@ -985,19 +985,19 @@ $(function() {
             if (res.success) {
                 location.reload();
             } else {
-                showAlert('Error: ' + res.message);
+                showAlert("<?php echo __('error_label'); ?>: " + res.message);
             }
         });
     });
 
     $('.procurement-delete-btn').on('click', function() {
         const id = $(this).data('id');
-        if (!confirm('Are you sure you want to delete this request?')) return;
+        if (!confirm("<?php echo __('confirm_delete_request'); ?>")) return;
         $.post('api/procurement_request.php', {action: 'delete', id: id}, function(res) {
             if (res.success) {
                 $('#request-row-' + id).fadeOut();
             } else {
-                showAlert('Error: ' + res.message);
+                showAlert("<?php echo __('error_label'); ?>: " + res.message);
             }
         });
     });

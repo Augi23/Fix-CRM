@@ -6,6 +6,16 @@
  */
 return [
     [
+        'date' => '2026-07-11',
+        'title' => 'Angličtina: přeložené stavy zakázek + 150 textů',
+        'items' => [
+            'Stavy zakázek se v anglickém (i ruském) rozhraní nově překládají — Přijato → Received, V opravě → In Repair, Připraveno k převzetí → Ready for Pickup, Vydáno → Collected… V databázi zůstávají česky, takže se nic nerozbije.',
+            'Celoplošný audit našel 110+ natvrdo česky napsaných textů (menu, notifikace, reklamace, nákupy, nákupní seznam, wizard, popupy) — převedeny na překladové klíče CS/EN/RU, celkem ~150 náhrad.',
+            'Opraveny i obrácené případy (anglické texty v českém rozhraní na stránce Nákupy).',
+            'Zbývá dopřekládat administrátorské stránky (Nastavení, Klienti, Sklad, Účetnictví) — následující kolo.',
+        ],
+    ],
+    [
         'date' => '2026-07-09',
         'title' => 'Dashboard: zarovnané sloupce, tabulka na maximum',
         'items' => [

@@ -218,7 +218,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
         <?php endif; ?>
         <?php if (isBranchGlobalViewer() && !empty($branches)): ?>
             <div class="mt-2 d-flex flex-wrap gap-2">
-                <a class="badge rounded-pill text-decoration-none <?php echo $active_branch_filter === 0 ? 'bg-primary' : 'bg-secondary'; ?>" href="orders.php<?php echo $filter_status ? '?filter=' . urlencode($filter_status) : ''; ?>">Všechny pobočky</a>
+                <a class="badge rounded-pill text-decoration-none <?php echo $active_branch_filter === 0 ? 'bg-primary' : 'bg-secondary'; ?>" href="orders.php<?php echo $filter_status ? '?filter=' . urlencode($filter_status) : ''; ?>"><?php echo __('all_branches'); ?></a>
                 <?php foreach ($branches as $branch): ?>
                     <?php $qs = http_build_query(array_filter(['filter' => $filter_status, 'branch_id' => (int)$branch['id']])); ?>
                     <a class="badge rounded-pill text-decoration-none <?php echo $active_branch_filter === (int)$branch['id'] ? 'bg-primary' : 'bg-secondary'; ?>" href="orders.php?<?php echo e($qs); ?>"><?php echo e($branch['name']); ?></a>
@@ -272,7 +272,7 @@ if (($search ?? '') === '' && !$filter_status && $page === 1) {
 <div class="afx-webres">
     <div class="afx-webres-head">
         <i class="fas fa-globe"></i>
-        <span>Rezervace z webu</span>
+        <span><?php echo __('web_bookings'); ?></span>
         <span class="afx-webres-count"><?php echo count($webBookings); ?></span>
     </div>
     <div class="afx-webres-list">
@@ -284,13 +284,13 @@ if (($search ?? '') === '' && !$filter_status && $page === 1) {
             <div class="afx-webres-when <?php echo $isToday ? 'today' : ''; ?>">
                 <?php if ($apptTs): ?>
                     <b><?php echo date('H:i', $apptTs); ?></b>
-                    <small><?php echo $isToday ? 'dnes' : date('j. n.', $apptTs); ?></small>
+                    <small><?php echo $isToday ? __('today') : date('j. n.', $apptTs); ?></small>
                 <?php else: ?>
-                    <b>—</b><small>bez termínu</small>
+                    <b>—</b><small><?php echo __('no_appointment'); ?></small>
                 <?php endif; ?>
             </div>
             <div class="afx-webres-body">
-                <div class="afx-webres-name"><?php echo e($wb['customer_name'] ?: 'Neznámý klient'); ?>
+                <div class="afx-webres-name"><?php echo e($wb['customer_name'] ?: __('unknown_client')); ?>
                     <?php if (!empty($wb['phone'])): ?><a class="afx-webres-tel" href="tel:<?php echo e($wb['phone']); ?>"><i class="fas fa-phone"></i> <?php echo e($wb['phone']); ?></a><?php endif; ?>
                 </div>
                 <div class="afx-webres-meta">
@@ -308,15 +308,15 @@ if (($search ?? '') === '' && !$filter_status && $page === 1) {
                     data-email="<?php echo e((string)$wb['email']); ?>"
                     data-device="<?php echo e((string)$wb['device']); ?>"
                     data-issue="<?php echo e(trim(($wb['service'] ?: '') . (!empty($wb['notes']) ? ' — ' . $wb['notes'] : ''))); ?>">
-                    <i class="fas fa-plus me-1"></i>Vytvořit zakázku
+                    <i class="fas fa-plus me-1"></i><?php echo __('create_order'); ?>
                 </button>
-                <button type="button" class="btn btn-sm afx-webres-done" data-id="<?php echo (int)$wb['id']; ?>" title="Vyřízeno / skrýt"><i class="fas fa-check"></i></button>
+                <button type="button" class="btn btn-sm afx-webres-done" data-id="<?php echo (int)$wb['id']; ?>" title="<?php echo e(__('booking_dismiss')); ?>"><i class="fas fa-check"></i></button>
             </div>
         </div>
         <?php endforeach; ?>
     </div>
 </div>
-<div class="afx-webres-divider"><span>Zakázky</span></div>
+<div class="afx-webres-divider"><span><?php echo __('orders'); ?></span></div>
 <script>
 $(function () {
     // Vyřízeno / skrýt

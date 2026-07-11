@@ -179,9 +179,9 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                     <input type="text" name="appearance" class="form-control">
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label"><i class="fas fa-camera me-1 text-info"></i> Foto stavu zařízení při příjmu</label>
+                                    <label class="form-label"><i class="fas fa-camera me-1 text-info"></i> <?php echo __('intake_photos_label'); ?></label>
                                     <input type="file" name="files[]" class="form-control" multiple accept="image/*,video/*">
-                                    <div class="form-text">Vyfoťte stav zařízení při příjmu (škrábance, praskliny, příslušenství) — předejde se pozdějším dohadům o stavu, v jakém k nám zařízení přišlo.</div>
+                                    <div class="form-text"><?php echo __('intake_photos_hint'); ?></div>
                                 </div>
                             </div>
                         </div>
@@ -273,7 +273,7 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                             <div class="row g-3">
                                 <?php if (isBranchGlobalViewer()): ?>
                                 <div class="col-md-6">
-                                    <label class="form-label"><i class="fas fa-store me-1"></i>Pobočka</label>
+                                    <label class="form-label"><i class="fas fa-store me-1"></i><?php echo __('branch'); ?></label>
                                     <select name="branch_id" class="form-select">
                                         <?php foreach ($branches_modal as $branch): ?>
                                             <option value="<?php echo (int)$branch['id']; ?>"><?php echo e($branch['name']); ?></option>

@@ -70,14 +70,14 @@ if (!empty($rows) && isset($pdo)) {
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Reklamace</h2>
+    <h2><?php echo __('complaints_title'); ?></h2>
     <button class="btn fw-semibold" style="background:#f97316;color:#fff" data-bs-toggle="modal" data-bs-target="#newComplaintModal">
-        <i class="fas fa-rotate-left me-1"></i> Nová reklamace
+        <i class="fas fa-rotate-left me-1"></i> <?php echo __('new_complaint'); ?>
     </button>
 </div>
 
 <?php if (!empty($_GET['created'])): ?>
-    <div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Reklamace <strong><?php echo e($_GET['created']); ?></strong> byla založena.</div>
+    <div class="alert alert-success"><i class="fas fa-check-circle me-2"></i><?php echo __('complaint'); ?> <strong><?php echo e($_GET['created']); ?></strong> <?php echo __('complaint_created_suffix'); ?></div>
 <?php endif; ?>
 <?php if (!empty($_GET['error'])): ?>
     <div class="alert alert-danger"><i class="fas fa-triangle-exclamation me-2"></i><?php echo e($_GET['error']); ?></div>
@@ -86,8 +86,8 @@ if (!empty($rows) && isset($pdo)) {
 <div class="card">
     <div class="card-body">
         <form method="GET" class="mb-3 d-flex gap-2">
-            <input type="text" class="form-control" name="search" placeholder="Hledat reklamace" value="<?php echo e($_GET['search'] ?? ''); ?>">
-            <button class="btn btn-primary" type="submit">Hledat</button>
+            <input type="text" class="form-control" name="search" placeholder="<?php echo e(__('search_complaints')); ?>" value="<?php echo e($_GET['search'] ?? ''); ?>">
+            <button class="btn btn-primary" type="submit"><?php echo __('search'); ?></button>
             <?php if (!empty($_GET['search'])): ?><a class="btn btn-outline-secondary" href="reklamace.php">Reset</a><?php endif; ?>
         </form>
 
@@ -95,14 +95,14 @@ if (!empty($rows) && isset($pdo)) {
             <table class="table table-striped table-hover align-middle">
                 <thead>
                     <tr>
-                        <th>Kód</th>
-                        <th>Zákazník</th>
-                        <th>Telefon</th>
-                        <th>Zařízení</th>
+                        <th><?php echo __('code_col'); ?></th>
+                        <th><?php echo __('customer_col'); ?></th>
+                        <th><?php echo __('phone'); ?></th>
+                        <th><?php echo __('device'); ?></th>
                         <th>IMEI/SN</th>
-                        <th>Důvod reklamace</th>
-                        <th>Zdroj / zakázka</th>
-                        <th>Stav</th>
+                        <th><?php echo __('complaint_reason_col'); ?></th>
+                        <th><?php echo __('source_order_col'); ?></th>
+                        <th><?php echo __('status_col'); ?></th>
                         <th></th>
                     </tr>
                 </thead>
@@ -123,11 +123,11 @@ if (!empty($rows) && isset($pdo)) {
                         <td>
                             <?php echo e($r['complaint_code']); ?>
                             <?php if ($isNewClient): ?>
-                                <span class="badge bg-warning text-dark ms-1" title="Nová reklamace z klientské sekce">NOVÁ</span>
+                                <span class="badge bg-warning text-dark ms-1" title="<?php echo e(__('new_complaint_from_client')); ?>"><?php echo __('new_badge'); ?></span>
                             <?php endif; ?>
                             <?php if (!empty($complaint_photos[(int)$r['id']])): $cp = $complaint_photos[(int)$r['id']]; ?>
                                 <a href="<?php echo e($cp['first_path']); ?>" target="_blank" rel="noopener"
-                                   class="badge bg-secondary text-decoration-none ms-1" title="Fotodokumentace">
+                                   class="badge bg-secondary text-decoration-none ms-1" title="<?php echo e(__('photo_documentation')); ?>">
                                     <i class="fas fa-camera"></i> <?php echo (int)$cp['n']; ?>
                                 </a>
                             <?php endif; ?>
@@ -148,12 +148,12 @@ if (!empty($rows) && isset($pdo)) {
                         <td style="min-width:170px;">
                             <select class="form-select form-select-sm complaint-status-select" data-cid="<?php echo (int)$r['id']; ?>">
                                 <?php foreach ($opts as $st): ?>
-                                    <option value="<?php echo e($st); ?>" <?php echo $curStatus === $st ? 'selected' : ''; ?>><?php echo e($st); ?></option>
+                                    <option value="<?php echo e($st); ?>" <?php echo $curStatus === $st ? 'selected' : ''; ?>><?php echo e($st === 'Čeká na zákazníka' ? __('status_waiting_customer') : $st); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </td>
                         <td class="text-nowrap">
-                            <a class="btn btn-sm btn-outline-secondary" href="print_complaint.php?id=<?php echo (int)$r['id']; ?>" target="_blank" rel="noopener" title="Reklamační protokol">
+                            <a class="btn btn-sm btn-outline-secondary" href="print_complaint.php?id=<?php echo (int)$r['id']; ?>" target="_blank" rel="noopener" title="<?php echo e(__('complaint_protocol')); ?>">
                                 <i class="fas fa-print"></i>
                             </a>
                         </td>
@@ -207,10 +207,10 @@ tr.complaint-row--new-client:hover { animation-play-state: paused; }
                         var tr = el.closest('tr');
                         if (tr) tr.classList.remove('complaint-row--new-client');
                     } else {
-                        alert('Nepodařilo se změnit stav reklamace.');
+                        alert('<?php echo __('complaint_status_change_failed'); ?>');
                     }
                 })
-                .catch(function(){ el.disabled = false; alert('Chyba spojení.'); });
+                .catch(function(){ el.disabled = false; alert('<?php echo __('connection_error'); ?>'); });
         });
     });
 })();

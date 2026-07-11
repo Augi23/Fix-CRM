@@ -221,7 +221,7 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
         <i class="fas fa-bell"></i>
         <span class="crm-v2-alert-dot"></span>
     </button>
-    <button class="btn btn-sm crm-v2-icon-btn lg-theme-toggle afx-hide-m" type="button" title="Light / Dark" aria-label="Light / Dark">
+    <button class="btn btn-sm crm-v2-icon-btn lg-theme-toggle afx-hide-m" type="button" title="<?php echo e(__('theme_toggle')); ?>" aria-label="<?php echo e(__('theme_toggle')); ?>">
         <i class="fas fa-sun"></i>
     </button>
     <div class="dropdown afx-hide-m">
@@ -252,7 +252,7 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
             <i class="fas fa-tools"></i><small><?php echo __('orders'); ?></small>
         </a>
         <a class="afx-cell <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php">
-            <i class="fas fa-rotate-left"></i><small>Reklamace</small>
+            <i class="fas fa-rotate-left"></i><small><?php echo __('complaints'); ?></small>
         </a>
         <a class="afx-cell <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php">
             <i class="fas fa-truck-loading"></i><small><?php echo __('procurement'); ?></small>
@@ -286,25 +286,25 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
             <i class="fas fa-plus"></i><small><?php echo __('new_order'); ?></small>
         </a>
         <a class="afx-cell act-orange" href="#" data-bs-toggle="modal" data-bs-target="#newComplaintModal">
-            <i class="fas fa-rotate-left"></i><small>Reklamace</small>
+            <i class="fas fa-rotate-left"></i><small><?php echo __('complaints'); ?></small>
         </a>
         <a class="afx-cell act-green <?php echo $current_page == 'nakupni-seznam.php' ? 'active' : ''; ?>" href="nakupni-seznam.php">
             <?php if (!empty($shoppingListBadgeCount) && $shoppingListBadgeCount > 0): ?><span class="afx-badge"><?php echo (int)$shoppingListBadgeCount; ?></span><?php endif; ?>
-            <i class="fas fa-cart-shopping"></i><small>Nákup. seznam</small>
+            <i class="fas fa-cart-shopping"></i><small><?php echo __('shopping_list'); ?></small>
         </a>
     </nav>
 </div>
 
 <!-- Mobil/tablet: spodní tab bar -->
-<nav class="afx-tabbar" aria-label="Mobilní navigace">
+<nav class="afx-tabbar" aria-label="<?php echo e(__('mobile_navigation')); ?>">
     <a class="afx-tb <?php echo $current_page == 'index.php' ? 'active' : ''; ?>" href="index.php"><i class="fas fa-home"></i><?php echo __('dashboard'); ?></a>
     <a class="afx-tb <?php echo $current_page == 'orders.php' ? 'active' : ''; ?>" href="orders.php">
         <?php if ($ordersBadgeCount > 0): ?><span class="afx-badge"><?php echo $ordersBadgeCount; ?></span><?php endif; ?>
         <i class="fas fa-tools"></i><?php echo __('orders'); ?>
     </a>
     <button class="afx-tb-plus" type="button" data-bs-toggle="modal" data-bs-target="#newOrderModal" aria-label="<?php echo __('new_order'); ?>"><i class="fas fa-plus"></i></button>
-    <a class="afx-tb <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php"><i class="fas fa-rotate-left"></i>Reklamace</a>
-    <button class="afx-tb" type="button" id="afxSheetOpen"><i class="fas fa-bars"></i>Menu</button>
+    <a class="afx-tb <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php"><i class="fas fa-rotate-left"></i><?php echo __('complaints'); ?></a>
+    <button class="afx-tb" type="button" id="afxSheetOpen"><i class="fas fa-bars"></i><?php echo __('menu'); ?></button>
 </nav>
 
 <!-- Mobil/tablet: sheet menu s hledáním -->
@@ -322,16 +322,16 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
         <?php endif; ?>
         <div class="afx-sheet-acts">
             <a class="afx-sheet-act b" href="#" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus"></i><?php echo __('new_order'); ?></a>
-            <a class="afx-sheet-act o" href="#" data-bs-toggle="modal" data-bs-target="#newComplaintModal"><i class="fas fa-rotate-left"></i>Reklamace</a>
+            <a class="afx-sheet-act o" href="#" data-bs-toggle="modal" data-bs-target="#newComplaintModal"><i class="fas fa-rotate-left"></i><?php echo __('complaints'); ?></a>
             <a class="afx-sheet-act g <?php echo $current_page == 'nakupni-seznam.php' ? 'active' : ''; ?>" href="nakupni-seznam.php">
                 <?php if (!empty($shoppingListBadgeCount) && $shoppingListBadgeCount > 0): ?><span class="afx-badge"><?php echo (int)$shoppingListBadgeCount; ?></span><?php endif; ?>
-                <i class="fas fa-cart-shopping"></i>Nákup. seznam
+                <i class="fas fa-cart-shopping"></i><?php echo __('shopping_list'); ?>
             </a>
         </div>
         <div class="afx-sheet-grid">
             <a class="afx-sheet-link <?php echo $current_page == 'index.php' ? 'active' : ''; ?>" href="index.php"><i class="fas fa-home"></i><?php echo __('dashboard'); ?></a>
             <a class="afx-sheet-link <?php echo $current_page == 'orders.php' ? 'active' : ''; ?>" href="orders.php"><i class="fas fa-tools"></i><?php echo __('orders'); ?></a>
-            <a class="afx-sheet-link <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php"><i class="fas fa-rotate-left"></i>Reklamace</a>
+            <a class="afx-sheet-link <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php"><i class="fas fa-rotate-left"></i><?php echo __('complaints'); ?></a>
             <a class="afx-sheet-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading"></i><?php echo __('procurement'); ?></a>
             <?php if (hasPermission('edit_customers')): ?>
             <a class="afx-sheet-link <?php echo $current_page == 'customers.php' ? 'active' : ''; ?>" href="customers.php"><i class="fas fa-users"></i><?php echo __('customers'); ?></a>
@@ -351,7 +351,7 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
             <span><?php echo e($afxFn); ?><small><?php echo e($roleLabel ?: __('role_employee')); ?></small></span>
         </div>
         <div class="afx-sheet-foot">
-            <button class="btn btn-outline-secondary btn-sm lg-theme-toggle" type="button"><i class="fas fa-sun me-1"></i>Vzhled</button>
+            <button class="btn btn-outline-secondary btn-sm lg-theme-toggle" type="button"><i class="fas fa-sun me-1"></i><?php echo __('theme'); ?></button>
             <span class="afx-sheet-langs">
                 <a class="btn btn-outline-secondary btn-sm <?php echo $currentLang === 'cs' ? 'active' : ''; ?>" href="set_language.php?lang=cs&amp;redirect=<?php echo rawurlencode($langRedirect); ?>">CS</a>
                 <a class="btn btn-outline-secondary btn-sm <?php echo $currentLang === 'en' ? 'active' : ''; ?>" href="set_language.php?lang=en&amp;redirect=<?php echo rawurlencode($langRedirect); ?>">EN</a>

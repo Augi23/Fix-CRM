@@ -69,7 +69,7 @@
         <?php if (empty($crm_notifs)): ?>
             <div class="crm-notifications-empty text-center py-5">
                 <i class="fas fa-bell-slash fa-lg mb-2 d-block text-white-50"></i>
-                <div class="small text-white-75">Žádná nová upozornění</div>
+                <div class="small text-white-75"><?php echo __('no_new_notifications'); ?></div>
             </div>
         <?php else: foreach ($crm_notifs as $n): ?>
             <a class="crm-notifications-item text-decoration-none" href="<?php echo e($n['url'] ?? '#'); ?>">
@@ -84,7 +84,7 @@
         <?php endforeach; endif; ?>
     </div>
     <div class="crm-notifications-foot">
-        <a href="orders.php" class="btn btn-sm btn-outline-secondary w-100"><i class="fas fa-list me-1"></i> Otevřít zakázky</a>
+        <a href="orders.php" class="btn btn-sm btn-outline-secondary w-100"><i class="fas fa-list me-1"></i> <?php echo __('open_orders'); ?></a>
     </div>
 </div>
 
@@ -113,14 +113,14 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content glass-card border-secondary text-white">
       <div class="modal-header border-secondary">
-        <h5 class="modal-title"><i class="fas fa-file-invoice me-2 text-primary"></i>Zakázkový list <span id="orderDocCode"></span></h5>
+        <h5 class="modal-title"><i class="fas fa-file-invoice me-2 text-primary"></i><?php echo __('order_sheet'); ?> <span id="orderDocCode"></span></h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p class="text-white-75 mb-3">Zakázkový list je připraven. Jak s ním chcete naložit?</p>
+        <p class="text-white-75 mb-3"><?php echo __('order_sheet_ready'); ?></p>
         <div class="d-grid gap-2">
-          <button type="button" class="btn btn-outline-info btn-lg" id="orderDocPrintBtn"><i class="fas fa-print me-2"></i>Vytisknout</button>
-          <button type="button" class="btn btn-outline-primary btn-lg" id="orderDocEmailBtn"><i class="fas fa-envelope me-2"></i>Odeslat e-mailem klientovi</button>
+          <button type="button" class="btn btn-outline-info btn-lg" id="orderDocPrintBtn"><i class="fas fa-print me-2"></i><?php echo __('print'); ?></button>
+          <button type="button" class="btn btn-outline-primary btn-lg" id="orderDocEmailBtn"><i class="fas fa-envelope me-2"></i><?php echo __('send_email_to_client'); ?></button>
         </div>
         <div id="orderDocMsg" class="small mt-3"></div>
       </div>
@@ -148,19 +148,19 @@ window.AFX_AMBIENT_INTERVAL_MIN = 10;
 <div id="assignPopupOverlay" class="assign-popup-overlay" role="dialog" aria-modal="true" aria-hidden="true">
     <div class="assign-popup-card">
         <div class="assign-popup-head">
-            <span class="assign-popup-kicker"><i class="fas fa-user-check me-2"></i>Nová přidělená zakázka</span>
-            <button type="button" class="assign-popup-x" onclick="afxAssignClose()" aria-label="Zavřít">&times;</button>
+            <span class="assign-popup-kicker"><i class="fas fa-user-check me-2"></i><?php echo __('new_assigned_order'); ?></span>
+            <button type="button" class="assign-popup-x" onclick="afxAssignClose()" aria-label="<?php echo e(__('close')); ?>">&times;</button>
         </div>
         <div class="assign-popup-device" id="assignPopupDevice">—</div>
         <div class="assign-popup-codeline">
             <span class="assign-popup-code" id="assignPopupCode">—</span>
-            <span class="assign-popup-prio" id="assignPopupPriority" style="display:none;"><i class="fas fa-bolt me-1"></i>Vysoká priorita</span>
+            <span class="assign-popup-prio" id="assignPopupPriority" style="display:none;"><i class="fas fa-bolt me-1"></i><?php echo __('high_priority'); ?></span>
         </div>
         <div class="assign-popup-rows">
-            <div class="assign-popup-row"><span class="k">Klient</span><span class="v" id="assignPopupClient">—</span></div>
-            <div class="assign-popup-row"><span class="k">Závada</span><span class="v" id="assignPopupProblem">—</span></div>
+            <div class="assign-popup-row"><span class="k"><?php echo __('client'); ?></span><span class="v" id="assignPopupClient">—</span></div>
+            <div class="assign-popup-row"><span class="k"><?php echo __('issue'); ?></span><span class="v" id="assignPopupProblem">—</span></div>
         </div>
-        <a href="#" id="assignPopupOpen" class="assign-popup-btn"><i class="fas fa-arrow-right me-2"></i>Otevřít zakázku</a>
+        <a href="#" id="assignPopupOpen" class="assign-popup-btn"><i class="fas fa-arrow-right me-2"></i><?php echo __('open_order'); ?></a>
     </div>
 </div>
 <style>
@@ -198,7 +198,7 @@ window.AFX_AMBIENT_INTERVAL_MIN = 10;
     if (!overlay) return;
     var queue = [], showing = false;
     function open(it){
-        document.getElementById('assignPopupDevice').textContent = it.device || 'Zařízení';
+        document.getElementById('assignPopupDevice').textContent = it.device || "<?php echo __('device'); ?>";
         document.getElementById('assignPopupCode').textContent = it.order_code || ('#' + it.order_id);
         var pr = document.getElementById('assignPopupPriority');
         pr.style.display = it.priority_high ? '' : 'none';

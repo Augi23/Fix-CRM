@@ -210,9 +210,9 @@ function localizedOrderStatusLabel(string $status): string {
                     <div class="col-md-12">
                         <div class="alert alert-success bg-transparent border border-success py-2 mb-0">
                             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small">
-                                <div><i class="far fa-clock me-2"></i><strong>Work time on order:</strong> <?php echo formatWorkDuration($order['work_duration_seconds'] ?? 0); ?></div>
+                                <div><i class="far fa-clock me-2"></i><strong><?php echo __('work_time_on_order'); ?></strong> <?php echo formatWorkDuration($order['work_duration_seconds'] ?? 0); ?></div>
                                 <?php if (!empty($order['work_started_at'])): ?>
-                                    <div class="text-white-75">Start: <?php echo date('d.m.Y H:i', strtotime($order['work_started_at'])); ?><?php if (!empty($order['work_finished_at'])): ?> | End: <?php echo date('d.m.Y H:i', strtotime($order['work_finished_at'])); ?><?php endif; ?></div>
+                                    <div class="text-white-75"><?php echo __('work_start'); ?> <?php echo date('d.m.Y H:i', strtotime($order['work_started_at'])); ?><?php if (!empty($order['work_finished_at'])): ?> | <?php echo __('work_end'); ?> <?php echo date('d.m.Y H:i', strtotime($order['work_finished_at'])); ?><?php endif; ?></div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -338,7 +338,7 @@ function localizedOrderStatusLabel(string $status): string {
                     <h6 class="mb-0"><?php echo __('parts_used'); ?></h6>
                     <div class="d-flex gap-2 flex-wrap">
                         <a class="btn btn-sm btn-outline-success" href="procurement.php?order_id=<?php echo $order['id']; ?>">
-                            <i class="fas fa-truck-loading me-1"></i> Add to procurement
+                            <i class="fas fa-truck-loading me-1"></i> <?php echo __('add_to_procurement'); ?>
                         </a>
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPartModal">
                             <i class="fas fa-plus me-1"></i> <?php echo __('add_part'); ?>
@@ -434,7 +434,7 @@ function localizedOrderStatusLabel(string $status): string {
                                 <option value="" <?php echo empty($order['shipping_method']) ? 'selected' : ''; ?>>-- <?php echo __('not_found'); ?> --</option>
                                 <option value="Self Pickup" <?php echo $order['shipping_method'] == 'Self Pickup' ? 'selected' : ''; ?>><?php echo __('self_pickup'); ?></option>
                                 <option value="Zasilkovna" <?php echo $order['shipping_method'] == 'Zasilkovna' ? 'selected' : ''; ?>>Zasilkovna</option>
-                                <option value="Ceska Posta" <?php echo $order['shipping_method'] == 'Ceska Posta' ? 'selected' : ''; ?>>Czech Post</option>
+                                <option value="Ceska Posta" <?php echo $order['shipping_method'] == 'Ceska Posta' ? 'selected' : ''; ?>><?php echo __('czech_post'); ?></option>
                                 <option value="PPL" <?php echo $order['shipping_method'] == 'PPL' ? 'selected' : ''; ?>>PPL</option>
                                 <option value="DPD" <?php echo $order['shipping_method'] == 'DPD' ? 'selected' : ''; ?>>DPD</option>
                                 <option value="GLS" <?php echo $order['shipping_method'] == 'GLS' ? 'selected' : ''; ?>>GLS</option>
@@ -530,9 +530,9 @@ function localizedOrderStatusLabel(string $status): string {
                             </button>
                             <ul class="dropdown-menu w-100 shadow">
                                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-paper-plane me-2 text-primary"></i> Zakázkový list — tisk / e&#8209;mail</a></li>
+                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-paper-plane me-2 text-primary"></i> <?php echo __('order_sheet_print_email'); ?></a></li>
                                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printOrderLabel(<?php echo (int)$order['id']; ?>)"><i class="fas fa-barcode me-2 text-info"></i> Štítek — Brother QL</a></li>
+                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printOrderLabel(<?php echo (int)$order['id']; ?>)"><i class="fas fa-barcode me-2 text-info"></i> <?php echo __('print_label'); ?></a></li>
                                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
                                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="window.open('print_label.php?id=<?php echo $order['id']; ?>', 'qllabel', 'width=440,height=360')"><i class="fas fa-tag me-2 text-info"></i> <?php echo __('print_label'); ?></a></li>
                             </ul>
@@ -657,7 +657,7 @@ function localizedOrderStatusLabel(string $status): string {
                     <div class="mb-3">
                         <label class="form-label"><?php echo __('select_part_from_warehouse'); ?></label>
                         <select name="inventory_id" id="addPartInventory" class="form-select" required></select>
-                        <div class="form-text text-white-75 small"><?php echo getCurrentStaffRole() === 'engineer' ? 'Search by name, SKU, or price. Technicians only see in-stock items.' : 'Search by name, SKU, or price.'; ?></div>
+                        <div class="form-text text-white-75 small"><?php echo getCurrentStaffRole() === 'engineer' ? __('search_part_hint_engineer') : 'Search by name, SKU, or price.'; ?></div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label"><?php echo __('quantity'); ?></label>

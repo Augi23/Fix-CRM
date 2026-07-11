@@ -50,7 +50,7 @@ try {
     $revenue_today = $revenue_yesterday = $revenue_today_trend = 0;
     $revenue_month = $revenue_prev = 0; $revenue_trend = 0; $revenue_12m = array_fill(0, 12, 0);
 }
-$month_labels = ['D','L','Ú','B','D','Č','Č','S','Z','Ř','L','D'];
+$month_labels = explode(',', __('month_initials'));
 $rev_max = max(1, max($revenue_12m));
 
 $branch_overview = [];
@@ -130,13 +130,13 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
     <div class="crm-branch-mini card glass-card border-0">
         <div class="crm-branch-mini-main">
             <div class="crm-branch-mini-name"><i class="fas fa-store me-2 text-primary"></i><?php echo e($branch['name']); ?></div>
-            <div class="crm-branch-mini-sub">Aktivní: <?php echo (int)$branch['active_orders']; ?> · Hotovo: <?php echo (int)$branch['done_orders']; ?></div>
+            <div class="crm-branch-mini-sub"><?php echo __('active_short'); ?>: <?php echo (int)$branch['active_orders']; ?> · <?php echo __('done_short'); ?>: <?php echo (int)$branch['done_orders']; ?></div>
         </div>
         <div class="crm-branch-mini-num">
             <b><?php echo (int)$branch['total_orders']; ?></b>
             <small><?php echo number_format((float)$branch['revenue'], 0, ',', ' '); ?> Kč</small>
         </div>
-        <a class="stretched-link" href="orders.php?branch_id=<?php echo (int)$branch['id']; ?>" aria-label="Pobočka <?php echo e($branch['name']); ?>"></a>
+        <a class="stretched-link" href="orders.php?branch_id=<?php echo (int)$branch['id']; ?>" aria-label="<?php echo e(__('branch')); ?> <?php echo e($branch['name']); ?>"></a>
     </div>
     <?php endforeach; ?>
 </div>
