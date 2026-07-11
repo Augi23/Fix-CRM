@@ -2763,13 +2763,26 @@ function ensureWebBookingsSchema(): void {
             delivery_method VARCHAR(80) DEFAULT NULL,
             status ENUM('new','converted','dismissed') NOT NULL DEFAULT 'new',
             order_id INT NULL,
+            caldav_uid VARCHAR(190) DEFAULT NULL,
+            caldav_synced_at DATETIME NULL,
+            caldav_last_error TEXT NULL,
             raw_payload MEDIUMTEXT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_wp_booking (wp_booking_id),
+            INDEX idx_caldav_uid (caldav_uid),
             INDEX idx_status_appt (status, appointment_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     } catch (Throwable $e) { /* tabulka už existuje */ }
+
+    foreach ([
+        "ALTER TABLE web_bookings ADD COLUMN caldav_uid VARCHAR(190) DEFAULT NULL AFTER order_id",
+        "ALTER TABLE web_bookings ADD COLUMN caldav_synced_at DATETIME NULL AFTER caldav_uid",
+        "ALTER TABLE web_bookings ADD COLUMN caldav_last_error TEXT NULL AFTER caldav_synced_at",
+        "ALTER TABLE web_bookings ADD INDEX idx_caldav_uid (caldav_uid)",
+    ] as $sql) {
+        try { $pdo->exec($sql); } catch (Throwable $e) { /* už existuje / nelze přidat */ }
+    }
 
     // sdílený klíč pro webhook z WordPressu (vygeneruje se jednou)
     try {
@@ -2777,4 +2790,181 @@ function ensureWebBookingsSchema(): void {
             set_setting('web_booking_key', bin2hex(random_bytes(24)));
         }
     } catch (Throwable $e) { /* settings nedostupné */ }
+}
+
+/**
+ * CalDAV synchronizace webových rezervací do firemního kalendáře.
+ * Nastavení: Nastavení → Integrace → Firemní kalendář (CalDAV).
+ */
+function crmCalDavEscapeText(string $value): string {
+    $value = str_replace(["\r\n", "\r"], "\n", $value);
+    $value = str_replace('\\', '\\\\', $value);
+    $value = str_replace(';', '\\;', $value);
+    $value = str_replace(',', '\\,', $value);
+    return str_replace("\n", '\\n', $value);
+}
+
+function crmCalDavFoldLine(string $line): string {
+    $out = '';
+    while (strlen($line) > 73) {
+        $chunk = function_exists('mb_strcut') ? mb_strcut($line, 0, 73, 'UTF-8') : substr($line, 0, 73);
+        $out .= $chunk . "\r\n ";
+        $line = substr($line, strlen($chunk));
+    }
+    return $out . $line;
+}
+
+function crmCalDavEventUid(array $booking): string {
+    $sourceId = trim((string)($booking['wp_booking_id'] ?? ''));
+    if ($sourceId === '') {
+        $sourceId = (string)($booking['id'] ?? bin2hex(random_bytes(8)));
+    }
+    $safeId = preg_replace('/[^a-zA-Z0-9._-]+/', '-', $sourceId);
+    return 'applefix-web-booking-' . trim($safeId, '-') . '@admin.applefix.cloud';
+}
+
+function crmCalDavBuildIcs(array $booking, string $uid): string {
+    $tz = new DateTimeZone('Europe/Prague');
+    $start = new DateTime((string)$booking['appointment_at'], $tz);
+    $duration = max(5, (int)get_setting('caldav_booking_duration_minutes', '30'));
+    $end = (clone $start)->modify('+' . $duration . ' minutes');
+
+    $customer = trim((string)($booking['customer_name'] ?? ''));
+    $device = trim((string)($booking['device'] ?? ''));
+    $service = trim((string)($booking['service'] ?? ''));
+    $summaryBits = array_filter(['Rezervace opravy', $customer, $device ?: $service]);
+    $summary = implode(' - ', $summaryBits);
+
+    $descriptionParts = array_filter([
+        $customer ? 'Zakaznik: ' . $customer : '',
+        trim((string)($booking['phone'] ?? '')) ? 'Telefon: ' . trim((string)$booking['phone']) : '',
+        trim((string)($booking['email'] ?? '')) ? 'E-mail: ' . trim((string)$booking['email']) : '',
+        $device ? 'Zarizeni: ' . $device : '',
+        $service ? 'Oprava: ' . $service : '',
+        trim((string)($booking['delivery_method'] ?? '')) ? 'Predani: ' . trim((string)$booking['delivery_method']) : '',
+        trim((string)($booking['notes'] ?? '')) ? 'Poznamka: ' . trim((string)$booking['notes']) : '',
+        'Zdroj: RepairPlugin / applefix.cz',
+    ]);
+
+    $stamp = gmdate('Ymd\THis\Z');
+    $lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//AppleFix//Fix-CRM Web Bookings//CS',
+        'CALSCALE:GREGORIAN',
+        'BEGIN:VEVENT',
+        'UID:' . $uid,
+        'DTSTAMP:' . $stamp,
+        'DTSTART;TZID=Europe/Prague:' . $start->format('Ymd\THis'),
+        'DTEND;TZID=Europe/Prague:' . $end->format('Ymd\THis'),
+        'SUMMARY:' . crmCalDavEscapeText($summary),
+        'DESCRIPTION:' . crmCalDavEscapeText(implode("\n", $descriptionParts)),
+        'END:VEVENT',
+        'END:VCALENDAR',
+    ];
+
+    return implode("\r\n", array_map('crmCalDavFoldLine', $lines)) . "\r\n";
+}
+
+function crmCalDavRequest(string $method, string $url, ?string $body = null): array {
+    $user = trim((string)get_setting('caldav_booking_user', ''));
+    $pass = (string)get_setting('caldav_booking_pass', '');
+    if ($url === '' || $user === '' || $pass === '') {
+        return [false, 'CalDAV neni nastaveny.'];
+    }
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST => $method,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HEADER => true,
+        CURLOPT_USERPWD => $user . ':' . $pass,
+        CURLOPT_HTTPAUTH => CURLAUTH_ANY,
+        CURLOPT_TIMEOUT => 12,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: text/calendar; charset=utf-8'],
+    ]);
+    if ($body !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+    }
+
+    $response = curl_exec($ch);
+    $err = curl_error($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    curl_close($ch);
+
+    if ($response === false) {
+        return [false, $err ?: 'CalDAV request selhal.'];
+    }
+    if ($code < 200 || $code >= 300) {
+        return [false, 'CalDAV HTTP ' . $code];
+    }
+
+    return [true, ''];
+}
+
+function crmSyncWebBookingToCalDav(int $bookingId): void {
+    global $pdo;
+    if (get_setting('caldav_booking_enabled', '0') !== '1') {
+        return;
+    }
+
+    try {
+        ensureWebBookingsSchema();
+        $stmt = $pdo->prepare("SELECT * FROM web_bookings WHERE id = ? LIMIT 1");
+        $stmt->execute([$bookingId]);
+        $booking = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$booking || empty($booking['appointment_at']) || ($booking['status'] ?? '') === 'dismissed') {
+            return;
+        }
+
+        $baseUrl = rtrim(trim((string)get_setting('caldav_booking_calendar_url', '')), '/') . '/';
+        if ($baseUrl === '/') {
+            return;
+        }
+
+        $uid = trim((string)($booking['caldav_uid'] ?? '')) ?: crmCalDavEventUid($booking);
+        $eventUrl = $baseUrl . rawurlencode($uid) . '.ics';
+        [$ok, $error] = crmCalDavRequest('PUT', $eventUrl, crmCalDavBuildIcs($booking, $uid));
+
+        if ($ok) {
+            $pdo->prepare("UPDATE web_bookings SET caldav_uid = ?, caldav_synced_at = NOW(), caldav_last_error = NULL WHERE id = ?")
+                ->execute([$uid, $bookingId]);
+        } else {
+            $pdo->prepare("UPDATE web_bookings SET caldav_uid = ?, caldav_last_error = ? WHERE id = ?")
+                ->execute([$uid, $error, $bookingId]);
+            error_log('crmSyncWebBookingToCalDav: ' . $error);
+        }
+    } catch (Throwable $e) {
+        error_log('crmSyncWebBookingToCalDav: ' . $e->getMessage());
+    }
+}
+
+function crmDeleteWebBookingFromCalDav(int $bookingId): void {
+    global $pdo;
+    if (get_setting('caldav_booking_enabled', '0') !== '1') {
+        return;
+    }
+
+    try {
+        ensureWebBookingsSchema();
+        $stmt = $pdo->prepare("SELECT caldav_uid FROM web_bookings WHERE id = ? LIMIT 1");
+        $stmt->execute([$bookingId]);
+        $uid = trim((string)$stmt->fetchColumn());
+        $baseUrl = rtrim(trim((string)get_setting('caldav_booking_calendar_url', '')), '/') . '/';
+        if ($uid === '' || $baseUrl === '/') {
+            return;
+        }
+
+        [$ok, $error] = crmCalDavRequest('DELETE', $baseUrl . rawurlencode($uid) . '.ics');
+        if ($ok) {
+            $pdo->prepare("UPDATE web_bookings SET caldav_synced_at = NULL, caldav_last_error = NULL WHERE id = ?")
+                ->execute([$bookingId]);
+        } else {
+            $pdo->prepare("UPDATE web_bookings SET caldav_last_error = ? WHERE id = ?")
+                ->execute([$error, $bookingId]);
+        }
+    } catch (Throwable $e) {
+        error_log('crmDeleteWebBookingFromCalDav: ' . $e->getMessage());
+    }
 }

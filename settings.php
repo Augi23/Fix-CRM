@@ -77,6 +77,15 @@ if (isset($_POST['update_integrations']) && $is_admin_check) {
     set_setting('smtp_from_email', trim($_POST['smtp_from_email'] ?? ''));
     set_setting('smtp_from_name', trim($_POST['smtp_from_name'] ?? ''));
 
+    // ── Firemní kalendář (CalDAV) — rezervace z webu ──
+    set_setting('caldav_booking_enabled', isset($_POST['caldav_booking_enabled']) ? '1' : '0');
+    set_setting('caldav_booking_calendar_url', trim($_POST['caldav_booking_calendar_url'] ?? ''));
+    set_setting('caldav_booking_user', trim($_POST['caldav_booking_user'] ?? ''));
+    if (trim((string)($_POST['caldav_booking_pass'] ?? '')) !== '') {
+        set_setting('caldav_booking_pass', trim($_POST['caldav_booking_pass']));
+    }
+    set_setting('caldav_booking_duration_minutes', (string) max(5, (int)($_POST['caldav_booking_duration_minutes'] ?? 30)));
+
     if (!empty($_POST['tg_bot_token'])) {
         $token = trim($_POST['tg_bot_token']);
         $webhook_url = rtrim((string)get_setting("fixer_webhook_url", "https://admin.applefix.cloud"), "/") . "/tg_webhook.php";
@@ -564,6 +573,27 @@ require_once 'includes/header.php';
                         </div>
                         <div class="form-text small text-white-75 mt-2">
                             Nové rezervace se objevují nahoře v Zakázkách, seřazené dle termínu. Tlačítko „Vytvořit zakázku" předvyplní wizard a rezervaci označí jako převzatou.
+                        </div>
+                    </div>
+
+                    <div class="col-12 border-top border-secondary pt-3">
+                        <h5 class="mb-3 text-info"><i class="fas fa-calendar-alt me-2"></i>Firemní kalendář (CalDAV) — rezervace z webu</h5>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="caldav_booking_enabled" id="caldavBookingEnabled" value="1" <?php echo get_setting('caldav_booking_enabled', '0') === '1' ? 'checked' : ''; ?>>
+                            <label class="form-check-label text-white-75" for="caldavBookingEnabled">Automaticky přidávat nové rezervace oprav do firemního kalendáře</label>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-8"><label class="form-label small text-white-75">CalDAV URL kalendáře</label>
+                                <input type="url" name="caldav_booking_calendar_url" class="form-control" value="<?php echo htmlspecialchars(get_setting('caldav_booking_calendar_url', '')); ?>" placeholder="https://applefix.cz/.../calendars/.../servis/"></div>
+                            <div class="col-md-4"><label class="form-label small text-white-75">Délka události v minutách</label>
+                                <input type="number" name="caldav_booking_duration_minutes" class="form-control" value="<?php echo htmlspecialchars(get_setting('caldav_booking_duration_minutes', '30')); ?>" min="5" step="5"></div>
+                            <div class="col-md-6"><label class="form-label small text-white-75">Uživatel</label>
+                                <input type="text" name="caldav_booking_user" class="form-control" value="<?php echo htmlspecialchars(get_setting('caldav_booking_user', '')); ?>" placeholder="servis@applefix.cz" autocomplete="off"></div>
+                            <div class="col-md-6"><label class="form-label small text-white-75">Heslo / app password</label>
+                                <input type="password" name="caldav_booking_pass" class="form-control" value="" placeholder="<?php echo get_setting('caldav_booking_pass') ? '•••••••• (uloženo — nech prázdné pro zachování)' : 'heslo ke CalDAV'; ?>" autocomplete="new-password"></div>
+                        </div>
+                        <div class="form-text small text-white-75 mt-2">
+                            Každá rezervace z RepairPluginu vytvoří nebo aktualizuje jednu událost. Zrušená rezervace se z kalendáře smaže, pokud už byla propsaná.
                         </div>
                     </div>
 

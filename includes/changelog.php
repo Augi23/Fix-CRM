@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-11',
+        'title' => 'Rezervace z webu → firemní kalendář (CalDAV)',
+        'items' => [
+            'Každá rezervace opravy z webu se může automaticky zapsat do firemního kalendáře přes CalDAV — nová rezervace vytvoří událost, změna ji přepíše, zrušení smaže.',
+            'Zapíná se v Nastavení → Integrace → Firemní kalendář (CalDAV): zapnout přepínač a vyplnit CalDAV URL kalendáře, uživatele a heslo/app password (+ délku události).',
+            'Tato integrace vznikla přímo na serveru; nyní je bezpečně sloučena do gitu, takže přežije všechny budoucí aktualizace.',
+        ],
+    ],
+    [
+        'date' => '2026-07-11',
         'title' => 'Angličtina: přeložené stavy zakázek + 150 textů',
         'items' => [
             'Stavy zakázek se v anglickém (i ruském) rozhraní nově překládají — Přijato → Received, V opravě → In Repair, Připraveno k převzetí → Ready for Pickup, Vydáno → Collected… V databázi zůstávají česky, takže se nic nerozbije.',

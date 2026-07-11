@@ -6,7 +6,9 @@
    `https://admin.applefix.cloud/api/website_booking.php` s klíčem `X-AFX-KEY`.
 3. CRM ji uloží do tabulky `web_bookings` (dedup dle booking_id) a zobrazí
    **nahoře v Zakázkách**, seřazenou dle termínu vzestupně, s jemným oddělovačem.
-4. „Vytvořit zakázku" předvyplní wizard; po dokončení se rezervace označí
+4. Pokud je v CRM zapnutý CalDAV, stejná rezervace se rovnou vytvoří/aktualizuje
+   ve firemním kalendáři.
+5. „Vytvořit zakázku" předvyplní wizard; po dokončení se rezervace označí
    jako převzatá (`converted` + odkaz na zakázku). ✓ = vyřízeno/skrýt.
 
 ## Instalace na WordPressu
@@ -20,6 +22,13 @@
      -H "X-AFX-KEY: <klíč>" -H "Content-Type: application/json" \
      -d '{"booking_id":"test1","name":"Test Klient","phone":"777123456","device":"iPhone 13","service":"Výměna displeje","appointment":"2026-07-15 14:00"}'`
    → v CRM Zakázkách se objeví rezervace.
+
+## Firemní kalendář přes CalDAV
+1. V CRM otevřít Nastavení → Integrace → Firemní kalendář (CalDAV).
+2. Zapnout automatické přidávání rezervací.
+3. Vyplnit CalDAV URL konkrétního kalendáře, uživatele a heslo/app password.
+4. Uložit. Nová rezervace vytvoří jednu událost, změna rezervace stejnou událost
+   přepíše a zrušená rezervace ji smaže.
 
 ## Stavy rezervace v CRM
 - `new` — zobrazena v panelu; `converted` — vytvořena zakázka; `dismissed` — skryta.

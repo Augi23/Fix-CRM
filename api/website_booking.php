@@ -83,6 +83,7 @@ try {
         if ($existing) {
             $pdo->prepare("UPDATE web_bookings SET status = 'dismissed' WHERE id = ? AND status = 'new'")
                 ->execute([(int)$existing['id']]);
+            crmDeleteWebBookingFromCalDav((int)$existing['id']);
         }
         echo json_encode(['success' => true, 'message' => 'Cancelled noted']);
         exit;
@@ -96,6 +97,7 @@ try {
                 appointment_at = ?, delivery_method = ?, raw_payload = ?
             WHERE id = ?")
             ->execute([$name, $phone, $email, $device, $service, $notes, $appt, $deliv, $payload, (int)$existing['id']]);
+        crmSyncWebBookingToCalDav((int)$existing['id']);
         echo json_encode(['success' => true, 'message' => 'Updated', 'id' => (int)$existing['id']]);
         exit;
     }
@@ -105,7 +107,10 @@ try {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         ->execute([$wpId !== '' ? $wpId : null, $name, $phone, $email, $device, $service, $notes, $appt, $deliv, $payload]);
 
-    echo json_encode(['success' => true, 'message' => 'Created', 'id' => (int)$pdo->lastInsertId()]);
+    $newId = (int)$pdo->lastInsertId();
+    crmSyncWebBookingToCalDav($newId);
+
+    echo json_encode(['success' => true, 'message' => 'Created', 'id' => $newId]);
 } catch (Throwable $e) {
     error_log('website_booking: ' . $e->getMessage());
     http_response_code(500);
