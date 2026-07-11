@@ -73,17 +73,36 @@ if ($authActive && function_exists('gitEndAuth')) { gitEndAuth(); }
 $pullOutput = function_exists('sanitizeGitText') ? sanitizeGitText($pullOutput) : $pullOutput;
 
 if ($exitCode !== 0) {
-    $failMsg = 'Update failed: ' . ($pullOutput ?: 'unknown error');
-    // Most likely cause when a tracked file the update touches was edited on the server.
-    if ($dirtyWarning !== '') {
-        $failMsg .= ' — ' . $dirtyWarning . '. Discard or commit those changes, then retry.';
+    // AUTO-OPRAVA: server má být vždy shodný s originem (aktualizace jsou pull-only,
+    // nikdo server needituje ručně). Když fast-forward zablokuje zastaralý lokálně
+    // změněný SLEDOVANÝ soubor, odložíme ho do git stash (obnovitelné) a zkusíme JEDNOU
+    // znovu. Nesledované soubory (uploady, zálohy) stash nechává být.
+    $recovered = false;
+    if (!empty($info['dirty'])) {
+        $stashCode = 0;
+        runGitCommand($repoRoot, 'stash push -m ' . escapeshellarg('afx-auto-pred-aktualizaci'), $stashCode);
+        if ($stashCode === 0) {
+            $authActive2 = function_exists('gitBeginAuth') ? gitBeginAuth($repoRoot, $remoteName) : false;
+            $pullRetry = runGitCommand($repoRoot, 'pull --ff-only ' . escapeshellarg($remoteName) . ' ' . escapeshellarg($targetBranch), $exitCode);
+            if ($authActive2 && function_exists('gitEndAuth')) { gitEndAuth(); }
+            $pullOutput = function_exists('sanitizeGitText') ? sanitizeGitText($pullRetry) : $pullRetry;
+            $recovered = ($exitCode === 0);
+        }
     }
-    echo json_encode([
-        'success' => false,
-        'message' => $failMsg,
-        'output' => $pullOutput,
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
+    if (!$recovered) {
+        $failMsg = 'Update failed: ' . ($pullOutput ?: 'unknown error');
+        if ($dirtyWarning !== '') {
+            $failMsg .= ' — ' . $dirtyWarning . '. Discard or commit those changes, then retry.';
+        }
+        echo json_encode([
+            'success' => false,
+            'message' => $failMsg,
+            'output' => $pullOutput,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+    // Aktualizace prošla až po automatickém odložení lokálních změn serveru.
+    $dirtyWarning = 'Zastaralé lokální změny na serveru byly odloženy do git stash a aktualizace proběhla.';
 }
 
 $newInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : $info;
