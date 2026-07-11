@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Dashboard: zarovnané sloupce, tabulka na maximum',
+        'items' => [
+            'Pravý sloupec nástěnky (pobočky, Tržby po měsících, Kontrola IMEI, Fronta dnes) má pevnou šířku 360 px — levý sloupec s dlaždicemi a tabulkou zakázek dostane všechno ostatní místo a končí na jedné svislé hraně.',
+            'Pobočková pole nahoře lícují se sloupcem panelů pod nimi.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Oprava: tabulka zakázek se zase vejde celá (bez scrollu)',
         'items' => [
             'Redesign omezil šířku obsahu na 1560 px, čímž se tabulka posledních zakázek přestala vcházet a musela se posouvat do stran. Obsah nyní opět využívá celou šířku okna jako dřív — řádek zakázky je vidět celý najednou.',

@@ -500,3 +500,26 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
 @media (max-width: 640px) {
   .crm-branch-col { flex-direction: column; }
 }
+
+/* ============================================================
+   13) DASHBOARD — šířkové zarovnání sloupců (dle Tomášova náčrtu)
+   Levý sloupec (dlaždice + tabulka zakázek) je pružný a končí na
+   jedné svislé hraně; pravý rail (pobočky / Tržby / IMEI / Fronta)
+   má PEVNOU šířku — tabulka zakázek tak dostane maximum místa.
+   ============================================================ */
+@media (min-width: 992px) {
+  .dashboard-main-row > .col-lg-9,
+  .dashboard-main-row > .dashboard-main-col {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0;
+  }
+  .dashboard-main-row > .col-lg-3 {
+    flex: 0 0 360px !important;
+    width: 360px !important;
+    max-width: 360px !important;
+  }
+  /* pobočky nahoře lícují s pravým railem (360 − 2×12px gutter řádku) */
+  .crm-stat-row .crm-branch-col { flex: 0 0 336px; }
+}
