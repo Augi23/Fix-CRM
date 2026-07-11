@@ -58,7 +58,9 @@ html, body {
 #content, #content.crm-v2-content { margin-left: 0 !important; }
 html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { margin-left: 0 !important; }
 #sidebar, #sidebarBackdrop { display: none !important; }
-.crm-main-content { max-width: 1560px; margin: 0 auto; width: 100%; }
+/* Obsah na PLNOU šířku okna — žádný max-width strop: tabulka zakázek se musí
+   vejít celá bez vodorovného scrollu (jako před redesignem). */
+.crm-main-content { width: 100%; }
 
 /* ============================================================
    4) TENKÝ SERVISNÍ ŘÁDEK
