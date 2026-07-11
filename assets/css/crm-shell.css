@@ -473,8 +473,11 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
 .crm-stat-row .crm-stat-grid { flex: 1 1 auto; min-width: 0; margin-bottom: 0 !important; }
 .crm-branch-col { flex: 0 0 290px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .crm-branch-mini {
-  flex: 1 1 0; display: flex !important; align-items: center; gap: 12px;
-  padding: 12px 16px !important; position: relative;
+  /* flex-direction:row PŘEBÍJÍ bootstrap .card (column) — jinak se obsah skládá
+     pod sebe, karta roste do výšky a natahuje celý řádek se statistikami */
+  flex: 1 1 0; display: flex !important; flex-direction: row !important;
+  align-items: center; gap: 12px; min-height: 0;
+  padding: 10px 14px !important; position: relative;
   border: 1px solid var(--b1) !important; border-radius: var(--r2) !important;
   transition: border-color .15s, box-shadow .15s;
 }
@@ -483,7 +486,7 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
 .crm-branch-mini-name { color: #fff; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .crm-branch-mini-sub { color: var(--fg2); font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .crm-branch-mini-num { text-align: right; line-height: 1.15; flex-shrink: 0; }
-.crm-branch-mini-num b { display: block; font-size: 19px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 14px rgba(85,212,255,.25); }
+.crm-branch-mini-num b { display: block; font-size: 17px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 14px rgba(85,212,255,.25); }
 .crm-branch-mini-num small { font-size: 10.5px; color: var(--fg2); font-variant-numeric: tabular-nums; }
 
 /* Menší displeje: pobočky pod statistiky (vedle sebe), pak vše pod sebe */

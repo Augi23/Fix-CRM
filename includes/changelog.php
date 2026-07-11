@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-09',
+        'title' => 'Dashboard: pobočková pole už nenatahují výšku řádku',
+        'items' => [
+            'Obsah pobočkových polí vpravo se skládal pod sebe (název / čísla), pole rostla do výšky a natáhla i čtyři statistické dlaždice. Obsah je nově v jednom řádku (název vlevo, čísla vpravo), pole jsou nízká a výšku řádku určují dlaždice.',
+        ],
+    ],
+    [
+        'date' => '2026-07-09',
         'title' => 'Oprava: Khalilovy ambientní zvuky se nespouštěly',
         'items' => [
             'Náhodné hlášky po ~10 minutách se nikdy nespustily — přehrávač startoval dřív, než se stihla načíst konfigurace se seznamem zvuků (pořadí skriptů). Opraveno; první hláška zazní ~10 minut po přihlášení, pak každých ~10 minut.',
