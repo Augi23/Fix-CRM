@@ -574,7 +574,7 @@ require_once 'includes/header.php';
                                 <input type="text" class="form-control" readonly onclick="this.select()" value="https://admin.applefix.cloud/api/website_booking.php?key=<?php echo htmlspecialchars($afxWbKey); ?>"></div>
                         </div>
                         <div class="form-text small text-white-75 mt-2">
-                            Nové rezervace se objevují nahoře v Zakázkách, seřazené dle termínu. Tlačítko „Vytvořit zakázku" předvyplní wizard a rezervaci označí jako převzatou.
+                            Z každé nové rezervace se <strong>automaticky založí zakázka „Přijato"</strong> (a nový zákazník, pokud v databázi ještě není) — objeví se rovnou v Zakázkách. Termín z webu, způsob předání i poznámka zákazníka se přenesou do poznámky technikovi. Kdyby se automatické založení nepovedlo (např. bez zařízení), rezervace zůstane nahoře v Zakázkách k ručnímu převzetí.
                         </div>
                         <?php $afxWbLast = (string)get_setting('web_booking_last_payload', ''); ?>
                         <details class="mt-2">

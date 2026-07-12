@@ -2968,3 +2968,134 @@ function crmDeleteWebBookingFromCalDav(int $bookingId): void {
         error_log('crmDeleteWebBookingFromCalDav: ' . $e->getMessage());
     }
 }
+
+/** Odhad typu zařízení (ENUM orders.device_type) z názvu zařízení. */
+function crmGuessDeviceType(string $device): string {
+    $d = mb_strtolower($device);
+    if (preg_match('/iphone|smartphone|\bphone\b|galaxy|pixel/u', $d)) return 'Phone';
+    if (preg_match('/ipad|tablet|\btab\b/u', $d)) return 'Tablet';
+    if (preg_match('/macbook|notebook|laptop|thinkpad/u', $d)) return 'Notebook';
+    if (preg_match('/imac|mac ?mini|mac ?pro|mac ?studio|desktop|\bpc\b|počítač/u', $d)) return 'Computer';
+    return 'Other';
+}
+
+/**
+ * Z webové rezervace (web_bookings) rovnou založí ZÁKAZNÍKA (pokud neexistuje) a ZAKÁZKU „Přijato".
+ * Idempotentní: pokud už rezervace má order_id nebo je dismissed, nic nedělá.
+ * Vrací ID vytvořené zakázky, nebo null (nezaložilo se — rezervace zůstane v panelu k ručnímu převzetí).
+ */
+function crmCreateOrderFromWebBooking(int $bookingId): ?int {
+    global $pdo;
+    try {
+        ensureWebBookingsSchema();
+        $stmt = $pdo->prepare("SELECT * FROM web_bookings WHERE id = ? LIMIT 1");
+        $stmt->execute([$bookingId]);
+        $b = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$b) return null;
+        if (!empty($b['order_id'])) return (int)$b['order_id'];        // už převzato
+        if (($b['status'] ?? 'new') !== 'new') return null;            // dismissed/converted
+
+        $raw = [];
+        if (!empty($b['raw_payload'])) { $raw = json_decode((string)$b['raw_payload'], true) ?: []; }
+        $pick = function(array $a, array $keys): string {
+            foreach ($keys as $k) { if (isset($a[$k]) && is_scalar($a[$k]) && trim((string)$a[$k]) !== '') return trim((string)$a[$k]); }
+            return '';
+        };
+
+        // ── Zákazník: najít podle telefonu (číslice) nebo e-mailu, jinak založit ──
+        $name  = trim((string)($b['customer_name'] ?? ''));
+        $phone = trim((string)($b['phone'] ?? ''));
+        $email = trim((string)($b['email'] ?? ''));
+        $parts = array_values(array_filter(preg_split('/\s+/', $name)));
+        $firstName = $name;
+        $lastName  = '';
+        if (count($parts) >= 2) { $lastName = array_pop($parts); $firstName = implode(' ', $parts); }
+        elseif (count($parts) === 1) { $firstName = $parts[0]; }
+        if ($firstName === '') { $firstName = 'Zákazník z webu'; }
+
+        $phoneDigits = preg_replace('/\D/', '', $phone);
+        $customerId = 0;
+        if ($phoneDigits !== '') {
+            try {
+                $q = $pdo->prepare("SELECT id FROM customers WHERE REGEXP_REPLACE(COALESCE(phone,''),'[^0-9]','') = ? AND ? <> '' ORDER BY id ASC LIMIT 1");
+                $q->execute([$phoneDigits, $phoneDigits]);
+                $customerId = (int)($q->fetchColumn() ?: 0);
+            } catch (Throwable $e) {
+                $q = $pdo->prepare("SELECT id FROM customers WHERE phone = ? LIMIT 1");
+                $q->execute([$phone]);
+                $customerId = (int)($q->fetchColumn() ?: 0);
+            }
+        }
+        if ($customerId === 0 && $email !== '') {
+            $q = $pdo->prepare("SELECT id FROM customers WHERE email = ? LIMIT 1");
+            $q->execute([$email]);
+            $customerId = (int)($q->fetchColumn() ?: 0);
+        }
+        $businessName = $pick($raw, ['customer_business_name', 'company']);
+        $addressBits = array_filter([
+            trim($pick($raw, ['customer_street_address', 'street']) . ' ' . $pick($raw, ['customer_house_no', 'house_no'])),
+            trim($pick($raw, ['customer_zipcode', 'zipcode']) . ' ' . $pick($raw, ['customer_city', 'city'])),
+            $pick($raw, ['customer_country', 'country']),
+        ]);
+        if ($customerId === 0) {
+            $pdo->prepare("INSERT INTO customers (customer_type, first_name, last_name, phone, email, address, company)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)")
+                ->execute([
+                    $businessName !== '' ? 'company' : 'private',
+                    mb_substr($firstName, 0, 50), mb_substr($lastName, 0, 50),
+                    mb_substr($phone, 0, 20), mb_substr($email, 0, 100),
+                    implode(', ', $addressBits) ?: null, $businessName !== '' ? mb_substr($businessName, 0, 100) : null,
+                ]);
+            $customerId = (int)$pdo->lastInsertId();
+        }
+
+        // ── Zařízení / oprava ──
+        $device = trim((string)($b['device'] ?? ''));
+        $brand  = $pick($raw, ['brand', 'device_brand', 'manufacturer']);
+        $model  = $pick($raw, ['model', 'device_model', 'model_name']);
+        $color  = $pick($raw, ['color', 'colour']);
+        if ($device === '') { $device = trim($brand . ' ' . $model . ' ' . $color); }
+        $deviceModel = mb_substr($device !== '' ? $device : 'Neurčeno', 0, 100);
+        $service = trim((string)($b['service'] ?? ''));
+        $problem = $service !== '' ? $service : 'Objednávka z webu';
+        $imei    = $pick($raw, ['customer_imei', 'imei', 'serial']);
+
+        // Poznámka technikovi: termín z webu + způsob + zákaznická poznámka
+        $noteBits = ['Zdroj: web (applefix.cz)'];
+        if (!empty($b['appointment_at'])) { $noteBits[] = 'Termín z webu: ' . date('j.n.Y H:i', strtotime((string)$b['appointment_at'])); }
+        if (!empty($b['delivery_method'])) { $noteBits[] = 'Způsob: ' . $b['delivery_method']; }
+        if (!empty($b['notes'])) { $noteBits[] = 'Poznámka zákazníka: ' . $b['notes']; }
+        $techNotes = implode("\n", $noteBits);
+
+        $estCost = (float)preg_replace('/[^0-9.]/', '', str_replace(',', '.', $pick($raw, ['total_price', 'balance_due_on_repair', 'sub_total'])));
+
+        // ── Zakázka „Přijato" ──
+        $status = getDefaultOrderStatus();
+        $branchId = getDefaultBranchId();
+        $orderCode = function_exists('generateNextOrderCode') ? generateNextOrderCode($pdo) : null;
+        $deviceType = crmGuessDeviceType($device);
+
+        $pdo->prepare("INSERT INTO orders
+            (customer_id, technician_id, branch_id, device_type, order_type, device_brand, device_model,
+             problem_description, technician_notes, serial_number, priority, estimated_cost, status, order_code)
+            VALUES (?, NULL, ?, ?, 'Non-Warranty', ?, ?, ?, ?, ?, 'Normal', ?, ?, ?)")
+            ->execute([
+                $customerId, $branchId, $deviceType,
+                mb_substr($brand !== '' ? $brand : '', 0, 100), $deviceModel,
+                mb_substr($problem, 0, 5000), $techNotes,
+                mb_substr($imei, 0, 100), $estCost > 0 ? $estCost : null, $status, $orderCode,
+            ]);
+        $orderId = (int)$pdo->lastInsertId();
+
+        if (function_exists('assignmentSegmentSync')) { try { assignmentSegmentSync($orderId, null, (string)$status); } catch (Throwable $e) {} }
+        if (function_exists('logOrderStatusChange')) { try { logOrderStatusChange($orderId, '', $status); } catch (Throwable $e) {} }
+
+        $pdo->prepare("UPDATE web_bookings SET status = 'converted', order_id = ? WHERE id = ?")
+            ->execute([$orderId, $bookingId]);
+
+        return $orderId;
+    } catch (Throwable $e) {
+        error_log('crmCreateOrderFromWebBooking: ' . $e->getMessage());
+        return null;   // rezervace zůstane v panelu → ruční převzetí
+    }
+}

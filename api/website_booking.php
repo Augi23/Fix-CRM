@@ -171,7 +171,9 @@ try {
             WHERE id = ?")
             ->execute([$name, $phone, $email, $device, $service, $notes, $appt, $deliv, $payload, (int)$existing['id']]);
         crmSyncWebBookingToCalDav((int)$existing['id']);
-        echo json_encode(['success' => true, 'message' => 'Updated', 'id' => (int)$existing['id']]);
+        // Rezervace ještě nebyla převzata → rovnou z ní založit zákazníka + zakázku
+        $orderId = crmCreateOrderFromWebBooking((int)$existing['id']);
+        echo json_encode(['success' => true, 'message' => 'Updated', 'id' => (int)$existing['id'], 'order_id' => $orderId]);
         exit;
     }
 
@@ -182,8 +184,10 @@ try {
 
     $newId = (int)$pdo->lastInsertId();
     crmSyncWebBookingToCalDav($newId);
+    // Automaticky založit zákazníka (pokud nový) + zakázku „Přijato" z webové rezervace
+    $orderId = crmCreateOrderFromWebBooking($newId);
 
-    echo json_encode(['success' => true, 'message' => 'Created', 'id' => $newId]);
+    echo json_encode(['success' => true, 'message' => 'Created', 'id' => $newId, 'order_id' => $orderId]);
 } catch (Throwable $e) {
     error_log('website_booking: ' . $e->getMessage());
     http_response_code(500);
