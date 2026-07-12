@@ -145,9 +145,11 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
                           border: none; border-radius: 11px; font-size: 14px; font-weight: 600;
                           box-shadow: 0 8px 22px rgba(10,132,255,0.28); }
 
+        /* Vynutit A4 na výšku (bez tohoto se orientace řídila výchozím nastavením tiskárny → tisklo na šířku) */
+        @page { size: A4 portrait; margin: 0; }
         @media print {
             body { background: #fff; padding: 0; font-size: 12px; }
-            .sheet { box-shadow: none; border-radius: 0; max-width: none; }
+            .sheet { box-shadow: none; border-radius: 0; max-width: none; width: 210mm; }
             .pad { padding: 11mm 13mm 10mm; }
             .accent-bar, .panel.client, .pickup, .note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-print { display: none !important; }

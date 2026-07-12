@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-12',
+        'title' => 'Tisk zakázkového listu vždy na A4 na výšku',
+        'items' => [
+            'Zakázkový list se dřív u některých tiskáren vytiskl na šířku — obsah byl širší (222 mm) než A4 na výšku (210 mm), tak se orientace otočila. Nově je natvrdo vynuceno A4 na výšku a list je omezen na šířku stránky.',
+        ],
+    ],
+    [
+        'date' => '2026-07-12',
         'title' => 'Priorita zakázek: Klidná / Normální / Urgentní + přenos z webu',
         'items' => [
             'Nová třetí priorita „Klidná" — pro zákazníky, kteří nespěchají. V přidání zakázky je místo zaškrtávátka „urgentní" rozbalovací výběr priority.',
