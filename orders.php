@@ -321,7 +321,6 @@ if (($search ?? '') === '' && !$filter_status && $page === 1) {
                         <i class="fas fa-plus me-1"></i><?php echo __('create_order'); ?>
                     </button>
                 <?php endif; ?>
-                <button type="button" class="btn btn-sm afx-webres-done" data-id="<?php echo (int)$wb['id']; ?>" title="<?php echo e(__('booking_dismiss')); ?>"><i class="fas fa-check"></i></button>
             </div>
         </div>
         <?php endforeach; ?>
