@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-12',
+        'title' => 'Historie stavů: opraveny divné symboly u nově založených zakázek',
+        'items' => [
+            'U zakázek založených rovnou (např. z RepairPluginu) se v historii stavů zobrazoval prázdný rámeček a rozbitá šipka. Nově se u první položky ukáže „Vytvořeno“ + samotný stav a mezi stavy je čitelná šipka „→“.',
+        ],
+    ],
+    [
+        'date' => '2026-07-12',
         'title' => 'Tisk zakázkového listu vždy na A4 na výšku',
         'items' => [
             'Zakázkový list se dřív u některých tiskáren vytiskl na šířku — obsah byl širší (222 mm) než A4 na výšku (210 mm), tak se orientace otočila. Nově je natvrdo vynuceno A4 na výšku a list je omezen na šířku stránky.',

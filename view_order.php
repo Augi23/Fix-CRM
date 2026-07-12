@@ -255,8 +255,12 @@ function localizedOrderStatusLabel(string $status): string {
                             <tr>
                                 <td class="small text-white-75"><?php echo date('d.m.Y H:i', strtotime($log['changed_at'])); ?></td>
                                 <td>
+                                    <?php if (trim((string)$log['old_status']) !== ''): ?>
                                     <span class="badge bg-transparent border border-secondary text-white-75"><?php echo htmlspecialchars(localizedOrderStatusLabel((string)$log['old_status'])); ?></span>
-                                    <i class="fas fa-arrow-right mx-1 text-white-75"></i>
+                                    <span class="mx-1 text-white-75" aria-hidden="true">&rarr;</span>
+                                    <?php else: ?>
+                                    <span class="text-white-75 me-1"><i class="fas fa-plus-circle me-1 text-success"></i><?php echo __('history_created'); ?></span>
+                                    <?php endif; ?>
                                     <span class="badge bg-primary text-white"><?php echo htmlspecialchars(orderStatusHistoryLabel((string)$log['new_status'], $log['status_tech_name'] ?? null)); ?></span>
                                 </td>
                                 <td><?php echo htmlspecialchars($who); ?></td>
