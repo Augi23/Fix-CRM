@@ -76,30 +76,44 @@ foreach (['data', 'payload', 'appointment', 'booking', 'customer', 'client', 'de
 }
 
 // ── Normalizace ──────────────────────────────────────────────────────────────
-$wpId    = wbPick($flat, ['booking_id', 'appointment_id', 'appointmentid', 'id', 'ID', 'reference', 'ref', 'order_id']);
+// Reálná pole RepairPluginu (Trigger Webhooks) ověřená z „Example Payload":
+//   appointment_number, event_start_datetime, customer_first_name/last_name/name,
+//   customer_email/phone/notes/imei, brand/model/color, items[].name, service_method,
+//   appointment_status, action.
+$wpId    = wbPick($flat, ['booking_id', 'appointment_number', 'appointment_id', 'appointmentid', 'id', 'ID', 'reference', 'ref', 'order_id']);
 $name    = wbPick($flat, ['name', 'customer_name', 'client_name', 'full_name', 'fullname', 'contact_name']);
 if ($name === '') {
-    $name = trim(wbPick($flat, ['first_name', 'firstname']) . ' ' . wbPick($flat, ['last_name', 'lastname', 'surname']));
+    $name = trim(wbPick($flat, ['first_name', 'firstname', 'customer_first_name']) . ' ' . wbPick($flat, ['last_name', 'lastname', 'surname', 'customer_last_name']));
 }
 $phone   = wbPick($flat, ['phone', 'customer_phone', 'phone_number', 'phonenumber', 'tel', 'telephone', 'mobile']);
 $email   = wbPick($flat, ['email', 'customer_email', 'mail', 'email_address']);
 $device  = wbPick($flat, ['device', 'device_name', 'device_model', 'model_name']);
 if ($device === '') {
-    $device = trim(wbPick($flat, ['brand', 'device_brand', 'manufacturer', 'category', 'category_name']) . ' ' . wbPick($flat, ['model', 'device_model', 'model_name']));
+    $device = trim(implode(' ', array_filter([
+        wbPick($flat, ['brand', 'device_brand', 'manufacturer', 'category', 'category_name']),
+        wbPick($flat, ['model', 'device_model', 'model_name']),
+        wbPick($flat, ['color', 'colour']),
+    ])));
 }
 $service = wbPick($flat, ['service', 'repair_name', 'repair', 'services', 'service_name']);
-if ($service === '' && isset($flat['repairs']) && is_array($flat['repairs'])) {
-    // repairs bývá pole oprav (řetězce nebo objekty s name/title)
-    $names = [];
-    foreach ($flat['repairs'] as $r) {
-        if (is_scalar($r)) { $names[] = (string)$r; }
-        elseif (is_array($r)) { $n = wbPick($r, ['name', 'title', 'repair_name', 'label']); if ($n !== '') { $names[] = $n; } }
+if ($service === '') {
+    // RepairPlugin: items[] (položky oprav), fallback repairs[]
+    foreach (['items', 'repairs', 'line_items'] as $arrKey) {
+        if ($service === '' && isset($flat[$arrKey]) && is_array($flat[$arrKey])) {
+            $names = [];
+            foreach ($flat[$arrKey] as $r) {
+                if (is_scalar($r)) { $names[] = (string)$r; }
+                elseif (is_array($r)) { $n = wbPick($r, ['name', 'title', 'repair_name', 'label', 'product_name']); if ($n !== '') { $names[] = $n; } }
+            }
+            $service = implode(', ', array_filter($names));
+        }
     }
-    $service = implode(', ', array_filter($names));
 }
-$notes   = wbPick($flat, ['notes', 'note', 'message', 'comments', 'comment', 'customer_note', 'remarks']);
-$deliv   = wbPick($flat, ['delivery', 'delivery_method', 'appointment_type', 'type', 'shipping_method']);
-$trigger = strtolower(wbPick($flat, ['trigger', 'event', 'hook', 'action', 'webhook_trigger']));
+$notes   = wbPick($flat, ['notes', 'note', 'message', 'comments', 'comment', 'customer_note', 'customer_notes', 'remarks']);
+$imei    = wbPick($flat, ['customer_imei', 'imei', 'serial', 'sn', 'serial_number']);
+if ($imei !== '') { $notes = trim($notes . ($notes !== '' ? ' · ' : '') . 'IMEI/SN: ' . $imei); }
+$deliv   = wbPick($flat, ['service_method', 'delivery', 'delivery_method', 'appointment_type', 'type', 'shipping_method']);
+$trigger = strtolower(wbPick($flat, ['action', 'trigger', 'event', 'hook', 'webhook_trigger']));
 $statusW = strtolower(wbPick($flat, ['status', 'appointment_status', 'booking_status']) ?: 'pending');
 // Trigger *_cancelled / *_deleted → rezervaci v CRM skrýt
 if ($trigger !== '' && (str_contains($trigger, 'cancel') || str_contains($trigger, 'delete'))) {
@@ -110,7 +124,7 @@ if (str_contains($statusW, 'cancel') || str_contains($statusW, 'delete') || $sta
 }
 
 $appt = null;
-$apptRaw = wbPick($flat, ['appointment', 'appointment_datetime', 'scheduled_at', 'datetime']);
+$apptRaw = wbPick($flat, ['event_start_datetime', 'appointment', 'appointment_datetime', 'scheduled_at', 'datetime']);
 if ($apptRaw === '') {
     $d = wbPick($flat, ['appointment_date', 'booking_date', 'date', 'appointmentdate']);
     $t = wbPick($flat, ['appointment_time', 'booking_time', 'time', 'appointmenttime', 'time_slot', 'timeslot']);
