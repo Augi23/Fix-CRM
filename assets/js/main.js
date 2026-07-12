@@ -560,7 +560,10 @@ function openPreviewInNewTab() {
             var model = (fd.get('device_model')||'').toString();
             var device = (brand+' '+model).trim() || '—';
             var type = (fd.get('device_type')||'').toString() || '—';
-            var prio = fd.get('priority') === 'High' ? (window.LANG_HIGH || 'Urgentní') : (window.LANG_NORMAL || 'Normální');
+            var prioVal = (fd.get('priority') || 'Normal').toString();
+            var prio = prioVal === 'High' ? (window.LANG_PRIORITY_HIGH || 'Urgentní')
+                     : prioVal === 'Low'  ? (window.LANG_PRIORITY_LOW || 'Klidná')
+                                          : (window.LANG_PRIORITY_NORMAL || 'Normální');
             var set = function(k,v){ var el = modal.querySelector('[data-summary="'+k+'"]'); if(el) el.textContent = v || '—'; };
             set('customer', cname || '—');
             set('device', device);

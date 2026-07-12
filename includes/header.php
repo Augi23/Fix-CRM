@@ -148,6 +148,9 @@ try {
     window.LANG_PREVIEW = '<?php echo __("preview_btn"); ?>';
     window.LANG_HIGH = '<?php echo __("high"); ?>';
     window.LANG_NORMAL = '<?php echo __("normal"); ?>';
+    window.LANG_PRIORITY_LOW = '<?php echo __("priority_low"); ?>';
+    window.LANG_PRIORITY_NORMAL = '<?php echo __("priority_normal"); ?>';
+    window.LANG_PRIORITY_HIGH = '<?php echo __("priority_high"); ?>';
     window.LANG_SEARCH_CLIENT = '<?php echo __("search_client_placeholder"); ?>';
     window.LANG_BRAND = '<?php echo __("brand"); ?>';
     window.LANG_MODEL = '<?php echo __("model_placeholder"); ?>';

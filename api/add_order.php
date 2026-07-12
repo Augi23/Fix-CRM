@@ -29,7 +29,7 @@ $serial_number    = trim($_POST['serial_number'] ?? '');
 $serial_number_2  = trim($_POST['serial_number_2'] ?? '');
 $pin_code         = trim($_POST['pin_code'] ?? '');
 $appearance       = trim($_POST['appearance'] ?? '');
-$priority         = in_array($_POST['priority'] ?? '', ['High', 'Normal']) ? $_POST['priority'] : 'Normal';
+$priority         = normalizeOrderPriority($_POST['priority'] ?? '');
 $estimated_cost   = max(0, filter_input(INPUT_POST, 'estimated_cost', FILTER_VALIDATE_FLOAT) ?: 0);
 $shipping_method  = trim($_POST['shipping_method'] ?? '') ?: null;
 $status           = getDefaultOrderStatus();
@@ -52,6 +52,7 @@ if ($technician_id) {
 }
 
 try {
+    ensureOrderPriorityLowValue();
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare(

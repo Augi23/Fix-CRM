@@ -32,6 +32,7 @@ try {
     // so run schema/bootstrap guard before starting explicit transaction.
     ensureOrderWorkTrackingSchema();
     ensureOrderWorkLogSchema(); // DDL — must run before beginTransaction()
+    ensureOrderPriorityLowValue(); // DDL — ENUM priority musí znát 'Low'
 
     $pdo->beginTransaction();
 
@@ -116,7 +117,7 @@ try {
         isset($_POST['technician_notes']) ? $_POST['technician_notes'] : $current['technician_notes'],
         isset($_POST['pin_code']) ? $_POST['pin_code'] : $current['pin_code'],
         isset($_POST['appearance']) ? $_POST['appearance'] : $current['appearance'],
-        isset($_POST['priority']) ? $_POST['priority'] : $current['priority'],
+        isset($_POST['priority']) ? normalizeOrderPriority($_POST['priority']) : $current['priority'],
         isset($_POST['serial_number']) ? $_POST['serial_number'] : $current['serial_number'],
         isset($_POST['serial_number_2']) ? $_POST['serial_number_2'] : $current['serial_number_2']
     ];

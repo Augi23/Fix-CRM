@@ -379,6 +379,7 @@ $(function () {
                         <th><?php echo __('device_model'); ?></th>
                         <th><?php echo __('problem'); ?></th>
                         <th><?php echo __('status'); ?></th>
+                        <th><?php echo __('priority'); ?></th>
                         <th><?php echo __('amount'); ?></th>
                         <th class="text-end pe-4"><?php echo __('action'); ?></th>
                     </tr>
@@ -386,7 +387,7 @@ $(function () {
                 <tbody>
                     <?php if (empty($orders)): ?>
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-white-75">
+                            <td colspan="8" class="text-center py-5 text-white-75">
                                 <i class="fas fa-folder-open fa-3x mb-3 d-block opacity-25"></i>
                                 <?php echo __('not_found'); ?>
                             </td>
@@ -461,6 +462,7 @@ $(function () {
                                 <div class="small mt-1"><span class="badge bg-dark border border-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)$order['branch_id'])); ?></span></div>
                                 <?php endif; ?>
                             </td>
+                            <td><?php echo getOrderPriorityBadge($order['priority'] ?? 'Normal'); ?></td>
                             <td class="fw-bold text-white"><?php echo formatMoney($order['final_cost'] ?: $order['estimated_cost']); ?></td>
                             <td class="text-end pe-4">
                                 <?php

@@ -197,11 +197,7 @@ function localizedOrderStatusLabel(string $status): string {
                     </div>
                     <div class="col-md-4 text-md-end">
                         <h6><?php echo __('priority'); ?></h6>
-                        <?php if($order['priority'] == 'High'): ?>
-                            <span class="badge bg-danger px-3 py-2 mt-1"><?php echo __('high'); ?></span>
-                        <?php else: ?>
-                            <span class="badge bg-secondary px-3 py-2 mt-1"><?php echo __('normal'); ?></span>
-                        <?php endif; ?>
+                        <?php echo getOrderPriorityBadge($order['priority'] ?? 'Normal'); ?>
                     </div>
                 </div>
 
@@ -1261,8 +1257,10 @@ function deleteOrder(id) {
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('priority'); ?></label>
                             <select name="priority" class="form-select">
-                                <option value="Normal" <?php echo ($order['priority'] == 'Normal') ? 'selected' : ''; ?>><?php echo __('normal'); ?></option>
-                                <option value="High" <?php echo ($order['priority'] == 'High') ? 'selected' : ''; ?>><?php echo __('high'); ?> 🔥</option>
+                                <?php $curPriority = normalizeOrderPriority($order['priority'] ?? 'Normal'); ?>
+                                <?php foreach (getOrderPriorityOptions() as $prioValue => $prioLabel): ?>
+                                    <option value="<?php echo e($prioValue); ?>" <?php echo ($curPriority === $prioValue) ? 'selected' : ''; ?>><?php echo $prioValue === 'High' ? '🔥 ' : ''; ?><?php echo e($prioLabel); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-4">

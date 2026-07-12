@@ -196,10 +196,11 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                             <div class="row g-3">
                                 <div class="col-md-3">
                                     <label class="form-label"><?php echo __('priority'); ?></label>
-                                    <div class="form-check mt-2">
-                                        <input class="form-check-input" type="checkbox" name="priority" value="High" id="priorityHighModal">
-                                        <label class="form-check-label" for="priorityHighModal"><?php echo __('high'); ?></label>
-                                    </div>
+                                    <select name="priority" class="form-select" id="priorityHighModal">
+                                        <?php foreach (getOrderPriorityOptions() as $prioValue => $prioLabel): ?>
+                                            <option value="<?php echo e($prioValue); ?>"<?php echo $prioValue === 'Normal' ? ' selected' : ''; ?>><?php echo $prioValue === 'High' ? '🔥 ' : ''; ?><?php echo e($prioLabel); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
                                 <?php if (!empty($order_templates_modal)): ?>
                                 <div class="col-md-<?php echo !empty($order_note_templates_modal) ? '4' : '9'; ?>">

@@ -90,7 +90,7 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
             </div>
             <div>
                 <div class="label"><?php echo mb_strtoupper(_l('priority')); ?>:</div>
-                <div class="value"><?php echo $order['priority'] == 'High' ? '🔥 '._l('high') : _l('normal'); ?></div>
+                <div class="value"><?php $pwPrio = normalizeOrderPriority($order['priority'] ?? 'Normal'); echo ($pwPrio === 'High' ? '🔥 ' : '') . _l('priority_' . strtolower($pwPrio)); ?></div>
             </div>
         </div>
     </div>

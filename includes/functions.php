@@ -596,16 +596,27 @@ function sqlPlaceholders(array $values): string {
 
 /** Returns the colour token for a status (new|pending|progress|waiting|completed|uncollected|collected|cancelled|default). */
 function getOrderStatusBadgeToken($status): string {
+    $status = preg_replace('/\s+/u', ' ', trim((string)$status));
     $definitions = getOrderStatusDefinitions();
-    $badge = $definitions[(string)$status]['badge'] ?? null;
+    $badge = $definitions[$status]['badge'] ?? null;
     if ($badge === null) {
-        $group = getOrderStatusGroup((string)$status);
+        // dohledání bez ohledu na velikost písmen (importy / starší DB hodnoty)
+        static $lcMap = null;
+        if ($lcMap === null) {
+            $lcMap = [];
+            foreach ($definitions as $key => $meta) { $lcMap[mb_strtolower($key)] = $meta['badge']; }
+        }
+        $badge = $lcMap[mb_strtolower($status)] ?? null;
+    }
+    if ($badge === null) {
+        $group = getOrderStatusGroup($status);
         $badge = [
             'new' => 'new',
             'pending_approval' => 'pending',
             'in_progress' => 'progress',
             'waiting_parts' => 'waiting',
-            'completed' => isOrderStatusIn((string)$status, 'uncollected') ? 'uncollected' : 'completed',
+            'completed' => isOrderStatusIn($status, 'uncollected') ? 'uncollected' : 'completed',
+            'uncollected' => 'uncollected',
             'collected' => 'collected',
             'cancelled' => 'cancelled',
         ][$group] ?? 'default';
@@ -616,6 +627,42 @@ function getOrderStatusBadgeToken($status): string {
 function getStatusBadge($status) {
     $badge = getOrderStatusBadgeToken($status);
     return '<span class="badge status-pill status-pill--'.$badge.'">' . e(getOrderStatusLabel((string)$status)) . '</span>';
+}
+
+// ── Priorita zakázky (Low = Klidná · Normal = Normální · High = Urgentní) ────
+
+/** Povolené hodnoty priority (DB hodnoty zůstávají anglicky, popisky se překládají). */
+function getOrderPriorityValues(): array {
+    return ['Low', 'Normal', 'High'];
+}
+
+function normalizeOrderPriority($priority): string {
+    $priority = trim((string)$priority);
+    return in_array($priority, getOrderPriorityValues(), true) ? $priority : 'Normal';
+}
+
+function getOrderPriorityLabel($priority): string {
+    return match (normalizeOrderPriority($priority)) {
+        'Low' => __('priority_low'),
+        'High' => __('priority_high'),
+        default => __('priority_normal'),
+    };
+}
+
+/** Volby pro dropdown priority — vzestupně: Klidná, Normální, Urgentní. */
+function getOrderPriorityOptions(): array {
+    return [
+        'Low' => __('priority_low'),
+        'Normal' => __('priority_normal'),
+        'High' => __('priority_high'),
+    ];
+}
+
+function getOrderPriorityBadge($priority): string {
+    $p = normalizeOrderPriority($priority);
+    $token = strtolower($p);
+    $icon = $p === 'High' ? '🔥 ' : '';
+    return '<span class="badge priority-pill priority-pill--' . $token . '">' . $icon . e(getOrderPriorityLabel($p)) . '</span>';
 }
 
 
@@ -2990,6 +3037,80 @@ function ensureRepairPluginOrderStatus(): void {
     }
 }
 
+/** Pojistka: ENUM orders.priority musí znát hodnotu 'Low' (Klidná). Idempotentní. */
+function ensureOrderPriorityLowValue(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $row = $pdo->query("SHOW COLUMNS FROM orders LIKE 'priority'")->fetch(PDO::FETCH_ASSOC);
+        $type = (string)($row['Type'] ?? '');
+        if ($type === '' || stripos($type, 'enum(') !== 0) return;   // není ENUM → nic netřeba
+        if (stripos($type, "'Low'") !== false) return;               // už tam je
+        $newType = preg_replace('/\)\s*$/', ",'Low')", $type, 1);
+        $pdo->exec("ALTER TABLE orders MODIFY COLUMN priority $newType DEFAULT 'Normal'");
+    } catch (Throwable $e) {
+        error_log('ensureOrderPriorityLowValue: ' . $e->getMessage());
+    }
+}
+
+/** Lowercase bez diakritiky — pro tolerantní porovnávání textů z webu. */
+function crmFoldText(string $s): string {
+    $s = mb_strtolower(trim($s));
+    return strtr($s, [
+        'á' => 'a', 'č' => 'c', 'ď' => 'd', 'é' => 'e', 'ě' => 'e', 'í' => 'i', 'ň' => 'n',
+        'ó' => 'o', 'ř' => 'r', 'š' => 's', 'ť' => 't', 'ú' => 'u', 'ů' => 'u', 'ý' => 'y', 'ž' => 'z',
+    ]);
+}
+
+/**
+ * Rozpozná prioritu z popisku volby v RepairPluginu (normal / express / nespěchám…).
+ * Vrací 'High' | 'Low' | 'Normal', nebo null pokud text prioritu nepřipomíná.
+ */
+function crmDetectWebPriority(string $label): ?string {
+    $t = crmFoldText($label);
+    if ($t === '') return null;
+    // POZOR na pořadí: „nespěchám" obsahuje „spěch" a „Priorita: normální"
+    // obsahuje „priorit" — Low a Normal se musí testovat před High.
+    if (preg_match('/nespech|no ?rush|klid|az to bude|pozdeji/', $t)) return 'Low';
+    if (preg_match('/normal|standard|bezn|klasick/', $t)) return 'Normal';
+    if (preg_match('/expres|urgent|priorit|spech|do ?24|24 ?h/', $t)) return 'High';
+    return null;
+}
+
+/** Je položka items[] z webhooku skutečná oprava/produkt (patří do popisu závady)? */
+function crmWebItemIsService(array $item): bool {
+    $type = strtolower(trim((string)($item['type'] ?? '')));
+    if (in_array($type, ['repair', 'upsale', 'product'], true)) return true;
+    if (in_array($type, ['extra_fee', 'fee', 'priority', 'discount', 'payment', 'shipping'], true)) return false;
+    // bez typu: vyřadit jen texty vypadající jako priorita
+    $name = (string)($item['name'] ?? '');
+    return crmDetectWebPriority($name) === null;
+}
+
+/** Najde v items[] webhooku zvolenou prioritu (položky mimo opravy). */
+function crmExtractWebPriority(array $payload): string {
+    foreach (['items', 'repairs', 'line_items'] as $key) {
+        $items = $payload[$key] ?? null;
+        if (!is_array($items)) continue;
+        foreach ($items as $item) {
+            if (!is_array($item)) continue;
+            if (crmWebItemIsService($item)) continue;
+            $detected = crmDetectWebPriority((string)($item['name'] ?? ''));
+            if ($detected !== null) return $detected;
+        }
+    }
+    // fallback: samostatné pole v payloadu
+    foreach (['priority', 'repair_priority', 'service_priority', 'appointment_priority'] as $key) {
+        if (isset($payload[$key]) && is_scalar($payload[$key])) {
+            $detected = crmDetectWebPriority((string)$payload[$key]);
+            if ($detected !== null) return $detected;
+        }
+    }
+    return 'Normal';
+}
+
 /** Odhad typu zařízení (ENUM orders.device_type) z názvu zařízení. */
 function crmGuessDeviceType(string $device): string {
     $d = mb_strtolower($device);
@@ -3080,6 +3201,9 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
         $service = trim((string)($b['service'] ?? ''));
         $problem = $service !== '' ? $service : 'Objednávka z webu';
         $imei    = $pick($raw, ['customer_imei', 'imei', 'serial']);
+        // Passcode zařízení z formuláře → pole PIN/heslo; priorita dle volby zákazníka
+        $passcode = $pick($raw, ['custom_device_passcode', 'device_passcode', 'customer_passcode', 'passcode', 'device_pin']);
+        $priority = crmExtractWebPriority($raw);
 
         // Poznámka technikovi: termín z webu + způsob + zákaznická poznámka
         $noteBits = ['Zdroj: web (applefix.cz)'];
@@ -3092,6 +3216,7 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
 
         // ── Zakázka „Přijato z RepairPluginu" ──
         ensureRepairPluginOrderStatus();
+        ensureOrderPriorityLowValue();
         $status = 'Přijato z RepairPluginu';
         $branchId = getDefaultBranchId();
         $orderCode = function_exists('generateNextOrderCode') ? generateNextOrderCode($pdo) : null;
@@ -3099,13 +3224,15 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
 
         $pdo->prepare("INSERT INTO orders
             (customer_id, technician_id, branch_id, device_type, order_type, device_brand, device_model,
-             problem_description, technician_notes, serial_number, priority, estimated_cost, status, order_code)
-            VALUES (?, NULL, ?, ?, 'Non-Warranty', ?, ?, ?, ?, ?, 'Normal', ?, ?, ?)")
+             problem_description, technician_notes, serial_number, pin_code, priority, estimated_cost, status, order_code)
+            VALUES (?, NULL, ?, ?, 'Non-Warranty', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             ->execute([
                 $customerId, $branchId, $deviceType,
                 mb_substr($brand !== '' ? $brand : '', 0, 100), $deviceModel,
                 mb_substr($problem, 0, 5000), $techNotes,
-                mb_substr($imei, 0, 100), $estCost > 0 ? $estCost : null, $status, $orderCode,
+                mb_substr($imei, 0, 100), $passcode !== '' ? mb_substr($passcode, 0, 50) : null,
+                normalizeOrderPriority($priority),
+                $estCost > 0 ? $estCost : null, $status, $orderCode,
             ]);
         $orderId = (int)$pdo->lastInsertId();
 

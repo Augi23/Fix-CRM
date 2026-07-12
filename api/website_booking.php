@@ -97,13 +97,20 @@ if ($device === '') {
 }
 $service = wbPick($flat, ['service', 'repair_name', 'repair', 'services', 'service_name']);
 if ($service === '') {
-    // RepairPlugin: items[] (položky oprav), fallback repairs[]
+    // RepairPlugin: items[] (položky oprav), fallback repairs[].
+    // Do popisu opravy patří jen skutečné opravy/produkty — poplatky (extra_fee,
+    // platební metoda) a zvolená priorita (normal/express/nespěchám) se vynechávají;
+    // priorita se přenáší zvlášť do pole priority zakázky (crmExtractWebPriority).
     foreach (['items', 'repairs', 'line_items'] as $arrKey) {
         if ($service === '' && isset($flat[$arrKey]) && is_array($flat[$arrKey])) {
             $names = [];
             foreach ($flat[$arrKey] as $r) {
-                if (is_scalar($r)) { $names[] = (string)$r; }
-                elseif (is_array($r)) { $n = wbPick($r, ['name', 'title', 'repair_name', 'label', 'product_name']); if ($n !== '') { $names[] = $n; } }
+                if (is_scalar($r)) {
+                    if (crmDetectWebPriority((string)$r) === null) { $names[] = (string)$r; }
+                } elseif (is_array($r) && crmWebItemIsService($r)) {
+                    $n = wbPick($r, ['name', 'title', 'repair_name', 'label', 'product_name']);
+                    if ($n !== '') { $names[] = $n; }
+                }
             }
             $service = implode(', ', array_filter($names));
         }
