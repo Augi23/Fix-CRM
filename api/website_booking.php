@@ -38,7 +38,9 @@ if ($raw !== '' && str_starts_with(trim($raw), '{')) {
 if (empty($in)) { $in = $_POST; }
 
 // ── Autentizace sdíleným klíčem ──────────────────────────────────────────────
-$given = (string)($_SERVER['HTTP_X_AFX_KEY'] ?? ($in['key'] ?? ''));
+// Hlavička X-AFX-KEY (náš mu-plugin) NEBO ?key= v URL (RepairPlugin Trigger
+// Webhooks neumí vlastní hlavičky — klíč se předává v URL webhooků).
+$given = (string)($_SERVER['HTTP_X_AFX_KEY'] ?? ($in['key'] ?? ($_GET['key'] ?? '')));
 $expected = (string)get_setting('web_booking_key', '');
 if ($expected === '' || !hash_equals($expected, $given)) {
     http_response_code(403);
@@ -46,19 +48,76 @@ if ($expected === '' || !hash_equals($expected, $given)) {
     exit;
 }
 
+// Diagnostika: poslední přijatý payload (zobrazeno v Nastavení → Integrace)
+try {
+    $dbg = $raw !== '' ? $raw : json_encode($_POST, JSON_UNESCAPED_UNICODE);
+    set_setting('web_booking_last_payload', date('Y-m-d H:i:s') . "\n" . mb_substr((string)$dbg, 0, 20000));
+} catch (Throwable $e) { /* jen diagnostika */ }
+
+// ── Adaptér: podpora formátu RepairPluginu (Trigger Webhooks) i našeho ───────
+/** Vybere první neprázdnou skalární hodnotu z kandidátních klíčů. */
+function wbPick(array $a, array $keys): string {
+    foreach ($keys as $k) {
+        if (isset($a[$k]) && is_scalar($a[$k]) && trim((string)$a[$k]) !== '') {
+            return trim((string)$a[$k]);
+        }
+    }
+    return '';
+}
+
+// Zploštit běžná vnoření (data/appointment/customer/booking/client/device…)
+$flat = $in;
+foreach (['data', 'payload', 'appointment', 'booking', 'customer', 'client', 'device', 'fields'] as $nest) {
+    if (isset($in[$nest]) && is_array($in[$nest])) {
+        foreach ($in[$nest] as $k => $v) {
+            if (!isset($flat[$k])) { $flat[$k] = $v; }
+        }
+    }
+}
+
 // ── Normalizace ──────────────────────────────────────────────────────────────
-$wpId    = trim((string)($in['booking_id'] ?? ''));
-$name    = trim((string)($in['name'] ?? ''));
-$phone   = trim((string)($in['phone'] ?? ''));
-$email   = trim((string)($in['email'] ?? ''));
-$device  = trim((string)($in['device'] ?? ''));
-$service = trim((string)($in['service'] ?? ''));
-$notes   = trim((string)($in['notes'] ?? ''));
-$deliv   = trim((string)($in['delivery'] ?? ''));
-$statusW = strtolower(trim((string)($in['status'] ?? 'pending')));
+$wpId    = wbPick($flat, ['booking_id', 'appointment_id', 'appointmentid', 'id', 'ID', 'reference', 'ref', 'order_id']);
+$name    = wbPick($flat, ['name', 'customer_name', 'client_name', 'full_name', 'fullname', 'contact_name']);
+if ($name === '') {
+    $name = trim(wbPick($flat, ['first_name', 'firstname']) . ' ' . wbPick($flat, ['last_name', 'lastname', 'surname']));
+}
+$phone   = wbPick($flat, ['phone', 'customer_phone', 'phone_number', 'phonenumber', 'tel', 'telephone', 'mobile']);
+$email   = wbPick($flat, ['email', 'customer_email', 'mail', 'email_address']);
+$device  = wbPick($flat, ['device', 'device_name', 'device_model', 'model_name']);
+if ($device === '') {
+    $device = trim(wbPick($flat, ['brand', 'device_brand', 'manufacturer', 'category', 'category_name']) . ' ' . wbPick($flat, ['model', 'device_model', 'model_name']));
+}
+$service = wbPick($flat, ['service', 'repair_name', 'repair', 'services', 'service_name']);
+if ($service === '' && isset($flat['repairs']) && is_array($flat['repairs'])) {
+    // repairs bývá pole oprav (řetězce nebo objekty s name/title)
+    $names = [];
+    foreach ($flat['repairs'] as $r) {
+        if (is_scalar($r)) { $names[] = (string)$r; }
+        elseif (is_array($r)) { $n = wbPick($r, ['name', 'title', 'repair_name', 'label']); if ($n !== '') { $names[] = $n; } }
+    }
+    $service = implode(', ', array_filter($names));
+}
+$notes   = wbPick($flat, ['notes', 'note', 'message', 'comments', 'comment', 'customer_note', 'remarks']);
+$deliv   = wbPick($flat, ['delivery', 'delivery_method', 'appointment_type', 'type', 'shipping_method']);
+$trigger = strtolower(wbPick($flat, ['trigger', 'event', 'hook', 'action', 'webhook_trigger']));
+$statusW = strtolower(wbPick($flat, ['status', 'appointment_status', 'booking_status']) ?: 'pending');
+// Trigger *_cancelled / *_deleted → rezervaci v CRM skrýt
+if ($trigger !== '' && (str_contains($trigger, 'cancel') || str_contains($trigger, 'delete'))) {
+    $statusW = 'cancelled';
+}
+if (str_contains($statusW, 'cancel') || str_contains($statusW, 'delete') || $statusW === 'trashed') {
+    $statusW = 'cancelled';
+}
 
 $appt = null;
-$apptRaw = trim((string)($in['appointment'] ?? ''));
+$apptRaw = wbPick($flat, ['appointment', 'appointment_datetime', 'scheduled_at', 'datetime']);
+if ($apptRaw === '') {
+    $d = wbPick($flat, ['appointment_date', 'booking_date', 'date', 'appointmentdate']);
+    $t = wbPick($flat, ['appointment_time', 'booking_time', 'time', 'appointmenttime', 'time_slot', 'timeslot']);
+    // time_slot bývá „14:00 - 14:30" → vzít začátek
+    if ($t !== '' && preg_match('/(\d{1,2}[:.]\d{2})/', $t, $m)) { $t = str_replace('.', ':', $m[1]); }
+    $apptRaw = trim($d . ' ' . $t);
+}
 if ($apptRaw !== '') {
     $ts = strtotime($apptRaw);
     if ($ts !== false) { $appt = date('Y-m-d H:i:s', $ts); }

@@ -570,10 +570,17 @@ require_once 'includes/header.php';
                                 <input type="text" class="form-control" readonly onclick="this.select()" value="https://admin.applefix.cloud/api/website_booking.php"></div>
                             <div class="col-md-5"><label class="form-label small text-white-75">Sdílený klíč (X-AFX-KEY)</label>
                                 <input type="text" class="form-control" readonly onclick="this.select()" value="<?php echo htmlspecialchars($afxWbKey); ?>"></div>
+                            <div class="col-12"><label class="form-label small text-white-75">URL pro RepairPlugin „Trigger Webhooks" (s klíčem — vložit do pole URL ve WordPressu)</label>
+                                <input type="text" class="form-control" readonly onclick="this.select()" value="https://admin.applefix.cloud/api/website_booking.php?key=<?php echo htmlspecialchars($afxWbKey); ?>"></div>
                         </div>
                         <div class="form-text small text-white-75 mt-2">
                             Nové rezervace se objevují nahoře v Zakázkách, seřazené dle termínu. Tlačítko „Vytvořit zakázku" předvyplní wizard a rezervaci označí jako převzatou.
                         </div>
+                        <?php $afxWbLast = (string)get_setting('web_booking_last_payload', ''); ?>
+                        <details class="mt-2">
+                            <summary class="small text-white-75" style="cursor:pointer;">Diagnostika: poslední přijatý payload z webu <?php echo $afxWbLast === '' ? '(zatím nic nedorazilo)' : ''; ?></summary>
+                            <pre class="small text-white-75 mt-2 p-2 border border-secondary rounded" style="max-height:260px; overflow:auto; white-space:pre-wrap;"><?php echo htmlspecialchars($afxWbLast !== '' ? $afxWbLast : '—'); ?></pre>
+                        </details>
                     </div>
 
                     <div class="col-12 border-top border-secondary pt-3">

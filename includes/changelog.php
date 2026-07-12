@@ -6,6 +6,15 @@
  */
 return [
     [
+        'date' => '2026-07-12',
+        'title' => 'Propojení s RepairPluginem: nativní webhooky',
+        'items' => [
+            'CRM endpoint nově rozumí formátu „Trigger Webhooks" přímo z RepairPluginu (adaptér polí, klíč v URL) — appointmenty z applefix.cz se propisují bez dalšího kódu na WordPressu.',
+            'Zrušený/smazaný appointment na webu rezervaci v CRM automaticky skryje.',
+            'V Nastavení → Integrace je připravená webhook URL s klíčem ke zkopírování a diagnostika posledního přijatého payloadu.',
+        ],
+    ],
+    [
         'date' => '2026-07-11',
         'title' => 'Rezervace z webu → firemní kalendář (CalDAV)',
         'items' => [
