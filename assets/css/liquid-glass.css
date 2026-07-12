@@ -238,14 +238,17 @@ nav.navbar.crm-v2-topbar,
    Musí být PO resetu .table pozadí (jinak by ho reset přebil).
    Barvy = paleta status pillů (v2), vlevo barevný proužek.
    ------------------------------------------------------------ */
-/* tmavý režim — SYTÉ řádky, ať barva odpovídá proužku vlevo (přání uživatele 8.7.2026) */
+/* tmavý režim — SYTÉ řádky, ať barva odpovídá proužku vlevo (přání uživatele 8.7.2026).
+   VÝJIMKY (13.7.2026): „Vydáno" (collected) NEbarví řádek — jen tmavě zelený badge;
+   „Připraveno k převzetí" (completed) je SVĚTLE ZELENÁ (ne oranžová/cyan);
+   „Přijato z RepairPluginu" (repairplugin) sytá fialová jako badge. */
 .order-row--status-new         > td { background: rgba(59,130,246,0.42)  !important; }
 .order-row--status-pending     > td { background: rgba(249,115,22,0.40)  !important; }
 .order-row--status-progress    > td { background: rgba(139,92,246,0.42)  !important; }
 .order-row--status-waiting     > td { background: rgba(239,68,68,0.44)   !important; }
-.order-row--status-completed   > td { background: rgba(6,182,212,0.40)   !important; }
+.order-row--status-completed   > td { background: rgba(74,222,128,0.36)  !important; }
 .order-row--status-uncollected > td { background: rgba(234,179,8,0.36)   !important; }
-.order-row--status-collected   > td { background: rgba(34,197,94,0.42)   !important; }
+.order-row--status-repairplugin > td { background: rgba(192,38,211,0.42) !important; }
 .order-row--status-cancelled   > td { background: rgba(156,163,175,0.28) !important; }
 .order-row--status-default     > td { background: rgba(148,163,184,0.24) !important; }
 /* hover = o stupeň sytější, ať klikatelnost zůstane čitelná */
@@ -253,29 +256,30 @@ nav.navbar.crm-v2-topbar,
 .order-row--status-pending:hover     > td { background: rgba(249,115,22,0.54)  !important; }
 .order-row--status-progress:hover    > td { background: rgba(139,92,246,0.56)  !important; }
 .order-row--status-waiting:hover     > td { background: rgba(239,68,68,0.58)   !important; }
-.order-row--status-completed:hover   > td { background: rgba(6,182,212,0.54)   !important; }
+.order-row--status-completed:hover   > td { background: rgba(74,222,128,0.50)  !important; }
 .order-row--status-uncollected:hover > td { background: rgba(234,179,8,0.48)   !important; }
-.order-row--status-collected:hover   > td { background: rgba(34,197,94,0.56)   !important; }
+.order-row--status-repairplugin:hover > td { background: rgba(192,38,211,0.56) !important; }
+.order-row--status-collected:hover   > td { background: rgba(148,163,184,0.12) !important; }
 .order-row--status-cancelled:hover   > td { background: rgba(156,163,175,0.40) !important; }
 .order-row--status-default:hover     > td { background: rgba(148,163,184,0.36) !important; }
 
-/* světlý režim — jemnější tint, tmavý text zůstává */
+/* světlý režim — jemnější tint, tmavý text zůstává (collected bez tintu i zde) */
 html[data-lg-theme="light"] .order-row--status-new         > td { background: #E8F0FE !important; }
 html[data-lg-theme="light"] .order-row--status-pending     > td { background: #FEEFE3 !important; }
 html[data-lg-theme="light"] .order-row--status-progress    > td { background: #F0EBFE !important; }
 html[data-lg-theme="light"] .order-row--status-waiting     > td { background: #FDEBEB !important; }
-html[data-lg-theme="light"] .order-row--status-completed   > td { background: #E5F6FA !important; }
+html[data-lg-theme="light"] .order-row--status-completed   > td { background: #E9FBEE !important; }
 html[data-lg-theme="light"] .order-row--status-uncollected > td { background: #FBF4DC !important; }
-html[data-lg-theme="light"] .order-row--status-collected   > td { background: #E7F7EC !important; }
+html[data-lg-theme="light"] .order-row--status-repairplugin > td { background: #F8E9FB !important; }
 html[data-lg-theme="light"] .order-row--status-cancelled   > td { background: #F0F1F3 !important; }
 html[data-lg-theme="light"] .order-row--status-default     > td { background: #F1F3F6 !important; }
 html[data-lg-theme="light"] .order-row--status-new:hover         > td { background: #D7E5FD !important; }
 html[data-lg-theme="light"] .order-row--status-pending:hover     > td { background: #FDE1CB !important; }
 html[data-lg-theme="light"] .order-row--status-progress:hover    > td { background: #E3D9FD !important; }
 html[data-lg-theme="light"] .order-row--status-waiting:hover     > td { background: #FBD9D9 !important; }
-html[data-lg-theme="light"] .order-row--status-completed:hover   > td { background: #D0EEF6 !important; }
+html[data-lg-theme="light"] .order-row--status-completed:hover   > td { background: #D3F5DE !important; }
 html[data-lg-theme="light"] .order-row--status-uncollected:hover > td { background: #F7EBBE !important; }
-html[data-lg-theme="light"] .order-row--status-collected:hover   > td { background: #D2F0DC !important; }
+html[data-lg-theme="light"] .order-row--status-repairplugin:hover > td { background: #F0D5F6 !important; }
 html[data-lg-theme="light"] .order-row--status-cancelled:hover   > td { background: #E3E5E9 !important; }
 html[data-lg-theme="light"] .order-row--status-default:hover     > td { background: #E4E8ED !important; }
 

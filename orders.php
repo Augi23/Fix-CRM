@@ -58,6 +58,14 @@ if (isset($pdo)) {
 
         $where_sql = $where_clauses ? ' WHERE ' . implode(' AND ', $where_clauses) : '';
 
+        // Rezervace z webu se zobrazují jako běžné zakázky (auto-vytvoření ve webhooku).
+        // Pojistka: pokud některá konverze dřív selhala, potichu ji zopakovat tady.
+        try {
+            ensureWebBookingsSchema();
+            $pendingWb = $pdo->query("SELECT id FROM web_bookings WHERE status = 'new' ORDER BY id ASC LIMIT 10")->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($pendingWb as $wbId) { crmCreateOrderFromWebBooking((int)$wbId); }
+        } catch (Throwable $e) { /* jen pojistka */ }
+
         // Count
         $count_stmt = $pdo->prepare(
             'SELECT COUNT(*) FROM orders o JOIN customers c ON o.customer_id = c.id' . $where_sql
@@ -72,7 +80,8 @@ if (isset($pdo)) {
 
         $stmt = $pdo->prepare(
             'SELECT o.*, c.first_name, c.last_name, c.phone, t.name as tech_name,
-                    (SELECT MAX(l.changed_at) FROM order_status_log l WHERE l.order_id = o.id) AS last_status_change
+                    (SELECT MAX(l.changed_at) FROM order_status_log l WHERE l.order_id = o.id) AS last_status_change,
+                    (SELECT MAX(wb.appointment_at) FROM web_bookings wb WHERE wb.order_id = o.id) AS web_appointment_at
              FROM orders o
              JOIN customers c ON o.customer_id = c.id
              LEFT JOIN technicians t ON o.technician_id = t.id'
@@ -257,116 +266,6 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
     <?php endforeach; ?>
 </div>
 
-<?php
-// ── Rezervace z webu (RepairPlugin na applefix.cz) — nahoře, dle termínu vzestupně ──
-$webBookings = [];
-if (($search ?? '') === '' && !$filter_status && $page === 1) {
-    try {
-        ensureWebBookingsSchema();
-        // 'new' = čeká na ruční převzetí (auto-založení se nepovedlo), 'converted' = už z ní vznikla zakázka.
-        // Obojí zůstává v panelu (oddělený přehled rezervací z webu, dle termínu).
-        $webBookings = $pdo->query("SELECT wb.*, o.order_code AS wb_order_code
-            FROM web_bookings wb
-            LEFT JOIN orders o ON o.id = wb.order_id
-            WHERE wb.status IN ('new','converted')
-            ORDER BY (wb.appointment_at IS NULL), wb.appointment_at ASC, wb.created_at ASC LIMIT 30")->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) { $webBookings = []; }
-}
-?>
-<?php if (!empty($webBookings)): ?>
-<div class="afx-webres">
-    <div class="afx-webres-head">
-        <i class="fas fa-globe"></i>
-        <span><?php echo __('web_bookings'); ?></span>
-        <span class="afx-webres-count"><?php echo count($webBookings); ?></span>
-    </div>
-    <div class="afx-webres-list">
-        <?php foreach ($webBookings as $wb):
-            $apptTs = !empty($wb['appointment_at']) ? strtotime((string)$wb['appointment_at']) : null;
-            $isToday = $apptTs && date('Y-m-d', $apptTs) === date('Y-m-d');
-        ?>
-        <div class="afx-webres-item <?php echo !empty($wb['order_id']) ? 'is-converted' : ''; ?>" id="webres-<?php echo (int)$wb['id']; ?>">
-            <div class="afx-webres-when <?php echo $isToday ? 'today' : ''; ?>">
-                <?php if ($apptTs): ?>
-                    <b><?php echo date('H:i', $apptTs); ?></b>
-                    <small><?php echo $isToday ? __('today') : date('j. n.', $apptTs); ?></small>
-                <?php else: ?>
-                    <b>—</b><small><?php echo __('no_appointment'); ?></small>
-                <?php endif; ?>
-            </div>
-            <div class="afx-webres-body">
-                <div class="afx-webres-name"><?php echo e($wb['customer_name'] ?: __('unknown_client')); ?>
-                    <?php if (!empty($wb['phone'])): ?><a class="afx-webres-tel" href="tel:<?php echo e($wb['phone']); ?>"><i class="fas fa-phone"></i> <?php echo e($wb['phone']); ?></a><?php endif; ?>
-                </div>
-                <div class="afx-webres-meta">
-                    <?php if (!empty($wb['device'])): ?><span><i class="fas fa-mobile-screen"></i> <?php echo e($wb['device']); ?></span><?php endif; ?>
-                    <?php if (!empty($wb['service'])): ?><span><i class="fas fa-wrench"></i> <?php echo e($wb['service']); ?></span><?php endif; ?>
-                    <?php if (!empty($wb['delivery_method'])): ?><span><i class="fas fa-hand-holding"></i> <?php echo e(crmTranslateWebServiceMethod((string)$wb['delivery_method'])); ?></span><?php endif; ?>
-                    <?php if (!empty($wb['notes'])): ?><span class="afx-webres-note" title="<?php echo e($wb['notes']); ?>"><i class="far fa-comment-dots"></i> <?php echo e(mb_strimwidth($wb['notes'], 0, 60, '…')); ?></span><?php endif; ?>
-                </div>
-            </div>
-            <div class="afx-webres-acts">
-                <?php if (!empty($wb['order_id'])): ?>
-                    <a class="btn btn-sm afx-webres-order" href="view_order.php?id=<?php echo (int)$wb['order_id']; ?>" title="Otevřít zakázku">
-                        <i class="fas fa-file-lines me-1"></i><?php echo e($wb['wb_order_code'] ?: ($wb['wp_booking_id'] ?: __('order'))); ?>
-                    </a>
-                <?php else: ?>
-                    <button type="button" class="btn btn-sm afx-webres-take"
-                        data-id="<?php echo (int)$wb['id']; ?>"
-                        data-name="<?php echo e($wb['customer_name']); ?>"
-                        data-phone="<?php echo e((string)$wb['phone']); ?>"
-                        data-email="<?php echo e((string)$wb['email']); ?>"
-                        data-device="<?php echo e((string)$wb['device']); ?>"
-                        data-issue="<?php echo e(trim(($wb['service'] ?: '') . (!empty($wb['notes']) ? ' — ' . $wb['notes'] : ''))); ?>">
-                        <i class="fas fa-plus me-1"></i><?php echo __('create_order'); ?>
-                    </button>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php endforeach; ?>
-    </div>
-</div>
-<div class="afx-webres-divider"><span><?php echo __('orders'); ?></span></div>
-<script>
-$(function () {
-    // Vyřízeno / skrýt
-    $('.afx-webres-done').on('click', function () {
-        var id = $(this).data('id');
-        $.post('api/web_booking_action.php', { action: 'dismiss', id: id }, function (res) {
-            if (res && res.success) {
-                $('#webres-' + id).slideUp(160, function () {
-                    $(this).remove();
-                    if (!$('.afx-webres-item').length) { $('.afx-webres, .afx-webres-divider').fadeOut(160); }
-                });
-            }
-        });
-    });
-    // Převzít do nové zakázky: předvyplní wizard a označí rezervaci jako převzatou
-    $('.afx-webres-take').on('click', function () {
-        var d = $(this).data();
-        var $m = $('#newOrderModal');
-        var parts = String(d.name || '').trim().split(/\s+/);
-        $m.find('[name="first_name"]').val(parts.slice(0, -1).join(' ') || parts[0] || '');
-        $m.find('[name="last_name"]').val(parts.length > 1 ? parts[parts.length - 1] : '');
-        $m.find('[name="phone"]').val(d.phone || '');
-        $m.find('[name="inline_email"]').val(d.email || '');
-        $m.find('[name="device_model"]').val(d.device || '');
-        $m.find('[name="problem_description"]').val(d.issue || '');
-        // booking id projde formulářem — add_order.php rezervaci označí jako převzatou
-        var $form = $m.find('#newOrderForm');
-        var $hid = $form.find('input[name="web_booking_id"]');
-        if (!$hid.length) { $hid = $('<input type="hidden" name="web_booking_id">').appendTo($form); }
-        $hid.val(d.id);
-        var modal = bootstrap.Modal.getOrCreateInstance($m[0]);
-        modal.show();
-    });
-    // Při běžném otevření wizardu (ne z rezervace) booking id vyčistit
-    $('#newOrderModal').on('hidden.bs.modal', function () {
-        $(this).find('input[name="web_booking_id"]').val('');
-    });
-});
-</script>
-<?php endif; ?>
 
 <div class="card glass-card shadow-sm border-0">
     <div class="card-body p-0">
@@ -444,6 +343,15 @@ $(function () {
                             </td>
                             <td>
                                 <?php echo getStatusBadge($order['status']); ?>
+                                <?php if (!empty($order['web_appointment_at'])):
+                                    $wbTs = strtotime((string)$order['web_appointment_at']);
+                                    $wbToday = $wbTs && date('Y-m-d', $wbTs) === date('Y-m-d');
+                                ?>
+                                <div class="afx-booked-chip<?php echo $wbToday ? ' is-today' : ''; ?>" title="<?php echo e(__('web_booking_no')); ?>">
+                                    <i class="far fa-calendar-check"></i>
+                                    <b><?php echo $wbToday ? __('today') : date('j.n.', $wbTs); ?> <?php echo date('H:i', $wbTs); ?></b>
+                                </div>
+                                <?php endif; ?>
                                 <?php if(!empty($order['shipping_method'])): ?>
                                     <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars($order['shipping_method']); ?></div>
                                 <?php endif; ?>

@@ -2576,7 +2576,7 @@ p, span, label, .small, small,
 .status-pill--pending    { background: #9a3412 !important; border-color: #fb923c !important; color: #fff7ed !important; font-weight: 700 !important; }   /* oranžová */
 .status-pill--progress   { background: #5b21b6 !important; border-color: #c084fc !important; color: #f5f3ff !important; font-weight: 700 !important; }   /* fialová */
 .status-pill--waiting    { background: #991b1b !important; border-color: #ef4444 !important; color: #fee2e2 !important; font-weight: 700 !important; }   /* červená (čeká na díl) */
-.status-pill--completed  { background: #92400e !important; border-color: #f59e0b !important; color: #fffbeb !important; font-weight: 700 !important; }   /* jantarová (připraveno k převzetí) */
+.status-pill--completed  { background: #4ade80 !important; border-color: #86efac !important; color: #052e16 !important; font-weight: 700 !important; }   /* světle zelená (připraveno k převzetí) */
 .status-pill--uncollected{ background: #854d0e !important; border-color: #facc15 !important; color: #fefce8 !important; font-weight: 700 !important; }   /* žlutá */
 .status-pill--collected  { background: #166534 !important; border-color: #22c55e !important; color: #dcfce7 !important; font-weight: 700 !important; }   /* zelená (vydáno) */
 .status-pill--cancelled  { background: #374151 !important; border-color: #9ca3af !important; color: #f3f4f6 !important; font-weight: 700 !important; }   /* šedá (stornováno) */
@@ -2743,42 +2743,23 @@ p, span, label, .small, small,
    Tint pozadí na všech buňkách + barevný pruh JEN na levém kraji řádku (první buňka),
    takže nevznikají svislé čáry mezi sloupci.
    ═══════════════════════════════════════════════════════════════════════════ */
-/* Alphy záměrně vyšší u tmavých/studených odstínů (modrá, jantar, šedá) —
-   při 0.16 na tmavém pozadí splývaly a řádky vypadaly nenabarveně. */
-.order-row--status-new         > td { background: rgba(59,130,246,0.26)  !important; }   /* modrá */
-.order-row--status-pending     > td { background: rgba(249,115,22,0.24)  !important; }   /* oranžová */
-.order-row--status-progress    > td { background: rgba(139,92,246,0.24)  !important; }   /* fialová */
-.order-row--status-waiting     > td { background: rgba(239,68,68,0.24)   !important; }   /* červená – čeká na díl */
-.order-row--status-completed   > td { background: rgba(245,158,11,0.26)  !important; }   /* jantarová – připraveno */
-.order-row--status-uncollected > td { background: rgba(234,179,8,0.24)   !important; }   /* žlutá */
-/* „Vydáno" (collected) záměrně NEbarví celý řádek — vyřízené zakázky by jinak
-   zaplavily tabulku zelenou. Zůstává jen tmavě zelený badge stavu. */
-.order-row--status-cancelled   > td { background: rgba(156,163,175,0.20) !important; }   /* šedá – stornováno */
-.order-row--status-default     > td { background: rgba(148,163,184,0.18) !important; }
-.order-row--status-repairplugin > td { background: rgba(192,38,211,0.24) !important; }   /* fialová – RepairPlugin */
+/* POZOR: tinty pozadí řádků VLASTNÍ liquid-glass.css (načítá se PO tomto souboru
+   a přebíjí ho). Tady zůstávají jen levé barevné proužky (td:first-child níže).
+   Pravidla: „Vydáno" (collected) NEbarví řádek ani pruh — jen tmavě zelený badge;
+   „Připraveno k převzetí" (completed) světle zelená; repairplugin sytá fialová. */
 
 .order-row--status-new         > td:first-child { box-shadow: inset 4px 0 0 #3b82f6 !important; }
 .order-row--status-pending     > td:first-child { box-shadow: inset 4px 0 0 #f97316 !important; }
 .order-row--status-progress    > td:first-child { box-shadow: inset 4px 0 0 #8b5cf6 !important; }
 .order-row--status-waiting     > td:first-child { box-shadow: inset 4px 0 0 #ef4444 !important; }
-.order-row--status-completed   > td:first-child { box-shadow: inset 4px 0 0 #f59e0b !important; }
+.order-row--status-completed   > td:first-child { box-shadow: inset 4px 0 0 #4ade80 !important; }   /* světle zelená – připraveno */
 .order-row--status-uncollected > td:first-child { box-shadow: inset 4px 0 0 #eab308 !important; }
 /* collected („Vydáno") bez levého pruhu — řádek se nebarví */
 .order-row--status-cancelled   > td:first-child { box-shadow: inset 4px 0 0 #9ca3af !important; }
 .order-row--status-default     > td:first-child { box-shadow: inset 4px 0 0 #94a3b8 !important; }
 .order-row--status-repairplugin > td:first-child { box-shadow: inset 4px 0 0 #d946ef !important; }
 
-.order-row--status-new:hover         > td { background: rgba(59,130,246,0.36)  !important; }
-.order-row--status-pending:hover     > td { background: rgba(249,115,22,0.34)  !important; }
-.order-row--status-progress:hover    > td { background: rgba(139,92,246,0.34)  !important; }
-.order-row--status-repairplugin:hover > td { background: rgba(192,38,211,0.34) !important; }
-.order-row--status-waiting:hover     > td { background: rgba(239,68,68,0.34)   !important; }
-.order-row--status-completed:hover   > td { background: rgba(245,158,11,0.36)  !important; }
-.order-row--status-uncollected:hover > td { background: rgba(234,179,8,0.34)   !important; }
-/* collected („Vydáno") — jen jemný neutrální hover, řádek se nebarví zeleně */
-.order-row--status-collected:hover   > td { background: rgba(148,163,184,0.14) !important; }
-.order-row--status-cancelled:hover   > td { background: rgba(156,163,175,0.28) !important; }
-.order-row--status-default:hover     > td { background: rgba(148,163,184,0.26) !important; }
+/* (hover tinty řádků rovněž vlastní liquid-glass.css) */
 
 /* ============================================================
    NOVÁ REKLAMACE — oranžová položka v sidebaru + modal fotky

@@ -532,19 +532,19 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
 }
 .afx-webres-order:hover { background: rgba(16,226,155,.22) !important; color: #fff !important; }
 
-/* Nástěnka — kompaktní widget Rezervace z webu (objednávkové časy) */
-.afx-dash-webres-item {
-  display: flex; align-items: center; gap: 12px; padding: 9px 6px;
-  border-bottom: 1px solid rgba(255,255,255,.06); transition: background .15s ease;
+/* Objednaný čas z webu (RepairPlugin) — výrazný chip u zakázky v seznamu i na nástěnce.
+   Zakázky z webu se zobrazují mezi běžnými zakázkami; chip nese termín od klienta. */
+.afx-booked-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 5px; padding: 3px 9px; border-radius: 8px;
+  background: rgba(95,210,255,.12); border: 1px solid rgba(95,210,255,.38);
+  color: #5fd2ff; font-size: 11.5px; line-height: 1.2; white-space: nowrap;
 }
-.afx-dash-webres-item:last-child { border-bottom: none; }
-.afx-dash-webres-item:hover { background: rgba(255,255,255,.04); border-radius: 10px; }
-.afx-dash-webres-time { flex: 0 0 52px; text-align: center; line-height: 1.05; }
-.afx-dash-webres-time b { display: block; font-size: 15px; font-weight: 700; color: #eef2f8; font-variant-numeric: tabular-nums; }
-.afx-dash-webres-time small { font-size: 10px; color: rgba(255,255,255,.45); font-weight: 500; }
-.afx-dash-webres-time.is-today b { color: #5fd2ff; text-shadow: 0 0 12px rgba(95,210,255,.45); }
-.afx-dash-webres-time.is-today small { color: #5fd2ff; }
-.afx-dash-webres-info { flex: 1 1 auto; min-width: 0; }
-.afx-dash-webres-name { font-size: 13.5px; font-weight: 600; color: #f2f5fa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.afx-dash-webres-sub { font-size: 11px; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.afx-dash-webres-badge { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.afx-booked-chip b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.afx-booked-chip.is-today {
+  background: rgba(95,210,255,.20); border-color: rgba(95,210,255,.62);
+  box-shadow: 0 0 14px rgba(95,210,255,.28);
+}
+html[data-lg-theme="light"] .afx-booked-chip {
+  background: #E5F6FD; border-color: #9BDCF8; color: #0369a1; box-shadow: none;
+}

@@ -211,8 +211,10 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
                             $where_clause = $where_clauses ? ' WHERE ' . implode(' AND ', $where_clauses) : '';
                             $search_id = is_numeric($search) ? (int)$search : 0;
+                            try { ensureWebBookingsSchema(); } catch (Throwable $e) {}   // subquery web_appointment_at
                             $sql = "SELECT o.*, c.first_name, c.last_name, c.phone, c.company, c.customer_type, t.name as tech_name,
-                                           (SELECT MAX(l.changed_at) FROM order_status_log l WHERE l.order_id = o.id) AS last_status_change
+                                           (SELECT MAX(l.changed_at) FROM order_status_log l WHERE l.order_id = o.id) AS last_status_change,
+                                           (SELECT MAX(wb.appointment_at) FROM web_bookings wb WHERE wb.order_id = o.id) AS web_appointment_at
                                     FROM orders o
                                     JOIN customers c ON o.customer_id = c.id
                                     LEFT JOIN technicians t ON o.technician_id = t.id" .
@@ -280,6 +282,15 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                 </td>
                                 <td>
                                     <?php echo getStatusBadge($r['status']); ?>
+                                    <?php if (!empty($r['web_appointment_at'])):
+                                        $wbTs = strtotime((string)$r['web_appointment_at']);
+                                        $wbToday = $wbTs && date('Y-m-d', $wbTs) === date('Y-m-d');
+                                    ?>
+                                    <div class="afx-booked-chip<?php echo $wbToday ? ' is-today' : ''; ?>" title="<?php echo e(__('web_booking_no')); ?>">
+                                        <i class="far fa-calendar-check"></i>
+                                        <b><?php echo $wbToday ? __('today') : date('j.n.', $wbTs); ?> <?php echo date('H:i', $wbTs); ?></b>
+                                    </div>
+                                    <?php endif; ?>
                                     <?php if(!empty($r['shipping_method'])): ?>
                                         <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars($r['shipping_method']); ?></div>
                                     <?php endif; ?>
@@ -381,58 +392,6 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                 <?php endforeach; endif; ?>
             </div>
         </div>
-
-        <!-- Rezervace z webu (RepairPlugin) — nadcházející termíny -->
-        <?php
-        $dashWebBookings = [];
-        try {
-            ensureWebBookingsSchema();
-            $dashWebBookings = $pdo->query("SELECT wb.*, o.order_code AS wb_order_code
-                FROM web_bookings wb
-                LEFT JOIN orders o ON o.id = wb.order_id
-                WHERE wb.status IN ('new','converted')
-                  AND (wb.appointment_at IS NULL OR wb.appointment_at >= NOW() - INTERVAL 1 DAY)
-                ORDER BY (wb.appointment_at IS NULL), wb.appointment_at ASC, wb.created_at ASC
-                LIMIT 6")->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Throwable $e) { $dashWebBookings = []; }
-        if (!empty($dashWebBookings)):
-        ?>
-        <div class="card glass-card border-0 mb-4 afx-dash-webres">
-            <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-globe text-info me-2"></i><?php echo __('web_bookings'); ?></h5>
-                <a href="orders.php" class="small text-decoration-none text-white-75"><?php echo __('view_all'); ?> <i class="fas fa-arrow-right ms-1"></i></a>
-            </div>
-            <div class="card-body pt-1">
-                <?php foreach ($dashWebBookings as $wb):
-                    $ts = !empty($wb['appointment_at']) ? strtotime((string)$wb['appointment_at']) : null;
-                    $isToday = $ts && date('Y-m-d', $ts) === date('Y-m-d');
-                    $rowHref = !empty($wb['order_id']) ? 'view_order.php?id=' . (int)$wb['order_id'] : 'orders.php';
-                ?>
-                <a href="<?php echo $rowHref; ?>" class="afx-dash-webres-item text-decoration-none">
-                    <div class="afx-dash-webres-time <?php echo $isToday ? 'is-today' : ''; ?>">
-                        <?php if ($ts): ?>
-                            <b><?php echo date('H:i', $ts); ?></b>
-                            <small><?php echo $isToday ? __('today') : date('j.n.', $ts); ?></small>
-                        <?php else: ?>
-                            <b>—</b><small><?php echo __('no_appointment'); ?></small>
-                        <?php endif; ?>
-                    </div>
-                    <div class="afx-dash-webres-info">
-                        <div class="afx-dash-webres-name"><?php echo e($wb['customer_name'] ?: __('unknown_client')); ?></div>
-                        <div class="afx-dash-webres-sub">
-                            <?php echo e($wb['device'] ?: ''); ?><?php if (!empty($wb['service'])): ?> · <?php echo e($wb['service']); ?><?php endif; ?>
-                        </div>
-                    </div>
-                    <?php if (!empty($wb['order_id'])): ?>
-                        <span class="badge status-pill status-pill--repairplugin afx-dash-webres-badge"><?php echo e($wb['wb_order_code'] ?: ($wb['wp_booking_id'] ?: __('order'))); ?></span>
-                    <?php else: ?>
-                        <span class="badge bg-warning text-dark afx-dash-webres-badge"><i class="fas fa-hourglass-half"></i></span>
-                    <?php endif; ?>
-                </a>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endif; ?>
 
         <div class="card glass-card border-0 mb-4">
             <div class="card-header bg-transparent border-bottom-0">

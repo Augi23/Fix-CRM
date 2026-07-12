@@ -7,6 +7,18 @@
 return [
     [
         'date' => '2026-07-13',
+        'title' => 'Zakázky z webu mezi běžnými zakázkami + nové barvy řádků',
+        'items' => [
+            'Sekce „Rezervace z webu" zmizela — zakázky z RepairPluginu se zobrazují jako běžné zakázky mezi ostatními (v seznamu i na nástěnce).',
+            'Objednaný čas od klienta je u zakázek z webu vidět přímo v seznamu zakázek i na nástěnce jako modrý štítek vedle stavu (dnešní termín svítí).',
+            '„Vydáno" už nebarví celý řádek — vyřízené zakázky mají jen tmavě zelený štítek stavu, řádek zůstává tmavý.',
+            '„Připraveno k převzetí" je nově světle zelené — celý řádek i štítek stavu (dřív oranžová).',
+            '„Přijato z RepairPluginu" barví celý řádek sytě fialově podle štítku.',
+            'Opraveno: barvy řádků definovaly dva soubory najednou a přebíjely se — teď je vlastní jediné místo, takže změny se už neztratí.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'title' => 'Rezervace z webu: nástěnka, časy, zrušení z webu a čísla objednávek',
         'items' => [
             'Na nástěnce je nový panel „Rezervace z webu" s nadcházejícími termíny — objednávkový čas je vidět na první pohled (dnešní termíny svítí modře).',
