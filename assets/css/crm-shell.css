@@ -523,3 +523,11 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
   /* pobočky nahoře lícují s pravým railem (360 − 2×12px gutter řádku) */
   .crm-stat-row .crm-branch-col { flex: 0 0 336px; }
 }
+
+/* Rezervace z webu už převedená na zakázku — odkaz na zakázku + jemné ztlumení */
+.afx-webres-item.is-converted { opacity: .82; }
+.afx-webres-order {
+  background: rgba(16,226,155,.12) !important; border: 1px solid rgba(16,226,155,.32) !important;
+  color: #4df0b8 !important; font-weight: 600 !important; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.afx-webres-order:hover { background: rgba(16,226,155,.22) !important; color: #fff !important; }

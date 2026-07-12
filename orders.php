@@ -263,8 +263,13 @@ $webBookings = [];
 if (($search ?? '') === '' && !$filter_status && $page === 1) {
     try {
         ensureWebBookingsSchema();
-        $webBookings = $pdo->query("SELECT * FROM web_bookings WHERE status = 'new'
-            ORDER BY (appointment_at IS NULL), appointment_at ASC, created_at ASC LIMIT 30")->fetchAll(PDO::FETCH_ASSOC);
+        // 'new' = čeká na ruční převzetí (auto-založení se nepovedlo), 'converted' = už z ní vznikla zakázka.
+        // Obojí zůstává v panelu (oddělený přehled rezervací z webu, dle termínu).
+        $webBookings = $pdo->query("SELECT wb.*, o.order_code AS wb_order_code
+            FROM web_bookings wb
+            LEFT JOIN orders o ON o.id = wb.order_id
+            WHERE wb.status IN ('new','converted')
+            ORDER BY (wb.appointment_at IS NULL), wb.appointment_at ASC, wb.created_at ASC LIMIT 30")->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) { $webBookings = []; }
 }
 ?>
@@ -280,7 +285,7 @@ if (($search ?? '') === '' && !$filter_status && $page === 1) {
             $apptTs = !empty($wb['appointment_at']) ? strtotime((string)$wb['appointment_at']) : null;
             $isToday = $apptTs && date('Y-m-d', $apptTs) === date('Y-m-d');
         ?>
-        <div class="afx-webres-item" id="webres-<?php echo (int)$wb['id']; ?>">
+        <div class="afx-webres-item <?php echo !empty($wb['order_id']) ? 'is-converted' : ''; ?>" id="webres-<?php echo (int)$wb['id']; ?>">
             <div class="afx-webres-when <?php echo $isToday ? 'today' : ''; ?>">
                 <?php if ($apptTs): ?>
                     <b><?php echo date('H:i', $apptTs); ?></b>
@@ -301,15 +306,21 @@ if (($search ?? '') === '' && !$filter_status && $page === 1) {
                 </div>
             </div>
             <div class="afx-webres-acts">
-                <button type="button" class="btn btn-sm afx-webres-take"
-                    data-id="<?php echo (int)$wb['id']; ?>"
-                    data-name="<?php echo e($wb['customer_name']); ?>"
-                    data-phone="<?php echo e((string)$wb['phone']); ?>"
-                    data-email="<?php echo e((string)$wb['email']); ?>"
-                    data-device="<?php echo e((string)$wb['device']); ?>"
-                    data-issue="<?php echo e(trim(($wb['service'] ?: '') . (!empty($wb['notes']) ? ' — ' . $wb['notes'] : ''))); ?>">
-                    <i class="fas fa-plus me-1"></i><?php echo __('create_order'); ?>
-                </button>
+                <?php if (!empty($wb['order_id'])): ?>
+                    <a class="btn btn-sm afx-webres-order" href="view_order.php?id=<?php echo (int)$wb['order_id']; ?>" title="Otevřít zakázku">
+                        <i class="fas fa-file-lines me-1"></i><?php echo e($wb['wb_order_code'] ?: ('#' . (int)$wb['order_id'])); ?>
+                    </a>
+                <?php else: ?>
+                    <button type="button" class="btn btn-sm afx-webres-take"
+                        data-id="<?php echo (int)$wb['id']; ?>"
+                        data-name="<?php echo e($wb['customer_name']); ?>"
+                        data-phone="<?php echo e((string)$wb['phone']); ?>"
+                        data-email="<?php echo e((string)$wb['email']); ?>"
+                        data-device="<?php echo e((string)$wb['device']); ?>"
+                        data-issue="<?php echo e(trim(($wb['service'] ?: '') . (!empty($wb['notes']) ? ' — ' . $wb['notes'] : ''))); ?>">
+                        <i class="fas fa-plus me-1"></i><?php echo __('create_order'); ?>
+                    </button>
+                <?php endif; ?>
                 <button type="button" class="btn btn-sm afx-webres-done" data-id="<?php echo (int)$wb['id']; ?>" title="<?php echo e(__('booking_dismiss')); ?>"><i class="fas fa-check"></i></button>
             </div>
         </div>
