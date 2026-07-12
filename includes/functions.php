@@ -299,6 +299,7 @@ function getOrderStatusDefinitions(): array {
     return [
         // ── Aktuální stavový model (od 7/2026) — jen tyto lze nově vybrat ──
         'Přijato' => ['group' => 'new', 'badge' => 'new'],
+        'Přijato z RepairPluginu' => ['group' => 'new', 'badge' => 'repairplugin'],
         'V opravě' => ['group' => 'in_progress', 'badge' => 'progress'],
         'V opravě - v externím servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
         'V opravě - v autorizovaném servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
@@ -445,6 +446,7 @@ function getOrderStatusTranslations(): array {
     return [
         'en' => [
             'Přijato' => 'Received',
+            'Přijato z RepairPluginu' => 'Received from RepairPlugin',
             'V opravě' => 'In Repair',
             'V opravě - v externím servisu' => 'In Repair — External Service',
             'V opravě - v autorizovaném servisu' => 'In Repair — Authorized Service',
@@ -464,6 +466,7 @@ function getOrderStatusTranslations(): array {
         ],
         'ru' => [
             'Přijato' => 'Принято',
+            'Přijato z RepairPluginu' => 'Принято из RepairPlugin',
             'V opravě' => 'В ремонте',
             'V opravě - v externím servisu' => 'В ремонте — внешний сервис',
             'V opravě - v autorizovaném servisu' => 'В ремонте — авторизованный сервис',
@@ -2969,6 +2972,24 @@ function crmDeleteWebBookingFromCalDav(int $bookingId): void {
     }
 }
 
+/** Runtime přidá hodnotu 'Přijato z RepairPluginu' do ENUM orders.status (idempotentní). */
+function ensureRepairPluginOrderStatus(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $row = $pdo->query("SHOW COLUMNS FROM orders LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
+        $type = (string)($row['Type'] ?? '');
+        if ($type === '' || stripos($type, 'enum(') !== 0) return;                 // není ENUM
+        if (mb_strpos($type, 'Přijato z RepairPluginu') !== false) return;         // už tam je
+        $newType = preg_replace('/\)\s*$/', ",'Přijato z RepairPluginu')", $type, 1);
+        $pdo->exec("ALTER TABLE orders MODIFY COLUMN status $newType DEFAULT 'Přijato'");
+    } catch (Throwable $e) {
+        error_log('ensureRepairPluginOrderStatus: ' . $e->getMessage());
+    }
+}
+
 /** Odhad typu zařízení (ENUM orders.device_type) z názvu zařízení. */
 function crmGuessDeviceType(string $device): string {
     $d = mb_strtolower($device);
@@ -3069,8 +3090,9 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
 
         $estCost = (float)preg_replace('/[^0-9.]/', '', str_replace(',', '.', $pick($raw, ['total_price', 'balance_due_on_repair', 'sub_total'])));
 
-        // ── Zakázka „Přijato" ──
-        $status = getDefaultOrderStatus();
+        // ── Zakázka „Přijato z RepairPluginu" ──
+        ensureRepairPluginOrderStatus();
+        $status = 'Přijato z RepairPluginu';
         $branchId = getDefaultBranchId();
         $orderCode = function_exists('generateNextOrderCode') ? generateNextOrderCode($pdo) : null;
         $deviceType = crmGuessDeviceType($device);

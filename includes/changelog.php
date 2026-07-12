@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-12',
+        'title' => 'Nový stav „Přijato z RepairPluginu" (fialový)',
+        'items' => [
+            'Zakázky automaticky založené z webové rezervace mají nový stav „Přijato z RepairPluginu" ve fialové barvě — na první pohled je vidět, že přišly z webu.',
+            'Stav se počítá jako aktivní/nová zakázka (fronta, statistiky, filtry) a je i v angličtině a ruštině.',
+        ],
+    ],
+    [
+        'date' => '2026-07-12',
         'title' => 'Rezervace z webu → rovnou zakázka + zákazník',
         'items' => [
             'Nová rezervace z applefix.cz teď automaticky založí zakázku „Přijato" — už se nemusí ručně klikat „Vytvořit zakázku".',

@@ -2581,6 +2581,7 @@ p, span, label, .small, small,
 .status-pill--collected  { background: #166534 !important; border-color: #22c55e !important; color: #dcfce7 !important; font-weight: 700 !important; }   /* zelená (vydáno) */
 .status-pill--cancelled  { background: #374151 !important; border-color: #9ca3af !important; color: #f3f4f6 !important; font-weight: 700 !important; }   /* šedá (stornováno) */
 .status-pill--default    { background: #334155 !important; border-color: #94a3b8 !important; color: #f1f5f9 !important; font-weight: 700 !important; }
+.status-pill--repairplugin { background: #86198f !important; border-color: #e879f9 !important; color: #fdf4ff !important; font-weight: 700 !important; }   /* fialová – Přijato z RepairPluginu */
 
 /* 7) Zakázky: stejné formátování střední tabulky jako na Nástěnce */
 .orders-center-table thead th,
@@ -2745,6 +2746,7 @@ p, span, label, .small, small,
 .order-row--status-collected   > td { background: rgba(34,197,94,0.18)   !important; }   /* zelená – vydáno */
 .order-row--status-cancelled   > td { background: rgba(156,163,175,0.14) !important; }   /* šedá – stornováno */
 .order-row--status-default     > td { background: rgba(148,163,184,0.12) !important; }
+.order-row--status-repairplugin > td { background: rgba(192,38,211,0.16) !important; }   /* fialová – RepairPlugin */
 
 .order-row--status-new         > td:first-child { box-shadow: inset 4px 0 0 #3b82f6 !important; }
 .order-row--status-pending     > td:first-child { box-shadow: inset 4px 0 0 #f97316 !important; }
@@ -2755,10 +2757,12 @@ p, span, label, .small, small,
 .order-row--status-collected   > td:first-child { box-shadow: inset 4px 0 0 #22c55e !important; }
 .order-row--status-cancelled   > td:first-child { box-shadow: inset 4px 0 0 #9ca3af !important; }
 .order-row--status-default     > td:first-child { box-shadow: inset 4px 0 0 #94a3b8 !important; }
+.order-row--status-repairplugin > td:first-child { box-shadow: inset 4px 0 0 #d946ef !important; }
 
 .order-row--status-new:hover         > td { background: rgba(59,130,246,0.26)  !important; }
 .order-row--status-pending:hover     > td { background: rgba(249,115,22,0.26)  !important; }
 .order-row--status-progress:hover    > td { background: rgba(139,92,246,0.26)  !important; }
+.order-row--status-repairplugin:hover > td { background: rgba(192,38,211,0.26) !important; }
 .order-row--status-waiting:hover     > td { background: rgba(239,68,68,0.28)   !important; }
 .order-row--status-completed:hover   > td { background: rgba(245,158,11,0.28)  !important; }
 .order-row--status-uncollected:hover > td { background: rgba(234,179,8,0.26)   !important; }
