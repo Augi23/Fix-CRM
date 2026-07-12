@@ -382,6 +382,58 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             </div>
         </div>
 
+        <!-- Rezervace z webu (RepairPlugin) — nadcházející termíny -->
+        <?php
+        $dashWebBookings = [];
+        try {
+            ensureWebBookingsSchema();
+            $dashWebBookings = $pdo->query("SELECT wb.*, o.order_code AS wb_order_code
+                FROM web_bookings wb
+                LEFT JOIN orders o ON o.id = wb.order_id
+                WHERE wb.status IN ('new','converted')
+                  AND (wb.appointment_at IS NULL OR wb.appointment_at >= NOW() - INTERVAL 1 DAY)
+                ORDER BY (wb.appointment_at IS NULL), wb.appointment_at ASC, wb.created_at ASC
+                LIMIT 6")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) { $dashWebBookings = []; }
+        if (!empty($dashWebBookings)):
+        ?>
+        <div class="card glass-card border-0 mb-4 afx-dash-webres">
+            <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-globe text-info me-2"></i><?php echo __('web_bookings'); ?></h5>
+                <a href="orders.php" class="small text-decoration-none text-white-75"><?php echo __('view_all'); ?> <i class="fas fa-arrow-right ms-1"></i></a>
+            </div>
+            <div class="card-body pt-1">
+                <?php foreach ($dashWebBookings as $wb):
+                    $ts = !empty($wb['appointment_at']) ? strtotime((string)$wb['appointment_at']) : null;
+                    $isToday = $ts && date('Y-m-d', $ts) === date('Y-m-d');
+                    $rowHref = !empty($wb['order_id']) ? 'view_order.php?id=' . (int)$wb['order_id'] : 'orders.php';
+                ?>
+                <a href="<?php echo $rowHref; ?>" class="afx-dash-webres-item text-decoration-none">
+                    <div class="afx-dash-webres-time <?php echo $isToday ? 'is-today' : ''; ?>">
+                        <?php if ($ts): ?>
+                            <b><?php echo date('H:i', $ts); ?></b>
+                            <small><?php echo $isToday ? __('today') : date('j.n.', $ts); ?></small>
+                        <?php else: ?>
+                            <b>—</b><small><?php echo __('no_appointment'); ?></small>
+                        <?php endif; ?>
+                    </div>
+                    <div class="afx-dash-webres-info">
+                        <div class="afx-dash-webres-name"><?php echo e($wb['customer_name'] ?: __('unknown_client')); ?></div>
+                        <div class="afx-dash-webres-sub">
+                            <?php echo e($wb['device'] ?: ''); ?><?php if (!empty($wb['service'])): ?> · <?php echo e($wb['service']); ?><?php endif; ?>
+                        </div>
+                    </div>
+                    <?php if (!empty($wb['order_id'])): ?>
+                        <span class="badge status-pill status-pill--repairplugin afx-dash-webres-badge"><?php echo e($wb['wb_order_code'] ?: ($wb['wp_booking_id'] ?: __('order'))); ?></span>
+                    <?php else: ?>
+                        <span class="badge bg-warning text-dark afx-dash-webres-badge"><i class="fas fa-hourglass-half"></i></span>
+                    <?php endif; ?>
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="card glass-card border-0 mb-4">
             <div class="card-header bg-transparent border-bottom-0">
                 <h5 class="mb-0"><?php echo __('quick_actions'); ?></h5>

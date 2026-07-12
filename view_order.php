@@ -40,6 +40,25 @@ if (!canAccessOrderBranch($order)) {
     die(__('no_edit_permission'));
 }
 
+// Self-heal: zakázka bez kódu (nesmí se uživateli ukazovat interní #ID) → doplnit další v řadě.
+if (trim((string)($order['order_code'] ?? '')) === '') {
+    try {
+        $healCode = generateNextOrderCode($pdo);
+        if ($healCode !== null) {
+            $pdo->prepare("UPDATE orders SET order_code = ? WHERE id = ?")->execute([$healCode, (int)$order['id']]);
+            $order['order_code'] = $healCode;
+        }
+    } catch (Throwable $e) { /* nevadí, zobrazí se #id a doplní se příště */ }
+}
+
+// Vazba na rezervaci z webu (RepairPlugin) — číslo objednávky z webu se ukazuje pod kódem zakázky.
+$webBookingRef = null;
+try {
+    $wbq = $pdo->prepare("SELECT wp_booking_id, appointment_at FROM web_bookings WHERE order_id = ? LIMIT 1");
+    $wbq->execute([(int)$order['id']]);
+    $webBookingRef = $wbq->fetch(PDO::FETCH_ASSOC) ?: null;
+} catch (Throwable $e) { $webBookingRef = null; }
+
 // Fetch parts linked to this order
 $stmt = $pdo->prepare("SELECT oi.*, i.part_name FROM order_items oi JOIN inventory i ON oi.inventory_id = i.id WHERE oi.order_id = ?");
 $stmt->execute([$id]);
@@ -122,12 +141,23 @@ function localizedOrderStatusLabel(string $status): string {
                         <i class="fas fa-trash me-1"></i> <?php echo __('delete'); ?>
                     </button>
                     <?php endif; ?>
-                    <h5 class="mb-0">
-                        <?php echo __('order'); ?> <?php echo e(orderDisplayCode($order)); ?> - <?php echo htmlspecialchars($order['device_model']); ?>
-                        <span class="text-white-75 fw-normal ms-2" style="font-size: 0.9rem;">
-                            (<?php echo __('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?>)
-                        </span>
-                    </h5>
+                    <div>
+                        <h5 class="mb-0">
+                            <?php echo __('order'); ?> <?php echo e(orderDisplayCode($order)); ?> - <?php echo htmlspecialchars($order['device_model']); ?>
+                            <span class="text-white-75 fw-normal ms-2" style="font-size: 0.9rem;">
+                                (<?php echo __('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?>)
+                            </span>
+                        </h5>
+                        <?php if (!empty($webBookingRef['wp_booking_id'])): ?>
+                        <div class="small mt-1" style="color:#5fd2ff;">
+                            <i class="fas fa-globe me-1"></i><?php echo __('web_booking_no'); ?>
+                            <span class="fw-bold font-monospace"><?php echo e((string)$webBookingRef['wp_booking_id']); ?></span>
+                            <?php if (!empty($webBookingRef['appointment_at'])): ?>
+                                <span class="text-white-75 ms-2"><i class="far fa-clock me-1"></i><?php echo date('j.n.Y H:i', strtotime((string)$webBookingRef['appointment_at'])); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <?php echo getStatusBadge($order['status']); ?>
             </div>

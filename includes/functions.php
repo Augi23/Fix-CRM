@@ -550,17 +550,29 @@ function generateNextOrderCode(PDO $pdo): ?string
              LIMIT 1"
         )->fetch();
     } catch (Throwable $e) {
-        return null;
+        // REGEXP/REGEXP_REPLACE nemusí být k dispozici → jednodušší dotaz (řada APFAZ…)
+        try {
+            $row = $pdo->query(
+                "SELECT order_code FROM orders
+                 WHERE order_code LIKE 'APFAZ%'
+                 ORDER BY LENGTH(order_code) DESC, order_code DESC
+                 LIMIT 1"
+            )->fetch();
+        } catch (Throwable $e2) {
+            return null;   // DB nedostupná — INSERT by stejně selhal
+        }
     }
     if (!$row || !preg_match('/^([A-Za-z]+)([0-9]+)$/', (string)$row['order_code'], $m)) {
-        return null;
+        // V DB zatím žádný kód v očekávaném tvaru → založit novou řadu APFAZ<rr>00001,
+        // ať zakázka NIKDY nezůstane bez kódu (jinak by se uživateli ukazovalo interní #ID).
+        $m = [null, 'APFAZ', date('y') . '00000'];
     }
     $prefix = $m[1];
     $digits = $m[2];
     $len = strlen($digits);
     $next = (int)$digits + 1;
     // pojistka proti kolizi (souběžné založení)
-    for ($i = 0; $i < 5; $i++) {
+    for ($i = 0; $i < 50; $i++) {
         $candidate = $prefix . str_pad((string)$next, $len, '0', STR_PAD_LEFT);
         $chk = $pdo->prepare('SELECT COUNT(*) FROM orders WHERE order_code = ?');
         $chk->execute([$candidate]);
@@ -3111,6 +3123,79 @@ function crmExtractWebPriority(array $payload): string {
     return 'Normal';
 }
 
+/**
+ * Přeloží způsob předání / service_method z RepairPluginu (anglicky z pluginu)
+ * do jazyka CRM. Neznámou hodnotu vrátí beze změny.
+ *   „Come by our store" | „Ship Device" | „Pickup Service"
+ */
+function crmTranslateWebServiceMethod(string $raw, ?string $lang = null): string {
+    $raw = trim($raw);
+    if ($raw === '') return '';
+    $lang = $lang ?: (function_exists('crm_get_language') ? crm_get_language() : 'cs');
+    $t = crmFoldText($raw);
+    // kanonické klíče → [cs, en, ru]
+    $map = [
+        'store'  => ['cs' => 'Osobně na prodejně', 'en' => 'Come by our store', 'ru' => 'Лично в магазине'],
+        'ship'   => ['cs' => 'Zaslání poštou',      'en' => 'Ship device',       'ru' => 'Отправка почтой'],
+        'pickup' => ['cs' => 'Vyzvednutí u zákazníka','en' => 'Pickup service',   'ru' => 'Забор у клиента'],
+    ];
+    $key = null;
+    if (preg_match('/come ?by|our ?store|\bstore\b|osobn|prodejn|na ?prodejn/', $t))      $key = 'store';
+    elseif (preg_match('/ship|posta|postou|postou|mail|posli|zasl/', $t))                 $key = 'ship';
+    elseif (preg_match('/pick ?up|vyzvednu|svoz|kuryr|courier/', $t))                     $key = 'pickup';
+    if ($key === null) return $raw;                       // neznámé → nechat originál
+    return $map[$key][$lang] ?? $map[$key]['cs'];
+}
+
+/**
+ * Zruší rezervaci z webu při cancelled/deleted webhooku z RepairPluginu.
+ * - web_booking → 'dismissed' (i když už byla převedena na zakázku)
+ * - pokud z ní vznikla zakázka a ta je stále čerstvá (stav „Přijato z RepairPluginu"
+ *   nebo skupina new), nastaví ji na „Stornováno" + poznámka; u rozpracované zakázky
+ *   status NEmění, jen přidá varovnou poznámku (chrání práci technika).
+ * - odstraní událost z firemního CalDAV kalendáře.
+ */
+function crmCancelWebBooking(int $bookingId): void {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM web_bookings WHERE id = ? LIMIT 1");
+        $stmt->execute([$bookingId]);
+        $b = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$b) return;
+
+        $orderId = (int)($b['order_id'] ?? 0);
+        if ($orderId > 0) {
+            $o = $pdo->prepare("SELECT id, status, technician_notes FROM orders WHERE id = ? LIMIT 1");
+            $o->execute([$orderId]);
+            $order = $o->fetch(PDO::FETCH_ASSOC);
+            if ($order) {
+                $curStatus = (string)$order['status'];
+                $stamp = date('j.n.Y H:i');
+                $isFresh = ($curStatus === 'Přijato z RepairPluginu') || isOrderStatusIn($curStatus, 'new');
+                if ($isFresh && !isOrderStatusIn($curStatus, 'cancelled')) {
+                    $note = trim((string)$order['technician_notes']);
+                    $note = ($note !== '' ? $note . "\n" : '') . '⚠ Rezervace zrušena na webu (RepairPlugin) ' . $stamp . ' → zakázka stornována.';
+                    $pdo->prepare("UPDATE orders SET status = 'Stornováno', technician_notes = ? WHERE id = ?")
+                        ->execute([$note, $orderId]);
+                    if (function_exists('logOrderStatusChange')) { try { logOrderStatusChange($orderId, $curStatus, 'Stornováno'); } catch (Throwable $e) {} }
+                    if (function_exists('assignmentSegmentSync')) { try { assignmentSegmentSync($orderId, $curStatus, 'Stornováno'); } catch (Throwable $e) {} }
+                } else {
+                    // rozpracovaná / hotová zakázka → neměnit stav, jen upozornit
+                    $note = trim((string)$order['technician_notes']);
+                    $note = ($note !== '' ? $note . "\n" : '') . '⚠ POZOR: zákazník zrušil rezervaci na webu ' . $stamp . ' (zakázka je již rozpracovaná — zkontrolujte).';
+                    $pdo->prepare("UPDATE orders SET technician_notes = ? WHERE id = ?")->execute([$note, $orderId]);
+                }
+            }
+        }
+
+        // rezervace pryč z panelu (i converted) + z kalendáře
+        $pdo->prepare("UPDATE web_bookings SET status = 'dismissed' WHERE id = ?")->execute([$bookingId]);
+        if (function_exists('crmDeleteWebBookingFromCalDav')) { crmDeleteWebBookingFromCalDav($bookingId); }
+    } catch (Throwable $e) {
+        error_log('crmCancelWebBooking: ' . $e->getMessage());
+    }
+}
+
 /** Odhad typu zařízení (ENUM orders.device_type) z názvu zařízení. */
 function crmGuessDeviceType(string $device): string {
     $d = mb_strtolower($device);
@@ -3207,8 +3292,9 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
 
         // Poznámka technikovi: termín z webu + způsob + zákaznická poznámka
         $noteBits = ['Zdroj: web (applefix.cz)'];
+        if (!empty($b['wp_booking_id'])) { $noteBits[] = 'Objednávka z webu č. ' . $b['wp_booking_id']; }
         if (!empty($b['appointment_at'])) { $noteBits[] = 'Termín z webu: ' . date('j.n.Y H:i', strtotime((string)$b['appointment_at'])); }
-        if (!empty($b['delivery_method'])) { $noteBits[] = 'Způsob: ' . $b['delivery_method']; }
+        if (!empty($b['delivery_method'])) { $noteBits[] = 'Způsob: ' . crmTranslateWebServiceMethod((string)$b['delivery_method'], 'cs'); }
         if (!empty($b['notes'])) { $noteBits[] = 'Poznámka zákazníka: ' . $b['notes']; }
         $techNotes = implode("\n", $noteBits);
 

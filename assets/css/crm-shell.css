@@ -531,3 +531,20 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
   color: #4df0b8 !important; font-weight: 600 !important; white-space: nowrap; font-variant-numeric: tabular-nums;
 }
 .afx-webres-order:hover { background: rgba(16,226,155,.22) !important; color: #fff !important; }
+
+/* Nástěnka — kompaktní widget Rezervace z webu (objednávkové časy) */
+.afx-dash-webres-item {
+  display: flex; align-items: center; gap: 12px; padding: 9px 6px;
+  border-bottom: 1px solid rgba(255,255,255,.06); transition: background .15s ease;
+}
+.afx-dash-webres-item:last-child { border-bottom: none; }
+.afx-dash-webres-item:hover { background: rgba(255,255,255,.04); border-radius: 10px; }
+.afx-dash-webres-time { flex: 0 0 52px; text-align: center; line-height: 1.05; }
+.afx-dash-webres-time b { display: block; font-size: 15px; font-weight: 700; color: #eef2f8; font-variant-numeric: tabular-nums; }
+.afx-dash-webres-time small { font-size: 10px; color: rgba(255,255,255,.45); font-weight: 500; }
+.afx-dash-webres-time.is-today b { color: #5fd2ff; text-shadow: 0 0 12px rgba(95,210,255,.45); }
+.afx-dash-webres-time.is-today small { color: #5fd2ff; }
+.afx-dash-webres-info { flex: 1 1 auto; min-width: 0; }
+.afx-dash-webres-name { font-size: 13.5px; font-weight: 600; color: #f2f5fa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.afx-dash-webres-sub { font-size: 11px; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.afx-dash-webres-badge { flex: 0 0 auto; font-variant-numeric: tabular-nums; }

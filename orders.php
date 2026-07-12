@@ -301,14 +301,14 @@ if (($search ?? '') === '' && !$filter_status && $page === 1) {
                 <div class="afx-webres-meta">
                     <?php if (!empty($wb['device'])): ?><span><i class="fas fa-mobile-screen"></i> <?php echo e($wb['device']); ?></span><?php endif; ?>
                     <?php if (!empty($wb['service'])): ?><span><i class="fas fa-wrench"></i> <?php echo e($wb['service']); ?></span><?php endif; ?>
-                    <?php if (!empty($wb['delivery_method'])): ?><span><i class="fas fa-hand-holding"></i> <?php echo e($wb['delivery_method']); ?></span><?php endif; ?>
+                    <?php if (!empty($wb['delivery_method'])): ?><span><i class="fas fa-hand-holding"></i> <?php echo e(crmTranslateWebServiceMethod((string)$wb['delivery_method'])); ?></span><?php endif; ?>
                     <?php if (!empty($wb['notes'])): ?><span class="afx-webres-note" title="<?php echo e($wb['notes']); ?>"><i class="far fa-comment-dots"></i> <?php echo e(mb_strimwidth($wb['notes'], 0, 60, '…')); ?></span><?php endif; ?>
                 </div>
             </div>
             <div class="afx-webres-acts">
                 <?php if (!empty($wb['order_id'])): ?>
                     <a class="btn btn-sm afx-webres-order" href="view_order.php?id=<?php echo (int)$wb['order_id']; ?>" title="Otevřít zakázku">
-                        <i class="fas fa-file-lines me-1"></i><?php echo e($wb['wb_order_code'] ?: ('#' . (int)$wb['order_id'])); ?>
+                        <i class="fas fa-file-lines me-1"></i><?php echo e($wb['wb_order_code'] ?: ($wb['wp_booking_id'] ?: __('order'))); ?>
                     </a>
                 <?php else: ?>
                     <button type="button" class="btn btn-sm afx-webres-take"

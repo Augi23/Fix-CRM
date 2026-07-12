@@ -161,11 +161,11 @@ try {
 
     if ($statusW === 'cancelled') {
         if ($existing) {
-            $pdo->prepare("UPDATE web_bookings SET status = 'dismissed' WHERE id = ? AND status = 'new'")
-                ->execute([(int)$existing['id']]);
-            crmDeleteWebBookingFromCalDav((int)$existing['id']);
+            // Zrušení/smazání na webu → skrýt rezervaci (i převedenou) a stornovat
+            // čerstvou zakázku; rozpracovanou jen označit poznámkou. + smazat z kalendáře.
+            crmCancelWebBooking((int)$existing['id']);
         }
-        echo json_encode(['success' => true, 'message' => 'Cancelled noted']);
+        echo json_encode(['success' => true, 'message' => 'Cancelled noted', 'id' => $existing ? (int)$existing['id'] : null]);
         exit;
     }
 
