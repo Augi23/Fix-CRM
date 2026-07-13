@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '03:57',
+        'title' => 'Historie úprav ukazuje i čas',
+        'items' => [
+            'Každý záznam v Historii úprav má vedle data nově i čas dokončení. Časy jsou doplněné zpětně i ke starším záznamům z posledních dní.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
+        'time' => '03:53',
         'title' => 'Nová ikona CRM v záložce prohlížeče',
         'items' => [
             'CRM má v záložce prohlížeče (favicon) logo AppleFix — černé jablko se zeleným křížem. Platí pro administraci, přihlášení i klientský portál.',
@@ -14,6 +23,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '03:51',
         'title' => 'Oprava chyby při změně stavu / mazání zakázek bez technika',
         'items' => [
             'U zakázek bez přiřazeného technika (typicky nové zakázky z webu) končila změna stavu, stornování či úprava chybou „Integrity constraint violation… technician_id". Systém se pokoušel uložit neexistujícího technika č. 0 — nyní správně ukládá „bez technika".',
@@ -21,6 +31,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '03:44',
         'title' => 'Drobné texty v tabulkách už nejsou verzálkami',
         'items' => [
             'E-mail, způsob dopravy a další drobné texty v řádcích zakázek se ukazovaly VELKÝMI PÍSMENY (pravidlo určené pro statistické karty dopadalo i na tabulky). Nyní jsou normálním textem v čitelné velikosti.',
@@ -28,6 +39,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '03:40',
         'title' => 'Kompaktnější sloupec Priorita',
         'items' => [
             'Štítky priority (Klidná / Normální / Urgentní) jsou menší a sloupec Priorita zabírá jen šířku nejširšího štítku — víc místa zbývá pro popis závady a stav.',
@@ -35,6 +47,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '03:39',
         'title' => 'Opravena ikona tisku ve sloupci Akce',
         'items' => [
             'Ikona tiskárny u tlačítka tisku se zobrazovala zdeformovaně (zmenšená pravidlem pro drobné texty v tabulce). Nyní má správnou velikost jako ostatní ikony akcí.',
@@ -42,6 +55,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '03:38',
         'title' => 'E-mail klienta přímo v seznamu zakázek',
         'items' => [
             'Ve sloupci Klient je pod telefonem nově i e-mail klienta (pokud je vyplněný) — kliknutím se rovnou otevře nový e-mail.',
@@ -49,6 +63,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '03:38',
         'title' => 'Dnešní objednané termíny z webu jemně pulzují',
         'items' => [
             'Pokud je oprava z webu objednaná na dnešek, štítek s časem lehce pulzuje (světelný nádech). Termíny na jiné dny zůstávají klidné.',
@@ -56,6 +71,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '03:37',
         'title' => '„Vydáno" už není černé — řádek splývá s pozadím okna',
         'items' => [
             'Řádky vydaných zakázek měly tmavší (skoro černé) pozadí než zbytek okna. Nově jsou průhledné, takže mají přesně stejnou barvu jako karta za nimi; stav „Vydáno" zůstává tmavě zelený štítek.',
@@ -63,6 +79,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '03:37',
         'title' => 'Větší štítek s objednaným časem u zakázek z webu',
         'items' => [
             'Modrý štítek s časem, na který si klient objednal opravu, je nyní stejně velký jako štítek stavu „Přijato z RepairPluginu" — lépe viditelný v seznamu zakázek i na nástěnce.',
@@ -70,6 +87,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '02:31',
         'title' => 'Odstraněny rušivé svislé čáry v seznamu zakázek',
         'items' => [
             'Urgentní a firemní zakázky vykreslovaly barevný proužek na začátku každé buňky řádku — vypadalo to jako červené (resp. modré) svislé oddělovací čáry přes celý řádek. Proužky jsou pryč; priorita je vidět ve svém sloupci a stav má nadále barevný proužek jen na levém okraji řádku.',
@@ -77,6 +95,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '00:49',
         'title' => 'Zakázky z webu mezi běžnými zakázkami + nové barvy řádků',
         'items' => [
             'Sekce „Rezervace z webu" zmizela — zakázky z RepairPluginu se zobrazují jako běžné zakázky mezi ostatními (v seznamu i na nástěnce).',
@@ -89,6 +108,7 @@ return [
     ],
     [
         'date' => '2026-07-13',
+        'time' => '00:14',
         'title' => 'Rezervace z webu: nástěnka, časy, zrušení z webu a čísla objednávek',
         'items' => [
             'Na nástěnce je nový panel „Rezervace z webu" s nadcházejícími termíny — objednávkový čas je vidět na první pohled (dnešní termíny svítí modře).',
@@ -100,6 +120,7 @@ return [
     ],
     [
         'date' => '2026-07-12',
+        'time' => '23:33',
         'title' => 'Historie stavů: opraveny divné symboly u nově založených zakázek',
         'items' => [
             'U zakázek založených rovnou (např. z RepairPluginu) se v historii stavů zobrazoval prázdný rámeček a rozbitá šipka. Nově se u první položky ukáže „Vytvořeno“ + samotný stav a mezi stavy je čitelná šipka „→“.',
@@ -107,6 +128,7 @@ return [
     ],
     [
         'date' => '2026-07-12',
+        'time' => '23:28',
         'title' => 'Tisk zakázkového listu vždy na A4 na výšku',
         'items' => [
             'Zakázkový list se dřív u některých tiskáren vytiskl na šířku — obsah byl širší (222 mm) než A4 na výšku (210 mm), tak se orientace otočila. Nově je natvrdo vynuceno A4 na výšku a list je omezen na šířku stránky.',
@@ -114,6 +136,7 @@ return [
     ],
     [
         'date' => '2026-07-12',
+        'time' => '23:20',
         'title' => 'Priorita zakázek: Klidná / Normální / Urgentní + přenos z webu',
         'items' => [
             'Nová třetí priorita „Klidná" — pro zákazníky, kteří nespěchají. V přidání zakázky je místo zaškrtávátka „urgentní" rozbalovací výběr priority.',
@@ -125,6 +148,7 @@ return [
     ],
     [
         'date' => '2026-07-12',
+        'time' => '20:31',
         'title' => 'Nový stav „Přijato z RepairPluginu" (fialový)',
         'items' => [
             'Zakázky automaticky založené z webové rezervace mají nový stav „Přijato z RepairPluginu" ve fialové barvě — na první pohled je vidět, že přišly z webu.',

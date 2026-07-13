@@ -1097,7 +1097,7 @@ require_once 'includes/header.php';
                             <?php foreach (array_slice($crm_history, 0, 50) as $hz): ?>
                                 <div class="mb-3 pb-2 border-bottom border-secondary">
                                     <div class="fw-bold text-white">
-                                        <span class="badge bg-primary me-2"><?php echo e(date('d.m.Y', strtotime((string)$hz['date']))); ?></span>
+                                        <span class="badge bg-primary me-2"><?php echo e(date('d.m.Y', strtotime((string)$hz['date']))); ?><?php if (!empty($hz['time'])): ?> · <?php echo e((string)$hz['time']); ?><?php endif; ?></span>
                                         <?php echo e((string)$hz['title']); ?>
                                     </div>
                                     <?php if (!empty($hz['items'])): ?>
