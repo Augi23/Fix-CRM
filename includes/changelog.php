@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:31',
+        'title' => 'Počítadla v horním menu sedí na ikonách + počítadlo reklamací',
+        'items' => [
+            'Číselný ukazatel (např. počet aktivních zakázek) už se nebije s názvem záložky — sedí vždy na pravém horním rohu ikony, jako na iPhonu.',
+            'Reklamace mají nově vlastní oranžové počítadlo — ukazuje počet reklamací, které nejsou vyřízené ani zamítnuté.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:28',
         'title' => 'Více oprav na jedné zakázce z ceníku',
         'items' => [

@@ -89,6 +89,14 @@ try {
     $ordersBadgeCount = 0;
 }
 
+// Počet aktivních reklamací (badge v menu) — vše mimo Vyřízeno/Zamítnuto
+$complaintsBadgeCount = 0;
+try {
+    $complaintsBadgeCount = (int)($pdo->query("SELECT COUNT(*) FROM complaints WHERE complaint_status NOT IN ('Vyřízeno','Zamítnuto')")->fetchColumn() ?: 0);
+} catch (Throwable $e) {
+    $complaintsBadgeCount = 0;
+}
+
 // Počet čekajících položek nákupního seznamu (badge v menu)
 $shoppingListBadgeCount = 0;
 try {
@@ -264,6 +272,7 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
             <i class="fas fa-tools"></i><small><?php echo __('orders'); ?></small>
         </a>
         <a class="afx-cell <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php">
+            <?php if ($complaintsBadgeCount > 0): ?><span class="afx-badge afx-badge--warn"><?php echo $complaintsBadgeCount; ?></span><?php endif; ?>
             <i class="fas fa-rotate-left"></i><small><?php echo __('complaints'); ?></small>
         </a>
         <a class="afx-cell <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php">
