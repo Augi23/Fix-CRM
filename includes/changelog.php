@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '06:10',
+        'title' => 'Dokumenty pro klienta se tisknou v jeho jazyce',
+        'items' => [
+            'Zakázkový list, účtenka, příjmový akt i reklamační protokol se automaticky otevírají v jazyce zvoleném u klienta — bez ručního vybírání. Ruční volba jazyka při tisku má nadále přednost.',
+            'Ukrajinským klientům se dokumenty zatím tisknou anglicky (překlad dokumentů do ukrajinštiny lze doplnit); e-maily jim odcházejí plně ukrajinsky.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '06:09',
         'title' => 'Jazyky zákazníka: čeština / angličtina / ukrajinština',
         'items' => [

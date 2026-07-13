@@ -2212,6 +2212,13 @@ function ensureCustomerLanguageColumn(): void {
     } catch (Throwable $e) { /* best-effort */ }
 }
 
+/** Jazyk pro DOKUMENTY klienta (tisk): cs/en přímo; ukrajinsky zatím dokumenty
+ *  přeložené nejsou → uk klientům se tisknou anglicky (e-maily jdou plně ukrajinsky). */
+function crmCustomerDocLang($preferredLanguage): string {
+    $lang = normalizeCustomerLanguage($preferredLanguage);
+    return $lang === 'uk' ? 'en' : $lang;
+}
+
 function normalizeCustomerLanguage($lang): string {
     $lang = strtolower(trim((string)$lang));
     return in_array($lang, ['cs', 'en', 'uk'], true) ? $lang : 'cs';

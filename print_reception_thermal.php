@@ -13,12 +13,16 @@ function _l($key) {
     return __($key, $target_lang);
 }
 
-$stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address 
+$stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address, c.preferred_language 
                        FROM orders o 
                        JOIN customers c ON o.customer_id = c.id 
                        WHERE o.id = ?");
 $stmt->execute([$id]);
 $order = $stmt->fetch();
+// bez ?lang → jazyk klienta (crm_normalize_language('' ) vrátí null → default níže)
+if (!isset($_GET['lang']) && $order) {
+    $target_lang = crmCustomerDocLang($order['preferred_language'] ?? 'cs');
+}
 
 if (!$order) die("Заказ не найден");
 

@@ -9,7 +9,7 @@ if (!defined('THERMAL_DOC_EMBED')) {
     if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
 
     $id = $_GET['id'] ?? $_GET['order_id'];
-    $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address
+    $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address, c.preferred_language
                            FROM orders o
                            JOIN customers c ON o.customer_id = c.id
                            WHERE o.id = ?");
@@ -25,7 +25,7 @@ if (!defined('THERMAL_DOC_EMBED')) {
 
     $currency = get_setting('currency', 'Kč');
 
-    $target_lang = $_GET['lang'] ?? 'cs';
+    $target_lang = $_GET['lang'] ?? crmCustomerDocLang($order['preferred_language'] ?? 'cs');
 }
 if (!function_exists('_l')) {
     function _l($key) { global $target_lang; return __($key, $target_lang); }

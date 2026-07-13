@@ -10,7 +10,7 @@ if (!defined('COMPLAINT_DOC_EMBED')) {
     if (!isset($_GET['id'])) die("Complaint ID is not specified");
 
     $cid = (int)$_GET['id'];
-    $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, cu.phone AS cust_phone, cu.email, cu.address
+    $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, cu.phone AS cust_phone, cu.email, cu.address, cu.preferred_language
                            FROM complaints c
                            LEFT JOIN customers cu ON cu.id = c.customer_id
                            WHERE c.id = ?");
@@ -25,7 +25,7 @@ if (!defined('COMPLAINT_DOC_EMBED')) {
         $complaintPhotos = $ps->fetchAll();
     } catch (Throwable $e) { $complaintPhotos = []; }
 
-    $target_lang = $_GET['lang'] ?? 'cs';
+    $target_lang = $_GET['lang'] ?? crmCustomerDocLang($complaint['preferred_language'] ?? 'cs');
 }
 $complaintPhotos = $complaintPhotos ?? [];
 $target_lang = $target_lang ?? 'cs';

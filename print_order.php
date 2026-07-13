@@ -10,7 +10,7 @@ if (!defined('ORDER_DOC_EMBED')) {
     if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
 
     $id = $_GET['id'] ?? $_GET['order_id'];
-    $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address, c.email
+    $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address, c.email, c.preferred_language
                            FROM orders o
                            JOIN customers c ON o.customer_id = c.id
                            WHERE o.id = ?");
@@ -23,7 +23,8 @@ if (!defined('ORDER_DOC_EMBED')) {
     $stmt->execute([$id]);
     $items = $stmt->fetchAll();
 
-    $target_lang = $_GET['lang'] ?? 'cs';
+    // bez ?lang → dokument v jazyce KLIENTA (volba při zakládání zakázky)
+    $target_lang = $_GET['lang'] ?? crmCustomerDocLang($order['preferred_language'] ?? 'cs');
 }
 if (!function_exists('_l')) {
     function _l($key) { global $target_lang; return __($key, $target_lang); }
