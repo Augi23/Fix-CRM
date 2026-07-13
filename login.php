@@ -221,7 +221,13 @@ if (!empty($_POST['ajax'])) {
     <title><?php echo e(__('login_title')); ?> - Repair CRM</title>
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
     <link rel="icon" type="image/png" href="/assets/img/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/img/favicon.png">
+    <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0d1512">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Fix-CRM">
+    <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(function () {}); }</script>
     <script>(function(){try{var t=localStorage.getItem('lg-theme')||'dark';document.documentElement.setAttribute('data-lg-theme',t);document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">

@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '08:30',
+        'title' => 'CRM jako aplikace na telefonu a tabletu',
+        'items' => [
+            'CRM si nově přidáš na plochu telefonu jako plnohodnotnou aplikaci — s ikonou AppleFix (bílé jablko se zeleným křížem na tmavém podkladu) a spouštěním na celou obrazovku bez adresního řádku.',
+            'iPhone/iPad: otevři admin.applefix.cloud v Safari → tlačítko Sdílet → „Přidat na plochu". Android: Chrome → menu ⋮ → „Přidat na plochu" (nebo nabídka „Nainstalovat aplikaci").',
+            'Funguje pro administraci i klientský portál; žádné ukládání dat do mezipaměti — appka vždy ukazuje živá data.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '07:34',
         'title' => 'Expresní příplatek / sleva u priority i při ručním založení zakázky',
         'items' => [

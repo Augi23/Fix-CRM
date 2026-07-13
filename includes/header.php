@@ -105,7 +105,13 @@ try {
     <title><?php echo e(get_setting('company_name', 'Repair CRM')); ?> - <?php echo e(__('dashboard')); ?></title>
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
     <link rel="icon" type="image/png" href="/assets/img/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/img/favicon.png">
+    <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0d1512">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Fix-CRM">
+    <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(function () {}); }</script>
     <meta name="csrf-token" content="<?php echo e($_SESSION['csrf_token'] ?? ''); ?>">
     <script>(function(){try{var t=localStorage.getItem('lg-theme')||'dark';document.documentElement.setAttribute('data-lg-theme',t);document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
 

@@ -1,0 +1,17 @@
+{
+  "name": "Fix-CRM — AppleFix",
+  "short_name": "Fix-CRM",
+  "description": "Servisní systém AppleFix — zakázky, klienti, sklad.",
+  "lang": "cs",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1512",
+  "theme_color": "#0d1512",
+  "icons": [
+    { "src": "/assets/img/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/img/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/img/app-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
