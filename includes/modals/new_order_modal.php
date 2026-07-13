@@ -210,6 +210,12 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <div class="col-md-3" id="priorityAdjustWrap" style="display:none;"
+                                     data-label-high="<?php echo e(__('priority_surcharge_label')); ?>"
+                                     data-label-low="<?php echo e(__('priority_discount_label')); ?>">
+                                    <label class="form-label" id="priorityAdjustLabel"><?php echo e(__('priority_surcharge_label')); ?></label>
+                                    <input type="number" name="priority_adjust" id="priorityAdjust" class="form-control" min="0" step="1" placeholder="0">
+                                </div>
                                 <?php if (!empty($order_templates_modal)): ?>
                                 <div class="col-md-<?php echo !empty($order_note_templates_modal) ? '4' : '9'; ?>">
                                     <label class="form-label"><?php echo __('templates'); ?></label>

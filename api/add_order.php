@@ -31,6 +31,14 @@ $pin_code         = trim($_POST['pin_code'] ?? '');
 $appearance       = trim($_POST['appearance'] ?? '');
 $priority         = normalizeOrderPriority($_POST['priority'] ?? '');
 $estimated_cost   = max(0, filter_input(INPUT_POST, 'estimated_cost', FILTER_VALIDATE_FLOAT) ?: 0);
+// Příplatek (Urgentní) / sleva (Klidná) k prioritě — zadává se kladné číslo
+$priority_adjust  = abs((float)str_replace(',', '.', (string)($_POST['priority_adjust'] ?? 0)));
+if ($priority === 'Low') { $priority_adjust = -$priority_adjust; }
+elseif ($priority !== 'High') { $priority_adjust = 0.0; }
+$base_cost = $estimated_cost;
+if ($priority_adjust != 0.0) {
+    $estimated_cost = max(0, $estimated_cost + $priority_adjust);   // celková cena vč. příplatku/slevy
+}
 $shipping_method  = trim($_POST['shipping_method'] ?? '') ?: null;
 $status           = getDefaultOrderStatus();
 
@@ -67,6 +75,14 @@ try {
         $pin_code, $appearance, $priority, $estimated_cost, $shipping_method, $status, $new_order_code
     ]);
     $order_id = (int)$pdo->lastInsertId();
+
+    // Rozpis ceny na zakázkový list: základ opravy + expresní příplatek / sleva
+    if ($priority_adjust != 0.0 && $base_cost > 0) {
+        try {
+            crmAddOrderPriceLine($order_id, 'Oprava' . ($problem_description !== '' ? ': ' . (function_exists('mb_strimwidth') ? mb_strimwidth($problem_description, 0, 80, '…') : substr($problem_description, 0, 80)) : ''), $base_cost, 0);
+            crmAddOrderPriceLine($order_id, $priority === 'High' ? 'Expresní příplatek (přednostní oprava)' : 'Sleva — oprava beze spěchu', $priority_adjust, 1);
+        } catch (Throwable $e) { /* rozpis je bonus */ }
+    }
     assignmentSegmentSync($order_id, $technician_id ? (int)$technician_id : null, (string)$status);
 
     logOrderStatusChange($order_id, '', $status);

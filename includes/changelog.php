@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '07:34',
+        'title' => 'Expresní příplatek / sleva u priority i při ručním založení zakázky',
+        'items' => [
+            'Když ve wizardu vybereš prioritu Urgentní, objeví se pole „Expresní příplatek" — částka se přičte k ceně opravy a na zakázkovém listu se vytiskne rozepsaně (oprava + příplatek + celkem). U priority Klidná jde stejně zadat sleva. Stejná logika, jakou má objednávka z webu.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '07:32',
         'title' => 'Zakázkový list s rozepsanou cenou (příplatky a slevy)',
         'items' => [

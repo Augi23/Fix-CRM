@@ -1377,3 +1377,21 @@ window.openOrderDocChoice = function (orderId, code) {
         }, 20000);
     }
 }());
+
+
+// Wizard: příplatek (Urgentní) / sleva (Klidná) k prioritě — vstup se ukáže dle volby
+$(document).on('change', '#priorityHighModal', function () {
+    const v = $(this).val();
+    const $w = $('#priorityAdjustWrap');
+    if (!$w.length) return;
+    if (v === 'High') {
+        $('#priorityAdjustLabel').text($w.data('label-high'));
+        $w.show();
+    } else if (v === 'Low') {
+        $('#priorityAdjustLabel').text($w.data('label-low'));
+        $w.show();
+    } else {
+        $w.hide();
+        $('#priorityAdjust').val('');
+    }
+});
