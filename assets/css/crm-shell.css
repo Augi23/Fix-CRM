@@ -544,6 +544,14 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
 .afx-booked-chip.is-today {
   background: rgba(95,210,255,.20); border-color: rgba(95,210,255,.62);
   box-shadow: 0 0 14px rgba(95,210,255,.28);
+  animation: afxBookedPulse 2.4s ease-in-out infinite;   /* jen dnešní termín pulzuje */
+}
+@keyframes afxBookedPulse {
+  0%, 100% { box-shadow: 0 0 8px  rgba(95,210,255,.18); border-color: rgba(95,210,255,.45); }
+  50%      { box-shadow: 0 0 20px rgba(95,210,255,.55); border-color: rgba(95,210,255,.95); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .afx-booked-chip.is-today { animation: none; }
 }
 html[data-lg-theme="light"] .afx-booked-chip {
   background: #E5F6FD; border-color: #9BDCF8; color: #0369a1; box-shadow: none;

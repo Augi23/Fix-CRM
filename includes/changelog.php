@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-13',
+        'title' => 'Dnešní objednané termíny z webu jemně pulzují',
+        'items' => [
+            'Pokud je oprava z webu objednaná na dnešek, štítek s časem lehce pulzuje (světelný nádech). Termíny na jiné dny zůstávají klidné.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'title' => '„Vydáno" už není černé — řádek splývá s pozadím okna',
         'items' => [
             'Řádky vydaných zakázek měly tmavší (skoro černé) pozadí než zbytek okna. Nově jsou průhledné, takže mají přesně stejnou barvu jako karta za nimi; stav „Vydáno" zůstává tmavě zelený štítek.',
