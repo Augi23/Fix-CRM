@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:07',
+        'title' => 'Ceník oprav z applefix.cz v CRM',
+        'items' => [
+            'CRM si umí stáhnout kompletní ceník oprav z objednávkového formuláře na webu (RepairPlugin) — všechny Apple modely, opravy i varianty dílů (Originál / Repas…) s cenami.',
+            'Načtení: Nastavení → Integrace → „Načíst ceník Apple z webu" (trvá 1–2 minuty, projede Smartphone, Tablet, Notebook i Stolní počítače). Po změně cen na webu stačí kliknout znovu.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '08:56',
         'title' => 'Zakázkový list e-mailem odchází v jazyce klienta',
         'items' => [

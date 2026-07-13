@@ -2212,6 +2212,106 @@ function ensureCustomerLanguageColumn(): void {
     } catch (Throwable $e) { /* best-effort */ }
 }
 
+/** ── Ceník oprav z applefix.cz (RepairPlugin) ─────────────────────────────
+ *  Sync přes veřejné AJAX endpointy objednávkového formuláře (rp_fe_get_models /
+ *  rp_fe_get_repairs). Ceny jsou u variant oprav (Originál / Repas…); oprava bez
+ *  varianty s cenou 0 = „na dotaz" (price NULL). Sync: Nastavení → Integrace. */
+function ensureRepairPricelistTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS repair_pricelist (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category VARCHAR(60) NOT NULL,
+            brand VARCHAR(60) NOT NULL,
+            model VARCHAR(120) NOT NULL,
+            model_code VARCHAR(190) NULL,
+            repair_name VARCHAR(150) NOT NULL,
+            variant VARCHAR(150) NULL,
+            price DECIMAL(10,2) NULL,
+            duration_min INT NULL,
+            synced_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_rpl_model (model),
+            INDEX idx_rpl_brand (brand, model)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+/** POST na admin-ajax.php applefix.cz; vrací dekódované JSON pole nebo null. */
+function crmPricelistFetch(array $post): ?array {
+    $ch = curl_init('https://applefix.cz/wp-admin/admin-ajax.php');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($post),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_USERAGENT => 'Fix-CRM pricelist sync (admin.applefix.cloud)',
+    ]);
+    $body = curl_exec($ch);
+    if (!is_string($body) || $body === '') { return null; }
+    $j = json_decode($body, true);
+    return is_array($j) ? $j : null;
+}
+
+/** Stáhne ceník jedné kategorie+značky (všechny modely) a nahradí ji v tabulce.
+ *  Vrací ['models' => n, 'rows' => m] nebo vyhazuje výjimku s popisem. */
+function crmSyncRepairPricelist(string $category, string $brand): array {
+    global $pdo;
+    ensureRepairPricelistTable();
+
+    $models = crmPricelistFetch(['action' => 'rp_fe_get_models', 'c_name' => $category, 'b_name' => $brand]);
+    $list = $models['results'] ?? null;
+    if (!is_array($list)) { throw new RuntimeException('Nepodařilo se načíst modely (' . $category . ' / ' . $brand . ').'); }
+
+    $rows = [];
+    foreach ($list as $m) {
+        // klíče odpovědi: A=id, B=název modelu, D=kódy modelu (A-čísla)
+        $mName = trim((string)($m['B'] ?? $m['m_name'] ?? ''));
+        $mCode = trim((string)($m['D'] ?? $m['m_code'] ?? ''));
+        if ($mName === '') { continue; }
+
+        $rep = crmPricelistFetch(['action' => 'rp_fe_get_repairs', 'b_name' => $brand, 'm_name' => $mName]);
+        if (!is_array($rep)) { continue; }
+        $repairs = array_merge((array)($rep['limited_repairs'] ?? []), (array)($rep['remaining_repairs'] ?? []));
+        $attrs = (array)($rep['repair_attrs_from_db'] ?? []);
+
+        foreach ($repairs as $r) {
+            $rName = trim((string)($r['r_name'] ?? ''));
+            if ($rName === '' || (string)($r['is_active'] ?? '1') !== '1') { continue; }
+            $rId = (string)($r['r_id'] ?? '');
+            $variants = (isset($attrs[$rId]) && is_array($attrs[$rId])) ? $attrs[$rId] : null;
+            if ($variants) {
+                foreach ($variants as $v) {
+                    // klíče: B=název varianty, D=cena, E=aktivní, H=doba trvání
+                    if ((string)($v['E'] ?? '1') !== '1') { continue; }
+                    $price = (float)preg_replace('/[^0-9.]/', '', str_replace(',', '.', (string)($v['D'] ?? '')));
+                    $rows[] = [$category, $brand, $mName, $mCode, $rName, trim((string)($v['B'] ?? '')), $price > 0 ? $price : null, (int)($v['H'] ?? 0) ?: null];
+                }
+            } else {
+                $price = (float)($r['r_price'] ?? 0);
+                $rows[] = [$category, $brand, $mName, $mCode, $rName, null, $price > 0 ? $price : null, (int)($r['r_duration'] ?? 0) ?: null];
+            }
+        }
+        usleep(120000);   // šetrné tempo vůči webu
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("DELETE FROM repair_pricelist WHERE category = ? AND brand = ?")->execute([$category, $brand]);
+        $ins = $pdo->prepare("INSERT INTO repair_pricelist (category, brand, model, model_code, repair_name, variant, price, duration_min) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        foreach ($rows as $row) { $ins->execute($row); }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        throw $e;
+    }
+    set_setting('pricelist_last_sync', date('Y-m-d H:i') . ' — ' . $category . ' / ' . $brand);
+    return ['models' => count($list), 'rows' => count($rows)];
+}
+
 /** Cenové řádky zakázky — rozpis ceny na zakázkovém listu (oprava, expresní
  *  příplatek, slevy…). Plní je webhook z RepairPluginu (items[]) a wizard CRM
  *  (příplatek/sleva dle priority). Rozpis se tiskne, když jsou aspoň 2 řádky. */

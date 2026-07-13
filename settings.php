@@ -584,6 +584,53 @@ require_once 'includes/header.php';
                     </div>
 
                     <div class="col-12 border-top border-secondary pt-3">
+                        <h5 class="mb-3 text-info"><i class="fas fa-tags me-2"></i>Ceník oprav z applefix.cz</h5>
+                        <?php
+                            ensureRepairPricelistTable();
+                            $plCount = 0; $plModels = 0;
+                            try {
+                                $plCount = (int)$pdo->query("SELECT COUNT(*) FROM repair_pricelist")->fetchColumn();
+                                $plModels = (int)$pdo->query("SELECT COUNT(DISTINCT CONCAT(brand,'|',model)) FROM repair_pricelist")->fetchColumn();
+                            } catch (Throwable $e) {}
+                            $plLast = get_setting('pricelist_last_sync', '');
+                        ?>
+                        <div class="small text-white-75 mb-2">
+                            Ceny oprav se stahují z objednávkového formuláře na applefix.cz (RepairPlugin) a nabízejí se při zakládání zakázky.
+                            Aktuálně v ceníku: <b class="text-white"><?php echo $plCount; ?></b> položek pro <b class="text-white"><?php echo $plModels; ?></b> modelů<?php echo $plLast !== '' ? ' · poslední načtení: ' . e($plLast) : ''; ?>.
+                        </div>
+                        <button type="button" class="btn btn-outline-info" id="afxSyncPricelistBtn">
+                            <i class="fas fa-rotate me-1"></i> Načíst ceník Apple z webu
+                        </button>
+                        <span class="small text-white-75 ms-2" id="afxSyncPricelistStatus"></span>
+                        <script>
+                        (function () {
+                            var btn = document.getElementById('afxSyncPricelistBtn');
+                            if (!btn) return;
+                            btn.addEventListener('click', async function () {
+                                var st = document.getElementById('afxSyncPricelistStatus');
+                                var cats = ['Smartphone', 'Tablet', 'Notebook', 'Stolní počítač'];
+                                btn.disabled = true;
+                                var total = 0;
+                                for (var i = 0; i < cats.length; i++) {
+                                    st.textContent = 'Načítám ' + cats[i] + '… (' + (i + 1) + '/' + cats.length + ')';
+                                    try {
+                                        var fd = new FormData();
+                                        fd.append('category', cats[i]);
+                                        fd.append('brand', 'Apple');
+                                        fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
+                                        var r = await fetch('api/sync_pricelist.php', { method: 'POST', body: fd });
+                                        var j = await r.json();
+                                        if (j.ok) { total += j.rows; } else { st.textContent = 'Chyba (' + cats[i] + '): ' + j.error; }
+                                    } catch (e) { st.textContent = 'Chyba spojení (' + cats[i] + ')'; }
+                                }
+                                st.textContent = 'Hotovo — načteno ' + total + ' cenových položek. Obnov stránku pro souhrn.';
+                                btn.disabled = false;
+                            });
+                        })();
+                        </script>
+                    </div>
+
+                    <div class="col-12 border-top border-secondary pt-3">
                         <h5 class="mb-3 text-info"><i class="fas fa-calendar-alt me-2"></i>Firemní kalendář (CalDAV) — rezervace z webu</h5>
                         <div class="form-check form-switch mb-3">
                             <input class="form-check-input" type="checkbox" name="caldav_booking_enabled" id="caldavBookingEnabled" value="1" <?php echo get_setting('caldav_booking_enabled', '0') === '1' ? 'checked' : ''; ?>>
