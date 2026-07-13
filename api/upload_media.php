@@ -55,11 +55,13 @@ $allowed_mime_to_ext = [
     'image/png' => 'png',
     'image/gif' => 'gif',
     'image/webp' => 'webp',
+    'image/heic' => 'heic',
+    'image/heif' => 'heif',
     'video/mp4' => 'mp4',
     'video/quicktime' => 'mov',
     'video/x-msvideo' => 'avi',
 ];
-$allowed_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi'];
+$allowed_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'mp4', 'mov', 'avi'];
 $success_count = 0;
 $rejected = [];
 
@@ -90,7 +92,9 @@ $finfo = finfo_open(FILEINFO_MIME_TYPE);
 foreach ($_FILES['files']['name'] as $key => $name) {
     $err = (int)($_FILES['files']['error'][$key] ?? UPLOAD_ERR_NO_FILE);
     if ($err !== UPLOAD_ERR_OK) {
-        $rejected[] = basename((string)$name) . " (upload error " . $err . ")";
+        $rejected[] = basename((string)$name) . ' — ' . (in_array($err, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)
+            ? 'soubor je větší než limit serveru (' . ini_get('upload_max_filesize') . ')'
+            : 'chyba nahrávání č. ' . $err);
         continue;
     }
 
