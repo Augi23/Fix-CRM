@@ -47,7 +47,7 @@ $co_email = $__bc['email'];
 
 // firemní identita na JEDEN řádek do záhlaví
 $__co_parts = [];
-$__addr1 = trim(preg_replace('/\s*[\r\n]+\s*/u', ' ', $co_addr));
+$__addr1 = trim(preg_replace('/\s*[\r\n]+\s*/u', ', ', $co_addr));
 if ($__addr1 !== '') $__co_parts[] = $__addr1;
 if ($co_ico !== '') $__co_parts[] = 'IČO: ' . $co_ico . ($co_dic !== '' ? ' · DIČ: ' . $co_dic : '');
 if ($co_phone !== '') $__co_parts[] = 'Tel.: ' . $co_phone;
@@ -83,13 +83,14 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
 <head>
     <meta charset="UTF-8">
     <title>Zakázkový list <?php echo e($orderCode); ?></title>
+    <?php if (!$__EMAIL_MODE): ?><link rel="stylesheet" href="assets/css/sf-pro.css?v=<?php echo (int)@filemtime(__DIR__ . '/assets/css/sf-pro.css'); ?>"><?php endif; ?>
     <style>
         :root {
             --ink:#111318; --sub:#4d5560; --muted:#949aa4; --line:#e8ebf0;
             --accent:#0a84ff; --accent-ink:#0a5bd6; --soft:#f6f8fb;
         }
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Arial, sans-serif;
+        body { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Arial, sans-serif;
                font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0; padding: 26px 18px;
                background: #eceff3; -webkit-font-smoothing: antialiased; }
         .sheet { max-width: 840px; margin: auto; background: #fff; border-radius: 18px; overflow: hidden;
@@ -102,12 +103,14 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
         .doc { text-align: right; }
         .doc .kick { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent-ink); font-weight: 800; }
         .doc h1 { margin: 3px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; font-family: ui-monospace, Menlo, monospace; }
-        .doc .date { font-size: 11px; color: var(--muted); margin-top: 5px; }
+        .doc .date { font-size: 11px; color: var(--muted); margin-top: 5px; font-weight: 300; }
 
-        /* firemní identita — jeden řádek v záhlaví */
-        .co-line { margin-top: 16px; padding: 9px 0 15px; border-bottom: 1px solid var(--line);
-                   font-size: 10.5px; color: var(--sub); }
-        .co-line b { color: var(--ink); font-weight: 800; }
+        /* firemní identita — designová PATIČKA dole (dřív řádek nahoře) */
+        .head-sep { margin-top: 16px; border-bottom: 1px solid var(--line); }
+        .foot { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); text-align: center; }
+        .foot .foot-name { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: var(--ink); }
+        .foot .foot-line { font-size: 10px; color: var(--muted); font-weight: 300; margin-top: 4px; letter-spacing: 0.02em; }
+        .foot .foot-line b { color: var(--sub); font-weight: 600; }
 
         /* dva sloupce: KLIENT | ZAŘÍZENÍ A OPRAVA */
         .cols { display: flex; gap: 16px; margin-top: 18px; }
@@ -121,7 +124,7 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
 
         .kv { display: flex; justify-content: space-between; gap: 14px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
         .kv:last-child { border-bottom: none; }
-        .kv .k { font-size: 11px; color: var(--muted); flex: 0 0 auto; padding-top: 1px; }
+        .kv .k { font-size: 11px; color: var(--muted); flex: 0 0 auto; padding-top: 1px; font-weight: 300; }
         .kv .v { font-size: 13px; font-weight: 700; text-align: right; word-break: break-word; }
         .kv .v.mono { font-family: ui-monospace, Menlo, monospace; }
         .kv .v.price { font-size: 15px; font-weight: 800; }
@@ -131,7 +134,7 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
                 border-radius: 9px; padding: 8px 10px; line-height: 1.5; }
 
         .legal { margin-top: 20px; padding-top: 14px; border-top: 2px solid var(--line);
-                 font-size: 8.4px; line-height: 1.6; color: #495059; text-align: justify; }
+                 font-size: 8.4px; line-height: 1.6; color: #495059; text-align: justify; font-weight: 300; }
         .legal p { margin: 0 0 8px; }
 
         .sigs { display: flex; gap: 44px; margin-top: 14px; }
@@ -180,7 +183,7 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
             </div>
         </div>
 
-        <div class="co-line"><b><?php echo e($co_name); ?></b>  ·  <?php echo e($co_line); ?></div>
+        <div class="head-sep"></div>
 
         <div class="cols">
             <div class="panel client">
@@ -228,6 +231,11 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
                 <div class="sig"></div>
                 <div class="sig"><div class="line">Podpis zákazníka</div></div>
             </div>
+        </div>
+
+        <div class="foot">
+            <div class="foot-name"><?php echo e($co_name); ?></div>
+            <div class="foot-line"><?php echo e($co_line); ?></div>
         </div>
     </div>
 </div>

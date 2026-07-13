@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '06:38',
+        'title' => 'Zakázkový list: písmo SF Pro a adresa v patičce',
+        'items' => [
+            'Zakázkový list používá firemní písmo SF Pro s jemnější typografií (tučné titulky, lehké popisky). Adresa a kontakty firmy se přesunuly z horní části do elegantní patičky na konci dokumentu.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '06:10',
         'title' => 'Dokumenty pro klienta se tisknou v jeho jazyce',
         'items' => [
