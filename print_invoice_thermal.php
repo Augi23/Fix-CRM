@@ -150,7 +150,8 @@ $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['paym
 
     <div class="footer">
         <div>Thank you for your trust!</div>
-        <div style="margin-top: 5px;"><?php echo get_setting('company_phone'); ?></div>
+        <?php $__bid = 0; try { $__bid = (int)$pdo->query("SELECT branch_id FROM orders WHERE id = " . (int)($invoice['order_id'] ?? 0))->fetchColumn(); } catch (Throwable $e) {} ?>
+        <div style="margin-top: 5px;"><?php echo htmlspecialchars(crmOrderBranchContact($__bid)['phone']); ?></div>
     </div>
 </div>
 

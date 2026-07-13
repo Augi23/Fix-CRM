@@ -77,8 +77,9 @@ if (!function_exists('_l')) {
 <div class="container">
     <div class="text-center">
         <div class="header bold"><?php echo htmlspecialchars(get_setting('company_name', 'Repair CRM')); ?></div>
-        <div style="font-size: 12px;"><?php echo htmlspecialchars(get_setting('company_address')); ?></div>
-        <div><?php echo _l('phone'); ?>: <?php echo htmlspecialchars(get_setting('company_phone')); ?></div>
+        <?php $__bc = crmOrderBranchContact((int)($order['branch_id'] ?? 0)); /* adresa dle pobočky zakázky */ ?>
+        <div style="font-size: 12px;"><?php echo htmlspecialchars($__bc['address_inline']); ?></div>
+        <div><?php echo _l('phone'); ?>: <?php echo htmlspecialchars($__bc['phone']); ?></div>
         <div class="line"></div>
         <div class="order-num bold"><?php echo mb_strtoupper(_l('order')); ?> <?php echo e(orderDisplayCode($order)); ?></div>
         <div class="bold"><?php echo mb_strtoupper(_l('collected')); ?></div>

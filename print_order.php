@@ -35,12 +35,14 @@ $__logo_fs = __DIR__ . '/assets/img/logo-black.png';
 $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((string)file_get_contents($__logo_fs)) : '';
 
 $co_name  = get_setting('company_name', 'AppleFix s.r.o.');
-$co_addr  = trim((string) get_setting('company_address', ''));
 $co_ico   = trim((string) get_setting('company_ico', ''));
 $co_dic   = trim((string) get_setting('company_dic', ''));
-$co_phone = trim((string) get_setting('company_phone', ''));
-$co_email = trim((string) get_setting('company_email', '')) ?: 'info@applefix.cz';
 $co_web   = trim((string) get_setting('company_web', '')) ?: 'www.applefix.cz';
+// adresa/telefon/e-mail dle POBOČKY zakázky (Karlín / Černá růže), fallback firma
+$__bc     = crmOrderBranchContact((int)($order['branch_id'] ?? 0));
+$co_addr  = $__bc['address'];
+$co_phone = $__bc['phone'];
+$co_email = $__bc['email'];
 
 // firemní identita na JEDEN řádek do záhlaví
 $__co_parts = [];

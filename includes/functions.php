@@ -2197,6 +2197,39 @@ function ensurePickupReadyColumns(PDO $pdo): void
     } catch (Throwable $e) { /* starší DB / bez oprávnění — funguje i bez těchto sloupců */ }
 }
 
+/** Kontakt POBOČKY zakázky pro všechny dokumenty (zakázkový list, účtenky, reklamační
+ *  protokol, e-maily): zakázka vystavená pobočkou nese JEJÍ adresu/telefon/e-mail.
+ *  Prázdná pole pobočky = fallback na globální nastavení firmy. */
+function crmOrderBranchContact($branchId): array {
+    global $pdo;
+    $out = [
+        'label'   => '',
+        'address' => trim((string)get_setting('company_address', '')),
+        'phone'   => trim((string)get_setting('company_phone', '')),
+        'email'   => trim((string)get_setting('company_email', '')) ?: 'info@applefix.cz',
+        'hours'   => '',
+    ];
+    try {
+        if (isset($pdo) && $pdo instanceof PDO) {
+            ensurePickupReadyColumns($pdo);
+            if ((int)$branchId > 0) {
+                $st = $pdo->prepare('SELECT name, address, opening_hours, contact_phone, contact_email FROM branches WHERE id = ? LIMIT 1');
+                $st->execute([(int)$branchId]);
+                if ($b = $st->fetch(PDO::FETCH_ASSOC)) {
+                    $out['label'] = trim((string)($b['name'] ?? ''));
+                    if (trim((string)($b['address'] ?? '')) !== '')       { $out['address'] = trim((string)$b['address']); }
+                    if (trim((string)($b['contact_phone'] ?? '')) !== '') { $out['phone'] = trim((string)$b['contact_phone']); }
+                    if (trim((string)($b['contact_email'] ?? '')) !== '') { $out['email'] = trim((string)$b['contact_email']); }
+                    $out['hours'] = trim((string)($b['opening_hours'] ?? ''));
+                }
+            }
+        }
+    } catch (Throwable $e) { /* fallback = globální firemní údaje */ }
+    // jednořádková varianta adresy pro hlavičky dokumentů
+    $out['address_inline'] = trim(preg_replace('/\s*\R\s*/u', ', ', $out['address']));
+    return $out;
+}
+
 /** Odešle klientovi e-mail, že je zakázka připravena k vyzvednutí (jen jednou, přes guard
  *  pickup_notified_at). Volá se při přechodu stavu do skupiny 'completed'. */
 function crmSendPickupReadyEmail(int $orderId): void

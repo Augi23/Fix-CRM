@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '05:15',
+        'title' => 'Všechny dokumenty se vystavují s adresou pobočky zakázky',
+        'items' => [
+            'Zakázkový list, účtenka, příjmový akt, faktura (termo) i reklamační protokol nesou adresu, telefon a e-mail POBOČKY, pod kterou zakázka vznikla — zakázka od zaměstnance z Karlína má Karlín (Křižíkova 177/29), z Černé růže má Na Příkopě 853. Zakázky z webu spadají pod výchozí pobočku automaticky.',
+            'Reklamační protokol bere pobočku přihlášeného zaměstnance (případně dohledá podle sériového čísla zařízení).',
+            'Když pobočka nemá údaje vyplněné, použijí se globální firemní údaje z Nastavení — nic nezůstane prázdné.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '05:05',
         'title' => 'Nový e-mail „Připraveno k vyzvednutí" s kontakty pobočky',
         'items' => [

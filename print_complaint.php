@@ -37,10 +37,21 @@ $__cust_email = (string)($complaint['email'] ?? '');
 $__created = !empty($complaint['created_at']) ? date('d.m.Y H:i', strtotime((string)$complaint['created_at'])) : date('d.m.Y H:i');
 
 $__company = get_setting('company_name', 'AppleFix s.r.o.');
-$__company_addr = get_setting('company_address', '');
 $__company_ico = get_setting('company_ico', '');
-$__company_phone = get_setting('company_phone', '');
-$__company_email = get_setting('company_email', get_setting('smtp_from_email', 'info@applefix.cz'));
+// Adresa/telefon/e-mail dle pobočky: reklamaci vystavuje zaměstnanec pobočky;
+// fallback = pobočka poslední zakázky se stejným S/N, jinak globální firma.
+$__complaint_branch = defined('COMPLAINT_DOC_EMBED') ? 0 : (int)getCurrentStaffBranchId();
+if ($__complaint_branch <= 0 && trim((string)($complaint['serial_number'] ?? '')) !== '') {
+    try {
+        $__bq = $pdo->prepare("SELECT branch_id FROM orders WHERE serial_number = ? ORDER BY id DESC LIMIT 1");
+        $__bq->execute([trim((string)$complaint['serial_number'])]);
+        $__complaint_branch = (int)$__bq->fetchColumn();
+    } catch (Throwable $e) { $__complaint_branch = 0; }
+}
+$__bc = crmOrderBranchContact($__complaint_branch);
+$__company_addr = $__bc['address_inline'];
+$__company_phone = $__bc['phone'];
+$__company_email = $__bc['email'] ?: get_setting('smtp_from_email', 'info@applefix.cz');
 
 $__logo_fs = __DIR__ . '/assets/img/logo-black.png';
 $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((string)file_get_contents($__logo_fs)) : '';
