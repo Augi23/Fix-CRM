@@ -78,6 +78,19 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
     } catch (Throwable $e) { $completedAt = ''; }
 }
 
+// Podpisy klienta (příjem/výdej) — vytisknou se nad podpisovou čarou
+$__sigs = ['prijem' => null, 'vydej' => null];
+if (function_exists('crmGetOrderSignatures')) {
+    foreach (crmGetOrderSignatures((int)$order['id']) as $sigT => $sigRow) {
+        $p = __DIR__ . '/' . ltrim((string)$sigRow['file_path'], '/');
+        if (isset($__sigs[$sigT]) || array_key_exists($sigT, $__sigs)) {
+            $__sigs[$sigT] = is_file($p)
+                ? ['img' => 'data:image/png;base64,' . base64_encode((string)file_get_contents($p)), 'at' => (string)$sigRow['signed_at']]
+                : null;
+        }
+    }
+}
+
 // Rozpis ceny (oprava + expresní příplatek / sleva…) — tiskne se od 2 řádků výš
 $priceLines = [];
 if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
@@ -144,6 +157,8 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
         .legal p { margin: 0 0 8px; }
 
         .sigs { display: flex; gap: 44px; margin-top: 14px; }
+        .sig .sig-img { display: block; height: 44px; width: auto; margin: 0 auto -8px; }
+        .sig .sig-at { font-size: 8.5px; color: var(--muted); text-align: center; margin-top: 2px; font-weight: 300; }
         .sig { flex: 1; }
         .sig .line { border-top: 1.4px solid var(--ink); margin-top: 40px; padding-top: 7px;
                      font-size: 10.5px; color: var(--muted); text-align: center; }
@@ -237,7 +252,11 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
 
         <div class="sigs">
             <div class="sig"></div>
-            <div class="sig"><div class="line">Podpis zákazníka</div></div>
+            <div class="sig">
+                <?php if ($__sigs['prijem']): ?><img class="sig-img" src="<?php echo $__sigs['prijem']['img']; ?>" alt="podpis"><?php endif; ?>
+                <div class="line">Podpis zákazníka</div>
+                <?php if ($__sigs['prijem']): ?><div class="sig-at">Podepsáno elektronicky <?php echo e(date('j. n. Y H:i', strtotime($__sigs['prijem']['at']))); ?></div><?php endif; ?>
+            </div>
         </div>
 
         <div class="pickup">
@@ -245,7 +264,11 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
             <div class="sub">Svým podpisem stvrzuji převzetí výše uvedeného zařízení z opravy.</div>
             <div class="sigs">
                 <div class="sig"></div>
-                <div class="sig"><div class="line">Podpis zákazníka</div></div>
+                <div class="sig">
+                    <?php if ($__sigs['vydej']): ?><img class="sig-img" src="<?php echo $__sigs['vydej']['img']; ?>" alt="podpis"><?php endif; ?>
+                    <div class="line">Podpis zákazníka</div>
+                    <?php if ($__sigs['vydej']): ?><div class="sig-at">Podepsáno elektronicky <?php echo e(date('j. n. Y H:i', strtotime($__sigs['vydej']['at']))); ?></div><?php endif; ?>
+                </div>
             </div>
         </div>
 

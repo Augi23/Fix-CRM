@@ -2356,6 +2356,41 @@ function crmSyncRepairPricelist(string $category, string $brand): array {
     return ['models' => count($list), 'rows' => count($rows)];
 }
 
+/** ── Podpisy klienta (iPad/tablet) ────────────────────────────────────────
+ *  order_signatures: podpis při PŘÍJMU (souhlas s podmínkami) a při VÝDEJI
+ *  (převzetí hotové zakázky). PNG s průhledným pozadím v uploads/signatures/,
+ *  tiskne se na zakázkovém listu nad podpisovou čarou. */
+function ensureOrderSignaturesTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS order_signatures (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            sig_type VARCHAR(20) NOT NULL,
+            file_path VARCHAR(255) NOT NULL,
+            signed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            requested_by VARCHAR(100) NULL,
+            INDEX idx_os_order (order_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+/** Podpisy zakázky jako mapa [sig_type => řádek]. */
+function crmGetOrderSignatures(int $orderId): array {
+    global $pdo;
+    try {
+        ensureOrderSignaturesTable();
+        $st = $pdo->prepare("SELECT sig_type, file_path, signed_at FROM order_signatures WHERE order_id = ? ORDER BY id ASC");
+        $st->execute([$orderId]);
+        $out = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $out[(string)$r['sig_type']] = $r; }
+        return $out;
+    } catch (Throwable $e) { return []; }
+}
+
 /** Cenové řádky zakázky — rozpis ceny na zakázkovém listu (oprava, expresní
  *  příplatek, slevy…). Plní je webhook z RepairPluginu (items[]) a wizard CRM
  *  (příplatek/sleva dle priority). Rozpis se tiskne, když jsou aspoň 2 řádky. */

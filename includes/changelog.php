@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '10:08',
+        'title' => 'Elektronický podpis klienta (1. etapa)',
+        'items' => [
+            'V detailu zakázky je nový blok „Podpis klienta" — Příjem do opravy a Převzetí hotové zakázky. Tlačítko Podepsat otevře celoobrazovkové podpisové plátno: klient se podepíše prstem na tabletu/iPadu, podpis se uloží k zakázce s datem a časem.',
+            'Podepsaná zakázka tiskne podpis přímo na zakázkovém listu nad podpisovou čarou (s poznámkou „Podepsáno elektronicky" a časem) — v tisku i v e-mailové verzi listu.',
+            'Opakovaný podpis nahradí předchozí; každý řádek ukazuje stav (zelené ✓ s časem).',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '10:03',
         'title' => 'Tlačítko „Přidat katalog" u dodavatelů na Nákupech',
         'items' => [

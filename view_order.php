@@ -51,6 +51,9 @@ if (trim((string)($order['order_code'] ?? '')) === '') {
     } catch (Throwable $e) { /* nevadí, zobrazí se #id a doplní se příště */ }
 }
 
+// Podpisy klienta (příjem/výdej) — blok v pravém sloupci + tisk na zakázkovém listu
+$orderSignatures = crmGetOrderSignatures((int)$order['id']);
+
 // Vazba na rezervaci z webu (RepairPlugin) — číslo objednávky z webu se ukazuje pod kódem zakázky.
 $webBookingRef = null;
 try {
@@ -567,6 +570,44 @@ function localizedOrderStatusLabel(string $status): string {
                                 <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="window.open('print_label.php?id=<?php echo $order['id']; ?>', 'qllabel', 'width=440,height=360')"><i class="fas fa-tag me-2 text-info"></i> <?php echo __('print_label'); ?></a></li>
                             </ul>
                         </div>
+
+                        <div class="mt-3 pt-3 border-top border-secondary">
+                            <div class="small text-white-75 mb-2"><i class="fas fa-signature me-2 text-info"></i><?php echo __('client_signature'); ?></div>
+                            <?php foreach (['prijem' => __('sign_reception'), 'vydej' => __('sign_pickup')] as $sigT => $sigLabel): $sig = $orderSignatures[$sigT] ?? null; ?>
+                            <div class="d-flex align-items-center justify-content-between mb-2" id="sigRow-<?php echo $sigT; ?>">
+                                <span class="small"><?php echo e($sigLabel); ?></span>
+                                <?php if ($sig): ?>
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success"><i class="fas fa-check me-1"></i><?php echo date('j.n. H:i', strtotime((string)$sig['signed_at'])); ?></span>
+                                <?php else: ?>
+                                    <button type="button" class="btn btn-sm btn-outline-info" onclick="afxSignOrder('<?php echo $sigT; ?>')"><i class="fas fa-pen-nib me-1"></i><?php echo __('sign_btn'); ?></button>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <script>
+                        window.AFX_SIGN_L10N = { clear: '<?php echo __('sign_clear'); ?>', cancel: '<?php echo __('cancel'); ?>', save: '<?php echo __('sign_save'); ?>' };
+                        function afxSignOrder(type) {
+                            afxSignaturePad({
+                                title: type === 'prijem' ? '<?php echo __('sign_pad_title_reception'); ?>' : '<?php echo __('sign_pad_title_pickup'); ?>',
+                                subtitle: '<?php echo e(orderDisplayCode($order)); ?> · <?php echo e(trim(($order['first_name'] ?? '') . ' ' . ($order['last_name'] ?? ''))); ?> · <?php echo e(trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? ''))); ?>',
+                                terms: type === 'prijem' ? '<?php echo __('sign_terms_reception'); ?>' : '<?php echo __('sign_terms_pickup'); ?>',
+                                onSave: function (dataUrl) {
+                                    var fd = new FormData();
+                                    fd.append('order_id', '<?php echo (int)$order['id']; ?>');
+                                    fd.append('sig_type', type);
+                                    fd.append('image', dataUrl);
+                                    fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                                    fetch('api/save_signature.php', { method: 'POST', body: fd })
+                                        .then(function (r) { return r.json(); })
+                                        .then(function (j) {
+                                            if (j.ok) { location.reload(); }
+                                            else { alert(j.error || 'Chyba'); }
+                                        })
+                                        .catch(function () { alert('Chyba spojení'); });
+                                }
+                            });
+                        }
+                        </script>
                     </div>
                 </form>
             </div>

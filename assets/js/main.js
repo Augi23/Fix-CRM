@@ -1575,3 +1575,105 @@ $(document).on('change', '#pricelistRepair', function () {
         setInterval(tick, 20000);
     }
 }());
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PODPISOVÝ PAD — celoobrazovkové podepisování prstem/perem (iPad u pultu).
+   Znovupoužitelný: volá ho detail zakázky i podpisová stanice.
+   afxSignaturePad({ title, subtitle, terms, onSave(dataUrl), onCancel })
+   ═══════════════════════════════════════════════════════════════════════════ */
+window.afxSignaturePad = function (opts) {
+    opts = opts || {};
+    var ov = document.createElement('div');
+    ov.className = 'afx-signpad-overlay';
+    ov.innerHTML =
+        '<div class="afx-signpad">' +
+        '  <div class="afx-signpad-head">' +
+        '    <div><div class="afx-signpad-title"></div><div class="afx-signpad-sub"></div></div>' +
+        '  </div>' +
+        '  <div class="afx-signpad-canvaswrap"><canvas></canvas><div class="afx-signpad-line"></div></div>' +
+        '  <div class="afx-signpad-terms"></div>' +
+        '  <div class="afx-signpad-actions">' +
+        '    <button type="button" class="btn btn-outline-secondary btn-lg" data-act="clear"></button>' +
+        '    <div class="flex-grow-1"></div>' +
+        '    <button type="button" class="btn btn-outline-secondary btn-lg" data-act="cancel"></button>' +
+        '    <button type="button" class="btn btn-success btn-lg px-4" data-act="save" disabled></button>' +
+        '  </div>' +
+        '</div>';
+    document.body.appendChild(ov);
+
+    var L = window.AFX_SIGN_L10N || {};
+    ov.querySelector('.afx-signpad-title').textContent = opts.title || L.title || 'Podpis klienta';
+    ov.querySelector('.afx-signpad-sub').textContent = opts.subtitle || '';
+    ov.querySelector('.afx-signpad-terms').textContent = opts.terms || '';
+    ov.querySelector('[data-act="clear"]').textContent = L.clear || 'Smazat';
+    ov.querySelector('[data-act="cancel"]').textContent = L.cancel || 'Zrušit';
+    ov.querySelector('[data-act="save"]').textContent = L.save || 'Uložit podpis';
+
+    var canvas = ov.querySelector('canvas');
+    var wrap = ov.querySelector('.afx-signpad-canvaswrap');
+    var ctx, dpr = Math.max(1, window.devicePixelRatio || 1);
+    var drawing = false, last = null, strokes = 0;
+    var saveBtn = ov.querySelector('[data-act="save"]');
+
+    function fit() {
+        var r = wrap.getBoundingClientRect();
+        canvas.width = Math.round(r.width * dpr);
+        canvas.height = Math.round(r.height * dpr);
+        canvas.style.width = r.width + 'px';
+        canvas.style.height = r.height + 'px';
+        ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.lineWidth = 2.6;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#101418';
+    }
+    requestAnimationFrame(fit);
+
+    function pos(e) {
+        var r = canvas.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    canvas.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        canvas.setPointerCapture(e.pointerId);
+        drawing = true; last = pos(e);
+    });
+    canvas.addEventListener('pointermove', function (e) {
+        if (!drawing) return;
+        e.preventDefault();
+        var p = pos(e);
+        // vyhlazení: čára do středu úsečky přes quadratic curve
+        var mid = { x: (last.x + p.x) / 2, y: (last.y + p.y) / 2 };
+        ctx.beginPath();
+        ctx.moveTo(last.x, last.y);
+        ctx.quadraticCurveTo(last.x, last.y, mid.x, mid.y);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        last = p;
+        strokes++;
+        if (strokes > 6) { saveBtn.disabled = false; }
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+        canvas.addEventListener(ev, function () { drawing = false; last = null; });
+    });
+
+    function close() { ov.remove(); }
+    ov.querySelector('[data-act="clear"]').addEventListener('click', function () {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        strokes = 0; saveBtn.disabled = true;
+    });
+    ov.querySelector('[data-act="cancel"]').addEventListener('click', function () {
+        close();
+        if (opts.onCancel) opts.onCancel();
+    });
+    saveBtn.addEventListener('click', function () {
+        if (strokes <= 6) return;
+        saveBtn.disabled = true;
+        var dataUrl = canvas.toDataURL('image/png');
+        close();
+        if (opts.onSave) opts.onSave(dataUrl);
+    });
+    return { close: close };
+};

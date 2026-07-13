@@ -558,3 +558,30 @@ html[data-lg-theme="light"] .afx-cell.active { color: #10151d; background: rgba(
 html[data-lg-theme="light"] .afx-booked-chip {
   background: #E5F6FD; border-color: #9BDCF8; color: #0369a1; box-shadow: none;
 }
+
+
+/* ── Podpisový pad (iPad u pultu) ─────────────────────────────────────────── */
+.afx-signpad-overlay {
+  position: fixed; inset: 0; z-index: 3200;
+  background: rgba(6, 10, 9, .82); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 18px;
+}
+.afx-signpad {
+  width: min(960px, 96vw); display: flex; flex-direction: column; gap: 12px;
+  background: #f6f8f7; border-radius: 22px; padding: 20px 22px;
+  box-shadow: 0 30px 90px rgba(0,0,0,.55);
+}
+.afx-signpad-title { font-size: 19px; font-weight: 800; color: #101418; letter-spacing: -.01em; }
+.afx-signpad-sub { font-size: 13px; color: #5b6470; margin-top: 2px; }
+.afx-signpad-canvaswrap {
+  position: relative; height: min(46vh, 380px);
+  background: #fff; border: 1.5px dashed #c3ccc9; border-radius: 16px; overflow: hidden;
+  touch-action: none;
+}
+.afx-signpad-canvaswrap canvas { display: block; touch-action: none; }
+.afx-signpad-line {
+  position: absolute; left: 8%; right: 8%; bottom: 18%; height: 0;
+  border-bottom: 1.5px solid #d4dbd8; pointer-events: none;
+}
+.afx-signpad-terms { font-size: 11.5px; color: #6a7480; line-height: 1.5; }
+.afx-signpad-actions { display: flex; gap: 10px; align-items: center; }
