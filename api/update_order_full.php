@@ -92,6 +92,19 @@ try {
         }
     }
 
+    // Klient: přepiš jen na EXISTUJÍCÍHO zákazníka; jinak ponech stávajícího.
+    // Pojistka proti tichému přepisu (dřív stačila neprázdná hodnota → chybný
+    // default z ořezaného seznamu v editaci přepisoval klienta zakázky).
+    $customerIdToSave = (int)$current['customer_id'];
+    $postedCustomerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : 0;
+    if ($postedCustomerId > 0 && $postedCustomerId !== $customerIdToSave) {
+        $chkCust = $pdo->prepare('SELECT 1 FROM customers WHERE id = ? LIMIT 1');
+        $chkCust->execute([$postedCustomerId]);
+        if ($chkCust->fetchColumn()) {
+            $customerIdToSave = $postedCustomerId;
+        }
+    }
+
     $sql = "UPDATE orders SET
         customer_id = ?,
         device_model = ?,
@@ -113,7 +126,7 @@ try {
         serial_number_2 = ?";
 
     $params = [
-        !empty($_POST['customer_id']) ? $_POST['customer_id'] : $current['customer_id'],
+        $customerIdToSave,
         isset($_POST['device_model']) ? $_POST['device_model'] : $current['device_model'],
         isset($_POST['device_brand']) ? $_POST['device_brand'] : $current['device_brand'],
         isset($_POST['device_type']) ? $_POST['device_type'] : $current['device_type'],

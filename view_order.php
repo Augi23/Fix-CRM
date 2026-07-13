@@ -77,8 +77,16 @@ $order_items = $stmt->fetchAll();
 // Parts are loaded dynamically in the modal so technicians can search the full catalog.
 $inventory = [];
 
-// Fetch all customers for edit modal (limit 500 max to prevent HTML crash)
-$customers_list = $pdo->query("SELECT id, first_name, last_name, phone FROM customers ORDER BY last_name ASC LIMIT 500")->fetchAll();
+// Klient se v editaci vybírá přes AJAX vyhledávání (api/search_customers.php).
+// Do <select> předvyplníme JEN aktuálního zákazníka zakázky jako vybranou položku.
+// DŘÍV se načítalo prvních 500 zákazníků (ORDER BY last_name LIMIT 500) — jenže
+// když klient zakázky v tom seznamu nebyl (víc než 500 zákazníků / příjmení dál
+// v abecedě), <select> neměl žádnou selected option a prohlížeč tiše vybral
+// PRVNÍHO zákazníka v seznamu; uložení editace ho pak přepsalo. Odtud „přepsaní
+// zákazníci jedním klientem". Načtením jen aktuálního klienta to nemůže nastat.
+$stmt = $pdo->prepare("SELECT id, first_name, last_name, phone FROM customers WHERE id = ? LIMIT 1");
+$stmt->execute([(int)$order['customer_id']]);
+$customers_list = $stmt->fetchAll();
 
 // Fetch active technicians for edit modal
 $techs = getActiveTechnicians();
@@ -1161,6 +1169,29 @@ $(document).ready(function() {
         tags: true,
         width: '100%'
     });
+
+    // Klient v editaci: AJAX vyhledávání přes VŠECHNY zákazníky (ne jen 500),
+    // aktuální klient je předvybraný. Zabraňuje tichému přepisu na prvního v seznamu.
+    var $custEdit = $('.select2-customer-edit');
+    if ($custEdit.length) {
+        $custEdit.select2({
+            dropdownParent: $('#editOrderFullModal'),
+            width: '100%',
+            placeholder: $custEdit.data('placeholder') || 'Hledat klienta…',
+            allowClear: false,
+            minimumInputLength: 0,
+            ajax: {
+                url: 'api/search_customers.php',
+                dataType: 'json',
+                delay: 250,
+                data: function(params) { return { q: params.term, page: params.page || 1 }; },
+                processResults: function(data, params) {
+                    params.page = params.page || 1;
+                    return { results: data.results, pagination: { more: data.pagination.more } };
+                }
+            }
+        });
+    }
 });
 
 function deletePart(id) {
@@ -1377,10 +1408,16 @@ function deleteOrder(id) {
                     <div class="row g-3">
                         <div class="col-md-12">
                             <label class="form-label"><?php echo __('client'); ?></label>
-                            <select name="customer_id" class="form-select select2-modal">
-                                <?php foreach($customers_list as $cl): ?>
-                                    <option value="<?php echo $cl['id']; ?>" <?php echo ($cl['id'] == $order['customer_id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($cl['first_name'] . ' ' . $cl['last_name'] . ' (' . $cl['phone'] . ')'); ?>
+                            <select name="customer_id" class="form-select select2-customer-edit" data-placeholder="<?php echo __('search_client_placeholder'); ?>">
+                                <?php foreach($customers_list as $cl):
+                                    // předvyplněná (vybraná) položka = aktuální klient zakázky; ostatní se dohledají AJAXem
+                                    $clFirst = in_array(trim((string)$cl['first_name']), ['-','–','—'], true) ? '' : trim((string)$cl['first_name']);
+                                    $clLast  = in_array(trim((string)$cl['last_name']),  ['-','–','—'], true) ? '' : trim((string)$cl['last_name']);
+                                    $clLabel = trim($clFirst . ' ' . $clLast);
+                                    if (trim((string)$cl['phone']) !== '') { $clLabel .= ' (' . $cl['phone'] . ')'; }
+                                ?>
+                                    <option value="<?php echo (int)$cl['id']; ?>" selected>
+                                        <?php echo htmlspecialchars($clLabel !== '' ? $clLabel : ('#' . (int)$cl['id'])); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>

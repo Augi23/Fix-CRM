@@ -7,6 +7,17 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '19:30',
+        'title' => 'OPRAVA CHYBY: editace zakázky mohla přepsat klienta na cizího',
+        'items' => [
+            'Našli jsme příčinu, proč se u některých zakázek „samo" přepsalo jméno klienta na jiného zákazníka: pole Klient v editaci nabízelo jen prvních 500 zákazníků (dle příjmení). Pokud klient zakázky do těch 500 nespadl, políčko se tiše přepnulo na úplně prvního zákazníka v seznamu a uložení editace ho zapsalo — proto se víc zakázek „slévalo" na jednoho a téhož klienta.',
+            'Nově se klient v editaci vyhledává živě přes všechny zákazníky (ne jen 500) a aktuální klient zakázky je vždy správně předvyplněný — omylem už ho nejde přepsat.',
+            'Přidána i serverová pojistka: klient zakázky se změní jen na skutečně existujícího zákazníka, jinak zůstane původní.',
+            'Pozn.: zakázky, u kterých k záměně už došlo, je potřeba ručně vrátit na správného klienta (týká se např. zakázek APFAZ2600499, 2600500, 2600503).',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '16:05',
         'title' => 'Oprava nahrávání fotek z počítače',
         'items' => [
