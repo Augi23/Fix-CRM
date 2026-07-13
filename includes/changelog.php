@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:37',
+        'title' => 'Počítadlo i u Nákupů v horním menu',
+        'items' => [
+            'Záložka Nákupy ukazuje počet aktivních položek (čekají na objednání nebo na doručení). Aktualizuje se živě jako ostatní počítadla; když není co řešit, číslovka zmizí.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:36',
         'title' => 'Zvuková upozornění: nová zakázka, změna stavu, přidělení technikovi',
         'items' => [

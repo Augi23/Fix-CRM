@@ -1559,6 +1559,7 @@ $(document).on('change', '#pricelistRepair', function () {
                     if (!d || !d.ok) return;
                     setBadge('orders.php', d.orders_badge, false);
                     setBadge('reklamace.php', d.complaints_badge, true);
+                    setBadge('procurement.php', d.procurement_badge, false);
                     var prev = getState();
                     var now = { o: d.last_order_id, l: d.last_status_log_id };
                     if (!prev) { setState(now); return; }          // první běh: jen zapamatovat

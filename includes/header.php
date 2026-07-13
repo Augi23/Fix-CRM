@@ -97,6 +97,14 @@ try {
     $complaintsBadgeCount = 0;
 }
 
+// Počet aktivních položek nákupů (badge v menu) — čeká na objednání nebo doručení
+$procurementBadgeCount = 0;
+try {
+    $procurementBadgeCount = (int)($pdo->query("SELECT COUNT(*) FROM purchase_requests WHERE status IN ('pending','ordered')")->fetchColumn() ?: 0);
+} catch (Throwable $e) {
+    $procurementBadgeCount = 0;
+}
+
 // Počet čekajících položek nákupního seznamu (badge v menu)
 $shoppingListBadgeCount = 0;
 try {
@@ -276,6 +284,7 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
             <i class="fas fa-rotate-left"></i><small><?php echo __('complaints'); ?></small>
         </a>
         <a class="afx-cell <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php">
+            <?php if ($procurementBadgeCount > 0): ?><span class="afx-badge"><?php echo $procurementBadgeCount; ?></span><?php endif; ?>
             <i class="fas fa-truck-loading"></i><small><?php echo __('procurement'); ?></small>
         </a>
         <?php if (hasPermission('edit_customers')): ?>
