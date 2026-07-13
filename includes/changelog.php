@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '05:05',
+        'title' => 'Nový e-mail „Připraveno k vyzvednutí" s kontakty pobočky',
+        'items' => [
+            'Klient dostane po dokončení opravy elegantní e-mail v novém světlém designu AppleFix — souhrn zakázky (zařízení, oprava, cena), tlačítko pro online sledování zakázky s PINem a kontakty.',
+            'Kontaktní blok se bere z POBOČKY zakázky: Karlín (Křižíkova 177/29, +420 704 011 939) nebo Černá růže (Na Příkopě 853, +420 705 926 236) — včetně otevírací doby a odkazu na mapu. Údaje poboček se předvyplnily automaticky a dají se upravit v databázi poboček.',
+            'E-mail se posílá jen jednou (při prvním přepnutí do „Připraveno k převzetí") a jen pokud má klient vyplněný e-mail.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '03:57',
         'title' => 'Historie úprav ukazuje i čas',
         'items' => [
