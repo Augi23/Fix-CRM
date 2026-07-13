@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '14:07',
+        'title' => 'Tisk štítků nově přes server — bez můstku, z čehokoliv',
+        'items' => [
+            'Štítky na Brother QL-810W tiskne přímo server CRM — tlačítko „Tisk štítku" teď funguje z jakéhokoliv počítače, iPadu, telefonu i ze Safari. Žádná instalace můstku na počítačích už není potřeba.',
+            'V Nastavení → Tisk štítků je nová sekce „Tisk přes server": stav spojení s tiskárnou, IP tiskárny a testovací štítek. Původní můstek zůstává jen jako záložní řešení.',
+            'Ověřeno ostrým tiskem: server poslal testovací štítek na tiskárnu v Karlíně.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '11:58',
         'title' => 'Oprava tlačítka Odhlásit',
         'items' => [

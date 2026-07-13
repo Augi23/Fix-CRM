@@ -954,7 +954,61 @@ require_once 'includes/header.php';
             <div class="row">
                 <div class="col-lg-7">
                     <div class="glass-panel p-4 border-secondary mb-3">
-                        <h5 class="mb-1 text-white"><i class="fas fa-print me-2 text-info"></i><?php echo __('label_bridge_title'); ?></h5>
+                        <h5 class="mb-1 text-white"><i class="fas fa-server me-2 text-success"></i>Tisk štítků přes server (doporučeno)</h5>
+                        <div class="small text-white-75 mb-3">Štítky tiskne přímo server CRM na tiskárnu Brother na pobočce — funguje z jakéhokoliv počítače, iPadu i Safari, bez instalací.</div>
+                        <div id="srvPrintStatus" class="alert alert-secondary py-2 mb-3"><i class="fas fa-circle-notch fa-spin me-2"></i>Zjišťuji stav…</div>
+                        <div class="row g-2 align-items-end mb-2" style="max-width:520px;">
+                            <div class="col-7">
+                                <label class="form-label small text-white-75">IP tiskárny (Brother QL-810W, Karlín)</label>
+                                <input type="text" id="srvPrinterIp" class="form-control font-monospace" value="<?php echo e(get_setting('label_printer_ip', '192.168.1.220')); ?>">
+                            </div>
+                            <div class="col-5 d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary" onclick="srvSaveIp()">Uložit</button>
+                                <button type="button" class="btn btn-outline-success" onclick="srvTestPrint()"><i class="fas fa-print me-1"></i>Testovací štítek</button>
+                            </div>
+                        </div>
+                        <script>
+                        function srvStatus() {
+                            fetch('api/print_label_server.php?action=status', { cache: 'no-store' })
+                                .then(function (r) { return r.json(); })
+                                .then(function (d) {
+                                    var el = document.getElementById('srvPrintStatus');
+                                    if (d.printer_reachable) {
+                                        el.className = 'alert alert-success py-2 mb-3';
+                                        el.innerHTML = '<i class="fas fa-check-circle me-2"></i>Server vidí tiskárnu <strong>' + d.printer_ip + '</strong>' + (d.env_ready ? '' : ' · první tisk chvíli potrvá (server si připraví prostředí)');
+                                    } else {
+                                        el.className = 'alert alert-warning py-2 mb-3';
+                                        el.innerHTML = '<i class="fas fa-triangle-exclamation me-2"></i>Tiskárna <strong>' + d.printer_ip + '</strong> ze serveru neodpovídá — zkontroluj, že je zapnutá.';
+                                    }
+                                }).catch(function () {});
+                        }
+                        function srvSaveIp() {
+                            var fd = new FormData();
+                            fd.append('action', 'save_ip');
+                            fd.append('ip', document.getElementById('srvPrinterIp').value.trim());
+                            fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
+                            fetch('api/print_label_server.php', { method: 'POST', body: fd })
+                                .then(function (r) { return r.json(); })
+                                .then(function (j) { if (!j.ok) { alert(j.error || 'Chyba'); } srvStatus(); });
+                        }
+                        function srvTestPrint() {
+                            var fd = new FormData();
+                            fd.append('action', 'test');
+                            fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
+                            var el = document.getElementById('srvPrintStatus');
+                            el.className = 'alert alert-secondary py-2 mb-3';
+                            el.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Tisknu testovací štítek…';
+                            fetch('api/print_label_server.php', { method: 'POST', body: fd })
+                                .then(function (r) { return r.json(); })
+                                .then(function (j) {
+                                    el.className = j.ok ? 'alert alert-success py-2 mb-3' : 'alert alert-danger py-2 mb-3';
+                                    el.innerHTML = j.ok ? '<i class="fas fa-check-circle me-2"></i>Testovací štítek odeslán na tiskárnu.' : '<i class="fas fa-triangle-exclamation me-2"></i>' + (j.error || 'Chyba');
+                                });
+                        }
+                        document.addEventListener('DOMContentLoaded', srvStatus);
+                        </script>
+                        <hr class="border-secondary my-4">
+                        <h5 class="mb-1 text-white"><i class="fas fa-print me-2 text-info"></i><?php echo __('label_bridge_title'); ?> <span class="badge bg-secondary ms-1">záložní řešení</span></h5>
                         <div class="small text-white-75 mb-3"><?php echo __('label_bridge_desc'); ?></div>
 
                         <div id="bridgeStatus" class="alert alert-secondary py-2 mb-3">

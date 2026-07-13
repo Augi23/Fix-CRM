@@ -1196,24 +1196,20 @@ window.afxLabelToast = function (msg, ok) {
 
 window.printOrderLabel = function (orderId, opts) {
     opts = opts || {};
-    fetch('api/order_label_data.php?id=' + encodeURIComponent(orderId), { credentials: 'same-origin' })
+    // Tisk jde PŘES SERVER (server → tiskárna na pobočce) — funguje z jakéhokoliv
+    // zařízení i prohlížeče, bez štítkového můstku na počítači.
+    var fd = new FormData();
+    fd.append('action', 'print');
+    fd.append('id', orderId);
+    fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+    fetch('api/print_label_server.php', { method: 'POST', body: fd, credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (!data.ok) { throw new Error(data.error || 'data štítku nedostupná'); }
-            return fetch(window.AFX_LABEL_BRIDGE + '/print', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: data.code, defect: data.defect, date: data.date, client: data.client })
-            }).then(function (r) { return r.json(); }).then(function (res) {
-                if (!res.ok) { throw new Error(res.error || 'tisk selhal'); }
-                window.afxLabelToast('🏷️ Štítek ' + data.code + ' odeslán na tiskárnu', true);
-            });
+        .then(function (res) {
+            if (!res.ok) { throw new Error(res.error || 'tisk selhal'); }
+            window.afxLabelToast('🏷️ Štítek ' + (res.code || '') + ' odeslán na tiskárnu', true);
         })
         .catch(function (e) {
-            var msg = /Failed to fetch|NetworkError|Load failed/i.test(String(e))
-                ? 'Štítkový můstek neběží na tomto počítači (tisk štítků funguje z recepčního Macu)'
-                : 'Tisk štítku selhal: ' + e.message;
-            if (!opts.silentFail) { window.afxLabelToast('⚠️ ' + msg, false); }
+            if (!opts.silentFail) { window.afxLabelToast('⚠️ Tisk štítku selhal: ' + e.message, false); }
         });
 };
 
