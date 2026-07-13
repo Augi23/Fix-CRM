@@ -207,6 +207,7 @@ window.AFX_AMBIENT_INTERVAL_MIN = 10;
         document.getElementById('assignPopupOpen').href = 'view_order.php?id=' + encodeURIComponent(it.order_id);
         overlay.style.display = 'flex';
         overlay.setAttribute('aria-hidden', 'false');
+        if (window.afxChime) { window.afxChime('assign'); }   // zvuk k popupu přidělené zakázky
         requestAnimationFrame(function(){ overlay.classList.add('show'); });
     }
     window.afxAssignClose = function(){

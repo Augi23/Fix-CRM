@@ -1472,3 +1472,105 @@ $(document).on('change', '#pricelistRepair', function () {
     }
     this.selectedIndex = 0;   // připraveno na další položku
 });
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ZVUKOVÁ UPOZORNĚNÍ — decentní syntetizované tóny (WebAudio, žádné soubory).
+   'order' = nová zakázka (vzestupná kvinta), 'status' = změna stavu (krátké
+   ťuknutí), 'assign' = přidělení technikovi (výraznější trojtón s popupem).
+   Prohlížeč pouští zvuk až po první interakci se stránkou — do té doby se
+   poslední upozornění podrží a přehraje při prvním kliknutí.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+    var pendingKind = null;
+    function ctx() {
+        try {
+            window.__afxAC = window.__afxAC || new (window.AudioContext || window.webkitAudioContext)();
+            return window.__afxAC;
+        } catch (e) { return null; }
+    }
+    window.afxChime = function (kind) {
+        var ac = ctx();
+        if (!ac) return;
+        if (ac.state === 'suspended') {
+            ac.resume().catch(function () {});
+            if (ac.state === 'suspended') { pendingKind = kind; return; }
+        }
+        var notes = kind === 'assign' ? [[784, 0], [988, 0.11], [1319, 0.22]]
+                  : kind === 'status' ? [[880, 0]]
+                  : [[659, 0], [988, 0.13]];
+        var t0 = ac.currentTime + 0.02;
+        notes.forEach(function (n) {
+            var o = ac.createOscillator(), g = ac.createGain();
+            o.type = 'sine'; o.frequency.value = n[0];
+            var t = t0 + n[1];
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(kind === 'assign' ? 0.55 : 0.4, t + 0.018);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+            o.connect(g); g.connect(ac.destination);
+            o.start(t); o.stop(t + 0.6);
+        });
+    };
+    ['click', 'keydown', 'touchstart'].forEach(function (ev) {
+        document.addEventListener(ev, function () {
+            var ac = window.__afxAC;
+            if (ac && ac.state === 'suspended') { ac.resume().catch(function () {}); }
+            if (pendingKind) { var k = pendingKind; pendingKind = null; setTimeout(function () { window.afxChime(k); }, 60); }
+        }, { passive: true });
+    });
+}());
+
+/* Poller: nová zakázka / změna stavu → zvuk + živá počítadla v doku.
+   Stav v localStorage (afx_notify_state) — první karta, která změnu uvidí,
+   ji „zarezervuje", takže víc otevřených karet nehraje vícekrát. */
+(function () {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else { init(); }
+
+    function init() {
+        if (!document.querySelector('.afx-dock')) return;   // jen stránky s dokem (přihlášený personál)
+        var KEY = 'afx_notify_state';
+
+        function getState() {
+            try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; }
+        }
+        function setState(st) {
+            try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
+        }
+        function setBadge(href, count, warn) {
+            var cell = document.querySelector('.afx-dock a[href="' + href + '"]');
+            if (!cell) return;
+            var b = cell.querySelector('.afx-badge');
+            if (count > 0) {
+                if (!b) {
+                    b = document.createElement('span');
+                    b.className = 'afx-badge' + (warn ? ' afx-badge--warn' : '');
+                    cell.prepend(b);
+                }
+                b.textContent = count;
+            } else if (b) { b.remove(); }
+        }
+
+        function tick() {
+            fetch('api/notify_poll.php', { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d || !d.ok) return;
+                    setBadge('orders.php', d.orders_badge, false);
+                    setBadge('reklamace.php', d.complaints_badge, true);
+                    var prev = getState();
+                    var now = { o: d.last_order_id, l: d.last_status_log_id };
+                    if (!prev) { setState(now); return; }          // první běh: jen zapamatovat
+                    if (now.o === prev.o && now.l === prev.l) return;
+                    setState(now);                                  // rezervace: další karty už nehrají
+                    if (window.afxChime) {
+                        window.afxChime(now.o > prev.o ? 'order' : 'status');
+                    }
+                })
+                .catch(function () {});
+        }
+        setTimeout(tick, 4000);
+        setInterval(tick, 20000);
+    }
+}());

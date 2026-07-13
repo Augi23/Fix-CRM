@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:36',
+        'title' => 'Zvuková upozornění: nová zakázka, změna stavu, přidělení technikovi',
+        'items' => [
+            'Když přibyde nová zakázka (třeba z webu), CRM přehraje decentní vzestupný tón; při změně stavu zakázky krátké ťuknutí. Počítadla v horním menu se přitom aktualizují samy, bez obnovení stránky.',
+            'Technik při přidělení zakázky slyší výraznější trojtón společně s vyskakovacím oknem (to už fungovalo, nově se zvukem).',
+            'Zvuky jsou syntetizované (žádné soubory) a hrají jen jednou i při více otevřených kartách. Prohlížeč pouští zvuk až po prvním kliknutí do stránky — první upozornění po přihlášení se případně přehraje při nejbližší interakci.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:31',
         'title' => 'Počítadla v horním menu sedí na ikonách + počítadlo reklamací',
         'items' => [
