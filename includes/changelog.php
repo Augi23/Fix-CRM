@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '10:38',
+        'title' => 'Technik si může sám převzít volnou zakázku',
+        'items' => [
+            'Pole Technik v detailu zakázky bylo pro techniky bez práva úprav zamčené — teď se u NEPŘIŘAZENÉ zakázky odemkne: technik v něm vidí sám sebe, vybere se, uloží a zakázka je jeho (s nápovědou přímo u pole).',
+            'Přeřazování mezi techniky zůstává vedoucím/adminům — hlídá to i server, nejen formulář.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '10:11',
         'title' => 'Podpisová stanice pro iPad (2. etapa podpisů)',
         'items' => [

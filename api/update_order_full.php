@@ -50,6 +50,17 @@ try {
 
     $new_status = normalizeOrderStatus($_POST['status'] ?? $current['status']);
     $technician_id = ($_POST['technician_id'] ?? '') !== '' ? (int)$_POST['technician_id'] : (int)$current['technician_id'];
+
+    // Technik bez práva úprav: smí jen PŘEVZÍT nepřiřazenou zakázku (sebe)
+    $isPlainTech = (($_SESSION['role'] ?? '') === 'technician')
+        && !hasPermission('edit_orders') && !hasPermission('admin_access');
+    if ($isPlainTech && (int)$technician_id !== (int)($current['technician_id'] ?? 0)) {
+        $ownTechId = (int)($_SESSION['tech_id'] ?? 0);
+        $curTechId = (int)($current['technician_id'] ?? 0);
+        if (!((int)$technician_id === $ownTechId && ($curTechId === 0 || $curTechId === $ownTechId))) {
+            throw new Exception('Technik si může zakázku pouze převzít — přeřazení provádí vedoucí.');
+        }
+    }
     $branch_id = (int)($current['branch_id'] ?? getCurrentStaffBranchId());
     if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
         throw new Exception('Vybraný technik nepatří do pobočky zakázky.');

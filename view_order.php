@@ -98,6 +98,11 @@ $show_invoice = hasPermission('admin_access')
     && isOrderStatusIn($status, 'done')
     && (($order['final_cost'] ?? 0) > 0 || ($order['estimated_cost'] ?? 0) > 0);
 $can_change_technician = hasPermission('admin_access') || hasPermission('edit_orders');
+// Technik bez práva na úpravy si smí NEPŘIŘAZENOU zakázku převzít sám (self-assign);
+// v selectu pak vidí jen sebe. Přeřazení mezi techniky zůstává vedoucím.
+$can_self_assign = !$can_change_technician
+    && !empty($_SESSION['tech_id'])
+    && empty($order['technician_id']);
 $ui_lang = crm_get_language();
 
 // Fetch status log
@@ -512,15 +517,19 @@ function localizedOrderStatusLabel(string $status): string {
                     <div id="actionsAdvanced">
                         <div class="mb-3">
                             <label class="form-label"><?php echo __('technician'); ?></label>
-                            <select name="technician_id" class="form-select mb-2" <?php echo !$can_change_technician ? 'disabled' : ''; ?>>
+                            <select name="technician_id" class="form-select mb-2" <?php echo (!$can_change_technician && !$can_self_assign) ? 'disabled' : ''; ?>>
                                 <option value="">-- <?php echo __('edit'); ?> --</option>
                                 <?php $techs = getActiveTechnicians(); foreach($techs as $t): ?>
+                                <?php if ($can_self_assign && !$can_change_technician && (int)$t['id'] !== (int)($_SESSION['tech_id'] ?? 0)) { continue; }   // technik vidí jen sebe ?>
                                 <option value="<?php echo $t['id']; ?>" <?php echo $order['technician_id'] == $t['id'] ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($t['name']); ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
-                            <?php if (!$can_change_technician): ?>
+                            <?php if ($can_self_assign && !$can_change_technician): ?>
+                                <div class="form-text text-info small mb-1"><i class="fas fa-hand me-1"></i><?php echo __('tech_take_hint'); ?></div>
+                            <?php endif; ?>
+                            <?php if (!$can_change_technician && !$can_self_assign): ?>
                                 <input type="hidden" name="technician_id" value="<?php echo $order['technician_id']; ?>">
                             <?php endif; ?>
                         </div>
@@ -1354,10 +1363,11 @@ function deleteOrder(id) {
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('technician'); ?></label>
-                            <select name="technician_id" class="form-select" <?php echo !$can_change_technician ? 'disabled' : ''; ?>>
+                            <select name="technician_id" class="form-select" <?php echo (!$can_change_technician && !$can_self_assign) ? 'disabled' : ''; ?>>
                                 <option value=""><?php echo __('choose_option'); ?></option>
                                 <?php 
                                 foreach($techs as $t): ?>
+                                    <?php if ($can_self_assign && !$can_change_technician && (int)$t['id'] !== (int)($_SESSION['tech_id'] ?? 0)) { continue; } ?>
                                     <option value="<?php echo $t['id']; ?>" <?php if($order['technician_id']==$t['id']) echo 'selected'; ?>>
                                         <?php echo htmlspecialchars($t['name']); ?>
                                     </option>

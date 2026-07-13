@@ -58,6 +58,17 @@ try {
     $current_estimated = $order_data['estimated_cost'];
     $current_final = $order_data['final_cost'];
     $target_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
+
+    // Technik bez práva úprav: smí jen PŘEVZÍT nepřiřazenou zakázku (sebe), nic jiného
+    $isPlainTech = (($_SESSION['role'] ?? '') === 'technician')
+        && !hasPermission('edit_orders') && !hasPermission('admin_access');
+    if ($isPlainTech && (int)$target_tech_id !== (int)$current_tech_id) {
+        $ownTechId = (int)($_SESSION['tech_id'] ?? 0);
+        $allowed = ((int)$target_tech_id === $ownTechId) && ((int)$current_tech_id === 0 || (int)$current_tech_id === $ownTechId);
+        if (!$allowed) {
+            throw new Exception($t('tech_self_assign_only'));
+        }
+    }
     $target_branch_id = (int)($order_data['branch_id'] ?? getCurrentStaffBranchId());
     if (!canAssignTechnicianToOrder($target_tech_id, $target_branch_id)) {
         throw new Exception('Vybraný technik nepatří do pobočky zakázky.');
