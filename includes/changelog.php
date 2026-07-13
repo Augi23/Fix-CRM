@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '15:20',
+        'title' => 'Zobrazit zakázkový list, rozbalené tiskové menu a odkaz na stanici',
+        'items' => [
+            'V detailu zakázky je nad tiskem nové tlačítko „Zobrazit zakázkový list" — dokument si prohlédneš bez tisknutí.',
+            'Tiskové menu už není rozklikávací — všechny volby (list, tisk/e-mail, dílenský list, štítek, účtenka) jsou pořád viditelné pod nadpisem Tisk.',
+            'V horní liště (ikona pera) a v mobilním menu je odkaz „Podpisová stanice" — na tabletu ji tak otevřeš bez psaní adresy.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '14:19',
         'title' => 'Pojistky proti podpisu cizí zakázky na tabletu',
         'items' => [

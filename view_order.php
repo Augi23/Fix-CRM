@@ -582,18 +582,18 @@ function localizedOrderStatusLabel(string $status): string {
                         </div>
                         <?php endif; ?>
                         <button type="submit" class="btn btn-success w-100 mb-2"><?php echo __('update_status'); ?></button>
-                        <div class="dropdown">
-                            <button class="btn btn-outline-info w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-print me-2"></i> <?php echo __('print'); ?>
-                            </button>
-                            <ul class="dropdown-menu w-100 shadow">
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-paper-plane me-2 text-primary"></i> <?php echo __('order_sheet_print_email'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="printOrderLabel(<?php echo (int)$order['id']; ?>)"><i class="fas fa-barcode me-2 text-info"></i> <?php echo __('print_label'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
-                                <li><a class="dropdown-item py-2" href="javascript:void(0)" onclick="window.open('print_label.php?id=<?php echo $order['id']; ?>', 'qllabel', 'width=440,height=360')"><i class="fas fa-tag me-2 text-info"></i> <?php echo __('print_label'); ?></a></li>
-                            </ul>
+                        <button type="button" class="btn btn-outline-primary w-100 mb-2" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> <?php echo e(orderDisplayCode($order)); ?>')">
+                            <i class="fas fa-file-lines me-2"></i> <?php echo __('view_order_sheet'); ?>
+                        </button>
+                        <div class="border border-secondary border-opacity-50 rounded-3 p-2">
+                            <div class="small text-white-75 mb-2"><i class="fas fa-print me-2"></i><?php echo __('print'); ?></div>
+                            <div class="d-grid gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i><?php echo __('a4_invoice'); ?></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-paper-plane me-2 text-primary"></i><?php echo __('order_sheet_print_email'); ?></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-tools me-2 text-warning"></i><?php echo __('work_order'); ?></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="printOrderLabel(<?php echo (int)$order['id']; ?>)"><i class="fas fa-barcode me-2 text-info"></i><?php echo __('print_label'); ?></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-receipt me-2 text-success"></i><?php echo __('thermal_receipt'); ?></button>
+                            </div>
                         </div>
 
                         <div class="mt-3 pt-3 border-top border-secondary">

@@ -249,6 +249,7 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
         <i class="fas fa-bell"></i>
         <span class="crm-v2-alert-dot"></span>
     </button>
+    <a class="btn btn-sm crm-v2-icon-btn" href="sign_station.php" title="<?php echo e(__('sign_station_link')); ?>" aria-label="<?php echo e(__('sign_station_link')); ?>"><i class="fas fa-pen-nib"></i></a>
     <button class="btn btn-sm crm-v2-icon-btn lg-theme-toggle afx-hide-m" type="button" title="<?php echo e(__('theme_toggle')); ?>" aria-label="<?php echo e(__('theme_toggle')); ?>">
         <i class="fas fa-sun"></i>
     </button>
@@ -353,6 +354,7 @@ $afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'mana
         <div class="afx-sheet-acts">
             <a class="afx-sheet-act b" href="#" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus"></i><?php echo __('new_order'); ?></a>
             <a class="afx-sheet-act o" href="#" data-bs-toggle="modal" data-bs-target="#newComplaintModal"><i class="fas fa-rotate-left"></i><?php echo __('complaints'); ?></a>
+            <a class="afx-sheet-act" href="sign_station.php"><i class="fas fa-pen-nib"></i><?php echo __('sign_station_link'); ?></a>
             <a class="afx-sheet-act g <?php echo $current_page == 'nakupni-seznam.php' ? 'active' : ''; ?>" href="nakupni-seznam.php">
                 <?php if (!empty($shoppingListBadgeCount) && $shoppingListBadgeCount > 0): ?><span class="afx-badge"><?php echo (int)$shoppingListBadgeCount; ?></span><?php endif; ?>
                 <i class="fas fa-cart-shopping"></i><?php echo __('shopping_list'); ?>
