@@ -55,6 +55,13 @@ $branchLabel = getBranchLabel((int)getCurrentStaffBranchId()) ?: get_setting('co
 </div>
 <div class="station-branch"><?php echo e($branchLabel); ?> · přihlášen: <?php echo e($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''); ?></div>
 
+<!-- Výběr z fronty (víc čekajících podpisů = klient si vybere SVOU zakázku) -->
+<div id="queueChooser" style="display:none; position:fixed; inset:0; z-index:3050; background:#070a09; flex-direction:column; align-items:center; justify-content:center; padding:24px;">
+    <div style="color:#eef2f8; font-size:22px; font-weight:800; margin-bottom:6px;">Kdo jde podepsat?</div>
+    <div style="color:rgba(255,255,255,.45); font-size:13px; font-weight:300; margin-bottom:22px;">Klepněte na svou zakázku — zkontrolujte jméno a zařízení.</div>
+    <div id="queueList" style="display:flex; flex-direction:column; gap:12px; width:min(560px,92vw);"></div>
+</div>
+
 <!-- Náhled zakázkového listu k podpisu -->
 <div id="docView" style="display:none; position:fixed; inset:0; z-index:3100; background:#eceff3; flex-direction:column;">
     <div style="flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px; background:#0d1512; color:#eef2f8;">
@@ -92,18 +99,49 @@ window.AFX_SIGN_L10N = { clear: 'Smazat', cancel: 'Teď ne', save: 'Uložit podp
     var docView = document.getElementById('docView');
     var doneFlash = document.getElementById('doneFlash');
 
+    var chooser = document.getElementById('queueChooser');
+
     function poll() {
         if (busy) return;
         fetch('api/sign_station.php', { credentials: 'same-origin', cache: 'no-store' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                if (busy || !d || !d.ok || !d.request) return;
+                if (busy || !d || !d.ok) return;
+                var reqs = d.requests || (d.request ? [d.request] : []);
+                if (!reqs.length) return;
                 busy = true;
-                current = d.request;
-                showDocument(d.request);
+                if (reqs.length === 1) {
+                    current = reqs[0];
+                    showDocument(reqs[0]);
+                } else {
+                    showChooser(reqs);   // víc čekajících → klient si vybere SVOU zakázku
+                }
             })
             .catch(function () {});
     }
+
+    // Výběr z fronty: karta = jméno klienta (velké) + zařízení + kdo poslal
+    function showChooser(reqs) {
+        var list = document.getElementById('queueList');
+        list.innerHTML = '';
+        reqs.forEach(function (r) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.style.cssText = 'display:block;width:100%;text-align:left;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:16px 18px;color:#eef2f8;';
+            b.innerHTML = '<div style="font-size:19px;font-weight:800;">' + esc(r.customer) + '</div>' +
+                '<div style="font-size:13px;font-weight:300;color:rgba(255,255,255,.55);margin-top:3px;">' +
+                esc(r.order_code) + ' · ' + esc(r.device) + (r.amount ? ' · ' + esc(r.amount) : '') +
+                (r.requested_by ? ' · obsluhuje ' + esc(r.requested_by) : '') + '</div>';
+            b.addEventListener('click', function () {
+                chooser.style.display = 'none';
+                current = r;
+                showDocument(r);
+            });
+            list.appendChild(b);
+        });
+        chooser.style.display = 'flex';
+    }
+    function esc(t) { var d = document.createElement('div'); d.textContent = String(t == null ? '' : t); return d.innerHTML; }
 
     // 1) Klientovi se ukáže CELÝ zakázkový list (v jeho jazyce, bez ovládání)
     function showDocument(req) {
@@ -116,6 +154,7 @@ window.AFX_SIGN_L10N = { clear: 'Smazat', cancel: 'Teď ne', save: 'Uložit podp
     }
     function hideDocument() {
         docView.style.display = 'none';
+        chooser.style.display = 'none';
         document.getElementById('docViewFrame').src = 'about:blank';
     }
 
@@ -138,8 +177,8 @@ window.AFX_SIGN_L10N = { clear: 'Smazat', cancel: 'Teď ne', save: 'Uložit podp
             vydej: 'Podpisem potvrzuji převzetí zařízení z opravy.'
         };
         afxSignaturePad({
-            title: req.sig_type === 'vydej' ? 'Podpis — převzetí hotové zakázky' : 'Podpis — převzetí zařízení do opravy',
-            subtitle: req.order_code + ' · ' + req.customer + ' · ' + req.device + (req.amount ? ' · ' + req.amount : ''),
+            title: 'Podepisuje: ' + req.customer,
+            subtitle: (req.sig_type === 'vydej' ? 'Převzetí hotové zakázky' : 'Převzetí do opravy') + ' · ' + req.order_code + ' · ' + req.device + (req.amount ? ' · ' + req.amount : ''),
             terms: terms[req.sig_type] || '',
             onSave: function (dataUrl) {
                 var fd = new FormData();

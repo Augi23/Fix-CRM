@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '14:19',
+        'title' => 'Pojistky proti podpisu cizí zakázky na tabletu',
+        'items' => [
+            'Když ve frontě čeká víc podpisů najednou (od různých zaměstnanců), tablet se nejdřív zeptá „Kdo jde podepsat?" — klient klepne na kartu se SVÝM jménem a zařízením, teprve pak se otevře jeho zakázkový list.',
+            'Jméno klienta je nejvýraznějším prvkem každého kroku: na výběrové kartě, v hlavičce dokumentu i na podpisovém plátně („Podepisuje: Jan Novák"). U karty je vidět i kdo z personálu podpis poslal.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '14:16',
         'title' => 'Tablet ukazuje při podpisu celý zakázkový list',
         'items' => [
