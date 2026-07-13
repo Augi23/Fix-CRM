@@ -412,7 +412,7 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                     <?php endif; ?>
                                     <div class="dropdown">
                                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" title="<?php echo __('print'); ?>">
-                                            <i class="fas fa-print text-white-75"></i>
+                                            <i class="fas fa-print"></i>
                                         </button>
                                         <ul class="dropdown-menu shadow dropdown-menu-end">
                                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>

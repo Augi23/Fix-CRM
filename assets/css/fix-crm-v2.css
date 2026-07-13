@@ -822,7 +822,8 @@ nav.crm-v2-topbar .navbar-brand {
   color: var(--purple) !important;
 }
 .table strong { font-weight: 600 !important; color: var(--fg1) !important; }
-.table .text-white-75,
+/* :not(i) — pravidlo je pro drobné texty; ikonám (fa-print apod.) nesmí měnit velikost */
+.table .text-white-75:not(i),
 .table small.text-white-75 { color: var(--fg3) !important; font-size: 11px !important; }
 
 /* ID buňka (mono — SF Mono) */
