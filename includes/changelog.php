@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '05:53',
+        'title' => 'E-mail klientům s originálním logem AppleFix',
+        'items' => [
+            'Hlavička e-mailu „Připraveno k vyzvednutí" nese originální AppleFix logo (černý nápis s jablkem) místo samotného jablka s dopsaným textem.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '05:15',
         'title' => 'Všechny dokumenty se vystavují s adresou pobočky zakázky',
         'items' => [

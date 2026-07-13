@@ -2295,7 +2295,7 @@ function crmPickupReadyEmailHtml(array $o): string
     $mapUrl      = 'https://mapy.cz/?q=' . rawurlencode(preg_replace('/\s+/u', ' ', $branchAddr));
     $phoneHref   = preg_replace('/[^0-9+]/', '', $branchPhone);
 
-    $logo   = 'https://admin.applefix.cloud/assets/img/favicon.png';
+    $logo   = 'https://admin.applefix.cloud/assets/img/logo-black.png';   // originální AppleFix wordmark
     $green  = '#76b82a';
     $portal = 'https://admin.applefix.cloud/login.php';
 
@@ -2331,8 +2331,7 @@ function crmPickupReadyEmailHtml(array $o): string
 
         . '<tr><td style="padding:26px 36px 22px;border-bottom:1px solid #eceeec;">'
         . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
-        . '<td style="vertical-align:middle;"><img src="' . $logo . '" width="44" alt="' . $company . '" style="display:inline-block;vertical-align:middle;border:0;">'
-        . '<span style="display:inline-block;vertical-align:middle;margin-left:12px;font-size:20px;font-weight:800;letter-spacing:-.02em;color:#111;">Apple<span style="color:' . $green . ';">Fix</span></span></td>'
+        . '<td style="vertical-align:middle;"><img src="' . $logo . '" width="168" alt="' . $company . '" style="display:block;border:0;height:auto;"></td>'
         . '<td align="right" style="vertical-align:middle;font-size:12px;color:#9aa19a;">Zakázka <span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#111;">' . $code . '</span></td>'
         . '</tr></table></td></tr>'
 
