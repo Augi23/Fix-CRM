@@ -14,6 +14,7 @@ if (!$customer) die(__('customer_not_found'));
 
 $success = false;
 $error = false;
+$notice = false;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
@@ -21,10 +22,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     $customer_type = $_POST['customer_type'] ?? 'private';
-    $first_name = $_POST['first_name'];
-    $last_name = $_POST['last_name'];
-    $phone = $_POST['phone'];
-    $email = $_POST['email'];
+    // Ochrana identity: vyplněné jméno/příjmení/telefon/e-mail přepíše jen administrátor.
+    [$guarded, $blockedFields] = crmGuardCustomerIdentity($customer, [
+        'first_name' => $_POST['first_name'] ?? '',
+        'last_name'  => $_POST['last_name'] ?? '',
+        'phone'      => $_POST['phone'] ?? '',
+        'email'      => $_POST['email'] ?? '',
+    ]);
+    $first_name = $guarded['first_name'];
+    $last_name  = $guarded['last_name'];
+    $phone      = $guarded['phone'];
+    $email      = $guarded['email'];
     $address = $_POST['address'];
     $ico = $_POST['ico'] ?? '';
     $dic = $_POST['dic'] ?? '';
@@ -36,6 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $update = $pdo->prepare("UPDATE customers SET customer_type = ?, first_name = ?, last_name = ?, phone = ?, email = ?, address = ?, ico = ?, dic = ?, company = ?, preferred_language = ? WHERE id = ?");
         $update->execute([$customer_type, $first_name, $last_name, $phone, $email, $address, $ico, $dic, $company, $preferred_language, $id]);
         $success = __('customer_updated_success');
+        if (!empty($blockedFields)) {
+            $notice = 'Jméno, příjmení, telefon nebo e-mail už byly vyplněné — změnit je může jen administrátor. Původní hodnoty byly zachovány, ostatní úpravy uloženy.';
+        }
         // Refresh
         $stmt->execute([$id]);
         $customer = $stmt->fetch();
@@ -52,6 +63,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <?php if ($success): ?>
     <div class="alert alert-success"><?php echo $success; ?></div>
+<?php endif; ?>
+<?php if ($notice): ?>
+    <div class="alert alert-warning"><i class="fas fa-lock me-2"></i><?php echo htmlspecialchars($notice); ?></div>
+<?php endif; ?>
+<?php if ($error): ?>
+    <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
 
 <div class="card">
@@ -91,21 +108,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                 </div>
 
+                <?php $__lockHint = '<div class="form-text text-warning"><i class="fas fa-lock me-1"></i>Vyplněný údaj mění jen administrátor</div>'; ?>
                 <div class="col-md-6">
                     <label class="form-label"><?php echo __('client'); ?> (<?php echo __('client_first_name'); ?>)</label>
-                    <input type="text" name="first_name" class="form-control" value="<?php echo htmlspecialchars($customer['first_name']); ?>" required>
+                    <input type="text" name="first_name" class="form-control" value="<?php echo htmlspecialchars($customer['first_name']); ?>" required <?php echo crmCustomerFieldLocked($customer['first_name']) ? 'readonly' : ''; ?>>
+                    <?php if (crmCustomerFieldLocked($customer['first_name'])) echo $__lockHint; ?>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label"><?php echo __('client'); ?> (<?php echo __('client_last_name'); ?>)</label>
-                    <input type="text" name="last_name" class="form-control" value="<?php echo htmlspecialchars($customer['last_name']); ?>" required>
+                    <input type="text" name="last_name" class="form-control" value="<?php echo htmlspecialchars($customer['last_name']); ?>" required <?php echo crmCustomerFieldLocked($customer['last_name']) ? 'readonly' : ''; ?>>
+                    <?php if (crmCustomerFieldLocked($customer['last_name'])) echo $__lockHint; ?>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label"><?php echo __('phone'); ?></label>
-                    <input type="tel" name="phone" class="form-control" value="<?php echo htmlspecialchars($customer['phone']); ?>" required>
+                    <input type="tel" name="phone" class="form-control" value="<?php echo htmlspecialchars($customer['phone']); ?>" required <?php echo crmCustomerFieldLocked($customer['phone']) ? 'readonly' : ''; ?>>
+                    <?php if (crmCustomerFieldLocked($customer['phone'])) echo $__lockHint; ?>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($customer['email']); ?>">
+                    <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($customer['email']); ?>" <?php echo crmCustomerFieldLocked($customer['email']) ? 'readonly' : ''; ?>>
+                    <?php if (crmCustomerFieldLocked($customer['email'])) echo $__lockHint; ?>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label"><?php echo __('customer_language'); ?></label>

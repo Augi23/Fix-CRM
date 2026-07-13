@@ -2492,6 +2492,44 @@ function crmCustomerDocLang($preferredLanguage): string {
     return $lang === 'uk' ? 'en' : $lang;
 }
 
+/**
+ * Ochrana identity klienta: jednou vyplněné jméno, příjmení, telefon a e-mail
+ * smí PŘEPSAT jen administrátor (hasPermission('admin_access')). Prázdný údaj
+ * (nebo jen „-"/„–"/„—") smí kdokoli DOPLNIT. Zabraňuje tomu, aby zaměstnanec
+ * omylem/záměrně přepsal kontaktní údaje zakázky na někoho jiného.
+ * @param array $existing původní řádek customers (aktuální hodnoty)
+ * @param array $posted   odeslané hodnoty (klíče first_name/last_name/phone/email)
+ * @return array [hodnoty_k_uložení(assoc), zablokovaná_pole(list), je_admin(bool)]
+ */
+function crmGuardCustomerIdentity(array $existing, array $posted): array {
+    $isAdmin = hasPermission('admin_access');
+    $fields = ['first_name', 'last_name', 'phone', 'email'];
+    $isBlank = static function ($v): bool {
+        $v = trim((string)$v);
+        return $v === '' || in_array($v, ['-', '–', '—'], true);
+    };
+    $values = [];
+    $blocked = [];
+    foreach ($fields as $f) {
+        $old = trim((string)($existing[$f] ?? ''));
+        $new = array_key_exists($f, $posted) ? trim((string)$posted[$f]) : $old;
+        if ($isAdmin || $isBlank($old) || $new === $old) {
+            $values[$f] = $new;   // admin / doplnění prázdného / beze změny → povoleno
+        } else {
+            $values[$f] = $old;   // zaměstnanec nesmí přepsat už vyplněný údaj
+            $blocked[] = $f;
+        }
+    }
+    return [$values, $blocked, $isAdmin];
+}
+
+/** Je vyplněný údaj identity klienta zamčený pro aktuálního uživatele? (pro UI: readonly) */
+function crmCustomerFieldLocked($value): bool {
+    if (hasPermission('admin_access')) return false;
+    $v = trim((string)$value);
+    return $v !== '' && !in_array($v, ['-', '–', '—'], true);
+}
+
 /** '' / null → NULL, jinak float (čárka i tečka). Pro číselné sloupce ve strict SQL. */
 function crmNumOrNull($v): ?float {
     $v = trim((string)($v ?? ''));

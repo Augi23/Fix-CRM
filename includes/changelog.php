@@ -7,6 +7,17 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '20:10',
+        'title' => 'Ochrana údajů klienta: vyplněné jméno/telefon/e-mail mění jen administrátor',
+        'items' => [
+            'Jednou vyplněné jméno, příjmení, telefon a e-mail klienta už NELZE přepsat běžným zaměstnancem — změnit je smí pouze administrátor. Prázdný údaj (nebo jen „-") smí kdokoli doplnit.',
+            'V detailu zakázky: pole Klient je pro zaměstnance zamčené (výběr jiného klienta = admin). Klienta si vybírá při zakládání, dodatečná záměna je na administrátorovi.',
+            'V úpravě klienta: vyplněné údaje jsou pro zaměstnance jen ke čtení (visačka zámku), prázdné jde doplnit. Pokus o změnu se neuloží a zobrazí se upozornění.',
+            'Serverová i vizuální pojistka — společně s dnešní opravou tichého přepisu klienta to záměně klienta spolehlivě zabrání.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '19:30',
         'title' => 'OPRAVA CHYBY: editace zakázky mohla přepsat klienta na cizího',
         'items' => [

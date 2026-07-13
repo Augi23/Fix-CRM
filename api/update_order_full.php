@@ -92,12 +92,12 @@ try {
         }
     }
 
-    // Klient: přepiš jen na EXISTUJÍCÍHO zákazníka; jinak ponech stávajícího.
-    // Pojistka proti tichému přepisu (dřív stačila neprázdná hodnota → chybný
-    // default z ořezaného seznamu v editaci přepisoval klienta zakázky).
+    // Klient zakázky: změnit ho (= přepsat jméno/telefon/e-mail na jiného člověka)
+    // smí JEN administrátor. Zaměstnanci zůstává původní klient. Pojistka proti
+    // záměně klienta i proti tichému přepisu z dřív ořezaného seznamu v editaci.
     $customerIdToSave = (int)$current['customer_id'];
     $postedCustomerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : 0;
-    if ($postedCustomerId > 0 && $postedCustomerId !== $customerIdToSave) {
+    if ($postedCustomerId > 0 && $postedCustomerId !== $customerIdToSave && hasPermission('admin_access')) {
         $chkCust = $pdo->prepare('SELECT 1 FROM customers WHERE id = ? LIMIT 1');
         $chkCust->execute([$postedCustomerId]);
         if ($chkCust->fetchColumn()) {

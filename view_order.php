@@ -58,6 +58,9 @@ $can_handoff = !empty($order['technician_id'])
     && ($__isOwnTech || $can_change_technician);
 $techTimes = crmGetOrderTechTimes((int)$order['id']);
 
+// Klienta zakázky (jméno/telefon/e-mail) smí přepsat/zaměnit jen administrátor.
+$__canEditCustomer = hasPermission('admin_access');
+
 // Podpisy klienta (příjem/výdej) — blok v pravém sloupci + tisk na zakázkovém listu
 $orderSignatures = crmGetOrderSignatures((int)$order['id']);
 
@@ -1408,7 +1411,7 @@ function deleteOrder(id) {
                     <div class="row g-3">
                         <div class="col-md-12">
                             <label class="form-label"><?php echo __('client'); ?></label>
-                            <select name="customer_id" class="form-select select2-customer-edit" data-placeholder="<?php echo __('search_client_placeholder'); ?>">
+                            <select name="customer_id" class="form-select select2-customer-edit" data-placeholder="<?php echo __('search_client_placeholder'); ?>" <?php echo $__canEditCustomer ? '' : 'disabled'; ?>>
                                 <?php foreach($customers_list as $cl):
                                     // předvyplněná (vybraná) položka = aktuální klient zakázky; ostatní se dohledají AJAXem
                                     $clFirst = in_array(trim((string)$cl['first_name']), ['-','–','—'], true) ? '' : trim((string)$cl['first_name']);
@@ -1421,6 +1424,9 @@ function deleteOrder(id) {
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php if (!$__canEditCustomer): ?>
+                                <div class="form-text"><i class="fas fa-lock me-1"></i>Klienta zakázky může změnit jen administrátor.</div>
+                            <?php endif; ?>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('brand'); ?></label>
