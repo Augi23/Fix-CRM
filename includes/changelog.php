@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '22:05',
+        'title' => 'Vyhledávání klienta najde i celé jméno („Barbara Ozima")',
+        'items' => [
+            'Vyhledávání zákazníka dřív hledalo zadaný text jen v jednotlivých polích zvlášť — když jste napsal/vložil celé jméno „Křestní Příjmení", nenašlo nic, protože křestní jméno a příjmení jsou uložené odděleně.',
+            'Nově se dotaz rozdělí na slova a najde klienta i podle celého jména (v obou pořadích), podle firmy i e-mailu. Zkopírované celé jméno tak funguje.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '21:40',
         'title' => 'Přiřazení klienta ke starší zakázce bez klienta',
         'items' => [

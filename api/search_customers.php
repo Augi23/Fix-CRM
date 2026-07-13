@@ -20,9 +20,22 @@ $params = [];
 $where = '';
 $use_recent = ($term === '');
 if (!$use_recent) {
-    $like = '%' . $term . '%';
-    $where = "WHERE first_name LIKE ? OR last_name LIKE ? OR phone LIKE ? OR company LIKE ?";
-    $params = [$like, $like, $like, $like];
+    // Hledání zvládne i CELÉ jméno ("Barbara Ozima"): rozdělíme dotaz na slova a
+    // KAŽDÉ slovo musí sedět na některé pole (jméno/příjmení/telefon/firma/e-mail)
+    // nebo na složené celé jméno. Dřív hledalo jen celý řetězec v jednom poli, takže
+    // "Barbara Ozima" (jméno + příjmení zvlášť) se nikdy nenašlo.
+    $tokens = preg_split('/\s+/', $term, -1, PREG_SPLIT_NO_EMPTY) ?: [$term];
+    $andClauses = [];
+    foreach ($tokens as $tok) {
+        $like = '%' . $tok . '%';
+        $andClauses[] = "(first_name LIKE ? OR last_name LIKE ? OR phone LIKE ? OR company LIKE ? OR email LIKE ? OR CONCAT_WS(' ', first_name, last_name) LIKE ? OR CONCAT_WS(' ', last_name, first_name) LIKE ?)";
+        array_push($params, $like, $like, $like, $like, $like, $like, $like);
+    }
+    $full = '%' . $term . '%';
+    // …plus přímá shoda celého dotazu na složené jméno (obě pořadí) i firmu
+    $fullClause = "CONCAT_WS(' ', first_name, last_name) LIKE ? OR CONCAT_WS(' ', last_name, first_name) LIKE ? OR company LIKE ?";
+    array_push($params, $full, $full, $full);
+    $where = "WHERE ((" . implode(' AND ', $andClauses) . ") OR (" . $fullClause . "))";
 }
 
 try {
