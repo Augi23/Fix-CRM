@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:57',
+        'title' => 'Automatické odhlášení výrazně prodlouženo (4 hodiny)',
+        'items' => [
+            'Přihlášení nově vydrží 4 hodiny nečinnosti. Odhalili jsme přitom, že server dosud mazal přihlášení už po ~30 minutách kvůli systémovému úklidu, který ignoroval nastavení aplikace — CRM má teď vlastní úložiště přihlášení, na které systém nesahá.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:37',
         'title' => 'Počítadlo i u Nákupů v horním menu',
         'items' => [

@@ -14,7 +14,19 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 ini_set('session.cookie_httponly', 1);
 ini_set('session.cookie_secure', (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 1 : 0);
 ini_set('session.use_strict_mode', 1);
-ini_set('session.gc_maxlifetime', 7200);
+// ── Životnost přihlášení ─────────────────────────────────────────────────────
+// POZOR: Ubuntu maže sessions systémovým časovačem phpsessionclean podle
+// /etc/php/*/fpm/php.ini (gc_maxlifetime 1440 = 24 min!) — ini_set na to nemá
+// vliv. Proto aplikace používá VLASTNÍ adresář sessions, který systémový úklid
+// nezná; o expiraci se stará PHP GC podle hodnoty ZDE. (13.7.2026)
+$__sessDir = rtrim(sys_get_temp_dir(), '/') . '/fixcrm_sessions';
+if (!is_dir($__sessDir)) { @mkdir($__sessDir, 0700, true); }
+if (is_dir($__sessDir) && is_writable($__sessDir)) {
+    session_save_path($__sessDir);
+    ini_set('session.gc_probability', 1);
+    ini_set('session.gc_divisor', 50);
+}
+ini_set('session.gc_maxlifetime', 14400);   // 4 h nečinnosti (2× původní záměr 2 h)
 ini_set('session.cookie_samesite', 'Strict');
 ini_set('session.use_only_cookies', 1);
 
