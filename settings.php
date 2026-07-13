@@ -308,7 +308,7 @@ if (isset($_POST['update_system_settings']) && $is_admin_check) {
 }
 
 $is_admin_user = hasPermission('admin_access');
-$can_view_all_staff = $is_admin_user || getCurrentStaffRole() === 'manager' || hasPermission('view_reports_all');
+$can_view_all_staff = $is_admin_user || in_array(getCurrentStaffRole(), ['manager', 'boss'], true) || hasPermission('view_reports_all');
 
 $active_tab = $_GET['tab'] ?? ($is_admin_user ? 'company' : 'staff');
 
@@ -685,6 +685,7 @@ require_once 'includes/header.php';
                                 <?php 
                                 $r = $t['role'] ?? 'engineer';
                                 if($r == 'admin' || in_array((string)($t['username'] ?? ''), $__adminUsernames, true)) echo '<span class="badge bg-danger">'.__('role_admin').'</span>';
+                                elseif($r == 'boss') echo '<span class="badge bg-warning text-dark">Boss</span>';
                                 elseif($r == 'manager') echo '<span class="badge bg-primary">'.__('role_manager').'</span>';
                                 else echo '<span class="badge bg-info-glow">'.__('role_engineer').'</span>';
                                 ?>
@@ -1242,6 +1243,7 @@ require_once 'includes/header.php';
                     <select name="role" class="form-select">
                         <option value="engineer"><?php echo __('role_engineer'); ?></option>
                         <option value="manager"><?php echo __('role_manager'); ?></option>
+                        <option value="boss">Boss</option>
                         <option value="admin"><?php echo __('role_admin'); ?></option>
                     </select>
                 </div>
@@ -1294,10 +1296,11 @@ require_once 'includes/header.php';
                     <select name="role" class="form-select">
                         <option value="engineer" <?php echo ($t['role'] ?? 'engineer') == 'engineer' ? 'selected' : ''; ?>><?php echo __('role_engineer'); ?></option>
                         <option value="manager" <?php echo ($t['role'] ?? 'engineer') == 'manager' ? 'selected' : ''; ?>><?php echo __('role_manager'); ?></option>
+                        <option value="boss" <?php echo ($t['role'] ?? 'engineer') == 'boss' ? 'selected' : ''; ?>>Boss</option>
                         <option value="admin" <?php echo ($t['role'] ?? 'engineer') == 'admin' ? 'selected' : ''; ?>><?php echo __('role_admin'); ?></option>
                     </select>
                     <?php else: ?>
-                        <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo ($t['role'] ?? 'engineer') == 'admin' ? __('role_admin') : (($t['role'] ?? 'engineer') == 'manager' ? __('role_manager') : __('role_engineer')); ?></div>
+                        <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo ($t['role'] ?? 'engineer') == 'admin' ? __('role_admin') : (($t['role'] ?? 'engineer') == 'boss' ? 'Boss' : (($t['role'] ?? 'engineer') == 'manager' ? __('role_manager') : __('role_engineer'))); ?></div>
                         <input type="hidden" name="role" value="<?php echo htmlspecialchars($t['role'] ?? 'engineer'); ?>">
                     <?php endif; ?>
                 </div>

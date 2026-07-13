@@ -45,7 +45,9 @@ function hasPermission($permission) {
         }
 
         $implicitPermissions = [];
-        if (getCurrentStaffRole() === 'manager') {
+        // Boss = tatáž práva jako manažer (o stupeň výš jen u přiřazování techniků,
+        // což řeší isBranchGlobalViewer + edit_orders níže).
+        if (in_array(getCurrentStaffRole(), ['manager', 'boss'], true)) {
             $implicitPermissions = [
                 'view_all_orders',
                 'edit_orders',
@@ -130,7 +132,9 @@ function getCurrentStaffBranchId(): int {
 }
 
 function isBranchGlobalViewer(): bool {
-    return hasPermission('admin_access') || getCurrentStaffRole() === 'manager';
+    // Boss vidí a přiřazuje napříč pobočkami stejně jako manažer/admin
+    // → smí určit jakéhokoliv technika k jakékoliv zakázce (canAssignTechnicianToOrder).
+    return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 }
 
 function addOrderBranchScope(array &$whereClauses, array &$params, string $orderAlias = 'o'): void {
@@ -1466,7 +1470,7 @@ function crmGetOrderNotificationContext(int $orderId): ?array {
 
 function crmGetOversightRecipients($excludeTechnicianIds = []): array {
     global $pdo;
-    $stmt = $pdo->query("SELECT id, name, role, telegram_id FROM technicians WHERE is_active = 1 AND role IN ('admin', 'manager')");
+    $stmt = $pdo->query("SELECT id, name, role, telegram_id FROM technicians WHERE is_active = 1 AND role IN ('admin', 'manager', 'boss')");
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     if (!is_array($excludeTechnicianIds)) {

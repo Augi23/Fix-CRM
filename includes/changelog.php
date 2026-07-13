@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '20:40',
+        'title' => 'Nová hodnost „Boss" (nad manažerem)',
+        'items' => [
+            'Přidána role Boss — má stejná práva jako manažer a navíc smí přiřadit jakéhokoliv technika k jakékoliv zakázce (i napříč pobočkami) a změnit technika i tehdy, když se sám technik z rozpracované zakázky neuvolnil. Tato práva má samozřejmě i administrátor.',
+            'Roli Boss lze nastavit zaměstnanci v Nastavení → tým (výběr role), zobrazuje se žlutou visačkou.',
+            'Tomáš Zahradník převeden z administrátora na hodnost Boss (přihlašuje se stejným jménem/heslem, nově jako Boss).',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '20:10',
         'title' => 'Ochrana údajů klienta: vyplněné jméno/telefon/e-mail mění jen administrátor',
         'items' => [
