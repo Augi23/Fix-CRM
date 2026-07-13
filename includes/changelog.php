@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-13',
+        'title' => 'Nová ikona CRM v záložce prohlížeče',
+        'items' => [
+            'CRM má v záložce prohlížeče (favicon) logo AppleFix — černé jablko se zeleným křížem. Platí pro administraci, přihlášení i klientský portál.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'title' => 'Oprava chyby při změně stavu / mazání zakázek bez technika',
         'items' => [
             'U zakázek bez přiřazeného technika (typicky nové zakázky z webu) končila změna stavu, stornování či úprava chybou „Integrity constraint violation… technician_id". Systém se pokoušel uložit neexistujícího technika č. 0 — nyní správně ukládá „bez technika".',
