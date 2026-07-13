@@ -2582,7 +2582,11 @@ p, span, label, .small, small,
 .status-pill--repairplugin { background: #86198f !important; border-color: #e879f9 !important; color: #fdf4ff !important; font-weight: 700 !important; }   /* fialová – Přijato z RepairPluginu */
 
 /* Pilulky priority zakázky (sloupec Priorita, detail zakázky) */
-.priority-pill { border: 1px solid transparent; font-weight: 700 !important; letter-spacing: .01em; }
+.priority-pill { border: 1px solid transparent; font-weight: 700 !important; letter-spacing: .01em;
+  padding: 4px 8px !important; font-size: 11px !important; border-radius: 8px !important; }
+/* sloupec Priorita jen tak široký, jak potřebuje nejširší badge */
+.orders-center-table th.col-priority,
+.orders-center-table td.col-priority { width: 1%; white-space: nowrap; text-align: center; }
 .priority-pill--high   { background: #b91c1c !important; border-color: #f87171 !important; color: #fef2f2 !important; }   /* červená – Urgentní */
 .priority-pill--normal { background: #334155 !important; border-color: #64748b !important; color: #e2e8f0 !important; }   /* neutrální – Normální */
 .priority-pill--low    { background: #115e59 !important; border-color: #2dd4bf !important; color: #f0fdfa !important; }   /* teal – Klidná */

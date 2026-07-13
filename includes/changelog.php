@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-13',
+        'title' => 'Kompaktnější sloupec Priorita',
+        'items' => [
+            'Štítky priority (Klidná / Normální / Urgentní) jsou menší a sloupec Priorita zabírá jen šířku nejširšího štítku — víc místa zbývá pro popis závady a stav.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'title' => 'Opravena ikona tisku ve sloupci Akce',
         'items' => [
             'Ikona tiskárny u tlačítka tisku se zobrazovala zdeformovaně (zmenšená pravidlem pro drobné texty v tabulce). Nyní má správnou velikost jako ostatní ikony akcí.',
