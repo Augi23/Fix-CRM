@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '06:41',
+        'title' => 'Účtenka při vydání v novém jednotném vzhledu',
+        'items' => [
+            'Účtenka (termo) sladěná se zakázkovým listem — logo, SF Pro, přehledné položky a celková částka, adresa pobočky v patičce.',
+            'Odstraněny pozůstatky původní šablony: cizí doména servis.expert, anglické věty a ruské tlačítko „Печать". QR kód vede na naše online sledování zakázky.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '06:39',
         'title' => 'Příjmový akt v novém jednotném vzhledu',
         'items' => [
