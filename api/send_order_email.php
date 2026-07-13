@@ -15,7 +15,7 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? $_GET['csrf_token'] ?? '')) {
 $order_id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
 if ($order_id <= 0) { echo json_encode(['ok' => false, 'error' => 'Chybí zakázka']); exit; }
 
-$stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address, c.email
+$stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address, c.email, c.preferred_language
                        FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?");
 $stmt->execute([$order_id]);
 $order = $stmt->fetch();
@@ -32,8 +32,8 @@ $st = $pdo->prepare("SELECT oi.*, i.part_name FROM order_items oi JOIN inventory
 $st->execute([$order_id]);
 $items = $st->fetchAll();
 
-// vykreslit dokument do HTML
-$target_lang = 'cs';
+// vykreslit dokument do HTML — v jazyce klienta (volba při zakládání zakázky)
+$target_lang = crmCustomerDocLang($order['preferred_language'] ?? 'cs');
 $__EMAIL_MODE = true;
 define('ORDER_DOC_EMBED', true);
 ob_start();

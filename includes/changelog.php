@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '08:56',
+        'title' => 'Zakázkový list e-mailem odchází v jazyce klienta',
+        'items' => [
+            'Ruční odeslání zakázkového listu e-mailem (tlačítko u zakázky) nově respektuje jazyk zvolený u klienta — dřív odcházel vždy česky.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '08:30',
         'title' => 'CRM jako aplikace na telefonu a tabletu',
         'items' => [
