@@ -192,7 +192,7 @@ try {
 $afxFn = trim((string)($_SESSION['full_name'] ?? 'U'));
 $afxFp = array_values(array_filter(explode(' ', $afxFn)));
 $afxInitials = mb_strtoupper(count($afxFp) >= 2 ? mb_substr($afxFp[0],0,1).mb_substr($afxFp[1],0,1) : mb_substr($afxFn,0,2));
-$afxIsManager = hasPermission('admin_access') || getCurrentStaffRole() === 'manager';
+$afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 ?>
 <!-- Saténové pozadí (grafit × lesní zelená) — struktura pro Liquid Glass refrakci -->
 <svg class="crm-bgfx" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1440 900" aria-hidden="true">
