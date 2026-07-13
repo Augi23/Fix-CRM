@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-13',
+        'title' => 'E-mail klienta přímo v seznamu zakázek',
+        'items' => [
+            'Ve sloupci Klient je pod telefonem nově i e-mail klienta (pokud je vyplněný) — kliknutím se rovnou otevře nový e-mail.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'title' => 'Dnešní objednané termíny z webu jemně pulzují',
         'items' => [
             'Pokud je oprava z webu objednaná na dnešek, štítek s časem lehce pulzuje (světelný nádech). Termíny na jiné dny zůstávají klidné.',

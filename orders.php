@@ -79,7 +79,7 @@ if (isset($pdo)) {
         $fetch_params[] = $search_id;
 
         $stmt = $pdo->prepare(
-            'SELECT o.*, c.first_name, c.last_name, c.phone, t.name as tech_name,
+            'SELECT o.*, c.first_name, c.last_name, c.phone, c.email, t.name as tech_name,
                     (SELECT MAX(l.changed_at) FROM order_status_log l WHERE l.order_id = o.id) AS last_status_change,
                     (SELECT MAX(wb.appointment_at) FROM web_bookings wb WHERE wb.order_id = o.id) AS web_appointment_at
              FROM orders o
@@ -324,6 +324,11 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                         <i class="fas fa-phone me-1 text-success"></i><?php echo e($client_phone); ?>
                                     </div>
                                     <?php endif; ?>
+                                <?php endif; ?>
+                                <?php if (!empty($order['email'])): ?>
+                                    <div><a class="small text-white-75 text-decoration-none" href="mailto:<?php echo e($order['email']); ?>" onclick="event.stopPropagation();">
+                                        <i class="fas fa-envelope me-1 text-info"></i><?php echo e($order['email']); ?>
+                                    </a></div>
                                 <?php endif; ?>
                             </td>
                             <td>
