@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '22:25',
+        'title' => 'Přejmenování kategorie zakázek „K odsouhlasení" → „Čeká na klienta"',
+        'items' => [
+            'Horní kategorie (dlaždice a filtr) v Zakázkách se nově jmenuje „Čeká na klienta" místo „K odsouhlasení". Význam i chování zůstávají stejné, změnil se jen název.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '22:05',
         'title' => 'Vyhledávání klienta najde i celé jméno („Barbara Ozima")',
         'items' => [
