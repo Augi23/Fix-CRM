@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:28',
+        'title' => 'Více oprav na jedné zakázce z ceníku',
+        'items' => [
+            'Pole „Oprava a cena dle ceníku" nyní přidává položky — vybereš displej, pak baterii… Každá se ukáže jako štítek s cenou (křížkem jde odebrat), popis závady i celková cena se skládají samy.',
+            'Na zakázkovém listu se všechny vybrané opravy rozepíšou po položkách, včetně expresního příplatku. Když cenu ručně upravíš, na listu se objeví řádek „Úprava ceny", aby rozpis vždy seděl na celkovou částku.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:25',
         'title' => 'Ceník ve wizardu zjednodušen — žádné druhé pole modelu',
         'items' => [

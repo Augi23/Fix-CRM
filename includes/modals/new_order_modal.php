@@ -243,6 +243,8 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                     <select id="pricelistRepair" class="form-select" disabled style="width:100%;">
                                         <option value=""><?php echo __('pricelist_repair_ph'); ?></option>
                                     </select>
+                                    <div id="pricelistChosen" class="d-flex flex-wrap gap-2 mt-2"></div>
+                                    <input type="hidden" name="pricelist_items" id="pricelistItems" value="">
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label"><?php echo __('problem'); ?></label>

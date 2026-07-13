@@ -1432,11 +1432,43 @@ function afxLoadPricelistRepairs() {
 $(document).on('change', '#newOrderModal select[name="device_model"], #newOrderModal select[name="device_brand"]', afxLoadPricelistRepairs);
 $(document).on('shown.bs.modal', '#newOrderModal', afxLoadPricelistRepairs);
 
+// Výběr opravy PŘIDÁVÁ položku (jedno zařízení může mít víc oprav) — chips + součet
+window.afxPricelistItems = window.afxPricelistItems || [];
+function afxRenderPricelistItems() {
+    var items = window.afxPricelistItems;
+    var $box = $('#pricelistChosen');
+    $box.empty();
+    items.forEach(function (it, idx) {
+        var priceTxt = it.price !== null ? Number(it.price).toLocaleString('cs-CZ') + ' Kč' : 'na dotaz';
+        $('<span class="badge bg-dark border border-secondary d-inline-flex align-items-center" style="gap:6px;font-weight:500;">')
+            .append(document.createTextNode(it.label + ' · ' + priceTxt))
+            .append($('<button type="button" class="btn-close btn-close-white" style="font-size:9px;" aria-label="×">').on('click', function () {
+                window.afxPricelistItems.splice(idx, 1);
+                afxRenderPricelistItems();
+            }))
+            .appendTo($box);
+    });
+    // hidden input + předvyplnění popisu závady a ceny
+    $('#pricelistItems').val(items.length ? JSON.stringify(items) : '');
+    if (items.length) {
+        $('#newOrderModal textarea[name="problem_description"]').val(items.map(function (i) { return i.label; }).join(', '));
+        var sum = items.reduce(function (a, i) { return a + (i.price !== null ? Number(i.price) : 0); }, 0);
+        $('#newOrderModal input[name="estimated_cost"]').val(sum > 0 ? sum : '');
+    }
+}
+$(document).on('hidden.bs.modal', '#newOrderModal', function () {
+    window.afxPricelistItems = [];
+    afxRenderPricelistItems();
+});
 $(document).on('change', '#pricelistRepair', function () {
     var o = this.options[this.selectedIndex];
     if (!o || !o.value) return;
-    $('#newOrderModal textarea[name="problem_description"]').val(o.value);
-    if (o.dataset.price !== '') {
-        $('#newOrderModal input[name="estimated_cost"]').val(o.dataset.price);
+    var label = o.value;
+    var price = o.dataset.price !== '' ? Number(o.dataset.price) : null;
+    var dupe = window.afxPricelistItems.some(function (i) { return i.label === label; });
+    if (!dupe) {
+        window.afxPricelistItems.push({ label: label, price: price });
+        afxRenderPricelistItems();
     }
+    this.selectedIndex = 0;   // připraveno na další položku
 });

@@ -76,13 +76,32 @@ try {
     ]);
     $order_id = (int)$pdo->lastInsertId();
 
-    // Rozpis ceny na zakázkový list: základ opravy + expresní příplatek / sleva
-    if ($priority_adjust != 0.0 && $base_cost > 0) {
-        try {
-            crmAddOrderPriceLine($order_id, 'Oprava' . ($problem_description !== '' ? ': ' . (function_exists('mb_strimwidth') ? mb_strimwidth($problem_description, 0, 80, '…') : substr($problem_description, 0, 80)) : ''), $base_cost, 0);
-            crmAddOrderPriceLine($order_id, $priority === 'High' ? 'Expresní příplatek (přednostní oprava)' : 'Sleva — oprava beze spěchu', $priority_adjust, 1);
-        } catch (Throwable $e) { /* rozpis je bonus */ }
-    }
+    // Rozpis ceny na zakázkový list: položky z ceníku / základ opravy + příplatek/sleva
+    try {
+        $plItems = json_decode((string)($_POST['pricelist_items'] ?? ''), true);
+        $plItems = is_array($plItems) ? array_values(array_filter($plItems, fn($i) => is_array($i) && trim((string)($i['label'] ?? '')) !== '')) : [];
+        $sortN = 0;
+        if (count($plItems) > 0) {
+            $linesSum = 0.0;
+            foreach ($plItems as $pi) {
+                $piPrice = (isset($pi['price']) && is_numeric($pi['price'])) ? (float)$pi['price'] : null;
+                if ($piPrice === null) { continue; }   // „na dotaz" — jen v popisu závady
+                crmAddOrderPriceLine($order_id, (string)$pi['label'], $piPrice, $sortN++);
+                $linesSum += $piPrice;
+            }
+            // ruční úprava ceny (personál přepsal částku) → vyrovnávací řádek, ať rozpis sedí
+            $diff = $base_cost - $linesSum;
+            if ($sortN > 0 && abs($diff) > 0.01) {
+                crmAddOrderPriceLine($order_id, 'Úprava ceny', $diff, $sortN++);
+            }
+            if ($priority_adjust != 0.0) {
+                crmAddOrderPriceLine($order_id, $priority === 'High' ? 'Expresní příplatek (přednostní oprava)' : 'Sleva — oprava beze spěchu', $priority_adjust, $sortN++);
+            }
+        } elseif ($priority_adjust != 0.0 && $base_cost > 0) {
+            crmAddOrderPriceLine($order_id, 'Oprava' . ($problem_description !== '' ? ': ' . (function_exists('mb_strimwidth') ? mb_strimwidth($problem_description, 0, 80, '…') : substr($problem_description, 0, 80)) : ''), $base_cost, $sortN++);
+            crmAddOrderPriceLine($order_id, $priority === 'High' ? 'Expresní příplatek (přednostní oprava)' : 'Sleva — oprava beze spěchu', $priority_adjust, $sortN++);
+        }
+    } catch (Throwable $e) { /* rozpis je bonus */ }
     assignmentSegmentSync($order_id, $technician_id ? (int)$technician_id : null, (string)$status);
 
     logOrderStatusChange($order_id, '', $status);
