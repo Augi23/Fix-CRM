@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '10:03',
+        'title' => 'Tlačítko „Přidat katalog" u dodavatelů na Nákupech',
+        'items' => [
+            'Vedle „Aktualizovat katalog" je nové tlačítko Přidat katalog — stačí název a adresa stránky s díly. Nový dodavatel se hned objeví ve výběru katalogů, ve filtrech i v aktualizaci skladu z katalogu.',
+            'Stávající tři katalogy (Mobilnidily.cz, refurb.zone, fixshop.cz) zůstávají beze změny.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:57',
         'title' => 'Automatické odhlášení výrazně prodlouženo (4 hodiny)',
         'items' => [

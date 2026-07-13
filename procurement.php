@@ -197,6 +197,9 @@ $can_add_procurement = $can_order;
         <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#catalogUpdateModal">
             <i class="fas fa-sync me-2"></i><?php echo __('update_catalog'); ?>
         </button>
+        <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#catalogAddModal">
+            <i class="fas fa-plus me-2"></i><?php echo __('add_catalog'); ?>
+        </button>
         <?php endif; ?>
         <?php if ($can_add_procurement): ?>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestModal">
@@ -208,6 +211,15 @@ $can_add_procurement = $can_order;
 </div>
 
 <?php
+// Flash: přidání katalogu dodavatele
+if (isset($_GET['catalog_source_added'])): ?>
+    <div class="alert alert-success border-0 shadow-sm"><i class="fas fa-check-circle me-2"></i><?php echo __('catalog_source_added'); ?></div>
+<?php elseif (!empty($_GET['catalog_source_error'])): ?>
+    <div class="alert alert-danger border-0 shadow-sm"><i class="fas fa-triangle-exclamation me-2"></i><?php
+        echo $_GET['catalog_source_error'] === 'exists' ? __('catalog_source_exists') : __('catalog_source_invalid');
+    ?></div>
+<?php endif;
+
 // Flash result of a catalog import (parse_catalog.php redirects here now).
 if (isset($_GET['catalog_imported'])):
     $cAdded = max(0, (int)($_GET['catalog_added'] ?? 0));
@@ -682,6 +694,36 @@ if (isset($_GET['catalog_imported'])):
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
                     <button type="submit" class="btn btn-success"><i class="fas fa-link me-2"></i><?php echo __('assign_to_order'); ?></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: přidat katalog dodavatele -->
+<div class="modal fade" id="catalogAddModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content glass-card border-secondary text-white">
+            <form action="api/add_supplier_catalog.php" method="POST">
+                <?php echo csrfField(); ?>
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="fas fa-book me-2 text-info"></i><?php echo __('add_catalog'); ?></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="<?php echo __('close'); ?>"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label"><?php echo __('catalog_name'); ?></label>
+                        <input type="text" name="catalog_name" class="form-control" placeholder="např. iFixit Store" required maxlength="80">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><?php echo __('catalog_url'); ?></label>
+                        <input type="url" name="catalog_url" class="form-control" placeholder="https://obchod.cz/nahradni-dily/" required maxlength="255">
+                        <div class="form-text text-white-75"><?php echo __('add_catalog_hint'); ?></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
+                    <button type="submit" class="btn btn-info"><i class="fas fa-plus me-2"></i><?php echo __('add_catalog'); ?></button>
                 </div>
             </form>
         </div>

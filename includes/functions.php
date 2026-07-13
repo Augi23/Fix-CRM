@@ -838,7 +838,8 @@ function getDeviceBrands() {
     }
 }
 
-function getSupplierCatalogs(): array {
+/** Výchozí (původně natvrdo zadané) katalogy — slouží jako seed a záložní seznam. */
+function getDefaultSupplierCatalogs(): array {
     return [
         'mobilnidily' => [
             'name' => 'Mobilnidily.cz',
@@ -856,6 +857,45 @@ function getSupplierCatalogs(): array {
             'default_url' => 'https://fixshop.cz/',
         ],
     ];
+}
+
+/** Katalogy dodavatelů žijí v DB (tlačítko „Přidat katalog" na Nákupech). */
+function ensureSupplierCatalogsTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS supplier_catalogs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            skey VARCHAR(40) NOT NULL UNIQUE,
+            name VARCHAR(80) NOT NULL,
+            host VARCHAR(120) NOT NULL,
+            default_url VARCHAR(255) NOT NULL,
+            is_active TINYINT NOT NULL DEFAULT 1
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        if ((int)$pdo->query("SELECT COUNT(*) FROM supplier_catalogs")->fetchColumn() === 0) {
+            $ins = $pdo->prepare("INSERT INTO supplier_catalogs (skey, name, host, default_url) VALUES (?, ?, ?, ?)");
+            foreach (getDefaultSupplierCatalogs() as $key => $c) {
+                $ins->execute([$key, $c['name'], $c['host'], $c['default_url']]);
+            }
+        }
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+function getSupplierCatalogs(): array {
+    global $pdo;
+    static $cache = null;
+    if ($cache !== null) { return $cache; }
+    try {
+        ensureSupplierCatalogsTable();
+        $out = [];
+        foreach ($pdo->query("SELECT skey, name, host, default_url FROM supplier_catalogs WHERE is_active = 1 ORDER BY name") as $r) {
+            $out[(string)$r['skey']] = ['name' => (string)$r['name'], 'host' => (string)$r['host'], 'default_url' => (string)$r['default_url']];
+        }
+        if ($out) { return $cache = $out; }
+    } catch (Throwable $e) { /* fallback níže */ }
+    return $cache = getDefaultSupplierCatalogs();
 }
 
 function supplierKeyFromUrl(string $url): string {
