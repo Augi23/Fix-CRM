@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:16',
+        'title' => 'Systémové e-maily odcházejí ze servis@applefix.cz',
+        'items' => [
+            'Veškeré e-maily odesílané systémem CRM (Připraveno k vyzvednutí, zakázkový list e-mailem…) nyní odcházejí z adresy servis@applefix.cz s odesílatelem „Servis | AppleFix.cz". Adresa info@applefix.cz zůstává vyhrazená pro dotazy klientů.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:12',
         'title' => 'Urgentní štítek u vydaných zakázek zešedne + správná role adminů',
         'items' => [
