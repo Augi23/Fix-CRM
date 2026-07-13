@@ -57,6 +57,8 @@ $currency = get_setting('currency', 'Kč');
         .qr-code { margin-top: 10px; }
         .qr-code img { width: 38mm; height: 38mm; }
         .qr-note { font-size: 10px; font-weight: 700; margin-top: 3px; }
+        a.doclink { color: inherit; text-decoration: none; }
+        @media screen { a.doclink { text-decoration: underline; text-underline-offset: 2px; } }
         .qr-sub { font-size: 9.5px; font-weight: 300; margin-top: 1px; }
         .terms { font-size: 10px; line-height: 1.35; margin-top: 12px; font-weight: 300; }
         .foot { margin-top: 14px; border-top: 1px solid #000; padding-top: 7px; text-align: center; }
@@ -118,7 +120,7 @@ $__portal = 'https://admin.applefix.cloud/login.php';
 
     <div class="text-center qr-code">
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode($__portal); ?>" alt="QR">
-        <div class="qr-note"><?php echo _l('status_page_label'); ?>: admin.applefix.cloud</div>
+        <div class="qr-note"><?php echo _l('status_page_label'); ?>: <a class="doclink" href="<?php echo $__portal; ?>">admin.applefix.cloud</a></div>
         <div class="qr-sub"><?php echo _l('client_portal_login_hint'); ?></div>
     </div>
 
@@ -128,7 +130,7 @@ $__portal = 'https://admin.applefix.cloud/login.php';
         <div class="foot-name"><?php echo htmlspecialchars(get_setting('company_name', 'AppleFix s.r.o.')); ?></div>
         <div class="foot-line">
             <?php echo htmlspecialchars($__bc['address_inline']); ?><br>
-            <?php echo _l('phone'); ?>: <?php echo htmlspecialchars($__bc['phone']); ?> · applefix.cz
+            <?php echo _l('phone'); ?>: <a class="doclink" href="tel:<?php echo htmlspecialchars(preg_replace('/[^0-9+]/', '', (string)$__bc['phone'])); ?>"><?php echo htmlspecialchars($__bc['phone']); ?></a> · <a class="doclink" href="https://applefix.cz">applefix.cz</a>
         </div>
     </div>
 </div>

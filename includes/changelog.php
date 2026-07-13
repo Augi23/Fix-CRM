@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '06:55',
+        'title' => 'Dokumenty: klikací kontakty na obrazovce + vždy A4 na výšku',
+        'items' => [
+            'Telefon, web, e-mail a adresa portálu jsou ve všech klientských dokumentech klikací, když se dokument prohlíží na obrazovce (náhled, e-mail) — na papíře se vytisknou jako běžný text, žádná falešná tlačítka.',
+            'Reklamační protokol má nyní stejně jako zakázkový list vynucený tisk na A4 na výšku.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '06:44',
         'title' => 'Reklamační protokol sladěn s novým vzhledem dokumentů',
         'items' => [

@@ -101,7 +101,11 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
         .foot { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); text-align: center; }
         .foot .foot-name { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: var(--ink); }
         .foot .foot-line { font-size: 10px; color: var(--muted); font-weight: 300; margin-top: 4px; letter-spacing: 0.02em; }
-        @media print { body { background: #fff; padding: 0; } .sheet { box-shadow: none; border-radius: 0; max-width: none; } }
+        a.doclink { color: inherit; text-decoration: none; }
+        @media screen { a.doclink { text-decoration: underline; text-underline-offset: 2px; } }
+        /* Vynutit A4 na výšku (jinak orientaci určuje tiskárna) */
+        @page { size: A4 portrait; margin: 0; }
+        @media print { body { background: #fff; padding: 0; } .sheet { box-shadow: none; border-radius: 0; max-width: none; width: 210mm; } }
     </style>
 </head>
 <body>
@@ -173,7 +177,7 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
             <div class="foot-name"><?php echo htmlspecialchars($__company); ?></div>
             <div class="foot-line">
                 <?php echo htmlspecialchars(trim($__company_addr)); ?><?php if ($__company_ico): ?> · IČO: <?php echo htmlspecialchars($__company_ico); ?><?php endif; ?>
-                · Tel.: <?php echo htmlspecialchars(trim($__company_phone)); ?><?php if ($__company_email): ?> · <?php echo htmlspecialchars($__company_email); ?><?php endif; ?>
+                · Tel.: <a class="doclink" href="tel:<?php echo htmlspecialchars(preg_replace('/[^0-9+]/', '', (string)$__company_phone)); ?>"><?php echo htmlspecialchars(trim($__company_phone)); ?></a><?php if ($__company_email): ?> · <a class="doclink" href="mailto:<?php echo htmlspecialchars($__company_email); ?>"><?php echo htmlspecialchars($__company_email); ?></a><?php endif; ?>
             </div>
         </div>
     </div>

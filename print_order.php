@@ -45,15 +45,15 @@ $co_addr  = $__bc['address'];
 $co_phone = $__bc['phone'];
 $co_email = $__bc['email'];
 
-// firemní identita na JEDEN řádek do záhlaví
-$__co_parts = [];
+// firemní identita do patičky — kontakty jako klikací odkazy (na papíře prostý text)
+$__foot_bits = [];
 $__addr1 = trim(preg_replace('/\s*[\r\n]+\s*/u', ', ', $co_addr));
-if ($__addr1 !== '') $__co_parts[] = $__addr1;
-if ($co_ico !== '') $__co_parts[] = 'IČO: ' . $co_ico . ($co_dic !== '' ? ' · DIČ: ' . $co_dic : '');
-if ($co_phone !== '') $__co_parts[] = 'Tel.: ' . $co_phone;
-$__co_parts[] = $co_web;
-$__co_parts[] = $co_email;
-$co_line = implode('  ·  ', $__co_parts);
+if ($__addr1 !== '') $__foot_bits[] = e($__addr1);
+if ($co_ico !== '') $__foot_bits[] = 'IČO: ' . e($co_ico) . ($co_dic !== '' ? ' · DIČ: ' . e($co_dic) : '');
+if ($co_phone !== '') $__foot_bits[] = 'Tel.: <a class="doclink" href="tel:' . e(preg_replace('/[^0-9+]/', '', $co_phone)) . '">' . e($co_phone) . '</a>';
+$__foot_bits[] = '<a class="doclink" href="https://applefix.cz">' . e($co_web) . '</a>';
+$__foot_bits[] = '<a class="doclink" href="mailto:' . e($co_email) . '">' . e($co_email) . '</a>';
+$co_line_html = implode('  ·  ', $__foot_bits);
 
 $orderCode = orderDisplayCode($order);
 $custName  = trim(($order['first_name'] ?? '') . ' ' . ($order['last_name'] ?? ''));
@@ -151,6 +151,9 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
                           border: none; border-radius: 11px; font-size: 14px; font-weight: 600;
                           box-shadow: 0 8px 22px rgba(10,132,255,0.28); }
 
+        /* odkazy: na OBRAZOVCE klikací (podtržené), na PAPÍŘE obyčejný text */
+        a.doclink { color: inherit; text-decoration: none; }
+        @media screen { a.doclink { text-decoration: underline; text-underline-offset: 2px; } }
         /* Vynutit A4 na výšku (bez tohoto se orientace řídila výchozím nastavením tiskárny → tisklo na šířku) */
         @page { size: A4 portrait; margin: 0; }
         @media print {
@@ -235,7 +238,7 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
 
         <div class="foot">
             <div class="foot-name"><?php echo e($co_name); ?></div>
-            <div class="foot-line"><?php echo e($co_line); ?></div>
+            <div class="foot-line"><?php echo $co_line_html; ?></div>
         </div>
     </div>
 </div>

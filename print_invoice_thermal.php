@@ -59,6 +59,8 @@ $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['paym
         .total-row .k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 400; }
         .total-row .v { font-size: 21px; font-weight: 800; }
         .barcode { text-align: center; margin: 10px 0 4px; font-size: 19px; letter-spacing: 3px; font-weight: 700; font-family: ui-monospace, Menlo, monospace; }
+        a.doclink { color: inherit; text-decoration: none; }
+        @media screen { a.doclink { text-decoration: underline; text-underline-offset: 2px; } }
         .foot { margin-top: 12px; border-top: 1px solid #000; padding-top: 7px; text-align: center; }
         .foot .thanks { font-size: 11px; font-weight: 700; margin-bottom: 5px; }
         .foot .foot-name { font-size: 12px; font-weight: 800; }
@@ -145,7 +147,7 @@ $__curr = $invoice['currency'] ?: 'Kč';
         <div class="foot-line">
             <?php echo htmlspecialchars($__bc['address_inline']); ?><br>
             <?php if ($__acc_ico): ?>IČO: <?php echo htmlspecialchars($__acc_ico); ?><?php endif; ?><?php if ($__acc_dic): ?> · DIČ: <?php echo htmlspecialchars($__acc_dic); ?><?php endif; ?><br>
-            Tel.: <?php echo htmlspecialchars($__bc['phone']); ?> · applefix.cz
+            Tel.: <a class="doclink" href="tel:<?php echo htmlspecialchars(preg_replace('/[^0-9+]/', '', (string)$__bc['phone'])); ?>"><?php echo htmlspecialchars($__bc['phone']); ?></a> · <a class="doclink" href="https://applefix.cz">applefix.cz</a>
         </div>
     </div>
 </div>
