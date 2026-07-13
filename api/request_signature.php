@@ -52,11 +52,24 @@ try {
     // starší čekající požadavky téže zakázky zrušit (ať stanice neukazuje duplicity)
     $pdo->prepare("UPDATE signature_requests SET status = 'cancelled' WHERE order_id = ? AND status = 'pending'")->execute([$orderId]);
 
-    $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
-    $pdo->prepare("INSERT INTO signature_requests (order_id, sig_type, branch_id, requested_by) VALUES (?, ?, ?, ?)")
-        ->execute([$orderId, $sigType, (int)($order['branch_id'] ?? 0) ?: null, $by !== '' ? mb_substr($by, 0, 100) : null]);
+    // volitelně: po podpisu automaticky poslat zakázkový list e-mailem
+    $emailAfter = (int)($_POST['email_after'] ?? 0) === 1;
+    $notice = '';
+    if ($emailAfter) {
+        $ce = $pdo->prepare("SELECT c.email FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id = ?");
+        $ce->execute([$orderId]);
+        $cliEmail = trim((string)$ce->fetchColumn());
+        if (!filter_var($cliEmail, FILTER_VALIDATE_EMAIL)) {
+            $emailAfter = false;
+            $notice = 'no_email';
+        }
+    }
 
-    echo json_encode(['ok' => true, 'request_id' => (int)$pdo->lastInsertId()]);
+    $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+    $pdo->prepare("INSERT INTO signature_requests (order_id, sig_type, branch_id, requested_by, email_after) VALUES (?, ?, ?, ?, ?)")
+        ->execute([$orderId, $sigType, (int)($order['branch_id'] ?? 0) ?: null, $by !== '' ? mb_substr($by, 0, 100) : null, $emailAfter ? 1 : 0]);
+
+    echo json_encode(['ok' => true, 'request_id' => (int)$pdo->lastInsertId(), 'notice' => $notice]);
 } catch (Throwable $e) {
     echo json_encode(['ok' => false, 'error' => 'Chyba serveru']);
 }

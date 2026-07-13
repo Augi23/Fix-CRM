@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '14:12',
+        'title' => 'Nová zakázka → podpis na tabletu → podepsaný list e-mailem',
+        'items' => [
+            'Dialog po založení zakázky má novou hlavní volbu „Podepsat na tabletu a poslat e-mailem": požadavek odejde na podpisový tablet, klient podepíše a zakázkový list se mu automaticky pošle e-mailem UŽ S PODPISEM — žádný tisk, sken ani ruční posílání.',
+            'Tablet je sdílený pro celou pobočku po Wi-Fi: požadavky z více počítačů se řadí do fronty a odbavují postupně — u pultu nevzniká fronta u jednoho PC.',
+            'Když klient e-mail nemá, systém to rovnou řekne a podpis se aspoň uloží k zakázce (list s podpisem jde kdykoliv vytisknout).',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '14:07',
         'title' => 'Tisk štítků nově přes server — bez můstku, z čehokoliv',
         'items' => [

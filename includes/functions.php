@@ -2381,6 +2381,37 @@ function ensureOrderSignaturesTable(): void {
     } catch (Throwable $e) { /* best-effort */ }
 }
 
+/** Pošle klientovi zakázkový list e-mailem (HTML = print_order.php v embed módu,
+ *  vč. případných podpisů). Vrací [ok, chyba]. Používá api/send_order_email.php
+ *  i automatika po podpisu na tabletu. */
+function crmSendOrderSheetEmail(int $orderId, ?string $toOverride = null): array {
+    global $pdo;
+    $st = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address, c.email, c.preferred_language
+                         FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?");
+    $st->execute([$orderId]);
+    $order = $st->fetch();
+    if (!$order) { return [false, 'Zakázka nenalezena']; }
+
+    $to = trim((string)($toOverride ?? $order['email'] ?? ''));
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return [false, 'Klient nemá platný e-mail.'];
+    }
+
+    $it = $pdo->prepare("SELECT oi.*, i.part_name FROM order_items oi JOIN inventory i ON oi.inventory_id = i.id WHERE oi.order_id = ?");
+    $it->execute([$orderId]);
+    $items = $it->fetchAll();
+
+    $target_lang = crmCustomerDocLang($order['preferred_language'] ?? 'cs');
+    $__EMAIL_MODE = true;
+    if (!defined('ORDER_DOC_EMBED')) { define('ORDER_DOC_EMBED', true); }
+    ob_start();
+    include __DIR__ . '/../print_order.php';
+    $html = ob_get_clean();
+
+    $subject = (get_setting('company_name', 'AppleFix')) . ' — zakázkový list ' . orderDisplayCode($order);
+    return smtpSendMail($to, $subject, $html);
+}
+
 /** Fronta požadavků pro podpisovou stanici (iPad na pultu): zaměstnanec pošle
  *  žádost z detailu zakázky, stanice si ji stáhne (poll) a po podpisu označí done. */
 function ensureSignatureRequestsTable(): void {
@@ -2396,9 +2427,11 @@ function ensureSignatureRequestsTable(): void {
             branch_id INT NULL,
             requested_by VARCHAR(100) NULL,
             status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            email_after TINYINT NOT NULL DEFAULT 0,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_sr_branch (branch_id, status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        try { $pdo->exec("ALTER TABLE signature_requests ADD COLUMN email_after TINYINT NOT NULL DEFAULT 0"); } catch (Throwable $e) { /* už existuje */ }
     } catch (Throwable $e) { /* best-effort */ }
 }
 

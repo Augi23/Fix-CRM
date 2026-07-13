@@ -1221,6 +1221,28 @@ window.openOrderDocChoice = function (orderId, code) {
     var msg = document.getElementById('orderDocMsg'); if (msg) msg.textContent = '';
     var printBtn = document.getElementById('orderDocPrintBtn');
     var emailBtn = document.getElementById('orderDocEmailBtn');
+    var signBtn = document.getElementById('orderDocSignBtn');
+    if (signBtn) {
+        signBtn.disabled = false;
+        signBtn.onclick = function () {
+            signBtn.disabled = true;
+            var fd = new FormData();
+            fd.append('action', 'create');
+            fd.append('order_id', orderId);
+            fd.append('sig_type', 'prijem');
+            fd.append('email_after', '1');
+            fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+            fetch('api/request_signature.php', { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    if (!j.ok) { msg.textContent = j.error || 'Chyba'; signBtn.disabled = false; return; }
+                    msg.innerHTML = j.notice === 'no_email'
+                        ? '✍️ ' + (window.AFX_DOC_L10N && AFX_DOC_L10N.sentNoEmail || 'Odesláno na tablet. Klient nemá e-mail — list se po podpisu jen uloží s podpisem.')
+                        : '✍️ ' + (window.AFX_DOC_L10N && AFX_DOC_L10N.sent || 'Odesláno na podpisový tablet — po podpisu klienta se zakázkový list (i s podpisem) automaticky pošle na jeho e-mail.');
+                })
+                .catch(function () { msg.textContent = 'Chyba spojení'; signBtn.disabled = false; });
+        };
+    }
     printBtn.onclick = function () {
         if (typeof openUniversalPreview === 'function') {
             openUniversalPreview('print_order.php?id=' + orderId, 'Zakázkový list');

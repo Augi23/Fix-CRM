@@ -62,16 +62,24 @@ try {
     $pdo->prepare("INSERT INTO order_signatures (order_id, sig_type, file_path, requested_by) VALUES (?, ?, ?, ?)")
         ->execute([$orderId, $sigType, 'uploads/signatures/' . $name, $by !== '' ? mb_substr($by, 0, 100) : null]);
 
-    // požadavek z podpisové stanice → označit vyřízený
+    // požadavek z podpisové stanice → označit vyřízený (+ případný auto e-mail listu)
     $reqId = (int)($_POST['request_id'] ?? 0);
+    $emailed = false;
     if ($reqId > 0) {
         try {
             ensureSignatureRequestsTable();
+            $rq = $pdo->prepare("SELECT email_after FROM signature_requests WHERE id = ? AND order_id = ? LIMIT 1");
+            $rq->execute([$reqId, $orderId]);
+            $emailAfter = (int)($rq->fetchColumn() ?: 0) === 1;
             $pdo->prepare("UPDATE signature_requests SET status = 'done' WHERE id = ? AND order_id = ?")->execute([$reqId, $orderId]);
-        } catch (Throwable $e) { /* podpis je uložen, stav fronty je podružný */ }
+            if ($emailAfter) {
+                // zakázkový list odchází UŽ S PODPISEM (print_order podpisy vkládá)
+                [$emailed, ] = crmSendOrderSheetEmail($orderId);
+            }
+        } catch (Throwable $e) { /* podpis je uložen, zbytek je best-effort */ }
     }
 
-    echo json_encode(['ok' => true, 'signed_at' => date('d.m.Y H:i')]);
+    echo json_encode(['ok' => true, 'signed_at' => date('d.m.Y H:i'), 'emailed' => $emailed]);
 } catch (Throwable $e) {
     echo json_encode(['ok' => false, 'error' => 'Chyba serveru']);
 }

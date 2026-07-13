@@ -119,6 +119,7 @@
       <div class="modal-body">
         <p class="text-white-75 mb-3"><?php echo __('order_sheet_ready'); ?></p>
         <div class="d-grid gap-2">
+          <button type="button" class="btn btn-success btn-lg" id="orderDocSignBtn"><i class="fas fa-pen-nib me-2"></i><?php echo __('order_doc_sign_email'); ?></button>
           <button type="button" class="btn btn-outline-info btn-lg" id="orderDocPrintBtn"><i class="fas fa-print me-2"></i><?php echo __('print'); ?></button>
           <button type="button" class="btn btn-outline-primary btn-lg" id="orderDocEmailBtn"><i class="fas fa-envelope me-2"></i><?php echo __('send_email_to_client'); ?></button>
         </div>
