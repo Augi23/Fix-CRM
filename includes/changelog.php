@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:25',
+        'title' => 'Ceník ve wizardu zjednodušen — žádné druhé pole modelu',
+        'items' => [
+            'Model se vybírá jen v původním poli Značka + Model, žádná duplicita. Jakmile model vybereš, nabídne se jediné pole „Oprava a cena dle ceníku z webu" nad popisem závady — výběr doplní závadu i cenu. Když model v ceníku není, pole to jen tiše oznámí.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:16',
         'title' => 'Systémové e-maily odcházejí ze servis@applefix.cz',
         'items' => [

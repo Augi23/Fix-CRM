@@ -136,20 +136,6 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                 <i class="fas fa-laptop text-info me-2"></i>
                                 <span class="fw-semibold small text-uppercase"><?php echo __('section_device'); ?></span>
                             </div>
-                            <div class="row g-3 mb-2">
-                                <div class="col-md-6">
-                                    <label class="form-label"><i class="fas fa-tags me-1 text-info"></i><?php echo __('pricelist_model'); ?></label>
-                                    <select id="pricelistModel" class="form-select" style="width:100%;">
-                                        <option value=""><?php echo __('pricelist_model_ph'); ?></option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label"><?php echo __('pricelist_repair'); ?></label>
-                                    <select id="pricelistRepair" class="form-select" disabled style="width:100%;">
-                                        <option value=""><?php echo __('pricelist_repair_ph'); ?></option>
-                                    </select>
-                                </div>
-                            </div>
                             <div class="row g-3">
                                 <div class="col-md-3">
                                     <label class="form-label"><?php echo __('device_type'); ?></label>
@@ -252,6 +238,12 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                     </select>
                                 </div>
                                 <?php endif; ?>
+                                <div class="col-12">
+                                    <label class="form-label"><i class="fas fa-tags me-1 text-info"></i><?php echo __('pricelist_repair'); ?></label>
+                                    <select id="pricelistRepair" class="form-select" disabled style="width:100%;">
+                                        <option value=""><?php echo __('pricelist_repair_ph'); ?></option>
+                                    </select>
+                                </div>
                                 <div class="col-12">
                                     <label class="form-label"><?php echo __('problem'); ?></label>
                                     <textarea name="problem_description" class="form-control" rows="2" required></textarea>

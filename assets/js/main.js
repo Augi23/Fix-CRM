@@ -1396,48 +1396,29 @@ $(document).on('change', '#priorityHighModal', function () {
     }
 });
 
-
-// ── Ceník oprav z applefix.cz ve wizardu: model → oprava/varianta → předvyplnění ──
-$(document).on('shown.bs.modal', '#newOrderModal', function () {
-    var $m = $('#pricelistModel');
-    if (!$m.length || $m.hasClass('select2-hidden-accessible')) return;
-    $m.select2({
-        dropdownParent: $('#newOrderModal'),
-        allowClear: true,
-        placeholder: $m.find('option').first().text(),
-        ajax: {
-            url: 'api/pricelist.php', dataType: 'json', delay: 200,
-            data: function (p) { return { op: 'models', q: p.term || '' }; },
-            processResults: function (d) {
-                return { results: (d.results || []).map(function (r) {
-                    return { id: r.brand + '|' + r.model, text: r.brand + ' ' + r.model + (r.model_code ? ' (' + r.model_code.split(',')[0].trim() + ')' : ''),
-                             brand: r.brand, model: r.model, category: r.category };
-                }) };
-            }
-        }
-    });
-});
-
-$(document).on('select2:select', '#pricelistModel', function (e) {
-    var d = e.params.data;
+// ── Ceník oprav z applefix.cz: navázáno na EXISTUJÍCÍ pole Značka+Model ──
+// Po výběru modelu se nabídnou opravy s cenami; výběr předvyplní závadu a cenu.
+function afxLoadPricelistRepairs() {
+    var $modal = $('#newOrderModal');
     var $r = $('#pricelistRepair');
-    // předvyplnit zařízení
-    var typeMap = { 'Smartphone': 'Phone', 'Tablet': 'Tablet', 'Notebook': 'Notebook', 'Stolní počítač': 'PC' };
-    var $type = $('#newOrderModal select[name="device_type"]');
-    if (typeMap[d.category]) { $type.val(typeMap[d.category]).trigger('change'); }
-    var $brand = $('#newOrderModal select[name="device_brand"]');
-    if ($brand.find('option[value="' + d.brand + '"]').length === 0) { $brand.append(new Option(d.brand, d.brand)); }
-    $brand.val(d.brand).trigger('change');
-    var $model = $('#newOrderModal select[name="device_model"]');
-    if ($model.find('option[value="' + d.model + '"]').length === 0) { $model.append(new Option(d.model, d.model)); }
-    $model.val(d.model).trigger('change');
-    // načíst opravy s cenami
-    $r.prop('disabled', true).empty().append(new Option('…', ''));
-    fetch('api/pricelist.php?op=repairs&brand=' + encodeURIComponent(d.brand) + '&model=' + encodeURIComponent(d.model))
+    if (!$r.length) return;
+    var brand = $modal.find('select[name="device_brand"]').val() || '';
+    var model = $modal.find('select[name="device_model"]').val() || '';
+    if (!brand || !model) {
+        $r.prop('disabled', true).empty().append(new Option($r.data('ph-empty') || 'Nejdřív vyber model', ''));
+        return;
+    }
+    fetch('api/pricelist.php?op=repairs&brand=' + encodeURIComponent(brand) + '&model=' + encodeURIComponent(model))
         .then(function (x) { return x.json(); })
         .then(function (j) {
-            $r.empty().append(new Option($r.data('ph') || '—', ''));
-            (j.results || []).forEach(function (row) {
+            var rows = j.results || [];
+            $r.empty();
+            if (!rows.length) {
+                $r.prop('disabled', true).append(new Option($r.data('ph-nomatch') || 'Model není v ceníku z webu', ''));
+                return;
+            }
+            $r.append(new Option($r.data('ph-pick') || '— vybrat opravu z ceníku —', ''));
+            rows.forEach(function (row) {
                 var label = row.repair_name + (row.variant ? ' — ' + row.variant : '');
                 var priceTxt = row.price !== null ? Number(row.price).toLocaleString('cs-CZ') + ' Kč' : 'cena na dotaz';
                 var o = new Option(label + '  ·  ' + priceTxt, label);
@@ -1446,14 +1427,15 @@ $(document).on('select2:select', '#pricelistModel', function (e) {
             });
             $r.prop('disabled', false);
         })
-        .catch(function () { $r.prop('disabled', false); });
-});
+        .catch(function () { $r.prop('disabled', true); });
+}
+$(document).on('change', '#newOrderModal select[name="device_model"], #newOrderModal select[name="device_brand"]', afxLoadPricelistRepairs);
+$(document).on('shown.bs.modal', '#newOrderModal', afxLoadPricelistRepairs);
 
 $(document).on('change', '#pricelistRepair', function () {
     var o = this.options[this.selectedIndex];
     if (!o || !o.value) return;
-    var $desc = $('#newOrderModal textarea[name="problem_description"]');
-    $desc.val(o.value);
+    $('#newOrderModal textarea[name="problem_description"]').val(o.value);
     if (o.dataset.price !== '') {
         $('#newOrderModal input[name="estimated_cost"]').val(o.dataset.price);
     }
