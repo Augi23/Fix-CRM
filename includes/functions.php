@@ -2212,6 +2212,43 @@ function ensureCustomerLanguageColumn(): void {
     } catch (Throwable $e) { /* best-effort */ }
 }
 
+/** Cenové řádky zakázky — rozpis ceny na zakázkovém listu (oprava, expresní
+ *  příplatek, slevy…). Plní je webhook z RepairPluginu (items[]) a wizard CRM
+ *  (příplatek/sleva dle priority). Rozpis se tiskne, když jsou aspoň 2 řádky. */
+function ensureOrderPriceLinesTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS order_price_lines (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            label VARCHAR(190) NOT NULL,
+            amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+            sort INT NOT NULL DEFAULT 0,
+            INDEX idx_opl_order (order_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+function crmAddOrderPriceLine(int $orderId, string $label, float $amount, int $sort = 0): void {
+    global $pdo;
+    ensureOrderPriceLinesTable();
+    $pdo->prepare("INSERT INTO order_price_lines (order_id, label, amount, sort) VALUES (?, ?, ?, ?)")
+        ->execute([$orderId, mb_substr(trim($label), 0, 190), round($amount, 2), $sort]);
+}
+
+function crmGetOrderPriceLines(int $orderId): array {
+    global $pdo;
+    try {
+        ensureOrderPriceLinesTable();
+        $st = $pdo->prepare("SELECT label, amount FROM order_price_lines WHERE order_id = ? ORDER BY sort ASC, id ASC");
+        $st->execute([$orderId]);
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
 /** Jazyk pro DOKUMENTY klienta (tisk): cs/en přímo; ukrajinsky zatím dokumenty
  *  přeložené nejsou → uk klientům se tisknou anglicky (e-maily jdou plně ukrajinsky). */
 function crmCustomerDocLang($preferredLanguage): string {
@@ -3466,6 +3503,33 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
 
         if (function_exists('assignmentSegmentSync')) { try { assignmentSegmentSync($orderId, null, (string)$status); } catch (Throwable $e) {} }
         if (function_exists('logOrderStatusChange')) { try { logOrderStatusChange($orderId, '', $status); } catch (Throwable $e) {} }
+
+        // Rozpis ceny z webu (opravy, expresní příplatek, slevy) → zakázkový list
+        try {
+            $sortI = 0; $linesSum = 0.0;
+            foreach (['items', 'repairs', 'line_items'] as $ik) {
+                if (!is_array($raw[$ik] ?? null)) { continue; }
+                foreach ($raw[$ik] as $it) {
+                    if (!is_array($it)) { continue; }
+                    $plabel = trim((string)($it['name'] ?? ''));
+                    $pamt = $it['item_subtotal'] ?? ($it['price'] ?? null);
+                    if ($plabel === '' || $pamt === null || !is_numeric($pamt)) { continue; }
+                    $pamt = (float)$pamt;
+                    if (abs($pamt) < 0.005) { continue; }
+                    crmAddOrderPriceLine($orderId, $plabel, $pamt, $sortI++);
+                    $linesSum += $pamt;
+                }
+                break;   // items[] má přednost, další klíče jsou aliasy
+            }
+            // sleva mimo položky (kupón/combo) — jen pokud sedí do celkové ceny
+            $combo = (float)($raw['combo_discount'] ?? 0);
+            if ($combo > 0.005 && $estCost > 0
+                && abs($linesSum - $estCost) > 0.01
+                && abs(($linesSum - $combo) - $estCost) <= 0.01) {
+                $cc = trim((string)($raw['coupon_code'] ?? ''));
+                crmAddOrderPriceLine($orderId, 'Sleva' . ($cc !== '' ? ' (' . $cc . ')' : ''), -$combo, $sortI++);
+            }
+        } catch (Throwable $e) { /* rozpis je bonus, nesmí shodit založení */ }
 
         $pdo->prepare("UPDATE web_bookings SET status = 'converted', order_id = ? WHERE id = ?")
             ->execute([$orderId, $bookingId]);

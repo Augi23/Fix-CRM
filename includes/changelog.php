@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '07:32',
+        'title' => 'Zakázkový list s rozepsanou cenou (příplatky a slevy)',
+        'items' => [
+            'Když má zakázka příplatek nebo slevu (např. expresní priorita z objednávky na webu, kupón), zakázkový list vytiskne rozpis po položkách a celkovou cenu. U zakázek z RepairPluginu se rozpis přenáší automaticky včetně slev.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '06:55',
         'title' => 'Dokumenty: klikací kontakty na obrazovce + vždy A4 na výšku',
         'items' => [

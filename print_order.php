@@ -77,6 +77,12 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
         }
     } catch (Throwable $e) { $completedAt = ''; }
 }
+
+// Rozpis ceny (oprava + expresní příplatek / sleva…) — tiskne se od 2 řádků výš
+$priceLines = [];
+if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
+    $priceLines = crmGetOrderPriceLines((int)$order['id']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="cs">
@@ -208,7 +214,14 @@ if (isset($pdo) && function_exists('getOrderStatusList')) {
                 <div class="kv"><div class="k">Zařízení</div><div class="v"><?php echo e($deviceStr ?: '—'); ?></div></div>
                 <div class="kv"><div class="k">Heslo zařízení / Kód obrazovky</div><div class="v mono"><?php echo e($pin !== '' ? $pin : '—'); ?></div></div>
                 <div class="kv"><div class="k">Požadovaná oprava</div><div class="v repair"><?php echo e((string)($order['problem_description'] ?? '') ?: '—'); ?></div></div>
-                <div class="kv"><div class="k">Předpokládaná cena opravy</div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : 'dle diagnostiky'; ?></div></div>
+                <?php if (count($priceLines) >= 2): ?>
+                    <?php foreach ($priceLines as $pl): ?>
+                    <div class="kv"><div class="k"><?php echo e($pl['label']); ?></div><div class="v"><?php echo e(formatMoney((float)$pl['amount'])); ?></div></div>
+                    <?php endforeach; ?>
+                    <div class="kv"><div class="k">Předpokládaná cena opravy celkem</div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : 'dle diagnostiky'; ?></div></div>
+                <?php else: ?>
+                    <div class="kv"><div class="k">Předpokládaná cena opravy</div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : 'dle diagnostiky'; ?></div></div>
+                <?php endif; ?>
                 <div class="kv"><div class="k">Přijetí zařízení do opravy</div><div class="v"><?php echo e($receivedAt); ?></div></div>
                 <div class="kv"><div class="k">Datum ukončení opravy</div><div class="v done"><?php echo e($completedAt !== '' ? $completedAt : '—'); ?></div></div>
                 <?php if ($pin === ''): ?>
