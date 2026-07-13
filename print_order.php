@@ -189,7 +189,7 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
 </head>
 <body>
 
-<?php if (!$__EMAIL_MODE): ?>
+<?php if (!$__EMAIL_MODE && empty($_GET['plain'])): ?>
 <div class="no-print toolbar">
     <button onclick="window.print()"><?php echo _l('print'); ?></button>
 </div>

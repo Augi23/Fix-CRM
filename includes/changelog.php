@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '14:16',
+        'title' => 'Tablet ukazuje při podpisu celý zakázkový list',
+        'items' => [
+            'Když pošleš zakázku na podpisový tablet, klientovi se nejdřív zobrazí CELÝ zakázkový list (v jeho jazyce, s cenami i podmínkami) — může si ho přečíst a teprve pak klepne Podepsat. Po podpisu tablet ukáže potvrzení „Podepsáno — uloženo a odesláno na e-mail" a vrátí se do čekání.',
+            'Podepsaná verze listu je automaticky všude: u zakázky, v tisku, v e-mailu i v klientské sekci na webu — klient tam vidí dokument s podpisem místo nepodepsaného.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '14:12',
         'title' => 'Nová zakázka → podpis na tabletu → podepsaný list e-mailem',
         'items' => [
