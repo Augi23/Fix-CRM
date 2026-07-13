@@ -24,7 +24,7 @@ if (!isset($_GET['lang']) && $order) {
     $target_lang = crmCustomerDocLang($order['preferred_language'] ?? 'cs');
 }
 
-if (!$order) die("Заказ не найден");
+if (!$order) die(__("print_not_found"));
 
 $currency = get_setting('currency', 'Kč');
 ?>
@@ -33,38 +33,37 @@ $currency = get_setting('currency', 'Kč');
 <head>
     <meta charset="UTF-8">
     <title><?php echo _l('reception_act'); ?> <?php echo e(orderDisplayCode($order)); ?></title>
+    <link rel="stylesheet" href="assets/css/sf-pro.css?v=<?php echo (int)@filemtime(__DIR__ . '/assets/css/sf-pro.css'); ?>">
     <style>
-        body { 
-            font-family: Arial, Helvetica, sans-serif; 
-            font-size: 14px; 
-            width: 72mm; 
-            margin: 0; 
-            padding: 0;
-            color: #000;
-            background: #fff;
-        }
-        .container {
-            width: 100%;
-            padding: 1mm;
-        }
+        /* Jednotný vizuál klientských dokumentů (dle zakázkového listu): SF Pro,
+           tučné hodnoty × light popisky, adresa pobočky v patičce dole. */
+        body { font-family: 'SF Pro Display', -apple-system, Arial, sans-serif; font-size: 13px;
+               width: 72mm; margin: 0; padding: 0; color: #000; background: #fff; }
+        .container { width: 100%; padding: 1mm; }
         .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .bold { font-weight: 900; }
-        .line { border-bottom: 2px dashed #000; margin: 8px 0; }
-        .header { font-size: 18px; margin-bottom: 3px; text-transform: uppercase; }
-        .order-num { font-size: 22px; margin: 5px 0; }
-        .item-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-        .label { color: #000; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
-        .footer { font-size: 12px; margin-top: 15px; border-top: 1px solid #000; padding-top: 5px; font-weight: bold; }
+        .bold { font-weight: 700; }
+        .rule { border-bottom: 1px solid #000; margin: 8px 0; }
+        .kick { font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 700; margin-top: 6px; }
+        .order-num { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; margin: 2px 0 1px; }
+        .date { font-size: 11px; font-weight: 300; }
+        .label { font-size: 9.5px; font-weight: 400; letter-spacing: 0.14em; text-transform: uppercase; margin: 7px 0 2px; }
+        .val { font-weight: 700; }
+        .kv { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+        .kv .k { font-weight: 300; }
+        .kv .v { font-weight: 700; text-align: right; }
+        .price-row { display: flex; justify-content: space-between; align-items: baseline; margin: 2px 0; }
+        .price-row .k { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 400; }
+        .price-row .v { font-size: 17px; font-weight: 800; }
         .qr-code { margin-top: 10px; }
-        .qr-code img { width: 40mm; height: 40mm; }
-        .terms { font-size: 11px; line-height: 1.2; margin-top: 15px; font-style: italic; }
-        
+        .qr-code img { width: 38mm; height: 38mm; }
+        .qr-note { font-size: 10px; font-weight: 700; margin-top: 3px; }
+        .qr-sub { font-size: 9.5px; font-weight: 300; margin-top: 1px; }
+        .terms { font-size: 10px; line-height: 1.35; margin-top: 12px; font-weight: 300; }
+        .foot { margin-top: 14px; border-top: 1px solid #000; padding-top: 7px; text-align: center; }
+        .foot .foot-name { font-size: 12px; font-weight: 800; }
+        .foot .foot-line { font-size: 9.5px; font-weight: 300; margin-top: 2px; line-height: 1.45; }
         @media print {
-            @page { 
-                margin: 0; 
-                size: 80mm auto; 
-            }
+            @page { margin: 0; size: 80mm auto; }
             body { width: 72mm; background: none; }
             .no-print { display: none; }
         }
@@ -72,68 +71,65 @@ $currency = get_setting('currency', 'Kč');
 </head>
 <body<?php if (empty($_GET['embed'])): ?> onload="window.print()"<?php endif; ?>>
 
+<?php
+$__bc = crmOrderBranchContact((int)($order['branch_id'] ?? 0));   // kontakty dle pobočky zakázky
+$__logo_fs = __DIR__ . '/assets/img/logo-black.png';
+$__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((string)file_get_contents($__logo_fs)) : '';
+$__portal = 'https://admin.applefix.cloud/login.php';
+?>
 <div class="container">
     <div class="text-center">
-        <div class="header bold"><?php echo htmlspecialchars(get_setting('company_name', 'Repair CRM')); ?></div>
-        <?php $__bc = crmOrderBranchContact((int)($order['branch_id'] ?? 0)); /* adresa dle pobočky zakázky */ ?>
-        <div style="font-size: 11px;"><?php echo htmlspecialchars($__bc['address_inline']); ?></div>
-        <div><?php echo _l('phone'); ?>: <?php echo htmlspecialchars($__bc['phone']); ?></div>
-        <div class="line"></div>
-        <div class="order-num bold"><?php echo mb_strtoupper(_l('order')); ?> <?php echo e(orderDisplayCode($order)); ?></div>
-        <div class="bold"><?php echo mb_strtoupper(_l('created')); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?></div>
-        <div class="line"></div>
+        <?php if ($__logo_data): ?><img src="<?php echo $__logo_data; ?>" alt="AppleFix" style="width: 46mm; height: auto; margin-top: 2mm;"><?php endif; ?>
+        <div class="kick"><?php echo _l('reception_act'); ?></div>
+        <div class="order-num"><?php echo e(orderDisplayCode($order)); ?></div>
+        <div class="date"><?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?></div>
+        <div class="rule"></div>
     </div>
 
-    <div class="label"><?php echo _l('client'); ?>:</div>
-    <div class="bold"><?php echo htmlspecialchars($order['first_name'] . ' ' . $order['last_name']); ?></div>
-    <div><?php echo _l('phone'); ?>: <?php echo htmlspecialchars($order['phone']); ?></div>
+    <div class="label"><?php echo _l('client'); ?></div>
+    <div class="val"><?php echo htmlspecialchars($order['first_name'] . ' ' . $order['last_name']); ?></div>
+    <div class="kv"><span class="k"><?php echo _l('phone'); ?></span><span class="v"><?php echo htmlspecialchars($order['phone']); ?></span></div>
 
-    <div class="line"></div>
+    <div class="rule"></div>
 
-    <div class="label"><?php echo _l('device_model'); ?>:</div>
-    <div class="bold" style="font-size: 15px;"><?php echo htmlspecialchars($order['device_brand'] . ' ' . $order['device_model']); ?></div>
-    
-    <div class="item-row mt-1">
-        <span>S/N:</span>
-        <span class="bold"><?php echo htmlspecialchars($order['serial_number'] ?: '---'); ?></span>
-    </div>
-    
+    <div class="label"><?php echo _l('device_model'); ?></div>
+    <div class="val" style="font-size: 15px;"><?php echo htmlspecialchars($order['device_brand'] . ' ' . $order['device_model']); ?></div>
+    <div class="kv"><span class="k">S/N</span><span class="v"><?php echo htmlspecialchars($order['serial_number'] ?: '---'); ?></span></div>
     <?php if($order['pin_code']): ?>
-    <div class="item-row">
-        <span><?php echo _l('pin'); ?>:</span>
-        <span class="bold"><?php echo htmlspecialchars($order['pin_code']); ?></span>
-    </div>
+    <div class="kv"><span class="k"><?php echo _l('pin'); ?></span><span class="v"><?php echo htmlspecialchars($order['pin_code']); ?></span></div>
     <?php endif; ?>
 
-    <div class="line"></div>
+    <div class="rule"></div>
 
-    <div class="label"><?php echo _l('appearance'); ?>:</div>
-    <div style="word-wrap: break-word;"><?php echo htmlspecialchars($order['appearance'] ?: '---'); ?></div>
+    <div class="label"><?php echo _l('appearance'); ?></div>
+    <div style="word-wrap: break-word; font-weight: 300;"><?php echo htmlspecialchars($order['appearance'] ?: '---'); ?></div>
 
-    <div class="line"></div>
+    <div class="label"><?php echo _l('problem'); ?></div>
+    <div style="word-wrap: break-word;"><?php echo htmlspecialchars($order['problem_description']); ?></div>
 
-    <div class="label"><?php echo _l('problem'); ?>:</div>
-    <div style="word-wrap: break-word; font-style: italic;"><?php echo htmlspecialchars($order['problem_description']); ?></div>
+    <div class="rule"></div>
 
-    <div class="line"></div>
-
-    <div class="item-row">
-        <span class="bold"><?php echo mb_strtoupper(_l('cost_est')); ?>:</span>
-        <span class="bold" style="font-size: 16px;"><?php echo formatMoney($order['estimated_cost']); ?></span>
+    <div class="price-row">
+        <span class="k"><?php echo _l('cost_est'); ?></span>
+        <span class="v"><?php echo formatMoney($order['estimated_cost']); ?></span>
     </div>
 
-    <div class="line"></div>
+    <div class="rule"></div>
 
     <div class="text-center qr-code">
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode('https://servis.expert/status/?id='.$order['id']); ?>" alt="QR">
-        <div style="font-size: 10px; margin-top: 3px;"><?php echo _l('status_page_label'); ?>: servis.expert/status</div>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode($__portal); ?>" alt="QR">
+        <div class="qr-note"><?php echo _l('status_page_label'); ?>: admin.applefix.cloud</div>
+        <div class="qr-sub"><?php echo _l('client_portal_login_hint'); ?></div>
     </div>
 
     <div class="terms text-center"><?php echo _l('print_reception_terms'); ?></div>
 
-    <div class="footer text-center">
-        <?php echo _l('reception_act'); ?> #<?php echo $order['id']; ?><br>
-        <div class="bold" style="margin-top: 3px;">www.servis.expert</div>
+    <div class="foot">
+        <div class="foot-name"><?php echo htmlspecialchars(get_setting('company_name', 'AppleFix s.r.o.')); ?></div>
+        <div class="foot-line">
+            <?php echo htmlspecialchars($__bc['address_inline']); ?><br>
+            <?php echo _l('phone'); ?>: <?php echo htmlspecialchars($__bc['phone']); ?> · applefix.cz
+        </div>
     </div>
 </div>
 

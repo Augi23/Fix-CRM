@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '06:39',
+        'title' => 'Příjmový akt v novém jednotném vzhledu',
+        'items' => [
+            'Příjmový akt (termo) má nový vzhled sladěný se zakázkovým listem — logo AppleFix, písmo SF Pro, přehledná typografie a adresa pobočky v patičce dole.',
+            'QR kód nově vede na naše online sledování zakázky (admin.applefix.cloud) místo cizí domény servis.expert, která na dokladu strašila z původní šablony. V patičce je číslo zakázky místo interního čísla.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '06:38',
         'title' => 'Zakázkový list: písmo SF Pro a adresa v patičce',
         'items' => [
