@@ -7,6 +7,25 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '16:05',
+        'title' => 'Oprava nahrávání fotek z počítače',
+        'items' => [
+            'Zvýšen limit velikosti nahrávaných souborů — server měl výchozí limit jen 2 MB na soubor, takže běžná fotka z počítače neprošla. Nově až 64 MB na soubor (80 MB na jedno odeslání).',
+            'Přidána podpora fotek HEIC/HEIF (formát fotek z iPhonu) — dosud je upload odmítal.',
+            'Když je soubor i tak příliš velký, CRM nově napíše srozumitelně „soubor je větší než limit serveru" místo obecné chyby.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
+        'time' => '15:58',
+        'title' => 'Oprava: zakázku šlo upravit až po vyplnění finální ceny',
+        'items' => [
+            'Úprava zakázky s prázdnou finální cenou (typicky zakázky z webu) padala na chybě databáze — prázdná cena se nově ukládá správně jako „nevyplněno".',
+            'Totéž platí pro předběžnou cenu a vícenáklady; funguje i desetinná čárka (např. „1 250,50").',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '15:20',
         'title' => 'Zobrazit zakázkový list, rozbalené tiskové menu a odkaz na stanici',
         'items' => [

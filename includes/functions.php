@@ -2492,6 +2492,13 @@ function crmCustomerDocLang($preferredLanguage): string {
     return $lang === 'uk' ? 'en' : $lang;
 }
 
+/** '' / null → NULL, jinak float (čárka i tečka). Pro číselné sloupce ve strict SQL. */
+function crmNumOrNull($v): ?float {
+    $v = trim((string)($v ?? ''));
+    if ($v === '') { return null; }
+    return (float)str_replace(',', '.', $v);
+}
+
 function normalizeCustomerLanguage($lang): string {
     $lang = strtolower(trim((string)$lang));
     return in_array($lang, ['cs', 'en', 'uk'], true) ? $lang : 'cs';

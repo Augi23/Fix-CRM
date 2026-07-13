@@ -121,9 +121,11 @@ try {
         $new_status,
         $technician_id ?: null,   // 0 = „bez technika" → SQL NULL (FK orders_ibfk_2)
         $branch_id,
-        isset($_POST['estimated_cost']) ? $_POST['estimated_cost'] : $current['estimated_cost'],
-        isset($_POST['final_cost']) ? $_POST['final_cost'] : $current['final_cost'],
-        isset($_POST['extra_expenses']) ? $_POST['extra_expenses'] : $current['extra_expenses'],
+        // POZOR: prázdný number input posílá '' — strict MariaDB '' jako DECIMAL odmítne
+        // (zakázky z webu mají finální cenu prázdnou → edit padal, dokud se nevyplnila)
+        isset($_POST['estimated_cost']) ? crmNumOrNull($_POST['estimated_cost']) : $current['estimated_cost'],
+        isset($_POST['final_cost']) ? crmNumOrNull($_POST['final_cost']) : $current['final_cost'],
+        isset($_POST['extra_expenses']) ? (crmNumOrNull($_POST['extra_expenses']) ?? 0) : $current['extra_expenses'],
         isset($_POST['problem_description']) ? $_POST['problem_description'] : $current['problem_description'],
         isset($_POST['technician_notes']) ? $_POST['technician_notes'] : $current['technician_notes'],
         isset($_POST['pin_code']) ? $_POST['pin_code'] : $current['pin_code'],
