@@ -2197,6 +2197,26 @@ function ensurePickupReadyColumns(PDO $pdo): void
     } catch (Throwable $e) { /* starší DB / bez oprávnění — funguje i bez těchto sloupců */ }
 }
 
+/** Jazyk komunikace zákazníka: customers.preferred_language (cs/en/ru, default cs).
+ *  Volí se při zakládání zakázky u údajů klienta; e-maily klientovi odcházejí v tomto jazyce. */
+function ensureCustomerLanguageColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $cols = $pdo->query("SHOW COLUMNS FROM customers")->fetchAll(PDO::FETCH_COLUMN);
+        if ($cols && !in_array('preferred_language', $cols, true)) {
+            $pdo->exec("ALTER TABLE `customers` ADD COLUMN `preferred_language` VARCHAR(5) NOT NULL DEFAULT 'cs'");
+        }
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+function normalizeCustomerLanguage($lang): string {
+    $lang = strtolower(trim((string)$lang));
+    return in_array($lang, ['cs', 'en', 'ru'], true) ? $lang : 'cs';
+}
+
 /** Kontakt POBOČKY zakázky pro všechny dokumenty (zakázkový list, účtenky, reklamační
  *  protokol, e-maily): zakázka vystavená pobočkou nese JEJÍ adresu/telefon/e-mail.
  *  Prázdná pole pobočky = fallback na globální nastavení firmy. */
@@ -2238,11 +2258,12 @@ function crmSendPickupReadyEmail(int $orderId): void
     if ($orderId <= 0 || !isset($pdo)) return;
     try {
         ensurePickupReadyColumns($pdo);
+        ensureCustomerLanguageColumn();
         $st = $pdo->prepare(
             "SELECT o.id, o.order_code, o.status, o.device_brand, o.device_model, o.pin_code,
                     o.problem_description, o.final_cost, o.estimated_cost,
                     o.pickup_notified_at, o.branch_id,
-                    c.first_name, c.last_name, c.email,
+                    c.first_name, c.last_name, c.email, c.preferred_language AS cust_lang,
                     b.name AS branch_name, b.address AS branch_address, b.opening_hours AS branch_hours,
                     b.contact_phone AS branch_phone, b.contact_email AS branch_email
              FROM orders o
@@ -2261,7 +2282,11 @@ function crmSendPickupReadyEmail(int $orderId): void
 
         $company = get_setting('company_name', 'AppleFix');
         $code = trim((string)($o['order_code'] ?? '')) !== '' ? (string)$o['order_code'] : ('#' . $orderId);
-        $subject = $company . ' — vaše zakázka ' . $code . ' je připravena k vyzvednutí';
+        $subject = $company . ' — ' . [
+            'cs' => 'vaše zakázka ' . $code . ' je připravena k vyzvednutí',
+            'en' => 'your order ' . $code . ' is ready for pickup',
+            'ru' => 'ваш заказ ' . $code . ' готов к выдаче',
+        ][normalizeCustomerLanguage($o['cust_lang'] ?? 'cs')];
         $html = crmPickupReadyEmailHtml($o);
 
         [$ok, $err] = smtpSendMail($to, $subject, $html);
@@ -2279,9 +2304,51 @@ function crmPickupReadyEmailHtml(array $o): string
 {
     $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 
+    // Texty ve TŘECH jazycích — e-mail odchází v jazyce zákazníka (customers.preferred_language)
+    $lang = normalizeCustomerLanguage($o['cust_lang'] ?? 'cs');
+    $T = [
+        'cs' => [
+            'order' => 'Zakázka', 'hero' => 'Vaše zařízení je opravené a připravené k&nbsp;vyzvednutí',
+            'body' => 'Dobrý den,<br>dokončili jsme opravu vašeho zařízení <b>%s</b>. Můžete se pro něj kdykoliv zastavit v&nbsp;otevírací době naší prodejny.',
+            'summary' => 'SOUHRN ZAK&Aacute;ZKY', 'device' => 'Zařízení', 'repair' => 'Provedená oprava', 'price' => 'Cena opravy',
+            'cta' => 'Sledovat zakázku online', 'pin' => 'Přihlásíte se svým e-mailem nebo telefonem a PINem zakázky:',
+            'where' => 'KDE N&Aacute;S NAJDETE', 'hours' => 'OTEV&Iacute;RAC&Iacute; DOBA', 'map' => 'Ukázat na mapě',
+            'hours_web' => 'Aktuální otevírací dobu najdete na', 'device_fallback' => 'vaše zařízení',
+            'footer' => 'Tento e-mail byl odeslán automaticky po dokončení vaší zakázky. K&nbsp;vyzvednutí prosím uveďte číslo zakázky',
+            'preheader' => 'Vaše zařízení %s je opravené a připravené k vyzvednutí.',
+        ],
+        'en' => [
+            'order' => 'Order', 'hero' => 'Your device is repaired and ready for pickup',
+            'body' => 'Hello,<br>we have finished repairing your <b>%s</b>. You are welcome to pick it up any time during our opening hours.',
+            'summary' => 'ORDER SUMMARY', 'device' => 'Device', 'repair' => 'Repair performed', 'price' => 'Repair price',
+            'cta' => 'Track your order online', 'pin' => 'Sign in with your e-mail or phone number and the order PIN:',
+            'where' => 'WHERE TO FIND US', 'hours' => 'OPENING HOURS', 'map' => 'Show on map',
+            'hours_web' => 'Current opening hours at', 'device_fallback' => 'your device',
+            'footer' => 'This e-mail was sent automatically after your repair was completed. Please state your order number when picking up:',
+            'preheader' => 'Your device %s is repaired and ready for pickup.',
+        ],
+        'ru' => [
+            'order' => 'Заказ', 'hero' => 'Ваше устройство отремонтировано и готово к выдаче',
+            'body' => 'Здравствуйте!<br>Мы завершили ремонт вашего устройства <b>%s</b>. Вы можете забрать его в любое время в часы работы нашего сервиса.',
+            'summary' => 'СВОДКА ЗАКАЗА', 'device' => 'Устройство', 'repair' => 'Выполненный ремонт', 'price' => 'Стоимость ремонта',
+            'cta' => 'Отслеживать заказ онлайн', 'pin' => 'Войдите, указав e-mail или телефон и PIN заказа:',
+            'where' => 'ГДЕ НАС НАЙТИ', 'hours' => 'ЧАСЫ РАБОТЫ', 'map' => 'Показать на карте',
+            'hours_web' => 'Актуальные часы работы на', 'device_fallback' => 'ваше устройство',
+            'footer' => 'Это письмо отправлено автоматически после завершения вашего заказа. При получении, пожалуйста, назовите номер заказа:',
+            'preheader' => 'Ваше устройство %s отремонтировано и готово к выдаче.',
+        ],
+    ];
+    $t = fn(string $k): string => $T[$lang][$k] ?? $T['cs'][$k];
+    // dny v uložené otevírací době jsou česky → přeložit pro EN/RU
+    $dayMap = [
+        'en' => ['Po' => 'Mon', 'Út' => 'Tue', 'St' => 'Wed', 'Čt' => 'Thu', 'Pá' => 'Fri', 'So' => 'Sat', 'Ne' => 'Sun', 'po domluvě' => 'by appointment'],
+        'ru' => ['Po' => 'Пн', 'Út' => 'Вт', 'St' => 'Ср', 'Čt' => 'Чт', 'Pá' => 'Пт', 'So' => 'Сб', 'Ne' => 'Вс', 'po domluvě' => 'по договорённости'],
+    ];
+    $dayTr = fn(string $v): string => isset($dayMap[$lang]) ? strtr($v, $dayMap[$lang]) : $v;
+
     $company = $e(get_setting('company_name', 'AppleFix'));
     $device  = trim(((string)($o['device_brand'] ?? '')) . ' ' . ((string)($o['device_model'] ?? '')));
-    $device  = $device !== '' ? $e($device) : 'vaše zařízení';
+    $device  = $device !== '' ? $e($device) : $t('device_fallback');
     $code    = trim((string)($o['order_code'] ?? '')) !== '' ? $e($o['order_code']) : ('#' . (int)($o['id'] ?? 0));
     $repair  = trim((string)($o['problem_description'] ?? ''));
     if ($repair !== '' && function_exists('mb_strimwidth')) { $repair = mb_strimwidth($repair, 0, 90, '…'); }
@@ -2304,68 +2371,68 @@ function crmPickupReadyEmailHtml(array $o): string
         // řádek "Po – Út: 10:00 – 20:00" → popisek + hodnota
         $parts = explode(':', $hl, 2);
         if (count($parts) === 2) {
-            $hoursRows .= '<tr><td style="color:#8a918a;padding-right:16px;white-space:nowrap;">' . $e(trim($parts[0])) . '</td><td><b>' . $e(trim($parts[1])) . '</b></td></tr>';
+            $hoursRows .= '<tr><td style="color:#8a918a;padding-right:16px;white-space:nowrap;">' . $e($dayTr(trim($parts[0]))) . '</td><td><b>' . $e($dayTr(trim($parts[1]))) . '</b></td></tr>';
         } else {
-            $hoursRows .= '<tr><td colspan="2" style="color:#33382f;">' . $e($hl) . '</td></tr>';
+            $hoursRows .= '<tr><td colspan="2" style="color:#33382f;">' . $e($dayTr($hl)) . '</td></tr>';
         }
     }
 
-    $summaryRows = '<tr><td style="padding:6px 0;color:#8a918a;">Zařízení</td><td align="right" style="padding:6px 0;font-weight:700;">' . $device . '</td></tr>';
+    $summaryRows = '<tr><td style="padding:6px 0;color:#8a918a;">' . $t('device') . '</td><td align="right" style="padding:6px 0;font-weight:700;">' . $device . '</td></tr>';
     if ($repair !== '') {
-        $summaryRows .= '<tr><td style="padding:6px 0;color:#8a918a;border-top:1px dashed #e0e5db;">Provedená oprava</td><td align="right" style="padding:6px 0;font-weight:700;border-top:1px dashed #e0e5db;">' . $e($repair) . '</td></tr>';
+        $summaryRows .= '<tr><td style="padding:6px 0;color:#8a918a;border-top:1px dashed #e0e5db;">' . $t('repair') . '</td><td align="right" style="padding:6px 0;font-weight:700;border-top:1px dashed #e0e5db;">' . $e($repair) . '</td></tr>';
     }
     if ($cost > 0) {
-        $summaryRows .= '<tr><td style="padding:6px 0;color:#8a918a;border-top:1px dashed #e0e5db;">Cena opravy</td><td align="right" style="padding:6px 0;font-weight:800;font-size:16px;border-top:1px dashed #e0e5db;">' . $e(formatMoney($cost)) . '</td></tr>';
+        $summaryRows .= '<tr><td style="padding:6px 0;color:#8a918a;border-top:1px dashed #e0e5db;">' . $t('price') . '</td><td align="right" style="padding:6px 0;font-weight:800;font-size:16px;border-top:1px dashed #e0e5db;">' . $e(formatMoney($cost)) . '</td></tr>';
     }
 
     $pinNote = $pin !== ''
-        ? '<div style="font-size:12px;color:#9aa19a;margin-top:10px;">Přihlásíte se svým e-mailem nebo telefonem a PINem zakázky: <b style="color:#33382f;">' . $e($pin) . '</b></div>'
+        ? '<div style="font-size:12px;color:#9aa19a;margin-top:10px;">' . $t('pin') . ' <b style="color:#33382f;">' . $e($pin) . '</b></div>'
         : '';
 
     return '<!doctype html><html lang="cs"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width,initial-scale=1"><title>' . $company . '</title></head>'
         . '<body style="margin:0;padding:0;background:#eef1ee;">'
-        . '<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Vaše zařízení ' . $device . ' je opravené a připravené k vyzvednutí.</div>'
+        . '<div style="display:none;max-height:0;overflow:hidden;opacity:0;">' . sprintf($t('preheader'), $device) . '</div>'
         . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1ee;padding:32px 12px;"><tr><td align="center">'
         . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(20,30,20,.10);font-family:-apple-system,BlinkMacSystemFont,\'SF Pro Text\',\'Segoe UI\',Arial,sans-serif;">'
 
         . '<tr><td style="padding:26px 36px 22px;border-bottom:1px solid #eceeec;">'
         . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
         . '<td style="vertical-align:middle;"><img src="' . $logo . '" width="168" alt="' . $company . '" style="display:block;border:0;height:auto;"></td>'
-        . '<td align="right" style="vertical-align:middle;font-size:12px;color:#9aa19a;">Zakázka <span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#111;">' . $code . '</span></td>'
+        . '<td align="right" style="vertical-align:middle;font-size:12px;color:#9aa19a;">' . $t('order') . ' <span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#111;">' . $code . '</span></td>'
         . '</tr></table></td></tr>'
 
         . '<tr><td style="background:' . $green . ';padding:18px 36px;">'
-        . '<div style="font-size:17px;font-weight:800;color:#ffffff;">&#10003;&nbsp; Vaše zařízení je opravené a připravené k&nbsp;vyzvednutí</div></td></tr>'
+        . '<div style="font-size:17px;font-weight:800;color:#ffffff;">&#10003;&nbsp; ' . $t('hero') . '</div></td></tr>'
 
         . '<tr><td style="padding:30px 36px 8px;"><div style="font-size:15px;line-height:1.65;color:#33382f;">'
-        . 'Dobrý den,<br>dokončili jsme opravu vašeho zařízení <b>' . $device . '</b>. Můžete se pro něj kdykoliv zastavit v&nbsp;otevírací době naší prodejny.</div></td></tr>'
+        . sprintf($t('body'), $device) . '</div></td></tr>'
 
         . '<tr><td style="padding:20px 36px 6px;">'
         . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f8f4;border:1px solid #e6ebe1;border-radius:12px;">'
-        . '<tr><td style="padding:16px 20px 6px;font-size:11px;font-weight:700;letter-spacing:.08em;color:' . $green . ';">SOUHRN ZAK&Aacute;ZKY</td></tr>'
+        . '<tr><td style="padding:16px 20px 6px;font-size:11px;font-weight:700;letter-spacing:.08em;color:' . $green . ';">' . $t('summary') . '</td></tr>'
         . '<tr><td style="padding:2px 20px 14px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#33382f;">' . $summaryRows . '</table></td></tr>'
         . '</table></td></tr>'
 
         . '<tr><td align="center" style="padding:24px 36px 8px;">'
-        . '<a href="' . $portal . '" style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 34px;border-radius:12px;">Sledovat zakázku online</a>' . $pinNote . '</td></tr>'
+        . '<a href="' . $portal . '" style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 34px;border-radius:12px;">' . $t('cta') . '</a>' . $pinNote . '</td></tr>'
 
         . '<tr><td style="padding:26px 36px 6px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
         . '<td width="52%" style="vertical-align:top;">'
-        . '<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#9aa19a;margin-bottom:8px;">KDE N&Aacute;S NAJDETE</div>'
+        . '<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#9aa19a;margin-bottom:8px;">' . $t('where') . '</div>'
         . '<div style="font-size:14px;line-height:1.6;color:#33382f;"><b>' . $e($branchName) . '</b><br>' . nl2br($e($branchAddr)) . '<br>'
         . ($branchPhone !== '' ? '<a href="tel:' . $e($phoneHref) . '" style="color:' . $green . ';text-decoration:none;font-weight:700;">' . $e($branchPhone) . '</a><br>' : '')
-        . '<a href="' . $e($mapUrl) . '" style="color:' . $green . ';text-decoration:none;font-size:13px;">Ukázat na mapě &rarr;</a></div></td>'
+        . '<a href="' . $e($mapUrl) . '" style="color:' . $green . ';text-decoration:none;font-size:13px;">' . $t('map') . ' &rarr;</a></div></td>'
         . '<td width="48%" style="vertical-align:top;">'
-        . '<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#9aa19a;margin-bottom:8px;">OTEV&Iacute;RAC&Iacute; DOBA</div>'
+        . '<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#9aa19a;margin-bottom:8px;">' . $t('hours') . '</div>'
         . ($hoursRows !== ''
             ? '<table role="presentation" cellpadding="0" cellspacing="0" style="font-size:13.5px;color:#33382f;line-height:1.75;">' . $hoursRows . '</table>'
-            : '<div style="font-size:13.5px;color:#33382f;">Aktuální otevírací dobu najdete na <a href="https://applefix.cz" style="color:' . $green . ';text-decoration:none;">applefix.cz</a>.</div>')
+            : '<div style="font-size:13.5px;color:#33382f;">' . $t('hours_web') . ' <a href="https://applefix.cz" style="color:' . $green . ';text-decoration:none;">applefix.cz</a>.</div>')
         . '</td></tr></table></td></tr>'
 
         . '<tr><td style="padding:24px 36px 26px;"><div style="border-top:1px solid #eceeec;padding-top:16px;font-size:11.5px;line-height:1.7;color:#a7ada6;">'
         . $company . ' &middot; <a href="https://applefix.cz" style="color:' . $green . ';text-decoration:none;">applefix.cz</a> &middot; <a href="mailto:info@applefix.cz" style="color:#a7ada6;">info@applefix.cz</a><br>'
-        . 'Tento e-mail byl odeslán automaticky po dokončení vaší zakázky. K&nbsp;vyzvednutí prosím uveďte číslo zakázky <b style="color:#33382f;">' . $code . '</b>.</div></td></tr>'
+        . $t('footer') . ' <b style="color:#33382f;">' . $code . '</b>.</div></td></tr>'
 
         . '</table></td></tr></table></body></html>';
 }

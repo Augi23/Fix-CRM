@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '06:06',
+        'title' => 'Jazyk zákazníka (CS/EN/RU) + e-maily v jeho jazyce',
+        'items' => [
+            'Při zakládání zakázky se u údajů klienta nově vybírá jazyk komunikace (čeština / angličtina / ruština) — pole je vedle telefonu. U stávajících klientů jde jazyk změnit v editaci klienta.',
+            'E-mail „Připraveno k vyzvednutí" odchází automaticky v jazyce zákazníka včetně předmětu, otevírací doby i dnů v týdnu.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '05:53',
         'title' => 'E-mail klientům s originálním logem AppleFix',
         'items' => [

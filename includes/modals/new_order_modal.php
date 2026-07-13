@@ -94,9 +94,17 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                                             <label class="form-label"><?php echo __('client'); ?> (<?php echo __('last_name_label'); ?>) <span class="text-danger">*</span></label>
                                                             <input type="text" name="last_name" id="inline_last_name" class="form-control">
                                                         </div>
-                                                        <div class="col-12">
+                                                        <div class="col-md-7">
                                                             <label class="form-label"><?php echo __('phone'); ?> <span class="text-danger">*</span></label>
                                                             <input type="tel" name="phone" id="inline_phone" class="form-control">
+                                                        </div>
+                                                        <div class="col-md-5">
+                                                            <label class="form-label"><?php echo __('customer_language'); ?></label>
+                                                            <select name="inline_language" id="inline_language" class="form-select">
+                                                                <option value="cs" selected>🇨🇿 Čeština</option>
+                                                                <option value="en">🇬🇧 English</option>
+                                                                <option value="ru">🇷🇺 Русский</option>
+                                                            </select>
                                                         </div>
                                                         <div class="col-12">
                                                             <label class="form-label"><?php echo __('email'); ?></label>

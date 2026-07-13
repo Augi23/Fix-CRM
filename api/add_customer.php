@@ -38,6 +38,7 @@ $address = $_POST['address'] ?? '';
 $ico = $_POST['ico'] ?? '';
 $dic = $_POST['dic'] ?? '';
 $company_name = $_POST['company_name'] ?? '';
+$language = normalizeCustomerLanguage($_POST['language'] ?? 'cs');
 
 if (!$first_name || !$last_name || !$phone) {
     if ($isAjax) {
@@ -51,8 +52,9 @@ if (!$first_name || !$last_name || !$phone) {
 }
 
 try {
-    $stmt = $pdo->prepare('INSERT INTO customers (customer_type, first_name, last_name, phone, email, address, ico, dic, company) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-    $stmt->execute([$customer_type, $first_name, $last_name, $phone, $email, $address, $ico, $dic, $company_name]);
+    ensureCustomerLanguageColumn();
+    $stmt = $pdo->prepare('INSERT INTO customers (customer_type, first_name, last_name, phone, email, address, ico, dic, company, preferred_language) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    $stmt->execute([$customer_type, $first_name, $last_name, $phone, $email, $address, $ico, $dic, $company_name, $language]);
     $id = $pdo->lastInsertId();
 
     if ($isAjax) {

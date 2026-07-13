@@ -943,6 +943,7 @@ $(document).ready(function() {
             email: $panel.find('input[name="inline_email"]').val() || '',
             address: $('#inline_address').val() || '',
             customer_type: $panel.find('input[name="customer_type"]:checked').val() || 'private',
+            language: $('#inline_language').val() || 'cs',
             ico: $('#inline_ico_input').val() || '',
             company_name: $('#inline_ares_name').val() || '',
             dic: $('#inline_ares_dic').val() || '',

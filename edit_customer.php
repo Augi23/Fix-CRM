@@ -31,8 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $company = $_POST['company'] ?? '';
 
     try {
-        $update = $pdo->prepare("UPDATE customers SET customer_type = ?, first_name = ?, last_name = ?, phone = ?, email = ?, address = ?, ico = ?, dic = ?, company = ? WHERE id = ?");
-        $update->execute([$customer_type, $first_name, $last_name, $phone, $email, $address, $ico, $dic, $company, $id]);
+        ensureCustomerLanguageColumn();
+        $preferred_language = normalizeCustomerLanguage($_POST['preferred_language'] ?? ($customer['preferred_language'] ?? 'cs'));
+        $update = $pdo->prepare("UPDATE customers SET customer_type = ?, first_name = ?, last_name = ?, phone = ?, email = ?, address = ?, ico = ?, dic = ?, company = ?, preferred_language = ? WHERE id = ?");
+        $update->execute([$customer_type, $first_name, $last_name, $phone, $email, $address, $ico, $dic, $company, $preferred_language, $id]);
         $success = __('customer_updated_success');
         // Refresh
         $stmt->execute([$id]);
@@ -104,6 +106,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="col-md-6">
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($customer['email']); ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label"><?php echo __('customer_language'); ?></label>
+                    <?php $__cl = normalizeCustomerLanguage($customer['preferred_language'] ?? 'cs'); ?>
+                    <select name="preferred_language" class="form-select">
+                        <option value="cs" <?php echo $__cl === 'cs' ? 'selected' : ''; ?>>🇨🇿 Čeština</option>
+                        <option value="en" <?php echo $__cl === 'en' ? 'selected' : ''; ?>>🇬🇧 English</option>
+                        <option value="ru" <?php echo $__cl === 'ru' ? 'selected' : ''; ?>>🇷🇺 Русский</option>
+                    </select>
                 </div>
                 <div class="col-12">
                     <label class="form-label"><?php echo __('address'); ?></label>
