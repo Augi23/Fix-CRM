@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '11:58',
+        'title' => 'Oprava tlačítka Odhlásit',
+        'items' => [
+            'Odhlášení po ranním prodloužení přihlášení nefungovalo (rušilo session ve starém úložišti, skutečné přihlášení přežilo). Nyní odhlášení maže správné přihlášení i cookie — funguje všem.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '11:51',
         'title' => 'Předávání zakázky mezi techniky + časy po technicích',
         'items' => [
