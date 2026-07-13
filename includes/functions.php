@@ -2214,7 +2214,7 @@ function ensureCustomerLanguageColumn(): void {
 
 function normalizeCustomerLanguage($lang): string {
     $lang = strtolower(trim((string)$lang));
-    return in_array($lang, ['cs', 'en', 'ru'], true) ? $lang : 'cs';
+    return in_array($lang, ['cs', 'en', 'uk'], true) ? $lang : 'cs';
 }
 
 /** Kontakt POBOČKY zakázky pro všechny dokumenty (zakázkový list, účtenky, reklamační
@@ -2285,7 +2285,7 @@ function crmSendPickupReadyEmail(int $orderId): void
         $subject = $company . ' — ' . [
             'cs' => 'vaše zakázka ' . $code . ' je připravena k vyzvednutí',
             'en' => 'your order ' . $code . ' is ready for pickup',
-            'ru' => 'ваш заказ ' . $code . ' готов к выдаче',
+            'uk' => 'ваше замовлення ' . $code . ' готове до видачі',
         ][normalizeCustomerLanguage($o['cust_lang'] ?? 'cs')];
         $html = crmPickupReadyEmailHtml($o);
 
@@ -2327,22 +2327,22 @@ function crmPickupReadyEmailHtml(array $o): string
             'footer' => 'This e-mail was sent automatically after your repair was completed. Please state your order number when picking up:',
             'preheader' => 'Your device %s is repaired and ready for pickup.',
         ],
-        'ru' => [
-            'order' => 'Заказ', 'hero' => 'Ваше устройство отремонтировано и готово к выдаче',
-            'body' => 'Здравствуйте!<br>Мы завершили ремонт вашего устройства <b>%s</b>. Вы можете забрать его в любое время в часы работы нашего сервиса.',
-            'summary' => 'СВОДКА ЗАКАЗА', 'device' => 'Устройство', 'repair' => 'Выполненный ремонт', 'price' => 'Стоимость ремонта',
-            'cta' => 'Отслеживать заказ онлайн', 'pin' => 'Войдите, указав e-mail или телефон и PIN заказа:',
-            'where' => 'ГДЕ НАС НАЙТИ', 'hours' => 'ЧАСЫ РАБОТЫ', 'map' => 'Показать на карте',
-            'hours_web' => 'Актуальные часы работы на', 'device_fallback' => 'ваше устройство',
-            'footer' => 'Это письмо отправлено автоматически после завершения вашего заказа. При получении, пожалуйста, назовите номер заказа:',
-            'preheader' => 'Ваше устройство %s отремонтировано и готово к выдаче.',
+        'uk' => [
+            'order' => 'Замовлення', 'hero' => 'Ваш пристрій відремонтовано і готовий до видачі',
+            'body' => 'Доброго дня!<br>Ми завершили ремонт вашого пристрою <b>%s</b>. Ви можете забрати його в будь-який час у години роботи нашого сервісу.',
+            'summary' => 'ПІДСУМОК ЗАМОВЛЕННЯ', 'device' => 'Пристрій', 'repair' => 'Виконаний ремонт', 'price' => 'Вартість ремонту',
+            'cta' => 'Відстежувати замовлення онлайн', 'pin' => 'Увійдіть, вказавши e-mail або телефон і PIN замовлення:',
+            'where' => 'ДЕ НАС ЗНАЙТИ', 'hours' => 'ГОДИНИ РОБОТИ', 'map' => 'Показати на мапі',
+            'hours_web' => 'Актуальні години роботи на', 'device_fallback' => 'ваш пристрій',
+            'footer' => 'Цей лист надіслано автоматично після завершення вашого замовлення. Під час отримання, будь ласка, назвіть номер замовлення:',
+            'preheader' => 'Ваш пристрій %s відремонтовано і готовий до видачі.',
         ],
     ];
     $t = fn(string $k): string => $T[$lang][$k] ?? $T['cs'][$k];
     // dny v uložené otevírací době jsou česky → přeložit pro EN/RU
     $dayMap = [
         'en' => ['Po' => 'Mon', 'Út' => 'Tue', 'St' => 'Wed', 'Čt' => 'Thu', 'Pá' => 'Fri', 'So' => 'Sat', 'Ne' => 'Sun', 'po domluvě' => 'by appointment'],
-        'ru' => ['Po' => 'Пн', 'Út' => 'Вт', 'St' => 'Ср', 'Čt' => 'Чт', 'Pá' => 'Пт', 'So' => 'Сб', 'Ne' => 'Вс', 'po domluvě' => 'по договорённости'],
+        'uk' => ['Po' => 'Пн', 'Út' => 'Вт', 'St' => 'Ср', 'Čt' => 'Чт', 'Pá' => 'Пт', 'So' => 'Сб', 'Ne' => 'Нд', 'po domluvě' => 'за домовленістю'],
     ];
     $dayTr = fn(string $v): string => isset($dayMap[$lang]) ? strtr($v, $dayMap[$lang]) : $v;
 

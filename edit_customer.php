@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <select name="preferred_language" class="form-select">
                         <option value="cs" <?php echo $__cl === 'cs' ? 'selected' : ''; ?>>🇨🇿 Čeština</option>
                         <option value="en" <?php echo $__cl === 'en' ? 'selected' : ''; ?>>🇬🇧 English</option>
-                        <option value="ru" <?php echo $__cl === 'ru' ? 'selected' : ''; ?>>🇷🇺 Русский</option>
+                        <option value="uk" <?php echo $__cl === 'uk' ? 'selected' : ''; ?>>🇺🇦 Українська</option>
                     </select>
                 </div>
                 <div class="col-12">

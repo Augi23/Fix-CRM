@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '06:09',
+        'title' => 'Jazyky zákazníka: čeština / angličtina / ukrajinština',
+        'items' => [
+            'Výběr jazyka klienta je nově Čeština / English / Українська (ruština nahrazena ukrajinštinou dle zadání). E-mail „Připraveno k vyzvednutí" odchází i ukrajinsky.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '06:06',
         'title' => 'Jazyk zákazníka (CS/EN/RU) + e-maily v jeho jazyce',
         'items' => [

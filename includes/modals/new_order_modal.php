@@ -103,7 +103,7 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                                             <select name="inline_language" id="inline_language" class="form-select">
                                                                 <option value="cs" selected>🇨🇿 Čeština</option>
                                                                 <option value="en">🇬🇧 English</option>
-                                                                <option value="ru">🇷🇺 Русский</option>
+                                                                <option value="uk">🇺🇦 Українська</option>
                                                             </select>
                                                         </div>
                                                         <div class="col-12">
