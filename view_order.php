@@ -51,6 +51,13 @@ if (trim((string)($order['order_code'] ?? '')) === '') {
     } catch (Throwable $e) { /* nevadí, zobrazí se #id a doplní se příště */ }
 }
 
+// Předání mezi techniky: tlačítka vidí přiřazený technik (nebo vedoucí) u rozpracované zakázky
+$__isOwnTech = !empty($_SESSION['tech_id']) && (int)$_SESSION['tech_id'] === (int)($order['technician_id'] ?? 0);
+$can_handoff = !empty($order['technician_id'])
+    && isOrderStatusIn((string)$order['status'], 'in_progress')
+    && ($__isOwnTech || $can_change_technician);
+$techTimes = crmGetOrderTechTimes((int)$order['id']);
+
 // Podpisy klienta (příjem/výdej) — blok v pravém sloupci + tisk na zakázkovém listu
 $orderSignatures = crmGetOrderSignatures((int)$order['id']);
 
@@ -500,6 +507,15 @@ function localizedOrderStatusLabel(string $status): string {
                 <form id="statusForm">
                     <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
                     <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">
+                    <?php if ($can_handoff): ?>
+                    <div class="border border-info border-opacity-50 rounded-3 p-2 mb-2">
+                        <div class="small text-white-75 mb-2"><i class="fas fa-people-arrows me-1 text-info"></i><?php echo __('handoff_question'); ?></div>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-sm btn-success" onclick="afxFinishOrder()"><i class="fas fa-check-double me-1"></i><?php echo __('handoff_done'); ?></button>
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="afxReleaseOrder()"><i class="fas fa-share me-1"></i><?php echo __('handoff_release'); ?></button>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <div class="d-grid gap-2 mb-2">
                         <?php if ($next_status): ?>
                             <button type="button" class="btn btn-success" id="nextStatusBtn" data-next-status="<?php echo $next_status; ?>">
@@ -596,7 +612,36 @@ function localizedOrderStatusLabel(string $status): string {
                             </div>
                             <?php endforeach; ?>
                         </div>
+                        <?php if (!empty($techTimes)): ?>
+                        <div class="mt-3 pt-3 border-top border-secondary">
+                            <div class="small text-white-75 mb-2"><i class="fas fa-stopwatch me-2 text-info"></i><?php echo __('tech_time_title'); ?></div>
+                            <?php foreach ($techTimes as $tt): ?>
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <span class="small"><?php echo e($tt['tech_name']); ?><?php if ((int)$tt['running'] === 1): ?> <i class="fas fa-circle text-success ms-1" style="font-size:7px;" title="běží"></i><?php endif; ?></span>
+                                <span class="small fw-bold font-monospace"><?php echo e(formatWorkDuration((int)$tt['minutes'])); ?></span>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
                         <script>
+                        function afxReleaseOrder() {
+                            showConfirm('<?php echo __('handoff_confirm'); ?>', function () {
+                                var fd = new FormData();
+                                fd.append('order_id', '<?php echo (int)$order['id']; ?>');
+                                fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                                fetch('api/release_order.php', { method: 'POST', body: fd })
+                                    .then(function (r) { return r.json(); })
+                                    .then(function (j) { if (j.ok) { location.reload(); } else { alert(j.error || 'Chyba'); } })
+                                    .catch(function () { alert('Chyba spojení'); });
+                            });
+                        }
+                        function afxFinishOrder() {
+                            var $sel = $('#statusForm select[name="status"]');
+                            if ($sel.length) {
+                                $sel.val('Připraveno k převzetí').trigger('change');
+                                $('#statusForm').trigger('submit');
+                            }
+                        }
                         window.AFX_SIGN_L10N = { clear: '<?php echo __('sign_clear'); ?>', cancel: '<?php echo __('cancel'); ?>', save: '<?php echo __('sign_save'); ?>' };
                         function afxSignRemote(type, btn) {
                             var $row = $(btn).closest('.d-flex');

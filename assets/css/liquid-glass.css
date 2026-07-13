@@ -249,6 +249,7 @@ nav.navbar.crm-v2-topbar,
 .order-row--status-completed   > td { background: rgba(74,222,128,0.36)  !important; }
 .order-row--status-uncollected > td { background: rgba(234,179,8,0.36)   !important; }
 .order-row--status-repairplugin > td { background: rgba(192,38,211,0.42) !important; }
+.order-row--status-handoff     > td { background: rgba(34,211,238,0.30)  !important; }
 .order-row--status-cancelled   > td { background: rgba(156,163,175,0.28) !important; }
 .order-row--status-default     > td { background: rgba(148,163,184,0.24) !important; }
 /* „Vydáno": řádek splývá s kartou (výchozí tr pozadí rgba(16,16,20,.55) působilo černě) */
@@ -262,6 +263,7 @@ nav.navbar.crm-v2-topbar,
 .order-row--status-completed:hover   > td { background: rgba(74,222,128,0.50)  !important; }
 .order-row--status-uncollected:hover > td { background: rgba(234,179,8,0.48)   !important; }
 .order-row--status-repairplugin:hover > td { background: rgba(192,38,211,0.56) !important; }
+.order-row--status-handoff:hover     > td { background: rgba(34,211,238,0.44)  !important; }
 .order-row--status-collected:hover   > td { background: rgba(148,163,184,0.12) !important; }
 .order-row--status-cancelled:hover   > td { background: rgba(156,163,175,0.40) !important; }
 .order-row--status-default:hover     > td { background: rgba(148,163,184,0.36) !important; }
@@ -274,6 +276,7 @@ html[data-lg-theme="light"] .order-row--status-waiting     > td { background: #F
 html[data-lg-theme="light"] .order-row--status-completed   > td { background: #E9FBEE !important; }
 html[data-lg-theme="light"] .order-row--status-uncollected > td { background: #FBF4DC !important; }
 html[data-lg-theme="light"] .order-row--status-repairplugin > td { background: #F8E9FB !important; }
+html[data-lg-theme="light"] .order-row--status-handoff     > td { background: #E4F9FD !important; }
 html[data-lg-theme="light"] .order-row--status-cancelled   > td { background: #F0F1F3 !important; }
 html[data-lg-theme="light"] .order-row--status-default     > td { background: #F1F3F6 !important; }
 html[data-lg-theme="light"] .order-row--status-collected,
@@ -285,6 +288,7 @@ html[data-lg-theme="light"] .order-row--status-waiting:hover     > td { backgrou
 html[data-lg-theme="light"] .order-row--status-completed:hover   > td { background: #D3F5DE !important; }
 html[data-lg-theme="light"] .order-row--status-uncollected:hover > td { background: #F7EBBE !important; }
 html[data-lg-theme="light"] .order-row--status-repairplugin:hover > td { background: #F0D5F6 !important; }
+html[data-lg-theme="light"] .order-row--status-handoff:hover     > td { background: #CBF2FA !important; }
 html[data-lg-theme="light"] .order-row--status-cancelled:hover   > td { background: #E3E5E9 !important; }
 html[data-lg-theme="light"] .order-row--status-default:hover     > td { background: #E4E8ED !important; }
 

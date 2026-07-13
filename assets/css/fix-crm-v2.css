@@ -2590,6 +2590,7 @@ p, span, label, .small, small,
 .status-pill--cancelled  { background: #374151 !important; border-color: #9ca3af !important; color: #f3f4f6 !important; font-weight: 700 !important; }   /* šedá (stornováno) */
 .status-pill--default    { background: #334155 !important; border-color: #94a3b8 !important; color: #f1f5f9 !important; font-weight: 700 !important; }
 .status-pill--repairplugin { background: #86198f !important; border-color: #e879f9 !important; color: #fdf4ff !important; font-weight: 700 !important; }   /* fialová – Přijato z RepairPluginu */
+.status-pill--handoff    { background: #0e7490 !important; border-color: #22d3ee !important; color: #ecfeff !important; font-weight: 700 !important; }   /* tyrkys – Čeká na technika */
 
 /* Pilulky priority zakázky (sloupec Priorita, detail zakázky) */
 .priority-pill { border: 1px solid transparent; font-weight: 700 !important; letter-spacing: .01em;
@@ -2771,6 +2772,7 @@ p, span, label, .small, small,
 .order-row--status-cancelled   > td:first-child { box-shadow: inset 4px 0 0 #9ca3af !important; }
 .order-row--status-default     > td:first-child { box-shadow: inset 4px 0 0 #94a3b8 !important; }
 .order-row--status-repairplugin > td:first-child { box-shadow: inset 4px 0 0 #d946ef !important; }
+.order-row--status-handoff     > td:first-child { box-shadow: inset 4px 0 0 #22d3ee !important; }   /* tyrkys – čeká na technika */
 
 /* (hover tinty řádků rovněž vlastní liquid-glass.css) */
 

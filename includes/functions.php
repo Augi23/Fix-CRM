@@ -300,6 +300,7 @@ function getOrderStatusDefinitions(): array {
         // ── Aktuální stavový model (od 7/2026) — jen tyto lze nově vybrat ──
         'Přijato' => ['group' => 'new', 'badge' => 'new'],
         'Přijato z RepairPluginu' => ['group' => 'new', 'badge' => 'repairplugin'],
+        'Čeká na technika' => ['group' => 'new', 'badge' => 'handoff'],
         'V opravě' => ['group' => 'in_progress', 'badge' => 'progress'],
         'V opravě - v externím servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
         'V opravě - v autorizovaném servisu' => ['group' => 'in_progress', 'badge' => 'progress'],
@@ -447,6 +448,7 @@ function getOrderStatusTranslations(): array {
         'en' => [
             'Přijato' => 'Received',
             'Přijato z RepairPluginu' => 'Received from RepairPlugin',
+            'Čeká na technika' => 'Waiting for technician',
             'V opravě' => 'In Repair',
             'V opravě - v externím servisu' => 'In Repair — External Service',
             'V opravě - v autorizovaném servisu' => 'In Repair — Authorized Service',
@@ -467,6 +469,7 @@ function getOrderStatusTranslations(): array {
         'ru' => [
             'Přijato' => 'Принято',
             'Přijato z RepairPluginu' => 'Принято из RepairPlugin',
+            'Čeká na technika' => 'Ожидает техника',
             'V opravě' => 'В ремонте',
             'V opravě - v externím servisu' => 'В ремонте — внешний сервис',
             'V opravě - v autorizovaném servisu' => 'В ремонте — авторизованный сервис',
@@ -3426,6 +3429,42 @@ function ensureRepairPluginOrderStatus(): void {
     } catch (Throwable $e) {
         error_log('ensureRepairPluginOrderStatus: ' . $e->getMessage());
     }
+}
+
+/** Pojistka: ENUM orders.status musí znát 'Čeká na technika' (předání mezi techniky). */
+function ensureHandoffOrderStatus(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $row = $pdo->query("SHOW COLUMNS FROM orders LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
+        $type = (string)($row['Type'] ?? '');
+        if ($type === '' || stripos($type, 'enum(') !== 0) return;
+        if (mb_strpos($type, 'Čeká na technika') !== false) return;
+        $newType = preg_replace('/\)\s*$/', ",'Čeká na technika')", $type, 1);
+        $pdo->exec("ALTER TABLE orders MODIFY COLUMN status $newType DEFAULT 'Přijato'");
+    } catch (Throwable $e) {
+        error_log('ensureHandoffOrderStatus: ' . $e->getMessage());
+    }
+}
+
+/** Souhrn času techniků na zakázce (order_work_log, běžící segment do teď). */
+function crmGetOrderTechTimes(int $orderId): array {
+    global $pdo;
+    try {
+        $st = $pdo->prepare("SELECT COALESCE(t.name, '—') AS tech_name,
+                SUM(CASE WHEN owl.ended_at IS NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, owl.started_at, NOW())) ELSE owl.duration_minutes END) AS minutes,
+                MAX(owl.ended_at IS NULL) AS running
+            FROM order_work_log owl
+            LEFT JOIN technicians t ON t.id = owl.technician_id
+            WHERE owl.order_id = ?
+            GROUP BY owl.technician_id, t.name
+            HAVING minutes > 0 OR running = 1
+            ORDER BY minutes DESC");
+        $st->execute([$orderId]);
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) { return []; }
 }
 
 /** Pojistka: ENUM orders.priority musí znát hodnotu 'Low' (Klidná). Idempotentní. */

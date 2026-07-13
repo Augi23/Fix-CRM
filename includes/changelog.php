@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '11:51',
+        'title' => 'Předávání zakázky mezi techniky + časy po technicích',
+        'items' => [
+            'Technik s rozpracovanou zakázkou má v detailu dvě volby: „Dokončeno 100 % — připravit k převzetí" (klasické dokončení), nebo „Uvolnit dalšímu technikovi" — když je hotová jen jeho specializovaná část.',
+            'Uvolněná zakázka přejde do nového tyrkysového stavu „Čeká na technika" a je bez přiřazení — další technik si ji převezme sám (pole Technik) a pokračuje.',
+            'Časy se počítají po technicích: uvolněním se čas prvnímu pozastaví, druhému začne běžet převzetím do opravy. V detailu zakázky je nový přehled „Čas techniků na zakázce" — kolik kdo na zakázce strávil (běžící čas označen zelenou tečkou).',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '11:05',
         'title' => 'Oprava kontroly štítkového můstku (Chrome ho blokoval)',
         'items' => [
