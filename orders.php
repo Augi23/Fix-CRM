@@ -425,6 +425,9 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                     <button type="button" class="btn btn-outline-secondary accounting-btn" data-id="<?php echo $order['id']; ?>" title="<?php echo __('accounting'); ?>">
                                         <i class="fas fa-file-invoice-dollar text-success"></i>
                                     </button>
+                                    <button type="button" class="btn btn-outline-danger" onclick="event.stopPropagation(); deleteOrder(<?php echo (int)$order['id']; ?>);" title="<?php echo __('delete'); ?>">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                     <?php endif; ?>
                                 </div>
                             </td>

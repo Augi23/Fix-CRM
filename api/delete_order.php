@@ -3,7 +3,7 @@ ob_start();
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 
-if (ob_get_length()) ob_clean(); 
+if (ob_get_length()) ob_clean();
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
@@ -17,52 +17,74 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     exit;
 }
 
-$id = $_POST['id'] ?? $_GET['id'] ?? null;
+// Trvalé smazání zakázky je nevratné → jen administrátor.
+if (!hasPermission('admin_access')) {
+    echo json_encode(['success' => false, 'message' => __('no_delete_permission')]);
+    exit;
+}
 
+$id = $_POST['id'] ?? $_GET['id'] ?? null;
 if (!$id) {
     echo json_encode(['success' => false, 'message' => __('id_missing')]);
     exit;
 }
 
-// Fetch order to check permissions
 try {
-    $stmt = $pdo->prepare("SELECT technician_id, branch_id FROM orders WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id FROM orders WHERE id = ?");
     $stmt->execute([$id]);
-    $order = $stmt->fetch();
-    
-    if (!$order) {
+    if (!$stmt->fetch()) {
         echo json_encode(['success' => false, 'message' => __('order_not_found')]);
         exit;
     }
-    
-    if (!canAccessOrderBranch($order) || (!hasPermission('edit_orders') && ($order['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0))) {
-        echo json_encode(['success' => false, 'message' => __('no_delete_permission')]);
+
+    // Ochrana citlivých návazností: fakturu ani reklamaci nesmí smazání zakázky
+    // tiše zničit — admin je musí nejdřív vyřešit zvlášť.
+    $invCount = $pdo->prepare("SELECT COUNT(*) FROM invoices WHERE order_id = ?");
+    $invCount->execute([$id]);
+    if ((int)$invCount->fetchColumn() > 0) {
+        echo json_encode(['success' => false, 'message' => 'Zakázku nelze smazat — má vystavenou fakturu. Nejdřív fakturu vyřešte v účetnictví.']);
         exit;
     }
-    
+    try {
+        $cmpCount = $pdo->prepare("SELECT COUNT(*) FROM complaints WHERE order_id = ?");
+        $cmpCount->execute([$id]);
+        if ((int)$cmpCount->fetchColumn() > 0) {
+            echo json_encode(['success' => false, 'message' => 'Zakázku nelze smazat — je k ní navázaná reklamace. Nejdřív vyřešte reklamaci.']);
+            exit;
+        }
+    } catch (Throwable $e) { /* tabulka complaints nemusí existovat na všech instancích */ }
+
     $pdo->beginTransaction();
-    
-    // 1. Delete linked items
-    $stmt1 = $pdo->prepare("DELETE FROM order_items WHERE order_id = ?");
-    $stmt1->execute([$id]);
-    
-    // 2. Delete attachments (files)
+
+    // Smazat fyzické soubory příloh (řádky padnou níže s ostatními child tabulkami)
     $stmt_files = $pdo->prepare("SELECT file_path FROM order_attachments WHERE order_id = ?");
     $stmt_files->execute([$id]);
-    $files = $stmt_files->fetchAll();
-    foreach ($files as $f) {
-        $full_path = '../' . $f['file_path'];
-        if (file_exists($full_path)) {
-            unlink($full_path);
+    foreach ($stmt_files->fetchAll() as $f) {
+        $full_path = '../' . ($f['file_path'] ?? '');
+        if (!empty($f['file_path']) && file_exists($full_path)) {
+            @unlink($full_path);
         }
     }
-    $stmt_del_files = $pdo->prepare("DELETE FROM order_attachments WHERE order_id = ?");
-    $stmt_del_files->execute([$id]);
-    
-    // 3. Delete the order itself
-    $stmt2 = $pdo->prepare("DELETE FROM orders WHERE id = ?");
-    $stmt2->execute([$id]);
-    
+
+    // Odvázat webovou rezervaci (záznam rezervace ponecháme kvůli historii)
+    $pdo->prepare("UPDATE web_bookings SET order_id = NULL WHERE order_id = ?")->execute([$id]);
+
+    // Smazat všechny podřízené záznamy zakázky. order_items/order_attachments mají FK
+    // na orders → MUSÍ padnout před samotnou zakázkou (jinak FK chyba 1451/1452).
+    $childTables = [
+        'order_items', 'order_attachments', 'order_status_log', 'order_assignment_log',
+        'order_work_log', 'order_price_lines', 'order_signatures', 'signature_requests',
+        'tech_assignment_popups', 'purchase_requests',
+    ];
+    foreach ($childTables as $tbl) {
+        try {
+            $pdo->prepare("DELETE FROM `$tbl` WHERE order_id = ?")->execute([$id]);
+        } catch (Throwable $e) { /* tabulka na této instanci nemusí existovat */ }
+    }
+
+    // Nakonec samotná zakázka
+    $pdo->prepare("DELETE FROM orders WHERE id = ?")->execute([$id]);
+
     $pdo->commit();
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
@@ -71,4 +93,3 @@ try {
     }
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
-?>

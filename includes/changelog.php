@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '21:15',
+        'title' => 'Admin: trvalé smazání zakázky přímo v seznamu',
+        'items' => [
+            'V seznamu zakázek má administrátor u každé zakázky vpravo červené tlačítko koše — zakázku lze nejen stornovat, ale i trvale odstranit (viditelné jen adminovi, u libovolného stavu).',
+            'Mazání je nevratné a jen pro administrátora; nejdřív se zeptá na potvrzení. Smaže i všechny navázané položky, přílohy (včetně souborů), podpisy a historii; webová rezervace se jen odpojí (zůstane v evidenci).',
+            'Pojistka: zakázku s vystavenou fakturou nebo navázanou reklamací nelze smazat — CRM na to upozorní, ať se nezničí účetní/reklamační data.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '20:40',
         'title' => 'Nová hodnost „Boss" (nad manažerem)',
         'items' => [
