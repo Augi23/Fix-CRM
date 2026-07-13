@@ -670,10 +670,14 @@ function getOrderPriorityOptions(): array {
     ];
 }
 
-function getOrderPriorityBadge($priority): string {
+function getOrderPriorityBadge($priority, ?string $orderStatus = null): string {
     $p = normalizeOrderPriority($priority);
     $token = strtolower($p);
     $icon = $p === 'High' ? '🔥 ' : '';
+    // Vydaná zakázka: urgence už nehoří — šedý badge bez ohně, ať seznam nekřičí
+    if ($p === 'High' && $orderStatus !== null && $orderStatus !== '' && isOrderStatusIn($orderStatus, 'collected')) {
+        return '<span class="badge priority-pill priority-pill--muted">' . e(getOrderPriorityLabel($p)) . '</span>';
+    }
     return '<span class="badge priority-pill priority-pill--' . $token . '">' . $icon . e(getOrderPriorityLabel($p)) . '</span>';
 }
 

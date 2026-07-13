@@ -2600,6 +2600,7 @@ p, span, label, .small, small,
 .priority-pill--high   { background: #b91c1c !important; border-color: #f87171 !important; color: #fef2f2 !important; }   /* červená – Urgentní */
 .priority-pill--normal { background: #334155 !important; border-color: #64748b !important; color: #e2e8f0 !important; }   /* neutrální – Normální */
 .priority-pill--low    { background: #115e59 !important; border-color: #2dd4bf !important; color: #f0fdfa !important; }   /* teal – Klidná */
+.priority-pill--muted  { background: #374151 !important; border-color: #4b5563 !important; color: #9ca3af !important; }   /* šedá – urgentní už vydaná */
 
 /* 7) Zakázky: stejné formátování střední tabulky jako na Nástěnce */
 .orders-center-table thead th,

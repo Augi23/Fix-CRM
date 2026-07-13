@@ -375,7 +375,7 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                 <div class="small mt-1"><span class="badge bg-dark border border-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)$order['branch_id'])); ?></span></div>
                                 <?php endif; ?>
                             </td>
-                            <td class="col-priority"><?php echo getOrderPriorityBadge($order['priority'] ?? 'Normal'); ?></td>
+                            <td class="col-priority"><?php echo getOrderPriorityBadge($order['priority'] ?? 'Normal', (string)$order['status']); ?></td>
                             <td class="fw-bold text-white"><?php echo formatMoney($order['final_cost'] ?: $order['estimated_cost']); ?></td>
                             <td class="text-end pe-4">
                                 <?php

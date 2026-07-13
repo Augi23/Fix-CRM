@@ -673,6 +673,10 @@ require_once 'includes/header.php';
                         <?php 
                         $techs_query = $can_view_all_staff ? "SELECT * FROM technicians ORDER BY name ASC" : "SELECT * FROM technicians WHERE id = " . intval($_SESSION['tech_id'] ?? 0);
                         $techs = $pdo->query($techs_query)->fetchAll();
+                        // Admin účty (Správa administrátorů) mají přednost před rolí na kartě
+                        // zaměstnance — jinak povýšený admin dál svítil jako Manažer/Technik.
+                        $__adminUsernames = [];
+                        try { $__adminUsernames = array_map('strval', array_column($pdo->query("SELECT username FROM users")->fetchAll(), 'username')); } catch (Throwable $e) {}
                         foreach ($techs as $t): ?>
                         <tr>
                             <td><strong><?php echo htmlspecialchars($t['name']); ?></strong></td>
@@ -680,7 +684,7 @@ require_once 'includes/header.php';
                             <td>
                                 <?php 
                                 $r = $t['role'] ?? 'engineer';
-                                if($r == 'admin') echo '<span class="badge bg-danger">'.__('role_admin').'</span>';
+                                if($r == 'admin' || in_array((string)($t['username'] ?? ''), $__adminUsernames, true)) echo '<span class="badge bg-danger">'.__('role_admin').'</span>';
                                 elseif($r == 'manager') echo '<span class="badge bg-primary">'.__('role_manager').'</span>';
                                 else echo '<span class="badge bg-info-glow">'.__('role_engineer').'</span>';
                                 ?>

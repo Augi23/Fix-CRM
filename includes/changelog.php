@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:12',
+        'title' => 'Urgentní štítek u vydaných zakázek zešedne + správná role adminů',
+        'items' => [
+            'Když je urgentní zakázka už vydaná, její štítek priority v seznamu zešedne (bez ohně) — červeně svítí jen to, co ještě hoří.',
+            'Záložka Zaměstnanci nyní ukazuje roli Admin i u zaměstnanců povýšených ve Správě administrátorů (dřív dál svítili jako Manažer/Technik, i když admin přístup měli).',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:09',
         'title' => 'Výběr opravy z ceníku přímo ve wizardu zakázky',
         'items' => [
