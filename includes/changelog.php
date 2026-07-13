@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '09:09',
+        'title' => 'Výběr opravy z ceníku přímo ve wizardu zakázky',
+        'items' => [
+            'V kroku „Zařízení" nového wizardu jsou dvě nová pole: vyhledáš model (např. „iPhone 15 Pro"), vybereš opravu s variantou dílu — a typ zařízení, značka, model, popis závady i cena se vyplní samy podle ceníku z webu.',
+            'Funguje po načtení ceníku v Nastavení → Integrace. Pole jsou volitelná — zakázku jde dál vyplnit i ručně.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '09:07',
         'title' => 'Ceník oprav z applefix.cz v CRM',
         'items' => [

@@ -1395,3 +1395,66 @@ $(document).on('change', '#priorityHighModal', function () {
         $('#priorityAdjust').val('');
     }
 });
+
+
+// ── Ceník oprav z applefix.cz ve wizardu: model → oprava/varianta → předvyplnění ──
+$(document).on('shown.bs.modal', '#newOrderModal', function () {
+    var $m = $('#pricelistModel');
+    if (!$m.length || $m.hasClass('select2-hidden-accessible')) return;
+    $m.select2({
+        dropdownParent: $('#newOrderModal'),
+        allowClear: true,
+        placeholder: $m.find('option').first().text(),
+        ajax: {
+            url: 'api/pricelist.php', dataType: 'json', delay: 200,
+            data: function (p) { return { op: 'models', q: p.term || '' }; },
+            processResults: function (d) {
+                return { results: (d.results || []).map(function (r) {
+                    return { id: r.brand + '|' + r.model, text: r.brand + ' ' + r.model + (r.model_code ? ' (' + r.model_code.split(',')[0].trim() + ')' : ''),
+                             brand: r.brand, model: r.model, category: r.category };
+                }) };
+            }
+        }
+    });
+});
+
+$(document).on('select2:select', '#pricelistModel', function (e) {
+    var d = e.params.data;
+    var $r = $('#pricelistRepair');
+    // předvyplnit zařízení
+    var typeMap = { 'Smartphone': 'Phone', 'Tablet': 'Tablet', 'Notebook': 'Notebook', 'Stolní počítač': 'PC' };
+    var $type = $('#newOrderModal select[name="device_type"]');
+    if (typeMap[d.category]) { $type.val(typeMap[d.category]).trigger('change'); }
+    var $brand = $('#newOrderModal select[name="device_brand"]');
+    if ($brand.find('option[value="' + d.brand + '"]').length === 0) { $brand.append(new Option(d.brand, d.brand)); }
+    $brand.val(d.brand).trigger('change');
+    var $model = $('#newOrderModal select[name="device_model"]');
+    if ($model.find('option[value="' + d.model + '"]').length === 0) { $model.append(new Option(d.model, d.model)); }
+    $model.val(d.model).trigger('change');
+    // načíst opravy s cenami
+    $r.prop('disabled', true).empty().append(new Option('…', ''));
+    fetch('api/pricelist.php?op=repairs&brand=' + encodeURIComponent(d.brand) + '&model=' + encodeURIComponent(d.model))
+        .then(function (x) { return x.json(); })
+        .then(function (j) {
+            $r.empty().append(new Option($r.data('ph') || '—', ''));
+            (j.results || []).forEach(function (row) {
+                var label = row.repair_name + (row.variant ? ' — ' + row.variant : '');
+                var priceTxt = row.price !== null ? Number(row.price).toLocaleString('cs-CZ') + ' Kč' : 'cena na dotaz';
+                var o = new Option(label + '  ·  ' + priceTxt, label);
+                o.dataset.price = row.price !== null ? row.price : '';
+                $r.append(o);
+            });
+            $r.prop('disabled', false);
+        })
+        .catch(function () { $r.prop('disabled', false); });
+});
+
+$(document).on('change', '#pricelistRepair', function () {
+    var o = this.options[this.selectedIndex];
+    if (!o || !o.value) return;
+    var $desc = $('#newOrderModal textarea[name="problem_description"]');
+    $desc.val(o.value);
+    if (o.dataset.price !== '') {
+        $('#newOrderModal input[name="estimated_cost"]').val(o.dataset.price);
+    }
+});
