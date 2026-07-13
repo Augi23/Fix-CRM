@@ -92,16 +92,23 @@ try {
         }
     }
 
-    // Klient zakázky: změnit ho (= přepsat jméno/telefon/e-mail na jiného člověka)
-    // smí JEN administrátor. Zaměstnanci zůstává původní klient. Pojistka proti
-    // záměně klienta i proti tichému přepisu z dřív ořezaného seznamu v editaci.
+    // Klient zakázky: PŘEPSAT skutečného vyplněného klienta smí jen administrátor
+    // (ochrana proti záměně). PŘIDAT/přiřadit klienta k zakázce se zástupným
+    // klientem („Neznámý"/prázdný) smí i zaměstnanec — typicky starší zakázka,
+    // kde se pravý klient do systému vložil až později.
     $customerIdToSave = (int)$current['customer_id'];
     $postedCustomerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : 0;
-    if ($postedCustomerId > 0 && $postedCustomerId !== $customerIdToSave && hasPermission('admin_access')) {
-        $chkCust = $pdo->prepare('SELECT 1 FROM customers WHERE id = ? LIMIT 1');
-        $chkCust->execute([$postedCustomerId]);
-        if ($chkCust->fetchColumn()) {
-            $customerIdToSave = $postedCustomerId;
+    if ($postedCustomerId > 0 && $postedCustomerId !== $customerIdToSave) {
+        $curCustStmt = $pdo->prepare('SELECT first_name, last_name, phone, email FROM customers WHERE id = ? LIMIT 1');
+        $curCustStmt->execute([$customerIdToSave]);
+        $curCust = $curCustStmt->fetch() ?: null;
+        $mayChangeCustomer = hasPermission('admin_access') || crmCustomerIsPlaceholder($curCust);
+        if ($mayChangeCustomer) {
+            $chkCust = $pdo->prepare('SELECT 1 FROM customers WHERE id = ? LIMIT 1');
+            $chkCust->execute([$postedCustomerId]);
+            if ($chkCust->fetchColumn()) {
+                $customerIdToSave = $postedCustomerId;
+            }
         }
     }
 

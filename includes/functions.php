@@ -2534,6 +2534,25 @@ function crmCustomerFieldLocked($value): bool {
     return $v !== '' && !in_array($v, ['-', '–', '—'], true);
 }
 
+/**
+ * Je klient zakázky jen ZÁSTUPNÝ/nevyplněný? (prázdné/„-" příjmení a jméno prázdné
+ * nebo typu „Neznámý"). Pak smí klienta k zakázce PŘIDAT/přiřadit i zaměstnanec —
+ * typicky u starší zakázky, kde se skutečný klient do systému vložil až později.
+ * Skutečného vyplněného klienta smí přepsat jen administrátor (ochrana proti záměně).
+ */
+function crmCustomerIsPlaceholder(?array $cust): bool {
+    if (!$cust) return true;
+    $blank = static function ($v): bool {
+        $v = trim((string)$v);
+        return $v === '' || in_array($v, ['-', '–', '—'], true);
+    };
+    $first = trim((string)($cust['first_name'] ?? ''));
+    $firstLower = function_exists('mb_strtolower') ? mb_strtolower($first, 'UTF-8') : strtolower($first);
+    $placeholderFirst = $blank($first) || in_array($firstLower,
+        ['neznámý', 'neznamy', 'neznámá', 'neznama', 'unknown', 'zákazník', 'zakaznik', 'klient', 'customer', 'walkin', 'walk-in'], true);
+    return $blank($cust['last_name'] ?? '') && $placeholderFirst;
+}
+
 /** '' / null → NULL, jinak float (čárka i tečka). Pro číselné sloupce ve strict SQL. */
 function crmNumOrNull($v): ?float {
     $v = trim((string)($v ?? ''));

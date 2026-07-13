@@ -58,8 +58,15 @@ $can_handoff = !empty($order['technician_id'])
     && ($__isOwnTech || $can_change_technician);
 $techTimes = crmGetOrderTechTimes((int)$order['id']);
 
-// Klienta zakázky (jméno/telefon/e-mail) smí přepsat/zaměnit jen administrátor.
-$__canEditCustomer = hasPermission('admin_access');
+// Klienta zakázky smí PŘEPSAT (skutečného vyplněného) jen administrátor. PŘIDAT
+// klienta k zakázce se zástupným/nevyplněným klientem („Neznámý") smí i zaměstnanec
+// — starší zakázka, kde se pravý klient vložil do systému později.
+$__canEditCustomer = hasPermission('admin_access') || crmCustomerIsPlaceholder([
+    'first_name' => $order['first_name'] ?? '',
+    'last_name'  => $order['last_name'] ?? '',
+    'phone'      => $order['phone'] ?? '',
+    'email'      => $order['email'] ?? '',
+]);
 
 // Podpisy klienta (příjem/výdej) — blok v pravém sloupci + tisk na zakázkovém listu
 $orderSignatures = crmGetOrderSignatures((int)$order['id']);

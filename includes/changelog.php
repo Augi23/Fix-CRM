@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '21:40',
+        'title' => 'Přiřazení klienta ke starší zakázce bez klienta',
+        'items' => [
+            'Když má zakázka jen zástupného/nevyplněného klienta („Neznámý" nebo prázdné jméno), lze k ní klienta přiřadit i bez administrátora — typicky u starší zakázky, kde se pravý klient vložil do systému až později. Pole Klient je pak v editaci odemčené.',
+            'Změna skutečného, už vyplněného klienta zůstává jen pro administrátora (ochrana proti záměně).',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '21:15',
         'title' => 'Admin: trvalé smazání zakázky přímo v seznamu',
         'items' => [
