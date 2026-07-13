@@ -108,7 +108,7 @@ try {
         isset($_POST['device_type']) ? $_POST['device_type'] : $current['device_type'],
         isset($_POST['order_type']) ? $_POST['order_type'] : $current['order_type'],
         $new_status,
-        $technician_id,
+        $technician_id ?: null,   // 0 = „bez technika" → SQL NULL (FK orders_ibfk_2)
         $branch_id,
         isset($_POST['estimated_cost']) ? $_POST['estimated_cost'] : $current['estimated_cost'],
         isset($_POST['final_cost']) ? $_POST['final_cost'] : $current['final_cost'],

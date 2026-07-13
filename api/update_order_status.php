@@ -125,7 +125,9 @@ try {
 
     $updated_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
     $sql .= ', technician_id = ?, branch_id = ?';
-    $params[] = $updated_tech_id;
+    // 0 = „bez technika" → SQL NULL, jinak padá FK orders_ibfk_2 (technik id 0 neexistuje);
+    // týká se hlavně zakázek z RepairPluginu, které vznikají bez přiřazeného technika
+    $params[] = $updated_tech_id ?: null;
     $params[] = $target_branch_id;
 
     if (isset($_REQUEST['extra_expenses']) && ($_SESSION['role'] ?? '') === 'admin') {
