@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-13',
+        'title' => 'Drobné texty v tabulkách už nejsou verzálkami',
+        'items' => [
+            'E-mail, způsob dopravy a další drobné texty v řádcích zakázek se ukazovaly VELKÝMI PÍSMENY (pravidlo určené pro statistické karty dopadalo i na tabulky). Nyní jsou normálním textem v čitelné velikosti.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'title' => 'Kompaktnější sloupec Priorita',
         'items' => [
             'Štítky priority (Klidná / Normální / Urgentní) jsou menší a sloupec Priorita zabírá jen šířku nejširšího štítku — víc místa zbývá pro popis závady a stav.',

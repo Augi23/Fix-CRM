@@ -656,6 +656,16 @@ nav.crm-v2-topbar .navbar-brand {
   text-transform: uppercase !important;
   margin-top: 4px !important;
 }
+/* …ale v tabulkách NE — pravidlo výše je pro stat karty; e-mail/telefon/datum
+   v řádcích zakázek musí zůstat normální text (ne 10px VERZÁLKY) */
+.card.glass-card .table .small,
+.card.glass-card .table p {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+  margin-top: 0 !important;
+}
 /* Stat card icons — sjednotit do neon fialové, bez barevného pozadí */
 .card.glass-card .bg-primary.bg-opacity-10,
 .card.glass-card .bg-info.bg-opacity-10,
