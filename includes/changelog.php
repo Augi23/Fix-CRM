@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-13',
+        'title' => '„Vydáno" už není černé — řádek splývá s pozadím okna',
+        'items' => [
+            'Řádky vydaných zakázek měly tmavší (skoro černé) pozadí než zbytek okna. Nově jsou průhledné, takže mají přesně stejnou barvu jako karta za nimi; stav „Vydáno" zůstává tmavě zelený štítek.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'title' => 'Větší štítek s objednaným časem u zakázek z webu',
         'items' => [
             'Modrý štítek s časem, na který si klient objednal opravu, je nyní stejně velký jako štítek stavu „Přijato z RepairPluginu" — lépe viditelný v seznamu zakázek i na nástěnce.',

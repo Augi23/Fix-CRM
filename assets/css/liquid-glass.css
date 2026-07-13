@@ -251,6 +251,9 @@ nav.navbar.crm-v2-topbar,
 .order-row--status-repairplugin > td { background: rgba(192,38,211,0.42) !important; }
 .order-row--status-cancelled   > td { background: rgba(156,163,175,0.28) !important; }
 .order-row--status-default     > td { background: rgba(148,163,184,0.24) !important; }
+/* „Vydáno": řádek splývá s kartou (výchozí tr pozadí rgba(16,16,20,.55) působilo černě) */
+.order-row--status-collected,
+.order-row--status-collected > td { background: transparent !important; }
 /* hover = o stupeň sytější, ať klikatelnost zůstane čitelná */
 .order-row--status-new:hover         > td { background: rgba(59,130,246,0.56)  !important; }
 .order-row--status-pending:hover     > td { background: rgba(249,115,22,0.54)  !important; }
@@ -273,6 +276,8 @@ html[data-lg-theme="light"] .order-row--status-uncollected > td { background: #F
 html[data-lg-theme="light"] .order-row--status-repairplugin > td { background: #F8E9FB !important; }
 html[data-lg-theme="light"] .order-row--status-cancelled   > td { background: #F0F1F3 !important; }
 html[data-lg-theme="light"] .order-row--status-default     > td { background: #F1F3F6 !important; }
+html[data-lg-theme="light"] .order-row--status-collected,
+html[data-lg-theme="light"] .order-row--status-collected > td { background: transparent !important; }
 html[data-lg-theme="light"] .order-row--status-new:hover         > td { background: #D7E5FD !important; }
 html[data-lg-theme="light"] .order-row--status-pending:hover     > td { background: #FDE1CB !important; }
 html[data-lg-theme="light"] .order-row--status-progress:hover    > td { background: #E3D9FD !important; }
