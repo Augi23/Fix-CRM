@@ -1015,7 +1015,11 @@ require_once 'includes/header.php';
                     .catch(function(){
                         clearTimeout(t);
                         st.className = 'alert alert-warning py-2 mb-3';
-                        st.innerHTML = '<i class="fas fa-triangle-exclamation me-2"></i><?php echo __('label_bridge_not_running'); ?>';
+                        var isSafari = /^((?!chrome|android|crios|edg).)*safari/i.test(navigator.userAgent);
+                        var extra = isSafari
+                            ? '<div class="small mt-2"><b>Používáš Safari</b> — Safari neumí ověřit můstek z HTTPS stránky (blokuje localhost). Otevři CRM v <b>Chrome</b>.</div>'
+                            : '<div class="small mt-2">Pokud instalace v Terminálu proběhla, ověř příkazem: <code>curl http://127.0.0.1:9110/health</code>.<br>Když odpoví <code>{"ok": true…}</code>, můstek běží — spusť instalační příkaz ještě jednou (stáhne aktualizovaný můstek s podporou nového zabezpečení Chrome) a klikni Zkontrolovat.</div>';
+                        st.innerHTML = '<i class="fas fa-triangle-exclamation me-2"></i><?php echo __('label_bridge_not_running'); ?>' + extra;
                         box.style.display = '';
                         document.getElementById('bridgePreviewBtn').style.display = 'none';
                         document.getElementById('bridgeTestBtn').style.display = 'none';

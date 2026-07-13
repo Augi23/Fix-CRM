@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '11:05',
+        'title' => 'Oprava kontroly štítkového můstku (Chrome ho blokoval)',
+        'items' => [
+            'Chrome nově tiše blokuje komunikaci webu s programy běžícími na počítači (nové zabezpečení „Private Network Access") — proto CRM můstek neviděl, i když v Terminálu běžel. Můstek nyní posílá potřebnou hlavičku.',
+            'Na pokladním počítači stačí spustit instalační příkaz z Nastavení → Tisk štítků ještě jednou — stáhne se opravená verze a stav naskočí.',
+            'Hláška „můstek neběží" nově poradí co dál — a v Safari rovnou řekne, že je potřeba Chrome (Safari tuhle komunikaci nepovoluje vůbec).',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '10:38',
         'title' => 'Technik si může sám převzít volnou zakázku',
         'items' => [

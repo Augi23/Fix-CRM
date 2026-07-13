@@ -173,6 +173,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", origin)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        # Chrome Private Network Access: bez tohoto Chrome tiše blokuje
+        # požadavky z HTTPS stránky na http://127.0.0.1 (preflight vyžaduje souhlas)
+        self.send_header("Access-Control-Allow-Private-Network", "true")
 
     def _json(self, status: int, payload: dict):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
