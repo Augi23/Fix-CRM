@@ -7,6 +7,13 @@
 return [
     [
         'date' => '2026-07-13',
+        'title' => 'Odstraněny rušivé svislé čáry v seznamu zakázek',
+        'items' => [
+            'Urgentní a firemní zakázky vykreslovaly barevný proužek na začátku každé buňky řádku — vypadalo to jako červené (resp. modré) svislé oddělovací čáry přes celý řádek. Proužky jsou pryč; priorita je vidět ve svém sloupci a stav má nadále barevný proužek jen na levém okraji řádku.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'title' => 'Zakázky z webu mezi běžnými zakázkami + nové barvy řádků',
         'items' => [
             'Sekce „Rezervace z webu" zmizela — zakázky z RepairPluginu se zobrazují jako běžné zakázky mezi ostatními (v seznamu i na nástěnce).',

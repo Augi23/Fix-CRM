@@ -803,15 +803,12 @@ nav.crm-v2-topbar .navbar-brand {
   background-color: rgba(10,132,255,0.07) !important;
 }
 
-/* Speciální řádky (company / high priority) */
-.order-row--company > td {
-  background: rgba(10,132,255,0.05) !important;
-  box-shadow: inset 3px 0 0 var(--blue) !important;
-}
-.order-row--high > td {
-  background: rgba(255,55,95,0.05) !important;
-  box-shadow: inset 3px 0 0 var(--red) !important;
-}
+/* Speciální řádky (company / high priority).
+   POZOR: žádný box-shadow na `> td` — inset proužek na KAŽDÉ buňce dělal svislé
+   „oddělovací čáry" přes celý řádek (červené u urgentních, modré u firem).
+   Priorita má dnes vlastní sloupec s badge, firma ikonu — řádkové značení netřeba. */
+.order-row--company > td { background: rgba(10,132,255,0.05) !important; }
+.order-row--high    > td { background: rgba(255,55,95,0.05)  !important; }
 .order-row--company:hover > td { background: rgba(10,132,255,0.10) !important; }
 .order-row--high:hover > td    { background: rgba(255,55,95,0.10) !important; }
 
