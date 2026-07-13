@@ -2378,6 +2378,27 @@ function ensureOrderSignaturesTable(): void {
     } catch (Throwable $e) { /* best-effort */ }
 }
 
+/** Fronta požadavků pro podpisovou stanici (iPad na pultu): zaměstnanec pošle
+ *  žádost z detailu zakázky, stanice si ji stáhne (poll) a po podpisu označí done. */
+function ensureSignatureRequestsTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS signature_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            sig_type VARCHAR(20) NOT NULL,
+            branch_id INT NULL,
+            requested_by VARCHAR(100) NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_sr_branch (branch_id, status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
 /** Podpisy zakázky jako mapa [sig_type => řádek]. */
 function crmGetOrderSignatures(int $orderId): array {
     global $pdo;

@@ -62,6 +62,15 @@ try {
     $pdo->prepare("INSERT INTO order_signatures (order_id, sig_type, file_path, requested_by) VALUES (?, ?, ?, ?)")
         ->execute([$orderId, $sigType, 'uploads/signatures/' . $name, $by !== '' ? mb_substr($by, 0, 100) : null]);
 
+    // požadavek z podpisové stanice → označit vyřízený
+    $reqId = (int)($_POST['request_id'] ?? 0);
+    if ($reqId > 0) {
+        try {
+            ensureSignatureRequestsTable();
+            $pdo->prepare("UPDATE signature_requests SET status = 'done' WHERE id = ? AND order_id = ?")->execute([$reqId, $orderId]);
+        } catch (Throwable $e) { /* podpis je uložen, stav fronty je podružný */ }
+    }
+
     echo json_encode(['ok' => true, 'signed_at' => date('d.m.Y H:i')]);
 } catch (Throwable $e) {
     echo json_encode(['ok' => false, 'error' => 'Chyba serveru']);

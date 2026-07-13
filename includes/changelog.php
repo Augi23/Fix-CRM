@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '10:11',
+        'title' => 'Podpisová stanice pro iPad (2. etapa podpisů)',
+        'items' => [
+            'Nová stránka sign_station.php — na iPadu u pultu ji otevřeš, přidáš na plochu a stanice čeká. Z detailu zakázky pošleš podpis tlačítkem s ikonou tabletu — iPad se do 3 vteřin sám probudí s údaji zakázky a klient podepíše.',
+            'Po podpisu se stanice vrátí do čekání a tobě se zakázka sama obnoví s uloženým podpisem. Stanice obsluhuje svou pobočku (Karlín / Černá růže dle přihlášeného účtu).',
+            'Postup nasazení: na iPadu se přihlas do CRM → otevři admin.applefix.cloud/sign_station.php → Sdílet → Přidat na plochu.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '10:08',
         'title' => 'Elektronický podpis klienta (1. etapa)',
         'items' => [

@@ -579,13 +579,48 @@ function localizedOrderStatusLabel(string $status): string {
                                 <?php if ($sig): ?>
                                     <span class="badge bg-success bg-opacity-25 text-success border border-success"><i class="fas fa-check me-1"></i><?php echo date('j.n. H:i', strtotime((string)$sig['signed_at'])); ?></span>
                                 <?php else: ?>
-                                    <button type="button" class="btn btn-sm btn-outline-info" onclick="afxSignOrder('<?php echo $sigT; ?>')"><i class="fas fa-pen-nib me-1"></i><?php echo __('sign_btn'); ?></button>
+                                    <span class="d-inline-flex gap-1">
+                                        <button type="button" class="btn btn-sm btn-outline-info" onclick="afxSignOrder('<?php echo $sigT; ?>')"><i class="fas fa-pen-nib me-1"></i><?php echo __('sign_btn'); ?></button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="<?php echo __('sign_station_send'); ?>" onclick="afxSignRemote('<?php echo $sigT; ?>', this)"><i class="fas fa-tablet-screen-button"></i></button>
+                                    </span>
                                 <?php endif; ?>
                             </div>
                             <?php endforeach; ?>
                         </div>
                         <script>
                         window.AFX_SIGN_L10N = { clear: '<?php echo __('sign_clear'); ?>', cancel: '<?php echo __('cancel'); ?>', save: '<?php echo __('sign_save'); ?>' };
+                        function afxSignRemote(type, btn) {
+                            var $row = $(btn).closest('.d-flex');
+                            var fd = new FormData();
+                            fd.append('action', 'create');
+                            fd.append('order_id', '<?php echo (int)$order['id']; ?>');
+                            fd.append('sig_type', type);
+                            fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                            fetch('api/request_signature.php', { method: 'POST', body: fd })
+                                .then(function (r) { return r.json(); })
+                                .then(function (j) {
+                                    if (!j.ok) { alert(j.error || 'Chyba'); return; }
+                                    var reqId = j.request_id;
+                                    var $wait = $('<span class="small text-info"><i class="fas fa-tablet-screen-button me-1"></i><?php echo __('sign_station_waiting'); ?> <a href="javascript:void(0)" class="text-white-75">✕</a></span>');
+                                    $row.find('span.d-inline-flex, button').last().parent().find('.d-inline-flex').replaceWith($wait);
+                                    var iv = setInterval(function () {
+                                        fetch('api/request_signature.php?check=' + reqId, { cache: 'no-store' })
+                                            .then(function (r) { return r.json(); })
+                                            .then(function (c) {
+                                                if (c.status === 'done') { clearInterval(iv); location.reload(); }
+                                                if (c.status === 'cancelled' || c.status === 'missing') { clearInterval(iv); location.reload(); }
+                                            }).catch(function () {});
+                                    }, 3000);
+                                    $wait.find('a').on('click', function () {
+                                        clearInterval(iv);
+                                        var cf = new FormData();
+                                        cf.append('action', 'cancel');
+                                        cf.append('request_id', reqId);
+                                        cf.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                                        fetch('api/request_signature.php', { method: 'POST', body: cf }).finally(function () { location.reload(); });
+                                    });
+                                });
+                        }
                         function afxSignOrder(type) {
                             afxSignaturePad({
                                 title: type === 'prijem' ? '<?php echo __('sign_pad_title_reception'); ?>' : '<?php echo __('sign_pad_title_pickup'); ?>',
