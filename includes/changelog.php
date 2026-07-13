@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '06:42',
+        'title' => 'Doklad o platbě (termo) česky a v jednotném vzhledu',
+        'items' => [
+            'Termo doklad z účetnictví je kompletně česky (dřív „RECEIPT", „Customer", „Items"…), v novém vzhledu s logem a SF Pro. IČO/DIČ a adresa pobočky jsou v patičce; ruská tlačítka nahrazena českými.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '06:41',
         'title' => 'Účtenka při vydání v novém jednotném vzhledu',
         'items' => [

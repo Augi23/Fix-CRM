@@ -22,10 +22,10 @@ $items = $stmt->fetchAll();
 
 // Payment method translations
 $payment_methods = [
-    'bank_transfer' => 'Bank transfer',
-    'cash' => 'Hotovost',
+    'bank_transfer' => 'Bankovním převodem',
+    'cash' => 'Hotově',
     'card' => 'Kartou',
-    'cod' => 'Cash on delivery'
+    'cod' => 'Na dobírku'
 ];
 $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['payment_method'];
 ?>
@@ -33,43 +33,36 @@ $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['paym
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo __('print_title_receipt'); ?> <?php echo $invoice['invoice_number']; ?></title>
+    <title><?php echo ($invoice['invoice_type'] == 'credit_note') ? 'Dobropis' : 'Doklad'; ?> <?php echo e($invoice['invoice_number']); ?></title>
+    <link rel="stylesheet" href="assets/css/sf-pro.css?v=<?php echo (int)@filemtime(__DIR__ . '/assets/css/sf-pro.css'); ?>">
     <style>
-        body { 
-            font-family: Arial, Helvetica, sans-serif; 
-            font-size: 13px; 
-            line-height: 1.2; 
-            margin: 0; 
-            padding: 0;
-            background: #fff;
-            color: #000;
-        }
-        .receipt {
-            width: 72mm; /* Better compatibility for 80mm printers */
-            padding: 2mm;
-            margin: 0 auto;
-            background: white;
-        }
-        .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 8px; margin-bottom: 8px; }
-        .company-name { font-size: 16px; font-weight: 900; text-transform: uppercase; }
-        .doc-title { font-size: 20px; font-weight: 900; margin: 5px 0; }
-        
-        .section { margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px dashed #000; }
-        .row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-        .label { font-weight: bold; color: #000; }
-        
-        .items { margin: 8px 0; }
+        /* Jednotný vizuál klientských dokumentů (dle zakázkového listu): SF Pro,
+           tučné hodnoty × light popisky, adresa/IČO v patičce dole. */
+        body { font-family: 'SF Pro Display', -apple-system, Arial, sans-serif; font-size: 13px;
+               line-height: 1.3; margin: 0; padding: 0; background: #fff; color: #000; }
+        .receipt { width: 72mm; padding: 2mm; margin: 0 auto; background: white; }
+        .text-center { text-align: center; }
+        .rule { border-bottom: 1px solid #000; margin: 8px 0; }
+        .kick { font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 700; margin-top: 6px; }
+        .doc-num { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; margin: 2px 0 1px; }
+        .date { font-size: 11px; font-weight: 300; }
+        .label { font-size: 9.5px; font-weight: 400; letter-spacing: 0.14em; text-transform: uppercase; margin: 7px 0 2px; }
+        .kv { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+        .kv .k { font-weight: 300; }
+        .kv .v { font-weight: 700; text-align: right; }
         .item { margin-bottom: 6px; }
-        .item-name { font-weight: bold; font-size: 14px; display: block; }
+        .item-name { font-weight: 700; display: block; }
         .item-details { display: flex; justify-content: space-between; font-size: 12px; }
-        .item-price { text-align: right; font-weight: bold; }
-        
-        .total-section { border-top: 3px solid #000; padding-top: 8px; margin-top: 8px; }
-        .total-row { display: flex; justify-content: space-between; font-size: 22px; font-weight: 900; }
-        
-        .footer { text-align: center; margin-top: 15px; font-size: 12px; font-weight: bold; color: #000; border-top: 1px solid #000; padding-top: 5px; }
-        .barcode { text-align: center; margin: 10px 0; font-size: 20px; letter-spacing: 3px; font-weight: bold; }
-        
+        .item-details .qty { font-weight: 300; }
+        .item-price { text-align: right; font-weight: 700; }
+        .total-row { text-align: right; margin: 4px 0 2px; }
+        .total-row .k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 400; }
+        .total-row .v { font-size: 21px; font-weight: 800; }
+        .barcode { text-align: center; margin: 10px 0 4px; font-size: 19px; letter-spacing: 3px; font-weight: 700; font-family: ui-monospace, Menlo, monospace; }
+        .foot { margin-top: 12px; border-top: 1px solid #000; padding-top: 7px; text-align: center; }
+        .foot .thanks { font-size: 11px; font-weight: 700; margin-bottom: 5px; }
+        .foot .foot-name { font-size: 12px; font-weight: 800; }
+        .foot .foot-line { font-size: 9.5px; font-weight: 300; margin-top: 2px; line-height: 1.45; }
         @media print {
             body { background: none; }
             .receipt { width: 72mm; margin: 0; padding: 0; }
@@ -81,77 +74,79 @@ $payment_method = $payment_methods[$invoice['payment_method']] ?? $invoice['paym
 <body>
 
 <div class="no-print" style="text-align: center; margin: 20px;">
-    <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 4px;"><?php echo __('print_btn'); ?></button>
-    <a href="accounting.php" style="padding: 10px 20px; text-decoration: none; background: #6c757d; color: white; border-radius: 4px; margin-left: 10px;"><?php echo __('back'); ?></a>
+    <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 4px;">Tisk</button>
+    <a href="accounting.php" style="padding: 10px 20px; text-decoration: none; background: #6c757d; color: white; border-radius: 4px; margin-left: 10px;">Zpět</a>
 </div>
 
+<?php
+$__bid = 0;
+try { $__bid = (int)$pdo->query("SELECT branch_id FROM orders WHERE id = " . (int)($invoice['order_id'] ?? 0))->fetchColumn(); } catch (Throwable $e) {}
+$__bc = crmOrderBranchContact($__bid);   // kontakty dle pobočky zakázky faktury
+$__logo_fs = __DIR__ . '/assets/img/logo-black.png';
+$__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((string)file_get_contents($__logo_fs)) : '';
+$__acc_name = trim((string)get_setting('acc_company_name')) ?: (string)get_setting('company_name', 'AppleFix s.r.o.');
+$__acc_ico  = trim((string)get_setting('acc_ico')) ?: trim((string)get_setting('company_ico', ''));
+$__acc_dic  = trim((string)get_setting('acc_dic')) ?: trim((string)get_setting('company_dic', ''));
+$__curr = $invoice['currency'] ?: 'Kč';
+?>
 <div class="receipt">
-    <div class="header">
-        <div class="company-name"><?php echo htmlspecialchars(get_setting('acc_company_name')); ?></div>
-        <div><?php echo nl2br(htmlspecialchars(get_setting('acc_address'))); ?></div>
-        <div>IČO: <?php echo htmlspecialchars(get_setting('acc_ico')); ?></div>
-        <?php if(get_setting('acc_dic')): ?>
-        <div>DIČ: <?php echo htmlspecialchars(get_setting('acc_dic')); ?></div>
-        <?php endif; ?>
+    <div class="text-center">
+        <?php if ($__logo_data): ?><img src="<?php echo $__logo_data; ?>" alt="AppleFix" style="width: 46mm; height: auto; margin-top: 2mm;"><?php endif; ?>
+        <div class="kick"><?php echo ($invoice['invoice_type'] == 'credit_note') ? 'Dobropis' : 'Doklad o platbě'; ?></div>
+        <div class="doc-num"><?php echo e($invoice['invoice_number']); ?></div>
+        <div class="date"><?php echo date('d.m.Y H:i', strtotime($invoice['created_at'])); ?></div>
+        <div class="rule"></div>
     </div>
 
-    <div class="doc-title" style="text-align: center;">
-        <?php echo ($invoice['invoice_type'] == 'credit_note') ? 'CREDIT NOTE' : 'RECEIPT'; ?>
-    </div>
-    <div style="text-align: center; margin-bottom: 10px;">
-        No. <?php echo $invoice['invoice_number']; ?>
-    </div>
+    <div class="kv"><span class="k">Variabilní symbol</span><span class="v"><?php echo e($invoice['variable_symbol']); ?></span></div>
+    <div class="kv"><span class="k">Způsob platby</span><span class="v"><?php echo e($payment_method); ?></span></div>
 
-    <div class="section">
-        <div class="row"><span class="label">Datum:</span><span><?php echo date('d.m.Y H:i', strtotime($invoice['created_at'])); ?></span></div>
-        <div class="row"><span class="label">Var. symbol:</span><span><?php echo $invoice['variable_symbol']; ?></span></div>
-        <div class="row"><span class="label">Platba:</span><span><?php echo $payment_method; ?></span></div>
-    </div>
+    <div class="rule"></div>
 
-    <div class="section">
-        <div class="label">Customer:</div>
-        <div><strong><?php echo htmlspecialchars($invoice['company'] ?: $invoice['first_name'] . ' ' . $invoice['last_name']); ?></strong></div>
-        <?php if($invoice['ico']): ?><div>IČO: <?php echo $invoice['ico']; ?></div><?php endif; ?>
-    </div>
+    <div class="label">Odběratel</div>
+    <div style="font-weight: 700;"><?php echo htmlspecialchars($invoice['company'] ?: $invoice['first_name'] . ' ' . $invoice['last_name']); ?></div>
+    <?php if($invoice['ico']): ?><div class="kv"><span class="k">IČO</span><span class="v"><?php echo e($invoice['ico']); ?></span></div><?php endif; ?>
+    <?php if($invoice['dic']): ?><div class="kv"><span class="k">DIČ</span><span class="v"><?php echo e($invoice['dic']); ?></span></div><?php endif; ?>
 
-    <div class="items">
-        <div style="border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 5px;"><strong>Items:</strong></div>
-        <?php foreach($items as $item): ?>
-        <div class="item">
-            <div class="item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-            <div class="item-details">
-                <span><?php echo $item['quantity']; ?> <?php echo $item['unit']; ?> × <?php echo number_format($item['price'], 2, ',', ' '); ?></span>
-                <span class="item-price"><?php echo number_format($item['quantity'] * $item['price'], 2, ',', ' '); ?> <?php echo $invoice['currency'] ?: 'Kč'; ?></span>
-            </div>
-        </div>
-        <?php endforeach; ?>
-        
-        <?php if(empty($items)): ?>
-        <div class="item">
-            <div class="item-name"><?php echo htmlspecialchars($invoice['notes'] ?: 'Service'); ?></div>
-            <div class="item-details">
-                <span>1 ks</span>
-                <span class="item-price"><?php echo number_format($invoice['total_amount'], 2, ',', ' '); ?> <?php echo $invoice['currency'] ?: 'Kč'; ?></span>
-            </div>
-        </div>
-        <?php endif; ?>
-    </div>
+    <div class="rule"></div>
 
-    <div class="total-section">
-        <div class="total-row">
-            <span>CELKEM:</span>
-            <span><?php echo number_format($invoice['total_amount'], 2, ',', ' '); ?> <?php echo $invoice['currency'] ?: 'Kč'; ?></span>
+    <div class="label">Položky</div>
+    <?php foreach($items as $item): ?>
+    <div class="item">
+        <span class="item-name"><?php echo htmlspecialchars($item['item_name']); ?></span>
+        <div class="item-details">
+            <span class="qty"><?php echo $item['quantity']; ?> <?php echo e($item['unit']); ?> × <?php echo number_format($item['price'], 2, ',', ' '); ?></span>
+            <span class="item-price"><?php echo number_format($item['quantity'] * $item['price'], 2, ',', ' '); ?> <?php echo e($__curr); ?></span>
         </div>
     </div>
+    <?php endforeach; ?>
+    <?php if(empty($items)): ?>
+    <div class="item">
+        <span class="item-name"><?php echo htmlspecialchars($invoice['notes'] ?: 'Servisní služby'); ?></span>
+        <div class="item-details">
+            <span class="qty">1 ks</span>
+            <span class="item-price"><?php echo number_format($invoice['total_amount'], 2, ',', ' '); ?> <?php echo e($__curr); ?></span>
+        </div>
+    </div>
+    <?php endif; ?>
 
-    <div class="barcode">
-        *<?php echo $invoice['variable_symbol']; ?>*
+    <div class="rule"></div>
+
+    <div class="total-row">
+        <div class="k">Celkem</div>
+        <div class="v"><?php echo number_format($invoice['total_amount'], 2, ',', ' '); ?> <?php echo e($__curr); ?></div>
     </div>
 
-    <div class="footer">
-        <div>Thank you for your trust!</div>
-        <?php $__bid = 0; try { $__bid = (int)$pdo->query("SELECT branch_id FROM orders WHERE id = " . (int)($invoice['order_id'] ?? 0))->fetchColumn(); } catch (Throwable $e) {} ?>
-        <div style="margin-top: 5px;"><?php echo htmlspecialchars(crmOrderBranchContact($__bid)['phone']); ?></div>
+    <div class="barcode">*<?php echo e($invoice['variable_symbol']); ?>*</div>
+
+    <div class="foot">
+        <div class="thanks">Děkujeme za vaši důvěru!</div>
+        <div class="foot-name"><?php echo htmlspecialchars($__acc_name); ?></div>
+        <div class="foot-line">
+            <?php echo htmlspecialchars($__bc['address_inline']); ?><br>
+            <?php if ($__acc_ico): ?>IČO: <?php echo htmlspecialchars($__acc_ico); ?><?php endif; ?><?php if ($__acc_dic): ?> · DIČ: <?php echo htmlspecialchars($__acc_dic); ?><?php endif; ?><br>
+            Tel.: <?php echo htmlspecialchars($__bc['phone']); ?> · applefix.cz
+        </div>
     </div>
 </div>
 
