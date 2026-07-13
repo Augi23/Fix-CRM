@@ -61,66 +61,61 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
 <head>
     <meta charset="UTF-8">
     <title>Reklamační protokol <?php echo htmlspecialchars((string)$complaint['complaint_code']); ?></title>
+    <link rel="stylesheet" href="<?php echo defined('COMPLAINT_DOC_EMBED') ? '../' : ''; ?>assets/css/sf-pro.css">
     <style>
-        :root { --accent:#f97316; --ink:#1d1d1f; --muted:#6b7280; --line:#e5e7eb; }
+        /* Jednotný vizuál klientských dokumentů (dle zakázkového listu): SF Pro,
+           modrý akcent, tučné hodnoty × light popisky, adresa v patičce dole. */
+        :root { --ink:#111318; --sub:#4d5560; --muted:#949aa4; --line:#e8ebf0;
+                --accent:#0a84ff; --accent-ink:#0a5bd6; --soft:#f6f8fb; }
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; font-size: 13.5px; line-height: 1.55;
-               color: var(--ink); margin: 0; padding: 24px; background: #f4f5f7; }
-        .sheet { max-width: 820px; margin: auto; background: #fff; border-radius: 16px; overflow: hidden;
-                 box-shadow: 0 10px 40px rgba(0,0,0,0.08); }
-        .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;
-                    padding: 26px 32px; background: linear-gradient(135deg,#2b1406,#3a1e0b); color: #fff; }
-        .doc-head .brand { display: flex; align-items: center; gap: 14px; }
-        .doc-head .brand img { height: 40px; width: auto; filter: brightness(0) invert(1); }
-        .doc-head .company-name { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
-        .doc-head .company-meta { font-size: 12px; color: rgba(255,255,255,0.72); margin-top: 2px; }
-        .doc-head .doc-meta { text-align: right; }
-        .doc-head .doc-kicker { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.6); }
-        .doc-head .doc-code { font-size: 26px; font-weight: 800; margin: 2px 0; }
-        .doc-head .doc-date { font-size: 12px; color: rgba(255,255,255,0.75); }
-        .body { padding: 26px 32px 30px; }
-        .grid2 { display: flex; gap: 18px; margin-bottom: 18px; }
-        .panel { flex: 1; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-        .panel h3 { margin: 0 0 8px; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-        .panel .big { font-size: 15px; font-weight: 700; }
-        .panel .row { margin-top: 3px; }
-        .panel .k { color: var(--muted); }
-        .block { margin: 16px 0; }
-        .block h3 { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
-        .reason { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; white-space: pre-wrap; min-height: 60px; }
-        .status-chip { display: inline-block; padding: 6px 12px; border-radius: 999px; background: #fff3e6; color: #b4530c;
-                       border: 1px solid #f6c48a; font-weight: 700; font-size: 12px; }
+        body { font-family: 'SF Pro Display', -apple-system, "Segoe UI", Arial, sans-serif; font-size: 13px; line-height: 1.55;
+               color: var(--ink); margin: 0; padding: 26px 18px; background: #eceff3; -webkit-font-smoothing: antialiased; }
+        .sheet { max-width: 840px; margin: auto; background: #fff; border-radius: 18px; overflow: hidden;
+                 box-shadow: 0 24px 64px rgba(17,20,24,0.12); }
+        .accent-bar { height: 5px; background: linear-gradient(90deg, #0a84ff, #5ac8fa 55%, #64d2ff); }
+        .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 28px 34px 0; }
+        .doc-head img { height: 34px; width: auto; }
+        .doc-meta { text-align: right; }
+        .doc-kicker { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent-ink); font-weight: 800; }
+        .doc-code { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 3px 0 0; font-family: ui-monospace, Menlo, monospace; }
+        .doc-date { font-size: 11px; color: var(--muted); margin-top: 5px; font-weight: 300; }
+        .head-sep { margin: 16px 34px 0; border-bottom: 1px solid var(--line); }
+        .body { padding: 18px 34px 30px; }
+        .grid2 { display: flex; gap: 16px; margin-bottom: 16px; }
+        .panel { flex: 1; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+        .panel h3 { margin: 0 0 8px; font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink); font-weight: 800; }
+        .panel .big { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+        .panel .row { margin-top: 4px; font-size: 12.5px; }
+        .panel .k { color: var(--muted); font-weight: 300; }
+        .block { margin: 14px 0; }
+        .block h3 { font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink); margin: 0 0 6px; font-weight: 800; }
+        .reason { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; white-space: pre-wrap; min-height: 60px; background: var(--soft); }
+        .status-chip { display: inline-block; padding: 6px 12px; border-radius: 999px; background: #e8f1fe; color: var(--accent-ink);
+                       border: 1px solid #b6d4fb; font-weight: 700; font-size: 12px; }
         .photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
         .photos img { width: 120px; height: 120px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
-        .fineprint { margin-top: 18px; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
-        .sign { display: flex; gap: 40px; margin-top: 34px; }
-        .sign .slot { flex: 1; border-top: 1px solid #9ca3af; padding-top: 6px; font-size: 11px; color: var(--muted); text-align: center; }
+        .fineprint { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--line);
+                     font-size: 10px; color: #495059; line-height: 1.55; font-weight: 300; text-align: justify; }
+        .sign { display: flex; gap: 40px; margin-top: 38px; }
+        .sign .slot { flex: 1; border-top: 1.4px solid var(--ink); padding-top: 7px; font-size: 10.5px; color: var(--muted); text-align: center; }
+        .foot { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); text-align: center; }
+        .foot .foot-name { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: var(--ink); }
+        .foot .foot-line { font-size: 10px; color: var(--muted); font-weight: 300; margin-top: 4px; letter-spacing: 0.02em; }
         @media print { body { background: #fff; padding: 0; } .sheet { box-shadow: none; border-radius: 0; max-width: none; } }
     </style>
 </head>
 <body>
 <div class="sheet">
+    <div class="accent-bar"></div>
     <div class="doc-head">
-        <div class="brand">
-            <?php if ($__logo_data): ?><img src="<?php echo $__logo_data; ?>" alt="logo"><?php endif; ?>
-            <div>
-                <p class="company-name"><?php echo htmlspecialchars($__company); ?></p>
-                <div class="company-meta">
-                    <?php echo htmlspecialchars(trim($__company_addr)); ?>
-                    <?php if ($__company_ico): ?> · IČO <?php echo htmlspecialchars($__company_ico); ?><?php endif; ?>
-                </div>
-                <div class="company-meta">
-                    <?php echo htmlspecialchars(trim($__company_phone)); ?>
-                    <?php if ($__company_email): ?> · <?php echo htmlspecialchars($__company_email); ?><?php endif; ?>
-                </div>
-            </div>
-        </div>
+        <?php if ($__logo_data): ?><img src="<?php echo $__logo_data; ?>" alt="<?php echo htmlspecialchars($__company); ?>"><?php endif; ?>
         <div class="doc-meta">
             <div class="doc-kicker">Reklamační protokol</div>
             <div class="doc-code"><?php echo htmlspecialchars((string)$complaint['complaint_code']); ?></div>
             <div class="doc-date"><?php echo htmlspecialchars($__created); ?></div>
         </div>
     </div>
+    <div class="head-sep"></div>
 
     <div class="body">
         <div class="grid2">
@@ -172,6 +167,14 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
         <div class="sign">
             <div class="slot">Za zákazníka</div>
             <div class="slot">Za servis <?php echo htmlspecialchars($__company); ?></div>
+        </div>
+
+        <div class="foot">
+            <div class="foot-name"><?php echo htmlspecialchars($__company); ?></div>
+            <div class="foot-line">
+                <?php echo htmlspecialchars(trim($__company_addr)); ?><?php if ($__company_ico): ?> · IČO: <?php echo htmlspecialchars($__company_ico); ?><?php endif; ?>
+                · Tel.: <?php echo htmlspecialchars(trim($__company_phone)); ?><?php if ($__company_email): ?> · <?php echo htmlspecialchars($__company_email); ?><?php endif; ?>
+            </div>
         </div>
     </div>
 </div>

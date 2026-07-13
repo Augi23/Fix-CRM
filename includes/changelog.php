@@ -7,6 +7,14 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '06:44',
+        'title' => 'Reklamační protokol sladěn s novým vzhledem dokumentů',
+        'items' => [
+            'Reklamační protokol přešel z hnědé hlavičky na jednotný vzhled zakázkového listu — světlá hlavička s logem, modrý akcent, písmo SF Pro a adresa s kontakty v patičce dole.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '06:42',
         'title' => 'Doklad o platbě (termo) česky a v jednotném vzhledu',
         'items' => [
