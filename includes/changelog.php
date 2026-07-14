@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '19:05',
+        'title' => 'Nová zakázka: technik se už nepředvybírá automaticky',
+        'items' => [
+            'Při vytváření zakázky se do pole Technik automaticky předvyplňoval ten, kdo zakázku zakládal (typicky Tomáš) — zakázky mu tak nechtěně padaly. Pole je nově vždy prázdné.',
+            'Zakázku lze založit bez technika — přidělí se později, nebo si ji technik vezme sám (to už fungovalo).',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '02:05',
         'title' => 'Po vydání zakázky: děkovný e-mail s žádostí o Google recenzi',
         'items' => [

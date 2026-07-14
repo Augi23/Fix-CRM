@@ -309,9 +309,13 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                 <div class="col-12">
                                     <label class="form-label"><?php echo __('technician'); ?></label>
                                     <select name="technician_id" class="form-select">
-                                        <option value="">-- <?php echo __('technician'); ?> --</option>
+                                        <?php /* Technik se NEpředvybírá (dřív se vytvářejícímu technikovi
+                                                 předvyplnil on sám → zakázky nechtěně padaly na něj).
+                                                 Zakázku lze založit bez technika — přidělí se později,
+                                                 nebo si ji technik vezme sám. */ ?>
+                                        <option value="" selected>-- <?php echo __('technician'); ?> --</option>
                                         <?php foreach ($techs_list_modal as $t): ?>
-                                            <option value="<?php echo (int)$t['id']; ?>" <?php echo (($_SESSION['role'] ?? '') !== 'admin' && $t['id'] == ($_SESSION['tech_id'] ?? 0)) ? 'selected' : ''; ?>><?php echo e($t['name']); ?><?php echo isBranchGlobalViewer() && !empty($t['branch_name']) ? ' · ' . e($t['branch_name']) : ''; ?></option>
+                                            <option value="<?php echo (int)$t['id']; ?>"><?php echo e($t['name']); ?><?php echo isBranchGlobalViewer() && !empty($t['branch_name']) ? ' · ' . e($t['branch_name']) : ''; ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
