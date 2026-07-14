@@ -2518,6 +2518,89 @@ function ensureOrderCreatedByColumn(): void {
     } catch (Throwable $e) { error_log('ensureOrderCreatedByColumn: ' . $e->getMessage()); }
 }
 
+/* ─────────────────────────  ČAS STRÁVENÝ V SYSTÉMU  ──────────────────────────
+ * Měří aktivní čas každého zaměstnance v CRM (zdroj: 20s poller upozornění —
+ * běží, dokud je CRM otevřené). Slouží ve statistikách hlavně pro Bosse/adminy,
+ * jejichž práce (správa a vývoj CRM) není vázaná na zakázky — odměna se jim
+ * počítá z hodin v systému × hodinová sazba z karty zaměstnance.
+ * ---------------------------------------------------------------------------- */
+
+/** Tabulka staff_activity: (kdo, den) → aktivní sekundy + poslední aktivita. */
+function ensureStaffActivityTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS staff_activity (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            actor_type VARCHAR(20) NOT NULL,
+            actor_id INT NOT NULL,
+            day DATE NOT NULL,
+            seconds INT NOT NULL DEFAULT 0,
+            last_seen DATETIME NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_actor_day (actor_type, actor_id, day),
+            KEY idx_day (day)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureStaffActivityTable: ' . $e->getMessage()); }
+}
+
+/** Zaznamená aktivitu přihlášeného zaměstnance (volá se z 20s polleru).
+ *  Mezera do 90 s = souvislá práce (přičte se); delší pauza se nepočítá. */
+function crmTrackStaffActivity(): void {
+    global $pdo;
+    try {
+        if (!isset($pdo)) return;
+        if (!empty($_SESSION['tech_id'])) {
+            $type = 'technician'; $id = (int)$_SESSION['tech_id'];
+        } elseif (is_numeric($_SESSION['user_id'] ?? null)) {
+            $type = 'user'; $id = (int)$_SESSION['user_id'];
+        } else {
+            return;
+        }
+        if (!$pdo->inTransaction()) { ensureStaffActivityTable(); }
+        $pdo->prepare(
+            "INSERT INTO staff_activity (actor_type, actor_id, day, seconds, last_seen)
+             VALUES (?, ?, CURDATE(), 0, NOW())
+             ON DUPLICATE KEY UPDATE
+                seconds = seconds + IF(TIMESTAMPDIFF(SECOND, last_seen, NOW()) BETWEEN 0 AND 90,
+                                       TIMESTAMPDIFF(SECOND, last_seen, NOW()), 0),
+                last_seen = NOW()"
+        )->execute([$type, $id]);
+    } catch (Throwable $e) { /* měření nesmí nikdy shodit poller */ }
+}
+
+/** Souhrn aktivního času v období pro statistiky (jméno, role, sekundy, sazba). */
+function crmGetStaffActivitySummary(string $from, string $to): array {
+    global $pdo;
+    try {
+        ensureStaffActivityTable();
+        $st = $pdo->prepare(
+            "SELECT sa.actor_type, sa.actor_id, SUM(sa.seconds) AS secs
+             FROM staff_activity sa WHERE sa.day BETWEEN ? AND ?
+             GROUP BY sa.actor_type, sa.actor_id");
+        $st->execute([$from, $to]);
+        $out = [];
+        foreach ($st->fetchAll() as $r) {
+            $name = ''; $role = ''; $rate = 0.0;
+            if ($r['actor_type'] === 'technician') {
+                $ts = $pdo->prepare("SELECT name, role, engineer_rate FROM technicians WHERE id = ?");
+                $ts->execute([(int)$r['actor_id']]);
+                if ($t = $ts->fetch()) { $name = (string)$t['name']; $role = (string)$t['role']; $rate = (float)($t['engineer_rate'] ?? 0); }
+            } else {
+                $us = $pdo->prepare("SELECT full_name, username FROM users WHERE id = ?");
+                $us->execute([(int)$r['actor_id']]);
+                if ($u = $us->fetch()) { $name = (string)($u['full_name'] ?: $u['username']); $role = 'admin'; }
+            }
+            if ($name === '') { continue; }   // smazaný účet
+            $out[] = ['name' => $name, 'role' => $role, 'seconds' => (int)$r['secs'], 'rate' => $rate, 'actor_type' => (string)$r['actor_type']];
+        }
+        usort($out, fn($a, $b) => $b['seconds'] <=> $a['seconds']);
+        return $out;
+    } catch (Throwable $e) { return []; }
+}
+
 /* ─────────────────────────────  ZÁLOHOVÁNÍ CRM  ───────────────────────────────
  * Kompletní záloha každých ~15 minut: DB dump (gzip) + uploads (tar.gz) + kód
  * (tar.gz jen při změně git verze). Spouští se samo z notify_poll/webhooku

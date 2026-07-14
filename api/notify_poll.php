@@ -15,6 +15,9 @@ if (!isset($_SESSION['user_id'])) {
 // místo pro odpálení automatické zálohy (každých 15 minut, na pozadí).
 crmBackupMaybeSchedule();
 
+// Měření aktivního času v systému (statistiky: hodiny Bosse/adminů = práce na CRM)
+crmTrackStaffActivity();
+
 try {
     $scope = orderBranchScopeSql('branch_id');   // '' nebo ' AND branch_id = N'
     $lastOrder = (int)($pdo->query("SELECT MAX(id) FROM orders" . ($scope !== '' ? ' WHERE ' . substr($scope, 5) : ''))->fetchColumn() ?: 0);

@@ -7,6 +7,17 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '22:10',
+        'title' => 'Statistiky: čas strávený v systému + odměna pro Bosse/adminy',
+        'items' => [
+            'CRM nově automaticky měří aktivní čas každého zaměstnance v systému (pauzy se nepočítají). V Přehledech → Statistiky zaměstnanců je nový panel „Čas strávený v systému".',
+            'Rolím Boss a Administrátor se z tohoto času počítá odměna (hodiny × sazba z karty zaměstnance) — jejich práce je správa a vývoj CRM, ne zakázky. Odměna běží i bez přijaté zakázky.',
+            'Technici mají čas v systému jen informativně — jejich odměna se dál počítá ze zakázek (žádné dvojí započtení).',
+            'Tip: nastav si hodinovou sazbu na kartě zaměstnance (Nastavení → Zaměstnanci → upravit → Odměna za hodinu), jinak se odměna počítá z nuly.',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '21:45',
         'title' => 'Správa administrátorů ukazuje VŠECHNY adminy',
         'items' => [

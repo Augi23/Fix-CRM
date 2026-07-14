@@ -300,6 +300,35 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     </tfoot>
                 </table>
             </div>
+
+            <!-- Čas strávený v systému (správa a vývoj CRM) -->
+            <?php $__activity = crmGetStaffActivitySummary($start_date, $end_date); if (!empty($__activity)): ?>
+            <div class="glass-panel p-4 border-secondary mt-4">
+                <h6 class="text-uppercase small text-muted mb-1"><i class="fas fa-laptop-code me-2 text-info"></i>Čas strávený v systému</h6>
+                <div class="small text-white-50 mb-3">Aktivní čas v CRM (měří se automaticky, pauzy se nepočítají). U rolí <b>Boss</b> a <b>Admin</b> se z něj počítá odměna — jejich práce (správa a vývoj CRM) není vázaná na zakázky. Sazba se bere z karty zaměstnance.</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0">
+                        <thead><tr><th>Zaměstnanec</th><th>Role</th><th class="text-end">Čas v systému</th><th class="text-center">Sazba</th><th class="text-end">Odměna za čas v systému</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($__activity as $act):
+                            $__hrs = $act['seconds'] / 3600;
+                            $__isCrmWorker = in_array($act['role'], ['boss', 'admin'], true);
+                            $__pay = $__isCrmWorker ? $__hrs * $act['rate'] : null;
+                            $__roleLbl = $act['role'] === 'boss' ? 'Boss' : ($act['role'] === 'admin' ? 'Administrátor' : ($act['role'] === 'manager' ? 'Manažer' : 'Technik'));
+                        ?>
+                            <tr>
+                                <td><strong><?php echo htmlspecialchars($act['name']); ?></strong></td>
+                                <td><span class="badge <?php echo $__isCrmWorker ? 'bg-danger' : 'bg-secondary'; ?>"><?php echo $__roleLbl; ?></span></td>
+                                <td class="text-end"><?php echo formatWorkDuration((int)round($act['seconds'] / 60)); ?></td>
+                                <td class="text-center"><?php echo $__isCrmWorker ? '<span class="badge bg-secondary">' . formatMoney($act['rate']) . '/h</span>' : '<span class="text-white-50">—</span>'; ?></td>
+                                <td class="text-end fw-bold <?php echo $__isCrmWorker ? 'text-primary' : 'text-white-50'; ?>"><?php echo $__isCrmWorker ? formatMoney($__pay) : '— (odměna ze zakázek)'; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
         <?php endif; ?>
 
         <!-- GENERAL STATS TAB -->
