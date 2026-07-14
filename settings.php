@@ -113,7 +113,11 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     $phone = $_POST['tech_phone'] ?? '';
     $spec = $_POST['tech_spec'];
     $role = $_POST['role'] ?? 'engineer';
-    $branch_id = filter_input(INPUT_POST, 'branch_id', FILTER_VALIDATE_INT) ?: getDefaultBranchId();
+    $branch_id = (int)(filter_input(INPUT_POST, 'branch_id', FILTER_VALIDATE_INT) ?: 0);
+    // Pobočka je POVINNÁ a musí být platná aktivní pobočka (žádný tichý fallback)
+    $__branchOk = false;
+    foreach (getBranches() as $__b) { if ((int)$__b['id'] === $branch_id) { $__branchOk = true; break; } }
+    if (!$__branchOk) { header("Location: settings.php?tab=staff&error=branch_required"); exit; }
     $telegramContact = parseTelegramContactInput($_POST['tech_tg'] ?? '');
     if (!$telegramContact['valid']) {
         header("Location: settings.php?tab=staff&error=telegram_contact_invalid");
@@ -155,7 +159,14 @@ if (isset($_POST['edit_tech'])) {
     $phone = $_POST['tech_phone'] ?? '';
     $spec = $_POST['tech_spec'];
     $role = $_POST['role'] ?? 'engineer';
-    $branch_id = filter_input(INPUT_POST, 'branch_id', FILTER_VALIDATE_INT) ?: getDefaultBranchId();
+    $branch_id = (int)(filter_input(INPUT_POST, 'branch_id', FILTER_VALIDATE_INT) ?: 0);
+    // Pobočka je POVINNÁ: admin nesmí uložit technika bez platné aktivní pobočky.
+    // (Non-adminovi se pobočka stejně přebírá z DB v re-verify bloku níže.)
+    if ($is_admin_check) {
+        $__branchOk = false;
+        foreach (getBranches() as $__b) { if ((int)$__b['id'] === $branch_id) { $__branchOk = true; break; } }
+        if (!$__branchOk) { header("Location: settings.php?tab=staff&error=branch_required"); exit; }
+    }
     $telegramContact = parseTelegramContactInput($_POST['tech_tg'] ?? '');
     if (!$telegramContact['valid']) {
         header("Location: settings.php?tab=staff&error=telegram_contact_invalid");
@@ -402,7 +413,8 @@ require_once 'includes/header.php';
                     'username_taken' => 'This username already exists.',
                     'unauthorized' => 'You do not have permission for this edit.',
                     'short_password' => 'Password is too short.',
-                    'csrf' => 'Form expired, please refresh the page.'
+                    'csrf' => 'Form expired, please refresh the page.',
+                    'branch_required' => 'Zaměstnanec musí mít vybranou pobočku — vyber ji a ulož znovu.'
                 ];
                 echo htmlspecialchars($settingsErrorMessages[$settingsError] ?? $settingsError, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             ?>
@@ -1413,7 +1425,7 @@ require_once 'includes/header.php';
                 </div>
                 <div class="col-md-12 mb-3">
                     <label class="form-label"><i class="fas fa-store me-1"></i>Pobočka</label>
-                    <select name="branch_id" class="form-select">
+                    <select name="branch_id" class="form-select" required>
                         <?php $__defB = (int)getDefaultBranchId(); foreach ($branches_settings as $branch): ?>
                             <option value="<?php echo (int)$branch['id']; ?>" <?php echo (int)$branch['id'] === $__defB ? 'selected' : ''; ?>><?php echo e($branch['name']); ?></option>
                         <?php endforeach; ?>
@@ -1476,7 +1488,7 @@ require_once 'includes/header.php';
                 <div class="col-md-12 mb-3">
                     <label class="form-label"><i class="fas fa-store me-1"></i>Pobočka</label>
                     <?php if ($is_admin_user): ?>
-                    <select name="branch_id" class="form-select">
+                    <select name="branch_id" class="form-select" required>
                         <?php
                         // PAST „prvního vybraného": technik s NULL/neaktivní pobočkou by bez
                         // selected spadl na první pobočku a uložení by ho tiše přeřadilo
@@ -1485,7 +1497,11 @@ require_once 'includes/header.php';
                         $__tbInList = false;
                         foreach ($branches_settings as $branch) { if ((int)$branch['id'] === $__tb) { $__tbInList = true; break; } }
                         if (!$__tbInList): ?>
-                            <option value="<?php echo $__tb; ?>" selected><?php echo $__tb > 0 ? e(getBranchLabel($__tb)) . ' (neaktivní pobočka)' : '— bez pobočky —'; ?></option>
+                            <?php if ($__tb > 0): ?>
+                                <option value="<?php echo $__tb; ?>" selected><?php echo e(getBranchLabel($__tb)); ?> (neaktivní pobočka)</option>
+                            <?php else: ?>
+                                <option value="" selected disabled>— vyber pobočku (povinné) —</option>
+                            <?php endif; ?>
                         <?php endif; ?>
                         <?php foreach ($branches_settings as $branch): ?>
                             <option value="<?php echo (int)$branch['id']; ?>" <?php echo $__tb === (int)$branch['id'] ? 'selected' : ''; ?>><?php echo e($branch['name']); ?></option>

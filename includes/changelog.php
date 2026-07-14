@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '21:05',
+        'title' => 'Zaměstnanec musí mít vybranou pobočku (povinné)',
+        'items' => [
+            'U zaměstnance je pobočka nově povinná — při vytváření i úpravě. Formulář bez vybrané pobočky nepustí uložení a server ověří, že jde o platnou aktivní pobočku (žádné tiché dosazení).',
+            'Technik, který dosud pobočku neměl, se při nejbližší úpravě karty musí zařadit — nabídka ukáže „vyber pobočku (povinné)".',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '20:45',
         'title' => 'Globální oprava „pasti prvního vybraného" ve výběrových polích',
         'items' => [
