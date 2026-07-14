@@ -2876,7 +2876,7 @@ function crmAuditActionLabel(string $action): string {
         'staff.create' => 'Vytvoření zaměstnance', 'staff.update' => 'Úprava zaměstnance',
         'staff.delete' => 'Smazání zaměstnance', 'staff.permissions' => 'Změna oprávnění',
         'admin.create' => 'Povýšení na administrátora', 'admin.password' => 'Změna hesla administrátora',
-        'admin.delete' => 'Odstranění administrátora',
+        'admin.delete' => 'Odstranění administrátora', 'admin.demote' => 'Odebrání admin práv',
         'order.signature_add' => 'Podpis klienta', 'order.dates_change' => 'Zpětná změna datumů',
         'order.item_add' => 'Přidání dílu k zakázce', 'order.item_update' => 'Úprava dílu zakázky',
         'order.item_delete' => 'Odebrání dílu ze zakázky',

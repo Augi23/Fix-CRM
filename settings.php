@@ -335,6 +335,27 @@ if (isset($_POST['promote_staff_admin']) && $is_admin_check) {
     exit;
 }
 
+// Odebrání admin práv zaměstnaneckému účtu (technicians.role='admin' → 'engineer').
+// Účet zaměstnance zůstává, jen ztrácí administrátorská práva. Sám sobě nelze.
+if (isset($_POST['demote_tech_admin']) && $is_admin_check) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    $dtId = (int)($_POST['demote_tech_admin'] ?? 0);
+    if ($dtId > 0 && (int)($_SESSION['tech_id'] ?? 0) !== $dtId) {
+        $ns = $pdo->prepare("SELECT name FROM technicians WHERE id = ? AND role = 'admin'");
+        $ns->execute([$dtId]);
+        $dtName = (string)$ns->fetchColumn();
+        if ($dtName !== '') {
+            $pdo->prepare("UPDATE technicians SET role = 'engineer' WHERE id = ?")->execute([$dtId]);
+            crmAuditLog('admin.demote', [
+                'entity_type' => 'technician', 'entity_id' => $dtId, 'entity_label' => $dtName,
+                'summary' => 'Zaměstnanci ' . $dtName . ' odebrána administrátorská práva (role → Technik)',
+            ]);
+        }
+    }
+    header("Location: settings.php?tab=admins&admin_deleted=1");
+    exit;
+}
+
 // Odstranění administrátorského účtu (jen admin). Pojistky: výchozího
 // administrátora 'admin' smazat NELZE (záchranný účet) a nikdo nesmí
 // smazat sám sebe (aby se nezamkl uprostřed práce).
@@ -1054,6 +1075,11 @@ require_once 'includes/header.php';
                     <thead class="table-dark"><tr><th><?php echo __('login_col'); ?></th><th><?php echo __('name_col'); ?></th><th><?php echo __('role_col'); ?></th><th class="text-end"><?php echo __('actions_col'); ?></th></tr></thead>
                     <tbody>
                         <?php $admins = $pdo->query("SELECT * FROM users ORDER BY role DESC")->fetchAll();
+                        // Admini jsou ve DVOU tabulkách: users (samostatné admin účty)
+                        // a technicians s role='admin' (zaměstnanecký účet s plnými právy).
+                        // Dřív se ukazovali jen ti první → seznam byl neúplný.
+                        $techAdmins = [];
+                        try { $techAdmins = $pdo->query("SELECT id, name, username, is_active FROM technicians WHERE role = 'admin' ORDER BY name")->fetchAll(); } catch (Throwable $e) {}
                         foreach ($admins as $admin): ?>
                         <tr>
                             <td><strong><?php echo htmlspecialchars($admin['username']); ?></strong></td>
@@ -1069,6 +1095,26 @@ require_once 'includes/header.php';
                                         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                                         <input type="hidden" name="delete_admin" value="<?php echo (int)$admin['id']; ?>">
                                         <button type="submit" class="btn btn-outline-danger" data-confirm="Opravdu odstranit administrátorský přístup @<?php echo e($admin['username']); ?>? Účet zaměstnance (pokud existuje) zůstává."><i class="fas fa-trash"></i></button>
+                                    </form>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php foreach ($techAdmins as $ta): ?>
+                        <tr>
+                            <td><strong>@<?php echo htmlspecialchars((string)($ta['username'] ?? '-')); ?></strong></td>
+                            <td><?php echo htmlspecialchars($ta['name']); ?><?php echo ($ta['is_active'] ?? 1) ? '' : ' <span class="badge bg-secondary ms-1">neaktivní</span>'; ?></td>
+                            <td><span class="badge bg-danger">Admin</span> <span class="text-white-50 small">zaměstnanecký účet</span></td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="settings.php?tab=staff" class="btn btn-outline-secondary" title="Heslo a údaje se spravují na kartě zaměstnance"><i class="fas fa-user-edit me-1"></i>Karta zaměstnance</a>
+                                    <?php $__isSelfTech = (int)($_SESSION['tech_id'] ?? 0) === (int)$ta['id'];
+                                          if (!$__isSelfTech): ?>
+                                    <form method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                        <input type="hidden" name="demote_tech_admin" value="<?php echo (int)$ta['id']; ?>">
+                                        <button type="submit" class="btn btn-outline-danger" data-confirm="Odebrat administrátorská práva zaměstnanci <?php echo e($ta['name']); ?>? Účet zůstane, role se změní na Technik."><i class="fas fa-user-minus"></i></button>
                                     </form>
                                     <?php endif; ?>
                                 </div>

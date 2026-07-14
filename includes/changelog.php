@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '21:45',
+        'title' => 'Správa administrátorů ukazuje VŠECHNY adminy',
+        'items' => [
+            'Ve Správě administrátorů se dosud ukazovaly jen samostatné admin účty — chyběli zaměstnanci s rolí Admin (např. přihlašující se zaměstnaneckým účtem). Nově jsou v seznamu obě skupiny; zaměstnanecké admin účty mají označení „zaměstnanecký účet".',
+            'U zaměstnaneckého admina lze admin práva odebrat (role se změní na Technik, účet zůstává) — s potvrzením, ne sám sobě, zapisuje se do Historie. Heslo a údaje se u nich dál spravují na kartě zaměstnance.',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '21:25',
         'title' => 'Správa administrátorů: možnost odstranit administrátora',
         'items' => [
