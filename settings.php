@@ -1351,16 +1351,23 @@ require_once 'includes/header.php';
                 }, 'json').fail(function() { btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus me-2"></i>Zálohovat teď'; showAlert('Chyba spojení'); });
             });
             function restoreBackup(name, timeLabel) {
-                showConfirm('Opravdu obnovit CRM do stavu ze ' + timeLabel + '?\n\nVšechny změny provedené PO tomto čase zmizí (databáze i soubory). Aktuální stav se před obnovou automaticky zazálohuje.', function() {
-                    showConfirm('POSLEDNÍ POTVRZENÍ: obnovit zálohu ' + timeLabel + '? Tato akce přepíše aktuální data.', function() {
-                        const html = '<div class="text-center py-3"><span class="spinner-border me-2"></span>Obnovuji zálohu, nezavírej stránku…</div>';
-                        document.body.insertAdjacentHTML('beforeend', '<div id="restoreOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:center;justify-content:center;color:#fff;">' + html + '</div>');
-                        $.post('api/backup_action.php', {op: 'restore', name: name}, function(res) {
-                            document.getElementById('restoreOverlay')?.remove();
-                            if (res.success) { showAlert(res.message); setTimeout(() => location.reload(), 1500); }
-                            else { showAlert(res.message || 'Obnova selhala'); }
-                        }, 'json').fail(function() { document.getElementById('restoreOverlay')?.remove(); showAlert('Chyba spojení při obnově'); });
-                    });
+                showConfirm('Opravdu obnovit CRM do stavu ze ' + timeLabel + '?<br><br>Všechny změny provedené PO tomto čase zmizí (databáze i soubory, včetně účtů založených později). Aktuální stav se před obnovou automaticky zazálohuje.', function() {
+                    // druhé potvrzení až po dokončení zavírací animace modalu
+                    // (okamžité znovuotevření téže Bootstrap instance by se zahodilo)
+                    setTimeout(function() {
+                        showConfirm('POSLEDNÍ POTVRZENÍ: obnovit zálohu ' + timeLabel + '? Tato akce přepíše aktuální data.', function() {
+                            const html = '<div class="text-center py-3"><span class="spinner-border me-2"></span>Obnovuji zálohu, nezavírej stránku…</div>';
+                            document.body.insertAdjacentHTML('beforeend', '<div id="restoreOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:center;justify-content:center;color:#fff;">' + html + '</div>');
+                            $.post('api/backup_action.php', {op: 'restore', name: name}, function(res) {
+                                document.getElementById('restoreOverlay')?.remove();
+                                if (res.success) { showAlert(res.message); setTimeout(() => location.reload(), 1500); }
+                                else { showAlert(res.message || 'Obnova selhala'); }
+                            }, 'json').fail(function() {
+                                document.getElementById('restoreOverlay')?.remove();
+                                showAlert('Spojení se přerušilo — obnova ale na serveru může stále běžet. Počkej minutu, obnov stránku a zkontroluj stav v této záložce; neklikej hned znovu na Obnovit.');
+                            });
+                        });
+                    }, 450);
                 });
             }
             </script>

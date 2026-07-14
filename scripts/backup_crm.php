@@ -11,6 +11,8 @@ require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
 ob_end_clean();
 
+if (!isset($pdo)) { fwrite(STDERR, "Backup failed: DB connection unavailable\n"); exit(1); }
+
 [$ok, $msg] = crmRunBackupNow('auto');
 if (!$ok) {
     try { set_setting('backup_last_status', 'CHYBA ' . date('d.m.Y H:i:s') . ': ' . $msg); } catch (Throwable $e) {}

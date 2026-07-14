@@ -2523,22 +2523,42 @@ function ensureOrderCreatedByColumn(): void {
  *  fallback backups/ v aplikaci chráněný .htaccess. */
 function crmBackupBaseDir(): string {
     $root = dirname(__DIR__);                    // kořen aplikace
-    $outside = dirname($root) . '/crm-backups';  // vedle aplikace, mimo webroot
-    if (is_dir($outside) || @mkdir($outside, 0750, true)) {
-        if (is_writable($outside)) return $outside;
-    }
-    $inside = $root . '/backups';
-    if (!is_dir($inside)) { @mkdir($inside, 0750, true); }
-    $ht = $inside . '/.htaccess';
-    if (!file_exists($ht)) { @file_put_contents($ht, "Require all denied\n"); }
-    return $inside;
+    $protect = static function (string $d): void {
+        // ochrana pro případ, že by adresář byl v dosahu webu: Apache deny +
+        // prázdný index (nginx directory listing) — defense-in-depth
+        if (!file_exists($d . '/.htaccess')) { @file_put_contents($d . '/.htaccess', "Require all denied\n"); }
+        if (!file_exists($d . '/index.html')) { @file_put_contents($d . '/index.html', ''); }
+    };
+    $pick = static function (string $base) use ($protect): ?string {
+        if (!is_dir($base) && !@mkdir($base, 0750, true)) return null;
+        if (!is_writable($base)) return null;
+        $protect($base);
+        // vlastní úložiště s náhodným jménem — i kdyby byl adresář omylem
+        // veřejně dostupný (nginx ignoruje .htaccess), cesta není uhodnutelná
+        $tokenFile = $base . '/.token';
+        $token = trim((string)@file_get_contents($tokenFile));
+        if (!preg_match('/^[a-f0-9]{24}\z/', $token)) {
+            $token = bin2hex(random_bytes(12));
+            @file_put_contents($tokenFile, $token);
+            @chmod($tokenFile, 0600);
+        }
+        $store = $base . '/store-' . $token;
+        if (!is_dir($store) && !@mkdir($store, 0750, true)) return null;
+        $protect($store);
+        return $store;
+    };
+    return $pick(dirname($root) . '/crm-backups')   // primárně mimo webroot
+        ?? $pick($root . '/backups')                // fallback v aplikaci
+        ?? sys_get_temp_dir() . '/crm-backups';     // nouzově (nemělo by nastat)
 }
 
 /** Dočasný my.cnf s přihlášením k DB — heslo nesmí do příkazové řádky (ps). */
 function crmBackupMysqlCnf(): string {
     $f = crmBackupBaseDir() . '/.my.cnf';
-    @file_put_contents($f, "[client]\nhost=" . DB_HOST . "\nuser=" . DB_USER . "\npassword=\"" . str_replace('"', '\\"', DB_PASS) . "\"\n");
-    @chmod($f, 0600);
+    if (!is_file($f)) { @touch($f); }
+    @chmod($f, 0600);                                // práva PŘED zápisem hesla
+    $esc = static fn(string $v): string => '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $v) . '"';
+    @file_put_contents($f, "[client]\nhost=" . $esc(DB_HOST) . "\nuser=" . $esc(DB_USER) . "\npassword=" . $esc(DB_PASS) . "\n");
     return $f;
 }
 
@@ -2558,29 +2578,48 @@ function crmBackupFindBin(array $candidates): ?string {
 function crmRunBackupNow(string $reason = 'auto'): array {
     if (!function_exists('exec')) { return [false, 'exec() není na serveru povolen']; }
     $base = crmBackupBaseDir();
+
+    // probíhající OBNOVA má přednost — běžná záloha počká na další cyklus
+    // (pojistná 'prerestore' záloha je součástí obnovy, ta projít musí)
+    if ($reason !== 'prerestore') {
+        $rl = @fopen($base . '/.restore.lock', 'c');
+        if ($rl) {
+            if (!flock($rl, LOCK_EX | LOCK_NB)) { fclose($rl); return [false, 'Právě probíhá obnova zálohy']; }
+            flock($rl, LOCK_UN); fclose($rl);
+        }
+    }
+
     $lock = @fopen($base . '/.lock', 'c');
     if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { return [false, 'Záloha už právě běží']; }
+    $dir = null;
     try {
         $root = dirname(__DIR__);
+
+        // binárka musí existovat DŘÍV, než cokoli vytvoříme
+        $dump = crmBackupFindBin(['mysqldump', 'mariadb-dump']);
+        if ($dump === null) { return [false, 'mysqldump není k dispozici']; }
+
         $stamp = date('Ymd_His');
         $prefix = ($reason === 'prerestore') ? 'prerestore_' : 'backup_';
         $dir = $base . '/' . $prefix . $stamp;
-        if (!@mkdir($dir, 0750, true)) { return [false, 'Nelze vytvořit adresář zálohy']; }
+        if (!@mkdir($dir, 0750, true)) { $dir = null; return [false, 'Nelze vytvořit adresář zálohy']; }
 
         // ── 1) databáze (kompletní: zakázky, klienti, faktury, historie…) ──
-        $dump = crmBackupFindBin(['mysqldump', 'mariadb-dump']);
-        if ($dump === null) { return [false, 'mysqldump není k dispozici']; }
         $cnf = crmBackupMysqlCnf();
         $dbFile = $dir . '/db.sql.gz';
-        $cmd = escapeshellarg($dump) . ' --defaults-extra-file=' . escapeshellarg($cnf)
+        $pipeline = escapeshellarg($dump) . ' --defaults-extra-file=' . escapeshellarg($cnf)
              . ' --single-transaction --quick --routines --triggers ' . escapeshellarg(DB_NAME)
              . ' 2>' . escapeshellarg($dir . '/db.err') . ' | gzip > ' . escapeshellarg($dbFile);
-        exec($cmd, $o1, $rc1);
-        if ($rc1 !== 0 || !is_file($dbFile) || filesize($dbFile) < 1024) {
+        // pipefail: jinak by exit kód patřil gzipu a selhání dumpu by se maskovalo
+        exec('bash -c ' . escapeshellarg('set -o pipefail; ' . $pipeline), $o1, $rc1);
+        $gzOk = is_file($dbFile) && filesize($dbFile) >= 1024;
+        if ($gzOk) { exec('gunzip -t ' . escapeshellarg($dbFile) . ' 2>/dev/null', $oT, $rcT); $gzOk = ($rcT === 0); }
+        if ($rc1 !== 0 || !$gzOk) {
             $err = trim((string)@file_get_contents($dir . '/db.err'));
             return [false, 'Dump databáze selhal' . ($err !== '' ? ': ' . mb_substr($err, 0, 200) : '')];
         }
         @unlink($dir . '/db.err');
+        $dirDone = false;   // od teď máme validní dump
 
         // ── 2) nahrané soubory (fotky zakázek, podpisy, přílohy reklamací) ──
         if (is_dir($root . '/uploads')) {
@@ -2614,17 +2653,20 @@ function crmRunBackupNow(string $reason = 'auto'): array {
 
         // ── 5) retence: starší 48 h pryč (vždy ale ponechat 10 nejnovějších) ──
         $all = array_merge(glob($base . '/backup_*', GLOB_ONLYDIR) ?: [], glob($base . '/prerestore_*', GLOB_ONLYDIR) ?: []);
-        rsort($all);
-        foreach (array_slice($all, 10) as $old) {
-            if (@filemtime($old) < time() - 48 * 3600) {
-                exec('rm -rf ' . escapeshellarg($old));
+        usort($all, static fn($a, $b) => (@filemtime($b) ?: 0) <=> (@filemtime($a) ?: 0));   // dle času, ne názvu
+        foreach (array_slice($all, 10) as $oldDir) {
+            if (@filemtime($oldDir) < time() - 48 * 3600) {
+                exec('rm -rf ' . escapeshellarg($oldDir));
             }
         }
 
         set_setting('backup_last_run', (string)time());
         set_setting('backup_last_status', 'OK ' . date('d.m.Y H:i:s') . ' (' . basename($dir) . ')');
+        $dirDone = true;
         return [true, basename($dir)];
     } finally {
+        // neúspěch nesmí nechat na disku rozbitou/prázdnou zálohu
+        if ($dir !== null && empty($dirDone)) { exec('rm -rf ' . escapeshellarg($dir)); }
         flock($lock, LOCK_UN); fclose($lock);
     }
 }
@@ -2657,41 +2699,48 @@ function crmListBackups(): array {
  * @return array{0:bool,1:string}
  */
 function crmRestoreBackup(string $name): array {
-    if (!preg_match('/^(backup|prerestore)_\d{8}_\d{6}$/', $name)) { return [false, 'Neplatný název zálohy']; }
+    if (!preg_match('/^(backup|prerestore)_\d{8}_\d{6}\z/', $name)) { return [false, 'Neplatný název zálohy']; }
     $base = crmBackupBaseDir();
     $dir = $base . '/' . $name;
     $dbFile = $dir . '/db.sql.gz';
     if (!is_file($dbFile)) { return [false, 'Záloha neobsahuje databázi']; }
 
-    // pojistka: záloha AKTUÁLNÍHO stavu, kdyby obnova byla omyl
-    [$okPre, $msgPre] = crmRunBackupNow('prerestore');
-    if (!$okPre) { return [false, 'Pojistná záloha selhala (' . $msgPre . ') — obnova přerušena']; }
+    // zámek přes CELOU obnovu — druhé kliknutí ani auto-záloha nesmí běžet souběžně
+    $rlock = @fopen($base . '/.restore.lock', 'c');
+    if (!$rlock || !flock($rlock, LOCK_EX | LOCK_NB)) { return [false, 'Obnova už právě probíhá — vydržte, může trvat i minuty.']; }
+    try {
+        // pojistka: záloha AKTUÁLNÍHO stavu, kdyby obnova byla omyl
+        [$okPre, $msgPre] = crmRunBackupNow('prerestore');
+        if (!$okPre) { return [false, 'Pojistná záloha selhala (' . $msgPre . ') — obnova přerušena']; }
 
-    $mysql = crmBackupFindBin(['mysql', 'mariadb']);
-    if ($mysql === null) { return [false, 'mysql klient není k dispozici']; }
-    $cnf = crmBackupMysqlCnf();
-    $errF = $base . '/.restore.err';
-    exec('gunzip -c ' . escapeshellarg($dbFile) . ' | ' . escapeshellarg($mysql)
-       . ' --defaults-extra-file=' . escapeshellarg($cnf) . ' ' . escapeshellarg(DB_NAME)
-       . ' 2>' . escapeshellarg($errF), $o, $rc);
-    if ($rc !== 0) {
-        $err = trim((string)@file_get_contents($errF));
-        return [false, 'Import databáze selhal' . ($err !== '' ? ': ' . mb_substr($err, 0, 200) : '') . '. Aktuální stav je v pojistné záloze.'];
+        $mysql = crmBackupFindBin(['mysql', 'mariadb']);
+        if ($mysql === null) { return [false, 'mysql klient není k dispozici']; }
+        $cnf = crmBackupMysqlCnf();
+        $errF = $base . '/.restore.err';
+        exec('bash -c ' . escapeshellarg('set -o pipefail; gunzip -c ' . escapeshellarg($dbFile) . ' | ' . escapeshellarg($mysql)
+           . ' --defaults-extra-file=' . escapeshellarg($cnf) . ' ' . escapeshellarg(DB_NAME)
+           . ' 2>' . escapeshellarg($errF)), $o, $rc);
+        if ($rc !== 0) {
+            $err = trim((string)@file_get_contents($errF));
+            return [false, 'Import databáze selhal' . ($err !== '' ? ': ' . mb_substr($err, 0, 200) : '') . '. Aktuální stav je v pojistné záloze.'];
+        }
+        @unlink($errF);
+
+        $root = dirname(__DIR__);
+        if (is_file($dir . '/files.tar.gz')) {
+            exec('tar -xzf ' . escapeshellarg($dir . '/files.tar.gz') . ' -C ' . escapeshellarg($root) . ' 2>/dev/null');
+        }
+
+        // audit AŽ PO importu — záznam o obnově přežije vrácení databáze zpět
+        crmAuditLog('system.backup_restore', [
+            'entity_type' => 'system',
+            'summary' => 'Obnovena záloha ' . $name . ' (pojistná kopie stavu před obnovou: ano)',
+        ]);
+        set_setting('backup_last_status', 'OBNOVENO z ' . $name . ' — ' . date('d.m.Y H:i:s'));
+        return [true, 'Obnoveno ze zálohy ' . $name];
+    } finally {
+        flock($rlock, LOCK_UN); fclose($rlock);
     }
-    @unlink($errF);
-
-    $root = dirname(__DIR__);
-    if (is_file($dir . '/files.tar.gz')) {
-        exec('tar -xzf ' . escapeshellarg($dir . '/files.tar.gz') . ' -C ' . escapeshellarg($root) . ' 2>/dev/null');
-    }
-
-    // audit AŽ PO importu — záznam o obnově přežije vrácení databáze zpět
-    crmAuditLog('system.backup_restore', [
-        'entity_type' => 'system',
-        'summary' => 'Obnovena záloha ' . $name . ' (pojistná kopie stavu před obnovou: ano)',
-    ]);
-    set_setting('backup_last_status', 'OBNOVENO z ' . $name . ' — ' . date('d.m.Y H:i:s'));
-    return [true, 'Obnoveno ze zálohy ' . $name];
 }
 
 /** Poor-man's cron: zavolat z častých requestů (poll/webhook). Levný check —
@@ -2702,10 +2751,13 @@ function crmBackupMaybeSchedule(): void {
         if (time() - $last < 900) return;                       // 15 minut
         if (!function_exists('exec')) return;
         set_setting('backup_last_attempt', (string)time());     // claim (proti souběhu)
-        $php = crmBackupFindBin(['php', 'php8.3', 'php8.2', 'php8.1']) ?: '/usr/bin/php';
+        $php = crmBackupFindBin(['php', 'php8.3', 'php8.2', 'php8.1']);
         $script = dirname(__DIR__) . '/scripts/backup_crm.php';
-        if (is_file($script)) {
+        if ($php !== null && is_file($script)) {
             exec('nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($script) . ' > /dev/null 2>&1 &');
+        } else {
+            // ať je problém vidět v UI Zálohy, ne aby zálohy tiše neběžely
+            set_setting('backup_last_status', 'CHYBA: nelze spustit zálohu (' . ($php === null ? 'php-cli nenalezen' : 'chybí scripts/backup_crm.php') . ')');
         }
     } catch (Throwable $e) { /* záloha nesmí nikdy shodit request */ }
 }

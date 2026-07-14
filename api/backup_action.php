@@ -10,6 +10,7 @@ header('Content-Type: application/json; charset=utf-8');
 @set_time_limit(300);
 
 if (!isset($_SESSION['user_id']) || !hasPermission('admin_access')) {
+    http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Jen administrátor.']); exit;
 }
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
