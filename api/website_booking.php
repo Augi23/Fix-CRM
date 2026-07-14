@@ -190,6 +190,7 @@ try {
         ->execute([$wpId !== '' ? $wpId : null, $name, $phone, $email, $device, $service, $notes, $appt, $deliv, $payload]);
 
     $newId = (int)$pdo->lastInsertId();
+    crmBackupMaybeSchedule();   // zálohy běží i v noci, když chodí jen webové objednávky
     crmSyncWebBookingToCalDav($newId);
     // Automaticky založit zákazníka (pokud nový) + zakázku „Přijato" z webové rezervace
     $orderId = crmCreateOrderFromWebBooking($newId);

@@ -2512,6 +2512,204 @@ function ensureOrderCreatedByColumn(): void {
     } catch (Throwable $e) { error_log('ensureOrderCreatedByColumn: ' . $e->getMessage()); }
 }
 
+/* ─────────────────────────────  ZÁLOHOVÁNÍ CRM  ───────────────────────────────
+ * Kompletní záloha každých ~15 minut: DB dump (gzip) + uploads (tar.gz) + kód
+ * (tar.gz jen při změně git verze). Spouští se samo z notify_poll/webhooku
+ * (poor-man's cron — žádný systémový cron není potřeba). Retence 48 hodin.
+ * Obnova ze Nastavení → Zálohy (jen admin), před obnovou pojistná záloha.
+ * ---------------------------------------------------------------------------- */
+
+/** Adresář záloh — PŘEDNOSTNĚ mimo webroot (../crm-backups vedle aplikace),
+ *  fallback backups/ v aplikaci chráněný .htaccess. */
+function crmBackupBaseDir(): string {
+    $root = dirname(__DIR__);                    // kořen aplikace
+    $outside = dirname($root) . '/crm-backups';  // vedle aplikace, mimo webroot
+    if (is_dir($outside) || @mkdir($outside, 0750, true)) {
+        if (is_writable($outside)) return $outside;
+    }
+    $inside = $root . '/backups';
+    if (!is_dir($inside)) { @mkdir($inside, 0750, true); }
+    $ht = $inside . '/.htaccess';
+    if (!file_exists($ht)) { @file_put_contents($ht, "Require all denied\n"); }
+    return $inside;
+}
+
+/** Dočasný my.cnf s přihlášením k DB — heslo nesmí do příkazové řádky (ps). */
+function crmBackupMysqlCnf(): string {
+    $f = crmBackupBaseDir() . '/.my.cnf';
+    @file_put_contents($f, "[client]\nhost=" . DB_HOST . "\nuser=" . DB_USER . "\npassword=\"" . str_replace('"', '\\"', DB_PASS) . "\"\n");
+    @chmod($f, 0600);
+    return $f;
+}
+
+/** Najde binárku (mysqldump/mariadb-dump apod.) — první existující vyhraje. */
+function crmBackupFindBin(array $candidates): ?string {
+    foreach ($candidates as $c) {
+        $p = trim((string)@shell_exec('command -v ' . escapeshellarg($c) . ' 2>/dev/null'));
+        if ($p !== '') return $p;
+    }
+    return null;
+}
+
+/**
+ * Provede kompletní zálohu HNED (blokující, řádově sekundy).
+ * @return array{0:bool,1:string} [ok, zpráva]
+ */
+function crmRunBackupNow(string $reason = 'auto'): array {
+    if (!function_exists('exec')) { return [false, 'exec() není na serveru povolen']; }
+    $base = crmBackupBaseDir();
+    $lock = @fopen($base . '/.lock', 'c');
+    if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { return [false, 'Záloha už právě běží']; }
+    try {
+        $root = dirname(__DIR__);
+        $stamp = date('Ymd_His');
+        $prefix = ($reason === 'prerestore') ? 'prerestore_' : 'backup_';
+        $dir = $base . '/' . $prefix . $stamp;
+        if (!@mkdir($dir, 0750, true)) { return [false, 'Nelze vytvořit adresář zálohy']; }
+
+        // ── 1) databáze (kompletní: zakázky, klienti, faktury, historie…) ──
+        $dump = crmBackupFindBin(['mysqldump', 'mariadb-dump']);
+        if ($dump === null) { return [false, 'mysqldump není k dispozici']; }
+        $cnf = crmBackupMysqlCnf();
+        $dbFile = $dir . '/db.sql.gz';
+        $cmd = escapeshellarg($dump) . ' --defaults-extra-file=' . escapeshellarg($cnf)
+             . ' --single-transaction --quick --routines --triggers ' . escapeshellarg(DB_NAME)
+             . ' 2>' . escapeshellarg($dir . '/db.err') . ' | gzip > ' . escapeshellarg($dbFile);
+        exec($cmd, $o1, $rc1);
+        if ($rc1 !== 0 || !is_file($dbFile) || filesize($dbFile) < 1024) {
+            $err = trim((string)@file_get_contents($dir . '/db.err'));
+            return [false, 'Dump databáze selhal' . ($err !== '' ? ': ' . mb_substr($err, 0, 200) : '')];
+        }
+        @unlink($dir . '/db.err');
+
+        // ── 2) nahrané soubory (fotky zakázek, podpisy, přílohy reklamací) ──
+        if (is_dir($root . '/uploads')) {
+            exec('tar -czf ' . escapeshellarg($dir . '/files.tar.gz') . ' -C ' . escapeshellarg($root) . ' uploads 2>/dev/null', $o2, $rc2);
+        }
+
+        // ── 3) kód CRM — jen když se změnila git verze od poslední zálohy ──
+        $gitHash = trim((string)@shell_exec('cd ' . escapeshellarg($root) . ' && git rev-parse HEAD 2>/dev/null'));
+        $lastHash = (string)@file_get_contents($base . '/.last_code_hash');
+        if ($gitHash === '' || $gitHash !== $lastHash) {
+            exec('tar -czf ' . escapeshellarg($dir . '/code.tar.gz')
+               . ' --exclude=./.git --exclude=./uploads --exclude=./backups --exclude=./print-bridge/.venv'
+               . ' -C ' . escapeshellarg($root) . ' . 2>/dev/null', $o3, $rc3);
+            if ($gitHash !== '') { @file_put_contents($base . '/.last_code_hash', $gitHash); }
+        }
+
+        // ── 4) metadata (pro přehled v UI) ──
+        global $pdo;
+        $counts = ['orders' => null, 'customers' => null];
+        try {
+            $counts['orders'] = (int)$pdo->query('SELECT COUNT(*) FROM orders')->fetchColumn();
+            $counts['customers'] = (int)$pdo->query('SELECT COUNT(*) FROM customers')->fetchColumn();
+        } catch (Throwable $e) {}
+        @file_put_contents($dir . '/meta.json', json_encode([
+            'time' => date('c'), 'reason' => $reason, 'git' => substr($gitHash, 0, 10),
+            'db_bytes' => @filesize($dbFile) ?: 0,
+            'files_bytes' => @filesize($dir . '/files.tar.gz') ?: 0,
+            'code_bytes' => @filesize($dir . '/code.tar.gz') ?: 0,
+            'orders' => $counts['orders'], 'customers' => $counts['customers'],
+        ], JSON_UNESCAPED_UNICODE));
+
+        // ── 5) retence: starší 48 h pryč (vždy ale ponechat 10 nejnovějších) ──
+        $all = array_merge(glob($base . '/backup_*', GLOB_ONLYDIR) ?: [], glob($base . '/prerestore_*', GLOB_ONLYDIR) ?: []);
+        rsort($all);
+        foreach (array_slice($all, 10) as $old) {
+            if (@filemtime($old) < time() - 48 * 3600) {
+                exec('rm -rf ' . escapeshellarg($old));
+            }
+        }
+
+        set_setting('backup_last_run', (string)time());
+        set_setting('backup_last_status', 'OK ' . date('d.m.Y H:i:s') . ' (' . basename($dir) . ')');
+        return [true, basename($dir)];
+    } finally {
+        flock($lock, LOCK_UN); fclose($lock);
+    }
+}
+
+/** Seznam záloh pro UI (nejnovější první). */
+function crmListBackups(): array {
+    $base = crmBackupBaseDir();
+    $out = [];
+    foreach (array_merge(glob($base . '/backup_*', GLOB_ONLYDIR) ?: [], glob($base . '/prerestore_*', GLOB_ONLYDIR) ?: []) as $d) {
+        $meta = json_decode((string)@file_get_contents($d . '/meta.json'), true) ?: [];
+        $out[] = [
+            'name' => basename($d),
+            'time' => @filemtime($d) ?: 0,
+            'db_bytes' => (int)($meta['db_bytes'] ?? (@filesize($d . '/db.sql.gz') ?: 0)),
+            'files_bytes' => (int)($meta['files_bytes'] ?? 0),
+            'code_bytes' => (int)($meta['code_bytes'] ?? 0),
+            'git' => (string)($meta['git'] ?? ''),
+            'orders' => $meta['orders'] ?? null,
+            'customers' => $meta['customers'] ?? null,
+            'prerestore' => str_starts_with(basename($d), 'prerestore_'),
+        ];
+    }
+    usort($out, fn($a, $b) => $b['time'] <=> $a['time']);
+    return $out;
+}
+
+/**
+ * Obnoví zálohu: nejdřív POJISTNÁ záloha aktuálního stavu, pak import DB
+ * a rozbalení uploads. Kód se automaticky NEobnovuje (řeší git) — jen upozorní.
+ * @return array{0:bool,1:string}
+ */
+function crmRestoreBackup(string $name): array {
+    if (!preg_match('/^(backup|prerestore)_\d{8}_\d{6}$/', $name)) { return [false, 'Neplatný název zálohy']; }
+    $base = crmBackupBaseDir();
+    $dir = $base . '/' . $name;
+    $dbFile = $dir . '/db.sql.gz';
+    if (!is_file($dbFile)) { return [false, 'Záloha neobsahuje databázi']; }
+
+    // pojistka: záloha AKTUÁLNÍHO stavu, kdyby obnova byla omyl
+    [$okPre, $msgPre] = crmRunBackupNow('prerestore');
+    if (!$okPre) { return [false, 'Pojistná záloha selhala (' . $msgPre . ') — obnova přerušena']; }
+
+    $mysql = crmBackupFindBin(['mysql', 'mariadb']);
+    if ($mysql === null) { return [false, 'mysql klient není k dispozici']; }
+    $cnf = crmBackupMysqlCnf();
+    $errF = $base . '/.restore.err';
+    exec('gunzip -c ' . escapeshellarg($dbFile) . ' | ' . escapeshellarg($mysql)
+       . ' --defaults-extra-file=' . escapeshellarg($cnf) . ' ' . escapeshellarg(DB_NAME)
+       . ' 2>' . escapeshellarg($errF), $o, $rc);
+    if ($rc !== 0) {
+        $err = trim((string)@file_get_contents($errF));
+        return [false, 'Import databáze selhal' . ($err !== '' ? ': ' . mb_substr($err, 0, 200) : '') . '. Aktuální stav je v pojistné záloze.'];
+    }
+    @unlink($errF);
+
+    $root = dirname(__DIR__);
+    if (is_file($dir . '/files.tar.gz')) {
+        exec('tar -xzf ' . escapeshellarg($dir . '/files.tar.gz') . ' -C ' . escapeshellarg($root) . ' 2>/dev/null');
+    }
+
+    // audit AŽ PO importu — záznam o obnově přežije vrácení databáze zpět
+    crmAuditLog('system.backup_restore', [
+        'entity_type' => 'system',
+        'summary' => 'Obnovena záloha ' . $name . ' (pojistná kopie stavu před obnovou: ano)',
+    ]);
+    set_setting('backup_last_status', 'OBNOVENO z ' . $name . ' — ' . date('d.m.Y H:i:s'));
+    return [true, 'Obnoveno ze zálohy ' . $name];
+}
+
+/** Poor-man's cron: zavolat z častých requestů (poll/webhook). Levný check —
+ *  když od poslední zálohy uplynulo 15+ minut, spustí zálohu na pozadí. */
+function crmBackupMaybeSchedule(): void {
+    try {
+        $last = (int)get_setting('backup_last_attempt', '0');
+        if (time() - $last < 900) return;                       // 15 minut
+        if (!function_exists('exec')) return;
+        set_setting('backup_last_attempt', (string)time());     // claim (proti souběhu)
+        $php = crmBackupFindBin(['php', 'php8.3', 'php8.2', 'php8.1']) ?: '/usr/bin/php';
+        $script = dirname(__DIR__) . '/scripts/backup_crm.php';
+        if (is_file($script)) {
+            exec('nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($script) . ' > /dev/null 2>&1 &');
+        }
+    } catch (Throwable $e) { /* záloha nesmí nikdy shodit request */ }
+}
+
 /* ─────────────────────────────  AUDITNÍ HISTORIE  ─────────────────────────────
  * Spolehlivý záznam „kdo — kdy — co udělal" napříč CRM. Jméno aktéra se ukládá
  * NATVRDO do řádku (ne jen ID), aby historie zůstala čitelná i po smazání účtu.

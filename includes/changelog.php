@@ -7,6 +7,17 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '01:10',
+        'title' => 'Automatické zálohy celého CRM každých 15 minut + obnova jedním kliknutím',
+        'items' => [
+            'CRM se nyní samo kompletně zálohuje každých 15 minut: celá databáze (zakázky, klienti, faktury, historie úprav…), nahrané soubory (fotky, podpisy, přílohy) i kód aplikace (ten jen při změně verze). Není potřeba nic nastavovat na serveru.',
+            'Nová záložka Nastavení → Zálohy (jen administrátor): seznam záloh s časem, velikostí a obsahem (počet zakázek/klientů v záloze), tlačítko „Zálohovat teď" a u každé zálohy „Obnovit".',
+            'Obnova vrátí databázi i soubory přesně do stavu zálohy — kdyby se cokoliv pokazilo, smazalo nebo přepsalo (jako včerejší záměna klientů), stačí se vrátit o pár minut zpět. Před každou obnovou se automaticky uloží pojistná kopie aktuálního stavu, takže ani obnovu nejde pokazit.',
+            'Zálohy starší 48 hodin se mažou samy (vždy ale zůstává minimálně 10 posledních). Ukládají se mimo veřejně přístupný prostor webu; obnova se zapisuje do Historie.',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '00:25',
         'title' => 'Historie úprav pokrývá i faktury, sklad, nákupy, reklamace a podpisy',
         'items' => [

@@ -30,3 +30,4 @@ vendor/
 Thumbs.db
 __pycache__/
 print-bridge/.venv/
+backups/

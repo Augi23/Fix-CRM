@@ -11,6 +11,10 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['ok' => false]); exit;
 }
 
+// Poor-man's cron: poller běží každých ~20 s od každého přihlášeného → ideální
+// místo pro odpálení automatické zálohy (každých 15 minut, na pozadí).
+crmBackupMaybeSchedule();
+
 try {
     $scope = orderBranchScopeSql('branch_id');   // '' nebo ' AND branch_id = N'
     $lastOrder = (int)($pdo->query("SELECT MAX(id) FROM orders" . ($scope !== '' ? ' WHERE ' . substr($scope, 5) : ''))->fetchColumn() ?: 0);

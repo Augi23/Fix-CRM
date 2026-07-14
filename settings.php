@@ -370,7 +370,7 @@ if (isset($_POST['delete_greeting']) && hasPermission('admin_access')) {
 
 // Security for technicians
 if (!$is_admin_user) {
-    if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'updates') {
+    if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'updates' || $active_tab == 'backups') {
         $active_tab = 'staff';
     }
 }
@@ -427,6 +427,9 @@ require_once 'includes/header.php';
         </li>
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'updates' ? 'active' : 'text-white-75'; ?>" href="?tab=updates" id="updatesNavLink"><i class="fas fa-cloud-download-alt me-2"></i><?php echo __('updates_tab'); ?> <span id="updateBadgeNav" class="badge bg-warning text-dark ms-1" style="display:none;">!</span></a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active_tab == 'backups' ? 'active' : 'text-white-75'; ?>" href="?tab=backups"><i class="fas fa-database me-2"></i>Zálohy</a>
         </li>
         <?php endif; ?>
     </ul>
@@ -1284,6 +1287,83 @@ require_once 'includes/header.php';
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- BACKUPS TAB -->
+        <div class="tab-pane fade <?php echo $active_tab == 'backups' ? 'show active' : ''; ?>">
+            <?php if ($active_tab == 'backups'):
+                $__backups = crmListBackups();
+                $__bkLastStatus = get_setting('backup_last_status', '');
+                $__bkLastRun = (int)get_setting('backup_last_run', '0');
+                $__fmtB = function ($b) { $b = (int)$b; if ($b >= 1048576) return number_format($b / 1048576, 1, ',', ' ') . ' MB'; if ($b >= 1024) return number_format($b / 1024, 0, ',', ' ') . ' kB'; return $b . ' B'; };
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                    <h5 class="mb-1 text-white"><i class="fas fa-database me-2 text-info"></i>Zálohy CRM</h5>
+                    <div class="small text-white-75">Automaticky každých 15 minut: celá databáze (zakázky, klienti, faktury, historie) + nahrané soubory + kód. Zálohy starší 48 hodin se mažou samy.</div>
+                </div>
+                <button type="button" class="btn btn-primary" id="btnBackupNow"><i class="fas fa-plus me-2"></i>Zálohovat teď</button>
+            </div>
+
+            <div class="glass-panel p-3 border-secondary mb-3 small">
+                <i class="fas fa-heartbeat me-2 <?php echo (time() - $__bkLastRun) < 1200 ? 'text-success' : 'text-warning'; ?>"></i>
+                Poslední záloha: <strong><?php echo $__bkLastRun > 0 ? date('d.m.Y H:i:s', $__bkLastRun) : 'zatím žádná'; ?></strong>
+                <?php if ($__bkLastStatus !== ''): ?> · stav: <?php echo e($__bkLastStatus); ?><?php endif; ?>
+                <?php if ($__bkLastRun > 0 && (time() - $__bkLastRun) > 3600): ?>
+                    <span class="text-warning ms-2"><i class="fas fa-exclamation-triangle me-1"></i>Poslední záloha je starší než hodinu — zálohy se spouštějí, jen když CRM někdo používá (nebo přijde webová objednávka).</span>
+                <?php endif; ?>
+            </div>
+
+            <div class="table-responsive glass-panel border-secondary">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead><tr><th>Čas zálohy</th><th>Databáze</th><th>Soubory</th><th>Kód</th><th>Obsah</th><th class="text-end">Akce</th></tr></thead>
+                    <tbody>
+                    <?php if (empty($__backups)): ?>
+                        <tr><td colspan="6" class="text-center text-white-50 py-4">Zatím žádné zálohy — první se vytvoří do 15 minut, nebo klikni na „Zálohovat teď".</td></tr>
+                    <?php else: foreach ($__backups as $bk): ?>
+                        <tr>
+                            <td style="white-space:nowrap;">
+                                <strong><?php echo date('d.m.Y H:i:s', $bk['time']); ?></strong>
+                                <?php if ($bk['prerestore']): ?><span class="badge bg-warning text-dark ms-2" title="Automatická pojistná kopie vytvořená před obnovou">pojistka před obnovou</span><?php endif; ?>
+                            </td>
+                            <td><?php echo $__fmtB($bk['db_bytes']); ?></td>
+                            <td><?php echo $bk['files_bytes'] > 0 ? $__fmtB($bk['files_bytes']) : '—'; ?></td>
+                            <td><?php echo $bk['code_bytes'] > 0 ? $__fmtB($bk['code_bytes']) : '<span class="text-white-50" title="Kód se od předchozí zálohy nezměnil — kryje ho starší záloha a git">beze změny</span>'; ?></td>
+                            <td class="small text-white-75"><?php echo $bk['orders'] !== null ? ((int)$bk['orders'] . ' zakázek, ' . (int)$bk['customers'] . ' klientů') : '—'; ?><?php echo $bk['git'] !== '' ? ' · ' . e($bk['git']) : ''; ?></td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-outline-warning" onclick="restoreBackup('<?php echo e($bk['name']); ?>', '<?php echo date('d.m.Y H:i:s', $bk['time']); ?>')"><i class="fas fa-history me-1"></i>Obnovit</button>
+                            </td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="small text-white-50 mt-2"><i class="fas fa-info-circle me-1"></i>Obnova vrátí databázi a nahrané soubory do stavu zálohy. Před každou obnovou se automaticky uloží pojistná kopie aktuálního stavu. Kód CRM se obnovou nemění (spravuje ho git v záložce Aktualizace).</div>
+
+            <script>
+            document.getElementById('btnBackupNow')?.addEventListener('click', function() {
+                const btn = this;
+                btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Zálohuji…';
+                $.post('api/backup_action.php', {op: 'run'}, function(res) {
+                    btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus me-2"></i>Zálohovat teď';
+                    if (res.success) { location.reload(); } else { showAlert(res.message || 'Záloha selhala'); }
+                }, 'json').fail(function() { btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus me-2"></i>Zálohovat teď'; showAlert('Chyba spojení'); });
+            });
+            function restoreBackup(name, timeLabel) {
+                showConfirm('Opravdu obnovit CRM do stavu ze ' + timeLabel + '?\n\nVšechny změny provedené PO tomto čase zmizí (databáze i soubory). Aktuální stav se před obnovou automaticky zazálohuje.', function() {
+                    showConfirm('POSLEDNÍ POTVRZENÍ: obnovit zálohu ' + timeLabel + '? Tato akce přepíše aktuální data.', function() {
+                        const html = '<div class="text-center py-3"><span class="spinner-border me-2"></span>Obnovuji zálohu, nezavírej stránku…</div>';
+                        document.body.insertAdjacentHTML('beforeend', '<div id="restoreOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:center;justify-content:center;color:#fff;">' + html + '</div>');
+                        $.post('api/backup_action.php', {op: 'restore', name: name}, function(res) {
+                            document.getElementById('restoreOverlay')?.remove();
+                            if (res.success) { showAlert(res.message); setTimeout(() => location.reload(), 1500); }
+                            else { showAlert(res.message || 'Obnova selhala'); }
+                        }, 'json').fail(function() { document.getElementById('restoreOverlay')?.remove(); showAlert('Chyba spojení při obnově'); });
+                    });
+                });
+            }
+            </script>
             <?php endif; ?>
         </div>
         <?php endif; ?>
