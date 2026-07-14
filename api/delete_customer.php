@@ -25,16 +25,24 @@ if (!$id) {
 }
 
 try {
+    // Jméno pro historii zjistíme JEŠTĚ před smazáním.
+    $__cn = '';
+    try { $ns = $pdo->prepare("SELECT TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) FROM customers WHERE id = ?"); $ns->execute([$id]); $__cn = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
+
     // Check if customer has orders
     $check = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE customer_id = ?");
     $check->execute([$id]);
     if ($check->fetchColumn() > 0) {
-        throw new Exception('Нельзя удалить клиента, у которого есть заказы. Сначала удалите заказы.');
+        throw new Exception('Nelze smazat klienta, který má zakázky. Nejdřív smažte zakázky.');
     }
 
     $stmt = $pdo->prepare("DELETE FROM customers WHERE id = ?");
     $stmt->execute([$id]);
-    
+
+    crmAuditLog('customer.delete', [
+        'entity_type' => 'customer', 'entity_id' => (int)$id, 'entity_label' => $__cn,
+        'summary' => 'Smazán klient ' . ($__cn !== '' ? $__cn : ('#' . $id)),
+    ]);
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

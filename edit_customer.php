@@ -44,6 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $update = $pdo->prepare("UPDATE customers SET customer_type = ?, first_name = ?, last_name = ?, phone = ?, email = ?, address = ?, ico = ?, dic = ?, company = ?, preferred_language = ? WHERE id = ?");
         $update->execute([$customer_type, $first_name, $last_name, $phone, $email, $address, $ico, $dic, $company, $preferred_language, $id]);
         $success = __('customer_updated_success');
+        crmAuditLog('customer.update', [
+            'entity_type' => 'customer', 'entity_id' => (int)$id,
+            'entity_label' => trim($first_name . ' ' . $last_name),
+            'summary' => 'Upraven klient ' . trim($first_name . ' ' . $last_name),
+            'details' => !empty($blockedFields) ? ['zablokovana_pole' => $blockedFields] : null,
+        ]);
         if (!empty($blockedFields)) {
             $notice = 'Jméno, příjmení, telefon nebo e-mail už byly vyplněné — změnit je může jen administrátor. Původní hodnoty byly zachovány, ostatní úpravy uloženy.';
         }

@@ -2496,6 +2496,134 @@ function crmCustomerDocLang($preferredLanguage): string {
     return $lang === 'uk' ? 'en' : $lang;
 }
 
+/** Sloupec orders.created_by_name — jméno zaměstnance, který zakázku vytvořil
+ *  (natvrdo, přežije smazání účtu). Starší zakázky ho nemají (NULL) — spolehlivá
+ *  zpětná rekonstrukce není možná, tak raději nic než špatné jméno. */
+function ensureOrderCreatedByColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM orders LIKE 'created_by_name'")->fetch();
+        if (!$col) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN created_by_name VARCHAR(190) NULL AFTER created_at");
+        }
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureOrderCreatedByColumn: ' . $e->getMessage()); }
+}
+
+/* ─────────────────────────────  AUDITNÍ HISTORIE  ─────────────────────────────
+ * Spolehlivý záznam „kdo — kdy — co udělal" napříč CRM. Jméno aktéra se ukládá
+ * NATVRDO do řádku (ne jen ID), aby historie zůstala čitelná i po smazání účtu.
+ * Zápis do historie NIKDY neshodí samotnou akci (vše v try/catch).
+ * ---------------------------------------------------------------------------- */
+
+/** Vytvoří tabulku audit_log (jednou za request). NIKDY nevolat uvnitř transakce
+ *  — DDL by transakci implicitně potvrdilo. crmAuditLog to hlídá sám. */
+function ensureAuditLogTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS audit_log (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            actor_type VARCHAR(20) NOT NULL DEFAULT 'system',
+            actor_id INT NULL,
+            actor_name VARCHAR(190) NOT NULL DEFAULT '',
+            actor_role VARCHAR(30) NULL,
+            action VARCHAR(60) NOT NULL,
+            entity_type VARCHAR(30) NULL,
+            entity_id INT NULL,
+            entity_label VARCHAR(190) NULL,
+            summary VARCHAR(255) NULL,
+            details MEDIUMTEXT NULL,
+            ip_address VARCHAR(45) NULL,
+            branch_id INT NULL,
+            PRIMARY KEY (id),
+            KEY idx_created (created_at),
+            KEY idx_actor (actor_type, actor_id),
+            KEY idx_entity (entity_type, entity_id),
+            KEY idx_action (action)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureAuditLogTable: ' . $e->getMessage()); }
+}
+
+/** Zjistí aktéra akce ze session (nebo z explicitního override v $opts). */
+function crmAuditResolveActor(array $opts): array {
+    if (isset($opts['actor_type'])) {
+        return [
+            (string)$opts['actor_type'],
+            isset($opts['actor_id']) ? (int)$opts['actor_id'] : null,
+            trim((string)($opts['actor_name'] ?? '')),
+            isset($opts['actor_role']) ? (string)$opts['actor_role'] : null,
+        ];
+    }
+    $name = trim((string)($_SESSION['full_name'] ?? ''));
+    if (!empty($_SESSION['tech_id'])) {                 // technik (i Boss/manažer)
+        $role = ($_SESSION['role'] ?? '') === 'admin' ? 'admin' : (string)($_SESSION['internal_role'] ?? $_SESSION['role'] ?? 'technician');
+        return ['technician', (int)$_SESSION['tech_id'], $name !== '' ? $name : ('Technik #' . (int)$_SESSION['tech_id']), $role];
+    }
+    if (!empty($_SESSION['user_id'])) {                 // admin účet (users)
+        return ['user', is_numeric($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null, $name !== '' ? $name : (string)($_SESSION['username'] ?? 'Administrátor'), 'admin'];
+    }
+    if (!empty($_SESSION['client_authenticated'])) {    // klientský portál
+        return ['client', (int)($_SESSION['client_customer_id'] ?? 0), trim((string)($_SESSION['client_full_name'] ?? 'Klient')), 'client'];
+    }
+    return ['system', null, 'Systém', null];            // webhook / automatika
+}
+
+/**
+ * Zapíše jednu položku do auditní historie. Best-effort: chyba zápisu nikdy
+ * neshodí volající akci. $opts: entity_type, entity_id, entity_label, summary,
+ * details (pole → JSON | řetězec), branch_id, a případný override aktéra
+ * actor_type/actor_id/actor_name/actor_role (např. u přihlášení).
+ */
+function crmAuditLog(string $action, array $opts = []): void {
+    global $pdo;
+    if ($action === '' || !isset($pdo)) return;
+    try {
+        // DDL (vytvoření tabulky) jen mimo transakci — jinak by ji implicitně potvrdilo.
+        if (!$pdo->inTransaction()) { ensureAuditLogTable(); }
+        [$aType, $aId, $aName, $aRole] = crmAuditResolveActor($opts);
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? ($_SERVER['REMOTE_ADDR'] ?? '');
+        if ($ip !== '') { $ip = substr(trim(explode(',', (string)$ip)[0]), 0, 45); }
+        $details = $opts['details'] ?? null;
+        if (is_array($details)) { $details = json_encode($details, JSON_UNESCAPED_UNICODE); }
+        $stmt = $pdo->prepare("INSERT INTO audit_log
+            (actor_type, actor_id, actor_name, actor_role, action, entity_type, entity_id, entity_label, summary, details, ip_address, branch_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+        $stmt->execute([
+            $aType, $aId, ($aName !== '' ? $aName : 'Neznámý'), $aRole, $action,
+            $opts['entity_type'] ?? null,
+            isset($opts['entity_id']) ? (int)$opts['entity_id'] : null,
+            $opts['entity_label'] ?? null,
+            $opts['summary'] ?? null,
+            ($details !== null && $details !== '') ? $details : null,
+            ($ip !== '' ? $ip : null),
+            isset($opts['branch_id']) ? (int)$opts['branch_id'] : null,
+        ]);
+    } catch (Throwable $e) {
+        error_log('crmAuditLog selhal (' . $action . '): ' . $e->getMessage());
+    }
+}
+
+/** Lidský český název úkonu pro zobrazení v historii. */
+function crmAuditActionLabel(string $action): string {
+    static $map = [
+        'auth.login' => 'Přihlášení', 'auth.logout' => 'Odhlášení',
+        'order.create' => 'Vytvoření zakázky', 'order.update' => 'Úprava zakázky',
+        'order.status_change' => 'Změna stavu zakázky', 'order.delete' => 'Smazání zakázky',
+        'customer.create' => 'Vytvoření klienta', 'customer.update' => 'Úprava klienta',
+        'customer.delete' => 'Smazání klienta',
+        'staff.create' => 'Vytvoření zaměstnance', 'staff.update' => 'Úprava zaměstnance',
+        'staff.delete' => 'Smazání zaměstnance', 'staff.permissions' => 'Změna oprávnění',
+        'admin.create' => 'Povýšení na administrátora', 'admin.password' => 'Změna hesla administrátora',
+    ];
+    return $map[$action] ?? $action;
+}
+
 /**
  * Ochrana identity klienta: jednou vyplněné jméno, příjmení, telefon a e-mail
  * smí PŘEPSAT jen administrátor (hasPermission('admin_access')). Prázdný údaj
@@ -3827,10 +3955,11 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
         $orderCode = function_exists('generateNextOrderCode') ? generateNextOrderCode($pdo) : null;
         $deviceType = crmGuessDeviceType($device);
 
+        ensureOrderCreatedByColumn();
         $pdo->prepare("INSERT INTO orders
             (customer_id, technician_id, branch_id, device_type, order_type, device_brand, device_model,
-             problem_description, technician_notes, serial_number, pin_code, priority, estimated_cost, status, order_code)
-            VALUES (?, NULL, ?, ?, 'Non-Warranty', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+             problem_description, technician_notes, serial_number, pin_code, priority, estimated_cost, status, order_code, created_by_name)
+            VALUES (?, NULL, ?, ?, 'Non-Warranty', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Web (applefix.cz)')")
             ->execute([
                 $customerId, $branchId, $deviceType,
                 mb_substr($brand !== '' ? $brand : '', 0, 100), $deviceModel,
@@ -3843,6 +3972,14 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
 
         if (function_exists('assignmentSegmentSync')) { try { assignmentSegmentSync($orderId, null, (string)$status); } catch (Throwable $e) {} }
         if (function_exists('logOrderStatusChange')) { try { logOrderStatusChange($orderId, '', $status); } catch (Throwable $e) {} }
+
+        crmAuditLog('order.create', [
+            'actor_type' => 'system', 'actor_name' => 'Web (RepairPlugin)',
+            'entity_type' => 'order', 'entity_id' => $orderId,
+            'entity_label' => ($orderCode ?: ('#' . $orderId)),
+            'summary' => 'Zakázka ' . ($orderCode ?: ('#' . $orderId)) . ' založena z webu' . ($name !== '' ? ' — ' . $name : ''),
+            'branch_id' => $branchId,
+        ]);
 
         // Rozpis ceny z webu (opravy, expresní příplatek, slevy) → zakázkový list
         try {

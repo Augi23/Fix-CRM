@@ -3,6 +3,12 @@
 // sessions (viz prodloužení přihlášení). Holé session_start() tady dřív otevřelo
 // session v jiném adresáři a odhlášení se nikdy nedotklo té skutečné.
 require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/includes/functions.php';
+
+// Zaznamenat odhlášení, dokud je session ještě platná (aktéra bereme z ní).
+if (function_exists('crmAuditLog')) {
+    crmAuditLog('auth.logout', ['entity_type' => 'auth', 'summary' => 'Odhlášení ze systému']);
+}
 
 $_SESSION = [];
 if (ini_get('session.use_cookies')) {

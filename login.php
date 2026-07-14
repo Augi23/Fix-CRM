@@ -116,6 +116,7 @@ if (isset($_POST['login'])) {
                 $_SESSION['branch_id'] = null;
                 invalidatePermissionsCache();
                 recordLoginAttempt($pdo, true);
+                crmAuditLog('auth.login', ['entity_type' => 'auth', 'summary' => 'Přihlášení do systému (administrátor)']);
                 if (!empty($_POST['ajax'])) {
                     header('Content-Type: application/json; charset=utf-8');
                     echo json_encode(['ok' => true, 'redirect' => 'index.php',
@@ -145,6 +146,7 @@ if (isset($_POST['login'])) {
                 }
                 invalidatePermissionsCache();
                 recordLoginAttempt($pdo, true);
+                crmAuditLog('auth.login', ['entity_type' => 'auth', 'summary' => 'Přihlášení do systému']);
                 if (!empty($_POST['ajax'])) {
                     header('Content-Type: application/json; charset=utf-8');
                     echo json_encode(['ok' => true, 'redirect' => 'index.php',

@@ -7,6 +7,26 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '23:55',
+        'title' => 'Seznam zakázek: přesný čas vytvoření a kdo zakázku založil',
+        'items' => [
+            'V levém sloupci seznamu zakázek je pod datem nově i přesný čas vytvoření a pod ním malým písmem jméno zaměstnance, který zakázku založil (u webových objednávek „Web (applefix.cz)").',
+            'Jméno tvůrce se ukládá od teď — starší zakázky ho nemají (zpětně ho nelze spolehlivě dohledat, tak raději nic než špatné jméno).',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
+        'time' => '23:40',
+        'title' => 'Nová sekce Historie úprav (jen pro administrátora)',
+        'items' => [
+            'V horním menu přibyla položka „Historie" (vidí ji jen administrátor). Spolehlivě zaznamenává, kdo a kdy co v systému provedl — ve formátu čas — úkon — kdo — čeho se týká — detail.',
+            'Zaznamenává se: přihlášení a odhlášení, vytvoření/úprava/změna stavu/smazání zakázky (i zakázky z webu), vytvoření/úprava/smazání klienta, vytvoření/úprava/smazání zaměstnance, změna oprávnění, povýšení na administrátora a změna hesla administrátora. Akce administrátorů se logují úplně stejně.',
+            'Jméno toho, kdo akci provedl, se ukládá natvrdo — historie zůstane čitelná i kdyby se účet později smazal. Zápis do historie nikdy neshodí samotnou akci.',
+            'Stránka umí filtrovat podle úkonu, jména, textu a data, se stránkováním. Slouží k dohledání, kde kdo co pokazil nebo zbytečně zasáhl.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '22:55',
         'title' => 'Výpis zaměstnanců ukazuje i administrátory (sjednotně se sekcí zvuků)',
         'items' => [

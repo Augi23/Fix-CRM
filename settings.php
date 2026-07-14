@@ -127,6 +127,10 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     $hashed_password = !empty($password) ? password_hash($password, PASSWORD_DEFAULT) : '';
     $stmt = $pdo->prepare("INSERT INTO technicians (name, email, phone, specialization, role, branch_id, telegram_id, telegram_username, username, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $username_val, $hashed_password]);
+    crmAuditLog('staff.create', [
+        'entity_type' => 'technician', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => $name,
+        'summary' => 'Vytvořen zaměstnanec ' . $name . ' (' . $role . ')' . ($username_val ? ', login @' . $username_val : ''),
+    ]);
     header("Location: settings.php?tab=staff&tech_added=1");
     exit;
 }
@@ -205,6 +209,10 @@ if (isset($_POST['edit_tech'])) {
     if ($is_admin_check) {
         $pdo->prepare('UPDATE orders SET branch_id = ? WHERE technician_id = ?')->execute([$branch_id, $id]);
     }
+    crmAuditLog('staff.update', [
+        'entity_type' => 'technician', 'entity_id' => (int)$id, 'entity_label' => $name,
+        'summary' => 'Upraven zaměstnanec ' . $name . ' (role: ' . $role . ', ' . ($active ? 'aktivní' : 'neaktivní') . ')',
+    ]);
     settingsDebugLog([
         'event' => 'edit_tech_saved',
         'tech_id' => $id,
@@ -226,8 +234,14 @@ if (isset($_POST['delete_tech']) && $is_admin_check) {
         header("Location: settings.php?tab=staff&error=csrf");
         exit;
     }
+    $__tn = '';
+    try { $ns = $pdo->prepare("SELECT name FROM technicians WHERE id = ?"); $ns->execute([$_POST['delete_tech']]); $__tn = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
     $stmt = $pdo->prepare("DELETE FROM technicians WHERE id = ?");
     $stmt->execute([$_POST['delete_tech']]);
+    crmAuditLog('staff.delete', [
+        'entity_type' => 'technician', 'entity_id' => (int)$_POST['delete_tech'], 'entity_label' => $__tn,
+        'summary' => 'Smazán zaměstnanec ' . ($__tn !== '' ? $__tn : ('#' . (int)$_POST['delete_tech'])),
+    ]);
     header("Location: settings.php?tab=staff");
     exit;
 }
@@ -235,6 +249,12 @@ if (isset($_POST['delete_tech']) && $is_admin_check) {
 if (isset($_POST['save_permissions']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     setTechPermissions($_POST['tech_id'], $_POST['permissions'] ?? []);
+    $__pn = ''; try { $ns = $pdo->prepare("SELECT name FROM technicians WHERE id = ?"); $ns->execute([(int)$_POST['tech_id']]); $__pn = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
+    crmAuditLog('staff.permissions', [
+        'entity_type' => 'technician', 'entity_id' => (int)$_POST['tech_id'], 'entity_label' => $__pn,
+        'summary' => 'Změna oprávnění: ' . ($__pn !== '' ? $__pn : ('#' . (int)$_POST['tech_id'])),
+        'details' => ['opravneni' => array_values((array)($_POST['permissions'] ?? []))],
+    ]);
     header("Location: settings.php?tab=staff&perms_updated=1");
     exit;
 }
@@ -245,7 +265,11 @@ if (isset($_POST['change_admin_password']) && hasPermission('manage_passwords'))
         $hashed = password_hash($_POST['new_password'], PASSWORD_DEFAULT);
         $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
         $stmt->execute([$hashed, $_POST['admin_id']]);
-        
+        crmAuditLog('admin.password', [
+            'entity_type' => 'user', 'entity_id' => (int)$_POST['admin_id'],
+            'summary' => 'Změna hesla administrátora (účet #' . (int)$_POST['admin_id'] . ')',
+        ]);
+
         if ($_POST['admin_id'] == $_SESSION['user_id'] && $_SESSION['role'] === 'admin') {
             session_destroy();
             header("Location: login.php");
@@ -282,6 +306,10 @@ if (isset($_POST['promote_staff_admin']) && $is_admin_check) {
 
     $pdo->prepare("INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, 'admin')")
         ->execute([$login, password_hash($pwd, PASSWORD_DEFAULT), (string)$staffRow['name']]);
+    crmAuditLog('admin.create', [
+        'entity_type' => 'user', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => (string)$staffRow['name'],
+        'summary' => 'Zaměstnanec ' . (string)$staffRow['name'] . ' povýšen na administrátora (login @' . $login . ')',
+    ]);
     header("Location: settings.php?tab=admins&admin_added=1");
     exit;
 }

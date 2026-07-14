@@ -30,9 +30,10 @@ if (!$id) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id FROM orders WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id, order_code FROM orders WHERE id = ?");
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) {
+    $__ord = $stmt->fetch();
+    if (!$__ord) {
         echo json_encode(['success' => false, 'message' => __('order_not_found')]);
         exit;
     }
@@ -86,6 +87,11 @@ try {
     $pdo->prepare("DELETE FROM orders WHERE id = ?")->execute([$id]);
 
     $pdo->commit();
+    $__oc = trim((string)($__ord['order_code'] ?? '')) !== '' ? (string)$__ord['order_code'] : ('#' . (int)$id);
+    crmAuditLog('order.delete', [
+        'entity_type' => 'order', 'entity_id' => (int)$id, 'entity_label' => $__oc,
+        'summary' => 'Trvale smazána zakázka ' . $__oc,
+    ]);
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {

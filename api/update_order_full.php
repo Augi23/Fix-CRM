@@ -333,6 +333,28 @@ try {
 
     $pdo->commit();
 
+    // Auditní historie: seznam změněných polí (kdo/kdy řeší crmAuditLog sám).
+    $__chg = [];
+    $__cmp = static function ($label, $old, $new) use (&$__chg) { if ((string)$old !== (string)$new) { $__chg[] = $label; } };
+    $__newFinal = isset($_POST['final_cost']) ? crmNumOrNull($_POST['final_cost']) : $current['final_cost'];
+    $__newEst   = isset($_POST['estimated_cost']) ? crmNumOrNull($_POST['estimated_cost']) : $current['estimated_cost'];
+    $__cmp('stav', $current['status'], $new_status);
+    $__cmp('klient', (int)$current['customer_id'], (int)$customerIdToSave);
+    $__cmp('technik', (int)($current['technician_id'] ?? 0), (int)$technician_id);
+    $__cmp('finální cena', $current['final_cost'], $__newFinal);
+    $__cmp('předběžná cena', $current['estimated_cost'], $__newEst);
+    $__cmp('priorita', $current['priority'], isset($_POST['priority']) ? normalizeOrderPriority($_POST['priority']) : $current['priority']);
+    $__cmp('popis závady', $current['problem_description'], isset($_POST['problem_description']) ? $_POST['problem_description'] : $current['problem_description']);
+    $__cmp('poznámka', $current['technician_notes'], isset($_POST['technician_notes']) ? $_POST['technician_notes'] : $current['technician_notes']);
+    $__cmp('zařízení', trim(($current['device_brand'] ?? '') . ' ' . ($current['device_model'] ?? '')), trim((isset($_POST['device_brand']) ? $_POST['device_brand'] : $current['device_brand']) . ' ' . (isset($_POST['device_model']) ? $_POST['device_model'] : $current['device_model'])));
+    $__oc = trim((string)($current['order_code'] ?? '')) !== '' ? (string)$current['order_code'] : ('#' . (int)$order_id);
+    crmAuditLog('order.update', [
+        'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
+        'summary' => 'Upravena zakázka ' . $__oc . (count($__chg) ? ' — změněno: ' . implode(', ', $__chg) : ' (beze změn)'),
+        'details' => ['zmeneno' => $__chg, 'stav' => [$current['status'], $new_status], 'customer_id' => [(int)$current['customer_id'], (int)$customerIdToSave]],
+        'branch_id' => $current['branch_id'] ?? null,
+    ]);
+
     if ($status_changed || $technician_changed) {
         crmNotifyOrderLifecycleEvent([
             'type' => 'order_status_changed',

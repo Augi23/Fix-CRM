@@ -61,18 +61,21 @@ if ($technician_id) {
 
 try {
     ensureOrderPriorityLowValue();
+    ensureOrderCreatedByColumn();   // DDL — před transakcí
     $pdo->beginTransaction();
 
+    $created_by_name = trim((string)($_SESSION['full_name'] ?? '')) ?: trim((string)($_SESSION['username'] ?? ''));
     $stmt = $pdo->prepare(
         "INSERT INTO orders (customer_id, technician_id, branch_id, device_type, order_type, device_brand, device_model,
-         problem_description, technician_notes, serial_number, serial_number_2, pin_code, appearance, priority, estimated_cost, shipping_method, status, order_code)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+         problem_description, technician_notes, serial_number, serial_number_2, pin_code, appearance, priority, estimated_cost, shipping_method, status, order_code, created_by_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $new_order_code = function_exists('generateNextOrderCode') ? generateNextOrderCode($pdo) : null;
     $stmt->execute([
         $customer_id, $technician_id, $branch_id, $device_type, $order_type, $device_brand, $device_model,
         $problem_description, $technician_notes, $serial_number, $serial_number_2,
-        $pin_code, $appearance, $priority, $estimated_cost, $shipping_method, $status, $new_order_code
+        $pin_code, $appearance, $priority, $estimated_cost, $shipping_method, $status, $new_order_code,
+        $created_by_name !== '' ? $created_by_name : null
     ]);
     $order_id = (int)$pdo->lastInsertId();
 
@@ -105,6 +108,14 @@ try {
     assignmentSegmentSync($order_id, $technician_id ? (int)$technician_id : null, (string)$status);
 
     logOrderStatusChange($order_id, '', $status);
+
+    $__dev = trim(($device_brand ?? '') . ' ' . ($device_model ?? ''));
+    crmAuditLog('order.create', [
+        'entity_type' => 'order', 'entity_id' => $order_id,
+        'entity_label' => ($new_order_code ?: ('#' . $order_id)),
+        'summary' => 'Vytvořena zakázka ' . ($new_order_code ?: ('#' . $order_id)) . ($__dev !== '' ? ' — ' . $__dev : ''),
+        'branch_id' => $branch_id ?? null,
+    ]);
 
     // Zakázka vznikla z webové rezervace → označit rezervaci jako převzatou
     $webBookingId = (int)($_POST['web_booking_id'] ?? 0);

@@ -41,7 +41,7 @@ if (!$order_id || !$new_status) {
 try {
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('SELECT status, technician_id, branch_id, estimated_cost, final_cost, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $order_data = $stmt->fetch();
 
@@ -175,6 +175,14 @@ try {
     $technician_changed = ((int)$current_tech_id !== (int)$updated_tech_id);
 
     $pdo->commit();
+
+    if ($status_changed) {
+        $__oc = trim((string)($order_data['order_code'] ?? '')) !== '' ? (string)$order_data['order_code'] : ('#' . (int)$order_id);
+        crmAuditLog('order.status_change', [
+            'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
+            'summary' => 'Zakázka ' . $__oc . ' — stav: ' . $current_status . ' → ' . $new_status,
+        ]);
+    }
 
     if ($status_changed || $technician_changed) {
         crmNotifyOrderLifecycleEvent([
