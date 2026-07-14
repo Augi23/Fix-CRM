@@ -4,6 +4,8 @@ require_once 'includes/functions.php';
 
 require_once 'includes/scan_resolver.php';
 
+ensureOrderCreatedByColumn();   // sloupec „kdo zakázku vytvořil" (levý sloupec seznamu)
+
 require_once 'includes/header.php';
 
 // ── Pagination ────────────────────────────────────────────────────────────────
@@ -308,6 +310,10 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                     <i class="fas fa-camera text-info ms-1" title="<?php echo __('media_files'); ?>"></i>
                                 <?php endif; ?>
                                 <div class="small text-white-75"><?php echo date('d.m.Y', strtotime($order['created_at'])); ?></div>
+                                <div class="small text-white-75"><i class="far fa-clock me-1" style="font-size:.7rem;"></i><?php echo date('H:i:s', strtotime($order['created_at'])); ?></div>
+                                <?php if (trim((string)($order['created_by_name'] ?? '')) !== ''): ?>
+                                    <div class="text-white-50" style="font-size:.72rem;" title="Zakázku vytvořil(a)"><i class="fas fa-user-pen me-1" style="font-size:.65rem;"></i><?php echo e($order['created_by_name']); ?></div>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <div><?php echo e($order['first_name'] . ' ' . $order['last_name']); ?></div>
