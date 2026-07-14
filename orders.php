@@ -931,7 +931,9 @@ $(document).ready(function() {
     });
 
     // Inline New Customer: AJAX submit and bind to New Order select
-    $('#saveNewCustomerBtn').on('click', function() {
+    // (namespace .saveCust NAHRADÍ globální handler z main.js — bez toho se
+    // klient odesílal dvakrát a vznikali duplicitní klienti)
+    $('#saveNewCustomerBtn').off('click.saveCust').on('click.saveCust', function() {
         const $panel = $('#newCustomerInlineForm');
         const firstName = $('#inline_first_name').val().trim();
         const lastName = $('#inline_last_name').val().trim();

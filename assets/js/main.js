@@ -834,8 +834,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        // Inline New Customer: AJAX submit
-        $('#saveNewCustomerBtn').on('click', function() {
+        // Inline New Customer: AJAX submit — namespace .saveCust: na stránkách
+        // s vlastním handlerem (orders.php) se tenhle odregistruje, jinak by
+        // JEDNO kliknutí odeslalo klienta DVAKRÁT (duplicitní klienti!)
+        $('#saveNewCustomerBtn').off('click.saveCust').on('click.saveCust', function() {
             const $panel = $('#newCustomerInlineForm');
             const firstName = $('#inline_first_name').val().trim();
             const lastName = $('#inline_last_name').val().trim();

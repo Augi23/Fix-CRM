@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '19:35',
+        'title' => 'OPRAVA: nový klient v zakázce — technici + konec duplicit',
+        'items' => [
+            'Řadoví technici nemohli ve wizardu nové zakázky založit nového klienta (skryté právo „úprava klientů" jim to tiše blokovalo) — založení klienta je nově povoleno každému přihlášenému zaměstnanci. Ochrana zůstává: přepis vyplněných údajů smí jen administrátor, mazání jen s právem.',
+            'Na stránce Zakázky se každé uložení nového klienta odesílalo DVAKRÁT (dva skryté obslužné skripty na jednom tlačítku) → vznikali duplicitní klienti. Opraveno — odesílá se jednou. Tohle je pravděpodobný původ dosavadních dubletů klientů.',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '19:05',
         'title' => 'Nová zakázka: technik se už nepředvybírá automaticky',
         'items' => [

@@ -6,7 +6,11 @@ require_once '../includes/functions.php';
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
     && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
-if (!isset($_SESSION['user_id']) || !hasPermission('edit_customers')) {
+// Založení NOVÉHO klienta = běžná práce u kasy → smí každý přihlášený
+// zaměstnanec (dřív vyžadováno právo edit_customers, které řadoví technici
+// nemají → nešlo dokončit novou zakázku s novým klientem). Citlivé akce
+// zůstávají chráněné: přepis údajů jen admin, mazání jen s edit_customers.
+if (!isset($_SESSION['user_id'])) {
     if ($isAjax) {
         ob_clean();
         header('Content-Type: application/json');
