@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '21:25',
+        'title' => 'Správa administrátorů: možnost odstranit administrátora',
+        'items' => [
+            'Ve Správě administrátorů lze nově odstranit administrátorský přístup (ikona koše). Výchozí administrátor „admin" je chráněný — u něj možnost odstranění není (záchranný účet). Vlastní účet si odstranit nejde (požádej druhého admina).',
+            'Odstranění maže jen adminský přístup — účet zaměstnance (pokud existuje) zůstává. Akce se zapisuje do Historie.',
+            'Oprava k tomu: potvrzovací dotazy u mazání (zaměstnanec, administrátor) se dosud vůbec nezobrazovaly — mazalo se na jeden klik. Nově se CRM vždy nejdřív zeptá.',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '21:05',
         'title' => 'Zaměstnanec musí mít vybranou pobočku (povinné)',
         'items' => [

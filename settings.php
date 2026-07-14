@@ -335,6 +335,31 @@ if (isset($_POST['promote_staff_admin']) && $is_admin_check) {
     exit;
 }
 
+// Odstranění administrátorského účtu (jen admin). Pojistky: výchozího
+// administrátora 'admin' smazat NELZE (záchranný účet) a nikdo nesmí
+// smazat sám sebe (aby se nezamkl uprostřed práce).
+if (isset($_POST['delete_admin']) && $is_admin_check) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    $delId = (int)($_POST['delete_admin'] ?? 0);
+    $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ?");
+    $stmt->execute([$delId]);
+    $delAdmin = $stmt->fetch();
+    if (!$delAdmin) { header("Location: settings.php?tab=admins"); exit; }
+    if (strtolower((string)$delAdmin['username']) === 'admin') {
+        header("Location: settings.php?tab=admins&error=admin_protected"); exit;
+    }
+    if (is_numeric($_SESSION['user_id'] ?? null) && (int)$_SESSION['user_id'] === $delId) {
+        header("Location: settings.php?tab=admins&error=admin_self_delete"); exit;
+    }
+    $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$delId]);
+    crmAuditLog('admin.delete', [
+        'entity_type' => 'user', 'entity_id' => $delId, 'entity_label' => (string)($delAdmin['full_name'] ?: $delAdmin['username']),
+        'summary' => 'Odstraněn administrátorský účet @' . $delAdmin['username'] . ' (' . ($delAdmin['full_name'] ?: '—') . ')',
+    ]);
+    header("Location: settings.php?tab=admins&admin_deleted=1");
+    exit;
+}
+
 if (isset($_POST['clear_logs']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     try { $pdo->query("DELETE FROM system_errors"); } catch (Exception $e) {}
@@ -961,6 +986,12 @@ require_once 'includes/header.php';
                 <div class="alert alert-danger py-2"><i class="fas fa-triangle-exclamation me-2"></i>Vyber zaměstnance a vyplň přihlašovací jméno.</div>
             <?php elseif (($_GET['error'] ?? '') === 'short_password'): ?>
                 <div class="alert alert-danger py-2"><i class="fas fa-triangle-exclamation me-2"></i>Heslo musí mít alespoň 8 znaků.</div>
+            <?php elseif (($_GET['error'] ?? '') === 'admin_protected'): ?>
+                <div class="alert alert-danger py-2"><i class="fas fa-triangle-exclamation me-2"></i>Výchozího administrátora „admin" nelze odstranit — je to záchranný účet.</div>
+            <?php elseif (($_GET['error'] ?? '') === 'admin_self_delete'): ?>
+                <div class="alert alert-danger py-2"><i class="fas fa-triangle-exclamation me-2"></i>Vlastní administrátorský účet si odstranit nemůžeš — požádej jiného administrátora.</div>
+            <?php elseif (!empty($_GET['admin_deleted'])): ?>
+                <div class="alert alert-success py-2"><i class="fas fa-check me-2"></i>Administrátorský přístup byl odstraněn.</div>
             <?php endif; ?>
 
             <!-- Přidat administrátora z aktuálních zaměstnanců -->
@@ -1028,7 +1059,20 @@ require_once 'includes/header.php';
                             <td><strong><?php echo htmlspecialchars($admin['username']); ?></strong></td>
                             <td><?php echo htmlspecialchars($admin['full_name']); ?></td>
                             <td><span class="badge bg-danger">Admin</span></td>
-                            <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#adminPwdModal<?php echo $admin['id']; ?>"><i class="fas fa-key me-1"></i> <?php echo __('password_btn'); ?></button></td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#adminPwdModal<?php echo $admin['id']; ?>"><i class="fas fa-key me-1"></i> <?php echo __('password_btn'); ?></button>
+                                    <?php $__isDefaultAdmin = strtolower((string)$admin['username']) === 'admin';
+                                          $__isSelf = is_numeric($_SESSION['user_id'] ?? null) && (int)$_SESSION['user_id'] === (int)$admin['id'];
+                                          if (!$__isDefaultAdmin && !$__isSelf): ?>
+                                    <form method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                        <input type="hidden" name="delete_admin" value="<?php echo (int)$admin['id']; ?>">
+                                        <button type="submit" class="btn btn-outline-danger" data-confirm="Opravdu odstranit administrátorský přístup @<?php echo e($admin['username']); ?>? Účet zaměstnance (pokud existuje) zůstává."><i class="fas fa-trash"></i></button>
+                                    </form>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>

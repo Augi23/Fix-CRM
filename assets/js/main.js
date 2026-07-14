@@ -646,7 +646,16 @@ function openPreviewInNewTab() {
         render();
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    // Globální potvrzení destruktivních formulářů: tlačítko/form s data-confirm
+// zobrazí potvrzovací dotaz PŘED odesláním (mazání zaměstnance, admina…).
+// Dřív atribut data-confirm nikdo neobsluhoval a mazalo se na jeden klik.
+document.addEventListener('submit', function (e) {
+    var btn = e.submitter;
+    var msg = (btn && btn.dataset && btn.dataset.confirm) || (e.target && e.target.dataset && e.target.dataset.confirm) || '';
+    if (msg && !window.confirm(msg)) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+
+document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.crm-wizard-modal').forEach(initWizard);
     });
 })();
