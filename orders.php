@@ -938,8 +938,9 @@ $(document).ready(function() {
         const firstName = $('#inline_first_name').val().trim();
         const lastName = $('#inline_last_name').val().trim();
         const phone = $('#inline_phone').val().trim();
-        
-        if (!firstName || !lastName || !phone) {
+        const email = ($('#inline_email').val() || '').trim();
+
+        if (!firstName || !lastName || !phone || !email || email.indexOf('@') < 1) {
             showAlert('<?php echo __('fill_required_fields'); ?>');
             return;
         }

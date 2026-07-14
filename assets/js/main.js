@@ -625,7 +625,7 @@ function openPreviewInNewTab() {
             if (cur === 2) {
                 var form = modal.querySelector('form');
                 var fd = form ? new FormData(form) : null;
-                var requiredKeys = ['device_type', 'order_type', 'device_brand', 'device_model', 'problem_description'];
+                var requiredKeys = ['device_type', 'order_type', 'device_brand', 'device_model', 'pin_code', 'problem_description'];
                 for (var k = 0; k < requiredKeys.length; k++) {
                     var key = requiredKeys[k];
                     var val = fd ? (fd.get(key) || '').toString().trim() : '';
@@ -842,8 +842,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const firstName = $('#inline_first_name').val().trim();
             const lastName = $('#inline_last_name').val().trim();
             const phone = $('#inline_phone').val().trim();
-            
-            if (!firstName || !lastName || !phone) return;
+            const email = ($('#inline_email').val() || '').trim();
+
+            if (!firstName || !lastName || !phone || !email || email.indexOf('@') < 1) {
+                const missing = !firstName ? '#inline_first_name' : !lastName ? '#inline_last_name' : !phone ? '#inline_phone' : '#inline_email';
+                const el = document.querySelector(missing);
+                if (el && el.reportValidity) { el.setCustomValidity(''); el.reportValidity(); el.focus(); }
+                return;
+            }
             
             const btn = $(this);
             btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');

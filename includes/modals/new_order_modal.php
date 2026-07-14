@@ -107,8 +107,8 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                                             </select>
                                                         </div>
                                                         <div class="col-12">
-                                                            <label class="form-label"><?php echo __('email'); ?></label>
-                                                            <input type="email" name="inline_email" class="form-control">
+                                                            <label class="form-label"><?php echo __('email'); ?> <span class="text-danger">*</span></label>
+                                                            <input type="email" name="inline_email" id="inline_email" class="form-control" required>
                                                         </div>
                                                         <div class="col-12">
                                                             <label class="form-label"><?php echo __('address'); ?></label>
@@ -179,8 +179,8 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                     <input type="text" name="serial_number_2" class="form-control">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label"><?php echo __('pin'); ?></label>
-                                    <input type="text" name="pin_code" class="form-control">
+                                    <label class="form-label"><?php echo __('pin'); ?> <span class="text-danger">*</span></label>
+                                    <input type="text" name="pin_code" class="form-control" required>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label"><?php echo __('appearance'); ?></label>

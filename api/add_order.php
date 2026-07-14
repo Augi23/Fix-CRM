@@ -42,7 +42,7 @@ if ($priority_adjust != 0.0) {
 $shipping_method  = trim($_POST['shipping_method'] ?? '') ?: null;
 $status           = getDefaultOrderStatus();
 
-if (!$customer_id || !$device_model) {
+if (!$customer_id || !$device_model || $pin_code === '') {
     die(__('missing_fields'));
 }
 
