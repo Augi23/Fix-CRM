@@ -1547,6 +1547,12 @@ function crmNotifyOrderLifecycleEvent(array $event): void {
         crmSendPickupReadyEmail($orderId);
     }
 
+    // Poděkování + žádost o Google recenzi — jen při přechodu DO skupiny 'collected' (vydáno).
+    if ($type === 'order_status_changed' && $newStatus !== '' && isOrderStatusIn($newStatus, 'collected')
+        && !($oldStatus !== '' && isOrderStatusIn($oldStatus, 'collected'))) {
+        crmSendOrderReviewEmail($orderId);
+    }
+
     $assignedTechId = isset($event['technician_id'])
         ? (int)$event['technician_id']
         : (int)($ctx['technician_id'] ?? 0);
@@ -3033,6 +3039,169 @@ function crmSendPickupReadyEmail(int $orderId): void
             $pdo->prepare("UPDATE orders SET pickup_notified_at = NOW() WHERE id = ?")->execute([$orderId]);
         }
     } catch (Throwable $e) { /* best-effort — nesmí shodit změnu stavu */ }
+}
+
+/** Sloupec orders.review_email_sent_at — žádost o recenzi se každé zakázce pošle max. jednou. */
+function ensureReviewEmailColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'review_email_sent_at'")->fetch()) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN review_email_sent_at TIMESTAMP NULL DEFAULT NULL");
+        }
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureReviewEmailColumn: ' . $e->getMessage()); }
+}
+
+/** Odkaz přímo do okna psaní Google recenze — pobočka Křižíkova 29 (Karlín).
+ *  Place ID ChIJb5zqZRmVC0cR_ysPp2WZD8M ověřeno přes Google Places API 14.7.2026
+ *  (AppleFix s.r.o., Křižíkova 29, Karlín). Přepsatelné settingem google_review_url;
+ *  prázdný setting = e-maily s žádostí o recenzi vypnuté. */
+function crmGoogleReviewUrl(string $lang = 'cs'): string {
+    $url = trim((string)get_setting('google_review_url',
+        'https://search.google.com/local/writereview?placeid=ChIJb5zqZRmVC0cR_ysPp2WZD8M'));
+    if ($url !== '' && !str_contains($url, 'hl=')) {
+        $url .= (str_contains($url, '?') ? '&' : '?') . 'hl=' . ($lang === 'uk' ? 'uk' : ($lang === 'en' ? 'en' : 'cs'));
+    }
+    return $url;
+}
+
+/**
+ * Po vydání zakázky: poděkování + nenásilná žádost o hodnocení na Google.
+ * Odchází v jazyce klienta, každé zakázce max. jednou (review_email_sent_at).
+ * Volá se z crmNotifyOrderLifecycleEvent při přechodu do skupiny 'collected'.
+ */
+function crmSendOrderReviewEmail(int $orderId): void {
+    global $pdo;
+    if ($orderId <= 0 || !isset($pdo)) return;
+    try {
+        ensureReviewEmailColumn();
+        ensureCustomerLanguageColumn();
+        $st = $pdo->prepare(
+            "SELECT o.id, o.order_code, o.status, o.review_email_sent_at,
+                    c.first_name, c.last_name, c.email, c.preferred_language AS cust_lang
+             FROM orders o JOIN customers c ON c.id = o.customer_id
+             WHERE o.id = ? LIMIT 1");
+        $st->execute([$orderId]);
+        $o = $st->fetch();
+        if (!$o) return;
+        if (!empty($o['review_email_sent_at'])) return;                    // už odesláno
+        if (!isOrderStatusIn((string)$o['status'], 'collected')) return;   // jen po vydání
+        if (crmCustomerIsPlaceholder($o)) return;                          // Interní/Neznámý klient
+        $to = trim((string)($o['email'] ?? ''));
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) return;
+        $lang = normalizeCustomerLanguage($o['cust_lang'] ?? 'cs');
+        if (crmGoogleReviewUrl($lang) === '') return;                      // vypnuto v nastavení
+        if (!function_exists('smtpSendMail')) return;
+
+        $company = get_setting('company_name', 'AppleFix');
+        $subject = $company . ' — ' . [
+            'cs' => 'děkujeme za Vaši důvěru',
+            'en' => 'thank you for your trust',
+            'uk' => 'дякуємо за вашу довіру',
+        ][$lang];
+        [$ok, ] = smtpSendMail($to, $subject, crmReviewRequestEmailHtml($o));
+        if ($ok) {
+            $pdo->prepare("UPDATE orders SET review_email_sent_at = NOW() WHERE id = ?")->execute([$orderId]);
+        }
+    } catch (Throwable $e) { /* best-effort — nesmí shodit změnu stavu */ }
+}
+
+/** HTML e-mailu s poděkováním a žádostí o Google recenzi — „liquid glass" pojetí:
+ *  jemné modravé pozadí, prosvětlená skleněná karta s vrstveným okrajem a měkkým
+ *  stínem, zlaté hvězdy, tmavé pill CTA přímo do okna psaní recenze. Tabulkový
+ *  layout + inline styly (Mail/Gmail/Outlook safe). Formální, vděčný tón, cs/en/uk. */
+function crmReviewRequestEmailHtml(array $o): string
+{
+    $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    $lang = normalizeCustomerLanguage($o['cust_lang'] ?? 'cs');
+    $T = [
+        'cs' => [
+            'order' => 'Zakázka', 'hero' => 'Děkujeme, že jste si vybrali AppleFix',
+            'body' => 'Dobrý den,<br>vaše zakázka <b>%s</b> byla dokončena a zařízení předáno. Děkujeme Vám za důvěru, kterou jste nám při opravě svěřili — velmi si jí vážíme.',
+            'ask' => 'Pokud jste byli s naší prací a přístupem spokojeni, budeme vděčni, když věnujete minutku hodnocení na&nbsp;Google. Vaše zpětná vazba je pro nás tou nejcennější odměnou a pomáhá nám se dál zlepšovat.',
+            'cta' => 'Ohodnotit AppleFix na Google',
+            'note' => 'Hodnocení se týká naší pobočky Křižíkova&nbsp;29, Praha&nbsp;8&nbsp;–&nbsp;Karlín. Zabere necelou minutu.',
+            'thanks' => 'Ještě jednou děkujeme a přejeme příjemný den.<br><b>Tým AppleFix</b>',
+            'footer' => 'Tento e-mail byl odeslán automaticky po předání zakázky %s. Pokud jste s čímkoliv nebyli spokojeni, napište nám prosím na',
+            'preheader' => 'Děkujeme za Vaši důvěru — Vaše hodnocení nám moc pomůže.',
+        ],
+        'en' => [
+            'order' => 'Order', 'hero' => 'Thank you for choosing AppleFix',
+            'body' => 'Hello,<br>your order <b>%s</b> has been completed and your device handed over. Thank you for the trust you placed in us — we truly appreciate it.',
+            'ask' => 'If you were happy with our work and service, we would be grateful if you could take a minute to rate us on&nbsp;Google. Your feedback is the most valuable reward for us and helps us keep improving.',
+            'cta' => 'Rate AppleFix on Google',
+            'note' => 'The review is for our Křižíkova&nbsp;29 branch, Prague&nbsp;8&nbsp;–&nbsp;Karlín. It takes less than a minute.',
+            'thanks' => 'Thank you once again and have a great day.<br><b>The AppleFix team</b>',
+            'footer' => 'This e-mail was sent automatically after order %s was handed over. If anything fell short, please let us know at',
+            'preheader' => 'Thank you for your trust — your rating would mean a lot to us.',
+        ],
+        'uk' => [
+            'order' => 'Замовлення', 'hero' => 'Дякуємо, що обрали AppleFix',
+            'body' => 'Доброго дня!<br>Ваше замовлення <b>%s</b> завершено, а пристрій передано. Дякуємо за довіру, яку ви нам виявили — ми дуже її цінуємо.',
+            'ask' => 'Якщо ви задоволені нашою роботою та підходом, будемо вдячні, якщо ви приділите хвилинку та оціните нас у&nbsp;Google. Ваш відгук — найцінніша винагорода для нас і допомагає нам ставати кращими.',
+            'cta' => 'Оцінити AppleFix у Google',
+            'note' => 'Відгук стосується нашої філії Křižíkova&nbsp;29, Прага&nbsp;8&nbsp;–&nbsp;Карлін. Це займе менше хвилини.',
+            'thanks' => 'Ще раз дякуємо та бажаємо гарного дня.<br><b>Команда AppleFix</b>',
+            'footer' => 'Цей лист надіслано автоматично після видачі замовлення %s. Якщо щось було не так, напишіть нам на',
+            'preheader' => 'Дякуємо за довіру — ваша оцінка нам дуже допоможе.',
+        ],
+    ];
+    $t = fn(string $k): string => $T[$lang][$k] ?? $T['cs'][$k];
+
+    $company = $e(get_setting('company_name', 'AppleFix'));
+    $code = trim((string)($o['order_code'] ?? '')) !== '' ? $e($o['order_code']) : ('#' . (int)($o['id'] ?? 0));
+    $reviewUrl = $e(crmGoogleReviewUrl($lang));
+    $replyTo = $e(get_setting('smtp_from_email', 'servis@applefix.cz'));
+    $logo = 'https://admin.applefix.cloud/assets/img/logo-black.png';
+    $star = '<span style="color:#f5b942;font-size:26px;line-height:1;">&#9733;</span>';
+
+    return '<!doctype html><html lang="' . $lang . '"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1"><title>' . $company . '</title></head>'
+        . '<body style="margin:0;padding:0;background:#e9eef7;">'
+        . '<div style="display:none;max-height:0;overflow:hidden;opacity:0;">' . $t('preheader') . '</div>'
+        // podklad s jemným studeným gradientem (glass podsvícení)
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e9eef7;background-image:linear-gradient(165deg,#eef2fa 0%,#e6ecf8 55%,#e9eef4 100%);padding:36px 12px;"><tr><td align="center">'
+        // „skleněná" karta: prosvětlená bílá, vrstvený okraj, měkký modravý stín
+        . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;background-image:linear-gradient(180deg,rgba(255,255,255,.96),rgba(250,252,255,.92));border:1px solid rgba(255,255,255,.9);outline:1px solid rgba(160,180,215,.28);border-radius:24px;overflow:hidden;box-shadow:0 18px 50px rgba(70,100,160,.16),0 2px 8px rgba(70,100,160,.08);font-family:-apple-system,BlinkMacSystemFont,\'SF Pro Text\',\'Segoe UI\',Arial,sans-serif;">'
+
+        // hlavička: logo + číslo zakázky
+        . '<tr><td style="padding:26px 36px 20px;border-bottom:1px solid rgba(160,180,215,.18);">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+        . '<td style="vertical-align:middle;"><img src="' . $logo . '" width="160" alt="' . $company . '" style="display:block;border:0;height:auto;"></td>'
+        . '<td align="right" style="vertical-align:middle;font-size:12px;color:#9aa4b5;">' . $t('order') . ' <span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#111;">' . $code . '</span></td>'
+        . '</tr></table></td></tr>'
+
+        // hvězdy + titulek
+        . '<tr><td align="center" style="padding:34px 36px 6px;">'
+        . '<div style="letter-spacing:6px;">' . $star . $star . $star . $star . $star . '</div>'
+        . '<div style="font-size:22px;font-weight:800;color:#16202e;margin-top:14px;letter-spacing:-.01em;">' . $t('hero') . '</div>'
+        . '</td></tr>'
+
+        // poděkování + prosba
+        . '<tr><td style="padding:18px 44px 4px;"><div style="font-size:15px;line-height:1.7;color:#39445a;">'
+        . sprintf($t('body'), $code) . '</div></td></tr>'
+        . '<tr><td style="padding:14px 44px 4px;"><div style="font-size:15px;line-height:1.7;color:#39445a;">' . $t('ask') . '</div></td></tr>'
+
+        // vnitřní skleněná buňka s CTA
+        . '<tr><td align="center" style="padding:26px 36px 8px;">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(240,245,252,.85);background-image:linear-gradient(180deg,rgba(255,255,255,.75),rgba(233,240,250,.7));border:1px solid rgba(160,180,215,.32);border-radius:18px;">'
+        . '<tr><td align="center" style="padding:26px 24px 24px;">'
+        . '<a href="' . $reviewUrl . '" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:15px 40px;border-radius:14px;box-shadow:0 6px 18px rgba(17,17,17,.22);">&#9733;&nbsp;&nbsp;' . $t('cta') . '</a>'
+        . '<div style="font-size:12px;color:#8b96aa;margin-top:14px;line-height:1.6;">' . $t('note') . '</div>'
+        . '</td></tr></table></td></tr>'
+
+        // podpis
+        . '<tr><td align="center" style="padding:24px 44px 30px;"><div style="font-size:14px;line-height:1.7;color:#39445a;">' . $t('thanks') . '</div></td></tr>'
+
+        // patička
+        . '<tr><td style="padding:18px 36px 22px;border-top:1px solid rgba(160,180,215,.18);background:rgba(244,247,252,.7);">'
+        . '<div style="font-size:11px;line-height:1.7;color:#9aa4b5;text-align:center;">' . sprintf($t('footer'), $code)
+        . ' <a href="mailto:' . $replyTo . '" style="color:#5b7bb0;text-decoration:none;">' . $replyTo . '</a></div>'
+        . '</td></tr>'
+
+        . '</table></td></tr></table></body></html>';
 }
 
 /** HTML e-mailu „připraveno k vyzvednutí" — světlý AppleFix design (schváleno 13.7.2026):

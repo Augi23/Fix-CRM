@@ -51,6 +51,7 @@ if (isset($_POST['update_company']) && $is_admin_check) {
     set_setting('company_email', trim($_POST['company_email'] ?? ''));
     set_setting('company_web', trim($_POST['company_web'] ?? ''));
     set_setting('currency', $_POST['currency']);
+    if (isset($_POST['google_review_url'])) { set_setting('google_review_url', trim($_POST['google_review_url'])); }
     crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Změna nastavení — Firemní údaje']);
     header("Location: settings.php?tab=company&updated=1");
     exit;
@@ -474,6 +475,11 @@ require_once 'includes/header.php';
                             <div class="col-md-6">
                                 <label class="form-label text-white-75 small">Web</label>
                                 <input type="text" name="company_web" class="form-control" placeholder="www.applefix.cz" value="<?php echo htmlspecialchars(get_setting('company_web')); ?>">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label text-white-75 small"><i class="fab fa-google me-1"></i>Odkaz na Google recenzi (posílá se klientům po vydání zakázky)</label>
+                                <input type="text" name="google_review_url" class="form-control" value="<?php echo htmlspecialchars(get_setting('google_review_url', 'https://search.google.com/local/writereview?placeid=ChIJb5zqZRmVC0cR_ysPp2WZD8M')); ?>">
+                                <div class="form-text small">Otevře klientovi přímo okno psaní recenze (pobočka Křižíkova 29, Karlín). Vymazáním pole se děkovné e-maily s žádostí o recenzi vypnou.</div>
                             </div>
                             <div class="col-12 mt-4 pt-3 border-top border-secondary">
                                 <button type="submit" name="update_company" class="btn btn-primary px-5"><?php echo __('save'); ?></button>

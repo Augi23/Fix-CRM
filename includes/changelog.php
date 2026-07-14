@@ -7,6 +7,17 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '02:05',
+        'title' => 'Po vydání zakázky: děkovný e-mail s žádostí o Google recenzi',
+        'items' => [
+            'Když se zakázka označí jako Vydáno, klientovi automaticky odejde elegantní děkovný e-mail (skleněný vzhled, zlaté hvězdy) s poděkováním za důvěru a zdvořilou prosbou o ohodnocení našich služeb.',
+            'Tlačítko v e-mailu otevře klientovi přímo okno psaní recenze na Google — pobočka Křižíkova 29, Karlín (žádné hledání, jedno kliknutí).',
+            'E-mail odchází v jazyce klienta (čeština/angličtina/ukrajinština), každé zakázce jen jednou, a neposílá se u interních/bezejmenných zakázek ani klientům bez e-mailu.',
+            'Odkaz na recenzi lze změnit či vypnout v Nastavení → Firemní údaje (vymazáním pole se e-maily vypnou).',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '01:10',
         'title' => 'Automatické zálohy celého CRM každých 15 minut + obnova jedním kliknutím',
         'items' => [
