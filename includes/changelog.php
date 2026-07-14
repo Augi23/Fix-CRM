@@ -7,6 +7,24 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '20:20',
+        'title' => 'Stavová tlačítka v detailu zakázky: jasnější a pulzující',
+        'items' => [
+            'Tlačítka „Přesunout do práce" / „Označit jako hotové" / „Označit jako vydané" jsou nově nepřehlédnutelná — jasnější barva podle cílového stavu (jantarová/světle zelená/tmavě zelená), ikona a jemné dýchání (pulz záře).',
+            'Stejné zvýraznění dostalo tlačítko „Dokončeno 100 % opravy" u předávání mezi techniky.',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
+        'time' => '20:05',
+        'title' => 'Nová zakázka: povinné údaje klienta a PIN',
+        'items' => [
+            'Při zakládání zakázky jsou nově povinné: jméno a příjmení klienta, telefon a e-mail (u nového klienta) a PIN/heslo zařízení. Bez nich průvodce nepustí dál.',
+            'PIN je vyžadován i na serveru — zakázku bez něj nejde založit ani obejitím formuláře.',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '19:35',
         'title' => 'OPRAVA: nový klient v zakázce — technici + konec duplicit',
         'items' => [

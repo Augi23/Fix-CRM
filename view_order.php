@@ -529,15 +529,20 @@ function localizedOrderStatusLabel(string $status): string {
                     <div class="border border-info border-opacity-50 rounded-3 p-2 mb-2">
                         <div class="small text-white-75 mb-2"><i class="fas fa-people-arrows me-1 text-info"></i><?php echo __('handoff_question'); ?></div>
                         <div class="d-grid gap-2">
-                            <button type="button" class="btn btn-sm btn-success" onclick="afxFinishOrder()"><i class="fas fa-check-double me-1"></i><?php echo __('handoff_done'); ?></button>
+                            <button type="button" class="btn btn-sm btn-success afx-status-pulse afx-status-pulse--completed" onclick="afxFinishOrder()"><i class="fas fa-check-double me-1"></i><?php echo __('handoff_done'); ?></button>
                             <button type="button" class="btn btn-sm btn-outline-info" onclick="afxReleaseOrder()"><i class="fas fa-share me-1"></i><?php echo __('handoff_release'); ?></button>
                         </div>
                     </div>
                     <?php endif; ?>
                     <div class="d-grid gap-2 mb-2">
                         <?php if ($next_status): ?>
-                            <button type="button" class="btn btn-success" id="nextStatusBtn" data-next-status="<?php echo $next_status; ?>">
-                                <?php echo $next_label ?: __('next_step'); ?>
+                            <?php
+                            // barva + ikona pulzujícího tlačítka podle CÍLOVÉHO stavu
+                            $__pulseCls = ['V opravě' => 'afx-status-pulse--progress', 'Připraveno k převzetí' => 'afx-status-pulse--completed', 'Vydáno' => 'afx-status-pulse--collected'][$next_status] ?? '';
+                            $__pulseIco = ['V opravě' => 'fa-play', 'Připraveno k převzetí' => 'fa-check', 'Vydáno' => 'fa-box-open'][$next_status] ?? 'fa-arrow-right';
+                            ?>
+                            <button type="button" class="btn btn-success afx-status-pulse <?php echo $__pulseCls; ?>" id="nextStatusBtn" data-next-status="<?php echo $next_status; ?>">
+                                <i class="fas <?php echo $__pulseIco; ?> me-2"></i><?php echo $next_label ?: __('next_step'); ?>
                             </button>
                         <?php else: ?>
                             <div class="text-white-75 small"><?php echo __('no_next_step'); ?></div>
