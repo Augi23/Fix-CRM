@@ -211,7 +211,13 @@ if (isset($_POST['edit_tech'])) {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     if ($is_admin_check) {
-        $pdo->prepare('UPDATE orders SET branch_id = ? WHERE technician_id = ?')->execute([$branch_id, $id]);
+        // Hromadný přesun zakázek technika mezi pobočkami JEN při skutečné změně
+        // pobočky — dřív běžel při KAŽDÉM uložení karty zaměstnance (tichý přesun).
+        $__prevBranch = null;
+        try { $bs = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ?'); $bs->execute([$id]); $__prevBranch = $bs->fetchColumn(); } catch (Throwable $e) {}
+        if ($__prevBranch === null || (int)$__prevBranch !== (int)$branch_id) {
+            $pdo->prepare('UPDATE orders SET branch_id = ? WHERE technician_id = ?')->execute([$branch_id, $id]);
+        }
     }
     crmAuditLog('staff.update', [
         'entity_type' => 'technician', 'entity_id' => (int)$id, 'entity_label' => $name,
@@ -1408,8 +1414,8 @@ require_once 'includes/header.php';
                 <div class="col-md-12 mb-3">
                     <label class="form-label"><i class="fas fa-store me-1"></i>Pobočka</label>
                     <select name="branch_id" class="form-select">
-                        <?php foreach ($branches_settings as $branch): ?>
-                            <option value="<?php echo (int)$branch['id']; ?>"><?php echo e($branch['name']); ?></option>
+                        <?php $__defB = (int)getDefaultBranchId(); foreach ($branches_settings as $branch): ?>
+                            <option value="<?php echo (int)$branch['id']; ?>" <?php echo (int)$branch['id'] === $__defB ? 'selected' : ''; ?>><?php echo e($branch['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -1471,8 +1477,18 @@ require_once 'includes/header.php';
                     <label class="form-label"><i class="fas fa-store me-1"></i>Pobočka</label>
                     <?php if ($is_admin_user): ?>
                     <select name="branch_id" class="form-select">
+                        <?php
+                        // PAST „prvního vybraného": technik s NULL/neaktivní pobočkou by bez
+                        // selected spadl na první pobočku a uložení by ho tiše přeřadilo
+                        // (a hromadně přesunulo i jeho zakázky). Doplníme aktuální hodnotu.
+                        $__tb = (int)($t['branch_id'] ?? 0);
+                        $__tbInList = false;
+                        foreach ($branches_settings as $branch) { if ((int)$branch['id'] === $__tb) { $__tbInList = true; break; } }
+                        if (!$__tbInList): ?>
+                            <option value="<?php echo $__tb; ?>" selected><?php echo $__tb > 0 ? e(getBranchLabel($__tb)) . ' (neaktivní pobočka)' : '— bez pobočky —'; ?></option>
+                        <?php endif; ?>
                         <?php foreach ($branches_settings as $branch): ?>
-                            <option value="<?php echo (int)$branch['id']; ?>" <?php echo (int)($t['branch_id'] ?? 0) === (int)$branch['id'] ? 'selected' : ''; ?>><?php echo e($branch['name']); ?></option>
+                            <option value="<?php echo (int)$branch['id']; ?>" <?php echo $__tb === (int)$branch['id'] ? 'selected' : ''; ?>><?php echo e($branch['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                     <?php else: ?>

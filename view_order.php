@@ -1443,8 +1443,15 @@ function deleteOrder(id) {
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('brand'); ?></label>
                             <select name="device_brand" class="form-select select2-tags-modal">
-                                <?php foreach(getDeviceBrands() as $brand): ?>
-                                    <option value="<?php echo $brand; ?>" <?php echo ($brand == $order['device_brand']) ? 'selected' : ''; ?>><?php echo $brand; ?></option>
+                                <?php
+                                // PAST „prvního vybraného": značka zakázky (volný text z wizardu)
+                                // nemusí být v číselníku → bez selected by spadla na první ('Acer')
+                                // a uložení by ji tiše přepsalo. Aktuální značku vždy doplníme.
+                                $__brands = getDeviceBrands();
+                                $__curBrand = trim((string)($order['device_brand'] ?? ''));
+                                if ($__curBrand !== '' && !in_array($__curBrand, $__brands, true)) { array_unshift($__brands, $__curBrand); }
+                                foreach($__brands as $brand): ?>
+                                    <option value="<?php echo htmlspecialchars($brand); ?>" <?php echo ($brand === $__curBrand) ? 'selected' : ''; ?>><?php echo htmlspecialchars($brand); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

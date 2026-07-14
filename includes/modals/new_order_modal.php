@@ -298,8 +298,12 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                 <div class="col-md-6">
                                     <label class="form-label"><i class="fas fa-store me-1"></i><?php echo __('branch'); ?></label>
                                     <select name="branch_id" class="form-select">
-                                        <?php foreach ($branches_modal as $branch): ?>
-                                            <option value="<?php echo (int)$branch['id']; ?>"><?php echo e($branch['name']); ?></option>
+                                        <?php
+                                        // předvybrat pobočku, kde uživatel stojí (jinak by se tiše
+                                        // vybrala první pobočka v seznamu — špatné dokumenty/filtry)
+                                        $__curB = (int)getCurrentStaffBranchId() ?: (int)getDefaultBranchId();
+                                        foreach ($branches_modal as $branch): ?>
+                                            <option value="<?php echo (int)$branch['id']; ?>" <?php echo (int)$branch['id'] === $__curB ? 'selected' : ''; ?>><?php echo e($branch['name']); ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>

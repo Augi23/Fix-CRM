@@ -7,6 +7,18 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '20:45',
+        'title' => 'Globální oprava „pasti prvního vybraného" ve výběrových polích',
+        'items' => [
+            'Po záměně klientů proběhla důkladná kontrola VŠECH výběrových polí v CRM, jestli nemohou tiše přeskočit na první položku a při uložení přepsat data. Nalezeny a opraveny 4 případy:',
+            'Úprava zakázky: značka zařízení mimo číselník (napsaná ručně) by se uložením tiše přepsala na první značku v abecedě — aktuální značka je teď vždy předvybraná.',
+            'Karta zaměstnance: technik bez pobočky / se zrušenou pobočkou by se uložením tiše přeřadil na první pobočku A přesunuly by se i všechny jeho zakázky — opraveno (aktuální pobočka vždy v nabídce; hromadný přesun zakázek jen při skutečné změně pobočky).',
+            'Nová zakázka i nový zaměstnanec: pobočka se předvybírá podle toho, kde uživatel je (dřív tiše první v seznamu).',
+            'Ostatní výběrová pole (stavy, technik v rychlém náhledu, modely, sklad, faktury) kontrola potvrdila jako bezpečná.',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '20:20',
         'title' => 'Stavová tlačítka v detailu zakázky: jasnější a pulzující',
         'items' => [
