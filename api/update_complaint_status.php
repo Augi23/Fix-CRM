@@ -39,6 +39,10 @@ try {
                            SET complaint_status = ?, staff_ack_at = COALESCE(staff_ack_at, NOW())
                            WHERE id = ?");
     $stmt->execute([$status, $id]);
+    crmAuditLog('complaint.status_change', [
+        'entity_type' => 'complaint', 'entity_id' => (int)$id,
+        'summary' => 'Reklamace #' . (int)$id . ' — stav: ' . $status,
+    ]);
     echo json_encode(['ok' => true, 'status' => $status], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     http_response_code(500);

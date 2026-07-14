@@ -61,6 +61,10 @@ try {
         } catch (Throwable $e) {}
     }
 
+    crmAuditLog('order.status_change', [
+        'entity_type' => 'order', 'entity_id' => (int)$orderId,
+        'summary' => 'Zakázka #' . (int)$orderId . ' uvolněna dalšímu technikovi (stav: ' . $oldStatus . ' → ' . $newStatus . ')',
+    ]);
     echo json_encode(['ok' => true]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }

@@ -33,6 +33,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             min_stock = ? 
             WHERE id = ?");
         $update->execute([$part_name, $sku, $quantity, $cost_price, $sale_price, $min_stock, $id]);
+        crmAuditLog('inventory.update', [
+            'entity_type' => 'inventory', 'entity_id' => (int)$id, 'entity_label' => (string)$part_name,
+            'summary' => 'Upraven skladový díl „' . $part_name . '" (ks: ' . $quantity . ', nákup: ' . $cost_price . ', prodej: ' . $sale_price . ')',
+        ]);
         $success = __("inventory_updated");
         // Refresh
         $stmt->execute([$id]);

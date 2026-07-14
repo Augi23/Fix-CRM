@@ -36,6 +36,7 @@ if (isset($_POST['update_branches']) && $is_admin_check) {
         $pdo->prepare("UPDATE branches SET address = ?, opening_hours = ? WHERE id = ?")
             ->execute([trim((string)$addr), $hrs, $bid]);
     }
+    crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Změna nastavení — Pobočky (adresy / otevírací doba)']);
     header("Location: settings.php?tab=company&updated=1");
     exit;
 }
@@ -50,6 +51,7 @@ if (isset($_POST['update_company']) && $is_admin_check) {
     set_setting('company_email', trim($_POST['company_email'] ?? ''));
     set_setting('company_web', trim($_POST['company_web'] ?? ''));
     set_setting('currency', $_POST['currency']);
+    crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Změna nastavení — Firemní údaje']);
     header("Location: settings.php?tab=company&updated=1");
     exit;
 }
@@ -97,6 +99,7 @@ if (isset($_POST['update_integrations']) && $is_admin_check) {
         curl_exec($ch);
         curl_close($ch);
     }
+    crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Změna nastavení — Integrace (API klíče / SMTP / webhooky) — hodnoty se z bezpečnostních důvodů nezaznamenávají']);
     header("Location: settings.php?tab=integrations&updated=1");
     exit;
 }
@@ -331,6 +334,7 @@ if (isset($_POST['update_system_settings']) && $is_admin_check) {
     set_setting('order_note_templates', $note_templates);
     set_setting('sla_new_hours', $sla_new);
     set_setting('sla_progress_hours', $sla_progress);
+    crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Změna nastavení — Systém']);
     header("Location: settings.php?tab=system&updated=1");
     exit;
 }

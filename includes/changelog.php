@@ -6,6 +6,16 @@
  */
 return [
     [
+        'date' => '2026-07-14',
+        'time' => '00:25',
+        'title' => 'Historie úprav pokrývá i faktury, sklad, nákupy, reklamace a podpisy',
+        'items' => [
+            'Po důkladné kontrole doplněno zaznamenávání dalších úkonů: faktury a dobropisy (vystavení/úprava/smazání/změna stavu vč. expresních), skladové díly (naskladnění/úprava/smazání), nákupní požadavky (vytvoření/objednání/naskladnění/přiřazení k zakázce/smazání), reklamace (vytvoření/změna stavu), podpisy klientů, díly na zakázce, uvolnění zakázky dalšímu technikovi, zpětná změna datumů zakázky, změny nastavení (u API klíčů a hesel se hodnoty nezaznamenávají) a aktualizace systému.',
+            'Vypnuta stará skrytá stránka pro úpravu zakázky, která obcházela historii i ochranu klienta — přesměruje na běžný detail zakázky, kde všechny pojistky platí.',
+            'Fotky HEIC (z iPhonu) jdou nově nahrát i při zakládání zakázky (dřív jen při dodatečném uploadu).',
+        ],
+    ],
+    [
         'date' => '2026-07-13',
         'time' => '23:55',
         'title' => 'Seznam zakázek: přesný čas vytvoření a kdo zakázku založil',

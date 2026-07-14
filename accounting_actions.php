@@ -32,6 +32,15 @@ switch ($action) {
             }
 
             $result = $manager->saveInvoice($_POST);
+            if (!empty($result['success'])) {
+                $__isEdit = !empty($_POST['id']);
+                $__invNo = trim((string)($_POST['invoice_number'] ?? '')) ?: ('#' . (int)($result['id'] ?? 0));
+                crmAuditLog($__isEdit ? 'invoice.update' : 'invoice.create', [
+                    'entity_type' => 'invoice', 'entity_id' => (int)($result['id'] ?? 0), 'entity_label' => $__invNo,
+                    'summary' => ($__isEdit ? 'Upravena faktura ' : 'Vystavena faktura ') . $__invNo
+                        . (!empty($_POST['total_amount']) ? ' (' . $_POST['total_amount'] . ' Kč)' : ''),
+                ]);
+            }
             echo json_encode($result);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -57,8 +66,15 @@ switch ($action) {
     case 'delete_invoice':
         try {
             $id = (int)$_POST['id'];
+            // číslo faktury pro historii zjistit PŘED smazáním
+            $__invNo = '';
+            try { $ns = $pdo->prepare("SELECT invoice_number FROM invoices WHERE id = ?"); $ns->execute([$id]); $__invNo = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
             $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$id]);
             $pdo->prepare("DELETE FROM invoices WHERE id = ?")->execute([$id]);
+            crmAuditLog('invoice.delete', [
+                'entity_type' => 'invoice', 'entity_id' => $id, 'entity_label' => $__invNo,
+                'summary' => 'Smazána faktura ' . ($__invNo !== '' ? $__invNo : ('#' . $id)),
+            ]);
             echo json_encode(['success' => true]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -70,6 +86,13 @@ switch ($action) {
             require_once 'models/InvoiceManager.php';
             $manager = new InvoiceManager($pdo);
             $success = $manager->updateStatus((int)$_POST['id'], $_POST['status'], $_POST['payment_method'] ?? null);
+            if ($success) {
+                crmAuditLog('invoice.status_change', [
+                    'entity_type' => 'invoice', 'entity_id' => (int)$_POST['id'],
+                    'summary' => 'Faktura #' . (int)$_POST['id'] . ' — stav: ' . (string)$_POST['status']
+                        . (!empty($_POST['payment_method']) ? ' (' . $_POST['payment_method'] . ')' : ''),
+                ]);
+            }
             echo json_encode(['success' => $success]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -80,6 +103,12 @@ switch ($action) {
         require_once 'models/InvoiceManager.php';
         $manager = new InvoiceManager($pdo);
         $result = $manager->createCreditNote((int)$_POST['id']);
+        if (!empty($result['success'])) {
+            crmAuditLog('invoice.credit_note', [
+                'entity_type' => 'invoice', 'entity_id' => (int)($result['id'] ?? 0),
+                'summary' => 'Vystaven dobropis k faktuře #' . (int)$_POST['id'],
+            ]);
+        }
         echo json_encode($result);
         break;
 

@@ -74,6 +74,10 @@ try {
     $stmt = $pdo->prepare("INSERT INTO complaints (complaint_code, customer_id, phone, device, serial_number, complaint_reason, complaint_status) VALUES (?, ?, ?, ?, ?, ?, 'Přijato')");
     $stmt->execute([$code, $customer_id, $phone, $device, $serial, $full_reason]);
     $complaint_id = (int)$pdo->lastInsertId();
+    crmAuditLog('complaint.create', [
+        'entity_type' => 'complaint', 'entity_id' => $complaint_id, 'entity_label' => (string)$code,
+        'summary' => 'Vytvořena reklamace ' . $code . ($device !== '' ? ' — ' . $device : ''),
+    ]);
 
     // ---- fotodokumentace ----
     if (!empty($_FILES['photos']) && is_array($_FILES['photos']['name'])) {

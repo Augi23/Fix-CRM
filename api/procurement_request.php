@@ -95,6 +95,10 @@ try {
             $_SESSION['user_id'] ?? ($_SESSION['tech_id'] ?? null),
         ]);
 
+        crmAuditLog('procurement.create', [
+            'entity_type' => 'procurement', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => $itemName,
+            'summary' => 'Požadavek na díl: ' . $itemName . ' (' . $quantity . ' ks)' . ($orderId > 0 ? ', zakázka #' . $orderId : ''),
+        ]);
         echo json_encode(['success' => true, 'message' => 'Request saved.']);
         exit;
     }
@@ -144,6 +148,11 @@ try {
 
         $pdo->commit();
 
+        crmAuditLog('procurement.status_change', [
+            'entity_type' => 'procurement', 'entity_id' => $id, 'entity_label' => (string)($request['item_name'] ?? ''),
+            'summary' => 'Díl „' . (string)($request['item_name'] ?? ('#' . $id)) . '" — stav nákupu: ' . (string)($request['status'] ?? '') . ' → ' . $status
+                . ((!$wasReceived && $isNowReceived && $inventoryId > 0) ? ' (naskladněno ' . $quantity . ' ks)' : ''),
+        ]);
         echo json_encode(['success' => true, 'message' => 'Status updated.']);
         exit;
     }
@@ -212,6 +221,10 @@ try {
 
         $pdo->commit();
 
+        crmAuditLog('procurement.assign_order', [
+            'entity_type' => 'procurement', 'entity_id' => (int)$requestId, 'entity_label' => (string)($request['item_name'] ?? ''),
+            'summary' => 'Díl „' . (string)($request['item_name'] ?? ('#' . (int)$requestId)) . '" přiřazen k zakázce #' . (int)$orderId . ' (' . (int)$qty . ' ks)',
+        ]);
         echo json_encode(['success' => true, 'message' => 'Part assigned to order.']);
         exit;
     }
@@ -222,8 +235,14 @@ try {
         }
 
         $id = (int)($_POST['id'] ?? 0);
+        $__pn = '';
+        try { $ns = $pdo->prepare("SELECT item_name FROM purchase_requests WHERE id = ?"); $ns->execute([$id]); $__pn = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
         $stmt = $pdo->prepare("DELETE FROM purchase_requests WHERE id = ?");
         $stmt->execute([$id]);
+        crmAuditLog('procurement.delete', [
+            'entity_type' => 'procurement', 'entity_id' => $id, 'entity_label' => $__pn,
+            'summary' => 'Smazán požadavek na díl ' . ($__pn !== '' ? '„' . $__pn . '"' : ('#' . $id)),
+        ]);
         echo json_encode(['success' => true, 'message' => 'Request deleted.']);
         exit;
     }

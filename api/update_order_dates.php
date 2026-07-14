@@ -35,9 +35,16 @@ try {
         exit;
     }
 
+    $__oldDates = null;
+    try { $ds = $pdo->prepare("SELECT created_at, updated_at FROM orders WHERE id = ?"); $ds->execute([$order_id]); $__oldDates = $ds->fetch(); } catch (Throwable $e) {}
     $stmt = $pdo->prepare("UPDATE orders SET created_at = ?, updated_at = ? WHERE id = ?");
     $stmt->execute([$created_at, $updated_at, $order_id]);
 
+    crmAuditLog('order.dates_change', [
+        'entity_type' => 'order', 'entity_id' => (int)$order_id,
+        'summary' => 'Zpětná změna datumů zakázky #' . (int)$order_id . ' (vytvořeno: ' . (string)($__oldDates['created_at'] ?? '?') . ' → ' . $created_at . ')',
+        'details' => ['stare' => $__oldDates, 'nove' => ['created_at' => $created_at, 'updated_at' => $updated_at]],
+    ]);
     echo json_encode(['success' => true, 'message' => 'Dates updated']);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

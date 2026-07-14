@@ -68,6 +68,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
 
+        crmAuditLog('invoice.create', [
+            'entity_type' => 'invoice', 'entity_id' => (int)$invoice_id, 'entity_label' => (string)$invoice_number,
+            'summary' => 'Vystavena faktura ' . $invoice_number,
+        ]);
         echo json_encode(['success' => true, 'message' => 'Invoice created', 'id' => $invoice_id]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);

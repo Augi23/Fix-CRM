@@ -2620,6 +2620,19 @@ function crmAuditActionLabel(string $action): string {
         'staff.create' => 'Vytvoření zaměstnance', 'staff.update' => 'Úprava zaměstnance',
         'staff.delete' => 'Smazání zaměstnance', 'staff.permissions' => 'Změna oprávnění',
         'admin.create' => 'Povýšení na administrátora', 'admin.password' => 'Změna hesla administrátora',
+        'order.signature_add' => 'Podpis klienta', 'order.dates_change' => 'Zpětná změna datumů',
+        'order.item_add' => 'Přidání dílu k zakázce', 'order.item_update' => 'Úprava dílu zakázky',
+        'order.item_delete' => 'Odebrání dílu ze zakázky',
+        'invoice.create' => 'Vystavení faktury', 'invoice.update' => 'Úprava faktury',
+        'invoice.delete' => 'Smazání faktury', 'invoice.status_change' => 'Změna stavu faktury',
+        'invoice.credit_note' => 'Vystavení dobropisu',
+        'complaint.create' => 'Vytvoření reklamace', 'complaint.status_change' => 'Změna stavu reklamace',
+        'procurement.create' => 'Požadavek na díl', 'procurement.status_change' => 'Změna stavu nákupu',
+        'procurement.assign_order' => 'Přiřazení dílu k zakázce', 'procurement.delete' => 'Smazání požadavku na díl',
+        'inventory.create' => 'Naskladnění dílu', 'inventory.update' => 'Úprava skladového dílu',
+        'inventory.delete' => 'Smazání skladového dílu',
+        'supplier_catalog.create' => 'Přidání katalogu dodavatele',
+        'settings.update' => 'Změna nastavení', 'system.update' => 'Aktualizace systému',
     ];
     return $map[$action] ?? $action;
 }

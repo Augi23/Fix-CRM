@@ -109,13 +109,6 @@ try {
 
     logOrderStatusChange($order_id, '', $status);
 
-    $__dev = trim(($device_brand ?? '') . ' ' . ($device_model ?? ''));
-    crmAuditLog('order.create', [
-        'entity_type' => 'order', 'entity_id' => $order_id,
-        'entity_label' => ($new_order_code ?: ('#' . $order_id)),
-        'summary' => 'Vytvořena zakázka ' . ($new_order_code ?: ('#' . $order_id)) . ($__dev !== '' ? ' — ' . $__dev : ''),
-        'branch_id' => $branch_id ?? null,
-    ]);
 
     // Zakázka vznikla z webové rezervace → označit rezervaci jako převzatou
     $webBookingId = (int)($_POST['web_booking_id'] ?? 0);
@@ -148,11 +141,13 @@ try {
             'image/png' => 'png',
             'image/gif' => 'gif',
             'image/webp' => 'webp',
+            'image/heic' => 'heic',
+            'image/heif' => 'heif',
             'video/mp4' => 'mp4',
             'video/quicktime' => 'mov',
             'video/x-msvideo' => 'avi',
         ];
-        $allowed_exts  = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi'];
+        $allowed_exts  = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'mp4', 'mov', 'avi'];
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
 
         foreach ($_FILES['files']['tmp_name'] as $key => $tmp) {
@@ -177,6 +172,15 @@ try {
     }
 
     $pdo->commit();
+
+    // Audit až PO commitu (mimo transakci — ensureAuditLogTable dělá DDL)
+    $__dev = trim(($device_brand ?? '') . ' ' . ($device_model ?? ''));
+    crmAuditLog('order.create', [
+        'entity_type' => 'order', 'entity_id' => $order_id,
+        'entity_label' => ($new_order_code ?: ('#' . $order_id)),
+        'summary' => 'Vytvořena zakázka ' . ($new_order_code ?: ('#' . $order_id)) . ($__dev !== '' ? ' — ' . $__dev : ''),
+        'branch_id' => $branch_id ?? null,
+    ]);
 
     crmNotifyOrderLifecycleEvent([
         'type' => 'order_created',

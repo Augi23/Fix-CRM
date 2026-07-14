@@ -79,6 +79,10 @@ try {
         } catch (Throwable $e) { /* podpis je uložen, zbytek je best-effort */ }
     }
 
+    crmAuditLog('order.signature_add', [
+        'entity_type' => 'order', 'entity_id' => (int)$orderId,
+        'summary' => 'Uložen podpis klienta k zakázce #' . (int)$orderId . ' (' . $sigType . ')' . ($emailed ? ', list odeslán e-mailem' : ''),
+    ]);
     echo json_encode(['ok' => true, 'signed_at' => date('d.m.Y H:i'), 'emailed' => $emailed]);
 } catch (Throwable $e) {
     echo json_encode(['ok' => false, 'error' => 'Chyba serveru']);

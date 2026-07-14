@@ -50,6 +50,10 @@ try {
     $del->execute([$id]);
 
     $pdo->commit();
+    crmAuditLog('order.item_delete', [
+        'entity_type' => 'order', 'entity_id' => (int)($item['order_id'] ?? 0),
+        'summary' => 'Zakázka #' . (int)($item['order_id'] ?? 0) . ' — odebrán díl (' . (int)($item['quantity'] ?? 0) . ' ks)',
+    ]);
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

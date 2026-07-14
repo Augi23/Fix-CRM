@@ -54,6 +54,10 @@ try {
     $upd_item->execute([$new_qty, $new_price, $id]);
 
     $pdo->commit();
+    crmAuditLog('order.item_update', [
+        'entity_type' => 'order', 'entity_id' => (int)($item['order_id'] ?? 0),
+        'summary' => 'Zakázka #' . (int)($item['order_id'] ?? 0) . ' — upraven díl (ks: ' . (int)($item['quantity'] ?? 0) . ' → ' . (int)$new_qty . ', cena: ' . $item['price'] . ' → ' . $new_price . ')',
+    ]);
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

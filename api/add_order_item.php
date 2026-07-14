@@ -88,6 +88,10 @@ try {
         sendTelegramNotification($notify['telegram_id'], $msg);
     }
 
+    crmAuditLog('order.item_add', [
+        'entity_type' => 'order', 'entity_id' => (int)$order_id,
+        'summary' => 'K zakázce #' . (int)$order_id . ' přidán díl „' . (string)($inventory['part_name'] ?? '') . '" (' . (int)$qty . ' ks)',
+    ]);
     echo json_encode(['success' => true, 'auto_procurement_queued' => $autoProcurementQueued, 'message' => $autoProcurementQueued ? 'Part was added and automatically queued for procurement.' : 'Part was added to order.']);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);

@@ -107,6 +107,13 @@ if ($exitCode !== 0) {
 
 $newInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : $info;
 
+if (function_exists('crmAuditLog')) {
+    crmAuditLog('system.update', [
+        'entity_type' => 'system',
+        'summary' => 'Aktualizace CRM: ' . trim(($info['local_short'] ?? '?')) . ' → ' . trim(($newInfo['local_short'] ?? '?')),
+    ]);
+}
+
 echo json_encode([
     'success' => true,
     'message' => 'Repository was updated from git.',

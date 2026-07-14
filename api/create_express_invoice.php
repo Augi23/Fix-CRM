@@ -96,8 +96,12 @@ try {
         $pdo->prepare("UPDATE orders SET final_cost = ? WHERE id = ?")
             ->execute([$total_amount, $order_id]);
 
+        crmAuditLog('invoice.update', [
+            'entity_type' => 'invoice', 'entity_id' => (int)$invoice_id, 'entity_label' => (string)$invoice_number,
+            'summary' => 'Upravena expresní faktura ' . $invoice_number . ' (' . $total_amount . ' Kč, zakázka #' . (int)$order_id . ' — přepsána finální cena)',
+        ]);
         echo json_encode([
-            'success' => true, 
+            'success' => true,
             'id' => $invoice_id,
             'invoice_number' => $invoice_number,
             'action' => 'updated'
@@ -149,8 +153,12 @@ try {
         $pdo->prepare("UPDATE orders SET final_cost = ? WHERE id = ?")
             ->execute([$total_amount, $order_id]);
 
+        crmAuditLog('invoice.create', [
+            'entity_type' => 'invoice', 'entity_id' => (int)$invoice_id, 'entity_label' => (string)$invoice_number,
+            'summary' => 'Vystavena expresní faktura ' . $invoice_number . ' (' . $total_amount . ' Kč, zakázka #' . (int)$order_id . ')',
+        ]);
         echo json_encode([
-            'success' => true, 
+            'success' => true,
             'id' => $invoice_id,
             'invoice_number' => $invoice_number,
             'action' => 'created'

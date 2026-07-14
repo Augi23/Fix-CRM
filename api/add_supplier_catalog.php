@@ -54,6 +54,10 @@ try {
     $pdo->prepare("INSERT INTO supplier_catalogs (skey, name, host, default_url) VALUES (?, ?, ?, ?)")
         ->execute([$skey, mb_substr($name, 0, 80), mb_substr($host, 0, 120), mb_substr($url, 0, 255)]);
 
+    crmAuditLog('supplier_catalog.create', [
+        'entity_type' => 'supplier_catalog', 'entity_label' => (string)$name,
+        'summary' => 'Přidán katalog dodavatele „' . $name . '" (' . $host . ')',
+    ]);
     backToProcurement(['catalog_source_added' => '1']);
 } catch (Throwable $e) {
     backToProcurement(['catalog_source_error' => 'server']);

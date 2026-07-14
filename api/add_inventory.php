@@ -34,6 +34,10 @@ try {
     // Manually added parts are real warehouse stock → always visible in Sklad.
     $stmt = $pdo->prepare("INSERT INTO inventory (part_name, sku, quantity, cost_price, sale_price, min_stock, is_stocked) VALUES (?, ?, ?, ?, ?, ?, 1)");
     $stmt->execute([$part_name, $sku, $quantity, $cost_price, $sale_price, $min_stock]);
+    crmAuditLog('inventory.create', [
+        'entity_type' => 'inventory', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => (string)$part_name,
+        'summary' => 'Naskladněn nový díl „' . $part_name . '" (' . $quantity . ' ks)',
+    ]);
     
     // Check if called from form (AJAX) or direct
     if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {

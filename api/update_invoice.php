@@ -71,6 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $pdo->commit();
+        crmAuditLog('invoice.update', [
+            'entity_type' => 'invoice', 'entity_id' => (int)($_POST['invoice_id'] ?? $_POST['id'] ?? 0), 'entity_label' => (string)$invoice_number,
+            'summary' => 'Upravena faktura ' . $invoice_number,
+        ]);
         echo json_encode(['success' => true, 'message' => 'Invoice updated']);
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();

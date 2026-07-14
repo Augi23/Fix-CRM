@@ -33,9 +33,15 @@ try {
         // If used in orders, we can't delete
         echo json_encode(['success' => false, 'message' => __('item_hidden_in_orders')]);
     } else {
-        // If not used, delete permanently
+        // If not used, delete permanently — jméno pro historii PŘED smazáním
+        $__pn = '';
+        try { $ns = $pdo->prepare("SELECT part_name FROM inventory WHERE id = ?"); $ns->execute([$id]); $__pn = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
         $stmt = $pdo->prepare("DELETE FROM inventory WHERE id = ?");
         $stmt->execute([$id]);
+        crmAuditLog('inventory.delete', [
+            'entity_type' => 'inventory', 'entity_id' => (int)$id, 'entity_label' => $__pn,
+            'summary' => 'Smazán skladový díl ' . ($__pn !== '' ? '„' . $__pn . '"' : ('#' . (int)$id)),
+        ]);
         echo json_encode(['success' => true]);
     }
 } catch (Exception $e) {
