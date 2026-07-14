@@ -8,9 +8,9 @@ return [
     [
         'date' => '2026-07-13',
         'time' => '22:25',
-        'title' => 'Přejmenování kategorie zakázek „K odsouhlasení" → „Čeká na klienta"',
+        'title' => 'Přejmenování kategorie zakázek „K odsouhlasení" → „Čeká na zákazníka"',
         'items' => [
-            'Horní kategorie (dlaždice a filtr) v Zakázkách se nově jmenuje „Čeká na klienta" místo „K odsouhlasení". Význam i chování zůstávají stejné, změnil se jen název.',
+            'Horní kategorie (dlaždice a filtr) v Zakázkách se nově jmenuje „Čeká na zákazníka" místo „K odsouhlasení". Nově sedí i s názvem stavu u jednotlivých zakázek. Význam a chování zůstávají stejné.',
         ],
     ],
     [
