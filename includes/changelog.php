@@ -7,6 +7,15 @@
 return [
     [
         'date' => '2026-07-13',
+        'time' => '22:55',
+        'title' => 'Výpis zaměstnanců ukazuje i administrátory (sjednotně se sekcí zvuků)',
+        'items' => [
+            'V Nastavení → Zaměstnanci se ve výpisu dřív ukazovali jen technici, kdežto níže u přiřazení uvítacích zvuků i administrátoři — proto tam bylo víc záznamů. Nově se administrátoři (účty jen v Administrátorech) zobrazí i v hlavním výpisu zaměstnanců, takže sedí.',
+            'Seznam u přiřazení zvuků se navíc zbavil duplicit — kdo měl účet technika i administrátora se stejným přihlášením, počítal se dřív dvakrát.',
+        ],
+    ],
+    [
+        'date' => '2026-07-13',
         'time' => '22:25',
         'title' => 'Přejmenování kategorie zakázek „K odsouhlasení" → „Čeká na zákazníka"',
         'items' => [

@@ -675,8 +675,16 @@ require_once 'includes/header.php';
                         $techs = $pdo->query($techs_query)->fetchAll();
                         // Admin účty (Správa administrátorů) mají přednost před rolí na kartě
                         // zaměstnance — jinak povýšený admin dál svítil jako Manažer/Technik.
-                        $__adminUsernames = [];
-                        try { $__adminUsernames = array_map('strval', array_column($pdo->query("SELECT username FROM users")->fetchAll(), 'username')); } catch (Throwable $e) {}
+                        $__adminRows = [];
+                        try { $__adminRows = $pdo->query("SELECT id, username, full_name FROM users ORDER BY full_name")->fetchAll(); } catch (Throwable $e) {}
+                        $__adminUsernames = array_map('strval', array_column($__adminRows, 'username'));
+                        // Admini, kteří mají JEN účet v users (ne technika) — dřív ve výpisu
+                        // zaměstnanců chyběli, ačkoliv se níže objevovali u přiřazení zvuků.
+                        // Doplníme je, ať výpis sedí a jsou vidět všichni.
+                        $__techUsernames = array_map(static fn($x) => strtolower((string)($x['username'] ?? '')), $techs);
+                        $__adminOnly = $can_view_all_staff ? array_values(array_filter($__adminRows, static function ($u) use ($__techUsernames) {
+                            return trim((string)$u['username']) !== '' && !in_array(strtolower((string)$u['username']), $__techUsernames, true);
+                        })) : [];
                         foreach ($techs as $t): ?>
                         <tr>
                             <td><strong><?php echo htmlspecialchars($t['name']); ?></strong></td>
@@ -720,6 +728,18 @@ require_once 'includes/header.php';
                             </td>
                         </tr>
                         <?php endforeach; ?>
+                        <?php foreach ($__adminOnly as $au): ?>
+                        <tr>
+                            <td><strong><?php echo htmlspecialchars($au['full_name'] ?: $au['username']); ?></strong></td>
+                            <td>@<?php echo htmlspecialchars($au['username']); ?></td>
+                            <td><span class="badge bg-danger"><?php echo __('role_admin'); ?></span></td>
+                            <td><span class="text-white-50 small">—</span></td>
+                            <td><span class="text-white-50 small">—</span></td>
+                            <td><span class="text-white-50 small">—</span></td>
+                            <td><span class="badge bg-success"><?php echo __('active_status'); ?></span></td>
+                            <td class="text-end"><a href="settings.php?tab=admins" class="btn btn-outline-secondary btn-sm" title="<?php echo __('role_admin'); ?>"><i class="fas fa-user-shield"></i></a></td>
+                        </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -728,8 +748,17 @@ require_once 'includes/header.php';
         <?php
             $greetingStaff = [];
             try {
-                foreach ($pdo->query('SELECT username, full_name AS name FROM users ORDER BY full_name')->fetchAll() as $gu) { $greetingStaff[] = $gu; }
-                foreach ($pdo->query('SELECT username, name FROM technicians WHERE is_active = 1 ORDER BY name')->fetchAll() as $gt) { $greetingStaff[] = $gt; }
+                // Bez duplicit podle username: aktivní technik má přednost, pak admini,
+                // kteří mají účet jen v users. Dřív se člověk v obou tabulkách počítal 2×.
+                $__gSeen = [];
+                foreach ($pdo->query('SELECT username, name FROM technicians WHERE is_active = 1 ORDER BY name')->fetchAll() as $gt) {
+                    $u = strtolower(trim((string)$gt['username'])); if ($u === '' || isset($__gSeen[$u])) continue;
+                    $__gSeen[$u] = true; $greetingStaff[] = $gt;
+                }
+                foreach ($pdo->query('SELECT username, full_name AS name FROM users ORDER BY full_name')->fetchAll() as $gu) {
+                    $u = strtolower(trim((string)$gu['username'])); if ($u === '' || isset($__gSeen[$u])) continue;
+                    $__gSeen[$u] = true; $greetingStaff[] = $gu;
+                }
             } catch (Throwable $e) { $greetingStaff = []; }
         ?>
         <?php if ($active_tab == 'staff'): ?>
