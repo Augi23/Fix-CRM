@@ -83,6 +83,29 @@ const CRM_APPLE_MODELS_BY_TYPE = {
     ]
 };
 
+/* ═══ Select2: globální opravy dropdownů (celé CRM) ═══
+   1) iPad/dotyk: tap na select (např. Model zařízení ve wizardu) dropdown otevřel
+      a OKAMŽITĚ zase zavřel — dvojité vyhodnocení tapu (touch + syntetický klik).
+      Pojistka: zavření do 150 ms po otevření se ignoruje (člověk tak rychle
+      dropdown záměrně nezavře).
+   2) jQuery 3.6 regrese (select2/select2#5993): vyhledávací pole v dropdownu
+      nedostane focus → na iPadu se neotevře klávesnice a hledání nefunguje. */
+(function () {
+    if (typeof window.jQuery === 'undefined') return;
+    var $doc = window.jQuery(document);
+    $doc.on('select2:open', function (e) {
+        try { window.jQuery(e.target).data('afxS2OpenedAt', Date.now()); } catch (err) {}
+        setTimeout(function () {
+            var s = document.querySelector('.select2-container--open .select2-search__field');
+            if (s) { try { s.focus(); } catch (err) {} }
+        }, 0);
+    });
+    $doc.on('select2:closing', function (e) {
+        var openedAt = window.jQuery(e.target).data('afxS2OpenedAt') || 0;
+        if (openedAt && (Date.now() - openedAt) < 150) { e.preventDefault(); }
+    });
+}());
+
 function crmIsAppleBrand(value) {
     const normalized = String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
     return normalized === 'apple' || normalized.includes('apple');

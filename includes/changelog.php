@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.6.4',
+        'date' => '2026-07-15',
+        'time' => '16:05',
+        'title' => 'Oprava: rozbalovací nabídky (Model zařízení aj.) se na iPadu hned zavíraly',
+        'items' => [
+            'Při vytváření zakázky se po ťuknutí do pole „Model zařízení" (a dalších vyhledávacích polí) nabídka otevřela a okamžitě zase zavřela — dotykové zařízení vyhodnotilo jeden tap dvakrát. Nově se zavření nabídky během první chvilky po otevření ignoruje, takže zůstane otevřená.',
+            'Zároveň opraveno, že vyhledávací políčko v rozbalené nabídce nedostalo kurzor (známá chyba kombinace jQuery 3.6 + select2) — na iPadu se teď správně otevře klávesnice a dá se hned psát.',
+            'Oprava platí pro všechny vyhledávací rozbalovací nabídky v celém CRM (model, značka, klient, díly ze skladu…).',
+        ],
+    ],
+    [
         'version' => '1.6.3',
         'date' => '2026-07-15',
         'time' => '15:35',
