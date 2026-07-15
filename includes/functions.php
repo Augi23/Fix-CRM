@@ -2532,6 +2532,36 @@ function ensureOrderCreatedByColumn(): void {
     } catch (Throwable $e) { error_log('ensureOrderCreatedByColumn: ' . $e->getMessage()); }
 }
 
+/* ───────────────────────────  INTERNÍ TÝMOVÝ CHAT  ───────────────────────────
+ * Jedna společná místnost pro všechny zaměstnance. Jméno autora se ukládá
+ * natvrdo (přežije smazání účtu). Nové zprávy hlásí 20s poller zvukem.
+ * ---------------------------------------------------------------------------- */
+function ensureStaffChatTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS staff_chat (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            actor_type VARCHAR(20) NOT NULL,
+            actor_id INT NOT NULL,
+            author_name VARCHAR(190) NOT NULL,
+            message TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureStaffChatTable: ' . $e->getMessage()); }
+}
+
+/** Aktér chatu = přihlášený zaměstnanec (technik nebo admin účet). */
+function crmChatActor(): ?array {
+    if (!empty($_SESSION['tech_id'])) return ['technician', (int)$_SESSION['tech_id']];
+    if (is_numeric($_SESSION['user_id'] ?? null)) return ['user', (int)$_SESSION['user_id']];
+    return null;
+}
+
 /* ─────────────────────────  KLIENTSKÁ DOMÉNA (applefix.help)  ────────────────
  * Klientský portál běží na vlastní doméně; admin CRM na admin.applefix.cloud.
  * Stejný kód, chování se větví podle HTTP hostu. Admin doména se NEMĚNÍ.

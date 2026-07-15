@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.3.0',
+        'date' => '2026-07-15',
+        'time' => '08:30',
+        'title' => 'Nový týmový chat (nahrazuje Fixer Chat)',
+        'items' => [
+            'V menu je nová sekce Chat — jedna společná místnost, kde si píší všichni zaměstnanci mezi sebou. Jednoduché bubliny, oddělovače dnů, odesílání Enterem.',
+            'Nová zpráva se hlasitě ohlásí výrazným zvukem KDEKOLIV v CRM (ne jen na stránce chatu) a na ikoně Chat v menu svítí počet nepřečtených zpráv. Vlastní zprávy pochopitelně nezvoní.',
+            'Původní sekce Fixer Chat (Telegram) byla odstraněna.',
+        ],
+    ],
+    [
         'version' => '1.2.2',
         'date' => '2026-07-15',
         'time' => '07:50',

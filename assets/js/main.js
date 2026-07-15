@@ -1532,6 +1532,7 @@ $(document).on('change', '#pricelistRepair', function () {
             if (ac.state === 'suspended') { pendingKind = kind; return; }
         }
         var notes = kind === 'assign' ? [[784, 0], [988, 0.11], [1319, 0.22]]
+                  : kind === 'chat'   ? [[988, 0], [1319, 0.10], [988, 0.20], [1319, 0.30]]
                   : kind === 'status' ? [[880, 0]]
                   : [[659, 0], [988, 0.13]];
         var t0 = ac.currentTime + 0.02;
@@ -1540,7 +1541,7 @@ $(document).on('change', '#pricelistRepair', function () {
             o.type = 'sine'; o.frequency.value = n[0];
             var t = t0 + n[1];
             g.gain.setValueAtTime(0.0001, t);
-            g.gain.exponentialRampToValueAtTime(kind === 'assign' ? 0.55 : 0.4, t + 0.018);
+            g.gain.exponentialRampToValueAtTime((kind === 'assign' || kind === 'chat') ? 0.6 : 0.4, t + 0.018);
             g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
             o.connect(g); g.connect(ac.destination);
             o.start(t); o.stop(t + 0.6);
@@ -1588,20 +1589,29 @@ $(document).on('change', '#pricelistRepair', function () {
         }
 
         function tick() {
-            fetch('api/notify_poll.php', { credentials: 'same-origin', cache: 'no-store' })
+            var chatSeen = 0;
+            try { chatSeen = parseInt(localStorage.getItem('afx_chat_seen') || '0', 10) || 0; } catch (e) {}
+            fetch('api/notify_poll.php?chat_seen=' + chatSeen, { credentials: 'same-origin', cache: 'no-store' })
                 .then(function (r) { return r.json(); })
                 .then(function (d) {
                     if (!d || !d.ok) return;
                     setBadge('orders.php', d.orders_badge, false);
                     setBadge('reklamace.php', d.complaints_badge, true);
                     setBadge('procurement.php', d.procurement_badge, false);
+                    setBadge('chat.php', d.chat_unread || 0, false);
                     var prev = getState();
-                    var now = { o: d.last_order_id, l: d.last_status_log_id };
+                    var now = { o: d.last_order_id, l: d.last_status_log_id, c: d.last_chat_other_id || 0 };
                     if (!prev) { setState(now); return; }          // první běh: jen zapamatovat
-                    if (now.o === prev.o && now.l === prev.l) return;
+                    var chatNew = now.c > (prev.c || 0);
+                    if (now.o === prev.o && now.l === prev.l && !chatNew) return;
                     setState(now);                                  // rezervace: další karty už nehrají
                     if (window.afxChime) {
-                        window.afxChime(now.o > prev.o ? 'order' : 'status');
+                        // zprávu na otevřené stránce chatu ohlásí chat sám
+                        if (chatNew && location.pathname.indexOf('chat.php') === -1) {
+                            window.afxChime('chat');
+                        } else if (now.o !== prev.o || now.l !== prev.l) {
+                            window.afxChime(now.o > prev.o ? 'order' : 'status');
+                        }
                     }
                 })
                 .catch(function () {});

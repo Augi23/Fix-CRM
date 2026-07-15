@@ -27,8 +27,26 @@ try { $ordersBadge = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE status
 try { $complaintsBadge = (int)($pdo->query("SELECT COUNT(*) FROM complaints WHERE complaint_status NOT IN ('Vyřízeno','Zamítnuto')")->fetchColumn() ?: 0); } catch (Throwable $e) { $complaintsBadge = 0; }
 try { $procurementBadge = (int)($pdo->query("SELECT COUNT(*) FROM purchase_requests WHERE status IN ('pending','ordered')")->fetchColumn() ?: 0); } catch (Throwable $e) { $procurementBadge = 0; }
 
+// Týmový chat: poslední zpráva od JINÉHO (zvuk) + počet nepřečtených (badge)
+$lastChatOther = 0; $chatUnread = 0;
+try {
+    ensureStaffChatTable();
+    $me = crmChatActor();
+    if ($me !== null) {
+        $q = $pdo->prepare("SELECT MAX(id) FROM staff_chat WHERE NOT (actor_type = ? AND actor_id = ?)");
+        $q->execute([$me[0], $me[1]]);
+        $lastChatOther = (int)($q->fetchColumn() ?: 0);
+        $seen = max(0, (int)($_GET['chat_seen'] ?? 0));
+        $q = $pdo->prepare("SELECT COUNT(*) FROM staff_chat WHERE id > ? AND NOT (actor_type = ? AND actor_id = ?)");
+        $q->execute([$seen, $me[0], $me[1]]);
+        $chatUnread = (int)($q->fetchColumn() ?: 0);
+    }
+} catch (Throwable $e) {}
+
 echo json_encode([
     'ok' => true,
+    'last_chat_other_id' => $lastChatOther,
+    'chat_unread' => $chatUnread,
     'last_order_id' => $lastOrder,
     'last_status_log_id' => $lastLog,
     'orders_badge' => $ordersBadge,

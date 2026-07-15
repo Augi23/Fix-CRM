@@ -372,8 +372,8 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
         <a class="afx-cell <?php echo $current_page == 'accounting.php' ? 'active' : ''; ?>" href="accounting.php">
             <i class="fas fa-file-invoice-dollar"></i><small><?php echo __('accounting'); ?></small>
         </a>
-        <a class="afx-cell <?php echo $current_page == 'fixer_chat.php' ? 'active' : ''; ?>" href="fixer_chat.php">
-            <i class="fab fa-telegram-plane"></i><small><?php echo __('fixer_chat'); ?></small>
+        <a class="afx-cell <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php">
+            <i class="fas fa-comments"></i><small>Chat</small>
         </a>
         <?php endif; ?>
         <?php if (hasPermission('admin_access')): ?>
@@ -446,7 +446,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <a class="afx-sheet-link <?php echo $current_page == 'reports.php' ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line"></i><?php echo __('reports'); ?></a>
             <?php if ($afxIsManager): ?>
             <a class="afx-sheet-link <?php echo $current_page == 'accounting.php' ? 'active' : ''; ?>" href="accounting.php"><i class="fas fa-file-invoice-dollar"></i><?php echo __('accounting'); ?></a>
-            <a class="afx-sheet-link <?php echo $current_page == 'fixer_chat.php' ? 'active' : ''; ?>" href="fixer_chat.php"><i class="fab fa-telegram-plane"></i><?php echo __('fixer_chat'); ?></a>
+            <a class="afx-sheet-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php"><i class="fas fa-comments"></i>Chat</a>
             <?php endif; ?>
             <?php if (hasPermission('admin_access')): ?>
             <a class="afx-sheet-link <?php echo $current_page == 'history.php' ? 'active' : ''; ?>" href="history.php"><i class="fas fa-clock-rotate-left"></i>Historie</a>
