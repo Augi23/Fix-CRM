@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.0.0',
+        'date' => '2026-07-15',
+        'time' => '04:05',
+        'title' => 'Zavedeno normální číslování verzí (1.0.0)',
+        'items' => [
+            'CRM má nově srozumitelné verze místo technických kódů: opravy a drobnosti zvyšují poslední číslo (1.0.1), nové funkce prostřední (1.1.0), zásadní přestavby první (2.0.0).',
+            'Verze je vidět v Nastavení → Aktualizace (technický kód sestavení zůstává malým písmem pro servisní účely) a u každého záznamu v historii úprav.',
+            'Dnešní stav systému je výchozí Verze 1.0.0.',
+        ],
+    ],
+    [
         'date' => '2026-07-14',
         'time' => '23:40',
         'title' => 'Nové pozadí: futuristické tečkové vlny (generované, ostré v každém rozlišení)',

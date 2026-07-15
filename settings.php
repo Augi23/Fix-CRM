@@ -1327,16 +1327,16 @@ require_once 'includes/header.php';
                             <div class="col-6">
                                 <div class="glass-panel p-3 text-center border-secondary">
                                     <div class="text-white-75 small"><?php echo __('current_version'); ?></div>
-                                    <div class="h4 text-white mb-0" id="localVersion"><?php echo htmlspecialchars(trim($branchLabel . ' @ ' . $localShort)); ?></div>
-                                    <div class="small text-muted">
-                                        <?php echo !empty($gitInfo['dirty']) ? 'dirty' : 'clean'; ?> · ahead <?php echo (int)($gitInfo['ahead_by'] ?? 0); ?> · behind <?php echo (int)($gitInfo['behind_by'] ?? 0); ?>
+                                    <div class="h4 text-white mb-0" id="localVersion">Verze <?php echo e(crmAppVersion()); ?></div>
+                                    <div class="small text-muted" title="technické označení sestavení">
+                                        <?php echo htmlspecialchars(trim($branchLabel . ' @ ' . $localShort)); ?> · <?php echo !empty($gitInfo['dirty']) ? 'dirty' : 'clean'; ?>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-6">
                                 <div class="glass-panel p-3 text-center border-secondary">
                                     <div class="text-white-75 small"><?php echo __('latest_version'); ?></div>
-                                    <div class="h4 text-muted mb-0" id="remoteVersion"><?php echo htmlspecialchars(trim($branchLabel . ' @ ' . $remoteShort)); ?></div>
+                                    <div class="h4 text-muted mb-0" id="remoteVersion"><?php echo !empty($gitInfo['remote_version']) ? 'Verze ' . e((string)$gitInfo['remote_version']) : htmlspecialchars(trim($branchLabel . ' @ ' . $remoteShort)); ?></div>
                                     <div class="small text-muted" id="remoteReleaseDate"><?php echo !empty($gitInfo['remote_date']) ? htmlspecialchars(date('Y-m-d H:i', strtotime($gitInfo['remote_date']))) : ''; ?></div>
                                 </div>
                             </div>
@@ -1385,6 +1385,7 @@ require_once 'includes/header.php';
                             <?php foreach (array_slice($crm_history, 0, 50) as $hz): ?>
                                 <div class="mb-3 pb-2 border-bottom border-secondary">
                                     <div class="fw-bold text-white">
+                                        <?php if (!empty($hz['version'])): ?><span class="badge bg-success me-1">v<?php echo e((string)$hz['version']); ?></span><?php endif; ?>
                                         <span class="badge bg-primary me-2"><?php echo e(date('d.m.Y', strtotime((string)$hz['date']))); ?><?php if (!empty($hz['time'])): ?> · <?php echo e((string)$hz['time']); ?><?php endif; ?></span>
                                         <?php echo e((string)$hz['title']); ?>
                                     </div>

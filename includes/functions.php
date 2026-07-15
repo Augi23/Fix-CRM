@@ -1239,6 +1239,17 @@ function gitRemoteSlug(string $repoRoot): ?string {
     return gitRemoteSlugFromUrl(gitRemoteUrl($repoRoot, 'origin'));
 }
 
+/** Lidská verze CRM ze souboru VERSION (formát major.minor.patch).
+ *  PRAVIDLO: velké číslo = zásadní přestavba, prostřední = nové funkce,
+ *  poslední = opravy a drobnosti. Zvyšuje se při každé změně (commit). */
+function crmAppVersion(): string {
+    static $v = null;
+    if ($v !== null) return $v;
+    $v = trim((string)@file_get_contents(dirname(__DIR__) . '/VERSION'));
+    if (!preg_match('/^\d+\.\d+\.\d+\z/', $v)) { $v = '1.0.0'; }
+    return $v;
+}
+
 function getGitRepoInfo(string $repoRoot): array {
     $repoRoot = rtrim($repoRoot, '/');
     $remoteName = 'origin';
@@ -1330,6 +1341,9 @@ function getGitRepoInfo(string $repoRoot): array {
         if ($code === 0 && $remote !== '') {
             $info['remote_commit'] = $remote;
             $info['remote_short'] = substr($remote, 0, 7);
+            // lidská verze dostupné aktualizace (VERSION soubor ve vzdáleném commitu)
+            $rv = trim((string)@shell_exec('cd ' . escapeshellarg($repoRoot) . ' && git show ' . escapeshellarg($remoteName . '/' . ($info['branch'] ?: 'main') . ':VERSION') . ' 2>/dev/null'));
+            if (preg_match('/^\d+\.\d+\.\d+\z/', $rv)) { $info['remote_version'] = $rv; }
         }
 
         $remoteDate = runGitCommand($repoRoot, 'show -s --format=%cI ' . escapeshellarg($remoteRef), $code);

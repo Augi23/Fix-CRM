@@ -107,10 +107,13 @@ if ($exitCode !== 0) {
 
 $newInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : $info;
 
+$__vOld = trim((string)@shell_exec('cd ' . escapeshellarg($repoRoot) . ' && git show ' . escapeshellarg(($info['local_commit'] ?? 'HEAD~0') . ':VERSION') . ' 2>/dev/null')) ?: '?';
+$__vNew = function_exists('crmAppVersion') ? trim((string)@file_get_contents($repoRoot . '/VERSION')) : '?';
 if (function_exists('crmAuditLog')) {
     crmAuditLog('system.update', [
         'entity_type' => 'system',
-        'summary' => 'Aktualizace CRM: ' . trim(($info['local_short'] ?? '?')) . ' → ' . trim(($newInfo['local_short'] ?? '?')),
+        'summary' => 'Aktualizace CRM: verze ' . $__vOld . ' → ' . $__vNew
+            . ' (' . trim(($info['local_short'] ?? '?')) . ' → ' . trim(($newInfo['local_short'] ?? '?')) . ')',
     ]);
 }
 
@@ -118,9 +121,9 @@ echo json_encode([
     'success' => true,
     'message' => 'Repository was updated from git.',
     'updated' => true,
-    'previous_version' => trim(($info['branch'] ?? 'main') . ' @ ' . ($info['local_short'] ?? '—')),
-    'new_version' => trim(($newInfo['branch'] ?? $info['branch']) . ' @ ' . ($newInfo['local_short'] ?? $info['local_short'])),
-    'current_version' => trim(($newInfo['branch'] ?? $info['branch']) . ' @ ' . ($newInfo['local_short'] ?? $info['local_short'])),
+    'previous_version' => 'Verze ' . $__vOld,
+    'new_version' => 'Verze ' . $__vNew,
+    'current_version' => 'Verze ' . $__vNew,
     'build' => sprintf('ahead %d / behind %d', (int)($newInfo['ahead_by'] ?? 0), (int)($newInfo['behind_by'] ?? 0)),
     'warning' => $dirtyWarning !== '' ? $dirtyWarning : null,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
