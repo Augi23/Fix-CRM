@@ -1,5 +1,12 @@
 <?php
 require_once __DIR__ . '/functions.php';
+
+// Klientská doména (applefix.help) NIKDY nezobrazuje admin CRM — každou admin
+// stránku přesměruje na přihlášení klientského portálu. Admin doména beze změny.
+if (function_exists('crmIsClientDomain') && crmIsClientDomain()) {
+    header('Location: /login.php');
+    exit;
+}
 require_once __DIR__ . '/../klient/includes/auth.php';
 
 // Keep client users inside the client portal

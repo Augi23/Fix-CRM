@@ -82,7 +82,7 @@ if (!function_exists('_l')) {
 $__bc = crmOrderBranchContact((int)($order['branch_id'] ?? 0));   // kontakty dle pobočky zakázky
 $__logo_fs = __DIR__ . '/assets/img/logo-black.png';
 $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((string)file_get_contents($__logo_fs)) : '';
-$__portal = 'https://admin.applefix.cloud/login.php';
+$__portal = crmClientPortalUrl();   // klientský portál (applefix.help po aktivaci)
 ?>
 <div class="container">
     <div class="text-center">
@@ -140,7 +140,7 @@ $__portal = 'https://admin.applefix.cloud/login.php';
 
     <div class="text-center qr-code">
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=<?php echo urlencode($__portal); ?>" alt="QR">
-        <div class="qr-note"><?php echo _l('status_page_label'); ?>: <a class="doclink" href="<?php echo $__portal; ?>">admin.applefix.cloud</a></div>
+        <div class="qr-note"><?php echo _l('status_page_label'); ?>: <a class="doclink" href="<?php echo $__portal; ?>"><?php echo e(preg_replace('~^https?://|/login\.php$~', '', crmClientPortalUrl())); ?></a></div>
         <div class="qr-sub"><?php echo _l('client_portal_login_hint'); ?></div>
     </div>
 

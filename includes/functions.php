@@ -2532,6 +2532,36 @@ function ensureOrderCreatedByColumn(): void {
     } catch (Throwable $e) { error_log('ensureOrderCreatedByColumn: ' . $e->getMessage()); }
 }
 
+/* ─────────────────────────  KLIENTSKÁ DOMÉNA (applefix.help)  ────────────────
+ * Klientský portál běží na vlastní doméně; admin CRM na admin.applefix.cloud.
+ * Stejný kód, chování se větví podle HTTP hostu. Admin doména se NEMĚNÍ.
+ * ---------------------------------------------------------------------------- */
+
+/** Doména klientského portálu (nastavitelná; prázdná = vypnuto). */
+function crmClientDomain(): string {
+    return strtolower(trim((string)get_setting('client_domain', 'applefix.help')));
+}
+
+/** Přišel aktuální požadavek přes klientskou doménu? */
+function crmIsClientDomain(): bool {
+    $d = crmClientDomain();
+    if ($d === '') return false;
+    $h = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+    $h = preg_replace('/:\d+$/', '', $h);
+    return $h === $d || $h === 'www.' . $d;
+}
+
+/** Absolutní URL klientského portálu pro e-maily/QR na dokumentech.
+ *  Na novou doménu se přepne až settingem client_domain_live=1 (po ověření,
+ *  že doména má certifikát a jede) — do té doby zůstávají odkazy staré. */
+function crmClientPortalUrl(): string {
+    $d = crmClientDomain();
+    if ($d !== '' && get_setting('client_domain_live', '0') === '1') {
+        return 'https://' . $d . '/login.php';
+    }
+    return 'https://admin.applefix.cloud/login.php';
+}
+
 /* ─────────────────────────  ČAS STRÁVENÝ V SYSTÉMU  ──────────────────────────
  * Měří aktivní čas každého zaměstnance v CRM (zdroj: 20s poller upozornění —
  * běží, dokud je CRM otevřené). Slouží ve statistikách hlavně pro Bosse/adminy,
@@ -3374,7 +3404,7 @@ function crmPickupReadyEmailHtml(array $o): string
 
     $logo   = 'https://admin.applefix.cloud/assets/img/logo-black.png';   // originální AppleFix wordmark
     $green  = '#76b82a';
-    $portal = 'https://admin.applefix.cloud/login.php';
+    $portal = crmClientPortalUrl();   // klientský portál (applefix.help po aktivaci)
 
     $hoursRows = '';
     foreach (array_filter(array_map('trim', preg_split('/\r?\n/', $branchHours))) as $hl) {

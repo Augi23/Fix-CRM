@@ -99,8 +99,12 @@ if (isset($_POST['login'])) {
             $error = __('login_fill_user_pass');
         } elseif (isset($pdo)) {
             $loginSucceeded = false;
+            // Na klientské doméně (applefix.help) se zaměstnanci NEpřihlásí —
+            // zaměstnanecké větve se přeskočí, funguje jen klientský lookup níže.
+            $allowStaffLogin = !crmIsClientDomain();
 
             // 1) Staff / admin login
+            if ($allowStaffLogin) {
             $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
             $stmt->execute([$username]);
             $user = $stmt->fetch();
@@ -157,6 +161,7 @@ if (isset($_POST['login'])) {
                 header('Location: index.php');
                 exit;
             }
+            } // konec zaměstnaneckých větví (jen mimo klientskou doménu)
 
             // 2) Client login - same portal, different dashboard
             $lookup = clientLookupCustomerAndOrders($pdo, $username);
@@ -279,6 +284,7 @@ if (!empty($_POST['ajax'])) {
     <a class="btn btn-sm <?php echo $currentLang === 'ru' ? 'btn-light text-dark' : 'btn-outline-light'; ?>" href="set_language.php?lang=ru&amp;redirect=<?php echo rawurlencode($_SERVER['REQUEST_URI'] ?? 'login.php'); ?>">RU</a>
 </div>
 
+<?php $isClientDom = crmIsClientDomain(); ?>
 <div class="login-page">
     <div class="login-scene">
         <section class="login-hero">
@@ -323,12 +329,12 @@ if (!empty($_POST['ajax'])) {
                     <?php echo csrfField(); ?>
                     <input type="hidden" name="login" value="1">
                     <div class="mb-3">
-                        <label class="form-label"><?php echo __('username_label'); ?></label>
-                        <input type="text" name="username" class="form-control" required autofocus autocomplete="username" placeholder="<?php echo e(__('login_username_placeholder')); ?>">
+                        <label class="form-label"><?php echo $isClientDom ? 'E-mail nebo telefon' : __('username_label'); ?></label>
+                        <input type="text" name="username" class="form-control" required autofocus autocomplete="username" placeholder="<?php echo $isClientDom ? 'zadejte e-mail nebo telefon ze zakázky' : e(__('login_username_placeholder')); ?>">
                     </div>
                     <div class="mb-4">
-                        <label class="form-label"><?php echo __('password'); ?></label>
-                        <input type="password" name="password" class="form-control" required autocomplete="current-password" placeholder="<?php echo e(__('login_password_placeholder')); ?>">
+                        <label class="form-label"><?php echo $isClientDom ? 'PIN zakázky' : __('password'); ?></label>
+                        <input type="password" name="password" class="form-control" required autocomplete="current-password" placeholder="<?php echo $isClientDom ? 'PIN najdete na zakázkovém listu' : e(__('login_password_placeholder')); ?>">
                     </div>
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary"><?php echo __('login_btn'); ?></button>

@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.2.0',
+        'date' => '2026-07-15',
+        'time' => '06:20',
+        'title' => 'Klientská sekce na vlastní doméně applefix.help',
+        'items' => [
+            'Klientský portál běží nově i na applefix.help — na této doméně se přihlašují jen klienti (e-mail/telefon + PIN zakázky), zaměstnanecké přihlášení je vypnuté a administrace není z této domény vůbec dosažitelná.',
+            'admin.applefix.cloud zůstává beze změny — zaměstnanci i klienti se tam přihlašují jako dosud.',
+            'Odkazy na klientský portál v e-mailech a na dokumentech půjdou na applefix.help teprve po ručním potvrzení (setting), aby se nic nerozbilo, dokud nová doména neběží naostro.',
+        ],
+    ],
+    [
         'version' => '1.1.0',
         'date' => '2026-07-15',
         'time' => '05:25',
