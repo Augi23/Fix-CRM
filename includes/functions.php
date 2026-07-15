@@ -2585,6 +2585,20 @@ function crmTrackStaffActivity(): void {
     } catch (Throwable $e) { /* měření nesmí nikdy shodit poller */ }
 }
 
+/** Sloupec technicians.pay_by_time — zaměstnanec odměňovaný z ČASU v systému
+ *  (brigádník/správce), ne ze zakázek. Nastavuje admin na kartě zaměstnance. */
+function ensurePayByTimeColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM technicians LIKE 'pay_by_time'")->fetch()) {
+            $pdo->exec("ALTER TABLE technicians ADD COLUMN pay_by_time TINYINT(1) NOT NULL DEFAULT 0");
+        }
+        $done = true;
+    } catch (Throwable $e) { error_log('ensurePayByTimeColumn: ' . $e->getMessage()); }
+}
+
 /** Aktivní čas v systému v období: časy techniků (tech_id => sekundy) a
  *  ZVLÁŠŤ samostatné admin účty (users) — admin je vlastní osoba s vlastním
  *  řádkem ve statistikách, NIC se nemapuje na techniky (žádné domněnky).

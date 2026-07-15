@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.1.0',
+        'date' => '2026-07-15',
+        'time' => '05:25',
+        'title' => 'Brigádníci: odměna z odpracovaného času místo zakázek',
+        'items' => [
+            'Na kartě zaměstnance je nový přepínač „Odměna z času v systému (brigádník)" — zaměstnanci se pak počítají hodiny strávené v CRM × jeho sazba, ne zakázky. Přepínat smí jen administrátor.',
+            'Ve statistikách má takový zaměstnanec u času v systému ikonu hodin a odměna se počítá z něj.',
+            'Andrea (brigádnice, 150 Kč/h) je takto rovnou nastavená.',
+        ],
+    ],
+    [
         'version' => '1.0.2',
         'date' => '2026-07-15',
         'time' => '05:00',

@@ -234,7 +234,8 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     </thead>
                     <tbody>
                         <?php
-                        $techs = $pdo->query("SELECT t.id, t.name, t.role, t.is_active, t.branch_id, b.name AS branch_name FROM technicians t LEFT JOIN branches b ON b.id = t.branch_id " . (isBranchGlobalViewer() ? "" : "WHERE t.branch_id = " . (int)getCurrentStaffBranchId()) . " ORDER BY b.id ASC, t.is_active DESC, t.name ASC")->fetchAll();
+                        ensurePayByTimeColumn();
+                        $techs = $pdo->query("SELECT t.id, t.name, t.role, t.is_active, t.branch_id, t.pay_by_time, b.name AS branch_name FROM technicians t LEFT JOIN branches b ON b.id = t.branch_id " . (isBranchGlobalViewer() ? "" : "WHERE t.branch_id = " . (int)getCurrentStaffBranchId()) . " ORDER BY b.id ASC, t.is_active DESC, t.name ASC")->fetchAll();
                         // aktivní čas v CRM: technici + samostatné admin účty (vlastní řádky)
                         $sysAll = crmGetSystemTime($start_date, $end_date);
                         $sysTime = $sysAll['tech'];
@@ -257,11 +258,14 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <?php
                             endif;
                             $s = getDetailedStats($pdo, $start_date, $end_date, $t['id']);
-                            // Všichni technici vč. Bosse se odměňují ZE ZAKÁZEK — čas
-                            // v systému je u nich jen informativní. Z času v systému se
-                            // odměňuje pouze samostatný admin účet (řádky níže).
+                            // Technici se odměňují ZE ZAKÁZEK; zaměstnanci s příznakem
+                            // „odměna z času" (brigádníci) z hodin v systému × sazba.
                             $sysMin = (int)round(($sysTime[(int)$t['id']] ?? 0) / 60);
-                            $isCrmWorker = false;
+                            $isCrmWorker = !empty($t['pay_by_time']);
+                            if ($isCrmWorker) {
+                                $s['earnings'] = ($sysMin / 60) * (float)$s['engineer_rate'];
+                                $s['profit'] = $s['revenue'] - $s['parts_cost'] - $s['expenses'] - $s['earnings'];
+                            }
                             $totals['sys_minutes'] += $sysMin;
                             $totals['received'] += $s['received'];
                             $totals['in_progress'] += $s['in_progress'];
@@ -287,7 +291,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 </a>
                             </td>
                             <td class="text-end"><?php echo formatWorkDuration($s['work_minutes']); ?></td>
-                            <td class="text-end text-white-75"><?php echo $sysMin > 0 ? formatWorkDuration($sysMin) : '—'; ?></td>
+                            <td class="text-end <?php echo $isCrmWorker ? 'fw-bold text-info' : 'text-white-75'; ?>"><?php echo $sysMin > 0 ? formatWorkDuration($sysMin) : '—'; ?><?php echo $isCrmWorker ? ' <i class="far fa-clock small" title="Odměna z času v systému (brigádník)"></i>' : ''; ?></td>
                             <td class="text-end"><?php echo formatMoney($s['revenue']); ?></td>
                             <td class="text-end text-muted small"><?php echo $s['parts_cost'] > 0 ? '-'.formatMoney($s['parts_cost']) : '—'; ?></td>
                             <td class="text-end text-muted small"><?php echo $s['expenses'] > 0 ? '-'.formatMoney($s['expenses']) : '—'; ?></td>

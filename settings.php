@@ -146,6 +146,7 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
 if (isset($_POST['edit_tech'])) {
     settingsDebugLog(['event' => 'edit_tech_hit', 'post' => $_POST, 'time' => date('c')]);
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    ensurePayByTimeColumn();
     $id = $_POST['tech_id'];
     
     // Security check: technicians can only edit themselves
@@ -176,6 +177,8 @@ if (isset($_POST['edit_tech'])) {
     $username = trim($_POST['tech_username'] ?? '');
     $password = $_POST['tech_password'] ?? '';
     $engineer_rate = floatval($_POST['engineer_rate'] ?? 0);
+    // Odměna z času v systému (brigádník) — smí přepnout jen admin
+    $pay_by_time = $is_admin_check ? (isset($_POST['pay_by_time']) ? 1 : 0) : null;
 
     // Re-verify important fields if NOT admin
     if (!$is_admin_check) {
@@ -212,11 +215,12 @@ if (isset($_POST['edit_tech'])) {
     }
     
     $username_val = !empty($username) ? $username : null;
+    $pbtSql = $pay_by_time !== null ? ", pay_by_time = " . (int)$pay_by_time : "";
     if (!empty($password)) {
-        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, branch_id = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, password = ?, engineer_rate = ? WHERE id = ?";
+        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, branch_id = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, password = ?, engineer_rate = ?" . $pbtSql . " WHERE id = ?";
         $params = [$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $active, $username_val, password_hash($password, PASSWORD_DEFAULT), $engineer_rate, $id];
     } else {
-        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, branch_id = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, engineer_rate = ? WHERE id = ?";
+        $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, branch_id = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, engineer_rate = ?" . $pbtSql . " WHERE id = ?";
         $params = [$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $active, $username_val, $engineer_rate, $id];
     }
     $stmt = $pdo->prepare($sql);
@@ -1642,6 +1646,10 @@ require_once 'includes/header.php';
                     <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?>/h</span>
                 </div>
                 <div class="form-text small"><?php echo __('rate_hint'); ?></div>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="pay_by_time" id="payByTime<?php echo $t['id']; ?>" <?php echo !empty($t['pay_by_time']) ? 'checked' : ''; ?>>
+                <label class="form-check-label" for="payByTime<?php echo $t['id']; ?>">Odměna z času v systému <span class="text-white-50 small">(brigádník — počítají se hodiny, ne zakázky)</span></label>
             </div>
             <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_active" id="isActive<?php echo $t['id']; ?>" <?php echo ($t['is_active'] ?? 1) ? 'checked' : ''; ?>><label class="form-check-label" for="isActive<?php echo $t['id']; ?>"><?php echo __('active_status'); ?></label></div>
             <?php else: ?>
