@@ -31,3 +31,6 @@ Thumbs.db
 __pycache__/
 print-bridge/.venv/
 backups/
+
+# Pomocný skript generovaný zálohovacím systémem přímo na serveru
+scripts/full_backup.sh

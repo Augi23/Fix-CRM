@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '1.6.2',
+        'date' => '2026-07-15',
+        'time' => '15:20',
+        'title' => 'Úklid: indikátor verze už nehlásí „dirty"',
+        'items' => [
+            'Pomocný skript zálohování (scripts/full_backup.sh), který si server vytváří sám, se nově ignoruje v gitu — stav verze v Aktualizacích už kvůli němu nehlásí „dirty".',
+        ],
+    ],
+    [
         'version' => '1.6.1',
         'date' => '2026-07-15',
         'time' => '15:00',
