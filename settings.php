@@ -1869,9 +1869,12 @@ function checkForUpdates(force = false) {
                 return;
             }
 
-            // Update remote version display
+            // Update remote version display — stejný formát jako PHP render („Verze 1.6.2");
+            // git štítek (main @ hash) se použije jen když číslo verze není k dispozici
             const rv = document.getElementById('remoteVersion');
-            rv.textContent = data.remote_version || rv.textContent;
+            if (data.remote_version) {
+                rv.textContent = /^\d+\.\d+\.\d+$/.test(data.remote_version) ? ('Verze ' + data.remote_version) : data.remote_version;
+            }
             rv.className = data.has_update ? 'h4 text-success mb-0' : 'h4 text-white mb-0';
             
             const rd = document.getElementById('remoteReleaseDate');

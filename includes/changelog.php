@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.6.3',
+        'date' => '2026-07-15',
+        'time' => '15:35',
+        'title' => 'Oprava: čísla verzí v Aktualizacích se ukazovala rozbitě',
+        'items' => [
+            'Po kliknutí na „Zkontrolovat aktualizace" se místo čísla verze ukazoval git štítek („vmain @ 1d2cca1"). API totiž do políček s verzí posílalo popis commitů místo čísla ze souboru VERSION.',
+            'Nově se VŠUDE konzistentně ukazuje „Verze 1.6.3" (aktuální i nejnovější) — technický údaj o commitu zůstává jen jako doplňkové „Sestavení".',
+        ],
+    ],
+    [
         'version' => '1.6.2',
         'date' => '2026-07-15',
         'time' => '15:20',

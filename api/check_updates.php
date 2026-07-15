@@ -35,6 +35,14 @@ $localLabel = trim($branch . ' @ ' . ($info['local_short'] ?: '—'));
 $remoteLabel = $info['remote_short'] ? trim($branch . ' @ ' . $info['remote_short']) : $localLabel;
 $buildLabel = sprintf('ahead %d / behind %d', (int)($info['ahead_by'] ?? 0), (int)($info['behind_by'] ?? 0));
 
+// Lidská čísla verzí (VERSION soubor) — UI ukazuje VŽDY „1.6.2", ne „main @ hash".
+// Git štítky zůstávají jen jako doplňkový build údaj (local_build/remote_build).
+// Dřív se do local_version/remote_version posílaly git štítky a stránka se po
+// „Zkontrolovat aktualizace" přepnula z „Verze 1.6.1" na „vmain @ 1d2cca1".
+$localSemver = function_exists('crmAppVersion') ? trim((string)crmAppVersion()) : '';
+if (!preg_match('/^\d+\.\d+\.\d+$/', $localSemver)) { $localSemver = ''; }
+$remoteSemver = trim((string)($info['remote_version'] ?? ''));
+
 if ($info['behind_by'] > 0) {
     $message = 'A new version is available on git.';
 } elseif ($info['ahead_by'] > 0) {
@@ -49,12 +57,14 @@ $response = [
     'success' => true,
     'message' => $message,
     'hint' => !empty($info['dirty']) ? 'Warning: working tree is not clean.' : '',
-    'new_version' => $localLabel,
-    'current_version' => $localLabel,
-    'local_version' => $localLabel,
-    'latest_version' => $remoteLabel,
+    'new_version' => $localSemver ?: $localLabel,
+    'current_version' => $localSemver ?: $localLabel,
+    'local_version' => $localSemver ?: $localLabel,
+    'latest_version' => $remoteSemver ?: ($localSemver ?: $remoteLabel),
     'release_date' => $info['remote_date'] ?: $info['local_date'],
     'build' => $buildLabel,
+    'local_build' => $localLabel,
+    'remote_build' => $remoteLabel,
     'has_update' => ((int)($info['behind_by'] ?? 0) > 0),
     'dirty' => !empty($info['dirty']),
     'branch' => $branch,
@@ -63,7 +73,7 @@ $response = [
     'remote_name' => (string)($info['remote_name'] ?? 'origin'),
     'remote_url' => (string)($info['remote_url'] ?? ''),
     'remote_commit' => $info['remote_commit'] ?: '',
-    'remote_version' => $remoteLabel,
+    'remote_version' => $remoteSemver ?: ($localSemver ?: $remoteLabel),
     'changelog' => array_map(static function (array $commit): array {
         $sha = $commit['short'] ?? substr((string)($commit['hash'] ?? ''), 0, 7);
         $date = $commit['date'] ?? '';
