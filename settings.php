@@ -67,6 +67,12 @@ if (isset($_POST['update_integrations']) && $is_admin_check) {
     set_setting('ai_api_key', trim($_POST['ai_api_key']));
     set_setting('ai_model', $_POST['ai_model']);
     set_setting('ifreeicloud_api_key', trim($_POST['ifreeicloud_api_key'] ?? ''));
+    // SMS brána GoSMS
+    set_setting('gosms_client_id', trim($_POST['gosms_client_id'] ?? ''));
+    if (trim($_POST['gosms_client_secret'] ?? '') !== '') { set_setting('gosms_client_secret', trim($_POST['gosms_client_secret'])); }
+    set_setting('gosms_channel', trim($_POST['gosms_channel'] ?? ''));
+    set_setting('sms_pickup_enabled', isset($_POST['sms_pickup_enabled']) ? '1' : '0');
+    set_setting('gosms_token', '');   // po změně přihlášení vynutit nový token
     set_setting('ifreeicloud_service_id', (string) intval($_POST['ifreeicloud_service_id'] ?? 0));
 
     // ── SMTP (odesílání zakázkových listů klientům e-mailem) ──
@@ -639,6 +645,45 @@ require_once 'includes/header.php';
                             <label class="form-label small text-white-75">Service ID z iFreeiCloud dashboardu</label>
                             <input type="number" name="ifreeicloud_service_id" class="form-control" value="<?php echo htmlspecialchars(get_setting_with_fallback('ifreeicloud_service_id', (string) IFREEICLOUD_SERVICE_ID_FALLBACK, 'IFREEICLOUD_SERVICE_ID')); ?>" min="0" step="1">
                             <div class="form-text small text-white-75 mt-2">Used as secondary verification below the Police DB result. Enter the real service ID for the selected iFreeiCloud check (e.g. FMI / model / serial from dashboard).</div>
+
+                            <hr class="border-secondary my-4">
+                            <h6 class="small fw-bold text-info mb-3"><i class="fas fa-comment-sms me-2"></i>SMS brána GoSMS.cz</h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label small text-white-75">Client ID</label>
+                                    <input type="text" name="gosms_client_id" class="form-control" value="<?php echo htmlspecialchars(get_setting('gosms_client_id', '')); ?>" placeholder="z GoSMS → Můj účet → API">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small text-white-75">Client Secret</label>
+                                    <input type="password" name="gosms_client_secret" class="form-control" value="" placeholder="<?php echo get_setting('gosms_client_secret', '') !== '' ? '••••••• (uloženo — vyplň jen při změně)' : 'client secret'; ?>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small text-white-75">Kanál (číslo)</label>
+                                    <input type="number" name="gosms_channel" class="form-control" value="<?php echo htmlspecialchars(get_setting('gosms_channel', '')); ?>" placeholder="ID kanálu z GoSMS">
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="sms_pickup_enabled" id="smsPickupEnabled" <?php echo get_setting('sms_pickup_enabled', '0') === '1' ? 'checked' : ''; ?>>
+                                        <label class="form-check-label" for="smsPickupEnabled">Posílat klientům SMS, když je zakázka <b>připravena k vyzvednutí</b> <span class="text-white-50 small">(v jazyce klienta, každé zakázce jen jednou)</span></label>
+                                    </div>
+                                </div>
+                                <div class="col-12 d-flex gap-2 align-items-center">
+                                    <input type="text" id="smsTestNumber" class="form-control" style="max-width:220px;" placeholder="+420777123456">
+                                    <button type="button" class="btn btn-outline-info" onclick="afxSmsTest()"><i class="fas fa-paper-plane me-1"></i>Poslat testovací SMS</button>
+                                    <span id="smsTestResult" class="small text-white-75"></span>
+                                </div>
+                            </div>
+                            <script>
+                            function afxSmsTest() {
+                                var n = document.getElementById('smsTestNumber').value.trim();
+                                var out = document.getElementById('smsTestResult');
+                                if (!n) { out.textContent = 'Zadej číslo.'; return; }
+                                out.textContent = 'Odesílám…';
+                                $.post('api/sms_test.php', { phone: n }, function (r) {
+                                    out.textContent = r.success ? '✓ Odesláno — zkontroluj telefon.' : ('✗ ' + (r.message || 'Chyba'));
+                                }, 'json').fail(function () { out.textContent = '✗ Chyba spojení'; });
+                            }
+                            </script>
                         </div>
                         <div class="form-text small text-white-75"><?php echo __('ai_hint'); ?></div>
                     </div>

@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.4.0',
+        'date' => '2026-07-15',
+        'time' => '09:30',
+        'title' => 'SMS klientům přes GoSMS (připraveno k vyzvednutí)',
+        'items' => [
+            'CRM umí posílat klientům SMS přes bránu GoSMS.cz. První automatická SMS: „zakázka připravena k vyzvednutí" — odchází spolu s e-mailem, v jazyce klienta (čeština/angličtina), každé zakázce jen jednou, bez diakritiky (úspora ceny SMS).',
+            'Nastavení → Integrace → sekce „SMS brána GoSMS.cz": Client ID, Client Secret, číslo kanálu, přepínač zapnutí a tlačítko „Poslat testovací SMS".',
+            'Každá odeslaná SMS se zapisuje do Historie. Dokud nejsou vyplněné klíče, nic se neposílá a nic se nerozbije.',
+        ],
+    ],
+    [
         'version' => '1.3.1',
         'date' => '2026-07-15',
         'time' => '08:50',

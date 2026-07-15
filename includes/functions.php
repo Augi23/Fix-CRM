@@ -1559,6 +1559,7 @@ function crmNotifyOrderLifecycleEvent(array $event): void {
     if ($type === 'order_status_changed' && $newStatus !== '' && isOrderStatusIn($newStatus, 'completed')
         && !($oldStatus !== '' && isOrderStatusIn($oldStatus, 'completed'))) {
         crmSendPickupReadyEmail($orderId);
+        crmSendPickupReadySms($orderId);
     }
 
     // Poděkování + žádost o Google recenzi — jen při přechodu DO skupiny 'collected' (vydáno).
@@ -2532,6 +2533,128 @@ function ensureOrderCreatedByColumn(): void {
     } catch (Throwable $e) { error_log('ensureOrderCreatedByColumn: ' . $e->getMessage()); }
 }
 
+/* ─────────────────────────────  SMS BRÁNA (GoSMS)  ───────────────────────────
+ * Odesílání SMS klientům přes GoSMS.cz (OAuth2 client_credentials).
+ * Nastavení v Integracích: gosms_client_id/secret, gosms_channel,
+ * sms_pickup_enabled. Bez klíčů se SMS tiše neodesílají (nic se nerozbije).
+ * ---------------------------------------------------------------------------- */
+
+/** Telefon na tvar +420XXXXXXXXX (GoSMS vyžaduje +<12 číslic>). */
+function crmSmsNormalizePhone(string $phone): ?string {
+    $p = preg_replace('/[^0-9+]/', '', $phone);
+    if ($p === '') return null;
+    if (str_starts_with($p, '00')) { $p = '+' . substr($p, 2); }
+    if (!str_starts_with($p, '+')) {
+        if (strlen($p) === 9) { $p = '+420' . $p; }       // české číslo bez předvolby
+        else { $p = '+' . $p; }
+    }
+    return preg_match('/^\+[0-9]{11,14}\z/', $p) ? $p : null;
+}
+
+/** Text bez diakritiky (SMS s diakritikou má jen 70 znaků/zprávu — dražší). */
+function crmSmsPlainText(string $t): string {
+    $out = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $t);
+    return $out !== false ? $out : $t;
+}
+
+/** Přístupový token GoSMS (cache ~58 min v settings). */
+function crmGosmsToken(): ?string {
+    $cid = trim((string)get_setting('gosms_client_id', ''));
+    $sec = trim((string)get_setting('gosms_client_secret', ''));
+    if ($cid === '' || $sec === '') return null;
+    $tok = (string)get_setting('gosms_token', '');
+    $exp = (int)get_setting('gosms_token_expires', '0');
+    if ($tok !== '' && $exp > time() + 30) return $tok;
+    $ch = curl_init('https://app.gosms.cz/oauth/v2/token');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query(['client_id' => $cid, 'client_secret' => $sec, 'grant_type' => 'client_credentials']),
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12,
+    ]);
+    $resp = curl_exec($ch);
+    curl_close($ch);
+    $d = json_decode((string)$resp, true);
+    if (!is_array($d) || empty($d['access_token'])) return null;
+    set_setting('gosms_token', (string)$d['access_token']);
+    set_setting('gosms_token_expires', (string)(time() + min(3500, (int)($d['expires_in'] ?? 3600))));
+    return (string)$d['access_token'];
+}
+
+/** Odešle SMS přes GoSMS. @return array{0:bool,1:string} [ok, chyba/detail] */
+function crmSendSms(string $phone, string $text): array {
+    $num = crmSmsNormalizePhone($phone);
+    if ($num === null) return [false, 'Neplatné telefonní číslo: ' . $phone];
+    $channel = (int)get_setting('gosms_channel', '0');
+    if ($channel <= 0) return [false, 'Není nastaven kanál GoSMS (Nastavení → Integrace)'];
+    $tok = crmGosmsToken();
+    if ($tok === null) return [false, 'GoSMS přihlášení selhalo — zkontroluj Client ID/Secret'];
+    $ch = curl_init('https://app.gosms.cz/api/v1/messages/');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tok, 'Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode(['message' => crmSmsPlainText($text), 'recipients' => [$num], 'channel' => $channel], JSON_UNESCAPED_UNICODE),
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15,
+    ]);
+    $resp = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($code === 201) return [true, ''];
+    return [false, 'GoSMS odmítla odeslání (HTTP ' . $code . '): ' . mb_substr((string)$resp, 0, 200)];
+}
+
+/** Sloupec orders.pickup_sms_at — SMS „připraveno" se posílá max. jednou. */
+function ensurePickupSmsColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'pickup_sms_at'")->fetch()) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN pickup_sms_at TIMESTAMP NULL DEFAULT NULL");
+        }
+        $done = true;
+    } catch (Throwable $e) { error_log('ensurePickupSmsColumn: ' . $e->getMessage()); }
+}
+
+/** SMS klientovi „zakázka připravena k vyzvednutí" (jednou, dle jazyka). */
+function crmSendPickupReadySms(int $orderId): void {
+    global $pdo;
+    if ($orderId <= 0 || !isset($pdo)) return;
+    try {
+        if (get_setting('sms_pickup_enabled', '0') !== '1') return;
+        ensurePickupSmsColumn();
+        $st = $pdo->prepare(
+            "SELECT o.id, o.order_code, o.status, o.pickup_sms_at, o.branch_id,
+                    c.phone, c.preferred_language AS cust_lang, b.address AS branch_address
+             FROM orders o JOIN customers c ON c.id = o.customer_id
+             LEFT JOIN branches b ON b.id = o.branch_id
+             WHERE o.id = ? LIMIT 1");
+        $st->execute([$orderId]);
+        $o = $st->fetch();
+        if (!$o) return;
+        if (!empty($o['pickup_sms_at'])) return;
+        if (!isOrderStatusIn((string)$o['status'], 'completed')) return;
+        $phone = trim((string)($o['phone'] ?? ''));
+        if ($phone === '') return;
+
+        $code = trim((string)($o['order_code'] ?? '')) ?: ('#' . $orderId);
+        $addr = crmSmsPlainText(trim((string)($o['branch_address'] ?? '')) ?: 'Krizikova 29, Praha 8');
+        $lang = normalizeCustomerLanguage($o['cust_lang'] ?? 'cs');
+        $text = $lang === 'cs'
+            ? "AppleFix: Vase zakazka $code je opravena a pripravena k vyzvednuti. $addr. Stav online: applefix.help"
+            : "AppleFix: Your order $code is repaired and ready for pickup. $addr. Track online: applefix.help";
+        [$ok, $err] = crmSendSms($phone, $text);
+        if ($ok) {
+            $pdo->prepare("UPDATE orders SET pickup_sms_at = NOW() WHERE id = ?")->execute([$orderId]);
+            crmAuditLog('sms.sent', [
+                'entity_type' => 'order', 'entity_id' => $orderId, 'entity_label' => $code,
+                'summary' => 'Klientovi odeslána SMS „připraveno k vyzvednutí" (' . crmSmsNormalizePhone($phone) . ')',
+            ]);
+        } else {
+            error_log('crmSendPickupReadySms #' . $orderId . ': ' . $err);
+        }
+    } catch (Throwable $e) { /* SMS nesmí shodit změnu stavu */ }
+}
+
 /* ───────────────────────────  INTERNÍ TÝMOVÝ CHAT  ───────────────────────────
  * Jedna společná místnost pro všechny zaměstnance. Jméno autora se ukládá
  * natvrdo (přežije smazání účtu). Nové zprávy hlásí 20s poller zvukem.
@@ -3063,6 +3186,7 @@ function crmAuditActionLabel(string $action): string {
         'inventory.delete' => 'Smazání skladového dílu',
         'supplier_catalog.create' => 'Přidání katalogu dodavatele',
         'settings.update' => 'Změna nastavení', 'system.update' => 'Aktualizace systému',
+        'sms.sent' => 'Odeslána SMS klientovi',
     ];
     return $map[$action] ?? $action;
 }
