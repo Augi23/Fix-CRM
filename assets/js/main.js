@@ -1599,6 +1599,12 @@ $(document).on('change', '#pricelistRepair', function () {
                     setBadge('reklamace.php', d.complaints_badge, true);
                     setBadge('procurement.php', d.procurement_badge, false);
                     setBadge('chat.php', d.chat_unread || 0, false);
+                    // Nepřečtená zpráva → ikona Chat dýmá bílým glow; po zobrazení chatu
+                    // (chat.php si zapíše afx_chat_seen) glow při dalším ticku zhasne.
+                    var chatGlow = (d.chat_unread || 0) > 0 && location.pathname.indexOf('chat.php') === -1;
+                    document.querySelectorAll('.afx-dock a[href="chat.php"], .afx-sheet-link[href="chat.php"]').forEach(function (el) {
+                        el.classList.toggle('afx-chat-glow', chatGlow);
+                    });
                     var prev = getState();
                     var now = { o: d.last_order_id, l: d.last_status_log_id, c: d.last_chat_other_id || 0 };
                     if (!prev) { setState(now); return; }          // první běh: jen zapamatovat

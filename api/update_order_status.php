@@ -49,9 +49,10 @@ try {
         throw new Exception($t('order_not_found'));
     }
 
-    if (!canAccessOrderBranch($order_data)) {
-        throw new Exception($t('access_denied_msg'));
-    }
+    // Od 1.6.0 (požadavek 15.7.2026): změnu stavu zakázky smí provést KAŽDÝ
+    // přihlášený zaměstnanec a technika smí přeřadit na kohokoliv (dřívější
+    // pobočková brána canAccessOrderBranch a omezení „technik smí jen převzít
+    // nepřiřazenou zakázku" hlásily technikům „Přístup odepřen").
 
     $current_status = $order_data['status'];
     $current_tech_id = $order_data['technician_id'];
@@ -59,16 +60,6 @@ try {
     $current_final = $order_data['final_cost'];
     $target_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
 
-    // Technik bez práva úprav: smí jen PŘEVZÍT nepřiřazenou zakázku (sebe), nic jiného
-    $isPlainTech = (($_SESSION['role'] ?? '') === 'technician')
-        && !hasPermission('edit_orders') && !hasPermission('admin_access');
-    if ($isPlainTech && (int)$target_tech_id !== (int)$current_tech_id) {
-        $ownTechId = (int)($_SESSION['tech_id'] ?? 0);
-        $allowed = ((int)$target_tech_id === $ownTechId) && ((int)$current_tech_id === 0 || (int)$current_tech_id === $ownTechId);
-        if (!$allowed) {
-            throw new Exception($t('tech_self_assign_only'));
-        }
-    }
     $target_branch_id = (int)($order_data['branch_id'] ?? getCurrentStaffBranchId());
     if (!canAssignTechnicianToOrder($target_tech_id, $target_branch_id)) {
         throw new Exception('Vybraný technik nepatří do pobočky zakázky.');

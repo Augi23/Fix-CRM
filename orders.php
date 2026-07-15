@@ -155,7 +155,7 @@ if (isset($pdo)) {
 }
 
 // FIX #5: Load technicians once (used in both New Order and Quick Edit modals)
-$techs_list = getActiveTechnicians();
+$techs_list = getActiveTechnicians(true);   // volny vyber technika — vsichni aktivni
 $branches = getBranches();
 $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) : getCurrentStaffBranchId();
 ?>
@@ -610,7 +610,7 @@ function escHTML(str) {
     return d.innerHTML;
 }
 
-const canEditQuickTechnician = <?php echo (hasPermission('admin_access') || hasPermission('edit_orders')) ? 'true' : 'false'; ?>;
+const canEditQuickTechnician = true;   // od 1.6.0: technika smi zmenit kazdy zamestnanec
 
 $(document).ready(function() {
     $('.order-modal-trigger').on('click', function() {

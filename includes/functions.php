@@ -190,16 +190,16 @@ function canAccessOrderBranch(array $order): bool {
 function canAssignTechnicianToOrder(?int $technicianId, ?int $branchId = null): bool {
     global $pdo;
     if (!$technicianId) {
-        return true;
+        return true;    // „bez technika" je vždy platná volba
     }
-    if (isBranchGlobalViewer()) {
-        return true;
-    }
+    // Od 1.6.0 (požadavek 15.7.2026): KAŽDÝ zaměstnanec smí zakázce přiřadit
+    // KTERÉHOKOLIV aktivního technika (i z jiné pobočky) — dřívější pobočkové
+    // omezení blokovalo techniky při zakládání zakázek a změnách stavu.
+    // Kontrola zůstává jen na existenci a aktivnosti technika.
     try {
-        $stmt = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? AND is_active = 1 LIMIT 1');
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM technicians WHERE id = ? AND is_active = 1');
         $stmt->execute([(int)$technicianId]);
-        $techBranchId = (int)$stmt->fetchColumn();
-        return $techBranchId > 0 && $techBranchId === ($branchId ?: getCurrentStaffBranchId());
+        return (int)$stmt->fetchColumn() > 0;
     } catch (Throwable $e) {
         return false;
     }
@@ -241,16 +241,18 @@ function ensureOrdersHaveBranch(): void {
 /**
  * Return active technicians visible for the current staff member.
  * Managers/admins see all branches; branch staff only see their branch colleagues.
+ * $allBranches = true → VŠICHNI aktivní technici bez ohledu na roli volajícího
+ * (výběr technika u zakázky je od 1.6.0 volný pro všechny zaměstnance).
  */
-function getActiveTechnicians(): array {
+function getActiveTechnicians(bool $allBranches = false): array {
     global $pdo;
     static $cache = [];
-    $key = isBranchGlobalViewer() ? 'all' : ('branch_' . getCurrentStaffBranchId());
+    $key = ($allBranches || isBranchGlobalViewer()) ? 'all' : ('branch_' . getCurrentStaffBranchId());
     if (isset($cache[$key])) {
         return $cache[$key];
     }
     try {
-        if (isBranchGlobalViewer()) {
+        if ($allBranches || isBranchGlobalViewer()) {
             $cache[$key] = $pdo->query(
                 'SELECT t.id, t.name, t.branch_id, b.name AS branch_name FROM technicians t LEFT JOIN branches b ON b.id = t.branch_id WHERE t.is_active = 1 ORDER BY b.id ASC, t.name ASC'
             )->fetchAll();

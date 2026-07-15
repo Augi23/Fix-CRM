@@ -622,3 +622,15 @@ html[data-lg-theme="light"] .afx-booked-chip {
 @media (prefers-reduced-motion: reduce) {
   .afx-status-pulse { animation: none; }
 }
+
+/* ── Chat: nepřečtená zpráva → ikona dýmá bílým glow (vypne se po zobrazení chatu) ── */
+@keyframes afxChatGlowPulse {
+  0%, 100% { opacity: .8; filter: drop-shadow(0 0 2px rgba(255,255,255,.35)); }
+  50%      { opacity: 1;  filter: drop-shadow(0 0 12px rgba(255,255,255,.95)); }
+}
+a.afx-chat-glow { animation: afxChatGlowPulse 1.5s ease-in-out infinite; }
+a.afx-chat-glow i,
+a.afx-chat-glow small {
+  color: #fff !important;
+  text-shadow: 0 0 10px rgba(255,255,255,.9), 0 0 24px rgba(255,255,255,.45);
+}

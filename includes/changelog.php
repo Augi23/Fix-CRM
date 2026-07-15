@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '1.6.0',
+        'date' => '2026-07-15',
+        'time' => '14:40',
+        'title' => 'Technici: volný výběr technika, volná změna stavu, chat pro všechny',
+        'items' => [
+            'Při vytváření zakázky si nově KAŽDÝ zaměstnanec (i technik) vybere kteréhokoliv aktivního technika, nebo nechá zakázku bez technika — dřív technik viděl jen kolegy své pobočky a výběr ho blokoval.',
+            'Změna stavu zakázky (přijato / v opravě / připraveno / vydáno) je povolena každému přihlášenému zaměstnanci — odstraněna pobočková brána i omezení „technik smí jen převzít nepřiřazenou zakázku", které hlásily „Přístup odepřen".',
+            'Technika u zakázky (v detailu i v rychlé editaci ze seznamu) smí změnit každý zaměstnanec; nabídka vždy obsahuje všechny aktivní techniky.',
+            'Sekce Chat je nově v menu vidět pro VŠECHNY zaměstnance (dřív omylem jen pro vedení — technici ji neměli).',
+            'Nepřečtená zpráva v chatu: ikona Chat v menu dýmá bílým světélkováním, dokud si chat nezobrazíš — pak zhasne.',
+        ],
+    ],
+    [
         'version' => '1.5.0',
         'date' => '2026-07-15',
         'time' => '13:05',

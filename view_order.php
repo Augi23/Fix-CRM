@@ -550,21 +550,17 @@ function localizedOrderStatusLabel(string $status): string {
                     <div id="actionsAdvanced">
                         <div class="mb-3">
                             <label class="form-label"><?php echo __('technician'); ?></label>
-                            <select name="technician_id" class="form-select mb-2" <?php echo (!$can_change_technician && !$can_self_assign) ? 'disabled' : ''; ?>>
+                            <?php /* Od 1.6.0: technika (i „bez technika") smí u zakázky nastavit
+                                     KAŽDÝ zaměstnanec — select je vždy povolený a nabízí všechny
+                                     aktivní techniky (dřív technik viděl jen sebe / disabled). */ ?>
+                            <select name="technician_id" class="form-select mb-2">
                                 <option value="">-- <?php echo __('edit'); ?> --</option>
-                                <?php $techs = getActiveTechnicians(); foreach($techs as $t): ?>
-                                <?php if ($can_self_assign && !$can_change_technician && (int)$t['id'] !== (int)($_SESSION['tech_id'] ?? 0)) { continue; }   // technik vidí jen sebe ?>
+                                <?php $techs = getActiveTechnicians(true); foreach($techs as $t): ?>
                                 <option value="<?php echo $t['id']; ?>" <?php echo $order['technician_id'] == $t['id'] ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($t['name']); ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
-                            <?php if ($can_self_assign && !$can_change_technician): ?>
-                                <div class="form-text text-info small mb-1"><i class="fas fa-hand me-1"></i><?php echo __('tech_take_hint'); ?></div>
-                            <?php endif; ?>
-                            <?php if (!$can_change_technician && !$can_self_assign): ?>
-                                <input type="hidden" name="technician_id" value="<?php echo $order['technician_id']; ?>">
-                            <?php endif; ?>
                         </div>
                         <div class="mb-3">
                             <label class="form-label d-flex justify-content-between align-items-center">
