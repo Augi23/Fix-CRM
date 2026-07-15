@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.0.1',
+        'date' => '2026-07-15',
+        'time' => '04:35',
+        'title' => 'Statistiky: admin/Boss v hlavní tabulce, bez duplicit, sazba 300 Kč/h',
+        'items' => [
+            'Zvláštní panel „Čas strávený v systému" zrušen — čas v systému je nově sloupec přímo v hlavní tabulce statistik zaměstnanců u každého.',
+            'Tomáš Zahradník se už neukazuje dvakrát (admin + Boss) — aktivita z administrátorského účtu se počítá do jeho jediného řádku.',
+            'Bossovi/adminovi se odměna počítá z času v systému × sazba (nastaveno 300 Kč/h) — i bez jediné přijaté zakázky. Technikům zůstává odměna ze zakázek, čas v systému mají informativně.',
+        ],
+    ],
+    [
         'version' => '1.0.0',
         'date' => '2026-07-15',
         'time' => '04:05',

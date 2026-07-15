@@ -2585,8 +2585,11 @@ function crmTrackStaffActivity(): void {
     } catch (Throwable $e) { /* měření nesmí nikdy shodit poller */ }
 }
 
-/** Souhrn aktivního času v období pro statistiky (jméno, role, sekundy, sazba). */
-function crmGetStaffActivitySummary(string $from, string $to): array {
+/** Aktivní čas v systému v období, sečtený PO TECHNICÍCH (tech_id => sekundy).
+ *  Aktivita samostatných admin účtů (users) se přičítá technikovi TÉŽE OSOBY:
+ *  účet „admin"/„Administrator" používá Tomáš → mapuje se na technika role Boss;
+ *  ostatní admin účty se párují podle shodného jména. Jedna osoba = jeden řádek. */
+function crmGetSystemTimeByTechnician(string $from, string $to): array {
     global $pdo;
     try {
         ensureStaffActivityTable();
@@ -2596,21 +2599,29 @@ function crmGetStaffActivitySummary(string $from, string $to): array {
              GROUP BY sa.actor_type, sa.actor_id");
         $st->execute([$from, $to]);
         $out = [];
+        $bossId = null;
+        try { $bossId = (int)($pdo->query("SELECT id FROM technicians WHERE role = 'boss' ORDER BY id LIMIT 1")->fetchColumn() ?: 0) ?: null; } catch (Throwable $e) {}
         foreach ($st->fetchAll() as $r) {
-            $name = ''; $role = ''; $rate = 0.0;
+            $secs = (int)$r['secs'];
             if ($r['actor_type'] === 'technician') {
-                $ts = $pdo->prepare("SELECT name, role, engineer_rate FROM technicians WHERE id = ?");
-                $ts->execute([(int)$r['actor_id']]);
-                if ($t = $ts->fetch()) { $name = (string)$t['name']; $role = (string)$t['role']; $rate = (float)($t['engineer_rate'] ?? 0); }
+                $tid = (int)$r['actor_id'];
             } else {
                 $us = $pdo->prepare("SELECT full_name, username FROM users WHERE id = ?");
                 $us->execute([(int)$r['actor_id']]);
-                if ($u = $us->fetch()) { $name = (string)($u['full_name'] ?: $u['username']); $role = 'admin'; }
+                $u = $us->fetch();
+                if (!$u) continue;
+                $tid = null;
+                if (in_array(strtolower((string)$u['username']), ['admin', 'administrator'], true)) {
+                    $tid = $bossId;                              // hlavní admin účet = Tomáš (Boss)
+                } else {
+                    $ts = $pdo->prepare("SELECT id FROM technicians WHERE name = ? LIMIT 1");
+                    $ts->execute([(string)$u['full_name']]);
+                    $tid = (int)($ts->fetchColumn() ?: 0) ?: $bossId;   // jinak dle jména, fallback Boss
+                }
+                if ($tid === null) continue;
             }
-            if ($name === '') { continue; }   // smazaný účet
-            $out[] = ['name' => $name, 'role' => $role, 'seconds' => (int)$r['secs'], 'rate' => $rate, 'actor_type' => (string)$r['actor_type']];
+            $out[$tid] = ($out[$tid] ?? 0) + $secs;
         }
-        usort($out, fn($a, $b) => $b['seconds'] <=> $a['seconds']);
         return $out;
     } catch (Throwable $e) { return []; }
 }

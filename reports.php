@@ -223,6 +223,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <th><?php echo __('technician'); ?></th>
                             <th class="text-center"><?php echo __('repaired_count'); ?></th>
                             <th class="text-end"><?php echo __('worked'); ?></th>
+                            <th class="text-end" title="Aktivní čas strávený v CRM (měří se automaticky)">V systému</th>
                             <th class="text-end"><?php echo __('total_revenue'); ?></th>
                             <th class="text-end text-muted small"><?php echo __('parts_cost'); ?></th>
                             <th class="text-end text-muted small"><?php echo __('expenses_label'); ?></th>
@@ -233,7 +234,10 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     </thead>
                     <tbody>
                         <?php
-                        $techs = $pdo->query("SELECT t.id, t.name, t.is_active, t.branch_id, b.name AS branch_name FROM technicians t LEFT JOIN branches b ON b.id = t.branch_id " . (isBranchGlobalViewer() ? "" : "WHERE t.branch_id = " . (int)getCurrentStaffBranchId()) . " ORDER BY b.id ASC, t.is_active DESC, t.name ASC")->fetchAll();
+                        $techs = $pdo->query("SELECT t.id, t.name, t.role, t.is_active, t.branch_id, b.name AS branch_name FROM technicians t LEFT JOIN branches b ON b.id = t.branch_id " . (isBranchGlobalViewer() ? "" : "WHERE t.branch_id = " . (int)getCurrentStaffBranchId()) . " ORDER BY b.id ASC, t.is_active DESC, t.name ASC")->fetchAll();
+                        // aktivní čas v CRM (admin účty sloučené k technikovi téže osoby)
+                        $sysTime = crmGetSystemTimeByTechnician($start_date, $end_date);
+                        $totals['sys_minutes'] = 0;
                         $lastBranchId = null;
                         $totals = [
                             'received' => 0, 'in_progress' => 0, 'completed' => 0, 'cancelled' => 0,
@@ -247,11 +251,20 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 $lastBranchId = (int)($t['branch_id'] ?? 0);
                         ?>
                         <tr class="table-secondary text-dark">
-                            <td colspan="9" class="fw-bold"><i class="fas fa-store me-2"></i><?php echo e($t['branch_name'] ?? getBranchLabel($lastBranchId)); ?></td>
+                            <td colspan="10" class="fw-bold"><i class="fas fa-store me-2"></i><?php echo e($t['branch_name'] ?? getBranchLabel($lastBranchId)); ?></td>
                         </tr>
                         <?php
                             endif;
                             $s = getDetailedStats($pdo, $start_date, $end_date, $t['id']);
+                            $sysMin = (int)round(($sysTime[(int)$t['id']] ?? 0) / 60);
+                            $isCrmWorker = in_array((string)($t['role'] ?? ''), ['boss', 'admin'], true);
+                            if ($isCrmWorker) {
+                                // Boss/admin: práce = správa a vývoj CRM → odměna z času
+                                // v systému × sazba (běží i bez jediné přijaté zakázky)
+                                $s['earnings'] = ($sysMin / 60) * (float)$s['engineer_rate'];
+                                $s['profit'] = $s['revenue'] - $s['parts_cost'] - $s['expenses'] - $s['earnings'];
+                            }
+                            $totals['sys_minutes'] += $sysMin;
                             $totals['received'] += $s['received'];
                             $totals['in_progress'] += $s['in_progress'];
                             $totals['completed'] += $s['completed'];
@@ -276,6 +289,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 </a>
                             </td>
                             <td class="text-end"><?php echo formatWorkDuration($s['work_minutes']); ?></td>
+                            <td class="text-end <?php echo $isCrmWorker ? 'fw-bold text-info' : 'text-white-75'; ?>"><?php echo $sysMin > 0 ? formatWorkDuration($sysMin) : '—'; ?><?php echo $isCrmWorker ? ' <i class="fas fa-laptop-code small" title="Odměna se počítá z času v systému (tvorba a správa CRM)"></i>' : ''; ?></td>
                             <td class="text-end"><?php echo formatMoney($s['revenue']); ?></td>
                             <td class="text-end text-muted small"><?php echo $s['parts_cost'] > 0 ? '-'.formatMoney($s['parts_cost']) : '—'; ?></td>
                             <td class="text-end text-muted small"><?php echo $s['expenses'] > 0 ? '-'.formatMoney($s['expenses']) : '—'; ?></td>
@@ -290,6 +304,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <td><?php echo __('total_period'); ?></td>
                             <td class="text-center"><?php echo $totals['completed']; ?></td>
                             <td class="text-end"><?php echo formatWorkDuration($totals['work_minutes']); ?></td>
+                            <td class="text-end"><?php echo formatWorkDuration((int)($totals['sys_minutes'] ?? 0)); ?></td>
                             <td class="text-end"><?php echo formatMoney($totals['revenue']); ?></td>
                             <td class="text-end text-muted small">-<?php echo formatMoney($totals['parts_cost']); ?></td>
                             <td class="text-end text-muted small">-<?php echo formatMoney($totals['expenses']); ?></td>
@@ -301,34 +316,6 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                 </table>
             </div>
 
-            <!-- Čas strávený v systému (správa a vývoj CRM) -->
-            <?php $__activity = crmGetStaffActivitySummary($start_date, $end_date); if (!empty($__activity)): ?>
-            <div class="glass-panel p-4 border-secondary mt-4">
-                <h6 class="text-uppercase small text-muted mb-1"><i class="fas fa-laptop-code me-2 text-info"></i>Čas strávený v systému</h6>
-                <div class="small text-white-50 mb-3">Aktivní čas v CRM (měří se automaticky, pauzy se nepočítají). U rolí <b>Boss</b> a <b>Admin</b> se z něj počítá odměna — jejich práce (správa a vývoj CRM) není vázaná na zakázky. Sazba se bere z karty zaměstnance.</div>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle mb-0">
-                        <thead><tr><th>Zaměstnanec</th><th>Role</th><th class="text-end">Čas v systému</th><th class="text-center">Sazba</th><th class="text-end">Odměna za čas v systému</th></tr></thead>
-                        <tbody>
-                        <?php foreach ($__activity as $act):
-                            $__hrs = $act['seconds'] / 3600;
-                            $__isCrmWorker = in_array($act['role'], ['boss', 'admin'], true);
-                            $__pay = $__isCrmWorker ? $__hrs * $act['rate'] : null;
-                            $__roleLbl = $act['role'] === 'boss' ? 'Boss' : ($act['role'] === 'admin' ? 'Administrátor' : ($act['role'] === 'manager' ? 'Manažer' : 'Technik'));
-                        ?>
-                            <tr>
-                                <td><strong><?php echo htmlspecialchars($act['name']); ?></strong></td>
-                                <td><span class="badge <?php echo $__isCrmWorker ? 'bg-danger' : 'bg-secondary'; ?>"><?php echo $__roleLbl; ?></span></td>
-                                <td class="text-end"><?php echo formatWorkDuration((int)round($act['seconds'] / 60)); ?></td>
-                                <td class="text-center"><?php echo $__isCrmWorker ? '<span class="badge bg-secondary">' . formatMoney($act['rate']) . '/h</span>' : '<span class="text-white-50">—</span>'; ?></td>
-                                <td class="text-end fw-bold <?php echo $__isCrmWorker ? 'text-primary' : 'text-white-50'; ?>"><?php echo $__isCrmWorker ? formatMoney($__pay) : '— (odměna ze zakázek)'; ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <?php endif; ?>
         <?php endif; ?>
 
         <!-- GENERAL STATS TAB -->
