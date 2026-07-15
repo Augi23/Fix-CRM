@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '22:40',
+        'title' => 'Údaje klienta smí měnit i technik — s výrazným záznamem v Historii',
+        'items' => [
+            'Zámek „vyplněné údaje klienta mění jen administrátor" je zrušen: jméno, příjmení, telefon i e-mail klienta nově změní každý zaměstnanec, stejně tak klienta u zakázky.',
+            'Každý přepis vyplněného údaje se ale v Historii výrazně zvýrazní (oranžový řádek s perem) jako „RUČNĚ ZMĚNĚNY údaje klienta" / „RUČNĚ ZMĚNĚN klient zakázky" — vždy s původní i novou hodnotou a kým. Zpětně tak jde dohledat každý zásah.',
+            'Doplnění prázdného údaje (např. chybějící e-mail) se zvýrazněně neoznačuje — je to běžná práce.',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '22:10',
         'title' => 'Statistiky: čas strávený v systému + odměna pro Bosse/adminy',
         'items' => [

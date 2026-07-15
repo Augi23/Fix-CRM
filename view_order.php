@@ -58,15 +58,9 @@ $can_handoff = !empty($order['technician_id'])
     && ($__isOwnTech || $can_change_technician);
 $techTimes = crmGetOrderTechTimes((int)$order['id']);
 
-// Klienta zakázky smí PŘEPSAT (skutečného vyplněného) jen administrátor. PŘIDAT
-// klienta k zakázce se zástupným/nevyplněným klientem („Neznámý") smí i zaměstnanec
-// — starší zakázka, kde se pravý klient vložil do systému později.
-$__canEditCustomer = hasPermission('admin_access') || crmCustomerIsPlaceholder([
-    'first_name' => $order['first_name'] ?? '',
-    'last_name'  => $order['last_name'] ?? '',
-    'phone'      => $order['phone'] ?? '',
-    'email'      => $order['email'] ?? '',
-]);
+// Klienta zakázky smí změnit každý s právy k zakázce; záměna skutečného klienta
+// se v Historii výrazně označí „RUČNĚ ZMĚNĚN" (audit v update_order_full.php).
+$__canEditCustomer = true;
 
 // Podpisy klienta (příjem/výdej) — blok v pravém sloupci + tisk na zakázkovém listu
 $orderSignatures = crmGetOrderSignatures((int)$order['id']);
@@ -1436,9 +1430,7 @@ function deleteOrder(id) {
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <?php if (!$__canEditCustomer): ?>
-                                <div class="form-text"><i class="fas fa-lock me-1"></i>Klienta zakázky může změnit jen administrátor.</div>
-                            <?php endif; ?>
+                            <div class="form-text"><i class="fas fa-history me-1"></i>Změna klienta se zaznamenává do historie jako „ručně změněno".</div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('brand'); ?></label>

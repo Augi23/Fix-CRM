@@ -92,22 +92,32 @@ try {
         }
     }
 
-    // Klient zakázky: PŘEPSAT skutečného vyplněného klienta smí jen administrátor
-    // (ochrana proti záměně). PŘIDAT/přiřadit klienta k zakázce se zástupným
-    // klientem („Neznámý"/prázdný) smí i zaměstnanec — typicky starší zakázka,
-    // kde se pravý klient do systému vložil až později.
+    // Klient zakázky: změnu smí provést každý s právy k zakázce, ale záměna
+    // skutečného vyplněného klienta se v Historii VÝRAZNĚ označí „RUČNĚ ZMĚNĚN"
+    // (rozhodnutí 14.7.2026 — místo dřívějšího admin-only zámku auditní stopa).
+    // Nový klient musí existovat (pojistka proti tichému defaultu ze selectu).
     $customerIdToSave = (int)$current['customer_id'];
     $postedCustomerId = !empty($_POST['customer_id']) ? (int)$_POST['customer_id'] : 0;
+    $__custChangeAudit = null;
     if ($postedCustomerId > 0 && $postedCustomerId !== $customerIdToSave) {
         $curCustStmt = $pdo->prepare('SELECT first_name, last_name, phone, email FROM customers WHERE id = ? LIMIT 1');
         $curCustStmt->execute([$customerIdToSave]);
         $curCust = $curCustStmt->fetch() ?: null;
-        $mayChangeCustomer = hasPermission('admin_access') || crmCustomerIsPlaceholder($curCust);
-        if ($mayChangeCustomer) {
-            $chkCust = $pdo->prepare('SELECT 1 FROM customers WHERE id = ? LIMIT 1');
-            $chkCust->execute([$postedCustomerId]);
-            if ($chkCust->fetchColumn()) {
-                $customerIdToSave = $postedCustomerId;
+        $newCustStmt = $pdo->prepare('SELECT first_name, last_name, phone FROM customers WHERE id = ? LIMIT 1');
+        $newCustStmt->execute([$postedCustomerId]);
+        $newCust = $newCustStmt->fetch() ?: null;
+        if ($newCust) {
+            $customerIdToSave = $postedCustomerId;
+            if (!crmCustomerIsPlaceholder($curCust)) {
+                // záměna skutečného klienta → připravit výrazný audit (zapíše se po UPDATE)
+                $__fmtC = static fn($c) => trim(((string)($c['first_name'] ?? '')) . ' ' . ((string)($c['last_name'] ?? '')))
+                    . (trim((string)($c['phone'] ?? '')) !== '' ? ' (' . $c['phone'] . ')' : '');
+                $__oc = trim((string)($current['order_code'] ?? '')) !== '' ? (string)$current['order_code'] : ('#' . (int)$order_id);
+                $__custChangeAudit = [
+                    'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
+                    'summary' => 'RUČNĚ ZMĚNĚN klient zakázky ' . $__oc . ': „' . $__fmtC($curCust ?: []) . '" → „' . $__fmtC($newCust) . '"',
+                    'details' => ['puvodni_klient_id' => (int)$current['customer_id'], 'novy_klient_id' => $postedCustomerId],
+                ];
             }
         }
     }
@@ -175,6 +185,8 @@ try {
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
+
+    if ($__custChangeAudit !== null) { crmAuditLog('order.customer_change', $__custChangeAudit); }
 
     // Per-technician work segments (mirror the orders.work_* transitions above).
     if ($is_starting || $is_reassigning_in_progress) {

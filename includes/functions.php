@@ -2955,6 +2955,8 @@ function crmAuditActionLabel(string $action): string {
         'order.create' => 'Vytvoření zakázky', 'order.update' => 'Úprava zakázky',
         'order.status_change' => 'Změna stavu zakázky', 'order.delete' => 'Smazání zakázky',
         'customer.create' => 'Vytvoření klienta', 'customer.update' => 'Úprava klienta',
+        'customer.identity_change' => 'RUČNĚ ZMĚNĚNY údaje klienta',
+        'order.customer_change' => 'RUČNĚ ZMĚNĚN klient zakázky',
         'customer.delete' => 'Smazání klienta',
         'staff.create' => 'Vytvoření zaměstnance', 'staff.update' => 'Úprava zaměstnance',
         'staff.delete' => 'Smazání zaměstnance', 'staff.permissions' => 'Změna oprávnění',
@@ -2978,41 +2980,29 @@ function crmAuditActionLabel(string $action): string {
 }
 
 /**
- * Ochrana identity klienta: jednou vyplněné jméno, příjmení, telefon a e-mail
- * smí PŘEPSAT jen administrátor (hasPermission('admin_access')). Prázdný údaj
- * (nebo jen „-"/„–"/„—") smí kdokoli DOPLNIT. Zabraňuje tomu, aby zaměstnanec
- * omylem/záměrně přepsal kontaktní údaje zakázky na někoho jiného.
- * @param array $existing původní řádek customers (aktuální hodnoty)
- * @param array $posted   odeslané hodnoty (klíče first_name/last_name/phone/email)
- * @return array [hodnoty_k_uložení(assoc), zablokovaná_pole(list), je_admin(bool)]
+ * Identita klienta (jméno/příjmení/telefon/e-mail): změny jsou POVOLENÉ všem
+ * zaměstnancům, ale přepis už vyplněné hodnoty se v Historii výrazně označuje
+ * jako „RUČNĚ ZMĚNĚNO" (rozhodnutí Tomáše 14.7.2026 — původní admin-only zámek
+ * po incidentu se záměnou klientů nahrazen důslednou auditní stopou).
+ * @return array [hodnoty_k_uložení(assoc), změněná_vyplněná_pole(map pole => [z, na])]
  */
 function crmGuardCustomerIdentity(array $existing, array $posted): array {
-    $isAdmin = hasPermission('admin_access');
     $fields = ['first_name', 'last_name', 'phone', 'email'];
     $isBlank = static function ($v): bool {
         $v = trim((string)$v);
         return $v === '' || in_array($v, ['-', '–', '—'], true);
     };
     $values = [];
-    $blocked = [];
+    $changes = [];   // jen PŘEPISY už vyplněných hodnot (doplnění prázdného se nehlásí)
     foreach ($fields as $f) {
         $old = trim((string)($existing[$f] ?? ''));
         $new = array_key_exists($f, $posted) ? trim((string)$posted[$f]) : $old;
-        if ($isAdmin || $isBlank($old) || $new === $old) {
-            $values[$f] = $new;   // admin / doplnění prázdného / beze změny → povoleno
-        } else {
-            $values[$f] = $old;   // zaměstnanec nesmí přepsat už vyplněný údaj
-            $blocked[] = $f;
+        $values[$f] = $new;
+        if ($new !== $old && !$isBlank($old)) {
+            $changes[$f] = ['z' => $old, 'na' => $new];
         }
     }
-    return [$values, $blocked, $isAdmin];
-}
-
-/** Je vyplněný údaj identity klienta zamčený pro aktuálního uživatele? (pro UI: readonly) */
-function crmCustomerFieldLocked($value): bool {
-    if (hasPermission('admin_access')) return false;
-    $v = trim((string)$value);
-    return $v !== '' && !in_array($v, ['-', '–', '—'], true);
+    return [$values, $changes];
 }
 
 /**

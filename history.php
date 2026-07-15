@@ -121,6 +121,9 @@ require_once 'includes/header.php';
         <?php else: foreach ($rows as $r):
             $action = (string)$r['action'];
             $col = $__actionColor($action);
+            // Ruční změny údajů/klienta = citlivé zásahy → výrazné zvýraznění řádku
+            $__manual = in_array($action, ['customer.identity_change', 'order.customer_change'], true);
+            if ($__manual) { $col = 'warning text-dark'; }
             $eLabel = trim((string)($r['entity_label'] ?? ''));
             $eType = (string)($r['entity_type'] ?? '');
             $eId = (int)($r['entity_id'] ?? 0);
@@ -128,9 +131,11 @@ require_once 'includes/header.php';
             if ($eType === 'order' && $eId > 0)    { $link = 'view_order.php?id=' . $eId; }
             elseif ($eType === 'customer' && $eId > 0) { $link = 'edit_customer.php?id=' . $eId; }
         ?>
-            <tr>
+            <tr<?php echo $__manual ? ' style="background:rgba(255,193,7,.08);box-shadow:inset 3px 0 0 #ffc107;"' : ''; ?>>
                 <td style="white-space:nowrap;" class="small"><?php echo date('d.m.Y H:i:s', strtotime((string)$r['created_at'])); ?></td>
-                <td><span class="badge bg-<?php echo $col; ?>"><?php echo htmlspecialchars(crmAuditActionLabel($action)); ?></span></td>
+                <td>
+                    <span class="badge bg-<?php echo $col; ?>"><?php echo $__manual ? '<i class="fas fa-pen-nib me-1"></i>' : ''; ?><?php echo htmlspecialchars(crmAuditActionLabel($action)); ?></span>
+                </td>
                 <td>
                     <strong><?php echo htmlspecialchars((string)$r['actor_name']); ?></strong>
                     <div><?php echo $__actorBadge($r); ?></div>

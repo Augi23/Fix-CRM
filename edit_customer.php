@@ -22,8 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     $customer_type = $_POST['customer_type'] ?? 'private';
-    // Ochrana identity: vyplněné jméno/příjmení/telefon/e-mail přepíše jen administrátor.
-    [$guarded, $blockedFields] = crmGuardCustomerIdentity($customer, [
+    // Změny identity jsou povolené, ale přepis vyplněných údajů se výrazně audituje.
+    [$guarded, $identityChanges] = crmGuardCustomerIdentity($customer, [
         'first_name' => $_POST['first_name'] ?? '',
         'last_name'  => $_POST['last_name'] ?? '',
         'phone'      => $_POST['phone'] ?? '',
@@ -44,14 +44,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $update = $pdo->prepare("UPDATE customers SET customer_type = ?, first_name = ?, last_name = ?, phone = ?, email = ?, address = ?, ico = ?, dic = ?, company = ?, preferred_language = ? WHERE id = ?");
         $update->execute([$customer_type, $first_name, $last_name, $phone, $email, $address, $ico, $dic, $company, $preferred_language, $id]);
         $success = __('customer_updated_success');
-        crmAuditLog('customer.update', [
-            'entity_type' => 'customer', 'entity_id' => (int)$id,
-            'entity_label' => trim($first_name . ' ' . $last_name),
-            'summary' => 'Upraven klient ' . trim($first_name . ' ' . $last_name),
-            'details' => !empty($blockedFields) ? ['zablokovana_pole' => $blockedFields] : null,
-        ]);
-        if (!empty($blockedFields)) {
-            $notice = 'Jméno, příjmení, telefon nebo e-mail už byly vyplněné — změnit je může jen administrátor. Původní hodnoty byly zachovány, ostatní úpravy uloženy.';
+        if (!empty($identityChanges)) {
+            // Přepis vyplněných kontaktních údajů → VÝRAZNÝ záznam v Historii
+            $fieldNames = ['first_name' => 'jméno', 'last_name' => 'příjmení', 'phone' => 'telefon', 'email' => 'e-mail'];
+            $parts = [];
+            foreach ($identityChanges as $f => $ch) {
+                $parts[] = ($fieldNames[$f] ?? $f) . ': „' . $ch['z'] . '" → „' . $ch['na'] . '"';
+            }
+            crmAuditLog('customer.identity_change', [
+                'entity_type' => 'customer', 'entity_id' => (int)$id,
+                'entity_label' => trim($first_name . ' ' . $last_name),
+                'summary' => 'RUČNĚ ZMĚNĚNY údaje klienta — ' . implode(', ', $parts),
+                'details' => ['zmeny' => $identityChanges],
+            ]);
+            $notice = 'Kontaktní údaje byly změněny — akce je zaznamenána v historii jako „ručně změněno".';
+        } else {
+            crmAuditLog('customer.update', [
+                'entity_type' => 'customer', 'entity_id' => (int)$id,
+                'entity_label' => trim($first_name . ' ' . $last_name),
+                'summary' => 'Upraven klient ' . trim($first_name . ' ' . $last_name),
+            ]);
         }
         // Refresh
         $stmt->execute([$id]);
@@ -114,26 +126,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                 </div>
 
-                <?php $__lockHint = '<div class="form-text text-warning"><i class="fas fa-lock me-1"></i>Vyplněný údaj mění jen administrátor</div>'; ?>
+                <div class="col-12">
+                    <div class="small text-white-50"><i class="fas fa-history me-1"></i>Změna vyplněného jména, telefonu či e-mailu se zaznamenává do historie jako „ručně změněno".</div>
+                </div>
                 <div class="col-md-6">
                     <label class="form-label"><?php echo __('client'); ?> (<?php echo __('client_first_name'); ?>)</label>
-                    <input type="text" name="first_name" class="form-control" value="<?php echo htmlspecialchars($customer['first_name']); ?>" required <?php echo crmCustomerFieldLocked($customer['first_name']) ? 'readonly' : ''; ?>>
-                    <?php if (crmCustomerFieldLocked($customer['first_name'])) echo $__lockHint; ?>
+                    <input type="text" name="first_name" class="form-control" value="<?php echo htmlspecialchars($customer['first_name']); ?>" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label"><?php echo __('client'); ?> (<?php echo __('client_last_name'); ?>)</label>
-                    <input type="text" name="last_name" class="form-control" value="<?php echo htmlspecialchars($customer['last_name']); ?>" required <?php echo crmCustomerFieldLocked($customer['last_name']) ? 'readonly' : ''; ?>>
-                    <?php if (crmCustomerFieldLocked($customer['last_name'])) echo $__lockHint; ?>
+                    <input type="text" name="last_name" class="form-control" value="<?php echo htmlspecialchars($customer['last_name']); ?>" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label"><?php echo __('phone'); ?></label>
-                    <input type="tel" name="phone" class="form-control" value="<?php echo htmlspecialchars($customer['phone']); ?>" required <?php echo crmCustomerFieldLocked($customer['phone']) ? 'readonly' : ''; ?>>
-                    <?php if (crmCustomerFieldLocked($customer['phone'])) echo $__lockHint; ?>
+                    <input type="tel" name="phone" class="form-control" value="<?php echo htmlspecialchars($customer['phone']); ?>" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Email</label>
-                    <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($customer['email']); ?>" <?php echo crmCustomerFieldLocked($customer['email']) ? 'readonly' : ''; ?>>
-                    <?php if (crmCustomerFieldLocked($customer['email'])) echo $__lockHint; ?>
+                    <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($customer['email']); ?>">
                 </div>
                 <div class="col-md-6">
                     <label class="form-label"><?php echo __('customer_language'); ?></label>
