@@ -36,20 +36,17 @@
 .sl-stat-received .sl-stat-num { color: var(--afx-mint) !important;   text-shadow: 0 0 18px rgba(59,232,168,.4); }
 
 /* ============================================================
-   2) POZADÍ — černá s bílými tečkami (hvězdné nebe)
-   Bezešvá dlaždice 512×512 (bg-stars.png @2x) opakovaná OBĚMA osami —
-   na rozdíl od dřívějšího SVG (preserveAspectRatio slice) se při změně
-   měřítka/rozlišení nikdy neořezává ani nedeformuje.
+   2) POZADÍ — futuristické halftone vlny (canvas #crmBgWaves)
+   Generuje se JS na míru oknu (header.php) a při resize/zoomu se
+   překreslí → nikdy se neořezává. Pod ním solid tmavá pro jistotu.
    ============================================================ */
 html, body {
-  background: #000 url('../img/bg-stars.png') repeat top left !important;
-  background-size: 512px 512px !important;
-  background-attachment: fixed !important;
-  background-color: #000 !important;
+  background: #04070d !important;
+  background-color: #04070d !important;
 }
-/* .crm-bgfx (SVG vlny) odstraněn z header.php — třída ponechána neškodná
-   pro případ starší cache */
-.crm-bgfx { display: none !important; }
+canvas.crm-bgfx {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+}
 /* POZOR: #content NESMÍ mít z-index — vytvořil by stacking context a všechna
    popup okna definovaná uvnitř stránek by skončila POD .modal-backdrop (1050,
    připojuje se k <body>) = neprokliknutelná vrstva. Pořadí nad .crm-bgfx (z:0)
@@ -327,6 +324,7 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
    9) SVĚTLÝ REŽIM (lg-theme přepínač) — decentní úpravy shellu
    ============================================================ */
 html[data-lg-theme="light"], html[data-lg-theme="light"] body { background: #eef1f0 !important; background-image: none !important; }
+html[data-lg-theme="light"] canvas.crm-bgfx { display: none !important; }
 html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
 html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); }
 html[data-lg-theme="light"] .afx-brand { color: #10151d; }

@@ -7,12 +7,12 @@
 return [
     [
         'date' => '2026-07-14',
-        'time' => '23:10',
-        'title' => 'Nové pozadí systému: černá s bílými tečkami ve vlnách',
+        'time' => '23:40',
+        'title' => 'Nové pozadí: futuristické tečkové vlny (generované, ostré v každém rozlišení)',
         'items' => [
-            'Pozadí CRM je nově černé s bílými tečkami plynoucími ve vlnách (particle efekt). Není to jeden velký obrázek, ale malá bezešvá dlaždice opakovaná oběma osami — při změně měřítka/rozlišení se už nikdy neořeže ani nerozmaže.',
-            'Odstraněno dřívější SVG pozadí s vlnami, které se při zvětšení stránky ořezávalo a zhoršovalo čitelnost.',
-            'Světlý režim zůstává čistě světlý (bez teček).',
+            'Pozadí CRM tvoří tmavě modrá plocha s tečkovými víry a vlnami v modro-azurovém přechodu (halftone particle efekt). Negeneruje se z obrázku — kreslí se živě přímo v prohlížeči přesně na míru okna, takže při JAKÉKOLIV změně rozlišení či měřítka se okamžitě překreslí a nikdy se neořeže ani nerozmaže.',
+            'Kompozice je navržená pro práci: víry žijí v rozích, střed obrazovky (kde jsou tabulky a karty) zůstává klidný a tmavý kvůli čitelnosti.',
+            'Odstraněno dřívější SVG pozadí, které se při změně měřítka ořezávalo. Světlý režim zůstává čistě světlý.',
         ],
     ],
     [
