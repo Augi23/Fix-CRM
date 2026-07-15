@@ -102,7 +102,6 @@ $customers = $stmt->fetchAll();
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
                                             <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" title="<?php echo __('preview'); ?>"><i class="fas fa-eye"></i></button>
-                                            <button class="btn btn-outline-success" onclick="openUniversalPreview('print_invoice_thermal.php?id=<?php echo $inv['id']; ?>', '<?php echo __('thermal_receipt'); ?> <?php echo $inv['invoice_number']; ?>')" title="<?php echo __('thermal_receipt'); ?>"><i class="fas fa-receipt"></i></button>
                                             <button class="btn btn-outline-primary" onclick="editInvoice(<?php echo $inv['id']; ?>)" title="<?php echo __('edit'); ?>"><i class="fas fa-edit"></i></button>
                                             <button class="btn btn-outline-warning" onclick="createCreditNote(<?php echo $inv['id']; ?>)" title="<?php echo __('credit_note'); ?>"><i class="fas fa-undo"></i></button>
                                             <button class="btn btn-outline-info" onclick="exportPohoda(<?php echo $inv['id']; ?>)" title="Pohoda"><i class="fas fa-file-export"></i></button>

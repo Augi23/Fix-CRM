@@ -609,7 +609,6 @@ function localizedOrderStatusLabel(string $status): string {
                                 <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-paper-plane me-2 text-primary"></i><?php echo __('order_sheet_print_email'); ?></button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-tools me-2 text-warning"></i><?php echo __('work_order'); ?></button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="printOrderLabel(<?php echo (int)$order['id']; ?>)"><i class="fas fa-barcode me-2 text-info"></i><?php echo __('print_label'); ?></button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-receipt me-2 text-success"></i><?php echo __('thermal_receipt'); ?></button>
                             </div>
                         </div>
 
@@ -806,9 +805,6 @@ function localizedOrderStatusLabel(string $status): string {
                         <?php if($existing_invoice): ?>
                         <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $existing_invoice['id']; ?>', '<?php echo __('invoice'); ?> #<?php echo $existing_invoice['invoice_number']; ?>')" class="btn btn-outline-secondary" title="<?php echo __('print'); ?>">
                             <i class="fas fa-print"></i>
-                        </a>
-                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice_thermal.php?id=<?php echo $existing_invoice['id']; ?>', '<?php echo __('thermal_receipt'); ?> #<?php echo $existing_invoice['invoice_number']; ?>')" class="btn btn-outline-success" title="<?php echo __('thermal_receipt'); ?>">
-                            <i class="fas fa-receipt"></i>
                         </a>
                         <?php endif; ?>
                     </div>

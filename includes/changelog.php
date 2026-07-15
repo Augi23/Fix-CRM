@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.2.1',
+        'date' => '2026-07-15',
+        'time' => '07:20',
+        'title' => 'Odstraněn tisk na termotiskárnu (nepoužívá se)',
+        'items' => [
+            'Z tiskového menu zmizely termo doklady (účtenka termo, příjemka termo, faktura termo) — nepoužíváte je. Odstraněno z detailu zakázky, seznamu zakázek i účetnictví.',
+            'Tisk štítků na Brother QL-810W a A4 doklady (zakázkový list, dílenský list, faktura) zůstávají beze změny.',
+            'Klientská online „Účtenka" v portálu funguje dál — je to jen zobrazení na obrazovce, ne tisk.',
+        ],
+    ],
+    [
         'version' => '1.2.0',
         'date' => '2026-07-15',
         'time' => '06:20',

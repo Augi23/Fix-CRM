@@ -422,9 +422,7 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                         </button>
                                         <ul class="dropdown-menu shadow dropdown-menu-end">
                                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
-                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openReceptionLangModal(<?php echo $order['id']; ?>)"><i class="fas fa-file-import me-2 text-info"></i> <?php echo __('reception_act_thermal'); ?></a></li>
                                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
-                                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=<?php echo $order['id']; ?>', '<?php echo __('thermal_receipt'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
                                         </ul>
                                     </div>
                                     <?php if (hasPermission('admin_access')): ?>
@@ -592,9 +590,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </button>
                         <ul class="dropdown-menu shadow dropdown-menu-end">
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_order.php?id=${o.id}', '<?php echo __('order_header'); ?> #' + o.id)"><i class="fas fa-file-invoice me-2 text-primary"></i> <?php echo __('a4_invoice'); ?></a></li>
-                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openReceptionLangModal(${o.id})"><i class="fas fa-file-import me-2 text-info"></i> <?php echo __('reception_act_thermal'); ?></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=${o.id}', '<?php echo __('work_order'); ?> #' + o.id)"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
-                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_thermal.php?id=${o.id}', '<?php echo __('thermal_receipt'); ?> #' + o.id)"><i class="fas fa-receipt me-2 text-success"></i> <?php echo __('thermal_receipt'); ?></a></li>
                         </ul>
                     </div>
                     <a href="#" id="fullViewBtn" class="btn btn-outline-primary"><?php echo __('open_full_view'); ?></a>
@@ -750,9 +746,7 @@ $(document).ready(function() {
                 // Update print links in modal footer
                 const footerLinks = $('#quickOrderModal .modal-footer .dropdown-item');
                 footerLinks.eq(0).attr('onclick', `openUniversalPreview('print_order.php?id=${o.id}', '<?php echo __('order_header'); ?> #${o.id}')`);
-                footerLinks.eq(1).attr('onclick', `openReceptionLangModal(${o.id})`);
-                footerLinks.eq(2).attr('onclick', `openUniversalPreview('print_workshop.php?id=${o.id}', '<?php echo __('work_order'); ?> #${o.id}')`);
-                footerLinks.eq(3).attr('onclick', `openUniversalPreview('print_thermal.php?id=${o.id}', '<?php echo __('thermal_receipt'); ?> #${o.id}')`);
+                footerLinks.eq(1).attr('onclick', `openUniversalPreview('print_workshop.php?id=${o.id}', '<?php echo __('work_order'); ?> #${o.id}')`);
 
                 $('#saveQuickOrderBtn').prop('disabled', false);
                 
@@ -1158,47 +1152,7 @@ $(document).ready(function() {
 </div>
 
 <!-- Language Selection for Reception Act Modal -->
-<div class="modal fade" id="receptionLangModal" tabindex="-1">
-    <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-dark bg-opacity-25 border-secondary border-0">
-                <h6 class="modal-title fw-bold"><?php echo __('select_print_language'); ?></h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <input type="hidden" id="langOrderId">
-                <div class="d-grid gap-3">
-                    <button type="button" class="btn btn-outline-primary py-3 btn-lang-select" data-lang="ru">
-                        <img src="https://flagcdn.com/w40/ru.png" class="me-2 rounded-1" width="24"> <?php echo __('lang_ru'); ?>
-                    </button>
-                    <button type="button" class="btn btn-outline-primary py-3 btn-lang-select" data-lang="cs">
-                        <img src="https://flagcdn.com/w40/cz.png" class="me-2 rounded-1" width="24"> <?php echo __('lang_cs'); ?>
-                    </button>
-                    <button type="button" class="btn btn-outline-primary py-3 btn-lang-select" data-lang="en">
-                        <img src="https://flagcdn.com/w40/gb.png" class="me-2 rounded-1" width="24"> <?php echo __('lang_en'); ?>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
-function openReceptionLangModal(orderId) {
-    $('#langOrderId').val(orderId);
-    $('#receptionLangModal').modal('show');
-}
-
-$(document).ready(function() {
-    $('.btn-lang-select').on('click', function() {
-        const lang = $(this).data('lang');
-        const orderId = $('#langOrderId').val();
-        $('#receptionLangModal').modal('hide');
-        
-        const url = `print_reception_thermal.php?id=${orderId}&lang=${lang}`;
-        openUniversalPreview(url, `<?php echo __('reception_act_thermal'); ?> #${orderId}`);
-    });
-});
 
 function deleteMedia(id) {
     if (typeof showConfirm !== 'function') {
