@@ -54,7 +54,7 @@ try {
     }
     $price = $inventory['sale_price'];
 
-    if (getCurrentStaffRole() === 'engineer' && (int)($inventory['quantity'] ?? 0) <= 0) {
+    if (in_array(getCurrentStaffRole(), ['engineer', 'brigadnik'], true) && (int)($inventory['quantity'] ?? 0) <= 0) {
         throw new Exception('Technician can select only items that are in stock.');
     }
 

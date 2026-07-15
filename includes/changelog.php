@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.5.0',
+        'date' => '2026-07-15',
+        'time' => '13:05',
+        'title' => 'Nová role Brigádník (Andrea)',
+        'items' => [
+            'Ve správě personálu je nová role „Brigádník" — stejná práva jako technik, ale odměna se počítá z přihlášeného času v systému (hodiny × sazba), ne ze zakázek. Odměna z času se u této role zapíná automaticky a nejde omylem vypnout.',
+            'Brigádník má vlastní zelený štítek s hodinami ve správě personálu, ve statistikách a v hlavičce po přihlášení (už se nezobrazuje jako „Technik").',
+            'Andrea je převedena na roli Brigádník (150 Kč/h, pobočka Karlín).',
+        ],
+    ],
+    [
         'version' => '1.4.2',
         'date' => '2026-07-15',
         'time' => '12:10',

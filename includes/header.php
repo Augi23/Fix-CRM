@@ -83,6 +83,7 @@ $roleLabel = match (getCurrentStaffRole()) {
     'admin' => __('role_admin'),
     'manager' => __('role_manager'),
     'engineer' => __('role_engineer'),
+    'brigadnik' => 'Brigádník',
     default => ucfirst((string)getCurrentStaffRole()),
 };
 

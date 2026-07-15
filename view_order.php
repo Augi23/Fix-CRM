@@ -830,7 +830,7 @@ function localizedOrderStatusLabel(string $status): string {
                     <div class="mb-3">
                         <label class="form-label"><?php echo __('select_part_from_warehouse'); ?></label>
                         <select name="inventory_id" id="addPartInventory" class="form-select" required></select>
-                        <div class="form-text text-white-75 small"><?php echo getCurrentStaffRole() === 'engineer' ? __('search_part_hint_engineer') : 'Search by name, SKU, or price.'; ?></div>
+                        <div class="form-text text-white-75 small"><?php echo in_array(getCurrentStaffRole(), ['engineer', 'brigadnik'], true) ? __('search_part_hint_engineer') : 'Search by name, SKU, or price.'; ?></div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label"><?php echo __('quantity'); ?></label>
@@ -1035,7 +1035,7 @@ $(document).ready(function() {
         width: '100%'
     });
 
-    const addPartStockOnly = <?php echo getCurrentStaffRole() === 'engineer' ? '1' : '0'; ?>;
+    const addPartStockOnly = <?php echo in_array(getCurrentStaffRole(), ['engineer', 'brigadnik'], true) ? '1' : '0'; ?>;
 
     $('#addPartInventory').select2({
         dropdownParent: $('#addPartModal'),

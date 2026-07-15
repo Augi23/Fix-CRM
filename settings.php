@@ -139,8 +139,11 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     }
     $username_val = !empty($username) ? $username : null;
     $hashed_password = !empty($password) ? password_hash($password, PASSWORD_DEFAULT) : '';
-    $stmt = $pdo->prepare("INSERT INTO technicians (name, email, phone, specialization, role, branch_id, telegram_id, telegram_username, username, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $username_val, $hashed_password]);
+    // Brigádník = automaticky odměna z času v systému (hodiny × sazba, ne zakázky)
+    ensurePayByTimeColumn();
+    $pay_by_time_new = ($role === 'brigadnik') ? 1 : 0;
+    $stmt = $pdo->prepare("INSERT INTO technicians (name, email, phone, specialization, role, branch_id, telegram_id, telegram_username, username, password, pay_by_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $username_val, $hashed_password, $pay_by_time_new]);
     crmAuditLog('staff.create', [
         'entity_type' => 'technician', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => $name,
         'summary' => 'Vytvořen zaměstnanec ' . $name . ' (' . $role . ')' . ($username_val ? ', login @' . $username_val : ''),
@@ -221,6 +224,8 @@ if (isset($_POST['edit_tech'])) {
     }
     
     $username_val = !empty($username) ? $username : null;
+    // Role Brigádník VŽDY znamená odměnu z času — přepínač se nedá vypnout omylem
+    if ($role === 'brigadnik' && $pay_by_time !== null) { $pay_by_time = 1; }
     $pbtSql = $pay_by_time !== null ? ", pay_by_time = " . (int)$pay_by_time : "";
     if (!empty($password)) {
         $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, branch_id = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, password = ?, engineer_rate = ?" . $pbtSql . " WHERE id = ?";
@@ -849,6 +854,7 @@ require_once 'includes/header.php';
                                 if($r == 'admin' || in_array((string)($t['username'] ?? ''), $__adminUsernames, true)) echo '<span class="badge bg-danger">'.__('role_admin').'</span>';
                                 elseif($r == 'boss') echo '<span class="badge bg-warning text-dark">Boss</span>';
                                 elseif($r == 'manager') echo '<span class="badge bg-primary">'.__('role_manager').'</span>';
+                                elseif($r == 'brigadnik') echo '<span class="badge bg-success bg-opacity-75"><i class="far fa-clock me-1"></i>Brigádník</span>';
                                 else echo '<span class="badge bg-info-glow">'.__('role_engineer').'</span>';
                                 ?>
                             </td>
@@ -1554,6 +1560,7 @@ require_once 'includes/header.php';
                     <label class="form-label"><?php echo __('crm_role_label'); ?></label>
                     <select name="role" class="form-select">
                         <option value="engineer"><?php echo __('role_engineer'); ?></option>
+                        <option value="brigadnik">Brigádník</option>
                         <option value="manager"><?php echo __('role_manager'); ?></option>
                         <option value="boss">Boss</option>
                         <option value="admin"><?php echo __('role_admin'); ?></option>
@@ -1607,12 +1614,13 @@ require_once 'includes/header.php';
                     <?php if ($is_admin_user): ?>
                     <select name="role" class="form-select">
                         <option value="engineer" <?php echo ($t['role'] ?? 'engineer') == 'engineer' ? 'selected' : ''; ?>><?php echo __('role_engineer'); ?></option>
+                        <option value="brigadnik" <?php echo ($t['role'] ?? 'engineer') == 'brigadnik' ? 'selected' : ''; ?>>Brigádník</option>
                         <option value="manager" <?php echo ($t['role'] ?? 'engineer') == 'manager' ? 'selected' : ''; ?>><?php echo __('role_manager'); ?></option>
                         <option value="boss" <?php echo ($t['role'] ?? 'engineer') == 'boss' ? 'selected' : ''; ?>>Boss</option>
                         <option value="admin" <?php echo ($t['role'] ?? 'engineer') == 'admin' ? 'selected' : ''; ?>><?php echo __('role_admin'); ?></option>
                     </select>
                     <?php else: ?>
-                        <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo ($t['role'] ?? 'engineer') == 'admin' ? __('role_admin') : (($t['role'] ?? 'engineer') == 'boss' ? 'Boss' : (($t['role'] ?? 'engineer') == 'manager' ? __('role_manager') : __('role_engineer'))); ?></div>
+                        <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo ($t['role'] ?? 'engineer') == 'admin' ? __('role_admin') : (($t['role'] ?? 'engineer') == 'boss' ? 'Boss' : (($t['role'] ?? 'engineer') == 'manager' ? __('role_manager') : (($t['role'] ?? 'engineer') == 'brigadnik' ? 'Brigádník' : __('role_engineer')))); ?></div>
                         <input type="hidden" name="role" value="<?php echo htmlspecialchars($t['role'] ?? 'engineer'); ?>">
                     <?php endif; ?>
                 </div>

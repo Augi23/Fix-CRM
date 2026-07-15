@@ -209,7 +209,7 @@ try {
 
         $stockQty = (int)($inventory['quantity'] ?? 0);
         $requestStatus = (string)($request['status'] ?? 'pending');
-        if (getCurrentStaffRole() === 'engineer' && $stockQty <= 0 && !in_array($requestStatus, ['ordered', 'received'], true)) {
+        if (in_array(getCurrentStaffRole(), ['engineer', 'brigadnik'], true) && $stockQty <= 0 && !in_array($requestStatus, ['ordered', 'received'], true)) {
             throw new Exception('A technician can assign an out-of-stock part only if it is already ordered or received.');
         }
 

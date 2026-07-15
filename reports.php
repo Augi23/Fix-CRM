@@ -258,10 +258,10 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <?php
                             endif;
                             $s = getDetailedStats($pdo, $start_date, $end_date, $t['id']);
-                            // Technici se odměňují ZE ZAKÁZEK; zaměstnanci s příznakem
-                            // „odměna z času" (brigádníci) z hodin v systému × sazba.
+                            // Technici se odměňují ZE ZAKÁZEK; role Brigádník (a zaměstnanci
+                            // s příznakem „odměna z času") z hodin v systému × sazba.
                             $sysMin = (int)round(($sysTime[(int)$t['id']] ?? 0) / 60);
-                            $isCrmWorker = !empty($t['pay_by_time']);
+                            $isCrmWorker = !empty($t['pay_by_time']) || (($t['role'] ?? '') === 'brigadnik');
                             if ($isCrmWorker) {
                                 $s['earnings'] = ($sysMin / 60) * (float)$s['engineer_rate'];
                                 $s['profit'] = $s['revenue'] - $s['parts_cost'] - $s['expenses'] - $s['earnings'];
@@ -516,7 +516,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         $presence_totals[$puid]['seconds'] += (int)$pr['seconds_active'];
                     }
                 } catch (Throwable $e) { $presence_rows = []; }
-                $presence_role_map = ['admin' => __('role_admin'), 'manager' => __('role_manager'), 'technician' => __('role_engineer'), 'engineer' => __('role_engineer')];
+                $presence_role_map = ['admin' => __('role_admin'), 'manager' => __('role_manager'), 'technician' => __('role_engineer'), 'engineer' => __('role_engineer'), 'brigadnik' => 'Brigádník', 'boss' => 'Boss'];
                 ?>
                 <div class="row g-3 mb-4">
                     <div class="col-lg-7">
