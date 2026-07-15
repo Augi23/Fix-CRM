@@ -7,6 +7,16 @@
 return [
     [
         'date' => '2026-07-14',
+        'time' => '23:10',
+        'title' => 'Nové pozadí systému: černá s bílými tečkami ve vlnách',
+        'items' => [
+            'Pozadí CRM je nově černé s bílými tečkami plynoucími ve vlnách (particle efekt). Není to jeden velký obrázek, ale malá bezešvá dlaždice opakovaná oběma osami — při změně měřítka/rozlišení se už nikdy neořeže ani nerozmaže.',
+            'Odstraněno dřívější SVG pozadí s vlnami, které se při zvětšení stránky ořezávalo a zhoršovalo čitelnost.',
+            'Světlý režim zůstává čistě světlý (bez teček).',
+        ],
+    ],
+    [
+        'date' => '2026-07-14',
         'time' => '22:40',
         'title' => 'Údaje klienta smí měnit i technik — s výrazným záznamem v Historii',
         'items' => [

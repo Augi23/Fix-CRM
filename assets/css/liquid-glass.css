@@ -26,14 +26,9 @@
    Bez nich by refrakce neměla co ohýbat (černá zůstane černá).
    Jemné, fixní, neruší čtení dat.
    ------------------------------------------------------------ */
-html, body {
-  background:
-    radial-gradient(900px 600px at 12% -8%,  rgba(10, 132, 255, 0.22) 0%, transparent 55%),
-    radial-gradient(800px 620px at 105% 12%, rgba(100, 210, 255, 0.12) 0%, transparent 55%),
-    radial-gradient(700px 700px at 55% 115%, rgba(0, 113, 227, 0.14) 0%, transparent 60%),
-    #000 !important;
-  background-attachment: fixed, fixed, fixed, fixed !important;
-}
+/* Pozadí definuje crm-shell.css (černá + bílé tečky, bezešvá dlaždice).
+   Dřívější radiální gradienty odstraněny — crm-shell se načítá později
+   a stejně je přebíjel; tady by jen matly. */
 /* OPRAVA posunuté stránky: off-canvas notifikační panel (position:fixed, translateX(100%))
    trčí ~320px vpravo za viewport a dělal vodorovný scroll → celá stránka posunutá.
    body{overflow-x:hidden} to neclipne (panel je fixed → clipuje ho jen viewport/html). */

@@ -194,35 +194,8 @@ $afxFp = array_values(array_filter(explode(' ', $afxFn)));
 $afxInitials = mb_strtoupper(count($afxFp) >= 2 ? mb_substr($afxFp[0],0,1).mb_substr($afxFp[1],0,1) : mb_substr($afxFn,0,2));
 $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 ?>
-<!-- Saténové pozadí (grafit × lesní zelená) — struktura pro Liquid Glass refrakci -->
-<svg class="crm-bgfx" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1440 900" aria-hidden="true">
-  <defs>
-    <linearGradient id="afx-sg1" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#121517"/><stop offset=".5" stop-color="#23282c"/><stop offset="1" stop-color="#0e1113"/>
-    </linearGradient>
-    <linearGradient id="afx-sg2" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#0a110d"/><stop offset=".55" stop-color="#172c21"/><stop offset="1" stop-color="#0b130f"/>
-    </linearGradient>
-    <linearGradient id="afx-sg3" x1="0" y1="0" x2="1" y2=".3">
-      <stop offset="0" stop-color="#10150f"/><stop offset=".5" stop-color="#22372c"/><stop offset="1" stop-color="#0e130f"/>
-    </linearGradient>
-    <linearGradient id="afx-sheen" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#6f9483" stop-opacity="0"/><stop offset=".5" stop-color="#9cc4ae" stop-opacity=".42"/><stop offset="1" stop-color="#6f9483" stop-opacity="0"/>
-    </linearGradient>
-    <filter id="afx-soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7"/></filter>
-  </defs>
-  <rect width="1440" height="900" fill="#070a09"/>
-  <path d="M-100,240 C 240,380 560,120 900,260 C 1180,375 1360,240 1540,330 L1540,-60 L-100,-60 Z" fill="url(#afx-sg3)" opacity=".62"/>
-  <path d="M-100,130 C 320,240 680,40 1020,170 C 1280,268 1420,150 1540,210 L1540,-60 L-100,-60 Z" fill="url(#afx-sg1)" opacity=".8"/>
-  <path d="M-100,560 C 300,470 640,660 980,545 C 1240,458 1400,540 1540,480 L1540,960 L-100,960 Z" fill="url(#afx-sg2)" opacity=".38"/>
-  <path d="M-100,690 C 260,540 520,820 830,660 C 1120,510 1300,640 1540,520 L1540,960 L-100,960 Z" fill="url(#afx-sg1)"/>
-  <path d="M-100,780 C 300,660 620,880 940,740 C 1220,620 1380,720 1540,650 L1540,960 L-100,960 Z" fill="url(#afx-sg2)" opacity=".6"/>
-  <path d="M-100,240 C 240,380 560,120 900,260 C 1180,375 1360,240 1540,330" stroke="url(#afx-sheen)" stroke-width="2.8" fill="none" filter="url(#afx-soft)" opacity=".9"/>
-  <path d="M-100,130 C 320,240 680,40 1020,170 C 1280,268 1420,150 1540,210" stroke="url(#afx-sheen)" stroke-width="2" fill="none" filter="url(#afx-soft)" opacity=".6"/>
-  <path d="M-100,560 C 300,470 640,660 980,545 C 1240,458 1400,540 1540,480" stroke="url(#afx-sheen)" stroke-width="2.4" fill="none" filter="url(#afx-soft)" opacity=".7"/>
-  <path d="M-100,690 C 260,540 520,820 830,660 C 1120,510 1300,640 1540,520" stroke="url(#afx-sheen)" stroke-width="3.2" fill="none" filter="url(#afx-soft)"/>
-  <path d="M-100,780 C 300,660 620,880 940,740 C 1220,620 1380,720 1540,650" stroke="url(#afx-sheen)" stroke-width="2.2" fill="none" filter="url(#afx-soft)" opacity=".75"/>
-</svg>
+<!-- Pozadí: černá s bílými tečkami (hvězdy) — bezešvá dlaždice bg-stars.png,
+     opakuje se oběma osami → žádné ořezávání při změně měřítka (viz crm-shell.css) -->
 
 <!-- Tenký servisní řádek -->
 <header class="afx-utility">
