@@ -108,7 +108,10 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                                         </div>
                                                         <div class="col-12">
                                                             <label class="form-label"><?php echo __('email'); ?> <span class="text-danger">*</span></label>
-                                                            <input type="email" name="inline_email" id="inline_email" class="form-control" required>
+                                                            <?php /* BEZ statického required! Pole je ve sbaleném panelu (collapse) —
+                                                                     prázdné+skryté required pole tiše blokovalo odeslání CELÉHO formuláře
+                                                                     („Dokončit" nedělalo nic). Povinnost hlídá JS při uložení klienta. */ ?>
+                                                            <input type="email" name="inline_email" id="inline_email" class="form-control">
                                                         </div>
                                                         <div class="col-12">
                                                             <label class="form-label"><?php echo __('address'); ?></label>

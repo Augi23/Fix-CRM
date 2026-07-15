@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.6.5',
+        'date' => '2026-07-15',
+        'time' => '16:40',
+        'title' => 'Oprava: tlačítko „Dokončit" u nové zakázky nic nedělalo',
+        'items' => [
+            'Při vytváření zakázky s existujícím klientem se po kliknutí na „Dokončit" nic nestalo. Příčina: e-mail ve sbaleném panelu „Nový klient" byl označen jako povinné pole formuláře — prázdné skryté povinné pole potichu blokovalo odeslání celého formuláře.',
+            'Povinnost e-mailu při zakládání NOVÉHO klienta zůstává (hlídá ji tlačítko uložení klienta) — jen už neblokuje zakázky s existujícím klientem.',
+            'Prověřeno, že stejná past není nikde jinde v aplikaci (žádné další povinné pole ve sbalených panelech).',
+        ],
+    ],
+    [
         'version' => '1.6.4',
         'date' => '2026-07-15',
         'time' => '16:05',
