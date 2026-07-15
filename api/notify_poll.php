@@ -18,6 +18,10 @@ crmBackupMaybeSchedule();
 // Měření aktivního času v systému (statistiky: hodiny Bosse/adminů = práce na CRM)
 crmTrackStaffActivity();
 
+// Jednorázově srovnat zakázky bez pobočky pod výchozí pobočku (interní/importované),
+// aby je technici viděli v seznamu a mohli měnit jejich stav (ne jen admin/Boss).
+ensureOrdersHaveBranch();
+
 try {
     $scope = orderBranchScopeSql('branch_id');   // '' nebo ' AND branch_id = N'
     $lastOrder = (int)($pdo->query("SELECT MAX(id) FROM orders" . ($scope !== '' ? ' WHERE ' . substr($scope, 5) : ''))->fetchColumn() ?: 0);

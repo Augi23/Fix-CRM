@@ -11,6 +11,13 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Fakturační data (jméno/IČO/DIČ, ceny, číslo faktury) jsou jen pro administrátory —
+// shodně s UI (tlačítko účtování se zobrazuje jen s admin_access).
+if (!hasPermission('admin_access')) {
+    echo json_encode(['success' => false, 'message' => __('access_denied_msg')]);
+    exit;
+}
+
 if (!isset($_GET['order_id'])) {
     echo json_encode(['success' => false, 'message' => 'Missing order ID']);
     exit;

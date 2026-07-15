@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '1.4.1',
+        'date' => '2026-07-15',
+        'time' => '11:20',
+        'title' => 'Oprava: technik nemohl měnit stav zakázky bez pobočky („Přístup odepřen")',
+        'items' => [
+            'Technici dostávali „Přístup odepřen" u interních (a starších importovaných) zakázek, které vznikly bez přiřazené pobočky. Přístup k zakázce byl totiž vázaný na shodu pobočky a takové zakázky viděl a mohl měnit jen administrátor / Boss.',
+            'Nově: zakázka bez pobočky nepatří žádné pobočce, takže ji smí obsloužit kterýkoliv přihlášený zaměstnanec (technik i personál). Pobočková izolace u zakázek, které pobočku mají, zůstává beze změny.',
+            'Zároveň proběhne jednorázové srovnání: zakázkám bez pobočky se doplní pobočka podle přiřazeného technika (u nepřiřazených hlavní pobočka Praha 8 – Karlín), aby se technikům správně zobrazovaly i v seznamu zakázek.',
+            'Drobné zabezpečení: API s fakturačními údaji (jméno, IČO/DIČ, ceny) je nově výslovně jen pro administrátory — stejně, jako už bylo skryté tlačítko účtování v seznamu zakázek.',
+        ],
+    ],
+    [
         'version' => '1.4.0',
         'date' => '2026-07-15',
         'time' => '09:30',

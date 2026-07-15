@@ -164,7 +164,14 @@ function canAccessOrderBranch(array $order): bool {
         return true;
     }
     $orderBranchId = (int)($order['branch_id'] ?? 0);
-    return $orderBranchId > 0 && $orderBranchId === getCurrentStaffBranchId();
+    // Zakázka bez přiřazené pobočky (NULL/0) není „vlastněna" žádnou pobočkou →
+    // smí ji obsloužit kterýkoliv přihlášený zaměstnanec. Týká se hlavně interních
+    // zakázek a starších/importovaných zakázek, které vznikly bez branch_id. Jinak by
+    // je viděl a měnil jen admin/Boss (globální diváci) a technik dostal „Přístup odepřen".
+    if ($orderBranchId <= 0) {
+        return true;
+    }
+    return $orderBranchId === getCurrentStaffBranchId();
 }
 
 function canAssignTechnicianToOrder(?int $technicianId, ?int $branchId = null): bool {
@@ -182,6 +189,39 @@ function canAssignTechnicianToOrder(?int $technicianId, ?int $branchId = null): 
         return $techBranchId > 0 && $techBranchId === ($branchId ?: getCurrentStaffBranchId());
     } catch (Throwable $e) {
         return false;
+    }
+}
+
+/**
+ * Jednorázový backfill: zakázkám bez pobočky (branch_id NULL/0) přiřadí výchozí
+ * pobočku (Karlín). Interní zakázky i starší/importované zakázky vznikaly bez
+ * branch_id — technici (ne-globální diváci) je pak neviděli v seznamu (orderBranchScopeSql
+ * je z listu vyřazuje) ani nemohli měnit jejich stav (canAccessOrderBranch).
+ * Gate přes system_settings, aby těžký UPDATE proběhl jen jednou.
+ */
+function ensureOrdersHaveBranch(): void {
+    global $pdo;
+    try {
+        if (get_setting('orders_branch_backfilled', '') === '1') {
+            return;
+        }
+        $defaultBranch = getDefaultBranchId();
+        if ($defaultBranch <= 0) {
+            return; // bez definované pobočky nemá backfill smysl — zkusí se příště
+        }
+        // Pobočku odvodit z přiřazeného technika (jako původní migrace 010), fallback na
+        // výchozí (Karlín). Zakázka přiřazená technikovi z jiné pobočky tak dostane SPRÁVNOU
+        // pobočku, ne plošně Karlín — jinak by u ní ten technik znovu narazil na „Přístup odepřen".
+        $stmt = $pdo->prepare(
+            'UPDATE orders o
+             LEFT JOIN technicians t ON t.id = o.technician_id
+             SET o.branch_id = COALESCE(NULLIF(t.branch_id, 0), ?)
+             WHERE o.branch_id IS NULL OR o.branch_id = 0'
+        );
+        $stmt->execute([$defaultBranch]);
+        set_setting('orders_branch_backfilled', '1');
+    } catch (Throwable $e) {
+        /* backfill nesmí nikdy shodit request */
     }
 }
 
