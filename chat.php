@@ -35,8 +35,9 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 .chat-msg.other .bubble { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.10); color: #fff; border-bottom-left-radius: 5px; }
 .chat-msg.mine { align-self: flex-end; text-align: right; }
 .chat-msg.mine .bubble { background: rgba(10,132,255,.85); color: #fff; border-bottom-right-radius: 5px; text-align: left; }
-.chat-msg .meta { font-size: .72rem; color: rgba(255,255,255,.5); margin: 2px 6px 0; }
-.chat-msg .who { font-size: .74rem; font-weight: 600; color: rgba(140,200,255,.9); margin: 0 6px 2px; }
+.chat-msg .meta { font-size: .74rem; color: rgba(255,255,255,.5); margin: 3px 6px 0; }
+.chat-msg .who { font-weight: 700; color: rgba(140,200,255,.95); }
+.chat-msg.mine .who { color: rgba(255,255,255,.75); }
 .chat-day { align-self: center; font-size: .72rem; color: rgba(255,255,255,.45); background: rgba(255,255,255,.06); border-radius: 10px; padding: 2px 12px; margin: 6px 0; }
 </style>
 
@@ -70,14 +71,14 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
             }
             var el = document.createElement('div');
             el.className = 'chat-msg ' + (m.mine ? 'mine' : 'other');
-            if (!m.mine) {
-                var who = document.createElement('div'); who.className = 'who'; who.textContent = m.author;
-                el.appendChild(who);
-                gotOther = true;
-            }
+            if (!m.mine) gotOther = true;
             var b = document.createElement('div'); b.className = 'bubble'; b.textContent = m.text;
             el.appendChild(b);
-            var meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = m.time;
+            // jméno odesílatele + čas POD bublinou (u každé zprávy)
+            var meta = document.createElement('div'); meta.className = 'meta';
+            var who = document.createElement('span'); who.className = 'who'; who.textContent = m.author;
+            meta.appendChild(who);
+            meta.appendChild(document.createTextNode(' · ' + m.time));
             el.appendChild(meta);
             box.appendChild(el);
         });

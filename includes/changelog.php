@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '1.3.1',
+        'date' => '2026-07-15',
+        'time' => '08:50',
+        'title' => 'Chat: jméno odesílatele pod každou bublinou',
+        'items' => [
+            'Pod každou zprávou v týmovém chatu je nově jméno odesílatele a čas (dřív jméno chybělo, resp. bylo jen nad cizími zprávami).',
+        ],
+    ],
+    [
         'version' => '1.3.0',
         'date' => '2026-07-15',
         'time' => '08:30',
