@@ -235,8 +235,9 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     <tbody>
                         <?php
                         $techs = $pdo->query("SELECT t.id, t.name, t.role, t.is_active, t.branch_id, b.name AS branch_name FROM technicians t LEFT JOIN branches b ON b.id = t.branch_id " . (isBranchGlobalViewer() ? "" : "WHERE t.branch_id = " . (int)getCurrentStaffBranchId()) . " ORDER BY b.id ASC, t.is_active DESC, t.name ASC")->fetchAll();
-                        // aktivní čas v CRM (admin účty sloučené k technikovi téže osoby)
-                        $sysTime = crmGetSystemTimeByTechnician($start_date, $end_date);
+                        // aktivní čas v CRM: technici + samostatné admin účty (vlastní řádky)
+                        $sysAll = crmGetSystemTime($start_date, $end_date);
+                        $sysTime = $sysAll['tech'];
                         $totals['sys_minutes'] = 0;
                         $lastBranchId = null;
                         $totals = [
@@ -256,14 +257,11 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <?php
                             endif;
                             $s = getDetailedStats($pdo, $start_date, $end_date, $t['id']);
+                            // Všichni technici vč. Bosse se odměňují ZE ZAKÁZEK — čas
+                            // v systému je u nich jen informativní. Z času v systému se
+                            // odměňuje pouze samostatný admin účet (řádky níže).
                             $sysMin = (int)round(($sysTime[(int)$t['id']] ?? 0) / 60);
-                            $isCrmWorker = in_array((string)($t['role'] ?? ''), ['boss', 'admin'], true);
-                            if ($isCrmWorker) {
-                                // Boss/admin: práce = správa a vývoj CRM → odměna z času
-                                // v systému × sazba (běží i bez jediné přijaté zakázky)
-                                $s['earnings'] = ($sysMin / 60) * (float)$s['engineer_rate'];
-                                $s['profit'] = $s['revenue'] - $s['parts_cost'] - $s['expenses'] - $s['earnings'];
-                            }
+                            $isCrmWorker = false;
                             $totals['sys_minutes'] += $sysMin;
                             $totals['received'] += $s['received'];
                             $totals['in_progress'] += $s['in_progress'];
@@ -289,13 +287,36 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 </a>
                             </td>
                             <td class="text-end"><?php echo formatWorkDuration($s['work_minutes']); ?></td>
-                            <td class="text-end <?php echo $isCrmWorker ? 'fw-bold text-info' : 'text-white-75'; ?>"><?php echo $sysMin > 0 ? formatWorkDuration($sysMin) : '—'; ?><?php echo $isCrmWorker ? ' <i class="fas fa-laptop-code small" title="Odměna se počítá z času v systému (tvorba a správa CRM)"></i>' : ''; ?></td>
+                            <td class="text-end text-white-75"><?php echo $sysMin > 0 ? formatWorkDuration($sysMin) : '—'; ?></td>
                             <td class="text-end"><?php echo formatMoney($s['revenue']); ?></td>
                             <td class="text-end text-muted small"><?php echo $s['parts_cost'] > 0 ? '-'.formatMoney($s['parts_cost']) : '—'; ?></td>
                             <td class="text-end text-muted small"><?php echo $s['expenses'] > 0 ? '-'.formatMoney($s['expenses']) : '—'; ?></td>
                             <td class="text-end fw-bold text-primary"><?php echo formatMoney($s['earnings']); ?></td>
                             <td class="text-end text-success fw-bold"><?php echo formatMoney($s['profit']); ?></td>
                             <td class="text-center"><span class="badge bg-secondary"><?php echo formatMoney($s['engineer_rate']); ?>/h</span></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php // Samostatné admin účty: odměna = čas v systému × sazba
+                              // (settings admin_hourly_rate) — práce = tvorba a správa CRM
+                        $adminRate = (float)get_setting('admin_hourly_rate', '300');
+                        foreach (($sysAll['users'] ?? []) as $au):
+                            $auMin = (int)round($au['seconds'] / 60);
+                            if ($auMin <= 0) continue;
+                            $auPay = ($auMin / 60) * $adminRate;
+                            $totals['sys_minutes'] += $auMin;
+                            $totals['earnings'] += $auPay;
+                        ?>
+                        <tr>
+                            <td><strong><?php echo htmlspecialchars($au['name']); ?></strong> <span class="badge bg-danger ms-1">Admin</span></td>
+                            <td class="text-center text-white-50">—</td>
+                            <td class="text-end text-white-50">—</td>
+                            <td class="text-end fw-bold text-info"><?php echo formatWorkDuration($auMin); ?> <i class="fas fa-laptop-code small" title="Tvorba a správa CRM — odměna z času v systému"></i></td>
+                            <td class="text-end text-white-50">—</td>
+                            <td class="text-end text-white-50">—</td>
+                            <td class="text-end text-white-50">—</td>
+                            <td class="text-end fw-bold text-primary"><?php echo formatMoney($auPay); ?></td>
+                            <td class="text-end text-white-50">—</td>
+                            <td class="text-center"><span class="badge bg-secondary"><?php echo formatMoney($adminRate); ?>/h</span></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>

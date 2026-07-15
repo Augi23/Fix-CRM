@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.0.2',
+        'date' => '2026-07-15',
+        'time' => '05:00',
+        'title' => 'Oprava odměn: admin z času v systému (300/h), Boss ze zakázek',
+        'items' => [
+            'Administrátor má ve statistikách vlastní řádek — odměna se mu počítá z času stráveného v systému × 300 Kč/h (tvorba a správa CRM), bez potřeby zakázek.',
+            'Tomáš (Boss) se odměňuje klasicky ze zakázek jako technici — sazba vrácena na 500 Kč/h. Khalil má nově 400 Kč/h.',
+            'Sloupec „V systému" zůstává u všech informativní; z času v systému se odměňuje jen admin.',
+        ],
+    ],
+    [
         'version' => '1.0.1',
         'date' => '2026-07-15',
         'time' => '04:35',
