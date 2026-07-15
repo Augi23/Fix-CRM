@@ -114,21 +114,34 @@ function getDefaultBranchId(): int {
 
 function getCurrentStaffBranchId(): int {
     global $pdo;
-    if (!empty($_SESSION['branch_id'])) {
-        return (int)$_SESSION['branch_id'];
+    static $cache = [];
+    $tid = (int)($_SESSION['tech_id'] ?? 0);
+    $ckey = 't' . $tid;
+    if (isset($cache[$ckey])) {
+        return $cache[$ckey];
     }
-    if (!empty($_SESSION['tech_id'])) {
+    // Technik: zdrojem pravdy je jeho AKTUÁLNÍ pobočka v DB, ne (možná zastaralá)
+    // hodnota v session. $_SESSION['branch_id'] se nastaví jen při přihlášení a nikdy
+    // se neobnoví — technik přeřazený mezi pobočkami (nebo po reorganizaci poboček) by
+    // jinak zůstal „uvězněný" na staré pobočce: přístup odepřen k zakázkám i špatný /
+    // prázdný seznam techniků při zakládání zakázky. Proto vždy načíst z DB a session
+    // s ní srovnat.
+    if ($tid > 0) {
         try {
             $stmt = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? LIMIT 1');
-            $stmt->execute([(int)$_SESSION['tech_id']]);
+            $stmt->execute([$tid]);
             $branchId = (int)$stmt->fetchColumn();
             if ($branchId > 0) {
-                $_SESSION['branch_id'] = $branchId;
-                return $branchId;
+                $_SESSION['branch_id'] = $branchId; // udrž session v souladu s DB
+                return $cache[$ckey] = $branchId;
             }
         } catch (Throwable $e) {}
     }
-    return getDefaultBranchId();
+    // Účty bez tech_id (admin/personál): respektuj session, jinak výchozí pobočka.
+    if (!empty($_SESSION['branch_id'])) {
+        return $cache[$ckey] = (int)$_SESSION['branch_id'];
+    }
+    return $cache[$ckey] = getDefaultBranchId();
 }
 
 function isBranchGlobalViewer(): bool {

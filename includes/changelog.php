@@ -6,15 +6,25 @@
  */
 return [
     [
+        'version' => '1.4.2',
+        'date' => '2026-07-15',
+        'time' => '12:10',
+        'title' => 'Oprava: technik „uvězněný" na staré pobočce (Přístup odepřen + špatný výběr technika)',
+        'items' => [
+            'Skutečná příčina hlášení „Přístup odepřen" u karlínských zakázek a toho, že při zakládání zakázky nešel vybrat správný technik: systém si pamatoval pobočku technika jen z okamžiku přihlášení a už ji nikdy neobnovil. Když se technik mezi pobočkami přeřadil (nebo se pobočky reorganizovaly), zůstal „uvězněný" na staré pobočce — nemohl měnit stav zakázek své skutečné pobočky a při zakládání zakázky se mu nabízeli technici cizí (nebo žádní).',
+            'Nově se pobočka technika bere vždy z databáze (aktuální stav), ne ze zapamatované hodnoty z přihlášení. Opraví se to samo při dalším načtení stránky — technik se nemusí odhlašovat.',
+            'Týká se to jak změny stavu zakázky (přijato/v opravě/připraveno/vydáno), tak výběru technika při zakládání nové zakázky.',
+        ],
+    ],
+    [
         'version' => '1.4.1',
         'date' => '2026-07-15',
         'time' => '11:20',
-        'title' => 'Oprava: technik nemohl měnit stav zakázky bez pobočky („Přístup odepřen")',
+        'title' => 'Zpřístupnění zakázek bez pobočky + zabezpečení fakturačního API',
         'items' => [
-            'Technici dostávali „Přístup odepřen" u interních (a starších importovaných) zakázek, které vznikly bez přiřazené pobočky. Přístup k zakázce byl totiž vázaný na shodu pobočky a takové zakázky viděl a mohl měnit jen administrátor / Boss.',
-            'Nově: zakázka bez pobočky nepatří žádné pobočce, takže ji smí obsloužit kterýkoliv přihlášený zaměstnanec (technik i personál). Pobočková izolace u zakázek, které pobočku mají, zůstává beze změny.',
-            'Zároveň proběhne jednorázové srovnání: zakázkám bez pobočky se doplní pobočka podle přiřazeného technika (u nepřiřazených hlavní pobočka Praha 8 – Karlín), aby se technikům správně zobrazovaly i v seznamu zakázek.',
-            'Drobné zabezpečení: API s fakturačními údaji (jméno, IČO/DIČ, ceny) je nově výslovně jen pro administrátory — stejně, jako už bylo skryté tlačítko účtování v seznamu zakázek.',
+            'Zakázka, která nemá přiřazenou pobočku, nově patří „všem" — smí ji obsloužit kterýkoliv přihlášený zaměstnanec, ne jen administrátor / Boss. Pobočková izolace u zakázek, které pobočku mají, zůstává beze změny. (Pojistka do budoucna; aktuálně jsou všechny zakázky s pobočkou.)',
+            'Jednorázové srovnání dat: případným zakázkám bez pobočky se doplní pobočka podle přiřazeného technika (u nepřiřazených hlavní pobočka Praha 8 – Karlín).',
+            'Zabezpečení: API s fakturačními údaji (jméno, IČO/DIČ, ceny) je nově výslovně jen pro administrátory — stejně, jako už bylo skryté tlačítko účtování v seznamu zakázek.',
         ],
     ],
     [
