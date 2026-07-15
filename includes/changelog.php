@@ -6,6 +6,20 @@
  */
 return [
     [
+        'version' => '1.6.1',
+        'date' => '2026-07-15',
+        'time' => '15:00',
+        'title' => 'Dotažení volnosti techniků (nálezy z kontrolní revize 1.6.0)',
+        'items' => [
+            'Rychlá změna stavu (blesk) v seznamu zakázek je nově dostupná každému zaměstnanci i u cizích a nepřiřazených zakázek — dřív ji technik viděl jen u svých.',
+            'Zakázka už se přiřazením technika NEPŘESOUVÁ na jeho pobočku — zůstává na pobočce, kde je zařízení. (Jinak by si technik přiřazením kolegy z jiné pobočky zakázku sám schoval — zmizela by mu ze seznamu i z detailu.)',
+            'Sjednocen i druhý ukládací endpoint (úprava zakázky): odstraněno omezení „technik si smí zakázku jen převzít", které by po 1.6.0 blokovalo to, co UI nabízí.',
+            'V detailu zakázky jde technik nově i ODEBRAT (volba „— bez technika —").',
+            'Opraveno skryté PHP varování v detailu zakázky (proměnná použitá před definicí) — vedoucím se díky tomu nezobrazovala tlačítka předání práce; teď se zobrazují správně.',
+            'Přesnější chybové hlášky při výběru neplatného technika („neexistuje nebo není aktivní" místo matoucí zmínky o pobočce).',
+        ],
+    ],
+    [
         'version' => '1.6.0',
         'date' => '2026-07-15',
         'time' => '14:40',

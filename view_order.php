@@ -51,6 +51,11 @@ if (trim((string)($order['order_code'] ?? '')) === '') {
     } catch (Throwable $e) { /* nevadí, zobrazí se #id a doplní se příště */ }
 }
 
+// Od 1.6.1: technika u zakázky smí změnit KAŽDÝ zaměstnanec (dřív jen vedoucí).
+// Definice musí být PŘED $can_handoff níže — dřív se používala nedefinovaná
+// (PHP warning) a vedoucím se nezobrazovala tlačítka předání.
+$can_change_technician = true;
+
 // Předání mezi techniky: tlačítka vidí přiřazený technik (nebo vedoucí) u rozpracované zakázky
 $__isOwnTech = !empty($_SESSION['tech_id']) && (int)$_SESSION['tech_id'] === (int)($order['technician_id'] ?? 0);
 $can_handoff = !empty($order['technician_id'])
@@ -93,7 +98,7 @@ $stmt->execute([(int)$order['customer_id']]);
 $customers_list = $stmt->fetchAll();
 
 // Fetch active technicians for edit modal
-$techs = getActiveTechnicians();
+$techs = getActiveTechnicians(true);   // vsichni aktivni technici (1.6.1)
 
 $status = $order['status'] ?? getDefaultOrderStatus();
 $next_status = null;
@@ -116,12 +121,9 @@ $show_shipping = isOrderStatusIn($status, 'done');
 $show_invoice = hasPermission('admin_access')
     && isOrderStatusIn($status, 'done')
     && (($order['final_cost'] ?? 0) > 0 || ($order['estimated_cost'] ?? 0) > 0);
-$can_change_technician = hasPermission('admin_access') || hasPermission('edit_orders');
-// Technik bez práva na úpravy si smí NEPŘIŘAZENOU zakázku převzít sám (self-assign);
-// v selectu pak vidí jen sebe. Přeřazení mezi techniky zůstává vedoucím.
-$can_self_assign = !$can_change_technician
-    && !empty($_SESSION['tech_id'])
-    && empty($order['technician_id']);
+// $can_change_technician je definováno výše (od 1.6.1 = true pro všechny zaměstnance).
+// Self-assign zvláštní režim už není potřeba — select technika je plně povolený všem.
+$can_self_assign = false;
 $ui_lang = crm_get_language();
 
 // Fetch status log
@@ -550,11 +552,11 @@ function localizedOrderStatusLabel(string $status): string {
                     <div id="actionsAdvanced">
                         <div class="mb-3">
                             <label class="form-label"><?php echo __('technician'); ?></label>
-                            <?php /* Od 1.6.0: technika (i „bez technika") smí u zakázky nastavit
-                                     KAŽDÝ zaměstnanec — select je vždy povolený a nabízí všechny
-                                     aktivní techniky (dřív technik viděl jen sebe / disabled). */ ?>
+                            <?php /* Od 1.6.0: technika smí u zakázky nastavit KAŽDÝ zaměstnanec —
+                                     select je vždy povolený, nabízí všechny aktivní techniky
+                                     a volbu „bez technika" (value=0 → endpoint uloží NULL). */ ?>
                             <select name="technician_id" class="form-select mb-2">
-                                <option value="">-- <?php echo __('edit'); ?> --</option>
+                                <option value="0" <?php echo empty($order['technician_id']) ? 'selected' : ''; ?>>— bez technika —</option>
                                 <?php $techs = getActiveTechnicians(true); foreach($techs as $t): ?>
                                 <option value="<?php echo $t['id']; ?>" <?php echo $order['technician_id'] == $t['id'] ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($t['name']); ?>
@@ -1454,11 +1456,11 @@ function deleteOrder(id) {
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('technician'); ?></label>
-                            <select name="technician_id" class="form-select" <?php echo (!$can_change_technician && !$can_self_assign) ? 'disabled' : ''; ?>>
+                            <?php /* Od 1.6.1: povoleno všem, všichni aktivní technici
+                                     (prázdná volba = beze změny — update_order_full nechá aktuálního) */ ?>
+                            <select name="technician_id" class="form-select">
                                 <option value=""><?php echo __('choose_option'); ?></option>
-                                <?php 
-                                foreach($techs as $t): ?>
-                                    <?php if ($can_self_assign && !$can_change_technician && (int)$t['id'] !== (int)($_SESSION['tech_id'] ?? 0)) { continue; } ?>
+                                <?php foreach($techs as $t): ?>
                                     <option value="<?php echo $t['id']; ?>" <?php if($order['technician_id']==$t['id']) echo 'selected'; ?>>
                                         <?php echo htmlspecialchars($t['name']); ?>
                                     </option>

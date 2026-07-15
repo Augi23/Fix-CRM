@@ -58,19 +58,17 @@ try {
     $current_tech_id = $order_data['technician_id'];
     $current_estimated = $order_data['estimated_cost'];
     $current_final = $order_data['final_cost'];
-    $target_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
+    // '0' = výslovně „bez technika" (odebrat přiřazení); prázdné = beze změny.
+    // POZOR: '0' je v PHP falsy, proto strict porovnání (dřív se '0' tiše ignorovala).
+    $target_tech_id = ($technician_id !== null && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
 
+    // Pobočka zakázky se přiřazením technika NEMĚNÍ — zakázka patří pobočce, kde
+    // je zařízení. (Dřívější „zakázka následuje technika" po uvolnění výběru
+    // techniků způsobovala, že by si aktér přiřazením kolegy z jiné pobočky
+    // zakázku sám schoval — zmizela by mu ze seznamu i z detailu.)
     $target_branch_id = (int)($order_data['branch_id'] ?? getCurrentStaffBranchId());
     if (!canAssignTechnicianToOrder($target_tech_id, $target_branch_id)) {
-        throw new Exception('Vybraný technik nepatří do pobočky zakázky.');
-    }
-    if ($target_tech_id) {
-        $stmtTechBranch = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? LIMIT 1');
-        $stmtTechBranch->execute([$target_tech_id]);
-        $techBranchId = (int)$stmtTechBranch->fetchColumn();
-        if ($techBranchId > 0) {
-            $target_branch_id = $techBranchId;
-        }
+        throw new Exception('Vybraný technik neexistuje nebo není aktivní.');
     }
 
     if (isOrderStatusIn($current_status, 'collected') && !isOrderStatusIn($new_status, 'collected')) {
@@ -125,7 +123,7 @@ try {
         $params[] = $final_cost;
     }
 
-    $updated_tech_id = ($technician_id && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
+    $updated_tech_id = ($technician_id !== null && $technician_id !== '') ? (int)$technician_id : (int)$current_tech_id;
     $sql .= ', technician_id = ?, branch_id = ?';
     // 0 = „bez technika" → SQL NULL, jinak padá FK orders_ibfk_2 (technik id 0 neexistuje);
     // týká se hlavně zakázek z RepairPluginu, které vznikají bez přiřazeného technika

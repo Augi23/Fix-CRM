@@ -47,17 +47,13 @@ if (!$customer_id || !$device_model || $pin_code === '') {
 }
 
 if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
-    die('Vybraný technik nepatří do zvolené pobočky.');
+    die('Vybraný technik neexistuje nebo není aktivní.');
 }
 
-if ($technician_id) {
-    $stmtTechBranch = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ? LIMIT 1');
-    $stmtTechBranch->execute([$technician_id]);
-    $techBranchId = (int)$stmtTechBranch->fetchColumn();
-    if ($techBranchId > 0) {
-        $branch_id = $techBranchId;
-    }
-}
+// Pobočka zakázky = pobočka zvolená při založení (u technika jeho pobočka),
+// NEMĚNÍ se podle přiřazeného technika — jinak by technik přiřazením kolegy
+// z jiné pobočky vlastní novou zakázku okamžitě „schoval" sám sobě
+// (orderBranchScopeSql by mu ji vyřadil ze seznamu).
 
 try {
     ensureOrderPriorityLowValue();

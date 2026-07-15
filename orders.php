@@ -385,9 +385,10 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                             <td class="fw-bold text-white"><?php echo formatMoney($order['final_cost'] ?: $order['estimated_cost']); ?></td>
                             <td class="text-end pe-4">
                                 <?php
-                                    $can_quick = hasPermission('admin_access') || hasPermission('edit_orders')
-                                        || (($_SESSION['role'] ?? '') === 'technician'
-                                            && (int)($order['technician_id'] ?? 0) === (int)($_SESSION['tech_id'] ?? 0));
+                                    // Od 1.6.1: rychlou změnu stavu smí provést KAŽDÝ zaměstnanec
+                                    // (dřív jen vedoucí nebo přiřazený technik — u cizích/nepřiřazených
+                                    // zakázek technici neměli v seznamu žádné rychlé ovládání).
+                                    $can_quick = true;
                                 ?>
                                 <?php
                                     $can_cancel = !isOrderStatusIn($order['status'], 'cancelled') && !isOrderStatusIn($order['status'], 'collected');
