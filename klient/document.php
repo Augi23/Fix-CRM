@@ -62,15 +62,6 @@ switch ($type) {
         include __DIR__ . '/../print_order.php';
         exit;
 
-    case 'receipt':
-        $stmt = $pdo->prepare("SELECT oi.*, i.part_name FROM order_items oi JOIN inventory i ON oi.inventory_id = i.id WHERE oi.order_id = ?");
-        $stmt->execute([$orderId]);
-        $items = $stmt->fetchAll();
-        $currency = get_setting('currency', 'Kč');
-        define('THERMAL_DOC_EMBED', true);
-        include __DIR__ . '/../print_thermal.php';
-        exit;
-
     case 'invoice':
         $stmt = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic,
                                       o.device_brand, o.device_model, o.serial_number

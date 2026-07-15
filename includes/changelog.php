@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.2.2',
+        'date' => '2026-07-15',
+        'time' => '07:50',
+        'title' => 'Klientský portál: odebrána účtenka, zůstává podepsaný zakázkový list',
+        'items' => [
+            'Z klientského portálu zmizela online „Účtenka" — klient má u zakázky zakázkový list (ten, který podepisuje), případně fakturu a reklamační protokol, pokud existují.',
+            'Ověřeno: zakázkový list se klientovi zobrazuje VČETNĚ elektronického podpisu (obrázek podpisu + „Podepsáno elektronicky" s datem a časem) — jak u převzetí do opravy, tak u výdeje.',
+        ],
+    ],
+    [
         'version' => '1.2.1',
         'date' => '2026-07-15',
         'time' => '07:20',

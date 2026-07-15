@@ -210,12 +210,6 @@ if ($selectedOrder && isset($pdo)) {
         }
     } catch (Throwable $e) { /* faktura nedostupná */ }
 
-    // Účtenka — jen pokud má zakázka vyčíslenou finální cenu
-    if (isset($selectedOrder['final_cost']) && $selectedOrder['final_cost'] !== null
-        && $selectedOrder['final_cost'] !== '' && (float)$selectedOrder['final_cost'] > 0) {
-        $clientDocs[] = ['type' => 'receipt', 'label' => __('client_doc_receipt'), 'icon' => 'fa-receipt'];
-    }
-
     // Reklamace k této zakázce
     if (function_exists('ensureComplaintsClientColumns')) { ensureComplaintsClientColumns($pdo); }
     try {
