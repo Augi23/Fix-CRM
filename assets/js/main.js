@@ -261,6 +261,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const form = this.closest('form');
         if (!form) return;
         e.preventDefault();
+        // Pojistka proti „tichému nic": NEVIDITELNÉ povinné pole (sbalený panel,
+        // skrytý krok wizardu) nesmí zablokovat odeslání — prohlížeč na něm neumí
+        // ukázat chybu ('not focusable') a formulář se bez reakce neodešle.
+        // Viditelná povinná pole validují normálně; skrytá hlídají JS handlery.
+        try {
+            Array.prototype.forEach.call(form.elements, function (el) {
+                if (el.required && !el.checkValidity() && el.offsetParent === null
+                    && !el.classList.contains('select2-hidden-accessible')) {
+                    el.removeAttribute('required');
+                }
+            });
+        } catch (err) { /* pojistka nesmí submit rozbít */ }
         form.requestSubmit ? form.requestSubmit(this) : form.submit();
     });
 

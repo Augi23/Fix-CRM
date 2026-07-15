@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.6.6',
+        'date' => '2026-07-15',
+        'time' => '17:00',
+        'title' => 'Pojistka: skryté povinné pole už nikdy tiše nezablokuje odeslání formuláře',
+        'items' => [
+            'Kontrolní revize (3 nezávislí recenzenti) potvrdila opravu 1.6.5 a doporučila obecnou pojistku: při odesílání formuláře v jakémkoliv okně se neviditelná prázdná povinná pole (sbalené panely, skryté kroky průvodce) automaticky přeskočí — prohlížeč na nich neumí zobrazit chybu a formulář by se jinak bez reakce neodeslal.',
+            'Viditelná povinná pole se validují dál normálně; vyplněná skrytá pole zůstávají beze změny. Ověřeno testem: formulář s dřívější chybou se s pojistkou odešle správně.',
+            'Zajímavost z revize: na starších iPadech chyba „Dokončit nic nedělá" nebyla — starší Safari validaci obchází. Proto se zdálo, že dřív vše fungovalo.',
+        ],
+    ],
+    [
         'version' => '1.6.5',
         'date' => '2026-07-15',
         'time' => '16:40',
