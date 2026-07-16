@@ -203,6 +203,112 @@ $guides['crm'] = [
         ],
     ],
     [
+        'id' => 'reklamace', 'icon' => 'fa-rotate-left', 'color' => '#f97316',
+        'title' => 'Reklamace',
+        'intro' => 'Klient reklamuje provedenou opravu? Eviduje se v sekci Reklamace s vazbou na původní zakázku.',
+        'steps' => [
+            'Otevři <b>Reklamace</b> v horním menu a klikni na <b>Nová reklamace</b>.',
+            'Vyber původní zakázku, popiš závadu a ulož.',
+            'Průběh měň stavy přímo v seznamu (v řešení → vyřízeno / zamítnuto). Otevřené reklamace svítí jako číslo u ikony Reklamace v menu.',
+        ],
+        'conditions' => [
+            ['typ' => 'role', 'text' => 'Reklamace vidí a řeší <b>všichni zaměstnanci</b>.'],
+            ['typ' => 'warn', 'text' => 'Zakázku s navázanou reklamací nejde smazat — reklamace se musí vyřešit dřív.'],
+        ],
+    ],
+    [
+        'id' => 'podpis-klienta', 'icon' => 'fa-signature', 'color' => '#64D2FF',
+        'title' => 'Podpis klienta (příjem / výdej)',
+        'intro' => 'Klient podepisuje převzetí do servisu a vyzvednutí — prstem na iPadu nebo na tvém zařízení.',
+        'steps' => [
+            'V detailu zakázky najdi vpravo blok <b>Podpis klienta</b> (řádky Příjem a Výdej).',
+            '<b>Podepsat</b> — otevře celoobrazovkový podpisový pad na zařízení, kde stojíš.',
+            'Ikona <b>tabletu</b> — pošle žádost na podpisovou stanici (iPad u pultu); klient podepíše tam.',
+            'Po podpisu se u řádku objeví zelené potvrzení s časem a podpis se tiskne na zakázkovém listu.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => 'Podepsaný dokument klient vidí i ve svém klientském portálu (applefix.help).'],
+        ],
+    ],
+    [
+        'id' => 'tisk-dokumentu', 'icon' => 'fa-print', 'color' => '#0A84FF',
+        'title' => 'Tisk dokumentů a štítku zakázky',
+        'intro' => 'Zakázkový list, servisní příkaz i štítek na zařízení vytiskneš z detailu zakázky (nebo ze seznamu ikonou tiskárny).',
+        'steps' => [
+            'V detailu zakázky klikni na tlačítko tisku — nabídka: <b>Zakázkový list A4</b> (pro klienta, s podpisy a rozpisem ceny), <b>Servisní příkaz</b> (pro dílnu).',
+            '<b>Tisk štítku</b> — pošle štítek s kódem zakázky rovnou na štítkovačku Brother (bez dialogu, tiskne server).',
+            'Ze seznamu zakázek jde totéž přes ikonu tiskárny u řádku.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => 'Štítkovačka je zapojená na Karlíně — štítky se tisknou tam. Čárový kód na štítku umí přečíst skener v horní liště (otevře zakázku).'],
+        ],
+    ],
+    [
+        'id' => 'web-objednavky', 'icon' => 'fa-globe', 'color' => '#BF5AF2',
+        'title' => 'Objednávky z webu (applefix.cz)',
+        'intro' => 'Rezervace z webu se v CRM objevují samy jako zakázky — nic se nezakládá ručně.',
+        'steps' => [
+            'Nová webová objednávka = zakázka s fialovým stavem <b>Přijato z RepairPluginu</b> a čipem s objednaným termínem (📅). Dnešní termíny visí i ve „Frontě dnes" na nástěnce.',
+            'Zakázka přichází <b>bez technika</b> — někdo si ji vezme, nebo se přiřadí.',
+            'Když klient objednávku na webu zruší, zakázka se v CRM automaticky stornuje.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => 'V poznámkách zakázky je vždy číslo webové objednávky, termín a poznámka klienta. Cena z webového ceníku se předvyplní do odhadu.'],
+        ],
+    ],
+    [
+        'id' => 'prehledy', 'icon' => 'fa-chart-line', 'color' => '#34C759',
+        'title' => 'Přehledy a statistiky',
+        'intro' => 'Výkony, tržby a odměny za zvolené období.',
+        'steps' => [
+            'Otevři <b>Přehledy</b>, nahoře nastav období (od–do) a klikni na <b>Aktualizovat</b>.',
+            '<b>Statistiky techniků</b>: opraveno, odpracováno, čas v systému, tržby a odměna po lidech (skupinované po pobočkách).',
+            '<b>Celkové statistiky servisu</b> a <b>Detailně po zaměstnancích</b> — další záložky téže stránky.',
+        ],
+        'conditions' => [
+            ['typ' => 'role', 'text' => 'Plné přehledy vidí <b>vedení</b>; technici vidí své statistiky.'],
+            ['typ' => 'info', 'text' => 'Odměny: technici ze zakázek (sazba × odpracovaný čas na opravách), brigádníci a admin z přihlášeného času v systému.'],
+        ],
+    ],
+    [
+        'id' => 'imei', 'icon' => 'fa-mobile-screen-button', 'color' => '#64D2FF',
+        'title' => 'Kontrola IMEI (kradené telefony)',
+        'intro' => 'Rychlé ověření zařízení proti policejní databázi — přímo z nástěnky.',
+        'steps' => [
+            'Na nástěnce vpravo najdi widget <b>Kontrola IMEI</b>.',
+            'Zadej <b>14 nebo 15 číslic</b> (u 14 se kontrolní číslice dopočítá) a klikni na <b>Zkontrolovat</b>.',
+        ],
+        'conditions' => [
+            ['typ' => 'warn', 'text' => 'Ověřuj u výkupů a podezřelých zařízení VŽDY — kontrola běží proti policejní databázi odcizených zařízení.'],
+        ],
+    ],
+    [
+        'id' => 'nakupni-seznam', 'icon' => 'fa-basket-shopping', 'color' => '#34C759',
+        'title' => 'Nákupní seznam',
+        'intro' => 'Rychlý týmový seznam „co dokoupit" — zelené tlačítko v horní liště.',
+        'steps' => [
+            'Klikni na zelené <b>Nákupní seznam</b> v horní liště.',
+            'Přidej položku (název, případně poznámka/priorita) — vidí ji všichni.',
+            'Po nákupu položku odškrtni.',
+        ],
+        'conditions' => [
+            ['typ' => 'role', 'text' => 'Přidávat může každý; správu položek (mazání, stavy) má vedení a lidé s právem nákupů.'],
+        ],
+    ],
+    [
+        'id' => 'klientsky-portal', 'icon' => 'fa-user-check', 'color' => '#0A84FF',
+        'title' => 'Klientský portál (applefix.help) — co říct klientovi',
+        'intro' => 'Klient si sám sleduje stav zakázky online. Hodí se znát, když se ptá „jak se to dozvím?".',
+        'steps' => [
+            'Klient dostane e-mail (a SMS, je-li zapnuta) při přijetí, dokončení a s výzvou k vyzvednutí — s odkazem na <b>applefix.help</b>.',
+            'Přihlásí se <b>e-mailem nebo telefonem</b> + <b>PINem zakázky</b> (má ho na zakázkovém listu).',
+            'V portálu vidí stav opravy, cenu a podepsané dokumenty.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => 'Interní zakázky do portálu nejdou (nemají kontakt ani PIN pro klienta).'],
+        ],
+    ],
+    [
         'id' => 'role-pobocky', 'icon' => 'fa-shield-halved', 'color' => '#BF5AF2',
         'title' => 'Kdo co smí — role a pobočky (přehled)',
         'intro' => 'Rychlá mapa práv, ať víš, proč někde něco nevidíš.',

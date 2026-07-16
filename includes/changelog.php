@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.9.7',
+        'date' => '2026-07-16',
+        'time' => '23:00',
+        'title' => 'Návody: doplněno 8 chybějících témat (celkem 22)',
+        'items' => [
+            'Do záložky CRM přibyly návody: Reklamace, Podpis klienta (příjem/výdej + podpisová stanice), Tisk dokumentů a štítku zakázky, Objednávky z webu, Přehledy a statistiky, Kontrola IMEI, Nákupní seznam a Klientský portál (co říct klientovi).',
+            'Sekce Návody teď pokrývá všechny hlavní funkce CRM — 22 postupů krok za krokem.',
+        ],
+    ],
+    [
         'version' => '1.9.6',
         'date' => '2026-07-16',
         'time' => '22:30',
