@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.7.2',
+        'date' => '2026-07-16',
+        'time' => '14:45',
+        'title' => 'Nástěnka: dlaždice „Nepřidělené zakázky" a „Nedokončené zakázky"',
+        'items' => [
+            'Nahoře na nástěnce přibyly mezi statistiky dvě dlaždice: „Nepřidělené zakázky" (aktivní zakázky bez technika) a „Nedokončené zakázky" (všechny rozpracované) — s názvem pobočky, ke které se čísla vztahují.',
+            'Obě dlaždice počítají VŽDY jen pobočku přihlášeného — Karlín vidí karlínská čísla, Na Příkopě svoje. Údaje druhé pobočky tu nikdo nevidí (na rozdíl od ostatních statistik, kde Karlín vidí vše).',
+            'Mřížka statistik přeskládána na 3×2, aby se šest dlaždic vešlo úhledně vedle přehledu poboček.',
+        ],
+    ],
+    [
         'version' => '1.7.1',
         'date' => '2026-07-16',
         'time' => '14:05',

@@ -1948,7 +1948,8 @@ html, body { font-size: 14px !important; }
 /* ── STAT GRID (4 cards) ───────────────────────── */
 .crm-stat-grid {
   display: grid !important;
-  grid-template-columns: repeat(4, 1fr) !important;
+  /* 6 dlaždic (od 1.7.2: + Nepřidělené a Nedokončené) → 3 sloupce × 2 řady */
+  grid-template-columns: repeat(3, 1fr) !important;
   gap: 14px !important;
 }
 @media (max-width: 1199.98px) {
@@ -1988,6 +1989,8 @@ html, body { font-size: 14px !important; }
 .crm-stat-2::before { background: linear-gradient(90deg, #FF9500 0%, #FF375F 100%) !important; }
 .crm-stat-3::before { background: linear-gradient(90deg, #34C759 0%, #0A84FF 100%) !important; }
 .crm-stat-4::before { background: linear-gradient(90deg, #64D2FF 0%, #0A84FF 50%, #0A84FF 100%) !important; }
+.crm-stat-5::before { background: linear-gradient(90deg, #FF375F 0%, #FF9500 100%) !important; }
+.crm-stat-6::before { background: linear-gradient(90deg, #BF5AF2 0%, #0A84FF 100%) !important; }
 
 .crm-stat-label {
   font-size: 10px !important;
