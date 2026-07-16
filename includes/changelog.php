@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.7.4',
+        'date' => '2026-07-16',
+        'time' => '16:00',
+        'title' => 'Dlaždice Nepřidělené/Nedokončené: vedení vidí obě pobočky',
+        'items' => [
+            'Upřesnění pravidla z 1.7.2: administrátoři a Boss (vedení) vidí v dlaždicích „Nepřidělené zakázky" a „Nedokončené zakázky" součet OBOU poboček (s popiskem „Obě pobočky").',
+            'Řadoví zaměstnanci vidí dál jen čísla své pobočky — pobočky si tyto údaje navzájem nevidí.',
+        ],
+    ],
+    [
         'version' => '1.7.3',
         'date' => '2026-07-16',
         'time' => '15:20',

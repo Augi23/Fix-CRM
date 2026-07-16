@@ -20,11 +20,13 @@ $waitingStatuses = orderStatusSqlIn($pdo, 'waiting_parts');
 $doneStatuses = orderStatusSqlIn($pdo, 'done');
 $activeStatuses = orderStatusSqlIn($pdo, 'active');
 
-// Dlaždice „Nepřidělené" a „Nedokončené": VŽDY jen vlastní pobočka přihlášeného
-// (i pro Karlín/adminy — na rozdíl od ostatních statistik). Požadavek 16.7.2026:
-// pobočka a její zaměstnanci nevidí tyto údaje té druhé pobočky.
+// Dlaždice „Nepřidělené" a „Nedokončené" (16.7.2026): vedení (admin/manažer/Boss)
+// vidí VŽDY součet obou poboček; řadoví zaměstnanci jen svou pobočku — pobočky
+// si tyto údaje navzájem nevidí.
+$__tilesGlobal = isBranchGlobalViewer();
 $__myBranchId = (int)getCurrentStaffBranchId();
-$__branch_cond = $__myBranchId > 0 ? " AND branch_id = " . $__myBranchId : '';
+$__branch_cond = (!$__tilesGlobal && $__myBranchId > 0) ? " AND branch_id = " . $__myBranchId : '';
+$__tilesBranchLabel = $__tilesGlobal ? 'Obě pobočky' : getBranchLabel($__myBranchId);
 $unassigned_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($activeStatuses) AND (technician_id IS NULL OR technician_id = 0)" . $__branch_cond)->fetchColumn();
 $unfinished_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($activeStatuses)" . $__branch_cond)->fetchColumn();
 
@@ -130,16 +132,16 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             <?php if ($revenue_today_trend > 0): ?>↑ <?php echo $revenue_today_trend; ?> % <?php echo __('vs_yesterday'); ?><?php elseif ($revenue_today_trend < 0): ?>↓ <?php echo abs($revenue_today_trend); ?> % <?php echo __('vs_yesterday'); ?><?php else: ?><?php echo __('no_change'); ?><?php endif; ?>
         </div>
     </div>
-    <?php /* Nepřidělené + Nedokončené: VŽDY jen vlastní pobočka přihlášeného */ ?>
+    <?php /* Nepřidělené + Nedokončené: vedení = obě pobočky, zaměstnanci = jen svoje */ ?>
     <a href="orders.php" class="crm-stat-card crm-stat-5 text-decoration-none">
         <div class="crm-stat-label">Nepřidělené zakázky</div>
         <div class="crm-stat-value"><?php echo (int)$unassigned_count; ?></div>
-        <div class="crm-stat-sub <?php echo $unassigned_count > 0 ? 'down' : ''; ?>"><i class="fas fa-store me-1" style="font-size:.7rem;"></i><?php echo e(getBranchLabel($__myBranchId)); ?></div>
+        <div class="crm-stat-sub <?php echo $unassigned_count > 0 ? 'down' : ''; ?>"><i class="fas fa-store me-1" style="font-size:.7rem;"></i><?php echo e($__tilesBranchLabel); ?></div>
     </a>
     <a href="orders.php" class="crm-stat-card crm-stat-6 text-decoration-none">
         <div class="crm-stat-label">Nedokončené zakázky</div>
         <div class="crm-stat-value"><?php echo (int)$unfinished_count; ?></div>
-        <div class="crm-stat-sub"><i class="fas fa-store me-1" style="font-size:.7rem;"></i><?php echo e(getBranchLabel($__myBranchId)); ?></div>
+        <div class="crm-stat-sub"><i class="fas fa-store me-1" style="font-size:.7rem;"></i><?php echo e($__tilesBranchLabel); ?></div>
     </a>
 </div>
 
