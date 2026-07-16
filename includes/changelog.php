@@ -6,6 +6,20 @@
  */
 return [
     [
+        'version' => '1.8.0',
+        'date' => '2026-07-16',
+        'time' => '17:30',
+        'title' => 'Sklad přes QR kódy: naskladnění i výdej dílů mobilem',
+        'items' => [
+            'Každý díl má QR štítek na regál (Sklad → tlačítko QR u dílu, nebo „QR štítky" pro tisk archu všech dílů najednou). Sken telefonem otevře kartu dílu.',
+            'NASKLADNĚNÍ: naskenuj QR na regálu, zadej počet přijatých kusů, hotovo — sklad se ihned navýší. Rychlé naskladnění jde i z počítače (ikona kamionu u dílu).',
+            'VÝDEJ NA ZAKÁZKU: technik u zakázky klikne „Vzít díl skenem QR", dojde ke skladu, naskenuje QR dílu, zadá počet — díl se přidá k zakázce i s cenou a sklad se OKAMŽITĚ odečte. Zakázka je předvybraná (platí 30 minut), jinak se vybere ze seznamu aktivních.',
+            'Každý pohyb (příjem/výdej/korekce) se zapisuje do deníku pohybů — na kartě dílu je vidět kdo, kdy a kolik, výdeje s odkazem na zakázku. Vše jde i do Historie.',
+            'Smazání QR-vydaného dílu ze zakázky kusy automaticky vrátí na sklad. Díly přidané postaru z počítače se dál odečítají při dokončení zakázky — nic se neodečte dvakrát.',
+            'Skener v horní liště CRM umí regálové QR kódy číst také — není potřeba ani kamera telefonu.',
+        ],
+    ],
+    [
         'version' => '1.7.6',
         'date' => '2026-07-16',
         'time' => '16:30',

@@ -40,9 +40,15 @@ try {
         throw new Exception(__('access_denied_msg'));
     }
 
-    // If order is already completed/collected, return parts to stock
-    if (in_array($item['status'], getOrderStatusList('done'), true)) {
+    // Vrácení na sklad: QR-vydané položky (stock_deducted=1) byly odečtené hned
+    // při výdeji → vrací se VŽDY; klasické položky jen pokud je zakázka dokončená
+    // (odečetly se při dokončení). Jinak by kusy zmizely/přibyly dvakrát.
+    $__wasDeducted = (int)($item['stock_deducted'] ?? 0) === 1;
+    if ($__wasDeducted || in_array($item['status'], getOrderStatusList('done'), true)) {
         changeInventoryQuantity($item['inventory_id'], $item['quantity']);
+        if ($__wasDeducted && function_exists('crmLogInventoryMove')) {
+            crmLogInventoryMove((int)$item['inventory_id'], (int)$item['quantity'], 'restock', (int)$item['order_id'], 'Vráceno ze zakázky (smazána položka)');
+        }
     }
 
     // Delete the item

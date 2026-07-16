@@ -2116,18 +2116,73 @@ function changeInventoryQuantity($inventory_id, $change) {
 /**
  * Process inventory changes when an order status changes.
  */
+/* ═══════════════ SKLAD: QR pohyby (naskladnění / výdej na zakázku) ═══════════════
+   Model 16.7.2026: sken QR na regálu = FYZICKÝ pohyb → sklad se mění OKAMŽITĚ.
+   Díl vydaný přes QR má na položce zakázky stock_deducted=1, takže ho pozdější
+   dokončení zakázky (processOrderInventoryChange) už NEodečte podruhé.
+   Položky přidané klasicky z počítače se dál odečítají až při dokončení. */
+
+/** Deník skladových pohybů (kdo, kdy, kolik, proč, k jaké zakázce). */
+function ensureInventoryMovesTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS inventory_moves (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            inventory_id INT NOT NULL,
+            delta INT NOT NULL,
+            reason VARCHAR(20) NOT NULL,               -- restock | issue | correction
+            order_id INT NULL DEFAULT NULL,
+            actor_name VARCHAR(100) NULL DEFAULT NULL,
+            note VARCHAR(255) NULL DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_moves_item (inventory_id, created_at),
+            KEY idx_moves_order (order_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureInventoryMovesTable: ' . $e->getMessage()); }
+}
+
+/** order_items.stock_deducted — 1 = sklad už fyzicky odečten (QR výdej). */
+function ensureOrderItemStockFlag(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM order_items LIKE 'stock_deducted'")->fetch()) {
+            $pdo->exec("ALTER TABLE order_items ADD COLUMN stock_deducted TINYINT(1) NOT NULL DEFAULT 0");
+        }
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureOrderItemStockFlag: ' . $e->getMessage()); }
+}
+
+/** Zápis pohybu do deníku (nikdy nesmí shodit hlavní operaci). */
+function crmLogInventoryMove(int $inventoryId, int $delta, string $reason, ?int $orderId = null, string $note = ''): void {
+    global $pdo;
+    try {
+        ensureInventoryMovesTable();
+        $actor = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+        $pdo->prepare("INSERT INTO inventory_moves (inventory_id, delta, reason, order_id, actor_name, note) VALUES (?, ?, ?, ?, ?, ?)")
+            ->execute([$inventoryId, $delta, $reason, $orderId ?: null, $actor !== '' ? $actor : null, $note !== '' ? mb_substr($note, 0, 255) : null]);
+    } catch (Throwable $e) { error_log('crmLogInventoryMove: ' . $e->getMessage()); }
+}
+
 function processOrderInventoryChange($order_id, $is_finishing, $was_finished) {
     global $pdo;
-    
+    ensureOrderItemStockFlag();
+
+    // Položky vydané přes QR (stock_deducted=1) jsou už fyzicky odečtené —
+    // dokončení/vrácení zakázky s nimi nehýbe (fyzickou pravdu drží QR pohyby).
     if (!$was_finished && $is_finishing) {
-        $stmt = $pdo->prepare('SELECT inventory_id, quantity FROM order_items WHERE order_id = ? AND inventory_id IS NOT NULL');
+        $stmt = $pdo->prepare('SELECT inventory_id, quantity FROM order_items WHERE order_id = ? AND inventory_id IS NOT NULL AND COALESCE(stock_deducted, 0) = 0');
         $stmt->execute([$order_id]);
         $items = $stmt->fetchAll();
         foreach ($items as $item) {
             changeInventoryQuantity($item['inventory_id'], -$item['quantity']);
         }
     } elseif ($was_finished && !$is_finishing) {
-        $stmt = $pdo->prepare('SELECT inventory_id, quantity FROM order_items WHERE order_id = ? AND inventory_id IS NOT NULL');
+        $stmt = $pdo->prepare('SELECT inventory_id, quantity FROM order_items WHERE order_id = ? AND inventory_id IS NOT NULL AND COALESCE(stock_deducted, 0) = 0');
         $stmt->execute([$order_id]);
         $items = $stmt->fetchAll();
         foreach ($items as $item) {

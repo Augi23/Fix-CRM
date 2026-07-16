@@ -58,6 +58,9 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
         <?php if($inventory_stats['low_stock'] > 0): ?>
             <span class="badge bg-warning text-dark me-2"><?php echo __('low_stock_alert'); ?>: <?php echo $inventory_stats['low_stock']; ?></span>
         <?php endif; ?>
+        <a href="inventory_qr_label.php?all=1" target="_blank" class="btn btn-outline-info" title="Vytiskne arch QR štítků všech naskladněných dílů — nalep na regály">
+            <i class="fas fa-qrcode me-2"></i> QR štítky
+        </a>
         <button class="btn btn-outline-info" data-bs-toggle="collapse" data-bs-target="#filterPanel">
             <i class="fas fa-filter me-2"></i> <?php echo __('filters'); ?>
         </button>
@@ -182,6 +185,8 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
                                     </td>
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-white border text-success restock-btn" data-id="<?php echo $item['id']; ?>" data-name="<?php echo htmlspecialchars($item['part_name']); ?>" title="Naskladnit (příjem kusů)"><i class="fas fa-truck-loading"></i></button>
+                                            <a href="inventory_qr_label.php?id=<?php echo $item['id']; ?>" target="_blank" class="btn btn-white border text-info" title="QR štítek na regál"><i class="fas fa-qrcode"></i></a>
                                             <a href="edit_inventory.php?id=<?php echo $item['id']; ?>" class="btn btn-white border" title="<?php echo __('edit'); ?>"><i class="fas fa-edit text-warning"></i></a>
                                             <button type="button" class="btn btn-white border text-success assign-order-btn" data-id="<?php echo $item['id']; ?>" data-name="<?php echo htmlspecialchars($item['part_name']); ?>" title="<?php echo __('use_in_repair'); ?>"><i class="fas fa-link"></i></button>
                                             <button type="button" class="btn btn-white border text-danger" onclick="deletePart(<?php echo $item['id']; ?>)" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>
@@ -390,6 +395,25 @@ function deletePart(id) {
         });
     });
 }
+
+// Rychlé naskladnění z řádku (desktop) — stejné API jako QR sken na regálu
+$(document).on('click', '.restock-btn', function () {
+    var id = this.dataset.id, name = this.dataset.name || '';
+    var qty = prompt('Naskladnit „' + name + '" — kolik kusů přijímáš?', '1');
+    if (qty === null) return;
+    qty = parseInt(qty, 10);
+    if (!qty || qty < 1) { alert('Zadej kladný počet kusů.'); return; }
+    var fd = new FormData();
+    fd.append('op', 'restock'); fd.append('inventory_id', id); fd.append('qty', qty);
+    fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+    fetch('api/inventory_move.php', {method: 'POST', body: fd, credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d.success) { location.reload(); }
+            else { alert(d.message || 'Chyba'); }
+        })
+        .catch(function () { alert('Síťová chyba.'); });
+});
 </script>
 
 

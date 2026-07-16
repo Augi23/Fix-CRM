@@ -406,6 +406,11 @@ function localizedOrderStatusLabel(string $status): string {
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPartModal">
                             <i class="fas fa-plus me-1"></i> <?php echo __('add_part'); ?>
                         </button>
+                        <?php /* QR výdej: připraví tuto zakázku, technik pak jen naskenuje QR dílu na regálu */ ?>
+                        <button class="btn btn-sm btn-outline-warning" id="qrTakePartBtn" data-order-id="<?php echo (int)$order['id']; ?>"
+                                title="Připraví tuto zakázku — pak stačí mobilem naskenovat QR kód dílu na regálu a díl se sem přidá i s cenou">
+                            <i class="fas fa-qrcode me-1"></i> Vzít díl skenem QR
+                        </button>
                     </div>
                 </div>
                 
@@ -953,6 +958,18 @@ $(document).ready(function() {
             const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : '<?php echo __("error"); ?>';
             showAlert(msg);
         });
+    });
+
+    // „Vzít díl skenem QR" — ozbrojí tuto zakázku (30 min), pak stačí naskenovat QR na regálu
+    $('#qrTakePartBtn').on('click', function () {
+        var btn = this;
+        $.post('api/qr_arm.php', {order_id: btn.dataset.orderId, csrf_token: $('meta[name="csrf-token"]').attr('content')}, function (d) {
+            if (d && d.success) {
+                showAlert('<i class="fas fa-qrcode me-1"></i> ' + d.message + ' Výdej se přidá k této zakázce (platí 30 minut).');
+            } else {
+                showAlert((d && d.message) || 'Chyba');
+            }
+        }, 'json');
     });
 
     $('#statusForm').on('submit', function(e) {
