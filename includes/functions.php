@@ -2535,8 +2535,11 @@ function ensureOrderPriceLinesTable(): void {
     global $pdo;
     static $done = false;
     if ($done) return;
+    // DDL nikdy uvnitř transakce (implicitní COMMIT v MariaDB) — zkusí se příště
+    if ($pdo->inTransaction()) return;
     $done = true;
     try {
+        if ($pdo->query("SHOW TABLES LIKE 'order_price_lines'")->fetch()) { return; }
         $pdo->exec("CREATE TABLE IF NOT EXISTS order_price_lines (
             id INT AUTO_INCREMENT PRIMARY KEY,
             order_id INT NOT NULL,
@@ -2550,7 +2553,13 @@ function ensureOrderPriceLinesTable(): void {
 
 function crmAddOrderPriceLine(int $orderId, string $label, float $amount, int $sort = 0): void {
     global $pdo;
-    ensureOrderPriceLinesTable();
+    // DDL NIKDY uvnitř transakce — „CREATE TABLE IF NOT EXISTS" dělá v MariaDB
+    // implicitní COMMIT i když tabulka existuje → finální $pdo->commit() pak
+    // spadl na „There is no active transaction" (bílá stránka „Order creation
+    // failed" u každé zakázky s příplatkem/ceníkem, zakázka přitom vznikla).
+    if (!$pdo->inTransaction()) {
+        ensureOrderPriceLinesTable();
+    }
     $pdo->prepare("INSERT INTO order_price_lines (order_id, label, amount, sort) VALUES (?, ?, ?, ?)")
         ->execute([$orderId, mb_substr(trim($label), 0, 190), round($amount, 2), $sort]);
 }
@@ -3950,7 +3959,10 @@ function assignmentSegmentSync(int $orderId, ?int $technicianId, ?string $status
     try {
         $attempt();
     } catch (Throwable $e) {
-        try { ensureOrderAssignmentLogSchema(); $attempt(); } catch (Throwable $e2) { /* ignore */ }
+        // ensure (DDL) jen MIMO transakci — implicitní COMMIT by rozbil atomicitu
+        if (!$pdo->inTransaction()) {
+            try { ensureOrderAssignmentLogSchema(); $attempt(); } catch (Throwable $e2) { /* ignore */ }
+        }
     }
 }
 
@@ -4193,6 +4205,8 @@ function ensureWebBookingsSchema(): void {
     global $pdo;
     static $done = false;
     if ($done) return;
+    // DDL nikdy uvnitř transakce (implicitní COMMIT by ji zabil) — zkusí se příště
+    if ($pdo->inTransaction()) return;
     $done = true;
 
     try {

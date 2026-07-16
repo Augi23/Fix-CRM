@@ -165,27 +165,33 @@ try {
 
     $pdo->commit();
 
-    if ($status_changed) {
-        $__oc = trim((string)($order_data['order_code'] ?? '')) !== '' ? (string)$order_data['order_code'] : ('#' . (int)$order_id);
-        crmAuditLog('order.status_change', [
-            'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
-            'summary' => 'Zakázka ' . $__oc . ' — stav: ' . $current_status . ' → ' . $new_status,
-        ]);
-    }
+    // Po commitu je změna ULOŽENÁ — audit/notifikace nesmí odpověď převrátit
+    // na chybu (uživatel by akci opakoval). Případný pád se jen zaloguje.
+    try {
+        if ($status_changed) {
+            $__oc = trim((string)($order_data['order_code'] ?? '')) !== '' ? (string)$order_data['order_code'] : ('#' . (int)$order_id);
+            crmAuditLog('order.status_change', [
+                'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
+                'summary' => 'Zakázka ' . $__oc . ' — stav: ' . $current_status . ' → ' . $new_status,
+            ]);
+        }
 
-    if ($status_changed || $technician_changed) {
-        crmNotifyOrderLifecycleEvent([
-            'type' => 'order_status_changed',
-            'order_id' => (int)$order_id,
-            'old_status' => (string)$current_status,
-            'new_status' => (string)$new_status,
-            'technician_id' => (int)$updated_tech_id,
-            'previous_technician_id' => (int)$current_tech_id,
-            'final_cost' => $final_cost,
-            'actor_role' => (string)($_SESSION['role'] ?? ''),
-            'actor_tech_id' => (int)($_SESSION['tech_id'] ?? 0),
-            'actor_name' => (string)($_SESSION['full_name'] ?? ''),
-        ]);
+        if ($status_changed || $technician_changed) {
+            crmNotifyOrderLifecycleEvent([
+                'type' => 'order_status_changed',
+                'order_id' => (int)$order_id,
+                'old_status' => (string)$current_status,
+                'new_status' => (string)$new_status,
+                'technician_id' => (int)$updated_tech_id,
+                'previous_technician_id' => (int)$current_tech_id,
+                'final_cost' => $final_cost,
+                'actor_role' => (string)($_SESSION['role'] ?? ''),
+                'actor_tech_id' => (int)($_SESSION['tech_id'] ?? 0),
+                'actor_name' => (string)($_SESSION['full_name'] ?? ''),
+            ]);
+        }
+    } catch (Throwable $e) {
+        error_log('update_order_status post-commit (audit/notify) selhal, zmena #' . (int)$order_id . ' ulozena: ' . $e->getMessage());
     }
 
     echo json_encode(['success' => true, 'message' => $t('status_updated')]);

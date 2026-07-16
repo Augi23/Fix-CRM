@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '1.6.7',
+        'date' => '2026-07-16',
+        'time' => '12:40',
+        'title' => 'KRITICKÁ oprava: „Order creation failed" při dokončení zakázky',
+        'items' => [
+            'Vytvoření zakázky s expresním příplatkem / slevou dle priority nebo s opravou vybranou z ceníku končilo bílou stránkou „Order creation failed" — a matoucí je, že zakázka se PŘITOM většinou vytvořila (hrozily duplicity při opakování).',
+            'Příčina: zápis rozpisu ceny si uvnitř databázové transakce ověřoval existenci tabulky příkazem, který v MariaDB transakci potichu ukončí — závěrečné potvrzení pak spadlo. Oprava: ověření tabulek se dělá VŽDY před transakcí (rozpis ceny, webové rezervace, log přiřazení).',
+            'Pojistka: od potvrzení zápisu už chybu nemůže způsobit ani audit, ani notifikace (Telegram/SMS/e-mail) — úspěšně vytvořená zakázka vždy korektně přesměruje, úspěšná změna stavu vždy vrátí úspěch. Selhání notifikací se jen zaloguje.',
+            'Zjištěno reprodukcí přímo na serveru; potvrzeno nezávislou revizí (2 agenti). Zkontrolujte prosím, zda dnes nevznikly duplicitní zakázky opakovanými pokusy.',
+        ],
+    ],
+    [
         'version' => '1.6.6',
         'date' => '2026-07-15',
         'time' => '17:00',

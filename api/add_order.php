@@ -58,6 +58,8 @@ if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
 try {
     ensureOrderPriorityLowValue();
     ensureOrderCreatedByColumn();   // DDL — před transakcí
+    ensureOrderPriceLinesTable();   // DDL — před transakcí (rozpis ceny)
+    ensureWebBookingsSchema();      // DDL — před transakcí (vazba na web rezervaci)
     $pdo->beginTransaction();
 
     $created_by_name = trim((string)($_SESSION['full_name'] ?? '')) ?: trim((string)($_SESSION['username'] ?? ''));
@@ -169,24 +171,31 @@ try {
 
     $pdo->commit();
 
-    // Audit až PO commitu (mimo transakci — ensureAuditLogTable dělá DDL)
-    $__dev = trim(($device_brand ?? '') . ' ' . ($device_model ?? ''));
-    crmAuditLog('order.create', [
-        'entity_type' => 'order', 'entity_id' => $order_id,
-        'entity_label' => ($new_order_code ?: ('#' . $order_id)),
-        'summary' => 'Vytvořena zakázka ' . ($new_order_code ?: ('#' . $order_id)) . ($__dev !== '' ? ' — ' . $__dev : ''),
-        'branch_id' => $branch_id ?? null,
-    ]);
+    // Od commitu je zakázka VYTVOŘENÁ — audit a notifikace jsou best-effort a
+    // NESMÍ shodit odpověď na „Order creation failed" (uživatel by ji zkusil
+    // založit znovu → duplicitní zakázky). Cokoliv tu spadne, jen se zaloguje.
+    try {
+        // Audit až PO commitu (mimo transakci — ensureAuditLogTable dělá DDL)
+        $__dev = trim(($device_brand ?? '') . ' ' . ($device_model ?? ''));
+        crmAuditLog('order.create', [
+            'entity_type' => 'order', 'entity_id' => $order_id,
+            'entity_label' => ($new_order_code ?: ('#' . $order_id)),
+            'summary' => 'Vytvořena zakázka ' . ($new_order_code ?: ('#' . $order_id)) . ($__dev !== '' ? ' — ' . $__dev : ''),
+            'branch_id' => $branch_id ?? null,
+        ]);
 
-    crmNotifyOrderLifecycleEvent([
-        'type' => 'order_created',
-        'order_id' => (int)$order_id,
-        'technician_id' => (int)($technician_id ?? 0),
-        'new_status' => $status,
-        'actor_role' => (string)($_SESSION['role'] ?? ''),
-        'actor_tech_id' => (int)($_SESSION['tech_id'] ?? 0),
-        'actor_name' => (string)($_SESSION['full_name'] ?? ''),
-    ]);
+        crmNotifyOrderLifecycleEvent([
+            'type' => 'order_created',
+            'order_id' => (int)$order_id,
+            'technician_id' => (int)($technician_id ?? 0),
+            'new_status' => $status,
+            'actor_role' => (string)($_SESSION['role'] ?? ''),
+            'actor_tech_id' => (int)($_SESSION['tech_id'] ?? 0),
+            'actor_name' => (string)($_SESSION['full_name'] ?? ''),
+        ]);
+    } catch (Throwable $e) {
+        error_log('add_order post-commit (audit/notify) selhal, zakázka #' . (int)$order_id . ' vznikla: ' . $e->getMessage());
+    }
 
     header("Location: ../orders.php?created_order=" . (int)$order_id);
     exit;
