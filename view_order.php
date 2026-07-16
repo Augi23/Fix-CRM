@@ -536,10 +536,11 @@ function localizedOrderStatusLabel(string $status): string {
                     <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
                     <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">
                     <?php if ($can_handoff): ?>
+                    <?php /* Jen „uvolnit dalšímu technikovi" — dokončení řeší hlavní zelené
+                             tlačítko níže (dřív tu bylo druhé tlačítko na tutéž akci = matoucí). */ ?>
                     <div class="border border-info border-opacity-50 rounded-3 p-2 mb-2">
-                        <div class="small text-white-75 mb-2"><i class="fas fa-people-arrows me-1 text-info"></i><?php echo __('handoff_question'); ?></div>
-                        <div class="d-grid gap-2">
-                            <button type="button" class="btn btn-sm btn-success afx-status-pulse afx-status-pulse--completed" onclick="afxFinishOrder()"><i class="fas fa-check-double me-1"></i><?php echo __('handoff_done'); ?></button>
+                        <div class="small text-white-75 mb-2"><i class="fas fa-people-arrows me-1 text-info"></i><?php echo __('handoff_release_hint'); ?></div>
+                        <div class="d-grid">
                             <button type="button" class="btn btn-sm btn-outline-info" onclick="afxReleaseOrder()"><i class="fas fa-share me-1"></i><?php echo __('handoff_release'); ?></button>
                         </div>
                     </div>
@@ -616,8 +617,9 @@ function localizedOrderStatusLabel(string $status): string {
                         </button>
                         <div class="border border-secondary border-opacity-50 rounded-3 p-2">
                             <div class="small text-white-75 mb-2"><i class="fas fa-print me-2"></i><?php echo __('print'); ?></div>
+                            <?php /* „A4 faktura" odstraněna — dělala totéž co velké tlačítko
+                                     „Zobrazit zakázkový list" výše (stejný náhled print_order.php). */ ?>
                             <div class="d-grid gap-1">
-                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-file-invoice me-2 text-primary"></i><?php echo __('a4_invoice'); ?></button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-paper-plane me-2 text-primary"></i><?php echo __('order_sheet_print_email'); ?></button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-tools me-2 text-warning"></i><?php echo __('work_order'); ?></button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="printOrderLabel(<?php echo (int)$order['id']; ?>)"><i class="fas fa-barcode me-2 text-info"></i><?php echo __('print_label'); ?></button>
@@ -662,13 +664,6 @@ function localizedOrderStatusLabel(string $status): string {
                                     .then(function (j) { if (j.ok) { location.reload(); } else { alert(j.error || 'Chyba'); } })
                                     .catch(function () { alert('Chyba spojení'); });
                             });
-                        }
-                        function afxFinishOrder() {
-                            var $sel = $('#statusForm select[name="status"]');
-                            if ($sel.length) {
-                                $sel.val('Připraveno k převzetí').trigger('change');
-                                $('#statusForm').trigger('submit');
-                            }
                         }
                         window.AFX_SIGN_L10N = { clear: '<?php echo __('sign_clear'); ?>', cancel: '<?php echo __('cancel'); ?>', save: '<?php echo __('sign_save'); ?>' };
                         function afxSignRemote(type, btn) {

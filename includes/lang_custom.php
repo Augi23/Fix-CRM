@@ -6,6 +6,7 @@
 
 $lang_overrides = [
     'cs' => [
+        'handoff_release_hint' => 'Předat rozdělanou zakázku jinému technikovi:',
         // Doplnění chybějících překladů (audit 16.7.2026)
         'default_order_hint' => 'Požadavky na díly k zakázkám — od žádosti po naskladnění.',
 
@@ -472,6 +473,7 @@ $lang_overrides = [
         'complaint_protocol' => 'Reklamační protokol',
     ],
     'ru' => [
+        'handoff_release_hint' => 'Передать начатый заказ другому технику:',
         // Doplnění chybějících překladů (audit 16.7.2026)
         'default_order_hint' => 'Запросы на детали для заказов — от заявки до принятия на склад.',
         'in_stock_col' => 'На складе',
@@ -930,6 +932,7 @@ $lang_overrides = [
         'complaint_protocol' => 'Рекламационный протокол',
     ],
     'en' => [
+        'handoff_release_hint' => 'Hand this in-progress order to another technician:',
         // Kompletní EN pokrytí (audit + překlad 16.7.2026) — všechny klíče používané v kódu
         'HDD' => 'HDD',
         'Notebook' => 'Laptop',

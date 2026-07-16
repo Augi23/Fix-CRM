@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.10.3',
+        'date' => '2026-07-16',
+        'time' => '01:29',
+        'title' => 'Úklid matoucích dvojitých tlačítek v detailu zakázky',
+        'items' => [
+            'Odstraněno tlačítko „Dokončeno 100 % — připravit k převzetí" v panelu předání práce — dělalo přesně totéž co hlavní zelené tlačítko pod ním. Panel předání teď nabízí jen skutečně jinou akci: „Uvolnit dalšímu technikovi" (odebere tebe a vrátí zakázku do fronty).',
+            'Odstraněno tlačítko „A4 faktura" v tiskovém boxu — otevíralo úplně stejný náhled jako velké tlačítko „Zobrazit zakázkový list" nad ním. Tisk/e-mail zakázkového listu, servisní příkaz a štítek zůstávají (každé je jiná funkce).',
+            'Cíl: každé tlačítko dělá jednu jasnou věc, nic se neopakuje pod jiným názvem.',
+        ],
+    ],
+    [
         'version' => '1.10.2',
         'date' => '2026-07-16',
         'time' => '19:59',
