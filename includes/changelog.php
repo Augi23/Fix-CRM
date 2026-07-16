@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '1.9.0',
+        'date' => '2026-07-16',
+        'time' => '19:30',
+        'title' => 'Nová sekce Návody (CRM + Opravy)',
+        'items' => [
+            'V horním menu je nová stránka Návody — jednoduché postupy krok za krokem, s vyhledáváním a záložkami CRM / Opravy.',
+            'Záložka CRM obsahuje 14 návodů: přidání zakázky, interní zakázka, nový klient, úprava klienta, změna stavu, přiřazení technika, naskladnění, výdej dílu QR skenem, přidání dílu z počítače, tisk QR štítků, Nákupy, chat, Historie a přehled rolí a poboček.',
+            'U každého návodu jsou barevně odlišené rámečky s podmínkami: modré = obsahová pravidla polí, oranžové = na co si dát pozor, fialové = kdo akci smí (role/pobočka).',
+            'Záložka Opravy je připravená na servisní postupy — budeme ji plnit postupně.',
+        ],
+    ],
+    [
         'version' => '1.8.2',
         'date' => '2026-07-16',
         'time' => '18:50',
