@@ -129,18 +129,17 @@
   </div>
 </div>
 <?php
-/* Ambientní zvuky pro Khalila: přihlášenému zaměstnanci se jménem khalil se
-   každých ~10 minut přehraje náhodná hláška (úvodní zvuk při loginu zůstává).
-   Logika přehrávání je v main.js (afxAmbient…), kadence přežívá přechody stránek. */
+/* Hláška pro Khalila: JEDNA jediná („Khalil! Less talking, more working."),
+   opakuje se každých 15 minut. Stejný zvuk hraje i jako uvítání při přihlášení
+   (uploads/greetings/<username>.m4a na serveru). Náhodné hlášky odstraněny
+   na přání 16.7.2026. Logika přehrávání je v main.js (afxAmbient…). */
 $_afx_staff = mb_strtolower(($_SESSION['username'] ?? '') . ' ' . ($_SESSION['full_name'] ?? ''), 'UTF-8');
 if (str_contains($_afx_staff, 'khalil')): ?>
 <script>
 window.AFX_AMBIENT_SOUNDS = [
-    'assets/sounds/khalil_ambient_1.mp3',
-    'assets/sounds/khalil_ambient_2.mp3',
-    'assets/sounds/khalil_ambient_3.mp3'
+    'assets/sounds/khalil_less_talking.m4a'
 ];
-window.AFX_AMBIENT_INTERVAL_MIN = 10;
+window.AFX_AMBIENT_INTERVAL_MIN = 15;
 </script>
 <?php endif; ?>
 

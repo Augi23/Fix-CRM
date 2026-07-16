@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.6.8',
+        'date' => '2026-07-16',
+        'time' => '12:25',
+        'title' => 'Khalil: jediná hláška „Less talking, more working" každých 15 minut',
+        'items' => [
+            'Náhodné ambientní hlášky pro Khalila odstraněny — zůstává jediná: „Khalil! Less talking, more working.", opakuje se každých 15 minut.',
+            'Stejná hláška nahradila i uvítací zvuk při přihlášení (vyměněno přímo na serveru, funguje hned).',
+        ],
+    ],
+    [
         'version' => '1.6.7',
         'date' => '2026-07-16',
         'time' => '12:40',
