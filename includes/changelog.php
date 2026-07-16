@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '1.10.2',
+        'date' => '2026-07-16',
+        'time' => '19:59',
+        'title' => 'Kompletní jazykové verze: čeština, angličtina, ruština 100%',
+        'items' => [
+            'Angličtina byla z velké části jen automaticky odvozená z názvů klíčů — doplněno 484 skutečných překladů (celé CRM: zakázky, sklad, nákupy, reklamace, faktury, nastavení, aktualizace…).',
+            'Ruština: doplněno 19 chybějících textů (skenování QR, katalog dílů, štítky) — Roman a Mark už neuvidí české texty v ruském rozhraní.',
+            'Čeština: doplněn poslední chybějící text v Nákupech.',
+            'Ověřeno strojově: všech 800 textů používaných v systému má překlad ve všech třech jazycích (CS/EN/RU); ukrajinština klientů se mapuje na angličtinu jako dosud.',
+        ],
+    ],
+    [
         'version' => '1.10.1',
         'date' => '2026-07-16',
         'time' => '19:11',
