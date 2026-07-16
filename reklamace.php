@@ -141,8 +141,15 @@ if (!empty($rows) && isset($pdo)) {
                             <?php if (($r['source'] ?? '') === 'client'): ?>
                                 <span class="badge" style="background:#f97316;color:#fff">Klient</span><br>
                             <?php endif; ?>
-                            <?php if (!empty($r['order_code'])): ?>
-                                <span class="small text-muted"><?php echo e($r['order_code']); ?></span>
+                            <?php /* Zdroj/zakázka: vždy proklik na původní zakázku (dohledání detailů) */ ?>
+                            <?php if (!empty($r['order_id'])): ?>
+                                <a class="small fw-semibold text-decoration-none" href="view_order.php?id=<?php echo (int)$r['order_id']; ?>" title="Otevřít zakázku">
+                                    <i class="fas fa-arrow-up-right-from-square me-1" style="font-size:.65rem;"></i><?php echo e($r['order_code'] ?: ('#' . (int)$r['order_id'])); ?>
+                                </a>
+                            <?php elseif (!empty($r['order_code'])): ?>
+                                <a class="small fw-semibold text-decoration-none" href="orders.php?search=<?php echo urlencode($r['order_code']); ?>" title="Vyhledat zakázku">
+                                    <i class="fas fa-magnifying-glass me-1" style="font-size:.65rem;"></i><?php echo e($r['order_code']); ?>
+                                </a>
                             <?php endif; ?>
                         </td>
                         <td style="min-width:170px;">

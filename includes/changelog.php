@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '1.10.4',
+        'date' => '2026-07-16',
+        'time' => '01:33',
+        'title' => 'Reklamace: sloupec Zdroj/zakázka je prokliknutelný na zakázku',
+        'items' => [
+            'V seznamu reklamací je kód zakázky ve sloupci Zdroj/zakázka nově odkaz — klikem se otevře původní zakázka (nebo se vyhledá, pokud reklamace nemá přímou vazbu) a dohledáš k ní všechny detaily.',
+        ],
+    ],
+    [
         'version' => '1.10.3',
         'date' => '2026-07-16',
         'time' => '01:29',
