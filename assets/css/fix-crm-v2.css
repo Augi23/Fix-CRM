@@ -2972,3 +2972,7 @@ input[type="number"], .input-group-text,
 /* Dropdowny a menu: položky 400, nadpisy skupin 600 */
 .dropdown-item { font-weight: 400 !important; }
 .dropdown-header { font-weight: 600 !important; }
+
+/* Dvojice dlaždic (Nepřidělené/Nedokončené) na stránce Zakázky */
+.crm-stat-grid--pair { grid-template-columns: repeat(2, 1fr) !important; }
+@media (max-width: 575.98px) { .crm-stat-grid--pair { grid-template-columns: 1fr !important; } }

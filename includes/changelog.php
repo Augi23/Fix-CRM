@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.7.6',
+        'date' => '2026-07-16',
+        'time' => '16:30',
+        'title' => 'Zakázky: dlaždice Nepřidělené a Nedokončené i nahoře na seznamu',
+        'items' => [
+            'Dlaždice „Nepřidělené zakázky" a „Nedokončené zakázky" z nástěnky se nově zobrazují i nahoře na stránce Zakázky (nad filtry stavů).',
+            'Stejná pravidla jako na nástěnce: vedení vidí součet obou poboček, řadoví zaměstnanci jen svou pobočku.',
+        ],
+    ],
+    [
         'version' => '1.7.5',
         'date' => '2026-07-16',
         'time' => '16:15',
