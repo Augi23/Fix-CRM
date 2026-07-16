@@ -378,7 +378,8 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
         <a class="afx-cell <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php">
             <i class="fas fa-comments"></i><small>Chat</small>
         </a>
-        <?php if (hasPermission('admin_access')): ?>
+        <?php /* Historie: všichni zaměstnanci kromě techniků vedlejších poboček */ ?>
+        <?php if (crmCanViewHistory()): ?>
         <a class="afx-cell <?php echo $current_page == 'history.php' ? 'active' : ''; ?>" href="history.php">
             <i class="fas fa-clock-rotate-left"></i><small>Historie</small>
         </a>
@@ -451,7 +452,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <?php endif; ?>
             <?php /* Chat vidí VŠICHNI zaměstnanci (dřív omylem jen vedení) */ ?>
             <a class="afx-sheet-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php"><i class="fas fa-comments"></i>Chat</a>
-            <?php if (hasPermission('admin_access')): ?>
+            <?php if (crmCanViewHistory()): ?>
             <a class="afx-sheet-link <?php echo $current_page == 'history.php' ? 'active' : ''; ?>" href="history.php"><i class="fas fa-clock-rotate-left"></i>Historie</a>
             <?php endif; ?>
             <a class="afx-sheet-link <?php echo $current_page == 'settings.php' ? 'active' : ''; ?>" href="settings.php"><i class="fas <?php echo $afxIsManager ? 'fa-cog' : 'fa-user-circle'; ?>"></i><?php echo __('settings'); ?></a>

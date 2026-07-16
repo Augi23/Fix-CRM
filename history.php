@@ -2,9 +2,9 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-// Historie je citlivá (kdo co provedl) → jen administrátor.
-$__isAdmin = (($_SESSION['role'] ?? '') === 'admin') || hasPermission('admin_access');
-if (!isset($_SESSION['user_id']) || !$__isAdmin) {
+// Historie: všichni zaměstnanci KROMĚ techniků vedlejších poboček
+// (Roman, Mark — Na Příkopě). Pravidlo 16.7.2026, viz crmCanViewHistory().
+if (!isset($_SESSION['user_id']) || !crmCanViewHistory()) {
     header('Location: index.php');
     exit;
 }

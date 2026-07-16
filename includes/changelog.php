@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.7.0',
+        'date' => '2026-07-16',
+        'time' => '13:40',
+        'title' => 'Historie pro všechny + asymetrická viditelnost tržeb podle pobočky',
+        'items' => [
+            'Záložku Historie nově vidí VŠICHNI zaměstnanci — s výjimkou techniků vedlejších poboček (Roman a Mark z Na Příkopě ji nevidí a stránka je pro ně zamčená).',
+            'Tržby a data poboček: zaměstnanci hlavní pobočky (Karlín) nově vidí tržby, zakázky a statistiky OBOU poboček. Roman a Mark vidí jen svoji pobočku (Na Příkopě) — na tržby Karlína nedosáhnou.',
+            'Pravidlo je vázané na pobočku, ne na jména — noví zaměstnanci Karlína dostanou plný výhled automaticky, noví lidé na vedlejších pobočkách jen svou pobočku.',
+        ],
+    ],
+    [
         'version' => '1.6.9',
         'date' => '2026-07-16',
         'time' => '13:10',

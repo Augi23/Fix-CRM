@@ -150,8 +150,30 @@ function isBranchGlobalViewer(): bool {
     return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 }
 
+/**
+ * Zaměstnanec HLAVNÍ pobočky (Karlín)? Pravidlo 16.7.2026: personál hlavní
+ * pobočky vidí data (tržby, zakázky, historii) VŠECH poboček; personál
+ * ostatních poboček (Roman, Mark — Na Příkopě) jen data svojí pobočky.
+ */
+function crmIsMainBranchStaff(): bool {
+    if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
+        return false;
+    }
+    $main = getDefaultBranchId();
+    return $main > 0 && getCurrentStaffBranchId() === $main;
+}
+
+/** Kdo smí do záložky Historie: všichni zaměstnanci KROMĚ techniků
+ *  vedlejších poboček (Roman, Mark). */
+function crmCanViewHistory(): bool {
+    if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
+        return false;
+    }
+    return hasPermission('admin_access') || isBranchGlobalViewer() || crmIsMainBranchStaff();
+}
+
 function addOrderBranchScope(array &$whereClauses, array &$params, string $orderAlias = 'o'): void {
-    if (isBranchGlobalViewer()) {
+    if (isBranchGlobalViewer() || crmIsMainBranchStaff()) {
         return;
     }
     $branchId = getCurrentStaffBranchId();
@@ -162,7 +184,7 @@ function addOrderBranchScope(array &$whereClauses, array &$params, string $order
 }
 
 function orderBranchScopeSql(string $column = 'branch_id'): string {
-    if (isBranchGlobalViewer()) {
+    if (isBranchGlobalViewer() || crmIsMainBranchStaff()) {
         return '';
     }
     $branchId = getCurrentStaffBranchId();
@@ -173,7 +195,7 @@ function canAccessOrderBranch(array $order): bool {
     if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
         return false;
     }
-    if (isBranchGlobalViewer()) {
+    if (isBranchGlobalViewer() || crmIsMainBranchStaff()) {
         return true;
     }
     $orderBranchId = (int)($order['branch_id'] ?? 0);
