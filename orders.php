@@ -303,7 +303,8 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                             $phone_clean  = normalizePhoneForTel($client_phone);
                         ?>
                         <?php [$staleCls, $staleTitle] = orderStaleRowAttrs($order); ?>
-                        <tr class="order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($order['status'])); ?><?php echo $staleCls; ?>"<?php echo $staleTitle ? ' title="' . e($staleTitle) . '"' : ''; ?> data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
+                        <?php $__isInternal = crmIsInternalCustomer($order['customer_id'] ?? 0); ?>
+                        <tr class="order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($order['status'])); ?><?php echo $staleCls; ?><?php echo $__isInternal ? ' order-row--internal' : ''; ?>"<?php echo $staleTitle ? ' title="' . e($staleTitle) . '"' : ''; ?> data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
                             <td class="ps-4">
                                 <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none"><?php echo e(orderDisplayCode($order)); ?></a>
                                 <?php if($has_media): ?>
@@ -316,7 +317,12 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <div><?php echo e($order['first_name'] . ' ' . $order['last_name']); ?></div>
+                                <?php if ($__isInternal): ?>
+                                    <div><span class="afx-internal-chip" title="Interní zakázka — není pro veřejného klienta"><i class="fas fa-screwdriver-wrench"></i>Interní</span></div>
+                                    <div class="small text-white-50 mt-1"><?php echo e($order['first_name'] . ' ' . $order['last_name']); ?></div>
+                                <?php else: ?>
+                                    <div><?php echo e($order['first_name'] . ' ' . $order['last_name']); ?></div>
+                                <?php endif; ?>
                                 <?php if($client_phone): ?>
                                     <?php if ($phone_clean !== ''): ?>
                                     <a class="phone-qr-trigger small text-white-75 text-decoration-none crm-phone-text"

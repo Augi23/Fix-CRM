@@ -195,7 +195,11 @@ function localizedOrderStatusLabel(string $status): string {
                     <div class="col-md-6">
                       <div class="order-summary-panel">
                         <h6><?php echo __('client'); ?></h6>
-                        <p class="osh-title mb-2"><strong><?php echo htmlspecialchars($order['first_name'].' '.$order['last_name']); ?></strong></p>
+                        <p class="osh-title mb-2"><strong><?php echo htmlspecialchars($order['first_name'].' '.$order['last_name']); ?></strong>
+                            <?php if (crmIsInternalCustomer($order['customer_id'] ?? 0)): ?>
+                                <span class="afx-internal-chip ms-2" title="Interní zakázka — není pro veřejného klienta"><i class="fas fa-screwdriver-wrench"></i>Interní</span>
+                            <?php endif; ?>
+                        </p>
                         <?php
                             $order_phone_href = normalizePhoneForTel($order['phone'] ?? '');
                             $order_email_href = normalizeEmailForMailto($order['email'] ?? '');

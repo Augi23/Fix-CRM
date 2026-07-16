@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.7.3',
+        'date' => '2026-07-16',
+        'time' => '15:20',
+        'title' => 'Interní zakázky: vlastní profil, tlačítko v průvodci a odlišení v seznamech',
+        'items' => [
+            'Duplicitní klient „Interní" smazán (žádné zakázky u něj nebyly) a hlavní profil upraven na „Interní zakázka — AppleFix interní evidence". Nemá telefon ani e-mail, takže mu neodejde žádná klientská notifikace a nejde na něj přihlásit do klientského portálu.',
+            'V průvodci novou zakázkou je v kroku Klient nové tlačítko „Interní zakázka" — jedním klikem vybere interní profil a předvyplní PIN, takže průvodce projde bez zádrhelů až k Dokončit.',
+            'Interní zakázky se v seznamu zakázek i na nástěnce odlišují fialovým štítkem „INTERNÍ" a barevným proužkem řádku — na první pohled se nepletou s běžnými klientskými zakázkami. Štítek je i v detailu zakázky.',
+        ],
+    ],
+    [
         'version' => '1.7.2',
         'date' => '2026-07-16',
         'time' => '14:45',

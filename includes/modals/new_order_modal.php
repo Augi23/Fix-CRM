@@ -41,10 +41,20 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                         <option value=""><?php echo __('enter_name_or_phone'); ?></option>
                                     </select>
                                 </div>
-                                <div class="col-md-6 d-flex align-items-end">
+                                <div class="col-md-6 d-flex align-items-end gap-2">
                                     <button type="button" class="btn btn-outline-secondary w-100" id="toggleNewCustomerPanelBtn" data-bs-toggle="collapse" data-bs-target="#inlineNewCustomerPanel" aria-expanded="false">
                                         <i class="fas fa-user-plus me-1"></i> <?php echo __('new_customer_btn'); ?>
                                     </button>
+                                    <?php $__internalCust = crmInternalCustomerId(); if ($__internalCust > 0): ?>
+                                    <?php /* Interní zakázka (neveřejná, evidence Karlín): vybere interního
+                                             klienta a doplní PIN, aby průvodce hladce prošel až k Dokončit. */ ?>
+                                    <button type="button" class="btn btn-outline-secondary w-100" id="internalOrderBtn"
+                                            data-customer-id="<?php echo (int)$__internalCust; ?>"
+                                            data-customer-label="Interní zakázka — AppleFix"
+                                            title="Neveřejná zakázka — interní evidence (zařízení mimo běžné klienty)">
+                                        <i class="fas fa-screwdriver-wrench me-1 text-warning"></i> Interní zakázka
+                                    </button>
+                                    <?php endif; ?>
                                 </div>
                                 <!-- Inline New Customer Panel -->
                                 <div class="col-12">
@@ -330,6 +340,30 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                         </div>
                     </div>
                 </div>
+                <?php if (crmInternalCustomerId() > 0): ?>
+                <script>
+                /* Interní zakázka: 1 klik = vybraný interní klient + předvyplněný PIN (0000),
+                   ať průvodce projde všemi kontrolami až k Dokončit. */
+                (function () {
+                    if (typeof window.jQuery === 'undefined') return;
+                    window.jQuery(document).on('click', '#internalOrderBtn', function () {
+                        var id = String(this.dataset.customerId || '');
+                        var label = this.dataset.customerLabel || 'Interní zakázka';
+                        if (!id) return;
+                        var $sel = window.jQuery('#newOrderModal select[name="customer_id"]');
+                        if (!$sel.find('option[value="' + id + '"]').length) {
+                            $sel.append(new Option(label, id, true, true));
+                        }
+                        $sel.val(id).trigger('change');
+                        var pin = document.querySelector('#newOrderModal [name="pin_code"]');
+                        if (pin && !pin.value.trim()) { pin.value = '0000'; }
+                        var btn = this;
+                        btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-warning');
+                        setTimeout(function () { btn.classList.add('btn-outline-secondary'); btn.classList.remove('btn-warning'); }, 900);
+                    });
+                }());
+                </script>
+                <?php endif; ?>
                 <div class="modal-footer bg-transparent border-secondary crm-wizard-footer">
                     <button type="button" class="btn btn-secondary" data-wizard-prev hidden>← <?php echo __('back'); ?></button>
                     <button type="button" class="btn btn-primary" data-wizard-next><?php echo __('wizard_next_btn'); ?> →</button>

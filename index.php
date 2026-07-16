@@ -268,7 +268,8 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                 $display_code = orderDisplayCode($r);
                             ?>
                             <?php [$staleCls, $staleTitle] = orderStaleRowAttrs($r); ?>
-                            <tr <?php echo $staleTitle ? 'title="' . e($staleTitle) . '" ' : ''; ?>class="clickable-order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($r['status'])); ?><?php echo $staleCls; ?><?php echo !empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''; ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
+                            <?php $__isInternal = crmIsInternalCustomer($r['customer_id'] ?? 0); ?>
+                            <tr <?php echo $staleTitle ? 'title="' . e($staleTitle) . '" ' : ''; ?>class="clickable-order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($r['status'])); ?><?php echo $staleCls; ?><?php echo $__isInternal ? ' order-row--internal' : (!empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''); ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
                                 <td>
                                     <a href="view_order.php?id=<?php echo (int)$r['id']; ?>" class="fw-bold text-decoration-none"><?php echo e($display_code); ?></a>
                                     <?php if($has_media): ?>
@@ -281,7 +282,12 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <strong><?php echo htmlspecialchars($r['first_name'].' '.$r['last_name']); ?></strong><br>
+                                    <?php if ($__isInternal): ?>
+                                        <div><span class="afx-internal-chip" title="Interní zakázka — není pro veřejného klienta"><i class="fas fa-screwdriver-wrench"></i>Interní</span></div>
+                                        <div class="small text-white-50 mt-1"><?php echo htmlspecialchars($r['first_name'].' '.$r['last_name']); ?></div>
+                                    <?php else: ?>
+                                        <strong><?php echo htmlspecialchars($r['first_name'].' '.$r['last_name']); ?></strong>
+                                    <?php endif; ?><br>
                                     <small class="text-white-75">
                                         <?php if ($phone_href !== ''): ?>
                                             <a href="tel:<?php echo e($phone_href); ?>" class="text-reset text-decoration-none crm-phone-text" onclick="event.stopPropagation();"><i class="fas fa-phone me-1 text-success"></i><?php echo htmlspecialchars($r['phone']); ?></a>

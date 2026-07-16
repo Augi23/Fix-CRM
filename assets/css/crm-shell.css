@@ -634,3 +634,14 @@ a.afx-chat-glow small {
   color: #fff !important;
   text-shadow: 0 0 10px rgba(255,255,255,.9), 0 0 24px rgba(255,255,255,.45);
 }
+
+/* ── Interní zakázky: výrazné odlišení od zakázek reálných klientů ── */
+.afx-internal-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .7rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: #BF5AF2; background: rgba(191,90,242,.13);
+  border: 1px solid rgba(191,90,242,.4); border-radius: 8px; padding: 2px 9px;
+  white-space: nowrap;
+}
+.order-row--internal td:first-child { box-shadow: inset 3px 0 0 rgba(191,90,242,.75); }
+.order-row--internal { font-style: normal; }

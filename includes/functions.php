@@ -150,6 +150,18 @@ function isBranchGlobalViewer(): bool {
     return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 }
 
+/** ID interního klienta („Interní zakázka" — evidence neveřejných zakázek
+ *  pobočky Karlín). Nastavuje setting 'internal_customer_id'; 0 = nepoužívá se. */
+function crmInternalCustomerId(): int {
+    return (int)get_setting('internal_customer_id', '0');
+}
+
+/** Je zakázka/klient interní evidencí (ne skutečný zákazník)? */
+function crmIsInternalCustomer($customerId): bool {
+    $internal = crmInternalCustomerId();
+    return $internal > 0 && (int)$customerId === $internal;
+}
+
 /**
  * Zaměstnanec HLAVNÍ pobočky (Karlín)? Pravidlo 16.7.2026: personál hlavní
  * pobočky vidí data (tržby, zakázky, historii) VŠECH poboček; personál
