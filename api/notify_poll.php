@@ -49,6 +49,9 @@ try {
 
 echo json_encode([
     'ok' => true,
+    // aktuální CSRF token — dlouho otevřené záložky si jím obnovují meta tag,
+    // aby akce nepadaly na „neplatný bezpečnostní token"
+    'csrf' => (string)($_SESSION['csrf_token'] ?? ''),
     'last_chat_other_id' => $lastChatOther,
     'chat_unread' => $chatUnread,
     'last_order_id' => $lastOrder,

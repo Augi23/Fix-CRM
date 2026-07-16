@@ -1623,13 +1623,33 @@ $(document).on('change', '#pricelistRepair', function () {
             } else if (b) { b.remove(); }
         }
 
+        // Vypršelá relace (uspaný počítač přes noc apod.): stránka vypadá živá,
+        // ale akce padají na „neplatný bezpečnostní token". Poller to pozná
+        // (ok:false) a ukáže jasný pruh s tlačítkem — místo záhadných chyb.
+        function sessionExpiredBanner() {
+            if (document.getElementById('afxSessionExpired')) return;
+            var bar = document.createElement('div');
+            bar.id = 'afxSessionExpired';
+            bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#B45309;color:#fff;'
+                + 'padding:10px 16px;text-align:center;font-weight:600;box-shadow:0 2px 14px rgba(0,0,0,.5);';
+            bar.innerHTML = '⚠️ Přihlášení vypršelo — rozdělaná práce nejde uložit. '
+                + '<button onclick="window.location.reload()" style="margin-left:10px;padding:4px 14px;border-radius:8px;border:0;background:#fff;color:#7c3aed;font-weight:700;cursor:pointer;">Přihlásit znovu</button>';
+            document.body.appendChild(bar);
+        }
+
         function tick() {
             var chatSeen = 0;
             try { chatSeen = parseInt(localStorage.getItem('afx_chat_seen') || '0', 10) || 0; } catch (e) {}
             fetch('api/notify_poll.php?chat_seen=' + chatSeen, { credentials: 'same-origin', cache: 'no-store' })
                 .then(function (r) { return r.json(); })
                 .then(function (d) {
+                    if (d && d.ok === false) { sessionExpiredBanner(); return; }
                     if (!d || !d.ok) return;
+                    // průběžné obnovení CSRF tokenu (dlouho otevřená záložka)
+                    if (d.csrf) {
+                        var m = document.querySelector('meta[name="csrf-token"]');
+                        if (m && m.content !== d.csrf) { m.content = d.csrf; }
+                    }
                     setBadge('orders.php', d.orders_badge, false);
                     setBadge('reklamace.php', d.complaints_badge, true);
                     setBadge('procurement.php', d.procurement_badge, false);

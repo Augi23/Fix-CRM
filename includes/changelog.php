@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.9.5',
+        'date' => '2026-07-16',
+        'time' => '22:00',
+        'title' => 'Oprava: „neplatný bezpečnostní token" ve staré otevřené záložce',
+        'items' => [
+            'Když počítač/iPad usnul a přihlášení mezitím vypršelo (4 h neaktivity), stránka vypadala živá, ale akce (nový klient, uložení…) padaly na „neplatný bezpečnostní token" — přesně Tomášův případ.',
+            'Nově: CRM pozná vypršelé přihlášení a ukáže nahoře oranžový pruh „Přihlášení vypršelo" s tlačítkem Přihlásit znovu — žádné záhadné chyby.',
+            'Dlouho otevřené (aktivní) záložky si navíc bezpečnostní token průběžně samy obnovují, takže na něj nenarazí vůbec.',
+        ],
+    ],
+    [
         'version' => '1.9.4',
         'date' => '2026-07-16',
         'time' => '21:30',
