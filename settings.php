@@ -449,7 +449,9 @@ if (isset($_POST['delete_greeting']) && hasPermission('admin_access')) {
 
 // Security for technicians
 if (!$is_admin_user) {
-    if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'updates' || $active_tab == 'backups') {
+    // Aktualizace smí i manažer/Boss (crmCanRunUpdates); ostatní admin taby ne.
+    if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'backups'
+        || ($active_tab == 'updates' && !crmCanRunUpdates())) {
         $active_tab = 'staff';
     }
 }
@@ -506,10 +508,13 @@ require_once 'includes/header.php';
             <a class="nav-link <?php echo $active_tab == 'admins' ? 'active' : 'text-white-75'; ?>" href="?tab=admins"><i class="fas fa-user-shield me-2"></i><?php echo __('admin_tab'); ?></a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php echo $active_tab == 'updates' ? 'active' : 'text-white-75'; ?>" href="?tab=updates" id="updatesNavLink"><i class="fas fa-cloud-download-alt me-2"></i><?php echo __('updates_tab'); ?> <span id="updateBadgeNav" class="badge bg-warning text-dark ms-1" style="display:none;">!</span></a>
-        </li>
-        <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'backups' ? 'active' : 'text-white-75'; ?>" href="?tab=backups"><i class="fas fa-database me-2"></i>Zálohy</a>
+        </li>
+        <?php endif; ?>
+        <?php /* Aktualizace smí celé vedení (admin, manažer, Boss) — 16.7.2026 */ ?>
+        <?php if (crmCanRunUpdates()): ?>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active_tab == 'updates' ? 'active' : 'text-white-75'; ?>" href="?tab=updates" id="updatesNavLink"><i class="fas fa-cloud-download-alt me-2"></i><?php echo __('updates_tab'); ?> <span id="updateBadgeNav" class="badge bg-warning text-dark ms-1" style="display:none;">!</span></a>
         </li>
         <?php endif; ?>
     </ul>
@@ -1338,8 +1343,8 @@ require_once 'includes/header.php';
             <?php endif; ?>
         </div>
 
-        <!-- UPDATES TAB -->
-        <?php if ($is_admin_user): ?>
+        <!-- UPDATES TAB — vedení (admin, manažer, Boss) -->
+        <?php if (crmCanRunUpdates()): ?>
         <div class="tab-pane fade <?php echo $active_tab == 'updates' ? 'show active' : ''; ?>">
             <div class="row g-4">
                 <!-- Left: Version & Update -->

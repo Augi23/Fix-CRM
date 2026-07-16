@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.9.4',
+        'date' => '2026-07-16',
+        'time' => '21:30',
+        'title' => 'Aktualizace CRM nově i pro manažera a Bosse',
+        'items' => [
+            'Záložka Nastavení → Aktualizace je nově dostupná celému vedení (admin, manažer, Boss) — včetně kontroly aktualizací, instalace a diagnostiky serveru.',
+            'Bezpečnost: kontrola aktualizací dřív neměla žádné ověření přihlášení — nově vyžaduje přihlášené vedení.',
+            'Návod „Kdo co smí" aktualizován: mazání zakázek a nastavení systému = jen admin; faktury = admin a Boss; aktualizace = vedení.',
+        ],
+    ],
+    [
         'version' => '1.9.3',
         'date' => '2026-07-16',
         'time' => '21:00',

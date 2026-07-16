@@ -156,6 +156,12 @@ function crmCanManageInvoices(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 
+/** Aktualizace CRM (kontrola + instalace + diagnostika) smí vedení:
+ *  administrátor, manažer i Boss (rozšířeno 16.7.2026 — dřív jen admin). */
+function crmCanRunUpdates(): bool {
+    return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
+}
+
 /** ID interního klienta („Interní zakázka" — evidence neveřejných zakázek
  *  pobočky Karlín). Nastavuje setting 'internal_customer_id'; 0 = nepoužívá se. */
 function crmInternalCustomerId(): int {

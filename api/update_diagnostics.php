@@ -11,7 +11,7 @@ require_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-if (!hasPermission('admin_access')) {
+if (!crmCanRunUpdates()) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Admin access required.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;

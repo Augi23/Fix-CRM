@@ -17,7 +17,7 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     exit;
 }
 
-if (!hasPermission('admin_access')) {
+if (!crmCanRunUpdates()) {
     echo json_encode([
         'success' => false,
         'message' => 'You do not have permission to run update.',

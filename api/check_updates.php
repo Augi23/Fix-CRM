@@ -9,6 +9,12 @@ require_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+// Kontrola aktualizací: jen přihlášené vedení (dřív endpoint neměl žádný gate).
+if (!isset($_SESSION['user_id']) || !crmCanRunUpdates()) {
+    echo json_encode(['success' => false, 'message' => __('unauthorized')], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $repoRoot = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
 $info = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : [];
 
