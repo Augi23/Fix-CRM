@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '1.10.5',
+        'date' => '2026-07-16',
+        'time' => '01:51',
+        'title' => 'Oprava: nefunkční kontrola IMEI na nástěnce',
+        'items' => [
+            'Widget „Kontrola IMEI" na nástěnce byl kvůli chybě v kódu úplně nefunkční — tlačítko „Zkontrolovat" nedělalo nic (chyběl začátek skriptu, což shodilo celý blok). Odhaleno automatickým auditem tlačítek. Opraveno, ověření telefonu proti policejní databázi zase funguje.',
+        ],
+    ],
+    [
         'version' => '1.10.4',
         'date' => '2026-07-16',
         'time' => '01:33',

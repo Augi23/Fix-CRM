@@ -470,6 +470,20 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
 <script>
 $(document).ready(function() {
+    // OPRAVA 17.7.2026: chyběly deklarace + otevření IMEI_I18N → celý inline blok
+    // padal na SyntaxError a IMEI kontrola na nástěnce vůbec nefungovala.
+    var $imeiInput = $('#imeiCheckInput');
+    var $imeiResult = $('#imeiCheckResult');
+
+    const IMEI_I18N = {
+        checking: <?php echo json_encode(__('checking'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        imeiMinDigits: <?php echo json_encode(__('imei_min_digits'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        checkCouldNotComplete: <?php echo json_encode(__('check_could_not_complete'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        policeDb: <?php echo json_encode(__('police_db'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        resultUnknown: <?php echo json_encode(__('result_unknown'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        resultFound: <?php echo json_encode(__('result_found'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        resultNotFound: <?php echo json_encode(__('result_not_found'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        checkFailed: <?php echo json_encode(__('check_failed'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
         serviceId: <?php echo json_encode(__('service_id'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
         yesRaw: <?php echo json_encode(__('yes'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
         noRaw: <?php echo json_encode(__('no'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
@@ -488,6 +502,27 @@ $(document).ready(function() {
     }
 
     function renderIfreeicloudResult(result) {
+        if (!result) { return ''; }
+        // stav + barva podle výsledku iFreeiCloud (success/warning)
+        var ok = !!result.success;
+        var icon = ok ? 'check-circle' : 'circle-exclamation';
+        var alertClass = ok
+            ? 'alert alert-success border-success border-opacity-25 bg-success bg-opacity-10 text-success'
+            : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
+        var headline = window.escapeHtml(result.headline || (ok ? (result.model || 'OK') : (result.message || '')));
+
+        // detailní pole (model, záruka, IMEI2, sériové…) pokud je vrací API
+        var detailsHtml = '';
+        if (result.details && typeof result.details === 'object') {
+            var rows = Object.keys(result.details).map(function (k) {
+                return '<div class="d-flex justify-content-between small py-1 border-bottom border-opacity-10"><span class="opacity-75">'
+                    + window.escapeHtml(k) + '</span><span class="fw-semibold">' + window.escapeHtml(String(result.details[k])) + '</span></div>';
+            }).join('');
+            if (rows) { detailsHtml = '<div class="mt-2">' + rows + '</div>'; }
+        }
+        var imageHtml = result.image ? '<div class="mt-2 text-center"><img src="' + window.escapeHtml(result.image) + '" alt="" style="max-height:120px;border-radius:8px;"></div>' : '';
+        var message = '';
+
         const meta = result.service_id !== undefined ? `<div class="small mt-2 opacity-50">${window.escapeHtml(IMEI_I18N.serviceId)}: ${window.escapeHtml(String(result.service_id))}${result.http_code ? ` · HTTP ${window.escapeHtml(String(result.http_code))}` : ''}</div>` : '';
         const note = (!detailsHtml && !imageHtml && result.summary) ? `<pre class="small mt-2 mb-0 p-2 rounded border border-opacity-25 bg-dark bg-opacity-25 text-white-75" style="white-space: pre-wrap;">${window.escapeHtml(result.summary)}</pre>` : '';
 

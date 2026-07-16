@@ -6,6 +6,12 @@
 
 $lang_overrides = [
     'cs' => [
+        'imei_min_digits' => 'Zadej alespoň 14 číslic IMEI.',
+        'check_could_not_complete' => 'Kontrolu se nepodařilo dokončit.',
+        'result_unknown' => 'Neznámý výsledek',
+        'result_found' => 'Nalezeno v databázi odcizených!',
+        'result_not_found' => 'V databázi odcizených nenalezeno',
+        'check_failed' => 'Kontrola selhala. Zkus to znovu.',
         'handoff_release_hint' => 'Předat rozdělanou zakázku jinému technikovi:',
         // Doplnění chybějících překladů (audit 16.7.2026)
         'default_order_hint' => 'Požadavky na díly k zakázkám — od žádosti po naskladnění.',
@@ -473,6 +479,12 @@ $lang_overrides = [
         'complaint_protocol' => 'Reklamační protokol',
     ],
     'ru' => [
+        'imei_min_digits' => 'Введите минимум 14 цифр IMEI.',
+        'check_could_not_complete' => 'Проверку не удалось завершить.',
+        'result_unknown' => 'Неизвестный результат',
+        'result_found' => 'Найдено в базе украденных!',
+        'result_not_found' => 'В базе украденных не найдено',
+        'check_failed' => 'Проверка не удалась. Попробуйте снова.',
         'handoff_release_hint' => 'Передать начатый заказ другому технику:',
         // Doplnění chybějících překladů (audit 16.7.2026)
         'default_order_hint' => 'Запросы на детали для заказов — от заявки до принятия на склад.',
@@ -932,6 +944,12 @@ $lang_overrides = [
         'complaint_protocol' => 'Рекламационный протокол',
     ],
     'en' => [
+        'imei_min_digits' => 'Enter at least 14 IMEI digits.',
+        'check_could_not_complete' => 'The check could not be completed.',
+        'result_unknown' => 'Unknown result',
+        'result_found' => 'Found in the stolen database!',
+        'result_not_found' => 'Not found in the stolen database',
+        'check_failed' => 'Check failed. Please try again.',
         'handoff_release_hint' => 'Hand this in-progress order to another technician:',
         // Kompletní EN pokrytí (audit + překlad 16.7.2026) — všechny klíče používané v kódu
         'HDD' => 'HDD',
