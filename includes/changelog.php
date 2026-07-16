@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.9.6',
+        'date' => '2026-07-16',
+        'time' => '22:30',
+        'title' => 'Zakázky: horní karty správně — jedna řada, bez duplicit',
+        'items' => [
+            'Odstraněn omylem naklonovaný blok šesti dlaždic z nástěnky (duplikoval čísla, která už na stránce byla).',
+            'Nepřidělené a Nedokončené zakázky jsou nově PÁTÁ a ŠESTÁ karta ve stávající horní řadě (Nové, Čeká na zákazníka, Rozdělané, Hotové…) — stejný styl, jedna řada pohromadě bez mezery.',
+            'Čísla se počítají stejně jako na nástěnce: vedení vidí obě pobočky, zaměstnanci svou.',
+        ],
+    ],
+    [
         'version' => '1.9.5',
         'date' => '2026-07-16',
         'time' => '22:00',

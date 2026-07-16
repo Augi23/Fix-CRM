@@ -154,6 +154,18 @@ if (isset($pdo)) {
     }
 }
 
+// Nepřidělené / Nedokončené (stejná čísla jako dlaždice na nástěnce):
+// vedení = obě pobočky, řadoví zaměstnanci = jen svoje pobočka
+$__uGlobal = isBranchGlobalViewer();
+$__uBranch = (int)getCurrentStaffBranchId();
+$__uCond = (!$__uGlobal && $__uBranch > 0) ? " AND branch_id = " . $__uBranch : '';
+$__uLabel = $__uGlobal ? 'Obě pobočky' : getBranchLabel($__uBranch);
+$__uActive = orderStatusSqlIn($pdo, 'active');
+try {
+    $__unassigned = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($__uActive) AND (technician_id IS NULL OR technician_id = 0)" . $__uCond)->fetchColumn();
+    $__unfinished = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($__uActive)" . $__uCond)->fetchColumn();
+} catch (Throwable $e) { $__unassigned = $__unfinished = 0; }
+
 // FIX #5: Load technicians once (used in both New Order and Quick Edit modals)
 $techs_list = getActiveTechnicians(true);   // volny vyber technika — vsichni aktivni
 $branches = getBranches();
@@ -161,7 +173,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
 ?>
 
 <div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-md-3">
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2">
         <a href="?filter=<?php echo urlencode('Přijato'); ?>" class="text-decoration-none">
             <div class="card bg-primary bg-opacity-10 border-0 p-3 <?php echo isOrderStatusIn($filter_status, 'new') ? 'ring-2 ring-primary border-primary border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
@@ -174,7 +186,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
             </div>
         </a>
     </div>
-    <div class="col-12 col-sm-6 col-md-3">
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2">
         <a href="?filter=<?php echo urlencode('Čeká na zákazníka'); ?>" class="text-decoration-none">
             <div class="card bg-info bg-opacity-10 border-0 p-3 <?php echo isOrderStatusIn($filter_status, 'pending_approval') ? 'ring-2 ring-info border-info border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
@@ -187,7 +199,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
             </div>
         </a>
     </div>
-    <div class="col-12 col-sm-6 col-md-3">
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2">
         <a href="?filter=<?php echo urlencode('V opravě'); ?>" class="text-decoration-none">
             <div class="card bg-warning bg-opacity-10 border-0 p-3 <?php echo isOrderStatusIn($filter_status, 'in_progress') ? 'ring-2 ring-warning border-warning border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
@@ -200,7 +212,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
             </div>
         </a>
     </div>
-    <div class="col-12 col-sm-6 col-md-3">
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2">
         <a href="?filter=<?php echo urlencode('Připraveno k převzetí'); ?>" class="text-decoration-none">
             <div class="card bg-success bg-opacity-10 border-0 p-3 <?php echo (isOrderStatusIn($filter_status, 'done')) ? 'ring-2 ring-success border-success border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
@@ -208,6 +220,33 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
                     <div>
                         <h4 class="mb-0 text-white"><?php echo $s_ready; ?></h4>
                         <p class="text-white-75 mb-0 small"><?php echo __('completed_orders'); ?></p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <?php /* Nepřidělené + Nedokončené — stejná řada, stejný styl karet */ ?>
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2">
+        <a href="orders.php" class="text-decoration-none" title="Aktivní zakázky bez technika — <?php echo e($__uLabel); ?>">
+            <div class="card bg-danger bg-opacity-10 border-0 p-3">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-user-slash text-danger fa-2x me-3"></i>
+                    <div>
+                        <h4 class="mb-0 text-white"><?php echo $__unassigned; ?></h4>
+                        <p class="text-white-75 mb-0 small">Nepřidělené zakázky</p>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2">
+        <a href="orders.php" class="text-decoration-none" title="Všechny rozpracované zakázky — <?php echo e($__uLabel); ?>">
+            <div class="card border-0 p-3" style="background: rgba(191,90,242,.10);">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-list-check fa-2x me-3" style="color:#BF5AF2;"></i>
+                    <div>
+                        <h4 class="mb-0 text-white"><?php echo $__unfinished; ?></h4>
+                        <p class="text-white-75 mb-0 small">Nedokončené zakázky</p>
                     </div>
                 </div>
             </div>
@@ -247,11 +286,6 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
             <i class="fas fa-plus me-2"></i> <?php echo __('new_order'); ?>
         </button>
     </div>
-</div>
-
-<?php /* Sdílené horní dlaždice — stejné rozvržení i obsah jako na Nástěnce */ ?>
-<div class="crm-stat-row mb-4">
-<?php include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
 </div>
 
 <?php
