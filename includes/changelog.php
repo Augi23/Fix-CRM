@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.7.1',
+        'date' => '2026-07-16',
+        'time' => '14:05',
+        'title' => 'Oprava: „Nejnovější verze" ukazovala tvoji verzi místo té z GitHubu',
+        'items' => [
+            'Karta Nejnovější verze a hláška „Aktualizace je k dispozici" ukazovaly nesmysl typu „v1.6.6 → v1.6.6". Číslo nové verze se z GitHubu nenačetlo (čtení šlo mimo interní git vrstvu a na serveru selhávalo) a záložní logika ho chybně nahradila lokální verzí.',
+            'Čtení vzdálené verze nově jde stejnou cestou jako ostatní git operace; když se přesto nepovede, ukáže se poctivě označení commitu — nikdy tvoje vlastní verze.',
+        ],
+    ],
+    [
         'version' => '1.7.0',
         'date' => '2026-07-16',
         'time' => '13:40',

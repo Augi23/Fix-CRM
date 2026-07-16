@@ -1418,9 +1418,13 @@ function getGitRepoInfo(string $repoRoot): array {
         if ($code === 0 && $remote !== '') {
             $info['remote_commit'] = $remote;
             $info['remote_short'] = substr($remote, 0, 7);
-            // lidská verze dostupné aktualizace (VERSION soubor ve vzdáleném commitu)
-            $rv = trim((string)@shell_exec('cd ' . escapeshellarg($repoRoot) . ' && git show ' . escapeshellarg($remoteName . '/' . ($info['branch'] ?: 'main') . ':VERSION') . ' 2>/dev/null'));
-            if (preg_match('/^\d+\.\d+\.\d+\z/', $rv)) { $info['remote_version'] = $rv; }
+            // lidská verze dostupné aktualizace (VERSION soubor ve vzdáleném commitu).
+            // POZOR: přes runGitCommand jako všechno ostatní — dřívější shell_exec
+            // na serveru nefungoval (zakázané/bez práv) → remote_version zůstala
+            // prázdná a UI pak ukazovalo „v1.6.6 → v1.6.6" místo skutečné nové verze.
+            $rvCode = 0;
+            $rv = trim((string)runGitCommand($repoRoot, 'show ' . escapeshellarg($remoteRef . ':VERSION'), $rvCode));
+            if ($rvCode === 0 && preg_match('/^\d+\.\d+\.\d+\z/', $rv)) { $info['remote_version'] = $rv; }
         }
 
         $remoteDate = runGitCommand($repoRoot, 'show -s --format=%cI ' . escapeshellarg($remoteRef), $code);

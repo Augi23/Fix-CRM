@@ -60,7 +60,9 @@ $response = [
     'new_version' => $localSemver ?: $localLabel,
     'current_version' => $localSemver ?: $localLabel,
     'local_version' => $localSemver ?: $localLabel,
-    'latest_version' => $remoteSemver ?: ($localSemver ?: $remoteLabel),
+    // POZOR: když se vzdálená verze nepodaří přečíst, ukázat git štítek —
+    // NIKDY lokální verzi (dřívější fallback ukazoval „v1.6.6 → v1.6.6").
+    'latest_version' => $remoteSemver ?: $remoteLabel,
     'release_date' => $info['remote_date'] ?: $info['local_date'],
     'build' => $buildLabel,
     'local_build' => $localLabel,
@@ -73,7 +75,7 @@ $response = [
     'remote_name' => (string)($info['remote_name'] ?? 'origin'),
     'remote_url' => (string)($info['remote_url'] ?? ''),
     'remote_commit' => $info['remote_commit'] ?: '',
-    'remote_version' => $remoteSemver ?: ($localSemver ?: $remoteLabel),
+    'remote_version' => $remoteSemver ?: $remoteLabel,
     'changelog' => array_map(static function (array $commit): array {
         $sha = $commit['short'] ?? substr((string)($commit['hash'] ?? ''), 0, 7);
         $date = $commit['date'] ?? '';
