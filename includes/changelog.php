@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '1.9.1',
+        'date' => '2026-07-16',
+        'time' => '20:10',
+        'title' => 'Oprava: rozbitá ikonka u času administrátora ve Statistikách',
+        'items' => [
+            'Ve Statistikách zaměstnanců se u řádku administrátora (sloupec V systému) zobrazoval prázdný čtvereček — ikona „laptop s kódem" se v Safari nevykreslila. Nahrazena hodinami, stejnými jako u brigádníků (významově sedí: odměna z času).',
+        ],
+    ],
+    [
         'version' => '1.9.0',
         'date' => '2026-07-16',
         'time' => '19:30',

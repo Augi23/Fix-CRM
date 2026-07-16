@@ -314,7 +314,9 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <td><strong><?php echo htmlspecialchars($au['name']); ?></strong> <span class="badge bg-danger ms-1">Admin</span></td>
                             <td class="text-center text-white-50">—</td>
                             <td class="text-end text-white-50">—</td>
-                            <td class="text-end fw-bold text-info"><?php echo formatWorkDuration($auMin); ?> <i class="fas fa-laptop-code small" title="Tvorba a správa CRM — odměna z času v systému"></i></td>
+                            <?php /* far fa-clock (stejně jako u brigádníků) — fa-laptop-code se
+                                     v Safari vykresloval jako prázdný čtvereček (chybějící glyf) */ ?>
+                            <td class="text-end fw-bold text-info"><?php echo formatWorkDuration($auMin); ?> <i class="far fa-clock small" title="Tvorba a správa CRM — odměna z času v systému"></i></td>
                             <td class="text-end text-white-50">—</td>
                             <td class="text-end text-white-50">—</td>
                             <td class="text-end text-white-50">—</td>
