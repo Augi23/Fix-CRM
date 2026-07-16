@@ -2655,13 +2655,24 @@ p, span, label, .small, small,
   font-weight: 500 !important;
 }
 
-/* Zakázky: lepší viditelnost dropdown menu akcí */
-.orders-table-wrap,
-.orders-table-wrap .table,
-.orders-table-wrap tbody,
-.orders-table-wrap tr,
-.orders-table-wrap td {
-  overflow: visible !important;
+/* Zakázky: lepší viditelnost dropdown menu akcí — JEN desktop.
+   Na mobilech overflow:visible tabulku uřezával (1600px obsahu v 375px
+   viewportu bez možnosti scrollu = „chybějící" sloupce Stav/Akce). */
+@media (min-width: 1081px) {
+  .orders-table-wrap,
+  .orders-table-wrap .table,
+  .orders-table-wrap tbody,
+  .orders-table-wrap tr,
+  .orders-table-wrap td {
+    overflow: visible !important;
+  }
+}
+@media (max-width: 1080px) {
+  .orders-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
 }
 
 .orders-center-table .dropdown-menu {
@@ -2989,3 +3000,36 @@ input[type="number"], .input-group-text,
 .cell-status .small, .cell-status .form-text { font-size: .7rem !important; }
 .cell-status .mt-1 { margin-top: 2px !important; }
 .cell-status .badge.bg-dark { font-size: .64rem; padding: 2px 7px; }
+
+
+/* ── iOS/mobil opravy (responsive audit 16.7.2026) ── */
+
+/* iOS zazoomuje pri fokusu inputu s pismem <16px a stranka pak „ujede".
+   Na dotykovych sirkach drzime vstupy na 16px. */
+@media (max-width: 1080px) {
+  .form-control, .form-select, textarea.form-control,
+  input[type="text"], input[type="search"], input[type="email"],
+  input[type="tel"], input[type="number"], input[type="password"], input[type="date"],
+  .select2-container--default .select2-search--dropdown .select2-search__field {
+    font-size: 16px !important;
+  }
+
+  /* Vsechny modaly: telo scrollovatelne, at tlacitka dole nikdy nezmizi
+     (23 z 24 modalu nemelo modal-dialog-scrollable) */
+  .modal-dialog:not(.modal-dialog-scrollable) .modal-body {
+    max-height: calc(100vh - 210px);
+    max-height: calc(100dvh - 210px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Strankovani zakazek pretekalo (11 kruhovych polozek ~530px) */
+  .pagination { flex-wrap: wrap; justify-content: center; row-gap: 6px; }
+
+  /* Chat: odecist i spodni mobilni listu */
+  .afx-chat-box { height: calc(100dvh - 330px) !important; min-height: 320px !important; }
+}
+
+/* dvh/svh: presnejsi minimalni vysky na iOS (vh fallback zustava vyse) */
+body { min-height: 100svh; }
+#content { min-height: 100svh !important; }

@@ -180,9 +180,9 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
 ?>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
         <h2 class="mb-0"><i class="fas fa-chart-line me-2 text-primary"></i><?php echo __('reports'); ?></h2>
-        <form class="d-flex gap-2">
+        <form class="d-flex gap-2 flex-wrap">
             <input type="hidden" name="tab" value="<?php echo $active_tab; ?>">
             <?php if($selected_tech_id): ?><input type="hidden" name="tech_id" value="<?php echo $selected_tech_id; ?>"><?php endif; ?>
             <input type="date" name="start_date" class="form-control form-control-sm" value="<?php echo $start_date; ?>">

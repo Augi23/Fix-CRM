@@ -6,6 +6,21 @@
  */
 return [
     [
+        'version' => '1.10.0',
+        'date' => '2026-07-16',
+        'time' => '23:59',
+        'title' => 'Velká oprava pro iPhony a iPady: scrollování a dostupnost tlačítek',
+        'items' => [
+            'ZAMRZLÉ SCROLLOVÁNÍ: po návratu „zpět" gestem na iOS se stránka obnovovala se zamčeným scrollem (otevřený modal/menu v mezipaměti) — nově se zámek automaticky odemkne. Douklizeno i po zavření oken (dřív občas zůstal neviditelný zámek).',
+            'UŘÍZNUTÁ TABULKA ZAKÁZEK: na telefonech nebyly vidět sloupce Stav/Priorita/Částka/Akce a nešlo k nim doscrollovat — tabulka teď na mobilech vodorovně scrolluje (na počítači beze změny).',
+            'MOBILNÍ MENU: tlačítko Odhlásit přetékalo mimo displej (nešlo se odhlásit!), menu nešlo posouvat na menších telefonech — opraveno, včetně odsazení pro dynamic island a home indicator (viewport-fit=cover + safe-area).',
+            'iPADY: horní menu přetékalo a poslední položky (Nastavení) byly useknuté — položky se zúžily a menu umí bezpečně scrollovat.',
+            'PŘIBLIŽOVÁNÍ NA iOS: formulářová pole měla malé písmo, iPhone při ťuknutí zazoomoval a stránka „ujela" — na dotykových šířkách je písmo polí 16px (iOS už nezoomuje). UI zoom z počítače se na mobilech nově neaplikuje (rozbíjel pevné lišty).',
+            'Chat, náhledy dokumentů, podpisový pad, přihlašovací stránka a všechny modaly: výšky přepočítány na skutečně viditelný viewport (dvh) — vstupy a tlačítka dole už nemizí pod lištami; každý modal jde na telefonu odscrollovat k tlačítkům.',
+            'Drobnosti: stránkování zakázek se zalamuje, výběr období v Přehledech se vejde na displej, tabulka dílů v detailu zakázky scrolluje.',
+        ],
+    ],
+    [
         'version' => '1.9.7',
         'date' => '2026-07-16',
         'time' => '23:00',

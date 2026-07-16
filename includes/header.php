@@ -131,7 +131,9 @@ try {
 <html lang="<?php echo e(crm_get_language()); ?>" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php /* viewport-fit=cover: zpřístupní env(safe-area-inset-*) pro iPhony
+             s dynamic island / home indicatorem (spodní lišta, sheet) */ ?>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?php echo e(get_setting('company_name', 'Repair CRM')); ?> - <?php echo e(__('dashboard')); ?></title>
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
     <link rel="icon" type="image/png" href="/assets/img/favicon.png">

@@ -83,6 +83,28 @@ const CRM_APPLE_MODELS_BY_TYPE = {
     ]
 };
 
+/* ═══ iOS bfcache: odemknout scroll po návratu „zpět" ═══
+   Safari na iPhonu/iPadu obnovuje stránky z back-forward cache VČETNĚ stavu
+   <body> — když uživatel odešel s otevřeným modalem nebo mobilním menu, vrátí
+   se na stránku se scroll-lockem (overflow:hidden) a NEJDE SCROLLOVAT.
+   Tohle byl hlavní hlášený problém „stránka se zasekne / nejde dolů". */
+window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    try {
+        document.body.classList.remove('afx-sheet-open', 'modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+        document.querySelectorAll('.modal-backdrop').forEach(function (b) { b.remove(); });
+        document.querySelectorAll('.modal.show').forEach(function (m) {
+            m.classList.remove('show');
+            m.style.display = 'none';
+            m.setAttribute('aria-hidden', 'true');
+        });
+        var sheet = document.querySelector('.afx-sheet');
+        if (sheet) { sheet.setAttribute('aria-hidden', 'true'); }
+    } catch (err) { /* odemknuti nesmi nic rozbit */ }
+});
+
 /* ═══ Select2: globální opravy dropdownů (celé CRM) ═══
    1) iPad/dotyk: tap na select (např. Model zařízení ve wizardu) dropdown otevřel
       a OKAMŽITĚ zase zavřel — dvojité vyhodnocení tapu (touch + syntetický klik).
@@ -251,6 +273,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     $(document).on('hidden.bs.modal', '.modal', function() {
         document.body.style.removeProperty('padding-right');
+        // uplne odemknuti, kdyz uz neni otevreny zadny dalsi modal
+        if (!document.querySelector('.modal.show')) {
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.querySelectorAll('.modal-backdrop').forEach(function (b) { b.remove(); });
+        }
     });
 
     // Initialize Global Modals
@@ -450,8 +478,8 @@ function openUniversalPreview(url, title = window.LANG_PREVIEW || 'Preview') {
     const iframe = document.createElement('iframe');
     iframe.id = 'previewIframe';
     iframe.style.width = '100%';
-    iframe.style.minHeight = isThermal ? '60vh' : '80vh';
-    iframe.style.height = isThermal ? '60vh' : '80vh';
+    iframe.style.minHeight = isThermal ? '55dvh' : '75dvh';
+    iframe.style.height = isThermal ? '55dvh' : '75dvh';
     iframe.style.border = 'none';
     iframe.style.background = '#fff';
     iframe.style.display = 'none'; // Hidden until loaded
@@ -978,6 +1006,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function apply(scale) {
+        // Mobil/iPad (tabbar režim): zoom NIKDY neaplikovat — ovladač je skrytý
+        // (uložený zoom by nešel vrátit) a style.zoom na rootu rozbíjí
+        // position:fixed prvky v iOS Safari.
+        if (window.matchMedia('(max-width: 1080px)').matches) { scale = 100; }
         // zoom na <html> škáluje celé UI uniformně (Chromium)
         document.documentElement.style.zoom = (scale === 100) ? '' : (scale / 100);
         // Ovladač sám drž v konstantní velikosti (kontra-zoom), ať při zvětšení nezmizí ani nenaroste.

@@ -231,11 +231,12 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
   .afx-search { display: none !important; }
   .afx-user b { display: none; }
   .afx-utility .afx-hide-m { display: none !important; }
-  .crm-main-content { padding-bottom: 96px !important; }
+  .crm-main-content { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)) !important; }
   .crm-ui-zoom--floating, #crmUiZoom { display: none !important; } /* koliduje s tab barem; zoom je desktop funkce */
 
   .afx-tabbar {
-    display: flex; position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 1040;
+    display: flex; position: fixed; left: 12px; right: 12px; z-index: 1040;
+    bottom: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     border-radius: 26px; padding: 7px 8px; align-items: center; justify-content: space-around;
     background: rgba(14, 19, 17, .74);
     backdrop-filter: blur(26px) saturate(1.5); -webkit-backdrop-filter: blur(26px) saturate(1.5);
@@ -267,8 +268,14 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
   .afx-sheet { position: fixed; inset: 0; z-index: 1045; }
   .afx-sheet .afx-scrim { position: absolute; inset: 0; background: rgba(3,5,4,.55); backdrop-filter: blur(3px); }
   .afx-sheet .afx-panel {
-    position: absolute; left: 10px; right: 10px; bottom: 10px; max-height: 84vh; overflow-y: auto;
+    position: absolute; left: 10px; right: 10px;
+    bottom: 10px; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    /* dvh: iOS vh je vetsi nez viditelny viewport -> horni cast sheetu (hledani)
+       byla na mensich iPhonech oriznuta mimo obrazovku */
+    max-height: calc(100vh - 90px); max-height: calc(100dvh - 24px - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
     border-radius: 26px; padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     background: rgba(13, 18, 16, .88);
     backdrop-filter: blur(30px) saturate(1.5); -webkit-backdrop-filter: blur(30px) saturate(1.5);
     border: 1px solid rgba(255,255,255,.10);
@@ -281,7 +288,7 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
     border-radius: 12px; overflow: hidden; flex-wrap: nowrap;
   }
   .afx-sheet-search .input-group-text { background: transparent !important; border: none !important; color: rgba(255,255,255,.4) !important; }
-  .afx-sheet-search .form-control { background: transparent !important; border: none !important; box-shadow: none !important; color: #eef2f8 !important; font-size: 14px !important; }
+  .afx-sheet-search .form-control { background: transparent !important; border: none !important; box-shadow: none !important; color: #eef2f8 !important; font-size: 16px !important; }  /* 16px: iOS jinak pri fokusu zazoomuje */
   .afx-sheet-acts { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
   .afx-sheet-act {
     display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -312,7 +319,7 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
   }
   .afx-sheet-link i { width: 18px; text-align: center; opacity: .85; }
   .afx-sheet-link.active { background: rgba(0,163,255,.15); color: #5fd2ff; border-color: rgba(0,163,255,.34); }
-  .afx-sheet-foot { display: flex; gap: 8px; margin-top: 12px; }
+  .afx-sheet-foot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .afx-sheet-foot .btn { flex: 1; border-radius: 12px !important; }
 }
 
@@ -645,3 +652,19 @@ a.afx-chat-glow small {
 }
 .order-row--internal td:first-child { box-shadow: inset 3px 0 0 rgba(191,90,242,.75); }
 .order-row--internal { font-style: normal; }
+
+
+/* ── iOS safe-area + pretekani (responsive audit 16.7.2026) ── */
+.afx-utility { padding-top: env(safe-area-inset-top, 0px); }
+
+/* Dok na uzsich desktopech/iPadech (1081-1440px) pretekal a posledni polozky
+   byly useknute -> horizontalni scroll bez viditelneho scrollbaru + uzsi bunky */
+.afx-dockwrap { overflow-x: auto; scrollbar-width: none; }
+.afx-dockwrap::-webkit-scrollbar { display: none; }
+@media (max-width: 1440px) {
+  .afx-cell { min-width: 62px; padding-left: 6px; padding-right: 6px; }
+  .afx-cell small { font-size: 9.5px; }
+}
+
+/* Podpisovy overlay: na nizsich viewportech (landscape/split view) musi jit scrollovat */
+.afx-signpad-overlay { overflow-y: auto; -webkit-overflow-scrolling: touch; }

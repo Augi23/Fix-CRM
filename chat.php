@@ -17,7 +17,9 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
         </div>
     </div>
 
-    <div class="glass-panel border-secondary d-flex flex-column" style="height: calc(100vh - 240px); min-height: 420px;">
+    <?php /* dvh: na iOS Safari je 100vh větší než viditelný viewport (adresní řádek)
+             → vstup chatu by byl schovaný; dvh sleduje skutečnou výšku. */ ?>
+    <div class="glass-panel border-secondary d-flex flex-column afx-chat-box" style="height: calc(100vh - 240px); height: calc(100dvh - 240px); min-height: 380px;">
         <div id="chatMessages" class="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-2"></div>
         <div class="border-top border-secondary p-2">
             <form id="chatForm" class="d-flex gap-2" autocomplete="off">

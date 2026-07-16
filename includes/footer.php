@@ -3,13 +3,13 @@
 
 <!-- Universal Preview Modal -->
 <div class="modal fade" id="universalPreviewModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header border-secondary py-2">
                 <h6 class="modal-title mb-0" id="universalPreviewTitle"><i class="fas fa-file-alt me-2 text-primary"></i><?php echo __('preview'); ?></h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-0" style="max-height: 85vh; overflow-y: auto; background: #f5f5f5;">
+            <div class="modal-body p-0" style="max-height: calc(100vh - 130px); max-height: calc(100dvh - 130px); overflow-y: auto; -webkit-overflow-scrolling: touch; background: #f5f5f5;">
                 <div id="universalPreviewContent"></div>
             </div>
             <div class="modal-footer border-secondary py-2">

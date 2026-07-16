@@ -417,6 +417,7 @@ function localizedOrderStatusLabel(string $status): string {
                     </div>
                 </div>
                 
+                <div class="table-responsive">
                 <table class="table table-sm border align-middle">
                     <thead class="bg-transparent border-bottom">
                         <tr>
@@ -456,6 +457,7 @@ function localizedOrderStatusLabel(string $status): string {
                         <?php endif; ?>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </div>
