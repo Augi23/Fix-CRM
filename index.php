@@ -166,13 +166,16 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
+                            <?php /* Sjednoceno se seznamem zakázek (orders.php): stejné sloupce,
+                                     stejné pořadí i obsah buněk — všichni (admin i technici) vidí
+                                     na nástěnce a v seznamu totéž. Technik je součástí buňky Stav. */ ?>
                             <tr>
                                 <th><?php echo __('order_no'); ?> / <?php echo __('created'); ?></th>
                                 <th><?php echo __('client'); ?></th>
                                 <th><?php echo __('device_model'); ?></th>
                                 <th><?php echo __('problem'); ?></th>
-                                <th><?php echo __('technician'); ?></th>
                                 <th><?php echo __('status'); ?></th>
+                                <th class="col-priority"><?php echo __('priority'); ?></th>
                                 <th><?php echo __('amount'); ?></th>
                             </tr>
                         </thead>
@@ -212,7 +215,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                             $where_clause = $where_clauses ? ' WHERE ' . implode(' AND ', $where_clauses) : '';
                             $search_id = is_numeric($search) ? (int)$search : 0;
                             try { ensureWebBookingsSchema(); } catch (Throwable $e) {}   // subquery web_appointment_at
-                            $sql = "SELECT o.*, c.first_name, c.last_name, c.phone, c.company, c.customer_type, t.name as tech_name,
+                            $sql = "SELECT o.*, c.first_name, c.last_name, c.phone, c.email, c.company, c.customer_type, t.name as tech_name,
                                            (SELECT MAX(l.changed_at) FROM order_status_log l WHERE l.order_id = o.id) AS last_status_change,
                                            (SELECT MAX(wb.appointment_at) FROM web_bookings wb WHERE wb.order_id = o.id) AS web_appointment_at
                                     FROM orders o
@@ -253,16 +256,25 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                         <i class="fas fa-camera text-info ms-1" title="<?php echo __('has_media'); ?>"></i>
                                     <?php endif; ?>
                                     <div class="small text-white-75"><?php echo date('d.m.Y', strtotime($r['created_at'])); ?></div>
+                                    <div class="small text-white-75"><i class="far fa-clock me-1" style="font-size:.7rem;"></i><?php echo date('H:i:s', strtotime($r['created_at'])); ?></div>
+                                    <?php if (trim((string)($r['created_by_name'] ?? '')) !== ''): ?>
+                                        <div class="text-white-50" style="font-size:.72rem;" title="Zakázku vytvořil(a)"><i class="fas fa-user-pen me-1" style="font-size:.65rem;"></i><?php echo e($r['created_by_name']); ?></div>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <strong><?php echo htmlspecialchars($r['first_name'].' '.$r['last_name']); ?></strong><br>
                                     <small class="text-white-75">
                                         <?php if ($phone_href !== ''): ?>
-                                            <a href="tel:<?php echo e($phone_href); ?>" class="text-reset text-decoration-none crm-phone-text" onclick="event.stopPropagation();"><?php echo htmlspecialchars($r['phone']); ?></a>
-                                        <?php else: ?>
-                                            <span class="crm-phone-text"><?php echo htmlspecialchars($r['phone']); ?></span>
+                                            <a href="tel:<?php echo e($phone_href); ?>" class="text-reset text-decoration-none crm-phone-text" onclick="event.stopPropagation();"><i class="fas fa-phone me-1 text-success"></i><?php echo htmlspecialchars($r['phone']); ?></a>
+                                        <?php elseif (!empty($r['phone'])): ?>
+                                            <span class="crm-phone-text"><i class="fas fa-phone me-1 text-success"></i><?php echo htmlspecialchars($r['phone']); ?></span>
                                         <?php endif; ?>
                                     </small>
+                                    <?php if (!empty($r['email'])): ?>
+                                        <div><a class="small text-white-75 text-decoration-none" href="mailto:<?php echo e($r['email']); ?>" onclick="event.stopPropagation();">
+                                            <i class="fas fa-envelope me-1 text-info"></i><?php echo e($r['email']); ?>
+                                        </a></div>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <?php echo $icon; ?> <strong><?php echo htmlspecialchars($r['device_brand']); ?></strong><br>
@@ -275,10 +287,9 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <small><?php echo htmlspecialchars(mb_strimwidth($r['problem_description'], 0, 40, "...")); ?></small>
-                                </td>
-                                <td>
-                                    <span class="dashboard-tech-name"><i class="fas fa-user-cog me-1"></i><?php echo htmlspecialchars($r['tech_name'] ?? '---'); ?></span>
+                                    <div class="text-truncate" style="max-width: 240px; font-size: 0.92rem; line-height: 1.35;" title="<?php echo htmlspecialchars($r['problem_description']); ?>">
+                                        <?php echo htmlspecialchars($r['problem_description']); ?>
+                                    </div>
                                 </td>
                                 <td>
                                     <?php echo getStatusBadge($r['status']); ?>
@@ -294,10 +305,22 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                     <?php if(!empty($r['shipping_method'])): ?>
                                         <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars($r['shipping_method']); ?></div>
                                     <?php endif; ?>
+                                    <?php if($_SESSION['role'] == 'admin' && ($r['extra_expenses'] ?? 0) > 0): ?>
+                                        <div class="mt-1 small text-danger"><i class="fas fa-minus-circle me-1"></i><?php echo __('extra_expenses'); ?>: <?php echo e($r['extra_expenses']); ?></div>
+                                    <?php endif; ?>
                                     <div class="small text-white-75 mt-1">
                                         <i class="far fa-clock me-1"></i><?php echo date('d.m.Y H:i', strtotime($r['updated_at'])); ?>
                                     </div>
+                                    <?php if(!empty($r['tech_name'])): ?>
+                                    <div class="small text-white-75 mt-1">
+                                        <i class="fas fa-user-cog me-1"></i><?php echo htmlspecialchars($r['tech_name']); ?>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if (isBranchGlobalViewer() && !empty($r['branch_id'])): ?>
+                                    <div class="small mt-1"><span class="badge bg-dark border border-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)$r['branch_id'])); ?></span></div>
+                                    <?php endif; ?>
                                 </td>
+                                <td class="col-priority"><?php echo getOrderPriorityBadge($r['priority'] ?? 'Normal', (string)$r['status']); ?></td>
                                 <td><strong><?php echo formatMoney($r['final_cost'] ?: $r['estimated_cost']); ?></strong></td>
                             </tr>
                             <?php endforeach; 

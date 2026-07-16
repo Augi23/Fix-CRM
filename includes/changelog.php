@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '1.6.9',
+        'date' => '2026-07-16',
+        'time' => '13:10',
+        'title' => 'Nástěnka a Seznam zakázek: sjednocený vzhled i údaje pro všechny',
+        'items' => [
+            'Tabulka zakázek na nástěnce má nově úplně stejné sloupce, pořadí i obsah buněk jako Seznam zakázek — admin i technici vidí všude totéž (rozdíl vznikal tím, že nástěnka měla vlastní chudší tabulku).',
+            'Sloupec č. zakázky na nástěnce nově ukazuje i přesný čas vytvoření a kdo zakázku založil; u klienta přibyl e-mail; problém se zobrazuje celý (se zkrácením jako v seznamu).',
+            'Samostatný sloupec Technik na nástěnce nahrazen údajem v buňce Stav (stejně jako v seznamu) a přibyl sloupec Priorita.',
+            'Jediné záměrné výjimky podle role (stejné na obou stránkách): interní náklady navíc vidí jen admin a štítek pobočky jen vedení.',
+        ],
+    ],
+    [
         'version' => '1.6.8',
         'date' => '2026-07-16',
         'time' => '12:25',
