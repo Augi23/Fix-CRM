@@ -5,6 +5,17 @@ require_once 'klient/includes/auth.php';
 
 $error = false;
 
+
+// Návrat po přihlášení (sken skladového QR odhlášeným zařízením) — POVOLEN jen
+// cíl sklad.php?... (žádné jiné/absolutní URL, žádný open redirect).
+function loginSafeRedirectTarget(): string {
+    $r = (string)($_REQUEST['redirect'] ?? '');
+    if ($r !== '' && preg_match('~^sklad\.php(\?[A-Za-z0-9_=&%.-]*)?$~', $r)) {
+        return $r;
+    }
+    return 'index.php';
+}
+
 function checkLoginAttempts($pdo) {
     if (!isset($pdo)) return true;
     try {
@@ -123,12 +134,12 @@ if (isset($_POST['login'])) {
                 crmAuditLog('auth.login', ['entity_type' => 'auth', 'summary' => 'Přihlášení do systému (administrátor)']);
                 if (!empty($_POST['ajax'])) {
                     header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(['ok' => true, 'redirect' => 'index.php',
+                    echo json_encode(['ok' => true, 'redirect' => loginSafeRedirectTarget(),
                         'greeting' => loginGreetingUrl((string)$user['username']),
                         'name' => (string)($user['full_name'] ?: $user['username'])], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
-                header('Location: index.php');
+                header('Location: ' . loginSafeRedirectTarget());
                 exit;
             }
 
@@ -153,12 +164,12 @@ if (isset($_POST['login'])) {
                 crmAuditLog('auth.login', ['entity_type' => 'auth', 'summary' => 'Přihlášení do systému']);
                 if (!empty($_POST['ajax'])) {
                     header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(['ok' => true, 'redirect' => 'index.php',
+                    echo json_encode(['ok' => true, 'redirect' => loginSafeRedirectTarget(),
                         'greeting' => loginGreetingUrl((string)$tech['username']),
                         'name' => (string)($tech['name'] ?: $tech['username'])], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
-                header('Location: index.php');
+                header('Location: ' . loginSafeRedirectTarget());
                 exit;
             }
             } // konec zaměstnaneckých větví (jen mimo klientskou doménu)
@@ -328,6 +339,10 @@ if (!empty($_POST['ajax'])) {
                 <form method="POST" class="login-form">
                     <?php echo csrfField(); ?>
                     <input type="hidden" name="login" value="1">
+                    <?php /* návrat na sklad po skenu QR odhlášeným zařízením (sanitizováno) */ ?>
+                    <?php $__lr = loginSafeRedirectTarget(); if ($__lr !== 'index.php'): ?>
+                        <input type="hidden" name="redirect" value="<?php echo e($__lr); ?>">
+                    <?php endif; ?>
                     <div class="mb-3">
                         <label class="form-label"><?php echo $isClientDom ? 'E-mail nebo telefon' : __('username_label'); ?></label>
                         <input type="text" name="username" class="form-control" required autofocus autocomplete="username" placeholder="<?php echo $isClientDom ? 'zadejte e-mail nebo telefon ze zakázky' : e(__('login_username_placeholder')); ?>">

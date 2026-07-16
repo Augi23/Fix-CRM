@@ -406,11 +406,14 @@ function localizedOrderStatusLabel(string $status): string {
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPartModal">
                             <i class="fas fa-plus me-1"></i> <?php echo __('add_part'); ?>
                         </button>
-                        <?php /* QR výdej: připraví tuto zakázku, technik pak jen naskenuje QR dílu na regálu */ ?>
+                        <?php /* QR výdej: připraví tuto zakázku, technik pak jen naskenuje QR dílu
+                                 na regálu. U vydaných/stornovaných zakázek nemá smysl. */ ?>
+                        <?php if (!isOrderStatusIn($status, 'collected') && !isOrderStatusIn($status, 'cancelled')): ?>
                         <button class="btn btn-sm btn-outline-warning" id="qrTakePartBtn" data-order-id="<?php echo (int)$order['id']; ?>"
                                 title="Připraví tuto zakázku — pak stačí mobilem naskenovat QR kód dílu na regálu a díl se sem přidá i s cenou">
                             <i class="fas fa-qrcode me-1"></i> Vzít díl skenem QR
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
                 
@@ -969,7 +972,9 @@ $(document).ready(function() {
             } else {
                 showAlert((d && d.message) || 'Chyba');
             }
-        }, 'json');
+        }, 'json').fail(function () {
+            showAlert('Nepodařilo se připravit zakázku — obnov stránku a zkus to znovu.');
+        });
     });
 
     $('#statusForm').on('submit', function(e) {

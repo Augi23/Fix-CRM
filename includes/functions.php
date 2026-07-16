@@ -2094,23 +2094,24 @@ function formatWorkDuration($minutesTotal) {
 function changeInventoryQuantity($inventory_id, $change) {
     global $pdo;
     if (!$inventory_id) return true;
-    
-    $stmt = $pdo->prepare("SELECT quantity, part_name FROM inventory WHERE id = ? FOR UPDATE");
-    $stmt->execute([$inventory_id]);
-    $item = $stmt->fetch();
-    
-    if (!$item) {
-        throw new Exception("Inventory item #{$inventory_id} not found.");
-    }
-    
-    $new_quantity = $item['quantity'] + $change;
-    
-    if ($new_quantity < 0) {
+    $change = (int)$change;
+    if ($change === 0) return true;
+
+    // ATOMICKY (quantity = quantity + ?): dřívější čtení+zápis ztrácelo update,
+    // když dva lidé naskladnili tentýž díl současně mimo transakci (autocommit
+    // pustil zámek FOR UPDATE hned po SELECTu).
+    $upd = $pdo->prepare("UPDATE inventory SET quantity = quantity + ? WHERE id = ? AND quantity + ? >= 0");
+    $upd->execute([$change, $inventory_id, $change]);
+    if ($upd->rowCount() === 0) {
+        $stmt = $pdo->prepare("SELECT quantity, part_name FROM inventory WHERE id = ?");
+        $stmt->execute([$inventory_id]);
+        $item = $stmt->fetch();
+        if (!$item) {
+            throw new Exception("Inventory item #{$inventory_id} not found.");
+        }
         throw new Exception("Not enough stock for item '{$item['part_name']}'. Available: {$item['quantity']}, Required: " . abs($change));
     }
-    
-    $upd = $pdo->prepare("UPDATE inventory SET quantity = ? WHERE id = ?");
-    return $upd->execute([$new_quantity, $inventory_id]);
+    return true;
 }
 
 /**

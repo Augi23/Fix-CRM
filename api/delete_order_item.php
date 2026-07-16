@@ -46,8 +46,8 @@ try {
     $__wasDeducted = (int)($item['stock_deducted'] ?? 0) === 1;
     if ($__wasDeducted || in_array($item['status'], getOrderStatusList('done'), true)) {
         changeInventoryQuantity($item['inventory_id'], $item['quantity']);
-        if ($__wasDeducted && function_exists('crmLogInventoryMove')) {
-            crmLogInventoryMove((int)$item['inventory_id'], (int)$item['quantity'], 'restock', (int)$item['order_id'], 'Vráceno ze zakázky (smazána položka)');
+        if (function_exists('crmLogInventoryMove')) {
+            crmLogInventoryMove((int)$item['inventory_id'], (int)$item['quantity'], 'return', (int)$item['order_id'], 'Vráceno ze zakázky (smazána položka)');
         }
     }
 

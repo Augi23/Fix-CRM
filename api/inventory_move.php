@@ -38,7 +38,9 @@ try {
 
     if ($op === 'restock') {
         if ($qty < 1 || $qty > 10000) { throw new Exception('Zadej počet naskladněných kusů (1–10000).'); }
+        $pdo->beginTransaction();
         changeInventoryQuantity($inventory_id, $qty);
+        $pdo->commit();
         crmLogInventoryMove($inventory_id, $qty, 'restock', null, $note);
         crmAuditLog('inventory.restock', [
             'entity_type' => 'inventory', 'entity_id' => $inventory_id, 'entity_label' => (string)$inv['part_name'],
@@ -52,11 +54,13 @@ try {
     if ($op === 'issue') {
         if ($qty < 1 || $qty > 1000) { throw new Exception('Zadej počet odebíraných kusů.'); }
         if ($order_id <= 0) { throw new Exception('Vyber zakázku, na kterou díl bereš.'); }
-        $o = $pdo->prepare("SELECT id, order_code, status FROM orders WHERE id = ?");
+        $o = $pdo->prepare("SELECT id, order_code, status, branch_id, technician_id FROM orders WHERE id = ?");
         $o->execute([$order_id]);
         $order = $o->fetch();
         if (!$order) { throw new Exception('Zakázka nenalezena.'); }
+        if (!canAccessOrderBranch($order)) { throw new Exception(__('access_denied_msg')); }
         if (isOrderStatusIn((string)$order['status'], 'collected')) { throw new Exception('Zakázka už je vydaná — díl na ni nejde přidat.'); }
+        if (isOrderStatusIn((string)$order['status'], 'cancelled')) { throw new Exception('Zakázka je stornovaná — díl na ni nejde přidat.'); }
         if ((int)$inv['quantity'] < $qty) { throw new Exception('Skladem je jen ' . (int)$inv['quantity'] . ' ks.'); }
 
         $pdo->beginTransaction();

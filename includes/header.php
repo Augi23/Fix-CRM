@@ -17,6 +17,12 @@ if (clientIsLoggedIn()) {
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php') {
+    // Sken regálového QR odhlášeným telefonem nesmí cíl ztratit: u skladu
+    // předáme návratovou adresu (login.php ji po přihlášení použije).
+    if (basename($_SERVER['PHP_SELF']) === 'sklad.php') {
+        header("Location: login.php?redirect=" . rawurlencode('sklad.php' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '')));
+        exit;
+    }
     header("Location: login.php");
     exit;
 }

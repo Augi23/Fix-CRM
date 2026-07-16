@@ -23,6 +23,8 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 ensureProcurementSchema();
+ensureOrderItemStockFlag();      // DDL — před transakcemi (assign_order vkládá stock_deducted)
+ensureInventoryMovesTable();
 
 $action = trim((string)($_POST['action'] ?? 'add'));
 
@@ -144,6 +146,16 @@ try {
             changeInventoryQuantity($inventoryId, $quantity);
             // Received parts become real warehouse stock → show in Sklad even after they run out.
             $pdo->prepare("UPDATE inventory SET is_stocked = 1 WHERE id = ?")->execute([$inventoryId]);
+            if (function_exists('crmLogInventoryMove')) {
+                crmLogInventoryMove($inventoryId, $quantity, 'restock', null, 'Příjem z nákupu #' . (int)$id);
+            }
+        } elseif ($wasReceived && !$isNowReceived && $inventoryId > 0) {
+            // Zrcadlo: omylem označené „přijato" vrácené zpět MUSÍ kusy zase odečíst —
+            // jinak každé received↔ordered kolečko přičte zásobu znovu (fantomové kusy).
+            changeInventoryQuantity($inventoryId, -$quantity);
+            if (function_exists('crmLogInventoryMove')) {
+                crmLogInventoryMove($inventoryId, -$quantity, 'adjust', null, 'Zrušení příjmu z nákupu #' . (int)$id);
+            }
         }
 
         $pdo->commit();
@@ -213,8 +225,17 @@ try {
             throw new Exception('A technician can assign an out-of-stock part only if it is already ordered or received.');
         }
 
-        $stmt = $pdo->prepare("INSERT INTO order_items (order_id, inventory_id, quantity, price) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$orderId, $inventoryId, $qty, (float)($inventory['sale_price'] ?? 0)]);
+        // Dokončená zakázka: odečíst hned + stock_deducted=1 (viz add_order_item.php) —
+        // přechod na „dokončeno", který by kusy odečetl, už proběhl a nenastane znovu.
+        $__orderDone = in_array((string)($order['status'] ?? ''), getOrderStatusList('done'), true);
+        if ($__orderDone) {
+            changeInventoryQuantity($inventoryId, -$qty);
+            if (function_exists('crmLogInventoryMove')) {
+                crmLogInventoryMove((int)$inventoryId, -$qty, 'issue', (int)$orderId, 'Díl z nákupu přiřazen na dokončenou zakázku');
+            }
+        }
+        $stmt = $pdo->prepare("INSERT INTO order_items (order_id, inventory_id, quantity, price, stock_deducted) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$orderId, $inventoryId, $qty, (float)($inventory['sale_price'] ?? 0), $__orderDone ? 1 : 0]);
 
         $stmt = $pdo->prepare("UPDATE purchase_requests SET order_id = ? WHERE id = ?");
         $stmt->execute([$orderId, $requestId]);

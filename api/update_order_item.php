@@ -17,13 +17,15 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 $id = $_POST['id'] ?? null;
-$new_qty = (float)($_POST['quantity'] ?? 1);
+$new_qty = max(1, (int)($_POST['quantity'] ?? 1));
 $new_price = (float)($_POST['price'] ?? 0);
 
 if (!$id) {
     echo json_encode(['success' => false, 'message' => __('missing_id')]);
     exit;
 }
+
+ensureOrderItemStockFlag(); // DDL — před transakcí
 
 try {
     $pdo->beginTransaction();
@@ -42,11 +44,19 @@ try {
         throw new Exception(__('access_denied_msg'));
     }
 
-    // If order is completed/collected, adjust inventory
-    if (in_array($item['status'], getOrderStatusList('done'), true)) {
-        $diff = $new_qty - $item['quantity'];
-        // Subtract the difference from stock
+    // Sklad se dorovnává o rozdíl, pokud je počet položky UŽ promítnutý do skladu:
+    // - stock_deducted=1 (QR výdej — odečteno hned při výdeji), NEZÁVISLE na stavu zakázky
+    // - jinak jen u dokončené zakázky (klasické položky se odečítají při dokončení)
+    // Bez toho by úprava počtu QR-vydané položky rozbila párování „odečteno == počet"
+    // a smazání položky by pak vracelo špatný počet kusů (fantomové zásoby).
+    $__deductedNow = ((int)($item['stock_deducted'] ?? 0) === 1)
+        || in_array($item['status'], getOrderStatusList('done'), true);
+    $diff = $new_qty - (int)$item['quantity'];
+    if ($__deductedNow && $diff !== 0) {
         changeInventoryQuantity($item['inventory_id'], -$diff);
+        if (function_exists('crmLogInventoryMove')) {
+            crmLogInventoryMove((int)$item['inventory_id'], -$diff, 'adjust', (int)$item['order_id'], 'Úprava počtu na zakázce (' . (int)$item['quantity'] . ' → ' . $new_qty . ' ks)');
+        }
     }
 
     // Update item

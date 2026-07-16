@@ -6,6 +6,20 @@
  */
 return [
     [
+        'version' => '1.8.1',
+        'date' => '2026-07-16',
+        'time' => '18:20',
+        'title' => 'Sklad: dotažení QR systému po kontrolní revizi (přesnost zásob)',
+        'items' => [
+            'Tři nezávislí revizoři prověřili QR sklad — nálezy opraveny, skladová čísla teď sedí ve všech kombinacích akcí:',
+            'Úprava počtu kusů u dílu na zakázce správně dorovná sklad i u QR-vydaných dílů; přidání dílu na už dokončenou zakázku sklad rovnou odečte (dřív se v těchto situacích mohly tvořit „fantomové" kusy).',
+            'Vrácení stavu nákupu z „přijato" zpět kusy zase odečte (dřív každé kolečko přijato↔objednáno přičítalo zásobu znovu). Smazání celé zakázky vrací QR-vydané kusy na sklad.',
+            'Připravená zakázka („Vzít díl skenem QR") se nově pamatuje NA UŽIVATELE, ne na prohlížeč — klik na počítači a sken telefonem už funguje dohromady. Na kartě dílu jde připravená zakázka zrušit křížkem.',
+            'Sken QR odhlášeným telefonem po přihlášení vrátí rovnou na kartu dílu (neztratí cíl). Výběr zakázky u výdeje má nově rychlé hledání a nabízí 50 posledních aktivních.',
+            'Bezpečnost: výdej hlídá pobočku zakázky a blokuje vydané i stornované zakázky; současné naskladnění dvěma lidmi už neztratí kusy (atomické přičítání).',
+        ],
+    ],
+    [
         'version' => '1.8.0',
         'date' => '2026-07-16',
         'time' => '17:30',

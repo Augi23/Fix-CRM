@@ -30,7 +30,7 @@ if (!$id) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, order_code FROM orders WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id, order_code, status FROM orders WHERE id = ?");
     $stmt->execute([$id]);
     $__ord = $stmt->fetch();
     if (!$__ord) {
@@ -69,6 +69,23 @@ try {
 
     // Odvázat webovou rezervaci (záznam rezervace ponecháme kvůli historii)
     $pdo->prepare("UPDATE web_bookings SET order_id = NULL WHERE order_id = ?")->execute([$id]);
+
+    // Vrátit na sklad kusy, jejichž odečet je už promítnutý: QR-vydané položky
+    // (stock_deducted=1) vždy; klasické položky jen u dokončené zakázky (stejné
+    // pravidlo jako delete_order_item.php). Jinak by smazání zakázky kusy „ztratilo".
+    try {
+        $__isDone = in_array((string)($__ord['status'] ?? ''), getOrderStatusList('done'), true);
+        $itq = $pdo->prepare("SELECT inventory_id, quantity, COALESCE(stock_deducted,0) sd FROM order_items WHERE order_id = ? AND inventory_id IS NOT NULL");
+        $itq->execute([$id]);
+        foreach ($itq->fetchAll() as $oi) {
+            if ((int)$oi['sd'] === 1 || $__isDone) {
+                changeInventoryQuantity($oi['inventory_id'], (int)$oi['quantity']);
+                if (function_exists('crmLogInventoryMove')) {
+                    crmLogInventoryMove((int)$oi['inventory_id'], (int)$oi['quantity'], 'return', (int)$id, 'Vráceno — zakázka smazána');
+                }
+            }
+        }
+    } catch (Throwable $e) { /* sloupec nemusí na staré instanci existovat */ }
 
     // Smazat všechny podřízené záznamy zakázky. order_items/order_attachments mají FK
     // na orders → MUSÍ padnout před samotnou zakázkou (jinak FK chyba 1451/1452).

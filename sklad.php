@@ -22,20 +22,26 @@ if ($qrId > 0) {
     $inv = $stmt->fetch();
 }
 
-// „ozbrojená" zakázka z detailu (Vzít díl skenem QR)
+// „ozbrojená" zakázka z detailu (Vzít díl skenem QR) — per-uživatel v DB,
+// takže funguje i klik na počítači + sken telefonem (jiná session)
 $armed = null;
-if (!empty($_SESSION['qr_issue_order']) && (int)($_SESSION['qr_issue_order']['expires'] ?? 0) > time()) {
-    $armed = $_SESSION['qr_issue_order'];
-}
+try {
+    $__armKey = 'qr_arm_' . preg_replace('/[^a-zA-Z0-9_]/', '', (string)$_SESSION['user_id']);
+    $__armRaw = (string)get_setting($__armKey, '');
+    if ($__armRaw !== '') {
+        $__arm = json_decode($__armRaw, true);
+        if (is_array($__arm) && (int)($__arm['expires'] ?? 0) > time()) { $armed = $__arm; }
+    }
+} catch (Throwable $e) {}
 
-// nabídka aktivních zakázek pro výdej (posledních 25 v mém rozsahu)
+// nabídka aktivních zakázek pro výdej (posledních 50 v mém rozsahu + rychlý filtr)
 $activeOrders = [];
 try {
     $activeSt = orderStatusSqlIn($pdo, 'active');
     $scope = orderBranchScopeSql('o.branch_id');
     $activeOrders = $pdo->query("SELECT o.id, o.order_code, o.device_brand, o.device_model, c.first_name, c.last_name
         FROM orders o JOIN customers c ON c.id = o.customer_id
-        WHERE o.status IN ($activeSt)$scope ORDER BY o.id DESC LIMIT 25")->fetchAll();
+        WHERE o.status IN ($activeSt)$scope ORDER BY o.id DESC LIMIT 50")->fetchAll();
 } catch (Throwable $e) { $activeOrders = []; }
 
 // posledních 6 pohybů dílu
@@ -77,9 +83,13 @@ if ($inv) {
     <div class="glass-panel p-3 border-secondary mb-3">
         <div class="fw-semibold text-white mb-2"><i class="fas fa-hand-holding me-2 text-warning"></i>Vydat na zakázku</div>
         <?php if ($armed): ?>
-            <div class="alert alert-info py-2 small mb-2"><i class="fas fa-link me-1"></i>Připraveno pro zakázku <b><?php echo e($armed['code'] ?: ('#' . $armed['id'])); ?></b> (z detailu zakázky)</div>
+            <div class="alert alert-info py-2 small mb-2 d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-link me-1"></i>Připraveno pro zakázku <b><?php echo e($armed['code'] ?: ('#' . $armed['id'])); ?></b></span>
+                <button type="button" class="btn btn-sm btn-outline-light py-0" id="btnDisarm" title="Zrušit připravenou zakázku">✕ Zrušit</button>
+            </div>
         <?php endif; ?>
-        <select id="issueOrder" class="form-select mb-2">
+        <input type="text" id="orderFilter" class="form-control mb-2" placeholder="Hledat zakázku (kód, zařízení, klient)…" autocomplete="off">
+        <select id="issueOrder" class="form-select mb-2" size="1">
             <option value="">— vyber zakázku —</option>
             <?php foreach ($activeOrders as $ao): ?>
                 <option value="<?php echo (int)$ao['id']; ?>" <?php echo ($armed && (int)$armed['id'] === (int)$ao['id']) ? 'selected' : ''; ?>>
@@ -124,7 +134,11 @@ if ($inv) {
         <?php foreach ($moves as $m): ?>
             <div class="d-flex justify-content-between small text-white-75 py-1 border-bottom border-secondary border-opacity-25">
                 <span><?php echo $m['delta'] > 0 ? '<span class="text-success">+' . (int)$m['delta'] . '</span>' : '<span class="text-warning">' . (int)$m['delta'] . '</span>'; ?> ks
-                    · <?php echo $m['reason'] === 'restock' ? 'naskladnění' : ($m['reason'] === 'issue' ? 'výdej' . ($m['order_id'] ? ' → <a href="view_order.php?id=' . (int)$m['order_id'] . '">zakázka</a>' : '') : 'korekce'); ?></span>
+                    · <?php
+                        $__rl = ['restock' => 'naskladnění', 'issue' => 'výdej', 'return' => 'vráceno', 'adjust' => 'úprava počtu', 'correction' => 'korekce'];
+                        echo $__rl[$m['reason']] ?? e($m['reason']);
+                        if ($m['order_id']) { echo ' → <a href="view_order.php?id=' . (int)$m['order_id'] . '">zakázka</a>'; }
+                    ?></span>
                 <span><?php echo e($m['actor_name'] ?: ''); ?> · <?php echo date('j.n. H:i', strtotime($m['created_at'])); ?></span>
             </div>
         <?php endforeach; ?>
@@ -179,6 +193,32 @@ function qrStep(id, d) {
             if (d.new_quantity < 1) { document.getElementById('btnIssue').disabled = true; }
         });
     });
+
+    // rychlý filtr nabídky zakázek (kód / zařízení / klient)
+    var filterEl = document.getElementById('orderFilter');
+    if (filterEl) {
+        filterEl.addEventListener('input', function () {
+            var q = this.value.toLowerCase();
+            var sel = document.getElementById('issueOrder');
+            Array.prototype.forEach.call(sel.options, function (o) {
+                if (!o.value) return;
+                o.hidden = q !== '' && o.text.toLowerCase().indexOf(q) === -1;
+            });
+        });
+    }
+
+    // zrušení připravené zakázky
+    var disarmBtn = document.getElementById('btnDisarm');
+    if (disarmBtn) {
+        disarmBtn.addEventListener('click', function () {
+            var fd = new FormData();
+            fd.append('order_id', '0'); fd.append('csrf_token', csrf);
+            fetch('api/qr_arm.php', {method: 'POST', body: fd, credentials: 'same-origin'})
+                .then(function (r) { return r.json(); })
+                .then(function () { location.reload(); })
+                .catch(function () { location.reload(); });
+        });
+    }
 }());
 </script>
 <?php endif; ?>

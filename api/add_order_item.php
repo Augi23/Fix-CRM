@@ -31,9 +31,11 @@ if (!$order_id || !$inventory_id) {
     exit;
 }
 
+ensureOrderItemStockFlag(); // DDL — mimo případné transakce
+
 try {
     // Check permissions
-    $stmt = $pdo->prepare("SELECT technician_id, branch_id FROM orders WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT technician_id, branch_id, status FROM orders WHERE id = ?");
     $stmt->execute([$order_id]);
     $order = $stmt->fetch();
     
@@ -58,8 +60,19 @@ try {
         throw new Exception('Technician can select only items that are in stock.');
     }
 
-    $stmt = $pdo->prepare("INSERT INTO order_items (order_id, inventory_id, quantity, price) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$order_id, $inventory_id, $qty, $price]);
+    // Zakázka UŽ v dokončené skupině: přechod „nedokončená → dokončená" (který sklad
+    // odečítá) už proběhl a znovu nenastane → odečíst HNED a označit stock_deducted=1
+    // (stejný model jako QR výdej). Jinak by díl nikdy sklad nesnížil, ale jeho
+    // smazání by kusy „vrátilo" — fantomová zásoba.
+    $__orderDone = in_array((string)($order['status'] ?? ''), getOrderStatusList('done'), true);
+    if ($__orderDone) {
+        changeInventoryQuantity($inventory_id, -$qty);
+        if (function_exists('crmLogInventoryMove')) {
+            crmLogInventoryMove((int)$inventory_id, -$qty, 'issue', (int)$order_id, 'Díl přidán na dokončenou zakázku');
+        }
+    }
+    $stmt = $pdo->prepare("INSERT INTO order_items (order_id, inventory_id, quantity, price, stock_deducted) VALUES (?, ?, ?, ?, ?)");
+    $stmt->execute([$order_id, $inventory_id, $qty, $price, $__orderDone ? 1 : 0]);
 
     $autoProcurementQueued = false;
     if ((int)($inventory['quantity'] ?? 0) <= 0) {
