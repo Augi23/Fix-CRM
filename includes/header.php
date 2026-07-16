@@ -352,15 +352,16 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <?php if ($complaintsBadgeCount > 0): ?><span class="afx-badge afx-badge--warn"><?php echo $complaintsBadgeCount; ?></span><?php endif; ?>
             <i class="fas fa-rotate-left"></i><small><?php echo __('complaints'); ?></small>
         </a>
-        <a class="afx-cell <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php">
-            <?php if ($procurementBadgeCount > 0): ?><span class="afx-badge"><?php echo $procurementBadgeCount; ?></span><?php endif; ?>
-            <i class="fas fa-truck-loading"></i><small><?php echo __('procurement'); ?></small>
-        </a>
+        <?php /* Pořadí: Klienti PŘED Nákupy (prohozeno 16.7.2026) */ ?>
         <?php if (hasPermission('edit_customers')): ?>
         <a class="afx-cell <?php echo $current_page == 'customers.php' ? 'active' : ''; ?>" href="customers.php">
             <i class="fas fa-users"></i><small><?php echo __('customers'); ?></small>
         </a>
         <?php endif; ?>
+        <a class="afx-cell <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php">
+            <?php if ($procurementBadgeCount > 0): ?><span class="afx-badge"><?php echo $procurementBadgeCount; ?></span><?php endif; ?>
+            <i class="fas fa-truck-loading"></i><small><?php echo __('procurement'); ?></small>
+        </a>
         <?php if (hasPermission('manage_inventory')): ?>
         <a class="afx-cell <?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>" href="inventory.php">
             <i class="fas fa-boxes"></i><small><?php echo __('inventory'); ?></small>
@@ -439,10 +440,10 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <a class="afx-sheet-link <?php echo $current_page == 'index.php' ? 'active' : ''; ?>" href="index.php"><i class="fas fa-home"></i><?php echo __('dashboard'); ?></a>
             <a class="afx-sheet-link <?php echo $current_page == 'orders.php' ? 'active' : ''; ?>" href="orders.php"><i class="fas fa-tools"></i><?php echo __('orders'); ?></a>
             <a class="afx-sheet-link <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php"><i class="fas fa-rotate-left"></i><?php echo __('complaints'); ?></a>
-            <a class="afx-sheet-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading"></i><?php echo __('procurement'); ?></a>
             <?php if (hasPermission('edit_customers')): ?>
             <a class="afx-sheet-link <?php echo $current_page == 'customers.php' ? 'active' : ''; ?>" href="customers.php"><i class="fas fa-users"></i><?php echo __('customers'); ?></a>
             <?php endif; ?>
+            <a class="afx-sheet-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading"></i><?php echo __('procurement'); ?></a>
             <?php if (hasPermission('manage_inventory')): ?>
             <a class="afx-sheet-link <?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>" href="inventory.php"><i class="fas fa-boxes"></i><?php echo __('inventory'); ?></a>
             <?php endif; ?>

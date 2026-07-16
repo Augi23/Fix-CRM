@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '1.7.5',
+        'date' => '2026-07-16',
+        'time' => '16:15',
+        'title' => 'Menu: Klienti a Nákupy prohozeny',
+        'items' => [
+            'V horním menu (i v mobilním menu) je nově pořadí … Reklamace, Klienti, Nákupy, Sklad … — Klienti a Nákupy si vyměnily místo.',
+        ],
+    ],
+    [
         'version' => '1.7.4',
         'date' => '2026-07-16',
         'time' => '16:00',
