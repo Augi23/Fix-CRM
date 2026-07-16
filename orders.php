@@ -249,28 +249,9 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
     </div>
 </div>
 
-<?php
-// ── Dlaždice Nepřidělené / Nedokončené (stejné jako na nástěnce, 16.7.2026):
-//    vedení = součet obou poboček, řadoví zaměstnanci = jen svoje pobočka ──
-$__tilesGlobal = isBranchGlobalViewer();
-$__myBranchId = (int)getCurrentStaffBranchId();
-$__tiles_cond = (!$__tilesGlobal && $__myBranchId > 0) ? " AND branch_id = " . $__myBranchId : '';
-$__tilesBranchLabel = $__tilesGlobal ? 'Obě pobočky' : getBranchLabel($__myBranchId);
-$__activeSt = orderStatusSqlIn($pdo, 'active');
-$__unassigned = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($__activeSt) AND (technician_id IS NULL OR technician_id = 0)" . $__tiles_cond)->fetchColumn();
-$__unfinished = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($__activeSt)" . $__tiles_cond)->fetchColumn();
-?>
-<div class="crm-stat-grid crm-stat-grid--pair mb-3">
-    <div class="crm-stat-card crm-stat-5">
-        <div class="crm-stat-label">Nepřidělené zakázky</div>
-        <div class="crm-stat-value"><?php echo $__unassigned; ?></div>
-        <div class="crm-stat-sub <?php echo $__unassigned > 0 ? 'down' : ''; ?>"><i class="fas fa-store me-1" style="font-size:.7rem;"></i><?php echo e($__tilesBranchLabel); ?></div>
-    </div>
-    <div class="crm-stat-card crm-stat-6">
-        <div class="crm-stat-label">Nedokončené zakázky</div>
-        <div class="crm-stat-value"><?php echo $__unfinished; ?></div>
-        <div class="crm-stat-sub"><i class="fas fa-store me-1" style="font-size:.7rem;"></i><?php echo e($__tilesBranchLabel); ?></div>
-    </div>
+<?php /* Sdílené horní dlaždice — stejné rozvržení i obsah jako na Nástěnce */ ?>
+<div class="crm-stat-row mb-4">
+<?php include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
 </div>
 
 <?php

@@ -105,45 +105,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
 <!-- 4 statistiky + pobočky na jednom řádku (pobočky nad sebou, stejná celková výška) -->
 <div class="crm-stat-row mb-4">
-<div class="crm-stat-grid">
-    <a href="orders.php" class="crm-stat-card crm-stat-1 text-decoration-none">
-        <div class="crm-stat-label"><?php echo __('active_orders'); ?></div>
-        <div class="crm-stat-value"><?php echo (int)$active_count; ?></div>
-        <div class="crm-stat-sub <?php echo $new_today > 0 ? 'up' : ''; ?>">
-            <?php if ($new_today > 0): ?>↑ <?php echo $new_today; ?> <?php echo __('today'); ?><?php else: ?><?php echo __('no_change'); ?><?php endif; ?>
-        </div>
-    </a>
-    <a href="?filter=<?php echo urlencode('Čeká na díl'); ?>" class="crm-stat-card crm-stat-2 text-decoration-none">
-        <div class="crm-stat-label"><?php echo __('waiting_parts'); ?></div>
-        <div class="crm-stat-value"><?php echo (int)$waiting_count; ?></div>
-        <div class="crm-stat-sub <?php echo $urgent_waiting > 0 ? 'down' : ''; ?>">
-            <?php echo $urgent_waiting > 0 ? $urgent_waiting.' '.__('urgent') : __('in_queue'); ?>
-        </div>
-    </a>
-    <a href="?filter=<?php echo urlencode('Připraveno k převzetí'); ?>" class="crm-stat-card crm-stat-3 text-decoration-none">
-        <div class="crm-stat-label"><?php echo __('repaired_today'); ?></div>
-        <div class="crm-stat-value"><?php echo (int)$completed_today; ?></div>
-        <div class="crm-stat-sub"><?php echo __('of'); ?> <?php echo (int)$planned_today; ?> <?php echo __('planned'); ?></div>
-    </a>
-    <div class="crm-stat-card crm-stat-4">
-        <div class="crm-stat-label"><?php echo __('daily_revenue'); ?></div>
-        <div class="crm-stat-value"><?php echo number_format($revenue_today, 0, ',', ' '); ?> Kč</div>
-        <div class="crm-stat-sub <?php echo $revenue_today_trend > 0 ? 'up' : ($revenue_today_trend < 0 ? 'down' : ''); ?>">
-            <?php if ($revenue_today_trend > 0): ?>↑ <?php echo $revenue_today_trend; ?> % <?php echo __('vs_yesterday'); ?><?php elseif ($revenue_today_trend < 0): ?>↓ <?php echo abs($revenue_today_trend); ?> % <?php echo __('vs_yesterday'); ?><?php else: ?><?php echo __('no_change'); ?><?php endif; ?>
-        </div>
-    </div>
-    <?php /* Nepřidělené + Nedokončené: vedení = obě pobočky, zaměstnanci = jen svoje */ ?>
-    <a href="orders.php" class="crm-stat-card crm-stat-5 text-decoration-none">
-        <div class="crm-stat-label">Nepřidělené zakázky</div>
-        <div class="crm-stat-value"><?php echo (int)$unassigned_count; ?></div>
-        <div class="crm-stat-sub <?php echo $unassigned_count > 0 ? 'down' : ''; ?>"><i class="fas fa-store me-1" style="font-size:.7rem;"></i><?php echo e($__tilesBranchLabel); ?></div>
-    </a>
-    <a href="orders.php" class="crm-stat-card crm-stat-6 text-decoration-none">
-        <div class="crm-stat-label">Nedokončené zakázky</div>
-        <div class="crm-stat-value"><?php echo (int)$unfinished_count; ?></div>
-        <div class="crm-stat-sub"><i class="fas fa-store me-1" style="font-size:.7rem;"></i><?php echo e($__tilesBranchLabel); ?></div>
-    </a>
-</div>
+<?php /* Sdílené dlaždice (stejné na Nástěnce i v Zakázkách) */ include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
 
 <?php if (!empty($branch_overview)): ?>
 <div class="crm-branch-col">

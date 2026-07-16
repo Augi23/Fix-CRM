@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.8.2',
+        'date' => '2026-07-16',
+        'time' => '18:50',
+        'title' => 'Zakázky: horní dlaždice ve stejném rozvržení jako na Nástěnce',
+        'items' => [
+            'Stránka Zakázky má nahoře stejnou sadu i rozvržení dlaždic jako Nástěnka (3×2): Aktivní zakázky, Čeká na díly, Opraveno dnes, Denní tržba, Nepřidělené a Nedokončené zakázky.',
+            'Dlaždice jsou nově jedna sdílená šablona pro obě stránky — nemohou se už nikdy rozjet (změna se propíše všude).',
+        ],
+    ],
+    [
         'version' => '1.8.1',
         'date' => '2026-07-16',
         'time' => '18:20',
