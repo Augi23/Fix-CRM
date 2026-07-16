@@ -2976,3 +2976,16 @@ input[type="number"], .input-group-text,
 /* Dvojice dlaždic (Nepřidělené/Nedokončené) na stránce Zakázky */
 .crm-stat-grid--pair { grid-template-columns: repeat(2, 1fr) !important; }
 @media (max-width: 575.98px) { .crm-stat-grid--pair { grid-template-columns: 1fr !important; } }
+
+/* ── Kompaktní sloupec Stav (nástěnka + seznam zakázek): menší pill i meta řádky ── */
+.cell-status { line-height: 1.3; min-width: 150px; }
+.cell-status .status-pill {
+  padding: 3px 9px !important;
+  font-size: .72rem !important;
+  border-radius: 8px !important;
+  gap: 5px !important;
+}
+.cell-status .afx-booked-chip { padding: 1px 8px; font-size: .68rem; }
+.cell-status .small, .cell-status .form-text { font-size: .7rem !important; }
+.cell-status .mt-1 { margin-top: 2px !important; }
+.cell-status .badge.bg-dark { font-size: .64rem; padding: 2px 7px; }

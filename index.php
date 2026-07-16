@@ -280,7 +280,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                         <?php echo htmlspecialchars($r['problem_description']); ?>
                                     </div>
                                 </td>
-                                <td>
+                                <td class="cell-status">
                                     <?php echo getStatusBadge($r['status']); ?>
                                     <?php if (!empty($r['web_appointment_at'])):
                                         $wbTs = strtotime((string)$r['web_appointment_at']);

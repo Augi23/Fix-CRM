@@ -363,7 +363,7 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                     <?php echo htmlspecialchars($order['problem_description']); ?>
                                 </div>
                             </td>
-                            <td>
+                            <td class="cell-status">
                                 <?php echo getStatusBadge($order['status']); ?>
                                 <?php if (!empty($order['web_appointment_at'])):
                                     $wbTs = strtotime((string)$order['web_appointment_at']);

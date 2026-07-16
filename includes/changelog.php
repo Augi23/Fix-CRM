@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '1.9.3',
+        'date' => '2026-07-16',
+        'time' => '21:00',
+        'title' => 'Kompaktnější sloupec Stav v seznamech zakázek',
+        'items' => [
+            'Buňky ve sloupci Stav (nástěnka i Zakázky) jsou menší: drobnější stavový štítek, menší čip objednaného času, těsnější řádky s časem/technikem a menší štítek pobočky — řádky zaberou méně místa a na obrazovku se toho vejde víc.',
+        ],
+    ],
+    [
         'version' => '1.9.2',
         'date' => '2026-07-16',
         'time' => '20:40',
