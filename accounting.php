@@ -3,8 +3,8 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
-// Check admin access
-if (!hasPermission('admin_access')) {
+// Účetnictví: administrátor a Boss (crmCanManageInvoices)
+if (!crmCanManageInvoices()) {
     echo '<div class="alert alert-danger">' . __('access_denied') . '</div>';
     require_once 'includes/footer.php';
     exit;

@@ -150,6 +150,12 @@ function isBranchGlobalViewer(): bool {
     return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 }
 
+/** Faktury a účetnictví smí administrátor a Boss (rozšířeno 16.7.2026 na žádost
+ *  admina — dřív jen admin). Mazání zakázek a nastavení systému zůstává adminovi. */
+function crmCanManageInvoices(): bool {
+    return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
+}
+
 /** ID interního klienta („Interní zakázka" — evidence neveřejných zakázek
  *  pobočky Karlín). Nastavuje setting 'internal_customer_id'; 0 = nepoužívá se. */
 function crmInternalCustomerId(): int {

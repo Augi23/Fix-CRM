@@ -118,7 +118,7 @@ $next_label_map = [
 ];
 $next_label = $next_status ? ($next_label_map[$next_status] ?? __('next_step')) : '';
 $show_shipping = isOrderStatusIn($status, 'done');
-$show_invoice = hasPermission('admin_access')
+$show_invoice = crmCanManageInvoices()
     && isOrderStatusIn($status, 'done')
     && (($order['final_cost'] ?? 0) > 0 || ($order['estimated_cost'] ?? 0) > 0);
 // $can_change_technician je definováno výše (od 1.6.1 = true pro všechny zaměstnance).
@@ -557,7 +557,7 @@ function localizedOrderStatusLabel(string $status): string {
                         <?php endif; ?>
                     </div>
 
-                    <?php if (!$show_invoice && hasPermission('admin_access')): ?>
+                    <?php if (!$show_invoice && crmCanManageInvoices()): ?>
                         <div class="text-white-75 small mb-2"><?php echo __('invoice_available_after_completed'); ?></div>
                     <?php endif; ?>
 

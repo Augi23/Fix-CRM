@@ -437,10 +437,13 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
                                         </ul>
                                     </div>
-                                    <?php if (hasPermission('admin_access')): ?>
+                                    <?php /* Účtování: admin a Boss; mazání zůstává jen adminovi */ ?>
+                                    <?php if (crmCanManageInvoices()): ?>
                                     <button type="button" class="btn btn-outline-secondary accounting-btn" data-id="<?php echo $order['id']; ?>" title="<?php echo __('accounting'); ?>">
                                         <i class="fas fa-file-invoice-dollar text-success"></i>
                                     </button>
+                                    <?php endif; ?>
+                                    <?php if (hasPermission('admin_access')): ?>
                                     <button type="button" class="btn btn-outline-danger" onclick="event.stopPropagation(); deleteOrder(<?php echo (int)$order['id']; ?>);" title="<?php echo __('delete'); ?>">
                                         <i class="fas fa-trash"></i>
                                     </button>

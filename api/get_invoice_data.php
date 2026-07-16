@@ -11,9 +11,9 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Fakturační data (jméno/IČO/DIČ, ceny, číslo faktury) jsou jen pro administrátory —
-// shodně s UI (tlačítko účtování se zobrazuje jen s admin_access).
-if (!hasPermission('admin_access')) {
+// Fakturační data (jméno/IČO/DIČ, ceny, číslo faktury): administrátor a Boss —
+// shodně s UI (tlačítko účtování).
+if (!crmCanManageInvoices()) {
     echo json_encode(['success' => false, 'message' => __('access_denied_msg')]);
     exit;
 }

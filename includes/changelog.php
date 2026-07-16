@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.9.2',
+        'date' => '2026-07-16',
+        'time' => '20:40',
+        'title' => 'Faktury a účetnictví nově i pro Bosse',
+        'items' => [
+            'Boss má nově přístup k fakturám a účetnictví: stránka Účetnictví, tlačítko účtování v seznamu zakázek, vystavení a úprava faktury v detailu zakázky.',
+            'Mazání zakázek, nastavení systému a aktualizace zůstávají jen administrátorovi.',
+            'Upravena i poslední věta v návodu „Kdo co smí" — odpovídá novému stavu.',
+        ],
+    ],
+    [
         'version' => '1.9.1',
         'date' => '2026-07-16',
         'time' => '20:10',
