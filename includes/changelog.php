@@ -6,9 +6,18 @@
  */
 return [
     [
+        'version' => '1.10.1',
+        'date' => '2026-07-16',
+        'time' => '19:11',
+        'title' => 'Oprava časů v Historii úprav',
+        'items' => [
+            'Časy u záznamů v Historii úprav byly psané ručně a neodpovídaly realitě (např. 23:59 u verze vydané v 18:16). Všech 41 záznamů srovnáno podle skutečných časů vydání (z gitu).',
+        ],
+    ],
+    [
         'version' => '1.10.0',
         'date' => '2026-07-16',
-        'time' => '23:59',
+        'time' => '18:16',
         'title' => 'Velká oprava pro iPhony a iPady: scrollování a dostupnost tlačítek',
         'items' => [
             'ZAMRZLÉ SCROLLOVÁNÍ: po návratu „zpět" gestem na iOS se stránka obnovovala se zamčeným scrollem (otevřený modal/menu v mezipaměti) — nově se zámek automaticky odemkne. Douklizeno i po zavření oken (dřív občas zůstal neviditelný zámek).',
@@ -23,7 +32,7 @@ return [
     [
         'version' => '1.9.7',
         'date' => '2026-07-16',
-        'time' => '23:00',
+        'time' => '17:56',
         'title' => 'Návody: doplněno 8 chybějících témat (celkem 22)',
         'items' => [
             'Do záložky CRM přibyly návody: Reklamace, Podpis klienta (příjem/výdej + podpisová stanice), Tisk dokumentů a štítku zakázky, Objednávky z webu, Přehledy a statistiky, Kontrola IMEI, Nákupní seznam a Klientský portál (co říct klientovi).',
@@ -33,7 +42,7 @@ return [
     [
         'version' => '1.9.6',
         'date' => '2026-07-16',
-        'time' => '22:30',
+        'time' => '17:50',
         'title' => 'Zakázky: horní karty správně — jedna řada, bez duplicit',
         'items' => [
             'Odstraněn omylem naklonovaný blok šesti dlaždic z nástěnky (duplikoval čísla, která už na stránce byla).',
@@ -44,7 +53,7 @@ return [
     [
         'version' => '1.9.5',
         'date' => '2026-07-16',
-        'time' => '22:00',
+        'time' => '17:46',
         'title' => 'Oprava: „neplatný bezpečnostní token" ve staré otevřené záložce',
         'items' => [
             'Když počítač/iPad usnul a přihlášení mezitím vypršelo (4 h neaktivity), stránka vypadala živá, ale akce (nový klient, uložení…) padaly na „neplatný bezpečnostní token" — přesně Tomášův případ.',
@@ -55,7 +64,7 @@ return [
     [
         'version' => '1.9.4',
         'date' => '2026-07-16',
-        'time' => '21:30',
+        'time' => '17:41',
         'title' => 'Aktualizace CRM nově i pro manažera a Bosse',
         'items' => [
             'Záložka Nastavení → Aktualizace je nově dostupná celému vedení (admin, manažer, Boss) — včetně kontroly aktualizací, instalace a diagnostiky serveru.',
@@ -66,7 +75,7 @@ return [
     [
         'version' => '1.9.3',
         'date' => '2026-07-16',
-        'time' => '21:00',
+        'time' => '17:36',
         'title' => 'Kompaktnější sloupec Stav v seznamech zakázek',
         'items' => [
             'Buňky ve sloupci Stav (nástěnka i Zakázky) jsou menší: drobnější stavový štítek, menší čip objednaného času, těsnější řádky s časem/technikem a menší štítek pobočky — řádky zaberou méně místa a na obrazovku se toho vejde víc.',
@@ -75,7 +84,7 @@ return [
     [
         'version' => '1.9.2',
         'date' => '2026-07-16',
-        'time' => '20:40',
+        'time' => '17:32',
         'title' => 'Faktury a účetnictví nově i pro Bosse',
         'items' => [
             'Boss má nově přístup k fakturám a účetnictví: stránka Účetnictví, tlačítko účtování v seznamu zakázek, vystavení a úprava faktury v detailu zakázky.',
@@ -86,7 +95,7 @@ return [
     [
         'version' => '1.9.1',
         'date' => '2026-07-16',
-        'time' => '20:10',
+        'time' => '17:29',
         'title' => 'Oprava: rozbitá ikonka u času administrátora ve Statistikách',
         'items' => [
             'Ve Statistikách zaměstnanců se u řádku administrátora (sloupec V systému) zobrazoval prázdný čtvereček — ikona „laptop s kódem" se v Safari nevykreslila. Nahrazena hodinami, stejnými jako u brigádníků (významově sedí: odměna z času).',
@@ -95,7 +104,7 @@ return [
     [
         'version' => '1.9.0',
         'date' => '2026-07-16',
-        'time' => '19:30',
+        'time' => '17:24',
         'title' => 'Nová sekce Návody (CRM + Opravy)',
         'items' => [
             'V horním menu je nová stránka Návody — jednoduché postupy krok za krokem, s vyhledáváním a záložkami CRM / Opravy.',
@@ -107,7 +116,7 @@ return [
     [
         'version' => '1.8.2',
         'date' => '2026-07-16',
-        'time' => '18:50',
+        'time' => '14:56',
         'title' => 'Zakázky: horní dlaždice ve stejném rozvržení jako na Nástěnce',
         'items' => [
             'Stránka Zakázky má nahoře stejnou sadu i rozvržení dlaždic jako Nástěnka (3×2): Aktivní zakázky, Čeká na díly, Opraveno dnes, Denní tržba, Nepřidělené a Nedokončené zakázky.',
@@ -117,7 +126,7 @@ return [
     [
         'version' => '1.8.1',
         'date' => '2026-07-16',
-        'time' => '18:20',
+        'time' => '14:45',
         'title' => 'Sklad: dotažení QR systému po kontrolní revizi (přesnost zásob)',
         'items' => [
             'Tři nezávislí revizoři prověřili QR sklad — nálezy opraveny, skladová čísla teď sedí ve všech kombinacích akcí:',
@@ -131,7 +140,7 @@ return [
     [
         'version' => '1.8.0',
         'date' => '2026-07-16',
-        'time' => '17:30',
+        'time' => '14:26',
         'title' => 'Sklad přes QR kódy: naskladnění i výdej dílů mobilem',
         'items' => [
             'Každý díl má QR štítek na regál (Sklad → tlačítko QR u dílu, nebo „QR štítky" pro tisk archu všech dílů najednou). Sken telefonem otevře kartu dílu.',
@@ -145,7 +154,7 @@ return [
     [
         'version' => '1.7.6',
         'date' => '2026-07-16',
-        'time' => '16:30',
+        'time' => '13:53',
         'title' => 'Zakázky: dlaždice Nepřidělené a Nedokončené i nahoře na seznamu',
         'items' => [
             'Dlaždice „Nepřidělené zakázky" a „Nedokončené zakázky" z nástěnky se nově zobrazují i nahoře na stránce Zakázky (nad filtry stavů).',
@@ -155,7 +164,7 @@ return [
     [
         'version' => '1.7.5',
         'date' => '2026-07-16',
-        'time' => '16:15',
+        'time' => '13:50',
         'title' => 'Menu: Klienti a Nákupy prohozeny',
         'items' => [
             'V horním menu (i v mobilním menu) je nově pořadí … Reklamace, Klienti, Nákupy, Sklad … — Klienti a Nákupy si vyměnily místo.',
@@ -164,7 +173,7 @@ return [
     [
         'version' => '1.7.4',
         'date' => '2026-07-16',
-        'time' => '16:00',
+        'time' => '13:48',
         'title' => 'Dlaždice Nepřidělené/Nedokončené: vedení vidí obě pobočky',
         'items' => [
             'Upřesnění pravidla z 1.7.2: administrátoři a Boss (vedení) vidí v dlaždicích „Nepřidělené zakázky" a „Nedokončené zakázky" součet OBOU poboček (s popiskem „Obě pobočky").',
@@ -174,7 +183,7 @@ return [
     [
         'version' => '1.7.3',
         'date' => '2026-07-16',
-        'time' => '15:20',
+        'time' => '13:08',
         'title' => 'Interní zakázky: vlastní profil, tlačítko v průvodci a odlišení v seznamech',
         'items' => [
             'Duplicitní klient „Interní" smazán (žádné zakázky u něj nebyly) a hlavní profil upraven na „Interní zakázka — AppleFix interní evidence". Nemá telefon ani e-mail, takže mu neodejde žádná klientská notifikace a nejde na něj přihlásit do klientského portálu.',
@@ -185,7 +194,7 @@ return [
     [
         'version' => '1.7.2',
         'date' => '2026-07-16',
-        'time' => '14:45',
+        'time' => '12:55',
         'title' => 'Nástěnka: dlaždice „Nepřidělené zakázky" a „Nedokončené zakázky"',
         'items' => [
             'Nahoře na nástěnce přibyly mezi statistiky dvě dlaždice: „Nepřidělené zakázky" (aktivní zakázky bez technika) a „Nedokončené zakázky" (všechny rozpracované) — s názvem pobočky, ke které se čísla vztahují.',
@@ -196,7 +205,7 @@ return [
     [
         'version' => '1.7.1',
         'date' => '2026-07-16',
-        'time' => '14:05',
+        'time' => '12:34',
         'title' => 'Oprava: „Nejnovější verze" ukazovala tvoji verzi místo té z GitHubu',
         'items' => [
             'Karta Nejnovější verze a hláška „Aktualizace je k dispozici" ukazovaly nesmysl typu „v1.6.6 → v1.6.6". Číslo nové verze se z GitHubu nenačetlo (čtení šlo mimo interní git vrstvu a na serveru selhávalo) a záložní logika ho chybně nahradila lokální verzí.',
@@ -206,7 +215,7 @@ return [
     [
         'version' => '1.7.0',
         'date' => '2026-07-16',
-        'time' => '13:40',
+        'time' => '12:30',
         'title' => 'Historie pro všechny + asymetrická viditelnost tržeb podle pobočky',
         'items' => [
             'Záložku Historie nově vidí VŠICHNI zaměstnanci — s výjimkou techniků vedlejších poboček (Roman a Mark z Na Příkopě ji nevidí a stránka je pro ně zamčená).',
@@ -217,7 +226,7 @@ return [
     [
         'version' => '1.6.9',
         'date' => '2026-07-16',
-        'time' => '13:10',
+        'time' => '12:26',
         'title' => 'Nástěnka a Seznam zakázek: sjednocený vzhled i údaje pro všechny',
         'items' => [
             'Tabulka zakázek na nástěnce má nově úplně stejné sloupce, pořadí i obsah buněk jako Seznam zakázek — admin i technici vidí všude totéž (rozdíl vznikal tím, že nástěnka měla vlastní chudší tabulku).',
@@ -229,7 +238,7 @@ return [
     [
         'version' => '1.6.8',
         'date' => '2026-07-16',
-        'time' => '12:25',
+        'time' => '12:19',
         'title' => 'Khalil: jediná hláška „Less talking, more working" každých 15 minut',
         'items' => [
             'Náhodné ambientní hlášky pro Khalila odstraněny — zůstává jediná: „Khalil! Less talking, more working.", opakuje se každých 15 minut.',
@@ -239,7 +248,7 @@ return [
     [
         'version' => '1.6.7',
         'date' => '2026-07-16',
-        'time' => '12:40',
+        'time' => '12:09',
         'title' => 'KRITICKÁ oprava: „Order creation failed" při dokončení zakázky',
         'items' => [
             'Vytvoření zakázky s expresním příplatkem / slevou dle priority nebo s opravou vybranou z ceníku končilo bílou stránkou „Order creation failed" — a matoucí je, že zakázka se PŘITOM většinou vytvořila (hrozily duplicity při opakování).',
@@ -251,7 +260,7 @@ return [
     [
         'version' => '1.6.6',
         'date' => '2026-07-15',
-        'time' => '17:00',
+        'time' => '15:30',
         'title' => 'Pojistka: skryté povinné pole už nikdy tiše nezablokuje odeslání formuláře',
         'items' => [
             'Kontrolní revize (3 nezávislí recenzenti) potvrdila opravu 1.6.5 a doporučila obecnou pojistku: při odesílání formuláře v jakémkoliv okně se neviditelná prázdná povinná pole (sbalené panely, skryté kroky průvodce) automaticky přeskočí — prohlížeč na nich neumí zobrazit chybu a formulář by se jinak bez reakce neodeslal.',
@@ -262,7 +271,7 @@ return [
     [
         'version' => '1.6.5',
         'date' => '2026-07-15',
-        'time' => '16:40',
+        'time' => '15:20',
         'title' => 'Oprava: tlačítko „Dokončit" u nové zakázky nic nedělalo',
         'items' => [
             'Při vytváření zakázky s existujícím klientem se po kliknutí na „Dokončit" nic nestalo. Příčina: e-mail ve sbaleném panelu „Nový klient" byl označen jako povinné pole formuláře — prázdné skryté povinné pole potichu blokovalo odeslání celého formuláře.',
@@ -273,7 +282,7 @@ return [
     [
         'version' => '1.6.4',
         'date' => '2026-07-15',
-        'time' => '16:05',
+        'time' => '15:14',
         'title' => 'Oprava: rozbalovací nabídky (Model zařízení aj.) se na iPadu hned zavíraly',
         'items' => [
             'Při vytváření zakázky se po ťuknutí do pole „Model zařízení" (a dalších vyhledávacích polí) nabídka otevřela a okamžitě zase zavřela — dotykové zařízení vyhodnotilo jeden tap dvakrát. Nově se zavření nabídky během první chvilky po otevření ignoruje, takže zůstane otevřená.',
@@ -284,7 +293,7 @@ return [
     [
         'version' => '1.6.3',
         'date' => '2026-07-15',
-        'time' => '15:35',
+        'time' => '14:43',
         'title' => 'Oprava: čísla verzí v Aktualizacích se ukazovala rozbitě',
         'items' => [
             'Po kliknutí na „Zkontrolovat aktualizace" se místo čísla verze ukazoval git štítek („vmain @ 1d2cca1"). API totiž do políček s verzí posílalo popis commitů místo čísla ze souboru VERSION.',
@@ -294,7 +303,7 @@ return [
     [
         'version' => '1.6.2',
         'date' => '2026-07-15',
-        'time' => '15:20',
+        'time' => '14:38',
         'title' => 'Úklid: indikátor verze už nehlásí „dirty"',
         'items' => [
             'Pomocný skript zálohování (scripts/full_backup.sh), který si server vytváří sám, se nově ignoruje v gitu — stav verze v Aktualizacích už kvůli němu nehlásí „dirty".',
@@ -303,7 +312,7 @@ return [
     [
         'version' => '1.6.1',
         'date' => '2026-07-15',
-        'time' => '15:00',
+        'time' => '14:28',
         'title' => 'Dotažení volnosti techniků (nálezy z kontrolní revize 1.6.0)',
         'items' => [
             'Rychlá změna stavu (blesk) v seznamu zakázek je nově dostupná každému zaměstnanci i u cizích a nepřiřazených zakázek — dřív ji technik viděl jen u svých.',
@@ -317,7 +326,7 @@ return [
     [
         'version' => '1.6.0',
         'date' => '2026-07-15',
-        'time' => '14:40',
+        'time' => '14:14',
         'title' => 'Technici: volný výběr technika, volná změna stavu, chat pro všechny',
         'items' => [
             'Při vytváření zakázky si nově KAŽDÝ zaměstnanec (i technik) vybere kteréhokoliv aktivního technika, nebo nechá zakázku bez technika — dřív technik viděl jen kolegy své pobočky a výběr ho blokoval.',
@@ -330,7 +339,7 @@ return [
     [
         'version' => '1.5.0',
         'date' => '2026-07-15',
-        'time' => '13:05',
+        'time' => '13:38',
         'title' => 'Nová role Brigádník (Andrea)',
         'items' => [
             'Ve správě personálu je nová role „Brigádník" — stejná práva jako technik, ale odměna se počítá z přihlášeného času v systému (hodiny × sazba), ne ze zakázek. Odměna z času se u této role zapíná automaticky a nejde omylem vypnout.',
@@ -341,7 +350,7 @@ return [
     [
         'version' => '1.4.2',
         'date' => '2026-07-15',
-        'time' => '12:10',
+        'time' => '13:22',
         'title' => 'Oprava: technik „uvězněný" na staré pobočce (Přístup odepřen + špatný výběr technika)',
         'items' => [
             'Skutečná příčina hlášení „Přístup odepřen" u karlínských zakázek a toho, že při zakládání zakázky nešel vybrat správný technik: systém si pamatoval pobočku technika jen z okamžiku přihlášení a už ji nikdy neobnovil. Když se technik mezi pobočkami přeřadil (nebo se pobočky reorganizovaly), zůstal „uvězněný" na staré pobočce — nemohl měnit stav zakázek své skutečné pobočky a při zakládání zakázky se mu nabízeli technici cizí (nebo žádní).',
@@ -352,7 +361,7 @@ return [
     [
         'version' => '1.4.1',
         'date' => '2026-07-15',
-        'time' => '11:20',
+        'time' => '12:49',
         'title' => 'Zpřístupnění zakázek bez pobočky + zabezpečení fakturačního API',
         'items' => [
             'Zakázka, která nemá přiřazenou pobočku, nově patří „všem" — smí ji obsloužit kterýkoliv přihlášený zaměstnanec, ne jen administrátor / Boss. Pobočková izolace u zakázek, které pobočku mají, zůstává beze změny. (Pojistka do budoucna; aktuálně jsou všechny zakázky s pobočkou.)',
@@ -363,7 +372,7 @@ return [
     [
         'version' => '1.4.0',
         'date' => '2026-07-15',
-        'time' => '09:30',
+        'time' => '11:31',
         'title' => 'SMS klientům přes GoSMS (připraveno k vyzvednutí)',
         'items' => [
             'CRM umí posílat klientům SMS přes bránu GoSMS.cz. První automatická SMS: „zakázka připravena k vyzvednutí" — odchází spolu s e-mailem, v jazyce klienta (čeština/angličtina), každé zakázce jen jednou, bez diakritiky (úspora ceny SMS).',
@@ -374,7 +383,7 @@ return [
     [
         'version' => '1.3.1',
         'date' => '2026-07-15',
-        'time' => '08:50',
+        'time' => '10:22',
         'title' => 'Chat: jméno odesílatele pod každou bublinou',
         'items' => [
             'Pod každou zprávou v týmovém chatu je nově jméno odesílatele a čas (dřív jméno chybělo, resp. bylo jen nad cizími zprávami).',
@@ -383,7 +392,7 @@ return [
     [
         'version' => '1.3.0',
         'date' => '2026-07-15',
-        'time' => '08:30',
+        'time' => '09:56',
         'title' => 'Nový týmový chat (nahrazuje Fixer Chat)',
         'items' => [
             'V menu je nová sekce Chat — jedna společná místnost, kde si píší všichni zaměstnanci mezi sebou. Jednoduché bubliny, oddělovače dnů, odesílání Enterem.',
@@ -394,7 +403,7 @@ return [
     [
         'version' => '1.2.2',
         'date' => '2026-07-15',
-        'time' => '07:50',
+        'time' => '07:03',
         'title' => 'Klientský portál: odebrána účtenka, zůstává podepsaný zakázkový list',
         'items' => [
             'Z klientského portálu zmizela online „Účtenka" — klient má u zakázky zakázkový list (ten, který podepisuje), případně fakturu a reklamační protokol, pokud existují.',
@@ -404,7 +413,7 @@ return [
     [
         'version' => '1.2.1',
         'date' => '2026-07-15',
-        'time' => '07:20',
+        'time' => '06:48',
         'title' => 'Odstraněn tisk na termotiskárnu (nepoužívá se)',
         'items' => [
             'Z tiskového menu zmizely termo doklady (účtenka termo, příjemka termo, faktura termo) — nepoužíváte je. Odstraněno z detailu zakázky, seznamu zakázek i účetnictví.',
@@ -415,7 +424,7 @@ return [
     [
         'version' => '1.2.0',
         'date' => '2026-07-15',
-        'time' => '06:20',
+        'time' => '06:29',
         'title' => 'Klientská sekce na vlastní doméně applefix.help',
         'items' => [
             'Klientský portál běží nově i na applefix.help — na této doméně se přihlašují jen klienti (e-mail/telefon + PIN zakázky), zaměstnanecké přihlášení je vypnuté a administrace není z této domény vůbec dosažitelná.',
@@ -426,7 +435,7 @@ return [
     [
         'version' => '1.1.0',
         'date' => '2026-07-15',
-        'time' => '05:25',
+        'time' => '04:38',
         'title' => 'Brigádníci: odměna z odpracovaného času místo zakázek',
         'items' => [
             'Na kartě zaměstnance je nový přepínač „Odměna z času v systému (brigádník)" — zaměstnanci se pak počítají hodiny strávené v CRM × jeho sazba, ne zakázky. Přepínat smí jen administrátor.',
@@ -437,7 +446,7 @@ return [
     [
         'version' => '1.0.2',
         'date' => '2026-07-15',
-        'time' => '05:00',
+        'time' => '04:26',
         'title' => 'Oprava odměn: admin z času v systému (300/h), Boss ze zakázek',
         'items' => [
             'Administrátor má ve statistikách vlastní řádek — odměna se mu počítá z času stráveného v systému × 300 Kč/h (tvorba a správa CRM), bez potřeby zakázek.',
@@ -448,7 +457,7 @@ return [
     [
         'version' => '1.0.1',
         'date' => '2026-07-15',
-        'time' => '04:35',
+        'time' => '04:22',
         'title' => 'Statistiky: admin/Boss v hlavní tabulce, bez duplicit, sazba 300 Kč/h',
         'items' => [
             'Zvláštní panel „Čas strávený v systému" zrušen — čas v systému je nově sloupec přímo v hlavní tabulce statistik zaměstnanců u každého.',
