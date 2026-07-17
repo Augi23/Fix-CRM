@@ -13,6 +13,21 @@ $token = trim((string)($_GET['t'] ?? ''));
 $custId = crmCustomerIdByCardToken($token);
 $card = $custId > 0 ? crmClientCardData($custId) : null;
 
+// Režim recepce: úspěšný sken (typicky z firemního iPhonu) pošle klienta i na
+// počítač recepce, který má zapnutý poslech (api/reception_poll.php).
+// &nopush=1 = otevřeno právě poslechem — nezapisovat znovu (smyčka).
+if ($card && !isset($_GET['nopush'])) {
+    try {
+        $__rb = getCurrentStaffBranchId() ?: getDefaultBranchId();
+        set_setting('reception_scan_b' . (int)$__rb, json_encode([
+            'n' => bin2hex(random_bytes(6)),
+            't' => $card['token'],
+            'name' => $card['name'],
+            'ts' => time(),
+        ], JSON_UNESCAPED_UNICODE));
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
 $orders = [];
 if ($card) {
     try {

@@ -11,6 +11,12 @@ if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '' && function_exi
         $_ctok = null;
         if (preg_match('~klient-karta\.php\?t=([A-Za-z0-9\-]+)~i', $_scan, $mm)) { $_ctok = $mm[1]; }
         elseif (preg_match('~^AFXC-[A-Za-z0-9]+$~i', $_scan)) { $_ctok = strtoupper($_scan); }
+        elseif (function_exists('scanNormalizeCandidates')) {
+            // HW čtečka s českým rozložením „přepíše" číslice na háčky — zkusit demangl
+            foreach (scanNormalizeCandidates($_scan) as $_cnd) {
+                if (preg_match('~^AFXC-[A-Za-z0-9]+$~i', (string)$_cnd)) { $_ctok = strtoupper((string)$_cnd); break; }
+            }
+        }
         if ($_ctok && crmCustomerIdByCardToken($_ctok) > 0) {
             header("Location: klient-karta.php?t=" . rawurlencode($_ctok));
             exit;

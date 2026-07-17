@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '1.12.0',
+        'date' => '2026-07-17',
+        'time' => '03:38',
+        'title' => 'Režim recepce: sken karty iPhonem otevře klienta na počítači',
+        'items' => [
+            'Nový „Režim recepce": na počítači recepce se na Nástěnce zapne pilulkou vlevo dole („Režim recepce"). Když pak kdokoliv z personálu naskenuje QR klientské karty firemním iPhonem, profil klienta se do ~3 vteřin otevře i na tomto počítači — bez sahání na klávesnici.',
+            'Zapíná se jednou a vydrží zapnuto (zelená pilulka „Recepce poslouchá skeny"). Funguje pro skeny v rámci stejné pobočky.',
+            'Čtečka čárových kódů u počítače nově zvládne i číslo věrnostní karty (AFXC-…) napsané „česky" — automaticky se přeloží zpět jako u kódů zakázek.',
+            'Do Návodů (CRM) přibyl návod „Věrnostní karta klienta — sken na recepci" s celým postupem.',
+        ],
+    ],
+    [
         'version' => '1.11.3',
         'date' => '2026-07-17',
         'time' => '03:06',

@@ -1834,3 +1834,61 @@ window.afxSignaturePad = function (opts) {
     });
     return { close: close };
 };
+
+/* ── REŽIM RECEPCE ──────────────────────────────────────────────────────────
+ * Mac na recepci „poslouchá": když personál naskenuje klientskou kartu
+ * (firemní iPhone → klient-karta.php), profil klienta se do ~3 s otevře
+ * i tady. Zapíná se plovoucím tlačítkem na Nástěnce, stav drží localStorage,
+ * takže poslech běží na všech stránkách CRM, dokud se nevypne. */
+(function () {
+    function enabled() { try { return localStorage.getItem('afx_reception_mode') === '1'; } catch (e) { return false; } }
+    function setEnabled(on) { try { localStorage.setItem('afx_reception_mode', on ? '1' : '0'); } catch (e) {} }
+
+    function makePill() {
+        var on = enabled();
+        var isDash = /(^\/(index\.php)?$)|index\.php/.test(window.location.pathname);
+        if (!on && !isDash) return;            // vypnuto → nabízet jen na Nástěnce
+        if (window.innerWidth < 900) return;   // telefony neposlouchají (ty skenují)
+        var pill = document.createElement('button');
+        pill.type = 'button';
+        pill.id = 'afxReceptionPill';
+        pill.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2000;border:0;border-radius:999px;'
+            + 'padding:9px 16px;font:600 13px -apple-system,system-ui,sans-serif;cursor:pointer;'
+            + 'box-shadow:0 6px 18px rgba(0,0,0,.35);backdrop-filter:blur(8px);'
+            + (on ? 'background:rgba(52,199,89,.9);color:#04170a;' : 'background:rgba(60,64,80,.85);color:#e8ecf5;');
+        pill.innerHTML = on
+            ? '<i class="fas fa-satellite-dish me-2"></i>Recepce poslouchá skeny — vypnout'
+            : '<i class="fas fa-desktop me-2"></i>Režim recepce: sken z iPhonu otevře klienta tady';
+        pill.title = 'Personál naskenuje QR klientské karty na přihlášeném iPhonu a profil klienta se otevře na tomto počítači.';
+        pill.addEventListener('click', function () { setEnabled(!enabled()); window.location.reload(); });
+        document.body.appendChild(pill);
+    }
+
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', makePill); }
+    else { makePill(); }
+
+    if (!enabled()) return;
+
+    var seen = '';
+    try { seen = sessionStorage.getItem('afx_reception_seen') || ''; } catch (e) {}
+    var first = (seen === '');   // čerstvá karta prohlížeče: první odpověď jen zapamatovat, neskákat na starý sken
+
+    function tick() {
+        fetch('api/reception_poll.php?seen=' + encodeURIComponent(seen), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.ok) return;
+                if (d.event && d.event.n && d.event.n !== seen) {
+                    seen = d.event.n;
+                    try { sessionStorage.setItem('afx_reception_seen', seen); } catch (e) {}
+                    if (first) { first = false; return; }
+                    // už jsme na kartě tohoto klienta → nepřenačítat
+                    if (window.location.href.indexOf('t=' + d.event.t) !== -1) return;
+                    window.location.href = d.event.url;
+                } else if (first) { first = false; }
+            })
+            .catch(function () {});
+    }
+    setInterval(tick, 3000);
+    tick();
+})();
