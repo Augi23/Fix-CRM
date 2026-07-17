@@ -6,8 +6,10 @@
    Musí se includovat PŘED includes/header.php (ten už posílá HTML).
    Používá index.php (dashboard hledání) i orders.php. */
 if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '' && function_exists('resolveScannedOrderId')) {
-    // Klientská karta (QR z peněženky) → recepční dohledání klienta
-    if (function_exists('crmCustomerIdByCardToken')) {
+    // Klientská karta (QR z peněženky) → recepční dohledání klienta.
+    // Jen pro přihlášený personál — anonym nesmí přes rozdíl v přesměrování
+    // zjišťovat, které tokeny karet existují (header.php ho stejně pošle na login).
+    if (!empty($_SESSION['user_id']) && function_exists('crmCustomerIdByCardToken')) {
         $_ctok = null;
         if (preg_match('~klient-karta\.php\?t=([A-Za-z0-9\-]+)~i', $_scan, $mm)) { $_ctok = $mm[1]; }
         elseif (preg_match('~^AFXC-[A-Za-z0-9]+$~i', $_scan)) { $_ctok = strtoupper($_scan); }

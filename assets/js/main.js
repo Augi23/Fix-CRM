@@ -1847,8 +1847,9 @@ window.afxSignaturePad = function (opts) {
     function makePill() {
         var on = enabled();
         var isDash = /(^\/(index\.php)?$)|index\.php/.test(window.location.pathname);
-        if (!on && !isDash) return;            // vypnuto → nabízet jen na Nástěnce
-        if (window.innerWidth < 900) return;   // telefony neposlouchají (ty skenují)
+        // Zapnutý režim ukazuje pilulku VŽDY (i na úzkém okně — ať jde vypnout);
+        // vypnutý se nabízí jen na Nástěnce a jen na velkých obrazovkách.
+        if (!on && (!isDash || window.innerWidth < 900)) return;
         var pill = document.createElement('button');
         pill.type = 'button';
         pill.id = 'afxReceptionPill';
@@ -1868,24 +1869,41 @@ window.afxSignaturePad = function (opts) {
     else { makePill(); }
 
     if (!enabled()) return;
+    if (window.innerWidth < 900) return;                                  // telefony neposlouchají (ty skenují)
+    if (/sign_station/.test(window.location.pathname)) return;            // podpisová stanice se nesmí přerušit
 
     var seen = '';
     try { seen = sessionStorage.getItem('afx_reception_seen') || ''; } catch (e) {}
-    var first = (seen === '');   // čerstvá karta prohlížeče: první odpověď jen zapamatovat, neskákat na starý sken
+    var first = (seen === '');   // čerstvá karta prohlížeče: starý event jen zapamatovat, neskákat na něj
+
+    // Neukrást rozdělanou práci: otevřený modal / kurzor ve formuláři → počkat.
+    // Event se NEoznačí jako viděný, takže se zkusí znovu za 3 s (max ~60 s).
+    function busy() {
+        if (document.querySelector('.modal.show')) return true;
+        var a = document.activeElement;
+        return !!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable));
+    }
 
     function tick() {
         fetch('api/reception_poll.php?seen=' + encodeURIComponent(seen), { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                if (!d || !d.ok) return;
-                if (d.event && d.event.n && d.event.n !== seen) {
-                    seen = d.event.n;
-                    try { sessionStorage.setItem('afx_reception_seen', seen); } catch (e) {}
-                    if (first) { first = false; return; }
-                    // už jsme na kartě tohoto klienta → nepřenačítat
-                    if (window.location.href.indexOf('t=' + d.event.t) !== -1) return;
-                    window.location.href = d.event.url;
-                } else if (first) { first = false; }
+                if (!d || !d.ok || !d.event || !d.event.n || d.event.n === seen) { first = false; return; }
+                if (first) {
+                    first = false;
+                    // sken starší ~10 s při startu poslechu = historie → jen zapamatovat
+                    if (typeof d.event.age !== 'number' || d.event.age > 10) {
+                        seen = d.event.n;
+                        try { sessionStorage.setItem('afx_reception_seen', seen); } catch (e) {}
+                        return;
+                    }
+                }
+                if (busy()) return;
+                seen = d.event.n;
+                try { sessionStorage.setItem('afx_reception_seen', seen); } catch (e) {}
+                // i pro stejného klienta se stránka přenačte (čerstvé body/zakázky);
+                // cílová URL nese nopush=1, takže smyčka nevznikne
+                window.location.href = d.event.url;
             })
             .catch(function () {});
     }

@@ -35,6 +35,7 @@ echo json_encode([
         'n'    => (string)$ev['n'],
         't'    => (string)($ev['t'] ?? ''),
         'name' => (string)($ev['name'] ?? ''),
+        'age'  => max(0, time() - (int)($ev['ts'] ?? 0)),   // stáří skenu v sekundách
         'url'  => 'klient-karta.php?t=' . rawurlencode((string)($ev['t'] ?? '')) . '&nopush=1',
     ] : null,
 ], JSON_UNESCAPED_UNICODE);

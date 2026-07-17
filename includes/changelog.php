@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '1.12.1',
+        'date' => '2026-07-17',
+        'time' => '03:48',
+        'title' => 'Režim recepce: doladění podle bezpečnostní kontroly',
+        'items' => [
+            'Počítač v režimu recepce už neskočí na klienta uprostřed rozdělané práce — když je otevřený formulář nebo se píše, sken chvíli počká a otevře se hned po dokončení.',
+            'Obnovení stránky klienta na iPhonu (potažení dolů, tlačítko Zpět) už znovu „nevystřelí" profil na počítač recepce — posílá se jen skutečně nový sken.',
+            'Sken téhož klienta podruhé stránku na počítači obnoví (čerstvé body a zakázky). Podpisová stanice na skeny nereaguje vůbec — podpis klienta nejde přerušit.',
+            'Dohledání karty skenem funguje jen pro přihlášený personál (zpřísnění proti hádání čísel karet zvenku).',
+        ],
+    ],
+    [
         'version' => '1.12.0',
         'date' => '2026-07-17',
         'time' => '03:38',

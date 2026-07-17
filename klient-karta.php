@@ -19,12 +19,22 @@ $card = $custId > 0 ? crmClientCardData($custId) : null;
 if ($card && !isset($_GET['nopush'])) {
     try {
         $__rb = getCurrentStaffBranchId() ?: getDefaultBranchId();
-        set_setting('reception_scan_b' . (int)$__rb, json_encode([
-            'n' => bin2hex(random_bytes(6)),
-            't' => $card['token'],
-            'name' => $card['name'],
-            'ts' => time(),
-        ], JSON_UNESCAPED_UNICODE));
+        $__rkey = 'reception_scan_b' . (int)$__rb;
+        // Dedup: obnovení téže stránky (pull-to-refresh, Zpět/Vpřed v Safari) do
+        // 2 minut NEposílá znovu — jinak by Mac recepce skákal zpět na klienta,
+        // i když nikdo nic neskenoval. Nový sken po 2 minutách projde normálně.
+        $__prev = json_decode((string)get_setting($__rkey, ''), true);
+        $__dup = is_array($__prev)
+            && (string)($__prev['t'] ?? '') === (string)$card['token']
+            && (time() - (int)($__prev['ts'] ?? 0)) < 120;
+        if (!$__dup) {
+            set_setting($__rkey, json_encode([
+                'n' => bin2hex(random_bytes(6)),
+                't' => $card['token'],
+                'name' => $card['name'],
+                'ts' => time(),
+            ], JSON_UNESCAPED_UNICODE));
+        }
     } catch (Throwable $e) { /* best-effort */ }
 }
 
