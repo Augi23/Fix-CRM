@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.11.2',
+        'date' => '2026-07-17',
+        'time' => '02:59',
+        'title' => 'Peněženky Apple a Google jsou naostro zapnuté',
+        'items' => [
+            'Klientská karta jde od teď přidat do Apple Wallet i Google Peněženky — v klientském portálu pod „Moje karta". Certifikáty a účty u Apple/Google jsou nastavené a ověřené.',
+            'Šablona karty pro Google (AppleFix Klub) je nově spravovaná přímo v Google konzoli — generátor odkazu byl upraven, aby s ní nekolidoval.',
+        ],
+    ],
+    [
         'version' => '1.11.1',
         'date' => '2026-07-17',
         'time' => '02:22',

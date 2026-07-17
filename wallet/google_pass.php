@@ -39,14 +39,9 @@ $company  = get_setting('company_name', 'AppleFix');
 $classId  = $issuerId . '.applefix_loyalty';
 $objectId = $issuerId . '.' . preg_replace('/[^A-Za-z0-9_.-]/', '_', $card['token']);
 
-$loyaltyClass = [
-    'id' => $classId,
-    'issuerName' => $company,
-    'programName' => $company . ' — věrnostní karta',
-    'reviewStatus' => 'UNDER_REVIEW',
-    'hexBackgroundColor' => '#141628',
-];
-
+// Třída karty (šablona) je spravovaná v Google Pay & Wallet Console
+// (applefix_loyalty, stav APPROVED, vytvořeno 17.7.2026) — do JWT se proto
+// posílají jen objekty; inline třída by kolidovala se schválenou verzí.
 $loyaltyObject = [
     'id' => $objectId,
     'classId' => $classId,
@@ -76,7 +71,6 @@ $claims = [
     'iat' => (int)($_SERVER['REQUEST_TIME'] ?? time()),
     'origins' => ['https://admin.applefix.cloud'],
     'payload' => [
-        'loyaltyClasses' => [$loyaltyClass],
         'loyaltyObjects' => [$loyaltyObject],
     ],
 ];
