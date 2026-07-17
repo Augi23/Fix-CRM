@@ -1244,6 +1244,171 @@ function productImageDisplayUrl(?string $url): string {
     return '';
 }
 
+/**
+ * POKLADNA (kasa prodejna) — přímý prodej dílů a produktů bez zakázky.
+ * pos_sales = hlavička dokladu (číslo KP…, platba, prodavač, celkem),
+ * pos_sale_items = položky (snapshot názvu/ceny v okamžiku prodeje —
+ * pozdější přejmenování dílu nesmí měnit historické doklady).
+ */
+function ensurePosTables(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS pos_sales (
+            id INT NOT NULL AUTO_INCREMENT,
+            sale_number VARCHAR(20) NOT NULL,
+            branch_id INT NULL DEFAULT NULL,
+            seller_name VARCHAR(100) NOT NULL DEFAULT '',
+            customer_id INT NULL DEFAULT NULL,
+            payment_method ENUM('cash','card','invoice') NOT NULL DEFAULT 'cash',
+            total DECIMAL(10,2) NOT NULL DEFAULT 0,
+            vat_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+            is_vat_payer TINYINT(1) NOT NULL DEFAULT 0,
+            invoice_id INT NULL DEFAULT NULL,
+            status ENUM('completed','cancelled') NOT NULL DEFAULT 'completed',
+            cancelled_at DATETIME NULL DEFAULT NULL,
+            cancelled_by VARCHAR(100) NULL DEFAULT NULL,
+            note VARCHAR(255) NULL DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_pos_sale_number (sale_number),
+            KEY idx_pos_created (created_at),
+            KEY idx_pos_payment (payment_method)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS pos_sale_items (
+            id INT NOT NULL AUTO_INCREMENT,
+            sale_id INT NOT NULL,
+            item_type ENUM('part','product') NOT NULL,
+            item_id INT NOT NULL,
+            item_name VARCHAR(255) NOT NULL,
+            item_code VARCHAR(64) NULL DEFAULT NULL,
+            quantity INT NOT NULL DEFAULT 1,
+            unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+            is_used_goods TINYINT(1) NOT NULL DEFAULT 0,
+            PRIMARY KEY (id),
+            KEY idx_pos_items_sale (sale_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('ensurePosTables: ' . $e->getMessage()); }
+}
+
+/** products.pos_sold_at — kdy byl kus prodán na kase. Import CSV je zdroj pravdy pro
+ *  stock_qty, ale prodej na kase ho předběhne: dokud se prodej nepropíše do appky,
+ *  import by kus „oživil". Flag drží stock_qty na nule a import konflikt nahlásí;
+ *  jakmile soubor sám hlásí prodáno (stock 0), flag se smaže — stav je srovnaný. */
+function ensureProductsPosColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM products LIKE 'pos_sold_at'")->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN pos_sold_at DATETIME NULL DEFAULT NULL");
+        }
+    } catch (Throwable $e) { error_log('ensureProductsPosColumn: ' . $e->getMessage()); }
+}
+
+/** Prodávat na kase smí KAŽDÝ přihlášený zaměstnanec (pultová operace, obě pobočky).
+ *  Guard akceptuje obě session varianty dual-loginu (users i technicians). */
+function crmCanUsePos(): bool {
+    return !empty($_SESSION['user_id']) || !empty($_SESSION['tech_id']);
+}
+
+/** STORNO prodeje jen admin/Boss — vrací zboží i peníze z evidence (stejná citlivost
+ *  jako faktury; manažer faktury nesmí — pravidlo 16.7.2026). */
+function crmCanCancelPosSale(): bool {
+    return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
+}
+
+/**
+ * Faktura z prodeje na kase — INSERT do stávajících invoices/invoice_items.
+ * Volat UVNITŘ běžící transakce checkoutu (proto ne InvoiceManager: ten si otevírá
+ * vlastní transakci a má admin-only gate, prodávat smí i ne-admin).
+ * Ceny kasy jsou koncové s DPH; konvence faktur = položky BEZ DPH:
+ *   běžné zboží (díly) u plátce → cena/(1+sazba), vat_rate = sazba
+ *   použité zboží §90 → cena beze změny, vat_rate 0 + povinná věta v poznámce
+ * $items: [['name','qty','unit_price','used']]. Vrací id faktury.
+ */
+function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, array $items, float $total): int {
+    $isVat = get_setting('acc_is_vat_payer', '0') == '1';
+    $vatRate = (float)get_setting('acc_vat_rate', '21');
+    $hasUsed = false;
+    $stdBase = 0.0;    // základ DPH (ceny bez DPH po zaokrouhlení na 2 des.)
+    $zeroBase = 0.0;   // §90 + neplátce (sazba 0)
+    $rows = [];
+    foreach ($items as $it) {
+        $qty = (int)$it['qty'];
+        $price = round((float)$it['unit_price'], 2);
+        if (!empty($it['used'])) {
+            $hasUsed = true;
+            $zeroBase += $price * $qty;
+            $rows[] = [(string)$it['name'], $qty, $price, 0.0];
+        } elseif ($isVat) {
+            $ex = round($price / (1 + $vatRate / 100), 2);
+            $stdBase += $ex * $qty;
+            $rows[] = [(string)$it['name'], $qty, $ex, $vatRate];
+        } else {
+            $zeroBase += $price * $qty;
+            $rows[] = [(string)$it['name'], $qty, $price, 0.0];
+        }
+    }
+    // total_amount a vat_amount POČÍTAT ze zaokrouhlených položek stejně, jako je
+    // počítá tisk faktury (print_invoice rekapituluje z invoice_items) — jinak by
+    // na jednom daňovém dokladu byla tři různá čísla. Případný halířový rozdíl
+    // proti kase je daň za konvenci „položky faktury bez DPH".
+    $vatAmount = $isVat ? round($stdBase * $vatRate / 100, 2) : 0.0;
+    $total = round($stdBase + $vatAmount + $zeroBase, 2);
+
+    $notes = 'Vystaveno z kasy, prodejní doklad ' . $saleNumber . '.';
+    if ($hasUsed && $isVat) {
+        $notes .= ' Zvláštní režim – použité zboží dle § 90 zákona č. 235/2004 Sb., o DPH.';
+    }
+
+    $prefix = (string)get_setting('acc_invoice_prefix', date('Y'));
+    $currency = get_setting('currency', 'Kč');
+    $ins = $pdo->prepare("INSERT INTO invoices
+            (invoice_number, variable_symbol, customer_id, order_id, date_issue, date_tax, date_due,
+             total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes)
+        VALUES (?, ?, ?, NULL, CURDATE(), CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY),
+                ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?)");
+    $invoiceId = 0;
+    // číselná řada faktur je historicky COUNT+1 (závodivé) — UNIQUE klíč + retry to jistí
+    for ($try = 0; $try < 6; $try++) {
+        $cnt = (int)$pdo->query("SELECT COUNT(*) FROM invoices")->fetchColumn();
+        $number = $prefix . str_pad((string)($cnt + 1 + $try), 4, '0', STR_PAD_LEFT);
+        try {
+            $ins->execute([$number, preg_replace('/\D/', '', $number) ?: null, $customerId,
+                round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes]);
+            $invoiceId = (int)$pdo->lastInsertId();
+            break;
+        } catch (PDOException $e) {
+            if ((int)($e->errorInfo[1] ?? 0) !== 1062) { throw $e; }   // jiná chyba než duplicitní číslo
+        }
+    }
+    if ($invoiceId <= 0) { throw new Exception('Nepodařilo se přidělit číslo faktury.'); }
+
+    $ii = $pdo->prepare("INSERT INTO invoice_items (invoice_id, item_name, quantity, unit, price, vat_rate) VALUES (?, ?, ?, 'ks', ?, ?)");
+    foreach ($rows as $r) { $ii->execute([$invoiceId, $r[0], $r[1], $r[2], $r[3]]); }
+    return $invoiceId;
+}
+
+/** Číslo prodejního dokladu KP<rr><5 číslic> — vezmi nejvyšší existující + 1.
+ *  $bump = číslo pokusu při kolizi: POZOR, SELECT uvnitř transakce čte pod
+ *  REPEATABLE READ pořád stejný snapshot, takže samotné opakování by vracelo
+ *  IDENTICKÉ číslo donekonečna — jiné číslo zajistí právě +$bump. */
+function generatePosSaleNumber(PDO $pdo, int $bump = 0): string {
+    $prefix = 'KP' . date('y');
+    try {
+        $last = $pdo->query("SELECT sale_number FROM pos_sales WHERE sale_number LIKE '" . $prefix . "%' ORDER BY sale_number DESC LIMIT 1")->fetchColumn();
+        if ($last && preg_match('/^' . $prefix . '(\d+)$/', (string)$last, $m)) {
+            $num = (int)$m[1] + 1 + $bump;
+            return $prefix . str_pad((string)$num, max(5, strlen($m[1])), '0', STR_PAD_LEFT);
+        }
+    } catch (Throwable $e) {}
+    return $prefix . str_pad((string)(1 + $bump), 5, '0', STR_PAD_LEFT);
+}
+
 function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $quantity, string $notes = ''): bool {
     global $pdo;
 
@@ -3488,6 +3653,7 @@ function crmAuditActionLabel(string $action): string {
         'complaint.create' => 'Vytvoření reklamace', 'complaint.status_change' => 'Změna stavu reklamace',
         'procurement.create' => 'Požadavek na díl', 'procurement.status_change' => 'Změna stavu nákupu',
         'products.import' => 'Import produktů (e-shop)', 'products.delete' => 'Smazání produktu (e-shop)',
+        'kasa.sale' => 'Prodej na kase', 'kasa.cancel' => 'Storno prodeje na kase',
         'procurement.assign_order' => 'Přiřazení dílu k zakázce', 'procurement.delete' => 'Smazání požadavku na díl',
         'inventory.create' => 'Naskladnění dílu', 'inventory.update' => 'Úprava skladového dílu',
         'inventory.delete' => 'Smazání skladového dílu',

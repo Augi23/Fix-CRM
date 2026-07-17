@@ -10,6 +10,7 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 ensureProductsTable();
+ensureProductsPosColumn();
 
 $canManage = crmCanManageProducts();
 
@@ -166,6 +167,8 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
                                     <td>
                                         <?php if ((int)$p['stock_qty'] > 0): ?>
                                             <span class="badge bg-success">Skladem</span>
+                                        <?php elseif (!empty($p['pos_sold_at'])): ?>
+                                            <span class="badge bg-warning text-dark" title="Prodáno přes Pokladnu — CRM ho automaticky drží vyprodaný, i kdyby ho soubor z appky ještě hlásil skladem">Prodáno na kase</span>
                                         <?php else: ?>
                                             <span class="badge bg-secondary">Vyprodáno</span>
                                         <?php endif; ?>

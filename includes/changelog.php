@@ -6,6 +6,21 @@
  */
 return [
     [
+        'version' => '2.0.0',
+        'date' => '2026-07-17',
+        'time' => '16:14',
+        'title' => 'POKLADNA — vlastní kasa přímo v CRM',
+        'items' => [
+            'Nová sekce Pokladna v horním menu: pultový prodej produktů (použitá elektronika) i servisních dílů bez zakládání zakázky. Vyhledávání nabízí jen zboží, které je skutečně skladem.',
+            'Košík s více položkami — množství i cenu za kus lze upravit (sleva na místě). Platba třemi velkými tlačítky: Hotově, Kartou (jen evidence typu pro účetnictví — terminál jede zvlášť) a Na fakturu (s výběrem zákazníka; faktura se vystaví automaticky).',
+            'Prodej okamžitě odepíše sklad: díl ubere kusy (se záznamem ve skladových pohybech), produkt se označí jako prodaný. Dvě kasy najednou se nemohou přeprodat — sklad hlídá databáze.',
+            'Po zaplacení se rovnou otevře tisk účtenky; u platby na fakturu i faktura. U použitého zboží účtenka i faktura správně uvádějí zvláštní režim DPH § 90 (daň se nevyčísluje).',
+            'Historie má novou podsekci „Kasa prodejna": všechny prodeje s doklady, souhrn Hotově/Kartou/Fakturou za zvolené období (denní uzávěrka), dotisk účtenek. Storno smí jen vedení a vrátí zboží na sklad.',
+            'Pojistka proti dvojímu prodeji: produkt prodaný na kase zůstane vyprodaný i po nahrání souboru z naskladňovací appky — import konflikt nahlásí, dokud kus nevyřadíš i v appce.',
+            'Prodávat může každý přihlášený zaměstnanec na obou pobočkách; každý doklad nese pobočku a jméno prodejce.',
+        ],
+    ],
+    [
         'version' => '1.15.1',
         'date' => '2026-07-17',
         'time' => '15:47',

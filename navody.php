@@ -14,6 +14,24 @@ $tab = ($_GET['tab'] ?? 'crm') === 'opravy' ? 'opravy' : 'crm';
 $guides = [];
 $guides['crm'] = [
     [
+        'id' => 'kasa-pokladna', 'icon' => 'fa-cash-register', 'color' => '#30D158',
+        'title' => 'Pokladna (kasa) — prodej přes pult',
+        'intro' => 'Přímý prodej produktů (použitá elektronika, příslušenství) a servisních dílů bez zakládání zakázky. Sklad se odečítá automaticky, účtenka se tiskne hned.',
+        'steps' => [
+            'Otevři <b>Pokladna</b> v horním menu.',
+            '<b>Najdi zboží:</b> do velkého pole piš název, model nebo sériové číslo. Nabízí se jen to, co je <b>skutečně skladem</b> — zelený štítek PRODUKT (bazarové zboží), modrý DÍL (servisní díl). Klikem se položka přidá do košíku.',
+            '<b>Košík:</b> položek můžeš přidat víc. U každé jde upravit <b>počet kusů</b> i <b>cenu za kus</b> (sleva na místě) — celková částka se přepočítá sama.',
+            '<b>Platba:</b> vyber jedno ze tří tlačítek — <b>Hotově</b>, <b>Kartou</b> (terminál jedeš normálně zvlášť, tady se jen eviduje typ platby pro účetnictví) nebo <b>Na fakturu</b> (vyber zákazníka — faktura se vystaví automaticky a objeví se i v Účetnictví).',
+            'Klikni na <b>Dokončit prodej</b> — otevře se <b>účtenka k tisku</b>; u platby na fakturu jde vytisknout i faktura. Účtenku jde kdykoli dotisknout ze seznamu „Dnešní prodeje" nebo z Historie.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => '<b>Sklad se odečítá automaticky</b> v okamžiku prodeje: díl ubere kusy (se záznamem ve skladových pohybech), produkt se přepne na vyprodáno. Produkt prodaný na kase zůstane vyprodaný i po dalším nahrání souboru z naskladňovací appky — systém to ohlídá sám.'],
+            ['typ' => 'info', 'text' => '<b>Historie → Kasa prodejna:</b> všechny doklady, souhrn Hotově/Kartou/Fakturou za zvolené období (denní uzávěrka) a dotisk účtenek.'],
+            ['typ' => 'info', 'text' => '<b>DPH u použitého zboží (§ 90):</b> na účtence i faktuře se u bazarového zboží DPH nevyčísluje — doklad má správný režim automaticky, nic neřešíš.'],
+            ['typ' => 'role', 'text' => '<b>Prodávat smí každý</b> přihlášený zaměstnanec na obou pobočkách. <b>Storno</b> (vrátí zboží na sklad a zruší případnou fakturu) smí jen vedení — admin a Boss, v Historii → Kasa prodejna.'],
+        ],
+    ],
+    [
         'id' => 'vernostni-karta-recepce', 'icon' => 'fa-id-card', 'color' => '#64D2FF',
         'title' => 'Věrnostní karta klienta — sken na recepci',
         'intro' => 'Každý klient má věrnostní kartu s QR kódem (v mobilu v Apple/Google Peněžence). Skenem karty se okamžitě otevře jeho profil se zakázkami a body — bez ručního hledání.',

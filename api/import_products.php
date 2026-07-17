@@ -75,6 +75,7 @@ $parsePrice = static function (string $v): float {
 };
 
 ensureProductsTable();   // DDL před transakcí (implicitní commit)
+ensureProductsPosColumn();
 
 // čas začátku VŽDY z hodin databáze — last_seen_at plní NOW() z MySQL a kdyby
 // PHP a MySQL běžely v jiném pásmu, stale-detekce by označila i čerstvé řádky
@@ -176,6 +177,27 @@ try {
     echo json_encode(['success' => false, 'message' => 'Import selhal: ' . $e->getMessage()]); exit;
 }
 
+// ── sladění s kasou ──
+// 1) soubor sám hlásí prodáno (stock 0) → stav je srovnaný, flag kasy pryč.
+//    Mazat smí JEN flagy potvrzené TÍMTO souborem: řádek v něm byl (last_seen_at
+//    aktualizován) a soubor vůbec nese sloupec [STOCK]. Podmínka pos_sold_at < start
+//    chrání před závodem: prodej běžící souběžně s importem má čerstvý flag a nesmí
+//    o něj přijít — jeho stock 0 neřekl soubor, ale kasa.
+// 2) kasa kus prodala (celý → flag), ale soubor ho stále hlásí skladem → držet na
+//    nule + nahlásit (jinak by denní import „oživil" prodaný kus na e-shopu).
+$posConflict = 0;
+try {
+    if (isset($idx['[STOCK]'])) {
+        $pdo->prepare("UPDATE products SET pos_sold_at = NULL
+            WHERE pos_sold_at IS NOT NULL AND stock_qty <= 0 AND last_seen_at >= ? AND pos_sold_at < ?")
+            ->execute([$startedAt, $startedAt]);
+    }
+    $posConflict = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE pos_sold_at IS NOT NULL AND stock_qty > 0")->fetchColumn();
+    if ($posConflict > 0) {
+        $pdo->exec("UPDATE products SET stock_qty = 0 WHERE pos_sold_at IS NOT NULL AND stock_qty > 0");
+    }
+} catch (Throwable $e) {}
+
 // řádky v DB, které v tomhle souboru nebyly (nemažou se — jen se zvýrazní na stránce)
 $stale = 0;
 try {
@@ -195,4 +217,5 @@ crmAuditLog('products.import', [
 $msg = 'Hotovo: ' . $created . ' nových, ' . $updated . ' aktualizovaných';
 if ($skipped > 0) { $msg .= ', ' . $skipped . ' přeskočeno (bez názvu/kódu)'; }
 if ($stale > 0) { $msg .= '. ' . $stale . ' dřívějších produktů v souboru nebylo — v seznamu dostanou štítek.'; }
-echo json_encode(['success' => true, 'message' => $msg, 'created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'stale' => $stale]);
+if ($posConflict > 0) { $msg .= ' ' . $posConflict . ' produktů prodaných na kase soubor ještě hlásí skladem — CRM je automaticky drží jako vyprodané.'; }
+echo json_encode(['success' => true, 'message' => $msg, 'created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'stale' => $stale, 'pos_conflict' => $posConflict]);
