@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '2.2.1',
+        'date' => '2026-07-17',
+        'time' => '17:41',
+        'title' => 'Pokladna: mazání položky velkým červeným křížkem',
+        'items' => [
+            'Tlačítko pro smazání položky z košíku je velký červený křížek — jednodušší a rychlejší na trefení.',
+        ],
+    ],
+    [
         'version' => '2.2.0',
         'date' => '2026-07-17',
         'time' => '17:41',
@@ -13,7 +22,7 @@ return [
         'items' => [
             'Zboží jde do košíku načíst USB čtečkou čárových kódů — kdykoli je Pokladna otevřená, bez klikání do jakéhokoli pole. Pípneš kód (sériové číslo produktu nebo SKU dílu) a položka se přidá rovnou do košíku.',
             'Sken potvrdí zvuk a zelená hláška („Přidáno: …"); nenalezený nebo nejednoznačný kód ohlásí nízké pípnutí s červenou hláškou.',
-            'U každé položky v košíku je velký červený křížek pro okamžité smazání položky.',
+            'U každé položky v košíku přibylo tlačítko pro okamžité smazání položky.',
         ],
     ],
     [
