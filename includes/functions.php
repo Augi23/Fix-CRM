@@ -990,6 +990,9 @@ function ensureSupplierCatalogsTable(): void {
             default_url VARCHAR(255) NOT NULL,
             is_active TINYINT NOT NULL DEFAULT 1
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // Víc URL na katalog (MobileSentrix: jedna kategorie = jeden odkaz) —
+        // ukládají se do default_url po řádcích, VARCHAR(255) by nestačil.
+        try { $pdo->exec("ALTER TABLE supplier_catalogs MODIFY COLUMN default_url TEXT NOT NULL"); } catch (Throwable $e) {}
         if ((int)$pdo->query("SELECT COUNT(*) FROM supplier_catalogs")->fetchColumn() === 0) {
             $ins = $pdo->prepare("INSERT INTO supplier_catalogs (skey, name, host, default_url) VALUES (?, ?, ?, ?)");
             foreach (getDefaultSupplierCatalogs() as $key => $c) {
@@ -997,6 +1000,12 @@ function ensureSupplierCatalogsTable(): void {
             }
         }
     } catch (Throwable $e) { /* best-effort */ }
+}
+
+/** Uložené URL katalogu (jedna na řádek) → pole neprázdných adres. */
+function supplierCatalogUrls(string $stored): array {
+    $parts = preg_split('/\s+/', trim($stored)) ?: [];
+    return array_values(array_filter(array_map('trim', $parts)));
 }
 
 function getSupplierCatalogs(): array {
@@ -1015,6 +1024,7 @@ function getSupplierCatalogs(): array {
 }
 
 function supplierKeyFromUrl(string $url): string {
+    $url = (string)(strtok(trim($url), " \n\r\t") ?: '');   // uloženo může být víc URL po řádcích
     $host = strtolower((string)parse_url($url, PHP_URL_HOST));
     if ($host === '') {
         return '';

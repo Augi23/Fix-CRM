@@ -21,7 +21,18 @@ function backToProcurement(array $params): void {
 }
 
 $name = trim((string)($_POST['catalog_name'] ?? ''));
-$url  = trim((string)($_POST['catalog_url'] ?? ''));
+
+// Víc odkazů na katalog (MobileSentrix: kategorie po modelech) — pole catalog_urls[],
+// zpětně kompatibilní s jedním polem catalog_url.
+$rawUrls = $_POST['catalog_urls'] ?? ($_POST['catalog_url'] ?? []);
+if (!is_array($rawUrls)) { $rawUrls = [$rawUrls]; }
+$urls = [];
+foreach ($rawUrls as $u) {
+    $u = trim((string)$u);
+    if ($u !== '') { $urls[] = mb_substr($u, 0, 500); }
+}
+$urls = array_values(array_unique($urls));
+$url = $urls[0] ?? '';
 
 $parts = parse_url($url);
 $scheme = strtolower((string)($parts['scheme'] ?? ''));
@@ -30,6 +41,16 @@ $host = preg_replace('/^www\./', '', $host);
 
 if ($name === '' || $host === '' || !in_array($scheme, ['http', 'https'], true)) {
     backToProcurement(['catalog_source_error' => 'invalid']);
+}
+
+// všechny odkazy musí být ze stejného webu (jeden katalog = jeden dodavatel)
+foreach ($urls as $u) {
+    $p = parse_url($u);
+    $s = strtolower((string)($p['scheme'] ?? ''));
+    $h = preg_replace('/^www\./', '', strtolower((string)($p['host'] ?? '')));
+    if ($h !== $host || !in_array($s, ['http', 'https'], true)) {
+        backToProcurement(['catalog_source_error' => 'invalid']);
+    }
 }
 
 try {
@@ -52,7 +73,7 @@ try {
     }
 
     $pdo->prepare("INSERT INTO supplier_catalogs (skey, name, host, default_url) VALUES (?, ?, ?, ?)")
-        ->execute([$skey, mb_substr($name, 0, 80), mb_substr($host, 0, 120), mb_substr($url, 0, 255)]);
+        ->execute([$skey, mb_substr($name, 0, 80), mb_substr($host, 0, 120), implode("\n", $urls)]);
 
     crmAuditLog('supplier_catalog.create', [
         'entity_type' => 'supplier_catalog', 'entity_label' => (string)$name,

@@ -214,6 +214,14 @@ $can_add_procurement = $can_order;
 // Flash: přidání katalogu dodavatele
 if (isset($_GET['catalog_source_added'])): ?>
     <div class="alert alert-success border-0 shadow-sm"><i class="fas fa-check-circle me-2"></i><?php echo __('catalog_source_added'); ?></div>
+<?php elseif (isset($_GET['catalog_source_deleted'])): ?>
+    <div class="alert alert-success border-0 shadow-sm">
+        <i class="fas fa-check-circle me-2"></i><?php echo __('catalog_source_deleted'); ?>
+        <span class="badge bg-danger ms-2"><?php echo __('catalog_items_removed'); ?>: <?php echo max(0, (int)($_GET['catalog_removed_items'] ?? 0)); ?></span>
+        <?php if ((int)($_GET['catalog_kept_items'] ?? 0) > 0): ?>
+            <span class="badge bg-secondary ms-1"><?php echo __('catalog_items_kept'); ?>: <?php echo (int)$_GET['catalog_kept_items']; ?></span>
+        <?php endif; ?>
+    </div>
 <?php elseif (!empty($_GET['catalog_source_error'])): ?>
     <div class="alert alert-danger border-0 shadow-sm"><i class="fas fa-triangle-exclamation me-2"></i><?php
         echo $_GET['catalog_source_error'] === 'exists' ? __('catalog_source_exists') : __('catalog_source_invalid');
@@ -717,9 +725,30 @@ if (isset($_GET['catalog_imported'])):
                     </div>
                     <div class="mb-3">
                         <label class="form-label"><?php echo __('catalog_url'); ?></label>
-                        <input type="url" name="catalog_url" class="form-control" placeholder="https://obchod.cz/nahradni-dily/" required maxlength="255">
-                        <div class="form-text text-white-75"><?php echo __('add_catalog_hint'); ?></div>
+                        <div id="catalogAddUrls">
+                            <div class="input-group mb-2 catalog-url-row">
+                                <input type="url" name="catalog_urls[]" class="form-control" placeholder="https://obchod.cz/nahradni-dily/" required maxlength="500">
+                                <button type="button" class="btn btn-outline-danger catalog-url-remove" title="<?php echo __('delete'); ?>" style="display:none;">&times;</button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-info" id="catalogAddUrlBtn"><i class="fas fa-plus me-1"></i><?php echo __('catalog_add_url_row'); ?></button>
+                        <div class="form-text text-white-75"><?php echo __('add_catalog_hint'); ?> <?php echo __('catalog_multi_hint'); ?></div>
                     </div>
+
+                    <?php if (!empty($suppliers)): ?>
+                    <hr class="border-secondary">
+                    <label class="form-label mb-2"><?php echo __('catalog_existing'); ?></label>
+                    <?php foreach ($suppliers as $exKey => $exSupplier): $exUrls = supplierCatalogUrls((string)($exSupplier['default_url'] ?? '')); ?>
+                        <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-secondary border-opacity-25">
+                            <div class="me-2 text-truncate">
+                                <span class="fw-semibold"><?php echo e($exSupplier['name']); ?></span>
+                                <span class="text-white-50 small ms-1"><?php echo e($exSupplier['host']); ?> · <?php echo count($exUrls); ?>&times; URL</span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger catalog-delete-btn" data-skey="<?php echo e($exKey); ?>" data-name="<?php echo e($exSupplier['name']); ?>" title="<?php echo __('catalog_delete'); ?>"><i class="fas fa-trash"></i></button>
+                        </div>
+                    <?php endforeach; ?>
+                    <div class="form-text text-white-75 mt-1"><?php echo __('catalog_delete_hint'); ?></div>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
@@ -755,19 +784,19 @@ if (isset($_GET['catalog_imported'])):
                     </div>
                     <div class="mb-3">
                         <label for="catalogUrl" class="form-label"><?php echo __('catalog_url'); ?></label>
-                        <input
-                            type="url"
+                        <textarea
                             id="catalogUrl"
                             name="catalog_url"
                             class="form-control"
-                            placeholder="e.g. https://www.mobilnidily.cz/nahradni-dily-apple-iphone/"
+                            rows="3"
+                            placeholder="https://www.mobilnidily.cz/nahradni-dily-apple-iphone/"
                             required
-                        >
-                        <div class="form-text text-white-75"><?php echo __('catalog_url_hint'); ?></div>
+                        ></textarea>
+                        <div class="form-text text-white-75"><?php echo __('catalog_url_hint'); ?> <?php echo __('catalog_multi_lines_hint'); ?></div>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <?php foreach ($suppliers as $supplierKey => $supplier): ?>
-                            <a class="btn btn-sm btn-outline-secondary" href="<?php echo e($supplier['default_url']); ?>" target="_blank" rel="noopener noreferrer">
+                        <?php foreach ($suppliers as $supplierKey => $supplier): $firstUrl = supplierCatalogUrls((string)($supplier['default_url'] ?? ''))[0] ?? '#'; ?>
+                            <a class="btn btn-sm btn-outline-secondary" href="<?php echo e($firstUrl); ?>" target="_blank" rel="noopener noreferrer">
                                 <i class="fas fa-external-link-alt me-1"></i><?php echo e($supplier['name']); ?>
                             </a>
                         <?php endforeach; ?>
@@ -1054,8 +1083,35 @@ $(function() {
     $('#catalogPreset').on('change', function() {
         const url = presets[$(this).val()];
         if (url) {
-            $('#catalogUrl').val(url);
+            $('#catalogUrl').val(url);   // víc URL po řádcích se vloží všechny
         }
+    });
+
+    // ── Přidat katalog: více polí s odkazem ──
+    $('#catalogAddUrlBtn').on('click', function() {
+        const $wrap = $('#catalogAddUrls');
+        const $row = $wrap.find('.catalog-url-row').first().clone();
+        $row.find('input').val('').prop('required', false);
+        $row.find('.catalog-url-remove').show();
+        $wrap.append($row);
+    });
+    $('#catalogAddUrls').on('click', '.catalog-url-remove', function() {
+        $(this).closest('.catalog-url-row').remove();
+    });
+
+    // ── Odstranění katalogu dodavatele ──
+    $('.catalog-delete-btn').on('click', function() {
+        const skey = $(this).data('skey');
+        const name = $(this).data('name');
+        showConfirm('<?php echo __('catalog_delete_confirm'); ?>'.replace('%s', name), function() {
+            const f = document.createElement('form');
+            f.method = 'POST';
+            f.action = 'api/delete_supplier_catalog.php';
+            f.innerHTML = <?php echo json_encode(csrfField()); ?> + '<input type="hidden" name="skey">';
+            f.querySelector('input[name="skey"]').value = skey;
+            document.body.appendChild(f);
+            f.submit();
+        });
     });
 
     if (<?php echo ($selectedOrderId > 0 && $can_add_procurement) ? 'true' : 'false'; ?> && requestModal) {

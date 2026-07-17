@@ -502,8 +502,22 @@ function upsertInventoryItem(string $name, string $sku, float $price, string $im
     return 'added';
 }
 
-$catalogUrl = trim((string)($_POST['catalog_url'] ?? ''));
-if (!isPublicCatalogUrl($catalogUrl)) {
+// Jeden katalog může mít víc vstupních odkazů (jedna URL na řádek) —
+// typicky MobileSentrix, kde je každá kategorie/model zvlášť.
+$catalogUrls = [];
+foreach (preg_split('/\s+/', trim((string)($_POST['catalog_url'] ?? ''))) ?: [] as $u) {
+    $u = trim($u);
+    if ($u !== '') { $catalogUrls[] = $u; }
+}
+$catalogUrls = array_values(array_unique($catalogUrls));
+$catalogUrl = $catalogUrls[0] ?? '';
+
+foreach ($catalogUrls as $u) {
+    if (!isPublicCatalogUrl($u)) {
+        redirectCatalogError('invalid_url', 'URL musí být veřejná a platná.');
+    }
+}
+if ($catalogUrl === '') {
     redirectCatalogError('invalid_url', 'URL musí být veřejná a platná.');
 }
 
@@ -511,13 +525,18 @@ $origin = getCatalogOrigin($catalogUrl);
 if ($origin === '') {
     redirectCatalogError('invalid_url', 'Nepodařilo se určit origin katalogu.');
 }
+foreach ($catalogUrls as $u) {
+    if (getCatalogOrigin($u) !== $origin) {
+        redirectCatalogError('invalid_url', 'Všechny odkazy musí být ze stejného webu (jeden katalog = jeden dodavatel).');
+    }
+}
 
 if (!ensureInventoryCatalogSchema()) {
     redirectCatalogError('processing_failed', 'Nepodařilo se připravit databázové sloupce pro katalog.');
 }
 
 $catalogSupplierKey = supplierKeyFromUrl($catalogUrl);
-set_setting('inventory_catalog_url', $catalogUrl);
+set_setting('inventory_catalog_url', implode("\n", $catalogUrls));
 
 try {
     $startHtml = fetchHtml($catalogUrl);
@@ -545,6 +564,11 @@ try {
 
     foreach (array_keys($categoryUrls) as $seedPageUrl) {
         $queuedPages[$seedPageUrl] = true;
+    }
+    // další vstupní odkazy katalogu (2., 3., … řádek) — každý si v cyklu
+    // objeví vlastní podkategorie a stránkování
+    foreach (array_slice($catalogUrls, 1) as $extraSeedUrl) {
+        $queuedPages[$extraSeedUrl] = true;
     }
 
     while (!empty($queuedPages)) {

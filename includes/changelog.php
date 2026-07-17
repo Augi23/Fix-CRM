@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.13.0',
+        'date' => '2026-07-17',
+        'time' => '10:45',
+        'title' => 'Katalogy: více odkazů na jeden katalog + mazání katalogů',
+        'items' => [
+            'Jeden katalog dodavatele může mít víc vstupních odkazů — přesně pro případy jako MobileSentrix, kde je každý model zvlášť. Při přidávání katalogu tlačítko „Další odkaz" přidá další políčko; není potřeba zakládat dodavatele desetkrát.',
+            'Aktualizace z katalogu zvládne víc adres najednou (po řádcích) — po výběru dodavatele se předvyplní všechny jeho odkazy a naimportují se jedním kliknutím.',
+            'Katalogy jdou nově odstranit: v okně „Přidat katalog" je seznam stávajících katalogů s košem. Odstranění smaže nenaskladněné položky katalogu; naskladněné a v zakázkách použité díly ve Skladu zůstávají.',
+        ],
+    ],
+    [
         'version' => '1.12.5',
         'date' => '2026-07-17',
         'time' => '10:36',
