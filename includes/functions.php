@@ -1309,6 +1309,29 @@ function ensureProductsPosColumn(): void {
     } catch (Throwable $e) { error_log('ensureProductsPosColumn: ' . $e->getMessage()); }
 }
 
+/** Sloupce pro naskladňování PŘÍMO v CRM: source ('app' = z CSV appky, 'crm' =
+ *  založeno/spravováno v CRM — import appky ho NIKDY nepřepisuje), autor
+ *  a výsledek PČR kontroly. */
+function ensureProductsCrmColumns(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $add = [
+            'source' => "ALTER TABLE products ADD COLUMN source VARCHAR(16) NOT NULL DEFAULT 'app'",
+            'created_by' => "ALTER TABLE products ADD COLUMN created_by VARCHAR(64) NULL DEFAULT NULL",
+            'pcr_status' => "ALTER TABLE products ADD COLUMN pcr_status VARCHAR(16) NULL DEFAULT NULL",
+            'pcr_checked_at' => "ALTER TABLE products ADD COLUMN pcr_checked_at DATETIME NULL DEFAULT NULL",
+        ];
+        foreach ($add as $col => $ddl) {
+            if (!$pdo->query("SHOW COLUMNS FROM products LIKE '" . $col . "'")->fetch()) {
+                $pdo->exec($ddl);
+            }
+        }
+    } catch (Throwable $e) { error_log('ensureProductsCrmColumns: ' . $e->getMessage()); }
+}
+
 /** Prodávat na kase smí KAŽDÝ přihlášený zaměstnanec (pultová operace, obě pobočky).
  *  Guard akceptuje obě session varianty dual-loginu (users i technicians). */
 function crmCanUsePos(): bool {

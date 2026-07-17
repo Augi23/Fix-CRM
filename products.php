@@ -8,11 +8,22 @@
  */
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+require_once 'includes/product_catalog.php';
 require_once 'includes/header.php';
 ensureProductsTable();
 ensureProductsPosColumn();
+ensureProductsCrmColumns();
 
 $canManage = crmCanManageProducts();
+
+// výchozí prodejna dle pobočky přihlášeného (Na Příkopě = Černá Růže = sklad vaclavak)
+$__myBranch = null;
+try {
+    $__bs = $pdo->prepare("SELECT code FROM branches WHERE id = ?");
+    $__bs->execute([(int)getCurrentStaffBranchId()]);
+    $__myBranch = (string)$__bs->fetchColumn();
+} catch (Throwable $e) {}
+$defaultStockKey = $__myBranch === 'prikope' ? 'vaclavak' : 'karlin';
 
 $limit = 50;
 $page = isset($_GET['p']) && is_numeric($_GET['p']) ? (int)$_GET['p'] : 1;
@@ -62,6 +73,12 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
             <i class="fas fa-filter me-2"></i> <?php echo __('filters'); ?>
         </button>
         <?php if ($canManage): ?>
+        <button class="btn btn-success" id="productCreateOpen" data-bs-toggle="modal" data-bs-target="#productCreateModal">
+            <i class="fas fa-box-open me-2"></i> Naskladnit produkt
+        </button>
+        <a class="btn btn-outline-secondary" href="api/export_products_csv.php" title="Kompletní sklad ve formátu souboru appky — pro ruční import do Upgates">
+            <i class="fas fa-file-csv me-2"></i> CSV pro Upgates
+        </a>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importModal">
             <i class="fas fa-file-upload me-2"></i> Nahrát soubor z appky
         </button>
@@ -110,7 +127,7 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
                                 <th>Cena</th>
                                 <th>Dostupnost</th>
                                 <th>Naskladněno</th>
-                                <?php if ($canManage): ?><th class="text-end pe-4"><?php echo __('action'); ?></th><?php endif; ?>
+                                <th class="text-end pe-4"><?php echo __('action'); ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -124,7 +141,8 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
                             <?php else: ?>
                                 <?php foreach ($products as $p): ?>
                                 <?php $img = productImageDisplayUrl($p['image_url'] ?? ''); ?>
-                                <?php $stale = ($lastImportAt !== '' && (string)$p['last_seen_at'] < $lastImportAt); ?>
+                                <?php // kusy spravované v CRM v souboru appky nejsou ZÁMĚRNĚ — badge „není v souboru" se jich netýká
+                                $stale = ($lastImportAt !== '' && (string)$p['last_seen_at'] < $lastImportAt && (string)($p['source'] ?? 'app') !== 'crm'); ?>
                                 <tr>
                                     <td class="ps-4">
                                         <?php if ($img !== ''): ?>
@@ -185,7 +203,15 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
                                     </td>
                                     <?php if ($canManage): ?>
                                     <td class="text-end pe-4">
-                                        <button type="button" class="btn btn-sm btn-white border text-danger product-delete-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-810W)"><i class="fas fa-tag"></i></button>
+                                            <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>
+                                            <button type="button" class="btn btn-white border text-danger product-delete-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>
+                                        </div>
+                                    </td>
+                                    <?php else: ?>
+                                    <td class="text-end pe-4">
+                                        <button type="button" class="btn btn-sm btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek"><i class="fas fa-tag"></i></button>
                                     </td>
                                     <?php endif; ?>
                                 </tr>
@@ -240,6 +266,136 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
 </div>
 
 <?php if ($canManage): ?>
+<!-- ═══ NASKLADNIT PRODUKT — náhrada Mac appky (v2.3.0) ═══ -->
+<div class="modal fade" id="productCreateModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-box-open me-2 text-success"></i><span id="pcTitleMode">Naskladnit produkt</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-4">
+                    <!-- ── formulář ── -->
+                    <div class="col-lg-7">
+                        <input type="hidden" id="pcEditId" value="">
+                        <input type="hidden" id="pcImageUrl" value="">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small">Typ zařízení</label>
+                                <select id="pcTyp" class="form-select"></select>
+                                <input type="text" id="pcTypCustom" class="form-control mt-1" placeholder="vlastní typ…" style="display:none;">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small">Model <span class="text-danger">*</span></label>
+                                <div class="d-flex gap-2">
+                                    <select id="pcModel" class="form-select"></select>
+                                    <input type="text" id="pcModelCustom" class="form-control" placeholder="vlastní model…" style="display:none;">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Úložiště</label>
+                                <select id="pcCap" class="form-select"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Barva</label>
+                                <div class="d-flex gap-2">
+                                    <select id="pcColor" class="form-select"></select>
+                                    <input type="text" id="pcColorCustom" class="form-control" placeholder="vlastní…" style="display:none;">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Stav</label>
+                                <select id="pcGrade" class="form-select"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Prodejna</label>
+                                <select id="pcStockKey" class="form-select">
+                                    <option value="karlin">Karlín</option>
+                                    <option value="vaclavak">Černá Růže</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Baterie</label>
+                                <div class="input-group">
+                                    <input type="number" id="pcBattery" class="form-control" min="0" max="100">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Prodejní cena <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" id="pcPrice" class="form-control" inputmode="numeric">
+                                    <span class="input-group-text">Kč</span>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small">SN / IMEI <span class="text-white-50">(naskenuj čtečkou nebo zapiš)</span></label>
+                                <input type="text" id="pcSerial" class="form-control" autocomplete="off">
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div id="pcPcrBadge" class="w-100 text-center small fw-bold rounded py-2" style="background:rgba(255,255,255,.06);color:#9aa3b2;">PČR: nekontrolováno</div>
+                            </div>
+                            <div class="col-md-3 pc-mac" style="display:none;">
+                                <label class="form-label small">RAM</label>
+                                <select id="pcRam" class="form-select"></select>
+                            </div>
+                            <div class="col-md-3 pc-mac" style="display:none;">
+                                <label class="form-label small">Jader CPU</label>
+                                <select id="pcCpu" class="form-select"></select>
+                            </div>
+                            <div class="col-md-3 pc-mac" style="display:none;">
+                                <label class="form-label small">Jader GPU</label>
+                                <select id="pcGpu" class="form-select"></select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Ročník</label>
+                                <select id="pcRocnik" class="form-select"></select>
+                            </div>
+                            <div class="col-md-3 pc-ipad" style="display:none;">
+                                <label class="form-label small">Generace</label>
+                                <select id="pcGenerace" class="form-select"></select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small">Foto produktu</label>
+                                <input type="file" id="pcPhoto" class="form-control" accept=".jpg,.jpeg,.png,.webp,image/*">
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="pcSold">
+                                    <label class="form-check-label small" for="pcSold">Prodáno (uloží se jako Vyprodáno)</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- ── živý náhled ── -->
+                    <div class="col-lg-5">
+                        <div class="glass-panel p-3 border-secondary h-100 d-flex flex-column">
+                            <div class="small text-white-50 mb-1">Název produktu (generuje se sám)</div>
+                            <div id="pcPreviewTitle" class="fs-5 fw-bold mb-3">—</div>
+                            <div class="small text-white-50 mb-1">Popis</div>
+                            <div id="pcPreviewDesc" class="small mb-3" style="color:rgba(255,255,255,.75);">—</div>
+                            <div id="pcPreviewImgWrap" class="mb-3" style="display:none;">
+                                <img id="pcPreviewImg" src="" alt="foto" class="rounded shadow-sm" style="max-width:130px;max-height:130px;object-fit:cover;">
+                            </div>
+                            <div id="pcHint" class="alert alert-warning border-0 py-2 small" style="display:none;"></div>
+                            <div class="mt-auto small text-white-50">Dnes přidáno: <strong id="pcTodayCount"><?php
+                                try { echo (int)$pdo->query("SELECT COUNT(*) FROM products WHERE DATE(added_at) = CURDATE()")->fetchColumn(); }
+                                catch (Throwable $e) { echo '—'; } ?></strong> ks</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span id="pcMsg" class="me-auto small"></span>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
+                <button type="button" class="btn btn-outline-success" id="pcSaveBtn"><i class="fas fa-plus me-1"></i> Přidat</button>
+                <button type="button" class="btn btn-success" id="pcSavePrintBtn" title="Ctrl/Cmd + Enter"><i class="fas fa-tag me-1"></i> Přidat a vytisknout štítek</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="importModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -269,7 +425,351 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
 <?php endif; ?>
 
 <script>
+// tisk cenového štítku — smí každý přihlášený (recepce tiskne cenovky)
+$(document).on('click', '.product-label-btn', function () {
+    var btn = this, ic = btn.querySelector('i');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    ic.className = 'fas fa-spinner fa-spin';
+    var fd = new FormData();
+    fd.append('action', 'print_product');
+    fd.append('id', btn.dataset.id);
+    fd.append('csrf_token', '<?php echo $_SESSION['csrf_token'] ?? ''; ?>');
+    fetch('api/print_label_server.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            btn.disabled = false; ic.className = 'fas fa-tag';
+            if (d.ok) { showAlert('Štítek odeslán na tiskárnu.'); }
+            else { showAlert('Tisk selhal: ' + escHtml(d.error || '')); }
+        })
+        .catch(function () { btn.disabled = false; ic.className = 'fas fa-tag'; showAlert('Síťová chyba při tisku.'); });
+});
+
 <?php if ($canManage): ?>
+// ═══ Naskladnit produkt — port Mac appky ═══
+(function () {
+    var CATALOG = <?php echo json_encode([
+        'types' => afxProductTypes(),
+        'caps' => AFX_CAPS, 'rams' => AFX_RAMS, 'cpus' => AFX_CPU_CORES, 'gpus' => AFX_GPU_CORES,
+        'grades' => AFX_GRADE_LABELS,
+        'years' => array_map('strval', range(2026, 2010)),
+        'gens' => array_map('strval', range(1, 11)),
+    ], JSON_UNESCAPED_UNICODE); ?>;
+    var CSRF = '<?php echo $_SESSION['csrf_token'] ?? ''; ?>';
+    var DEFAULT_STOCK = '<?php echo $defaultStockKey; ?>';
+    var CUSTOM = '✏️ Vlastní…';
+
+    var el = function (id) { return document.getElementById(id); };
+    var $typC = el('pcTypCustom');
+    var $typ = el('pcTyp'), $model = el('pcModel'), $modelC = el('pcModelCustom'),
+        $cap = el('pcCap'), $color = el('pcColor'), $colorC = el('pcColorCustom'),
+        $grade = el('pcGrade'), $stockKey = el('pcStockKey'), $bat = el('pcBattery'),
+        $price = el('pcPrice'), $serial = el('pcSerial'), $ram = el('pcRam'),
+        $cpu = el('pcCpu'), $gpu = el('pcGpu'), $rocnik = el('pcRocnik'), $gen = el('pcGenerace'),
+        $sold = el('pcSold'), $photo = el('pcPhoto'), $imageUrl = el('pcImageUrl'),
+        $badge = el('pcPcrBadge'), $msg = el('pcMsg'), $hint = el('pcHint'), $editId = el('pcEditId');
+
+    function fillSelect(sel, values, withEmpty, withCustom) {
+        sel.innerHTML = '';
+        if (withEmpty) sel.appendChild(new Option('—', ''));
+        values.forEach(function (v) { sel.appendChild(new Option(v, v)); });
+        if (withCustom) sel.appendChild(new Option(CUSTOM, CUSTOM));
+    }
+    function typVal() { return $typ.value === CUSTOM ? $typC.value.trim() : $typ.value; }
+    function typeDef() {
+        var tv = typVal();
+        for (var i = 0; i < CATALOG.types.length; i++) if (CATALOG.types[i].id === tv) return CATALOG.types[i];
+        return { id: tv, manuf: '', k: '', cap: true, ram: false, gen: false, colors: [], models: [] };
+    }
+    function modelVal() { return $model.value === CUSTOM ? $modelC.value.trim() : $model.value.trim(); }
+    function colorVal() { return $color.value === CUSTOM ? $colorC.value.trim() : $color.value.trim(); }
+
+    // JS zrcadlo build_title() — jen pro živý náhled, server počítá autoritativně
+    function buildTitle() {
+        var t = typeDef();
+        var model = modelVal();
+        var dm = model;
+        if (model && t.id && model.toLowerCase().indexOf(t.id.toLowerCase()) !== 0) dm = t.id + ' ' + model;
+        var cap = t.cap ? $cap.value : '';
+        var ram = t.ram ? $ram.value : '', cpu = t.ram ? $cpu.value : '', gpu = t.ram ? $gpu.value : '';
+        var mem = (ram && cap) ? ram + '/' + cap + ' SSD' : (ram ? ram + ' RAM' : cap);
+        var cores = [cpu ? cpu + ' CPU' : '', gpu ? gpu + ' GPU' : ''].filter(Boolean).join(' ');
+        var spec = (cores && mem) ? cores + ', ' + mem : (cores || mem);
+        var gr = ($grade.value || '').split(' ')[0] || 'A';
+        return [dm, spec, colorVal(), gr].filter(Boolean).join(' ').trim();
+    }
+    function buildDesc() {
+        var t = typeDef();
+        var out = [];
+        var gr = ($grade.value || '').split(' ')[0] || 'A';
+        if (gr) out.push('Stav: ' + gr);
+        if ($bat.value) out.push('Kondice baterie: ' + $bat.value + ' %');
+        if (t.ram && $cpu.value) out.push('Jader CPU: ' + $cpu.value);
+        if (t.ram && $gpu.value) out.push('Jader GPU: ' + $gpu.value);
+        if (t.ram && $ram.value) out.push('RAM: ' + $ram.value);
+        if (t.cap && $cap.value) out.push('Úložiště: ' + $cap.value);
+        if (colorVal()) out.push('Barva: ' + colorVal());
+        if ($rocnik.value) out.push('Ročník: ' + $rocnik.value);
+        if (t.gen && $gen.value) out.push('Generace: ' + $gen.value);
+        out.push('Zvláštní režim DPH §90 (použité zboží)');
+        return out.join(' | ');
+    }
+    function refreshPreview() {
+        el('pcPreviewTitle').textContent = buildTitle() || '—';
+        el('pcPreviewDesc').textContent = buildDesc();
+    }
+
+    function onType() {
+        var t = typeDef();
+        fillSelect($model, t.models, true, true);
+        fillSelect($color, t.colors, true, true);
+        $modelC.style.display = 'none'; $colorC.style.display = 'none';
+        document.querySelectorAll('.pc-mac').forEach(function (n) { n.style.display = t.ram ? '' : 'none'; });
+        document.querySelectorAll('.pc-ipad').forEach(function (n) { n.style.display = t.gen ? '' : 'none'; });
+        refreshPreview();
+    }
+
+    // hodnota mimo výčet selectu se nesmí tiše zahodit (starší kusy: 3 TB, rok 2009…)
+    function setSelectValue(sel, val) {
+        val = val || '';
+        if (val !== '' && !Array.prototype.some.call(sel.options, function (o) { return o.value === val; })) {
+            sel.insertBefore(new Option(val, val), sel.options[sel.options.length] || null);
+        }
+        sel.value = val;
+    }
+
+    // init
+    fillSelect($typ, CATALOG.types.map(function (t) { return t.id; }), false, true);
+    fillSelect($cap, CATALOG.caps, true, false);
+    fillSelect($grade, CATALOG.grades, false, false);
+    fillSelect($ram, CATALOG.rams, true, false);
+    fillSelect($cpu, CATALOG.cpus, true, false);
+    fillSelect($gpu, CATALOG.gpus, true, false);
+    fillSelect($rocnik, CATALOG.years, true, false);
+    fillSelect($gen, CATALOG.gens, true, false);
+    $grade.value = 'Nový';
+    $stockKey.value = DEFAULT_STOCK;
+    onType();
+
+    $typ.addEventListener('change', function () {
+        $typC.style.display = $typ.value === CUSTOM ? '' : 'none';
+        onType();
+    });
+    $model.addEventListener('change', function () { $modelC.style.display = $model.value === CUSTOM ? '' : 'none'; refreshPreview(); });
+    $color.addEventListener('change', function () { $colorC.style.display = $color.value === CUSTOM ? '' : 'none'; refreshPreview(); });
+    [$typC, $modelC, $colorC, $cap, $grade, $bat, $ram, $cpu, $gpu, $rocnik, $gen].forEach(function (n) {
+        n.addEventListener('input', refreshPreview);
+        n.addEventListener('change', refreshPreview);
+    });
+
+    // ── PČR badge (živý, orientační — server kontroluje znovu) ──
+    var badgeStyles = {
+        clean: ['rgba(26,140,86,.25)', '#6fe08d', 'PČR: V POŘÁDKU'],
+        stolen: ['rgba(200,40,40,.3)', '#ff8080', 'PČR: POZOR – ODCIZENO'],
+        unknown: ['rgba(150,120,30,.25)', '#ffd76b', 'PČR: NEOVĚŘENO'],
+        error: ['rgba(150,120,30,.25)', '#ffd76b', 'PČR: NEOVĚŘENO (chyba)'],
+        notimei: ['rgba(255,255,255,.06)', '#9aa3b2', 'PČR: není IMEI'],
+        none: ['rgba(255,255,255,.06)', '#9aa3b2', 'PČR: nekontrolováno'],
+    };
+    function setBadge(status) {
+        var s = badgeStyles[status] || badgeStyles.none;
+        $badge.style.background = s[0]; $badge.style.color = s[1]; $badge.textContent = s[2];
+    }
+    // formGen: generace formuláře — pozdní odpovědi (PČR, foto) z PŘEDCHOZÍHO kusu
+    // nesmí zapsat do už vyčištěného/nového formuláře
+    var formGen = 0;
+    var photoBusy = false;
+
+    $serial.addEventListener('blur', function () {
+        var v = $serial.value.trim();
+        if (v.replace(/\D/g, '').length < 14) { setBadge(v ? 'notimei' : 'none'); return; }
+        $badge.textContent = 'PČR: kontroluji…';
+        var gen = formGen;
+        var fd = new FormData();
+        fd.append('imei', v); fd.append('csrf_token', CSRF);
+        fetch('api/product_pcr.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (gen === formGen) setBadge(d.status || 'error'); })
+            .catch(function () { if (gen === formGen) setBadge('error'); });
+    });
+
+    // ── foto: upload hned po výběru ──
+    $photo.addEventListener('change', function () {
+        if (!$photo.files.length) return;
+        var code = $serial.value.trim() || ('foto-' + Date.now());
+        var gen = formGen;
+        var fd = new FormData();
+        fd.append('image', $photo.files[0]);
+        fd.append('code', code);
+        fd.append('csrf_token', CSRF);
+        photoBusy = true;
+        $msg.textContent = 'Nahrávám fotku…';
+        fetch('api/upload_product_image.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                photoBusy = false;
+                if (gen !== formGen) return;   // formulář mezitím přešel na další kus
+                if (d.success) {
+                    $imageUrl.value = d.url;
+                    el('pcPreviewImg').src = d.url;
+                    el('pcPreviewImgWrap').style.display = '';
+                    $msg.textContent = 'Foto přiloženo.';
+                } else { $msg.textContent = 'Foto se nenahrálo: ' + (d.message || ''); }
+            })
+            .catch(function () { photoBusy = false; if (gen === formGen) $msg.textContent = 'Foto se nenahrálo (síť).'; });
+    });
+
+    // ── uložení (create/update), stolen force flow, sériové naskladňování ──
+    var saving = false;
+    var savedSomething = false;   // řídí reload po zavření modalu (ne křehký text v $msg)
+    function save(printAfter, force) {
+        if (saving) return;
+        if (photoBusy) { $msg.textContent = 'Počkej — fotka se ještě nahrává…'; return; }
+        if (!modelVal()) { $msg.textContent = 'Vyplň model.'; return; }
+        if (!$price.value.trim()) { $msg.textContent = 'Vyplň cenu.'; return; }
+        saving = true;
+        $msg.textContent = 'Ukládám…';
+        var fd = new FormData();
+        fd.append('action', $editId.value ? 'update' : 'create');
+        if ($editId.value) fd.append('id', $editId.value);
+        fd.append('csrf_token', CSRF);
+        fd.append('typ', typVal());
+        fd.append('model', modelVal());
+        fd.append('cap', typeDef().cap ? $cap.value : '');
+        fd.append('color', colorVal());
+        fd.append('grade', $grade.value);
+        fd.append('battery', $bat.value);
+        fd.append('price', $price.value.trim());
+        fd.append('serial', $serial.value.trim());
+        fd.append('ram', typeDef().ram ? $ram.value : '');
+        fd.append('cpu', typeDef().ram ? $cpu.value : '');
+        fd.append('gpu', typeDef().ram ? $gpu.value : '');
+        fd.append('rocnik', $rocnik.value);
+        fd.append('generace', typeDef().gen ? $gen.value : '');
+        if ($sold.checked) fd.append('sold', '1');
+        fd.append('stock_key', $stockKey.value);
+        fd.append('image_url', $imageUrl.value);
+        if (force) fd.append('force', '1');
+        fetch('api/product_create.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                saving = false;
+                if (d.needs_confirmation) {
+                    if (confirm(d.confirm_text)) { save(printAfter, true); }
+                    else { $msg.textContent = 'Neuloženo (odcizené zařízení).'; }
+                    return;
+                }
+                if (!d.success) { $msg.textContent = d.message || 'Uložení selhalo.'; return; }
+                savedSomething = true;
+                el('pcTodayCount').textContent = d.today_count;
+                $msg.textContent = ($editId.value ? 'Uloženo: ' : 'Naskladněno: ') + d.title;
+                if (d.hint) { $hint.textContent = d.hint; $hint.style.display = ''; }
+                else { $hint.style.display = 'none'; }
+                var printPromise = Promise.resolve();
+                if (printAfter && d.id) {
+                    var pf = new FormData();
+                    pf.append('action', 'print_product'); pf.append('id', d.id); pf.append('csrf_token', CSRF);
+                    printPromise = fetch('api/print_label_server.php', { method: 'POST', body: pf, credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (p) { if (!p.ok) { $msg.textContent += ' · Tisk štítku selhal: ' + (p.error || ''); } })
+                        .catch(function () { $msg.textContent += ' · Tisk štítku selhal (síť).'; });
+                }
+                // reload při editaci až PO doběhnutí tisku — unload by in-flight tisk zrušil
+                if ($editId.value) { printPromise.then(function () { location.reload(); }); return; }
+                // vyčistit vše KROMĚ Typ / Stav / Prodejna — sériové naskladňování jako v appce
+                formGen++;
+                [$modelC, $colorC, $bat, $price, $serial].forEach(function (n) { n.value = ''; });
+                $model.value = ''; $color.value = ''; $cap.value = '';
+                $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
+                $modelC.style.display = 'none'; $colorC.style.display = 'none';
+                $sold.checked = false;
+                $photo.value = ''; $imageUrl.value = '';
+                el('pcPreviewImgWrap').style.display = 'none';
+                setBadge('none');
+                refreshPreview();
+            })
+            .catch(function () { saving = false; $msg.textContent = 'Síťová chyba — zkus to znovu.'; });
+    }
+    el('pcSaveBtn').addEventListener('click', function () { save(false, false); });
+    el('pcSavePrintBtn').addEventListener('click', function () { save(true, false); });
+    document.getElementById('productCreateModal').addEventListener('keydown', function (e) {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); save(true, false); }
+    });
+    // po zavření modalu obnovit tabulku (nové kusy) — při otevřeném se nerefreshuje
+    document.getElementById('productCreateModal').addEventListener('hidden.bs.modal', function () {
+        if (savedSomething) { location.reload(); }
+    });
+    el('productCreateOpen').addEventListener('click', function () {
+        // režim NOVÝ produkt — vyčistit VŠE (i pozůstatky předchozí editace)
+        formGen++;
+        $editId.value = '';
+        el('pcTitleMode').textContent = 'Naskladnit produkt';
+        el('pcSaveBtn').innerHTML = '<i class="fas fa-plus me-1"></i> Přidat';
+        $typC.value = ''; $typC.style.display = 'none';
+        if ($typ.value === CUSTOM) { $typ.value = CATALOG.types[0].id; onType(); }
+        [$modelC, $colorC, $bat, $price, $serial].forEach(function (n) { n.value = ''; });
+        $model.value = ''; $color.value = ''; $cap.value = '';
+        $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
+        $modelC.style.display = 'none'; $colorC.style.display = 'none';
+        $sold.checked = false;
+        $photo.value = ''; $imageUrl.value = '';
+        el('pcPreviewImgWrap').style.display = 'none';
+        $hint.style.display = 'none';
+        $msg.textContent = '';
+        setBadge('none');
+        refreshPreview();
+    });
+
+    // ── editace existujícího produktu ──
+    $(document).on('click', '.product-edit-btn', function () {
+        var id = this.dataset.id;
+        fetch('api/product_create.php?action=get&id=' + id, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.success) { showAlert(d.message || 'Načtení selhalo.'); return; }
+                var p = d.product;
+                formGen++;
+                $editId.value = p.id;
+                el('pcTitleMode').textContent = 'Upravit produkt';
+                el('pcSaveBtn').innerHTML = '<i class="fas fa-save me-1"></i> Uložit změny';
+                // typ odvodit z kategorie (K-kód), fallback z názvu; NEZNÁMÝ typ (z appky
+                // „Vlastní…") NIKDY nespadne na iPhone — přešel by na cizí K-kód a výrobce
+                var typ = '';
+                CATALOG.types.forEach(function (t) { if (t.k && t.k === p.category_code) typ = t.id; });
+                if (!typ) { CATALOG.types.forEach(function (t) { if (p.title.indexOf(t.id) === 0) typ = t.id; }); }
+                if (typ) { $typ.value = typ; $typC.value = ''; $typC.style.display = 'none'; }
+                else { $typ.value = CUSTOM; $typC.value = ''; $typC.style.display = ''; }
+                onType();
+                var t = typeDef();
+                // model bez prefixu typu (display_model ho přidává zpět)
+                var m = p.model || '';
+                if (t.models.indexOf(m) >= 0) { $model.value = m; }
+                else if (m) { $model.value = CUSTOM; $modelC.style.display = ''; $modelC.value = m; }
+                if (t.colors.indexOf(p.color) >= 0) { $color.value = p.color; }
+                else if (p.color) { $color.value = CUSTOM; $colorC.style.display = ''; $colorC.value = p.color; }
+                setSelectValue($cap, p.cap);
+                // grade token → celý label
+                var gl = CATALOG.grades.filter(function (g) { return g.split(' ')[0] === p.grade; });
+                $grade.value = gl.length ? gl[0] : 'Nový';
+                $bat.value = p.battery || '';
+                $price.value = p.price || '';
+                $serial.value = p.serial || '';
+                setSelectValue($ram, p.ram); setSelectValue($cpu, p.cpu); setSelectValue($gpu, p.gpu);
+                setSelectValue($rocnik, p.rocnik); setSelectValue($gen, p.generace);
+                $sold.checked = !!p.sold;
+                $stockKey.value = p.stock_key || DEFAULT_STOCK;
+                $imageUrl.value = p.image_url || '';
+                if (p.image_url) { el('pcPreviewImg').src = p.image_url; el('pcPreviewImgWrap').style.display = ''; }
+                else { el('pcPreviewImgWrap').style.display = 'none'; }
+                setBadge(p.pcr_status || 'none');
+                $msg.textContent = p.source === 'app' ? 'Pozor: kus z appky — uložením ho převezme CRM (import appky ho už nepřepíše).' : '';
+                refreshPreview();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('productCreateModal')).show();
+            })
+            .catch(function () { showAlert('Načtení produktu selhalo.'); });
+    });
+})();
+
 document.getElementById('importForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var btn = document.getElementById('importSubmitBtn');

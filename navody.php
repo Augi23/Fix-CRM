@@ -14,6 +14,24 @@ $tab = ($_GET['tab'] ?? 'crm') === 'opravy' ? 'opravy' : 'crm';
 $guides = [];
 $guides['crm'] = [
     [
+        'id' => 'naskladneni-produktu', 'icon' => 'fa-box-open', 'color' => '#0A84FF',
+        'title' => 'Naskladnění produktu (bazar) přímo v CRM',
+        'intro' => 'Nový kus použité elektroniky naskladníš rovnou v CRM — bez Mac appky. Kus je okamžitě prodejný na Pokladně a připravený pro e-shop.',
+        'steps' => [
+            'Otevři <b>Sklad → Produkty — e-shop</b> a klikni na zelené <b>Naskladnit produkt</b>.',
+            'Vyber <b>typ zařízení a model</b> (nabídka je stejná jako v appce; „✏️ Vlastní…" pro cokoliv mimo seznam), doplň úložiště, barvu, stav, baterii a <b>cenu</b>. Název produktu se skládá sám — vidíš ho živě vpravo.',
+            '<b>SN / IMEI naskenuj čtečkou</b> nebo zapiš — systém ho hned prověří v <b>databázi odcizených mobilů Policie ČR</b> (zelená = v pořádku, červená = POZOR). Bez SN se kód vygeneruje automaticky (AFX-…).',
+            'Volitelně přilož <b>foto produktu</b> (nahraje se hned) a klikni na <b>Přidat</b>, nebo rovnou <b>Přidat a vytisknout štítek</b> (Ctrl/Cmd+Enter) — cenovka vyjede z Brotheru na Karlíně.',
+            'Formulář se vyčistí (typ, stav a prodejna zůstanou) — můžeš hned naskladňovat další kus. Úprava kusu: tužka u řádku v tabulce.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => '<b>Duplicity hlídá systém:</b> stejné SN/IMEI podruhé nepřidáš (ukáže se, kdy byl kus naskladněn). Odcizené zařízení z databáze PČR jde přidat jen po výslovném potvrzení — a zapíše se to do Historie.'],
+            ['typ' => 'info', 'text' => '<b>Mac appka funguje dál souběžně.</b> Kus naskladněný v CRM si CRM chrání — import souboru z appky ho nepřepíše. Jeden fyzický kus ale naskladňuj jen v jednom systému.'],
+            ['typ' => 'info', 'text' => '<b>Pro Upgates:</b> tlačítko „CSV pro Upgates" stáhne kompletní sklad ve formátu appky — nahraje se do Upgates stejně jako dřív soubor z appky (párování podle kódu, aktualizace stávajících).'],
+            ['typ' => 'role', 'text' => 'Naskladňovat a upravovat smí <b>vedení</b> (admin, Boss, manažer). Tisknout cenový štítek smí každý přihlášený.'],
+        ],
+    ],
+    [
         'id' => 'kasa-pokladna', 'icon' => 'fa-cash-register', 'color' => '#30D158',
         'title' => 'Pokladna (kasa) — prodej přes pult',
         'intro' => 'Přímý prodej produktů (použitá elektronika, příslušenství) a servisních dílů bez zakládání zakázky. Sklad se odečítá automaticky, účtenka se tiskne hned.',

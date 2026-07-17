@@ -25,11 +25,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     afx_img_fail('Jen POST.', 405);
 }
 
-// ── Autorizace tokenem (appka je bez session) ──
-$token = (string)($_POST['token'] ?? ($_SERVER['HTTP_X_AFX_TOKEN'] ?? ''));
-$expected = (string)get_setting('product_image_token', '');
-if ($expected === '' || !hash_equals($expected, $token)) {
-    afx_img_fail('Neplatný token.', 403);
+// ── Autorizace: přihlášená session (naskladnění v CRM) NEBO token (Mac appka) ──
+$sessionOk = (!empty($_SESSION['user_id']) || !empty($_SESSION['tech_id']))
+    && validateCsrfToken((string)($_POST['csrf_token'] ?? ''))
+    && crmCanManageProducts();
+if (!$sessionOk) {
+    // přihlášený uživatel s vypršelým CSRF nesmí dostat matoucí „Neplatný token" (to je hláška appky)
+    if ((!empty($_SESSION['user_id']) || !empty($_SESSION['tech_id'])) && isset($_POST['csrf_token'])) {
+        afx_img_fail('Přihlášení vypršelo — obnov stránku (⌘R) a zkus fotku znovu.', 403);
+    }
+    // původní tokenová větev pro appku — BEZE ZMĚNY
+    $token = (string)($_POST['token'] ?? ($_SERVER['HTTP_X_AFX_TOKEN'] ?? ''));
+    $expected = (string)get_setting('product_image_token', '');
+    if ($expected === '' || !hash_equals($expected, $token)) {
+        afx_img_fail('Neplatný token.', 403);
+    }
 }
 
 $code = trim((string)($_POST['code'] ?? ''));

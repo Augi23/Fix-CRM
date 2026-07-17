@@ -76,11 +76,12 @@ $parsePrice = static function (string $v): float {
 
 ensureProductsTable();   // DDL před transakcí (implicitní commit)
 ensureProductsPosColumn();
+ensureProductsCrmColumns();
 
 // čas začátku VŽDY z hodin databáze — last_seen_at plní NOW() z MySQL a kdyby
 // PHP a MySQL běžely v jiném pásmu, stale-detekce by označila i čerstvé řádky
 $startedAt = (string)$pdo->query("SELECT NOW()")->fetchColumn();
-$created = 0; $updated = 0; $skipped = 0; $rows = 0;
+$created = 0; $updated = 0; $skipped = 0; $rows = 0; $crmOwned = 0;
 
 // Aktualizovat JEN sloupce, jejichž hlavička v nahraném souboru opravdu je.
 // V oběhu jsou starší, užší varianty souboru — kdyby se updatovalo vše,
@@ -149,6 +150,10 @@ try {
         VALUES (" . implode(', ', array_fill(0, count($colNames), '?')) . ", NOW())
         ON DUPLICATE KEY UPDATE " . implode(', ', $updateParts));
 
+    // kusy založené/převzaté PŘÍMO v CRM (source='crm') import appky NEPŘEPISUJE —
+    // CRM je pro ně autorita; soubor appky je může mít zastarale
+    $crmCheck = $pdo->prepare("SELECT source FROM products WHERE product_code = ?");
+
     $pdo->beginTransaction();
 
     while (($row = fgetcsv($stream, 0, $delim, '"', '')) !== false) {
@@ -158,6 +163,9 @@ try {
 
         if ($col($row, '[TITLE]') === '' || $col($row, '[PRODUCT_CODE]') === '') { $skipped++; continue; }   // bez názvu/kódu nejde upsertovat
 
+        $crmCheck->execute([mb_substr($col($row, '[PRODUCT_CODE]'), 0, 64)]);
+        if ((string)$crmCheck->fetchColumn() === 'crm') { $crmOwned++; continue; }
+
         $values = [];
         foreach ($fields as $fn) { $values[] = $fn($row); }
         $up->execute($values);
@@ -165,7 +173,7 @@ try {
         if ($rc === 1) { $created++; } else { $updated++; }
     }
 
-    if ($created + $updated === 0) {
+    if ($created + $updated + $crmOwned === 0) {
         $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => 'V souboru nebyl žádný použitelný řádek (' . $rows . ' řádků, ' . $skipped . ' přeskočeno). Je to správný soubor?']); exit;
     }
@@ -201,7 +209,8 @@ try {
 // řádky v DB, které v tomhle souboru nebyly (nemažou se — jen se zvýrazní na stránce)
 $stale = 0;
 try {
-    $st = $pdo->prepare("SELECT COUNT(*) FROM products WHERE last_seen_at < ?");
+    // source='crm' kusy v souboru appky záměrně nejsou — do „stale" se nepočítají
+    $st = $pdo->prepare("SELECT COUNT(*) FROM products WHERE last_seen_at < ? AND source != 'crm'");
     $st->execute([$startedAt]);
     $stale = (int)$st->fetchColumn();
     set_setting('products_last_import_at', $startedAt);
@@ -218,4 +227,5 @@ $msg = 'Hotovo: ' . $created . ' nových, ' . $updated . ' aktualizovaných';
 if ($skipped > 0) { $msg .= ', ' . $skipped . ' přeskočeno (bez názvu/kódu)'; }
 if ($stale > 0) { $msg .= '. ' . $stale . ' dřívějších produktů v souboru nebylo — v seznamu dostanou štítek.'; }
 if ($posConflict > 0) { $msg .= ' ' . $posConflict . ' produktů prodaných na kase soubor ještě hlásí skladem — CRM je automaticky drží jako vyprodané.'; }
-echo json_encode(['success' => true, 'message' => $msg, 'created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'stale' => $stale, 'pos_conflict' => $posConflict]);
+if ($crmOwned > 0) { $msg .= ' ' . $crmOwned . ' kusů přeskočeno — spravují se přímo v CRM (naskladněno/upraveno tady).'; }
+echo json_encode(['success' => true, 'message' => $msg, 'created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'stale' => $stale, 'pos_conflict' => $posConflict, 'crm_owned' => $crmOwned]);

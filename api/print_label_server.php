@@ -79,7 +79,60 @@ if (!$envOk) {
     echo json_encode(['ok' => false, 'error' => 'Prostředí tisku se nepodařilo připravit: ' . $envErr]); exit;
 }
 
-if ($action === 'test') {
+if ($action === 'print_product') {
+    // ── cenový štítek PRODUKTU (Sklad → Produkty) — port label_data() z appky ──
+    ensureProductsTable();
+    $pid = (int)($_POST['id'] ?? 0);
+    $st = $pdo->prepare("SELECT * FROM products WHERE id = ?");
+    $st->execute([$pid]);
+    $p = $st->fetch();
+    if (!$p) { echo json_encode(['ok' => false, 'error' => 'Produkt nenalezen']); exit; }
+    $raw = json_decode((string)($p['raw_csv'] ?? ''), true) ?: [];
+
+    $title = (string)$p['title'];
+    $model = trim((string)($p['model'] ?? ''));
+    $cap = trim((string)($p['capacity'] ?? ''));
+    $color = trim((string)($p['color'] ?? ''));
+    $grade = trim((string)($p['grade'] ?? ''));
+    $bat = trim((string)($p['battery'] ?? ''));
+    $ram = trim((string)($raw['[PARAMETER "RAM"]'] ?? ''));
+    $cpu = trim((string)($raw['CPU_JADRA'] ?? ''));
+    $gpu = trim((string)($raw['GPU_JADRA'] ?? ''));
+    $sn = (string)$p['product_code'];
+    if (str_starts_with(strtoupper($sn), 'AFX') || str_starts_with(strtoupper($sn), 'PREVIEW')) { $sn = ''; }
+
+    $nazev = $model;
+    if ($nazev === '') {   // ostatní značky bez PARAMETER Model — odsekat suffixy z názvu
+        $nazev = $title;
+        foreach ([$grade, $color, $cap] as $suf) {
+            if ($suf !== '' && str_ends_with($nazev, ' ' . $suf)) {
+                $nazev = rtrim(mb_substr($nazev, 0, mb_strlen($nazev) - mb_strlen(' ' . $suf)));
+            }
+        }
+    }
+    if (str_contains(mb_strtolower($title), 'macbook')) {
+        // MacBook: starší kusy mají RAM/úložiště jen v názvu — doplnit odsud
+        if (preg_match('/(\d+\s*GB)\s*\/\s*(\d+(?:[.,]\d+)?\s*(?:GB|TB))(?:\s*SSD)?/u', $title, $mm, PREG_OFFSET_CAPTURE)) {
+            $pname = rtrim(mb_strcut($title, 0, $mm[0][1]), ' ,');
+            $pname = trim(preg_replace('/\s+\d+\s*CPU.*$/u', '', $pname));
+            if ($pname !== '' && mb_strlen($pname) > mb_strlen($nazev)) { $nazev = $pname; }
+            if ($ram === '') { $ram = $mm[1][0]; }
+            if ($cap === '') { $cap = $mm[2][0]; }
+        }
+    }
+    // celá cena → „21 290 Kč"; necelá se NEzaokrouhluje (přesně jako appka)
+    $priceF = (float)$p['price'];
+    if ($priceF <= 0) { $cena = ''; }
+    elseif ($priceF == (int)$priceF) { $cena = number_format($priceF, 0, ',', ' ') . ' Kč'; }
+    else { $cena = rtrim(rtrim(number_format($priceF, 2, '.', ''), '0'), '.') . ' Kč'; }
+    $data = [
+        'nazev' => $nazev, 'barva' => $color, 'stav' => $grade, 'uloziste' => $cap,
+        'baterie' => $bat, 'ram' => $ram, 'cpu' => $cpu, 'gpu' => $gpu,
+        'sn' => $sn, 'cena' => $cena,
+        'mac' => str_contains(mb_strtolower($nazev !== '' ? $nazev : $title), 'macbook'),
+    ];
+    $args = ['--product-json' => base64_encode((string)json_encode($data, JSON_UNESCAPED_UNICODE))];
+} elseif ($action === 'test') {
     $args = ['--code' => 'TEST' . date('His'), '--defect' => 'Testovací štítek ze serveru', '--date' => date('d.m.Y'), '--client' => 'Fix-CRM'];
 } else {
     $orderId = (int)($_POST['id'] ?? 0);
@@ -113,7 +166,7 @@ $last = trim((string)end($outLines));
 $res = json_decode($last, true);
 
 if (is_array($res) && !empty($res['ok'])) {
-    echo json_encode(['ok' => true, 'code' => $args['--code']]);
+    echo json_encode(['ok' => true, 'code' => $args['--code'] ?? 'produkt']);
 } else {
     $err = is_array($res) ? (string)($res['error'] ?? '') : implode(' | ', array_slice($outLines, -3));
     echo json_encode(['ok' => false, 'error' => 'Tisk selhal: ' . ($err !== '' ? $err : 'neznámá chyba')]);

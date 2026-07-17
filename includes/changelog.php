@@ -6,6 +6,21 @@
  */
 return [
     [
+        'version' => '2.3.0',
+        'date' => '2026-07-17',
+        'time' => '19:09',
+        'title' => 'NASKLADNĚNÍ PRODUKTŮ přímo v CRM — náhrada Mac appky',
+        'items' => [
+            'Sklad → Produkty má zelené tlačítko „Naskladnit produkt": stejný formulář jako v naskladňovací appce (typ, model, úložiště, barva, stav, baterie, cena, SN/IMEI, RAM a jádra u MacBooků) s živým náhledem automaticky složeného názvu.',
+            'SN/IMEI se při zadání hned prověří v databázi odcizených mobilů Policie ČR — zelená V POŘÁDKU / červená POZOR–ODCIZENO (přidat jde jen po výslovném potvrzení, se záznamem v Historii). Duplicitní SN systém nepustí.',
+            'Foto produktu se nahraje rovnou z prohlížeče; „Přidat a vytisknout štítek" (Ctrl/Cmd+Enter) pošle cenovku na Brother QL-810W — stejný vzhled štítku jako z appky, včetně velkého MacBook formátu.',
+            'Naskladněný kus je okamžitě prodejný na Pokladně a připravený pro e-shop (ukládá se i kompletní datový řádek pro Upgates). Formulář se po přidání čistí pro další kus (typ, stav a prodejna zůstávají) — sériové naskladňování jako v appce.',
+            'Úprava produktu tužkou u řádku; tisk cenovky ikonkou štítku (smí každý přihlášený). Tlačítko „CSV pro Upgates" stáhne celý sklad ve formátu souboru appky pro dosavadní ruční import — nově se do něj propisují i prodeje z kasy (Vyprodáno).',
+            'Mac appka funguje dál souběžně: kusy naskladněné v CRM si CRM chrání — import souboru z appky je nepřepíše (jen ohlásí počet). Jeden fyzický kus naskladňuj jen v jednom systému.',
+            'Návod pro zaměstnance: Návody → CRM → „Naskladnění produktu (bazar) přímo v CRM".',
+        ],
+    ],
+    [
         'version' => '2.2.1',
         'date' => '2026-07-17',
         'time' => '17:41',
