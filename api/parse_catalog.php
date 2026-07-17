@@ -2,7 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 
-if (!isset($_SESSION['user_id']) || !hasPermission('admin_access')) {
+if (!isset($_SESSION['user_id']) || !crmCanManageCatalogs()) {
     die(__('unauthorized'));
 }
 

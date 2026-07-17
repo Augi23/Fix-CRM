@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.12.5',
+        'date' => '2026-07-17',
+        'time' => '10:36',
+        'title' => 'Boss má plná práva na Nákupy a Sklad',
+        'items' => [
+            'Boss nově zvládne v Nákupech a Skladu všechno co administrátor: import a aktualizaci katalogů dodavatelů, přidání nového dodavatele, správu produktů, naskladnění, korekce stavu i objednávky dílů.',
+            'Tlačítka „Aktualizovat z katalogu" a „Přidat katalog" se Bossovi nyní zobrazují na stránce Nákupy.',
+        ],
+    ],
+    [
         'version' => '1.12.4',
         'date' => '2026-07-17',
         'time' => '10:19',

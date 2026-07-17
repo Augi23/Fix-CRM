@@ -193,7 +193,7 @@ $can_add_procurement = $can_order;
         <div class="text-white-75 small"><?php echo __('proc_desc'); ?></div>
     </div>
     <div class="d-flex gap-2">
-        <?php if (hasPermission('admin_access')): ?>
+        <?php if (crmCanManageCatalogs()): ?>
         <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#catalogUpdateModal">
             <i class="fas fa-sync me-2"></i><?php echo __('update_catalog'); ?>
         </button>

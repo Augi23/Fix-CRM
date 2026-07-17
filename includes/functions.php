@@ -156,6 +156,14 @@ function crmCanManageInvoices(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 
+/** Plná správa katalogů dodavatelů v Nákupech/Skladu (import, přidání dodavatele)
+ *  smí administrátor a Boss (rozšířeno 17.7.2026 — Boss má neomezená práva na
+ *  Nákupy a Sklad: katalogy, produkty, objednávky). Zbytek sekce mu pokrývají
+ *  implicitní práva manage_inventory + procurement_manage v hasPermission(). */
+function crmCanManageCatalogs(): bool {
+    return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
+}
+
 /** Aktualizace CRM (kontrola + instalace + diagnostika) smí vedení:
  *  administrátor, manažer i Boss (rozšířeno 16.7.2026 — dřív jen admin). */
 function crmCanRunUpdates(): bool {
