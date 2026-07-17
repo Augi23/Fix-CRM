@@ -1536,19 +1536,22 @@ require_once 'includes/header.php';
 
                         <div class="row g-3 mb-4">
                             <div class="col-6">
-                                <div class="glass-panel p-3 text-center border-secondary">
+                                <div class="glass-panel p-3 text-center border-secondary h-100">
                                     <div class="text-white-75 small"><?php echo __('current_version'); ?></div>
-                                    <div class="h4 text-white mb-0" id="localVersion">Verze <?php echo e(crmAppVersion()); ?></div>
-                                    <div class="small text-muted" title="technické označení sestavení">
+                                    <div class="h4 text-white mb-1" id="localVersion">Verze <?php echo e(crmAppVersion()); ?></div>
+                                    <?php if (!empty($gitInfo['local_date'])): ?>
+                                        <div class="small text-white-75"><i class="far fa-calendar-check me-1 text-info"></i><?php echo e(crmCzechDateTime((string)$gitInfo['local_date'])); ?></div>
+                                    <?php endif; ?>
+                                    <div class="text-muted mt-1" style="font-size:.72rem;" title="technické označení sestavení">
                                         <?php echo htmlspecialchars(trim($branchLabel . ' @ ' . $localShort)); ?> · <?php echo !empty($gitInfo['dirty']) ? 'dirty' : 'clean'; ?>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-6">
-                                <div class="glass-panel p-3 text-center border-secondary">
+                                <div class="glass-panel p-3 text-center border-secondary h-100">
                                     <div class="text-white-75 small"><?php echo __('latest_version'); ?></div>
-                                    <div class="h4 text-muted mb-0" id="remoteVersion"><?php echo !empty($gitInfo['remote_version']) ? 'Verze ' . e((string)$gitInfo['remote_version']) : htmlspecialchars(trim($branchLabel . ' @ ' . $remoteShort)); ?></div>
-                                    <div class="small text-muted" id="remoteReleaseDate"><?php echo !empty($gitInfo['remote_date']) ? htmlspecialchars(date('Y-m-d H:i', strtotime($gitInfo['remote_date']))) : ''; ?></div>
+                                    <div class="h4 text-muted mb-1" id="remoteVersion"><?php echo !empty($gitInfo['remote_version']) ? 'Verze ' . e((string)$gitInfo['remote_version']) : htmlspecialchars(trim($branchLabel . ' @ ' . $remoteShort)); ?></div>
+                                    <div class="small text-white-75" id="remoteReleaseDate"><?php echo !empty($gitInfo['remote_date']) ? '<i class="far fa-calendar-check me-1 text-info"></i>' . e(crmCzechDateTime((string)$gitInfo['remote_date'])) : ''; ?></div>
                                 </div>
                             </div>
                         </div>
@@ -2035,7 +2038,7 @@ function checkForUpdates(force = false) {
             
             const rd = document.getElementById('remoteReleaseDate');
             if (rd && data.release_date) {
-                rd.textContent = UPDATE_TRANSLATIONS.release_date + ': ' + data.release_date;
+                rd.innerHTML = '<i class="far fa-calendar-check me-1 text-info"></i>' + escapeHtml(crmCzechDateTimeJS(data.release_date));
             }
 
             // Status message
@@ -2116,6 +2119,25 @@ function escapeHtml(s) {
     const div = document.createElement('div');
     div.textContent = s;
     return div.innerHTML;
+}
+
+// Lidsky čitelné datum a čas v češtině — stejný formát jako PHP crmCzechDateTime().
+function crmCzechDateTimeJS(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    const days = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
+    const months = ['ledna', 'února', 'března', 'dubna', 'května', 'června', 'července', 'srpna', 'září', 'října', 'listopadu', 'prosince'];
+    const pad = n => String(n).padStart(2, '0');
+    let out = days[d.getDay()] + ' ' + d.getDate() + '. ' + months[d.getMonth()] + ' ' + d.getFullYear()
+        + ' · ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const day = new Date(d); day.setHours(0, 0, 0, 0);
+    const diff = Math.round((today - day) / 86400000);
+    if (diff === 0) out += ' (dnes)';
+    else if (diff === 1) out += ' (včera)';
+    else if (diff >= 2 && diff <= 6) out += ' (před ' + diff + ' dny)';
+    return out;
 }
 
 function runUpdateDiagnostics() {

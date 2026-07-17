@@ -805,6 +805,37 @@ function formatMoney($amount) {
     return number_format((float)$amount, 0, ',', ' ') . ' ' . $currency;
 }
 
+/** Relativní český popis dne k datu (dnes/včera/před N dny), jinak ''. */
+function crmRelativeDayLabel(int $ts): string {
+    $day = strtotime(date('Y-m-d', $ts));
+    $diff = (int)floor((strtotime('today') - $day) / 86400);
+    if ($diff === 0) return 'dnes';
+    if ($diff === 1) return 'včera';
+    if ($diff >= 2 && $diff <= 6) return 'před ' . $diff . ' dny';
+    return '';
+}
+
+/**
+ * Lidsky čitelné datum a čas v češtině: „pátek 17. července 2026 · 11:07 (dnes)".
+ * Přijme ISO 8601 (git %cI) i „Y-m-d H:i". Používá se hlavně v sekci Aktualizace.
+ */
+function crmCzechDateTime(?string $isoOrDate, bool $withWeekday = true, bool $withRelative = true): string {
+    $isoOrDate = trim((string)$isoOrDate);
+    if ($isoOrDate === '') return '';
+    $ts = strtotime($isoOrDate);
+    if ($ts === false) return $isoOrDate;
+    $days = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
+    $months = ['', 'ledna', 'února', 'března', 'dubna', 'května', 'června', 'července', 'srpna', 'září', 'října', 'listopadu', 'prosince'];
+    $out = ($withWeekday ? $days[(int)date('w', $ts)] . ' ' : '')
+        . (int)date('j', $ts) . '. ' . $months[(int)date('n', $ts)] . ' ' . date('Y', $ts)
+        . ' · ' . date('H:i', $ts);
+    if ($withRelative) {
+        $rel = crmRelativeDayLabel($ts);
+        if ($rel !== '') { $out .= ' (' . $rel . ')'; }
+    }
+    return $out;
+}
+
 function get_setting($key, $default = '') {
     global $pdo;
     static $cache = [];

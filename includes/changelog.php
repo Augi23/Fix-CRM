@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.13.2',
+        'date' => '2026-07-17',
+        'time' => '11:23',
+        'title' => 'Aktualizace: čitelnější datum a čas u verzí',
+        'items' => [
+            'Datum vydání u aktuální a nejnovější verze (Nastavení → Aktualizace) se zobrazuje lidsky: „pátek 17. července 2026 · 11:07 (dnes)" místo strojového „2026-07-17 11:07".',
+            'K aktuální verzi přibylo datum jejího nasazení, ať je hned vidět, jak stará je.',
+        ],
+    ],
+    [
         'version' => '1.13.1',
         'date' => '2026-07-17',
         'time' => '11:07',
