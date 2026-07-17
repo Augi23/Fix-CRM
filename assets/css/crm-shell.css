@@ -71,6 +71,7 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
   display: flex; align-items: center; gap: 12px;
   height: 46px; padding: 0 18px;
   font-size: 12.5px; color: rgba(255,255,255,.55);
+  background: #000;   /* neprůhledná — animované pozadí do lišty neprosvítá */
 }
 .afx-brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 14px; color: #eef2f8; letter-spacing: -.01em; text-decoration: none; }
 .afx-brand:hover { color: #fff; }
@@ -333,7 +334,7 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
 html[data-lg-theme="light"], html[data-lg-theme="light"] body { background: #eef1f0 !important; background-image: none !important; }
 html[data-lg-theme="light"] canvas.crm-bgfx { display: none !important; }
 html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
-html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); }
+html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); background: #fff; } /* světlý motiv: lišta neprůhledně bílá (černá by pohřbila tmavý text) */
 html[data-lg-theme="light"] .afx-brand { color: #10151d; }
 html[data-lg-theme="light"] .afx-brand img { filter: none; } /* světlý motiv → černé logo */
 html[data-lg-theme="light"] .afx-cell { color: #46505e; }

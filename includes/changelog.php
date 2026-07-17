@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.15.1',
+        'date' => '2026-07-17',
+        'time' => '15:47',
+        'title' => 'Horní lišta s logem a vyhledáváním je neprůhledně černá',
+        'items' => [
+            'Tenká lišta úplně nahoře (logo, vyhledávání, QR sken, upozornění) má nově sytě černé neprůhledné pozadí — animované vlny do ní už neprosvítají.',
+            'Velké menu se sekcemi pod ní zůstalo beze změny; ve světlém motivu je lišta neprůhledně bílá.',
+        ],
+    ],
+    [
         'version' => '1.15.0',
         'date' => '2026-07-17',
         'time' => '15:24',
