@@ -44,7 +44,8 @@ try {
 .pos-item-code { font-size: 12.5px; color: rgba(255,255,255,.5); }
 .pos-cart input.pos-qty, .pos-cart input.pos-price { font-size: 18px; font-weight: 600; text-align: center; padding: 9px 6px; }
 .pos-line-total { font-size: 18px; font-weight: 700; white-space: nowrap; }
-.pos-remove { font-size: 15px; padding: 9px 12px; }
+.pos-remove { font-size: 26px; line-height: 1; padding: 6px 10px; border: 0; background: none; color: #ff5f57; cursor: pointer; transition: transform .12s, color .12s; }
+.pos-remove:hover { color: #ff2d21; transform: scale(1.18); }
 .pos-total { font-size: 58px; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
 .pos-total-label { font-size: 22px; font-weight: 600; }
 .pos-pay { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
@@ -252,7 +253,7 @@ try {
                 + '<td><input type="number" class="form-control pos-qty" min="1" max="' + c.stock + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"></td>'
                 + '<td><input type="text" class="form-control pos-price" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"></td>'
                 + '<td class="text-end pos-line-total">' + fmt(c.price * c.qty) + '</td>'
-                + '<td><button type="button" class="btn btn-white border text-danger pos-remove" onclick="posRemove(' + i + ')" title="Smazat položku z košíku"><i class="fas fa-trash"></i></button></td>';
+                + '<td><button type="button" class="pos-remove" onclick="posRemove(' + i + ')" title="Smazat položku z košíku"><i class="fas fa-times"></i></button></td>';
             $body.appendChild(tr);
         });
         $empty.style.display = cart.length ? 'none' : '';

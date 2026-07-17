@@ -13,7 +13,7 @@ return [
         'items' => [
             'Zboží jde do košíku načíst USB čtečkou čárových kódů — kdykoli je Pokladna otevřená, bez klikání do jakéhokoli pole. Pípneš kód (sériové číslo produktu nebo SKU dílu) a položka se přidá rovnou do košíku.',
             'Sken potvrdí zvuk a zelená hláška („Přidáno: …"); nenalezený nebo nejednoznačný kód ohlásí nízké pípnutí s červenou hláškou.',
-            'U každé položky v košíku je červené tlačítko s košem pro okamžité smazání položky.',
+            'U každé položky v košíku je velký červený křížek pro okamžité smazání položky.',
         ],
     ],
     [
