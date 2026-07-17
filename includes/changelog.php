@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.11.1',
+        'date' => '2026-07-17',
+        'time' => '02:22',
+        'title' => 'Sklad: jasnější naskladnění · Admin má pobočku Karlín',
+        'items' => [
+            'Tlačítko pro příjem nového zboží na stránce Sklad se nově jmenuje „Naskladnit nový díl" (dřív jen „Přidat díl") a na mobilu/iPadu se už neschovává mimo obraz. Otevře formulář s názvem dílu, počtem kusů a cenami; pro opakovaný příjem existujícího dílu slouží ikona náklaďáčku v řádku nebo sken QR na regálu.',
+            'Účet administrátora má nově přiřazenou výchozí pobočku Karlín — zobrazuje se v seznamu zaměstnanců i při zakládání zakázky (dřív prázdná pomlčka). Na práva to nemá vliv: admin dál vidí a spravuje všechny pobočky.',
+        ],
+    ],
+    [
         'version' => '1.11.0',
         'date' => '2026-07-17',
         'time' => '02:05',

@@ -977,6 +977,7 @@ $lang_overrides = [
         'add_employee_title' => 'Add employee',
         'add_media_files' => 'Add photos/videos',
         'add_part' => 'Add part',
+        'stock_new_part' => 'Stock new part',
         'add_part_to_order' => 'Add part to order',
         'address' => 'Address',
         'admin_management_title' => 'Administrator management',

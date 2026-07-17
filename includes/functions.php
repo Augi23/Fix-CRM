@@ -1104,6 +1104,33 @@ function ensureInventoryStockedSchema(): void {
     }
 }
 
+/**
+ * Přiřazení pobočky administrátorům (účty v tabulce `users`).
+ * Admin má globální výhled (řídí se rolí/admin_access, ne pobočkou), ale „pro pořádek"
+ * má i výchozí pobočku Karlín — aby se všude zobrazovala a předvybírala.
+ * Sloupec users.branch_id + backfill stávajících adminů na Karlín (jednorázově).
+ */
+function ensureUsersBranchColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM users LIKE 'branch_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN branch_id INT NULL DEFAULT NULL");
+        }
+        if (get_setting('users_branch_backfilled', '') !== '1') {
+            $def = getDefaultBranchId();   // Karlín
+            // guard nastavit až po skutečném backfillu — bez výchozí pobočky (čerstvá DB,
+            // výpadek dotazu) se musí příští request pokusit znovu, jinak by zůstalo NULL navždy
+            if ($def > 0) {
+                $pdo->prepare("UPDATE users SET branch_id = ? WHERE branch_id IS NULL OR branch_id = 0")->execute([$def]);
+                set_setting('users_branch_backfilled', '1');
+            }
+        }
+    } catch (Throwable $e) { error_log('ensureUsersBranchColumn: ' . $e->getMessage()); }
+}
+
 /** SQL fragment for "this part belongs in the warehouse view" (real stock). */
 function inventoryStockedWhereSql(): string {
     return '(is_stocked = 1 OR quantity > 0)';

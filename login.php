@@ -116,6 +116,7 @@ if (isset($_POST['login'])) {
 
             // 1) Staff / admin login
             if ($allowStaffLogin) {
+            ensureUsersBranchColumn();
             $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
             $stmt->execute([$username]);
             $user = $stmt->fetch();
@@ -128,7 +129,9 @@ if (isset($_POST['login'])) {
                 $_SESSION['role']      = 'admin';
                 $_SESSION['full_name'] = $user['full_name'];
                 $_SESSION['tech_id']   = null;
-                $_SESSION['branch_id'] = null;
+                // Admin má globální výhled (řídí se rolí), ale výchozí pobočku Karlín —
+                // aby se všude zobrazovala a předvybírala. Viz ensureUsersBranchColumn().
+                $_SESSION['branch_id'] = (int)($user['branch_id'] ?? 0) ?: getDefaultBranchId();
                 invalidatePermissionsCache();
                 recordLoginAttempt($pdo, true);
                 crmAuditLog('auth.login', ['entity_type' => 'auth', 'summary' => 'Přihlášení do systému (administrátor)']);

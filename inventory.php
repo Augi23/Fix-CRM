@@ -54,7 +54,7 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
         <h2 class="mb-0"><?php echo __('inventory'); ?></h2>
         <small class="text-muted"><?php echo __('total_items'); ?>: <?php echo $total_count; ?></small>
     </div>
-    <div class="d-flex gap-2 align-items-center">
+    <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
         <?php if($inventory_stats['low_stock'] > 0): ?>
             <span class="badge bg-warning text-dark me-2"><?php echo __('low_stock_alert'); ?>: <?php echo $inventory_stats['low_stock']; ?></span>
         <?php endif; ?>
@@ -65,7 +65,7 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
             <i class="fas fa-filter me-2"></i> <?php echo __('filters'); ?>
         </button>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newPartModal">
-            <i class="fas fa-plus me-2"></i> <?php echo __('add_part'); ?>
+            <i class="fas fa-plus me-2"></i> <?php echo __('stock_new_part'); ?>
         </button>
     </div>
 </div>
@@ -263,7 +263,7 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
             <form action="api/add_inventory.php" method="POST">
                 <?php echo csrfField(); ?>
                 <div class="modal-header">
-                    <h5 class="modal-title"><?php echo __('add_part'); ?></h5>
+                    <h5 class="modal-title"><i class="fas fa-truck-loading me-2 text-success"></i><?php echo __('stock_new_part'); ?></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">

@@ -990,7 +990,8 @@ require_once 'includes/header.php';
                         // Admin účty (Správa administrátorů) mají přednost před rolí na kartě
                         // zaměstnance — jinak povýšený admin dál svítil jako Manažer/Technik.
                         $__adminRows = [];
-                        try { $__adminRows = $pdo->query("SELECT id, username, full_name FROM users ORDER BY full_name")->fetchAll(); } catch (Throwable $e) {}
+                        if (function_exists('ensureUsersBranchColumn')) { ensureUsersBranchColumn(); }
+                        try { $__adminRows = $pdo->query("SELECT id, username, full_name, branch_id FROM users ORDER BY full_name")->fetchAll(); } catch (Throwable $e) { try { $__adminRows = $pdo->query("SELECT id, username, full_name FROM users ORDER BY full_name")->fetchAll(); } catch (Throwable $e2) {} }
                         $__adminUsernames = array_map('strval', array_column($__adminRows, 'username'));
                         // Admini, kteří mají JEN účet v users (ne technika) — dřív ve výpisu
                         // zaměstnanců chyběli, ačkoliv se níže objevovali u přiřazení zvuků.
@@ -1048,7 +1049,7 @@ require_once 'includes/header.php';
                             <td><strong><?php echo htmlspecialchars($au['full_name'] ?: $au['username']); ?></strong></td>
                             <td>@<?php echo htmlspecialchars($au['username']); ?></td>
                             <td><span class="badge bg-danger"><?php echo __('role_admin'); ?></span></td>
-                            <td><span class="text-white-50 small">—</span></td>
+                            <td><span class="badge bg-dark border border-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)($au['branch_id'] ?? 0) ?: getDefaultBranchId())); ?></span></td>
                             <td><span class="text-white-50 small">—</span></td>
                             <td><span class="text-white-50 small">—</span></td>
                             <td><span class="badge bg-success"><?php echo __('active_status'); ?></span></td>
