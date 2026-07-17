@@ -1,0 +1,4 @@
+# nahrané fotky produktů se do gitu necommitují (žijí na serveru)
+products/*
+!products/.gitkeep
+!products/index.html

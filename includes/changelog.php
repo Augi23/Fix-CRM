@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '1.14.0',
+        'date' => '2026-07-17',
+        'time' => '12:02',
+        'title' => 'Fotky produktů: úložiště pro naskladňovací appku (Upgates + Facebook)',
+        'items' => [
+            'Server nově přijímá fotky produktů z naskladňovací aplikace a ukládá je veřejně (media/products). Stejná adresa fotky pak funguje jak pro zobrazení v Upgates e-shopu, tak pro import do Facebook / Meta katalogu.',
+            'Navazuje úprava naskladňovací appky (tlačítko „Foto produktu") — fotka se nahraje sem a její adresa se uloží do sloupce obrázku.',
+        ],
+    ],
+    [
         'version' => '1.13.3',
         'date' => '2026-07-17',
         'time' => '11:35',
