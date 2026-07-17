@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.2.0',
+        'date' => '2026-07-17',
+        'time' => '17:41',
+        'title' => 'Pokladna: USB čtečka čárových kódů + jasné mazání položek',
+        'items' => [
+            'Zboží jde do košíku načíst USB čtečkou čárových kódů — kdykoli je Pokladna otevřená, bez klikání do jakéhokoli pole. Pípneš kód (sériové číslo produktu nebo SKU dílu) a položka se přidá rovnou do košíku.',
+            'Sken potvrdí zvuk a zelená hláška („Přidáno: …"); nenalezený nebo nejednoznačný kód ohlásí nízké pípnutí s červenou hláškou.',
+            'U každé položky v košíku je červené tlačítko s košem pro okamžité smazání položky.',
+        ],
+    ],
+    [
         'version' => '2.1.2',
         'date' => '2026-07-17',
         'time' => '17:36',

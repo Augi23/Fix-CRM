@@ -20,6 +20,7 @@ $guides['crm'] = [
         'steps' => [
             'Otevři <b>Pokladna</b> v horním menu.',
             '<b>Najdi zboží:</b> do velkého pole piš název, model nebo sériové číslo. Nabízí se jen to, co je <b>skutečně skladem</b> — zelený štítek PRODUKT (bazarové zboží), modrý DÍL (servisní díl). Klikem se položka přidá do košíku.',
+            '<b>Nebo pípni čtečkou:</b> USB čtečka čárových kódů funguje kdykoli, když je Pokladna otevřená — <b>nemusíš klikat do žádného pole</b>. Načteš kód a položka skočí rovnou do košíku (vysoké pípnutí = přidáno, nízké + hláška = kód nenalezen).',
             '<b>Košík:</b> položek můžeš přidat víc. U každé jde upravit <b>počet kusů</b> i <b>cenu za kus</b> (sleva na místě) — celková částka se přepočítá sama.',
             '<b>Platba:</b> vyber jedno ze tří tlačítek — <b>Hotově</b>, <b>Kartou</b> (terminál jedeš normálně zvlášť, tady se jen eviduje typ platby pro účetnictví) nebo <b>Na fakturu</b> (vyber zákazníka — faktura se vystaví automaticky a objeví se i v Účetnictví).',
             'Klikni na <b>Dokončit prodej</b> — otevře se <b>účtenka k tisku</b>; u platby na fakturu jde vytisknout i faktura. Účtenku jde kdykoli dotisknout ze seznamu „Dnešní prodeje" nebo z Historie.',

@@ -82,6 +82,12 @@ try {
 .pos-lock-card .lk-other:hover { color: #5fd2ff; }
 @keyframes lkshake { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
 .pos-lock-card.shake { animation: lkshake .4s; }
+/* toast po skenu čtečkou */
+.pos-toast { position: fixed; top: 64px; right: 22px; z-index: 11500; display: none; align-items: center; gap: 10px;
+  padding: 13px 18px; border-radius: 14px; font-size: 15.5px; font-weight: 600; color: #fff;
+  box-shadow: 0 14px 40px rgba(0,0,0,.4); }
+.pos-toast.ok { display: flex; background: rgba(28,120,60,.96); border: 1px solid rgba(110,224,141,.5); }
+.pos-toast.err { display: flex; background: rgba(150,40,40,.96); border: 1px solid rgba(255,122,122,.5); }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -96,7 +102,7 @@ try {
     <!-- ── vyhledávání ── -->
     <div class="col-lg-6">
         <div class="glass-panel p-3 border-secondary">
-            <label class="form-label small text-white-50 mb-2"><i class="fas fa-search me-1"></i> Najdi produkt nebo díl (jen skladem)</label>
+            <label class="form-label small text-white-50 mb-2"><i class="fas fa-search me-1"></i> Najdi produkt nebo díl (jen skladem) · <i class="fas fa-barcode me-1"></i>USB čtečka funguje kdykoli — stačí pípnout kód</label>
             <input type="text" id="posSearch" class="form-control pos-search" placeholder="iPhone 13, displej, sériové číslo…" autocomplete="off">
             <div id="posResults" class="pos-results mt-2"></div>
         </div>
@@ -246,7 +252,7 @@ try {
                 + '<td><input type="number" class="form-control pos-qty" min="1" max="' + c.stock + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"></td>'
                 + '<td><input type="text" class="form-control pos-price" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"></td>'
                 + '<td class="text-end pos-line-total">' + fmt(c.price * c.qty) + '</td>'
-                + '<td><button type="button" class="btn btn-white border text-danger pos-remove" onclick="posRemove(' + i + ')"><i class="fas fa-times"></i></button></td>';
+                + '<td><button type="button" class="btn btn-white border text-danger pos-remove" onclick="posRemove(' + i + ')" title="Smazat položku z košíku"><i class="fas fa-trash"></i></button></td>';
             $body.appendChild(tr);
         });
         $empty.style.display = cart.length ? 'none' : '';
@@ -332,6 +338,85 @@ try {
     document.getElementById('posDoneNew').addEventListener('click', function () {
         document.getElementById('posDone').style.display = 'none';
         location.reload();
+    });
+
+    // ── USB čtečka čárových kódů — funguje KDEKOLI na stránce ──
+    // Čtečka je klávesnice, která „napíše" kód strojovým tempem (10–40 ms/znak)
+    // a pošle Enter. Globální zachytávač pozná rychlou dávku znaků: nezáleží,
+    // jestli je kurzor v poli, mimo něj, nebo nikde.
+    var scanBuf = '', scanLast = 0, scanStart = 0;
+    var toastTimer = null;
+    var $toast = document.createElement('div');
+    $toast.className = 'pos-toast';
+    document.body.appendChild($toast);
+
+    function posToast(ok, text) {
+        $toast.className = 'pos-toast ' + (ok ? 'ok' : 'err');
+        $toast.innerHTML = '<i class="fas fa-' + (ok ? 'check-circle' : 'exclamation-circle') + '"></i><span></span>';
+        $toast.querySelector('span').textContent = text;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { $toast.className = 'pos-toast'; }, 3200);
+    }
+    function beep(ok) {   // krátké pípnutí jako u skutečné kasy (vysoké = OK, nízké = chyba)
+        try {
+            var ctx = window.__posAC = window.__posAC || new (window.AudioContext || window.webkitAudioContext)();
+            var o = ctx.createOscillator(), g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value = ok ? 1320 : 220;
+            g.gain.value = 0.07;
+            o.start(); o.stop(ctx.currentTime + (ok ? 0.09 : 0.25));
+        } catch (e) {}
+    }
+
+    function handleScan(code) {
+        fetch('api/pos_search.php?q=' + encodeURIComponent(code), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var results = (d.success && d.results) || [];
+                var exact = results.filter(function (r) { return (r.code || '').toLowerCase() === code.toLowerCase(); });
+                var hit = exact.length === 1 ? exact[0] : (exact.length === 0 && results.length === 1 ? results[0] : null);
+                if (hit) {
+                    addToCart(hit);
+                    beep(true);
+                    posToast(true, 'Přidáno: ' + hit.name);
+                } else {
+                    beep(false);
+                    posToast(false, exact.length > 1 || results.length > 1
+                        ? 'Kód „' + code + '" odpovídá více položkám — vyber ručně.'
+                        : 'Kód „' + code + '" není skladem ani v systému.');
+                }
+            })
+            .catch(function () { beep(false); posToast(false, 'Síťová chyba při hledání kódu.'); });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (locked) return;
+        var now = Date.now();
+        if (e.key === 'Enter') {
+            // dávka ≥4 znaků napsaná strojovým tempem = sken
+            if (scanBuf.length >= 4 && (now - scanLast) < 120 && (now - scanStart) < scanBuf.length * 55 + 200) {
+                var code = scanBuf;
+                scanBuf = '';
+                e.preventDefault();
+                // čtečka znaky „napsala" i do zrovna aktivního pole — uklidit je
+                var el = document.activeElement;
+                if (el && ('value' in el) && typeof el.value === 'string' && el.value.slice(-code.length) === code) {
+                    el.value = el.value.slice(0, -code.length);
+                }
+                handleScan(code);
+            } else {
+                scanBuf = '';
+            }
+            return;
+        }
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (now - scanLast > 120) { scanBuf = ''; scanStart = now; }   // pauza = píše člověk, začít znovu
+            scanBuf += e.key;
+            scanLast = now;
+            if (scanBuf.length > 64) { scanBuf = scanBuf.slice(-64); }
+        } else if (e.key !== 'Shift') {
+            scanBuf = '';
+        }
     });
 
     // ── zámek po nečinnosti (15 min) ──
