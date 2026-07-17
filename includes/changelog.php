@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.12.2',
+        'date' => '2026-07-17',
+        'time' => '04:44',
+        'title' => 'Nový design klientské karty v peněžence',
+        'items' => [
+            'Karta v Apple Wallet dostala nový vzhled: gradientový pás s vodoznakem jablka za jménem klienta, čisté logo bez ořezaného textu vedle něj a sladěné tlumené barvy (tmavé indigo).',
+            'Stejnou paletu dostala i karta v klientském portálu („Moje karta") — obě verze teď vypadají jednotně.',
+            'Klienti, kteří už kartu v peněžence mají, uvidí nový design po odebrání a opětovném přidání karty z portálu.',
+        ],
+    ],
+    [
         'version' => '1.12.1',
         'date' => '2026-07-17',
         'time' => '03:48',

@@ -58,10 +58,10 @@ $pass = [
     'organizationName'   => $company,
     'serialNumber'       => $serial,
     'description'        => $company . ' — věrnostní karta',
-    'logoText'           => $company,
+    // logoText záměrně chybí — wordmark v logo.png mluví sám, text se vedle něj ořezával
     'foregroundColor'    => 'rgb(255,255,255)',
-    'backgroundColor'    => 'rgb(20,22,40)',
-    'labelColor'         => 'rgb(150,170,255)',
+    'backgroundColor'    => 'rgb(15,17,28)',      // navazuje na levý okraj strip gradientu
+    'labelColor'         => 'rgb(142,160,208)',
     'barcodes'           => [[
         'format'          => 'PKBarcodeFormatQR',
         'message'         => crmCardScanUrl($serial),
@@ -95,10 +95,20 @@ $passJson = json_encode($pass, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 // ── Obrázky (icon.png povinný) ──
 $assets = [];
-$iconSrc = __DIR__ . '/../assets/img/app-icon-192.png';
-$logoSrc = __DIR__ . '/../assets/img/applefix-logo.png';
+$imgDir = __DIR__ . '/../assets/img';
+$iconSrc = $imgDir . '/app-icon-192.png';
 if (is_file($iconSrc)) { $bin = file_get_contents($iconSrc); $assets['icon.png'] = $bin; $assets['icon@2x.png'] = $bin; }
-if (is_file($logoSrc)) { $bin = file_get_contents($logoSrc); $assets['logo.png'] = $bin; $assets['logo@2x.png'] = $bin; }
+// designové podklady karty (generované, viz assets/img/wallet/):
+// logo = wordmark s odsazením (160×50 pt), strip = gradientový pás s vodoznakem jablka
+foreach (['logo.png', 'logo@2x.png', 'logo@3x.png', 'strip.png', 'strip@2x.png', 'strip@3x.png'] as $n) {
+    $p = $imgDir . '/wallet/' . $n;
+    if (is_file($p)) { $assets[$n] = file_get_contents($p); }
+}
+// fallback na původní wordmark, kdyby wallet podklady na serveru chyběly
+if (!isset($assets['logo.png']) && is_file($imgDir . '/applefix-logo.png')) {
+    $bin = file_get_contents($imgDir . '/applefix-logo.png');
+    $assets['logo.png'] = $bin; $assets['logo@2x.png'] = $bin;
+}
 if (!isset($assets['icon.png'])) { afx_pass_fail('Chybí icon.png pro pass.', 500); }
 
 // ── manifest.json (SHA1 každého souboru) ──

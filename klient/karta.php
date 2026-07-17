@@ -30,10 +30,12 @@ $qr = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=0&data=' 
     .wrap { max-width:440px; margin:0 auto; }
     .loyalty-card {
         border-radius:22px; padding:22px; color:#fff; position:relative; overflow:hidden;
-        background:linear-gradient(135deg,#0A84FF 0%,#5E5CE6 55%,#BF5AF2 100%);
-        box-shadow:0 18px 44px rgba(10,132,255,.35);
+        /* stejná paleta jako pass v Apple Wallet (strip gradient) */
+        background:linear-gradient(135deg,#0F111C 0%,#182042 55%,#2E265C 100%);
+        border:1px solid rgba(142,160,208,.22);
+        box-shadow:0 18px 44px rgba(46,38,92,.45);
     }
-    .loyalty-card::after { content:""; position:absolute; right:-40px; top:-40px; width:180px; height:180px; border-radius:50%; background:rgba(255,255,255,.12); }
+    .loyalty-card::after { content:""; position:absolute; right:-40px; top:-40px; width:200px; height:200px; border-radius:50%; background:radial-gradient(circle,rgba(94,92,230,.28),transparent 70%); }
     .lc-brand { font-weight:800; letter-spacing:.5px; font-size:1.1rem; }
     .lc-name { font-size:1.35rem; font-weight:700; margin-top:22px; }
     .lc-stats { display:flex; gap:10px; margin-top:16px; }
