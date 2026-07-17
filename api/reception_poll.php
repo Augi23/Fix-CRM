@@ -20,6 +20,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $branch = getCurrentStaffBranchId() ?: getDefaultBranchId();
+session_write_close();   // poll jen čte — nedržet zámek session (běží každé ~3 s)
 $raw = (string)get_setting('reception_scan_b' . (int)$branch, '');
 $ev = $raw !== '' ? json_decode($raw, true) : null;
 $seen = (string)($_GET['seen'] ?? '');

@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.12.4',
+        'date' => '2026-07-17',
+        'time' => '10:19',
+        'title' => 'Oprava: CRM „zamrzalo" během importu katalogu · nový dodavatel Jablečnédíly.cz',
+        'items' => [
+            'Když běžel import katalogu dodavatele, celé CRM v tom samém prohlížeči přestalo reagovat (filtry v Nákupech, jiné záložky) — import držel zámek přihlášení po celou dobu běhu. Opraveno, během importu jde normálně pracovat dál.',
+            'Tlačítko importu se po spuštění zamkne a ukazuje „Import běží…" — nejde omylem spustit dvakrát.',
+            'Do katalogu v Nákupech přibyl dodavatel Jablečnédíly.cz (Shoptet) — naimportováno přes 1200 dílů s cenami, obrázky a skladovou dostupností. Aktualizace stejně jako u ostatních: Aktualizovat z katalogu → Jablečnédíly.cz.',
+        ],
+    ],
+    [
         'version' => '1.12.3',
         'date' => '2026-07-17',
         'time' => '09:59',

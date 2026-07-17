@@ -16,6 +16,11 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     die(__('csrf_token_invalid'));
 }
 
+// Import běží dlouho (crawl celého katalogu) — session UVOLNIT hned po ověření,
+// jinak drží zámek a všechny další požadavky uživatele (filtry, jiné taby CRM)
+// visí, dokud import neskončí. Do session už dál nezapisujeme.
+session_write_close();
+
 set_time_limit(300);
 
 function redirectToInventory(array $params = []): void {

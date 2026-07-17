@@ -1070,6 +1070,11 @@ function confirmCatalogUpdate(form) {
     }
 
     showConfirm('<?php echo __('parse_confirm'); ?>', function() {
+        // pojistka proti dvojímu spuštění: import běží minuty, druhý klik by ho rozjel znovu
+        if (form.dataset.importRunning === '1') { return; }
+        form.dataset.importRunning = '1';
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Import běží…'; }
         form.submit();
     });
 
