@@ -1841,6 +1841,7 @@ window.afxSignaturePad = function (opts) {
  * i tady. Zapíná se plovoucím tlačítkem na Nástěnce, stav drží localStorage,
  * takže poslech běží na všech stránkách CRM, dokud se nevypne. */
 (function () {
+  try {
     function enabled() { try { return localStorage.getItem('afx_reception_mode') === '1'; } catch (e) { return false; } }
     function setEnabled(on) { try { localStorage.setItem('afx_reception_mode', on ? '1' : '0'); } catch (e) {} }
 
@@ -1909,4 +1910,5 @@ window.afxSignaturePad = function (opts) {
     }
     setInterval(tick, 3000);
     tick();
+  } catch (e) { /* Režim recepce nesmí nikdy shodit zbytek UI (horní lišta apod.) */ }
 })();

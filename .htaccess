@@ -18,6 +18,16 @@ RewriteEngine On
     Header always set X-Frame-Options "SAMEORIGIN"
     Header always set X-XSS-Protection "1; mode=block"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Statické soubory (JS/CSS) revaliduj — mají cache-bust ?v=<filemtime>, ale
+    # ať prohlížeč po nasazení nedrží starou verzi z heuristické cache (rozbitá
+    # horní lišta apod.). Obrázky/fonty smí cachovat dlouho.
+    <FilesMatch "\.(js|css)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+    <FilesMatch "\.(png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf)$">
+        Header set Cache-Control "public, max-age=2592000"
+    </FilesMatch>
 </IfModule>
 
 # ── Disable directory listing ─────────────────────────────────────────────────

@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.13.1',
+        'date' => '2026-07-17',
+        'time' => '11:07',
+        'title' => 'Oprava: horní lišta (upozornění, QR sken, hledání) po aktualizaci nereagovala',
+        'items' => [
+            'Prohlížeč po nasazení někdy držel starou verzi skriptů z paměti a horní lišta pak nereagovala na kliknutí. Nově se skripty (JS/CSS) po každé aktualizaci vždy ověří, takže se tohle už nestane.',
+            'Kdyby to u někoho ještě přetrvávalo: stačí jednou tvrdě obnovit stránku (na Macu Cmd+Shift+R, na Windows Ctrl+F5).',
+            'Funkce „Režim recepce" navíc pojištěna tak, aby v žádném případě nemohla ovlivnit zbytek ovládání.',
+        ],
+    ],
+    [
         'version' => '1.13.0',
         'date' => '2026-07-17',
         'time' => '10:45',
