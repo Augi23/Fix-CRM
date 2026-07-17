@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.13.3',
+        'date' => '2026-07-17',
+        'time' => '11:35',
+        'title' => 'Endy (Andrea): přístup do Klientů, Skladu a Nákupů',
+        'items' => [
+            'Andrea (Endy) může nově upravovat údaje klientů — kdyby při zadávání vznikl překlep, opraví si ho sama (sekce Klienti i přímo u zakázky).',
+            'Získala přístup do Skladu a plnou práci v Nákupech (objednávání dílů). Návody měla přístupné i dřív.',
+            'Aby se práva projevila, musí se Andrea jednou odhlásit a znovu přihlásit.',
+        ],
+    ],
+    [
         'version' => '1.13.2',
         'date' => '2026-07-17',
         'time' => '11:23',
