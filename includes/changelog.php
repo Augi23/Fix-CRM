@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.0.1',
+        'date' => '2026-07-17',
+        'time' => '17:02',
+        'title' => 'Pokladna: čistší rozhraní jako u skutečné kasy',
+        'items' => [
+            'Sekce „Dnešní prodeje" z Pokladny zmizela — historie prodejů patří do Historie → Kasa prodejna (odkaz zůstal nahoře vedle denních součtů). Kasa je teď čistě prodejní plocha.',
+            'Košík je výrazně větší a čitelnější: větší názvy položek, velká pole pro kusy a cenu, větší řádkové součty, celková částka i platební tlačítka — rozhraní klasické pokladny.',
+        ],
+    ],
+    [
         'version' => '2.0.0',
         'date' => '2026-07-17',
         'time' => '16:14',

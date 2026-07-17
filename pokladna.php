@@ -14,15 +14,10 @@ ensurePosTables();
 ensureProductsTable();
 ensureProductsPosColumn();
 
-$canCancel = crmCanCancelPosSale();
-
-// dnešní prodeje (pro rychlý dotisk účtenky přímo z kasy)
-$today = [];
+// denní součty do hlavičky (uzávěrka na první pohled); historie prodejů
+// je záměrně JEN v Historie → Kasa prodejna, kasa je čistě prodejní plocha
 $todaySums = ['cash' => 0.0, 'card' => 0.0, 'invoice' => 0.0];
 try {
-    $st = $pdo->query("SELECT id, sale_number, created_at, total, payment_method, status, seller_name
-        FROM pos_sales WHERE DATE(created_at) = CURDATE() ORDER BY id DESC LIMIT 20");
-    $today = $st->fetchAll();
     foreach ($pdo->query("SELECT payment_method, SUM(total) s FROM pos_sales
         WHERE DATE(created_at) = CURDATE() AND status = 'completed' GROUP BY payment_method") as $r) {
         $todaySums[(string)$r['payment_method']] = (float)$r['s'];
@@ -42,80 +37,59 @@ try {
 .pos-type { font-size: 10px; font-weight: 700; letter-spacing: .05em; border-radius: 7px; padding: 2px 7px; white-space: nowrap; }
 .pos-type.part { background: rgba(0,163,255,.18); color: #6fd0ff; }
 .pos-type.product { background: rgba(48,209,88,.16); color: #6fe08d; }
-.pos-cart td { vertical-align: middle; }
-.pos-cart input { text-align: right; }
-.pos-total { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
-.pos-pay { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
-  flex: 1; padding: 14px 8px; border-radius: 17px; border: 0; cursor: pointer; font-weight: 600; font-size: 13.5px;
+/* Košík = hlavní plocha kasy — všechno velké a čitelné jako na skutečné pokladně */
+.pos-cart td { vertical-align: middle; padding: 12px 8px; }
+.pos-cart thead th { font-size: 13px; }
+.pos-item-name { font-size: 16px; font-weight: 600; line-height: 1.25; }
+.pos-item-code { font-size: 12.5px; color: rgba(255,255,255,.5); }
+.pos-cart input.pos-qty, .pos-cart input.pos-price { font-size: 18px; font-weight: 600; text-align: center; padding: 9px 6px; }
+.pos-line-total { font-size: 18px; font-weight: 700; white-space: nowrap; }
+.pos-remove { font-size: 15px; padding: 9px 12px; }
+.pos-total { font-size: 46px; font-weight: 700; letter-spacing: -.02em; }
+.pos-total-label { font-size: 17px; }
+.pos-pay { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  flex: 1; padding: 19px 10px; border-radius: 19px; border: 0; cursor: pointer; font-weight: 700; font-size: 15.5px;
   background: rgba(255,255,255,.05); color: #a7b1c2; box-shadow: inset 0 0 0 1px rgba(255,255,255,.09);
   transition: background .16s, color .16s, box-shadow .16s; }
-.pos-pay i { font-size: 19px; }
+.pos-pay i { font-size: 25px; }
 .pos-pay.sel-cash { color: #6fe08d; background: rgba(48,209,88,.16); box-shadow: inset 0 0 0 1px rgba(48,209,88,.4), 0 0 16px rgba(48,209,88,.22); text-shadow: 0 0 12px rgba(48,209,88,.5); }
 .pos-pay.sel-card { color: #5fd2ff; background: rgba(0,163,255,.18); box-shadow: inset 0 0 0 1px rgba(0,163,255,.45), 0 0 16px rgba(0,163,255,.25); text-shadow: 0 0 12px rgba(95,210,255,.5); }
 .pos-pay.sel-invoice { color: #ffc46b; background: rgba(255,159,10,.15); box-shadow: inset 0 0 0 1px rgba(255,159,10,.42), 0 0 16px rgba(255,159,10,.22); text-shadow: 0 0 12px rgba(255,159,10,.5); }
-.pos-finish { width: 100%; padding: 15px; border: 0; border-radius: 17px; font-size: 16.5px; font-weight: 700;
+.pos-finish { width: 100%; padding: 20px; border: 0; border-radius: 19px; font-size: 19px; font-weight: 700;
   color: #eaf6ff; background: linear-gradient(135deg, rgba(0,163,255,.34), rgba(90,200,250,.22));
   box-shadow: inset 0 0 0 1px rgba(0,163,255,.5), 0 8px 26px rgba(0,120,210,.28); cursor: pointer; transition: filter .15s, transform .12s; }
 .pos-finish:hover { filter: brightness(1.15); }
 .pos-finish:active { transform: scale(.985); }
 .pos-finish:disabled { opacity: .45; cursor: not-allowed; }
-.pos-empty { color: rgba(255,255,255,.4); text-align: center; padding: 26px 0; }
+.pos-empty { color: rgba(255,255,255,.4); text-align: center; padding: 34px 0; font-size: 15.5px; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h2 class="mb-0"><i class="fas fa-cash-register me-2 text-info"></i>Pokladna</h2>
     <span class="text-white-50 small">Dnes: hotově <strong><?php echo formatMoney($todaySums['cash']); ?></strong>
         · kartou <strong><?php echo formatMoney($todaySums['card']); ?></strong>
-        · fakturou <strong><?php echo formatMoney($todaySums['invoice']); ?></strong></span>
+        · fakturou <strong><?php echo formatMoney($todaySums['invoice']); ?></strong>
+        <?php if (crmCanViewHistory()): ?> · <a href="history.php?tab=kasa" class="text-info text-decoration-none">historie kasy →</a><?php endif; ?></span>
 </div>
 
 <div class="row g-4">
-    <!-- ── vyhledávání + dnešní prodeje ── -->
-    <div class="col-lg-7">
-        <div class="glass-panel p-3 border-secondary mb-4">
+    <!-- ── vyhledávání ── -->
+    <div class="col-lg-6">
+        <div class="glass-panel p-3 border-secondary">
             <label class="form-label small text-white-50 mb-2"><i class="fas fa-search me-1"></i> Najdi produkt nebo díl (jen skladem)</label>
             <input type="text" id="posSearch" class="form-control pos-search" placeholder="iPhone 13, displej, sériové číslo…" autocomplete="off">
             <div id="posResults" class="pos-results mt-2"></div>
         </div>
-
-        <div class="glass-panel p-3 border-secondary">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <strong><i class="fas fa-clock me-2 text-white-50"></i>Dnešní prodeje</strong>
-                <?php if (crmCanViewHistory()): ?>
-                <a href="history.php?tab=kasa" class="small text-info text-decoration-none">Celá historie kasy →</a>
-                <?php endif; ?>
-            </div>
-            <?php if (empty($today)): ?>
-                <div class="pos-empty">Dnes zatím žádný prodej.</div>
-            <?php else: ?>
-            <div class="table-responsive">
-                <table class="table table-dark table-sm align-middle mb-0">
-                    <tbody>
-                    <?php foreach ($today as $t): $cn = (string)$t['status'] === 'cancelled'; ?>
-                        <tr<?php echo $cn ? ' class="text-decoration-line-through opacity-50"' : ''; ?>>
-                            <td><code><?php echo e($t['sale_number']); ?></code></td>
-                            <td class="small"><?php echo date('H:i', strtotime((string)$t['created_at'])); ?></td>
-                            <td class="small"><?php echo e($t['seller_name']); ?></td>
-                            <td><span class="badge <?php echo ['cash' => 'bg-success', 'card' => 'bg-info text-dark', 'invoice' => 'bg-warning text-dark'][(string)$t['payment_method']] ?? 'bg-secondary'; ?>"><?php echo ['cash' => 'Hotově', 'card' => 'Kartou', 'invoice' => 'Faktura'][(string)$t['payment_method']] ?? ''; ?></span></td>
-                            <td class="text-end fw-bold"><?php echo formatMoney((float)$t['total']); ?></td>
-                            <td class="text-end"><a href="print_receipt.php?id=<?php echo (int)$t['id']; ?>" target="_blank" class="btn btn-sm btn-white border text-info" title="Účtenka"><i class="fas fa-print"></i></a></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            <?php endif; ?>
-        </div>
     </div>
 
     <!-- ── košík + platba ── -->
-    <div class="col-lg-5">
+    <div class="col-lg-6">
         <div class="glass-panel p-3 border-secondary">
-            <strong class="d-block mb-2"><i class="fas fa-shopping-basket me-2 text-white-50"></i>Košík</strong>
+            <strong class="d-block mb-2 fs-5"><i class="fas fa-shopping-basket me-2 text-white-50"></i>Košík</strong>
             <div class="table-responsive">
-                <table class="table table-dark table-sm align-middle mb-2 pos-cart">
+                <table class="table table-dark align-middle mb-2 pos-cart">
                     <thead>
-                        <tr class="small text-white-50"><th>Položka</th><th style="width:74px;">Ks</th><th style="width:104px;">Cena/ks</th><th class="text-end">Celkem</th><th style="width:34px;"></th></tr>
+                        <tr class="text-white-50"><th>Položka</th><th style="width:92px;">Ks</th><th style="width:132px;">Cena/ks</th><th class="text-end">Celkem</th><th style="width:44px;"></th></tr>
                     </thead>
                     <tbody id="posCartBody"></tbody>
                 </table>
@@ -123,7 +97,7 @@ try {
             <div id="posCartEmpty" class="pos-empty">Košík je prázdný — vyhledej zboží vlevo.</div>
 
             <div class="d-flex justify-content-between align-items-center my-3">
-                <span class="text-white-50">Celkem</span>
+                <span class="text-white-50 pos-total-label">Celkem</span>
                 <span class="pos-total" id="posTotal">0 Kč</span>
             </div>
 
@@ -233,11 +207,11 @@ try {
         $body.innerHTML = '';
         cart.forEach(function (c, i) {
             var tr = document.createElement('tr');
-            tr.innerHTML = '<td><div class="fw-semibold small">' + esc(c.name) + '</div><div class="cd small text-white-50">' + esc(c.code || '') + '</div></td>'
-                + '<td><input type="number" class="form-control form-control-sm" min="1" max="' + c.stock + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"></td>'
-                + '<td><input type="text" class="form-control form-control-sm" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"></td>'
-                + '<td class="text-end fw-bold">' + fmt(c.price * c.qty) + '</td>'
-                + '<td><button type="button" class="btn btn-sm btn-white border text-danger" onclick="posRemove(' + i + ')"><i class="fas fa-times"></i></button></td>';
+            tr.innerHTML = '<td><div class="pos-item-name">' + esc(c.name) + '</div><div class="pos-item-code">' + esc(c.code || '') + '</div></td>'
+                + '<td><input type="number" class="form-control pos-qty" min="1" max="' + c.stock + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"></td>'
+                + '<td><input type="text" class="form-control pos-price" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"></td>'
+                + '<td class="text-end pos-line-total">' + fmt(c.price * c.qty) + '</td>'
+                + '<td><button type="button" class="btn btn-white border text-danger pos-remove" onclick="posRemove(' + i + ')"><i class="fas fa-times"></i></button></td>';
             $body.appendChild(tr);
         });
         $empty.style.display = cart.length ? 'none' : '';
