@@ -36,6 +36,7 @@ $permission_pages = [
     'edit_customer.php' => 'edit_customers',
     'inventory.php' => 'manage_inventory',
     'edit_inventory.php' => 'manage_inventory',
+    'products.php' => 'manage_inventory',
     // 'reports.php' => 'admin_access', // Handled specially below
 ];
 
@@ -63,6 +64,9 @@ if ($current_page == 'orders.php') {
 } elseif ($current_page == 'inventory.php') {
     $search_action = 'inventory.php';
     $search_placeholder = __('inventory') . ' (ID, ' . __('part_name') . ', ' . __('sku') . '...)';
+} elseif ($current_page == 'products.php') {
+    $search_action = 'products.php';
+    $search_placeholder = 'Produkty (název, kód, model...)';
 } elseif ($current_page == 'settings.php') {
     if (($_SESSION['role'] ?? '') == 'admin') {
         $search_action = 'settings.php';
@@ -77,6 +81,7 @@ $pageTitleMap = [
     'orders.php' => __('orders'),
     'customers.php' => __('customers'),
     'inventory.php' => __('inventory'),
+    'products.php' => __('inventory'),
     'reports.php' => __('reports'),
     'accounting.php' => __('accounting'),
     'settings.php' => __('settings'),
@@ -371,7 +376,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <i class="fas fa-truck-loading"></i><small><?php echo __('procurement'); ?></small>
         </a>
         <?php if (hasPermission('manage_inventory')): ?>
-        <a class="afx-cell <?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>" href="inventory.php">
+        <a class="afx-cell <?php echo in_array($current_page, ['inventory.php', 'products.php'], true) ? 'active' : ''; ?>" href="inventory.php">
             <i class="fas fa-boxes"></i><small><?php echo __('inventory'); ?></small>
         </a>
         <?php endif; ?>
@@ -456,7 +461,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <?php endif; ?>
             <a class="afx-sheet-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading"></i><?php echo __('procurement'); ?></a>
             <?php if (hasPermission('manage_inventory')): ?>
-            <a class="afx-sheet-link <?php echo $current_page == 'inventory.php' ? 'active' : ''; ?>" href="inventory.php"><i class="fas fa-boxes"></i><?php echo __('inventory'); ?></a>
+            <a class="afx-sheet-link <?php echo in_array($current_page, ['inventory.php', 'products.php'], true) ? 'active' : ''; ?>" href="inventory.php"><i class="fas fa-boxes"></i><?php echo __('inventory'); ?></a>
             <?php endif; ?>
             <a class="afx-sheet-link <?php echo $current_page == 'reports.php' ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line"></i><?php echo __('reports'); ?></a>
             <?php if ($afxIsManager): ?>

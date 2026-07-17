@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '1.15.0',
+        'date' => '2026-07-17',
+        'time' => '15:24',
+        'title' => 'Sklad rozdělen: Servis a Produkty (příprava na vlastní e-shop)',
+        'items' => [
+            'Sekce Sklad má nově dvě záložky: „Servis — náhradní díly" (vše, co tam bylo doteď) a „Produkty — e-shop" (použitá elektronika a příslušenství, které půjdou z CRM na náš vlastní e-shop místo Upgates).',
+            'Produkty se nahrávají souborem z naskladňovací aplikace (AppleFix-produkty.csv) — tlačítko „Nahrát soubor z appky". Import podle kódu kusu přidá nové a aktualizuje stávající; nic sám nemaže, takže opakované nahrání je bezpečné.',
+            'Produkt, který v naposledy nahraném souboru chyběl, dostane žlutý štítek „není v posledním souboru" — na omyl se přijde, ale nic se neztratí.',
+            'Nahrávat a mazat produkty smí jen vedení (admin, Boss, manažer); prohlížet je může každý, kdo vidí Sklad.',
+            'Servisní část skladu (výdej dílů na zakázky, QR štítky, nákupy) zůstala beze změny — produkty se do ní nepletou.',
+        ],
+    ],
+    [
         'version' => '1.14.0',
         'date' => '2026-07-17',
         'time' => '12:02',

@@ -1185,6 +1185,65 @@ function inventoryStockedWhereSql(): string {
     return '(is_stocked = 1 OR quantity > 0)';
 }
 
+/**
+ * Sklad → záložka Produkty: bazarová elektronika a příslušenství pro e-shop.
+ * ZÁMĚRNĚ samostatná tabulka, NE řádky v `inventory` — servisní logika
+ * (výdej dílu na zakázku, QR sklad, nákupy u dodavatelů, statistiky min_stock)
+ * se produktů nesmí ani dotknout. Zdroj pravdy je soubor z naskladňovací
+ * appky (Upgates CSV); tabulka je jeho zrcadlo, import = upsert podle kódu.
+ */
+function ensureProductsTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS products (
+            id INT NOT NULL AUTO_INCREMENT,
+            product_code VARCHAR(64) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            manufacturer VARCHAR(64) DEFAULT NULL,
+            category_code VARCHAR(64) DEFAULT NULL,
+            model VARCHAR(128) DEFAULT NULL,
+            capacity VARCHAR(32) DEFAULT NULL,
+            color VARCHAR(64) DEFAULT NULL,
+            grade VARCHAR(16) DEFAULT NULL,
+            battery VARCHAR(16) DEFAULT NULL,
+            price DECIMAL(10,2) NOT NULL DEFAULT 0,
+            stock_qty INT NOT NULL DEFAULT 0,
+            stock_key VARCHAR(32) NOT NULL DEFAULT '',
+            image_url VARCHAR(500) DEFAULT NULL,
+            pcr_result VARCHAR(255) DEFAULT NULL,
+            added_at DATETIME DEFAULT NULL,
+            raw_csv MEDIUMTEXT DEFAULT NULL,
+            first_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_products_code (product_code),
+            KEY idx_products_stock (stock_qty),
+            KEY idx_products_title (title)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('ensureProductsTable: ' . $e->getMessage()); }
+}
+
+/** Import/mazání produktů (e-shopové ceny) smí jen vedení — prohlížet je může
+ *  každý s manage_inventory, ale zápis je admin / Boss / manažer. */
+function crmCanManageProducts(): bool {
+    return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['boss', 'manager'], true);
+}
+
+/** Fotku produktu renderovat jen z našeho úložiště — [IMAGES] v CSV je text
+ *  z cizího souboru a cizí host by byl sledovací pixel v adminu. */
+function productImageDisplayUrl(?string $url): string {
+    $url = trim((string)$url);
+    if ($url === '') return '';
+    if (str_starts_with($url, 'https://admin.applefix.cloud/') || str_starts_with($url, 'media/products/')) {
+        return $url;
+    }
+    return '';
+}
+
 function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $quantity, string $notes = ''): bool {
     global $pdo;
 
@@ -3428,6 +3487,7 @@ function crmAuditActionLabel(string $action): string {
         'invoice.credit_note' => 'Vystavení dobropisu',
         'complaint.create' => 'Vytvoření reklamace', 'complaint.status_change' => 'Změna stavu reklamace',
         'procurement.create' => 'Požadavek na díl', 'procurement.status_change' => 'Změna stavu nákupu',
+        'products.import' => 'Import produktů (e-shop)', 'products.delete' => 'Smazání produktu (e-shop)',
         'procurement.assign_order' => 'Přiřazení dílu k zakázce', 'procurement.delete' => 'Smazání požadavku na díl',
         'inventory.create' => 'Naskladnění dílu', 'inventory.update' => 'Úprava skladového dílu',
         'inventory.delete' => 'Smazání skladového dílu',

@@ -70,6 +70,8 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
     </div>
 </div>
 
+<?php require 'includes/inventory_tabs.php'; ?>
+
 <div class="collapse mb-4 <?php echo (!empty($search) || !empty($min_price) || !empty($max_price)) ? 'show' : ''; ?>" id="filterPanel">
     <div class="card card-body shadow-sm">
         <form action="inventory.php" method="GET" class="row g-3">
