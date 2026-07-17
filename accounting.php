@@ -54,6 +54,8 @@ $customers = $stmt->fetchAll();
     </div>
 </div>
 
+<?php require 'includes/accounting_tabs.php'; ?>
+
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
         <ul class="nav nav-pills px-4 pt-3 mb-3" id="accTabs" role="tablist">

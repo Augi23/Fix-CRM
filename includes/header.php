@@ -87,6 +87,7 @@ $pageTitleMap = [
     'pokladna.php' => 'Pokladna',
     'reports.php' => __('reports'),
     'accounting.php' => __('accounting'),
+    'banka.php' => __('accounting'),
     'settings.php' => __('settings'),
     'edit_order.php' => __('orders'),
     'view_order.php' => __('orders'),
@@ -374,26 +375,28 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <i class="fas fa-users"></i><small><?php echo __('customers'); ?></small>
         </a>
         <?php endif; ?>
-        <a class="afx-cell <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php">
-            <?php if ($procurementBadgeCount > 0): ?><span class="afx-badge"><?php echo $procurementBadgeCount; ?></span><?php endif; ?>
-            <i class="fas fa-truck-loading"></i><small><?php echo __('procurement'); ?></small>
-        </a>
+        <?php /* Logické skupiny (17.7.2026): zboží (Sklad→Nákupy→Pokladna) → peníze
+                 (Účetnictví = Faktury|Banka) → analýza (Přehledy) → ostatní */ ?>
         <?php if (hasPermission('manage_inventory')): ?>
         <a class="afx-cell <?php echo in_array($current_page, ['inventory.php', 'products.php'], true) ? 'active' : ''; ?>" href="inventory.php">
             <i class="fas fa-boxes"></i><small><?php echo __('inventory'); ?></small>
         </a>
         <?php endif; ?>
+        <a class="afx-cell <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php">
+            <?php if ($procurementBadgeCount > 0): ?><span class="afx-badge"><?php echo $procurementBadgeCount; ?></span><?php endif; ?>
+            <i class="fas fa-truck-loading"></i><small><?php echo __('procurement'); ?></small>
+        </a>
         <a class="afx-cell <?php echo $current_page == 'pokladna.php' ? 'active' : ''; ?>" href="pokladna.php">
             <i class="fas fa-cash-register"></i><small>Pokladna</small>
         </a>
-        <a class="afx-cell <?php echo $current_page == 'reports.php' ? 'active' : ''; ?>" href="reports.php">
-            <i class="fas fa-chart-line"></i><small><?php echo __('reports'); ?></small>
-        </a>
         <?php if ($afxIsManager): ?>
-        <a class="afx-cell <?php echo $current_page == 'accounting.php' ? 'active' : ''; ?>" href="accounting.php">
+        <a class="afx-cell <?php echo in_array($current_page, ['accounting.php', 'banka.php'], true) ? 'active' : ''; ?>" href="accounting.php">
             <i class="fas fa-file-invoice-dollar"></i><small><?php echo __('accounting'); ?></small>
         </a>
         <?php endif; ?>
+        <a class="afx-cell <?php echo $current_page == 'reports.php' ? 'active' : ''; ?>" href="reports.php">
+            <i class="fas fa-chart-line"></i><small><?php echo __('reports'); ?></small>
+        </a>
         <?php /* Chat vidí VŠICHNI zaměstnanci (dřív omylem jen vedení) */ ?>
         <a class="afx-cell <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php">
             <i class="fas fa-comments"></i><small>Chat</small>
@@ -465,15 +468,15 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <?php if (hasPermission('edit_customers')): ?>
             <a class="afx-sheet-link <?php echo $current_page == 'customers.php' ? 'active' : ''; ?>" href="customers.php"><i class="fas fa-users"></i><?php echo __('customers'); ?></a>
             <?php endif; ?>
-            <a class="afx-sheet-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading"></i><?php echo __('procurement'); ?></a>
             <?php if (hasPermission('manage_inventory')): ?>
             <a class="afx-sheet-link <?php echo in_array($current_page, ['inventory.php', 'products.php'], true) ? 'active' : ''; ?>" href="inventory.php"><i class="fas fa-boxes"></i><?php echo __('inventory'); ?></a>
             <?php endif; ?>
+            <a class="afx-sheet-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading"></i><?php echo __('procurement'); ?></a>
             <a class="afx-sheet-link <?php echo $current_page == 'pokladna.php' ? 'active' : ''; ?>" href="pokladna.php"><i class="fas fa-cash-register"></i>Pokladna</a>
-            <a class="afx-sheet-link <?php echo $current_page == 'reports.php' ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line"></i><?php echo __('reports'); ?></a>
             <?php if ($afxIsManager): ?>
-            <a class="afx-sheet-link <?php echo $current_page == 'accounting.php' ? 'active' : ''; ?>" href="accounting.php"><i class="fas fa-file-invoice-dollar"></i><?php echo __('accounting'); ?></a>
+            <a class="afx-sheet-link <?php echo in_array($current_page, ['accounting.php', 'banka.php'], true) ? 'active' : ''; ?>" href="accounting.php"><i class="fas fa-file-invoice-dollar"></i><?php echo __('accounting'); ?></a>
             <?php endif; ?>
+            <a class="afx-sheet-link <?php echo $current_page == 'reports.php' ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line"></i><?php echo __('reports'); ?></a>
             <?php /* Chat vidí VŠICHNI zaměstnanci (dřív omylem jen vedení) */ ?>
             <a class="afx-sheet-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php"><i class="fas fa-comments"></i>Chat</a>
             <a class="afx-sheet-link <?php echo $current_page == 'navody.php' ? 'active' : ''; ?>" href="navody.php"><i class="fas fa-graduation-cap"></i>Návody</a>

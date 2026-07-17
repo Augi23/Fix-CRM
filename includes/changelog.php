@@ -6,6 +6,20 @@
  */
 return [
     [
+        'version' => '2.4.0',
+        'date' => '2026-07-17',
+        'time' => '19:38',
+        'title' => 'BANKA — propojení s Komerční bankou (jako Money S3)',
+        'items' => [
+            'Účetnictví má nově dvě podsekce: FAKTURY a BANKA (stejně jako Sklad má Servis/Produkty). V Bance je napojený účet KB přes oficiální KB API: CRM stahuje bankovní pohyby a příchozí platby AUTOMATICKY páruje s fakturami podle variabilního symbolu — spárovaná faktura se sama označí jako ZAPLACENÁ.',
+            'Hlavní menu je přeuspořádané do logických skupin: příjem práce (Zakázky, Reklamace, Klienti) → zboží (Sklad, Nákupy, Pokladna) → peníze (Účetnictví) → Přehledy → ostatní. Nic nepřibylo ani neubylo, jen to dává smysl za sebou.',
+            'Platba, kde VS sedí, ale částka ne, se žlutě označí „k prověření"; každou platbu jde spárovat i ručně (a párování zrušit). Přehled: příjmy/výdaje měsíce, filtry, vše se ukládá lokálně.',
+            'Faktury mají QR PLATBU (standard ČBA) — zákazník naskenuje kód v bankovní aplikaci a má předvyplněnou částku, účet i VS. Funguje hned, bez čekání na banku.',
+            'Nastavení → Banka: průvodce připojením (registrace na developers.kb.cz, klíče, testovací sandbox i ostrý účet), tlačítko „Načíst účty / otestovat". Jednorázově je potřeba certifikát I.CA a potvrzení jednatelem KB Klíčem — souhlas platí 12 měsíců.',
+            'Synchronizace se drží bezplatného tarifu KB (interval 61 minut); administrátor může vynutit okamžitou. Vytvořit fakturu „uvnitř banky" KB neumožňuje nikomu — tohle je stejný způsob, jakým to dělá Money S3.',
+        ],
+    ],
+    [
         'version' => '2.3.0',
         'date' => '2026-07-17',
         'time' => '19:09',

@@ -487,7 +487,7 @@ if (isset($_POST['delete_greeting']) && hasPermission('admin_access')) {
 // Security for technicians
 if (!$is_admin_user) {
     // Aktualizace smí i manažer/Boss (crmCanRunUpdates); ostatní admin taby ne.
-    if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'loyalty' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'backups'
+    if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'loyalty' || $active_tab == 'banka' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'backups'
         || ($active_tab == 'updates' && !crmCanRunUpdates())) {
         $active_tab = 'staff';
     }
@@ -532,6 +532,9 @@ require_once 'includes/header.php';
         </li>
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'loyalty' ? 'active' : 'text-white-75'; ?>" href="?tab=loyalty"><i class="fas fa-id-card me-2"></i>Věrnostní karta</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active_tab == 'banka' ? 'active' : 'text-white-75'; ?>" href="?tab=banka"><i class="fas fa-building-columns me-2"></i>Banka</a>
         </li>
         <?php endif; ?>
         <li class="nav-item">
@@ -860,6 +863,96 @@ require_once 'includes/header.php';
                     </div>
                 </div>
             </form>
+        </div>
+
+        <!-- BANKA (KB API) TAB -->
+        <div class="tab-pane fade <?php echo $active_tab == 'banka' ? 'show active' : ''; ?>">
+            <?php if ($active_tab == 'banka'): require_once 'includes/kb_api.php'; ensureBankTables(); ?>
+            <div class="glass-panel p-4 border-secondary mb-3">
+                <h5 class="mb-1"><i class="fas fa-building-columns me-2 text-info"></i>Napojení na Komerční banku (KB API)</h5>
+                <p class="text-white-50 small mb-3">Přímý přístup k účtu (ADAA): CRM stahuje pohyby a automaticky páruje příchozí platby s fakturami podle VS — jako v Money S3. Postup registrace: <a href="https://developers.kb.cz" target="_blank" class="text-info">developers.kb.cz</a> → API klíče (OAuth2 + ADAA); pro produkci kvalifikovaný certifikát I.CA/PostSignum → registrace aplikace → souhlas KB Klíčem (platí 12 měsíců).</p>
+                <div class="mb-2">
+                    Stav: <?php echo kbApiConfigured()
+                        ? '<span class="badge bg-success">nakonfigurováno</span> <span class="text-white-50 small">prostředí: ' . e(kbApiEnv()) . ' · poslední sync: ' . (get_setting('kb_last_sync_at', '') ?: 'nikdy') . '</span>'
+                        : '<span class="badge bg-secondary">nepřipojeno</span>'; ?>
+                </div>
+                <form id="kbSettingsForm" class="row g-3" autocomplete="off">
+                    <div class="col-md-3">
+                        <label class="form-label small">Prostředí</label>
+                        <select name="kb_env" class="form-select">
+                            <option value="sandbox" <?php echo kbApiEnv() === 'sandbox' ? 'selected' : ''; ?>>Sandbox (testovací)</option>
+                            <option value="prod" <?php echo kbApiEnv() === 'prod' ? 'selected' : ''; ?>>Produkce (ostrý účet)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-9">
+                        <label class="form-label small">Účet (accountId z KB — vyplní „Načíst účty")</label>
+                        <div class="input-group">
+                            <input type="text" name="kb_account_id" class="form-control" value="<?php echo e(get_setting('kb_account_id', '')); ?>">
+                            <button type="button" class="btn btn-outline-info" id="kbTestBtn">Načíst účty / otestovat</button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">API klíč — ADAA</label>
+                        <input type="text" name="kb_api_key_adaa" class="form-control" value="<?php echo e(get_setting('kb_api_key_adaa', '')); ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">API klíč — OAuth2</label>
+                        <input type="text" name="kb_api_key_oauth" class="form-control" value="<?php echo e(get_setting('kb_api_key_oauth', '')); ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Client ID</label>
+                        <input type="text" name="kb_client_id" class="form-control" value="<?php echo e(get_setting('kb_client_id', '')); ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Client secret <span class="text-white-50">(prázdné = beze změny)</span></label>
+                        <input type="password" name="kb_client_secret" class="form-control" placeholder="<?php echo get_setting('kb_client_secret', '') !== '' ? '••••••• uloženo' : ''; ?>">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Refresh token <span class="text-white-50">(z autorizace KB Klíčem; prázdné = beze změny)</span></label>
+                        <input type="password" name="kb_refresh_token" class="form-control" placeholder="<?php echo get_setting('kb_refresh_token', '') !== '' ? '••••••• uloženo' : ''; ?>">
+                    </div>
+                    <div class="col-12 d-flex gap-2 align-items-center">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Uložit nastavení banky</button>
+                        <span id="kbSettingsMsg" class="small text-white-50"></span>
+                    </div>
+                </form>
+            </div>
+            <script>
+            (function () {
+                var CSRF = '<?php echo $_SESSION['csrf_token'] ?? ''; ?>';
+                var form = document.getElementById('kbSettingsForm');
+                if (!form) return;
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var fd = new FormData(form);
+                    fd.append('csrf_token', CSRF);
+                    fetch('api/kb_settings.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            document.getElementById('kbSettingsMsg').textContent = d.success ? 'Uloženo.' : ('Chyba: ' + (d.message || ''));
+                        })
+                        .catch(function () { document.getElementById('kbSettingsMsg').textContent = 'Síťová chyba.'; });
+                });
+                document.getElementById('kbTestBtn').addEventListener('click', function () {
+                    var msg = document.getElementById('kbSettingsMsg');
+                    msg.textContent = 'Testuji spojení… (nezapomeň nejdřív Uložit)';
+                    var fd = new FormData();
+                    fd.append('action', 'test');
+                    fd.append('csrf_token', CSRF);
+                    fetch('api/kb_sync.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            if (!d.success) { msg.textContent = 'Chyba: ' + (d.message || ''); return; }
+                            if (!d.accounts.length) { msg.textContent = 'Spojení OK, ale žádné účty.'; return; }
+                            var inp = form.querySelector('[name=kb_account_id]');
+                            if (!inp.value) { inp.value = d.accounts[0].accountId; }
+                            msg.textContent = 'Spojení OK — účty: ' + d.accounts.map(function (a) { return a.iban || a.accountId; }).join(', ') + ' (accountId doplněno, ulož).';
+                        })
+                        .catch(function () { msg.textContent = 'Síťová chyba.'; });
+                });
+            })();
+            </script>
+            <?php endif; ?>
         </div>
 
         <!-- VĚRNOSTNÍ KARTA TAB -->

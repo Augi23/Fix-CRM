@@ -183,6 +183,39 @@ if (!defined('INVOICE_DOC_EMBED')) {
         </tr>
     </table>
 
+    <?php
+    // ── QR PLATBA (standard ČBA SPAYD) — jen u nezaplacených převodních faktur,
+    //    ne v e-mail embedu (externí skript by mailový klient nenačetl)
+    $__qrSpayd = '';
+    if (!defined('INVOICE_DOC_EMBED')
+        && (string)($invoice['invoice_type'] ?? 'invoice') === 'invoice'   // ne dobropis
+        && in_array((string)$invoice['status'], ['issued', 'overdue'], true)   // ne draft/paid/cancelled
+        && !in_array((string)$invoice['payment_method'], ['cash', 'card', 'cod'], true)) {
+        require_once __DIR__ . '/includes/kb_api.php';
+        $__qrSpayd = afxSpaydForInvoice($invoice);
+    }
+    ?>
+    <?php if ($__qrSpayd !== ''): ?>
+    <div style="display:flex;align-items:center;gap:14px;margin:10px 0 4px;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;">
+        <div id="qrPlatba" style="line-height:0;"></div>
+        <div>
+            <div style="font-weight:bold;font-size:12px;">QR Platba</div>
+            <div style="font-size:9px;color:#666;">Naskenujte v bankovní aplikaci — částka, účet i variabilní symbol se předvyplní.</div>
+        </div>
+    </div>
+    <script src="assets/js/qrcode.js"></script>
+    <script>
+    (function () {
+        try {
+            var qr = qrcode(0, 'M');
+            qr.addData(<?php echo json_encode($__qrSpayd); ?>);
+            qr.make();
+            document.getElementById('qrPlatba').innerHTML = qr.createSvgTag({ cellSize: 3, margin: 2 });
+        } catch (e) { /* QR je bonus — faktura funguje i bez něj */ }
+    })();
+    </script>
+    <?php endif; ?>
+
     <table class="items-table">
         <thead>
             <tr>
