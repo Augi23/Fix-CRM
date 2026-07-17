@@ -29,6 +29,7 @@ $guides['crm'] = [
             ['typ' => 'info', 'text' => '<b>Historie → Kasa prodejna:</b> všechny doklady, souhrn Hotově/Kartou/Fakturou za zvolené období (denní uzávěrka) a dotisk účtenek.'],
             ['typ' => 'info', 'text' => '<b>DPH u použitého zboží (§ 90):</b> na účtence i faktuře se u bazarového zboží DPH nevyčísluje — doklad má správný režim automaticky, nic neřešíš.'],
             ['typ' => 'role', 'text' => '<b>Prodávat smí každý</b> přihlášený zaměstnanec na obou pobočkách. <b>Storno</b> (vrátí zboží na sklad a zruší případnou fakturu) smí jen vedení — admin a Boss, v Historii → Kasa prodejna.'],
+            ['typ' => 'info', 'text' => '<b>Zámek kasy:</b> když se kasa 15 minut nepoužívá, obrazovka se zamkne. Stačí zadat <b>svoje heslo</b> (jméno je předvyplněné) a pracuješ dál — nic se neztratí, rozdělaný košík zůstává. Odkaz „Přihlásit jiného zaměstnance" použij při střídání směny.'],
         ],
     ],
     [

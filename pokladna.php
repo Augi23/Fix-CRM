@@ -62,6 +62,26 @@ try {
 .pos-finish:active { transform: scale(.985); }
 .pos-finish:disabled { opacity: .45; cursor: not-allowed; }
 .pos-empty { color: rgba(255,255,255,.4); text-align: center; padding: 34px 0; font-size: 15.5px; }
+/* Zámek kasy po nečinnosti — plné překrytí, pod ním nejde nic dělat ani číst */
+.pos-lock { position: fixed; inset: 0; z-index: 12000; display: none; align-items: center; justify-content: center;
+  background: rgba(5,8,14,.72); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
+.pos-lock.show { display: flex; }
+.pos-lock-card { width: min(400px, 92vw); background: rgba(14,18,26,.92); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 22px; padding: 30px 28px; text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+.pos-lock-card .lk-icon { font-size: 34px; color: #5fd2ff; margin-bottom: 10px; }
+.pos-lock-card h4 { font-weight: 700; margin-bottom: 4px; }
+.pos-lock-card .lk-who { color: rgba(255,255,255,.65); margin-bottom: 18px; }
+.pos-lock-card .lk-who strong { color: #fff; }
+.pos-lock-card input[type=password] { font-size: 20px; text-align: center; padding: 11px; letter-spacing: .12em; }
+.pos-lock-card .lk-err { color: #ff7a7a; font-size: 13.5px; min-height: 20px; margin-top: 9px; }
+.pos-lock-card .lk-btn { width: 100%; margin-top: 8px; padding: 13px; border: 0; border-radius: 14px; font-size: 16.5px; font-weight: 700;
+  color: #eaf6ff; background: linear-gradient(135deg, rgba(0,163,255,.34), rgba(90,200,250,.22));
+  box-shadow: inset 0 0 0 1px rgba(0,163,255,.5); cursor: pointer; }
+.pos-lock-card .lk-btn:hover { filter: brightness(1.15); }
+.pos-lock-card .lk-other { display: inline-block; margin-top: 14px; font-size: 13px; color: rgba(255,255,255,.5); text-decoration: none; }
+.pos-lock-card .lk-other:hover { color: #5fd2ff; }
+@keyframes lkshake { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
+.pos-lock-card.shake { animation: lkshake .4s; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -129,6 +149,21 @@ try {
                 <button type="button" class="btn btn-outline-light ms-auto" id="posDoneNew"><i class="fas fa-plus me-1"></i> Nový prodej</button>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Zámek kasy po 15 min nečinnosti — odemyká heslem přihlášený zaměstnanec -->
+<div class="pos-lock" id="posLock">
+    <div class="pos-lock-card" id="posLockCard">
+        <div class="lk-icon"><i class="fas fa-lock"></i></div>
+        <h4>Kasa uzamčena</h4>
+        <div class="lk-who">Přihlášen: <strong><?php echo e($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''); ?></strong></div>
+        <form id="posLockForm" autocomplete="off">
+            <input type="password" class="form-control" id="posLockPass" placeholder="Heslo" autocomplete="current-password">
+            <div class="lk-err" id="posLockErr"></div>
+            <button type="submit" class="lk-btn"><i class="fas fa-unlock me-2"></i>Odemknout</button>
+        </form>
+        <a href="logout.php" class="lk-other">Přihlásit jiného zaměstnance →</a>
     </div>
 </div>
 
@@ -296,7 +331,67 @@ try {
     });
     document.getElementById('posDoneNew').addEventListener('click', function () {
         document.getElementById('posDone').style.display = 'none';
-        location.reload();   // obnoví i seznam dnešních prodejů
+        location.reload();
+    });
+
+    // ── zámek po nečinnosti (15 min) ──
+    // Hlídá se skutečná aktivita v záložce; po probuzení záložky (visibilitychange)
+    // se kontroluje i uplynulý čas — prohlížeč timery na pozadí uspává.
+    var LOCK_AFTER = 15 * 60 * 1000;
+    var lastActivity = Date.now();
+    var locked = false;
+    var $lock = document.getElementById('posLock');
+    var $lockCard = document.getElementById('posLockCard');
+    var $lockPass = document.getElementById('posLockPass');
+    var $lockErr = document.getElementById('posLockErr');
+
+    function lockNow() {
+        if (locked) return;
+        locked = true;
+        $lockErr.textContent = '';
+        $lockPass.value = '';
+        $lock.classList.add('show');
+        setTimeout(function () { $lockPass.focus(); }, 60);
+    }
+    function touchActivity() {
+        if (locked) return;
+        lastActivity = Date.now();
+    }
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'input', 'wheel'].forEach(function (ev) {
+        document.addEventListener(ev, touchActivity, { passive: true });
+    });
+    setInterval(function () {
+        if (!locked && Date.now() - lastActivity >= LOCK_AFTER) { lockNow(); }
+    }, 15000);
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && !locked && Date.now() - lastActivity >= LOCK_AFTER) { lockNow(); }
+    });
+
+    document.getElementById('posLockForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var fd = new FormData();
+        fd.append('password', $lockPass.value);
+        fd.append('csrf_token', '<?php echo $_SESSION['csrf_token'] ?? ''; ?>');
+        fetch('api/pos_unlock.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.ok) {
+                    locked = false;
+                    lastActivity = Date.now();
+                    $lock.classList.remove('show');
+                    $lockPass.value = '';
+                    $lockErr.textContent = '';
+                    return;
+                }
+                if (d.redirect) { window.location = d.redirect; return; }
+                $lockErr.textContent = d.message || 'Špatné heslo.';
+                $lockPass.value = '';
+                $lockPass.focus();
+                $lockCard.classList.remove('shake');
+                void $lockCard.offsetWidth;   // restart animace
+                $lockCard.classList.add('shake');
+            })
+            .catch(function () { $lockErr.textContent = 'Síťová chyba — zkus to znovu.'; });
     });
 
     render();

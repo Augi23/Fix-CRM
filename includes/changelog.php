@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.1.0',
+        'date' => '2026-07-17',
+        'time' => '17:05',
+        'title' => 'Pokladna: zámek obrazovky po 15 minutách nečinnosti',
+        'items' => [
+            'Když se otevřená kasa 15 minut nepoužívá, obrazovka se automaticky zamkne — obsah kasy pod zámkem není vidět a nejde s ní pracovat.',
+            'Odemčení je na pár vteřin: jméno přihlášeného zaměstnance je předvyplněné, stačí zadat heslo a pokračovat. Rozdělaný košík se neztrácí.',
+            'Po 5 špatných pokusech se session ukončí a jde se na plné přihlášení (zapíše se do Historie). Při střídání směny slouží odkaz „Přihlásit jiného zaměstnance".',
+        ],
+    ],
+    [
         'version' => '2.0.1',
         'date' => '2026-07-17',
         'time' => '17:02',
