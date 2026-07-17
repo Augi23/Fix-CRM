@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '1.12.3',
+        'date' => '2026-07-17',
+        'time' => '09:59',
+        'title' => 'Nákupy: katalog MobileSentrix (mobilesentrix.eu)',
+        'items' => [
+            'Import katalogu v Nákupech nově umí MobileSentrix — dřív hlásil 0 produktů, protože jejich e-shop používá jinou strukturu stránek. Načítá název, cenu (bez DPH), obrázek, odkaz i skladovou dostupnost dodavatele (počet kusů).',
+            'Produkty dostávají stabilní kód „MS-…", takže opakovaný import stejné kategorie položky aktualizuje (synchronizace cen a dostupnosti), nezakládá duplicity.',
+            'Prochází se i podkategorie a všechny stránky výpisu. Tip: importuj po kategoriích (např. díly pro konkrétní model iPhonu) — celý katalog MobileSentrix má desítky tisíc položek a import je omezen na 200 stránek najednou.',
+        ],
+    ],
+    [
         'version' => '1.12.2',
         'date' => '2026-07-17',
         'time' => '04:44',

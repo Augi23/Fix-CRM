@@ -260,6 +260,11 @@ function createXPathFromHtml(string $html): ?DOMXPath {
     return new DOMXPath($doc);
 }
 
+function isMobileSentrixUrl(string $url): bool {
+    $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+    return $host !== '' && (str_contains($host, 'mobilesentrix'));
+}
+
 function collectCategoryUrls(DOMXPath $xpath, string $currentUrl, string $origin): array {
     $links = $xpath->query("//ul[contains(@class, 'category-list')]//a[@href] | //div[contains(@class, 'categories')]//a[@href]");
     $categoryUrls = [];
@@ -277,6 +282,31 @@ function collectCategoryUrls(DOMXPath $xpath, string $currentUrl, string $origin
         }
 
         $categoryUrls[$resolvedUrl] = trim($link->nodeValue);
+    }
+
+    // MobileSentrix (Magento): strom kategorií nemá category-list třídy — podkategorie
+    // poznáme podle CESTY: jsou to odkazy, jejichž path začíná cestou aktuální stránky
+    // (např. /replacement-parts/apple pod /replacement-parts). Produkty žijí v kořeni
+    // (/nazev-produktu), takže prefix filtr je nikdy nezachytí. Sestup je rekurzivní —
+    // každá podkategorie objeví zase své děti.
+    if (isMobileSentrixUrl($currentUrl)) {
+        $currentPath = rtrim((string)parse_url($currentUrl, PHP_URL_PATH), '/');
+        if ($currentPath !== '' && $currentPath !== '/') {
+            foreach ($xpath->query('//a[@href]') as $link) {
+                $resolvedUrl = resolveCatalogUrl($origin, $currentUrl, $link->getAttribute('href'));
+                if ($resolvedUrl === '' || str_contains($resolvedUrl, '?')) {
+                    continue;
+                }
+                $host = (string)parse_url($resolvedUrl, PHP_URL_HOST);
+                if ($host === '' || strcasecmp($host, $originHost) !== 0) {
+                    continue;
+                }
+                $path = rtrim((string)parse_url($resolvedUrl, PHP_URL_PATH), '/');
+                if ($path !== $currentPath && str_starts_with($path, $currentPath . '/')) {
+                    $categoryUrls[$resolvedUrl] = trim($link->nodeValue);
+                }
+            }
+        }
     }
 
     return $categoryUrls;
@@ -308,6 +338,19 @@ function collectPaginationUrls(DOMXPath $xpath, string $currentUrl, string $orig
         }
 
         $pageUrls[$resolvedUrl] = trim((string)$node->textContent);
+    }
+
+    // MobileSentrix: počet stránek nese skryté pole .total_pages, listuje se ?p=N
+    if (isMobileSentrixUrl($currentUrl) && strpos($currentUrl, '?p=') === false) {
+        $totalNode = $xpath->query("//input[contains(concat(' ', normalize-space(@class), ' '), ' total_pages ')]/@value")->item(0);
+        $totalPages = $totalNode ? (int)trim((string)$totalNode->nodeValue) : 0;
+        if ($totalPages > 1) {
+            $baseUrl = preg_replace('/[?&]p=\d+/', '', $currentUrl);
+            $sep = str_contains($baseUrl, '?') ? '&' : '?';
+            for ($p = 2; $p <= min($totalPages, 50); $p++) {
+                $pageUrls[$baseUrl . $sep . 'p=' . $p] = 'strana ' . $p;
+            }
+        }
     }
 
     return $pageUrls;
@@ -537,7 +580,8 @@ try {
              //div[contains(concat(' ', normalize-space(@class), ' '), ' product ')] |
              //article[contains(concat(' ', normalize-space(@class), ' '), ' product ')] |
              //*[@data-testid='productItem'] |
-             //*[@data-micro='product']"
+             //*[@data-micro='product'] |
+             //li[contains(concat(' ', normalize-space(@class), ' '), ' item ')][.//*[contains(concat(' ', normalize-space(@class), ' '), ' product-name ')]]"
         );
         if (!$products || $products->length === 0) {
             continue;
@@ -548,9 +592,13 @@ try {
 
             $name = queryFirstValue($pageXPath, $product, [
                 ".//span[@data-micro='name']",
+                // product-name PŘED img/@alt — u MobileSentrix je první <img> odznak
+                // („Soldering Required" apod.), jeho alt by přepsal skutečný název
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' product-name ')]//a",
+                ".//h2[contains(concat(' ', normalize-space(@class), ' '), ' product-name ')]",
+                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' product-name ')]",
                 ".//img/@alt",
                 ".//a[@title]/@title",
-                ".//*[contains(concat(' ', normalize-space(@class), ' '), ' product-name ')]//a",
                 ".//*[contains(concat(' ', normalize-space(@class), ' '), ' name ')]//a",
                 ".//*[contains(concat(' ', normalize-space(@class), ' '), ' line-clamp-3 ')]",
                 ".//*[contains(concat(' ', normalize-space(@class), ' '), ' font-bold ')]",
@@ -569,18 +617,28 @@ try {
                     $sku = trim((string)$match[1]);
                 }
             }
+            if ($sku === '' && isMobileSentrixUrl($pageUrl)) {
+                // stabilní ID produktu z quickorder inputu → SKU „MS-<id>" (klíč pro synchronizaci)
+                $msId = queryFirstValue($pageXPath, $product, [".//input[@name='products[]']/@value"]);
+                if ($msId !== '' && ctype_digit($msId)) {
+                    $sku = 'MS-' . $msId;
+                }
+            }
 
             $priceRaw = queryFirstValue($pageXPath, $product, [
                 ".//div[@data-micro='offer']/@data-micro-price",
                 ".//*[@data-micro='price']/@content",
                 ".//*[@itemprop='price']/@content",
+                ".//span[contains(concat(' ', normalize-space(@class), ' '), ' price-info-span ')]/@data-base-price",
                 ".//*[contains(concat(' ', normalize-space(@class), ' '), ' price-final ')]",
                 ".//*[contains(concat(' ', normalize-space(@class), ' '), ' product-card-list__price ')]//*[contains(concat(' ', normalize-space(@class), ' '), ' font-bold ')]",
                 ".//*[contains(concat(' ', normalize-space(@class), ' '), ' font-bold ')]",
             ]);
             if ($priceRaw === '') {
                 $productText = trim(preg_replace('/\s+/u', ' ', html_entity_decode($product->textContent ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
-                if (preg_match('/(\d[\d\s]*[.,]?\d*)\s*Kč/iu', $productText, $match)) {
+                if (preg_match('/(\d[\d\s]*[.,]?\d*)\s*(?:Kč|€|EUR)/iu', $productText, $match)) {
+                    $priceRaw = trim((string)$match[1]);
+                } elseif (preg_match('/[€]\s*(\d[\d\s]*[.,]?\d*)/u', $productText, $match)) {
                     $priceRaw = trim((string)$match[1]);
                 }
             }
@@ -615,6 +673,16 @@ try {
             }
 
             [$supplierAvailability, $supplierStockQty] = extractAvailabilityInfo($pageXPath, $product);
+            if ($supplierAvailability === '' && isMobileSentrixUrl($pageUrl)) {
+                // skladovou zásobu dodavatele nese hidden input .productqty (max. objednatelné množství)
+                $msQty = queryFirstValue($pageXPath, $product, [".//input[contains(concat(' ', normalize-space(@class), ' '), ' productqty ')]/@value"]);
+                if ($msQty !== '' && ctype_digit($msQty)) {
+                    $supplierStockQty = (int)$msQty;
+                    $supplierAvailability = $supplierStockQty > 0
+                        ? ('Skladem u dodavatele (' . $supplierStockQty . ' ks)')
+                        : 'Vyprodáno u dodavatele';
+                }
+            }
 
             $result = upsertInventoryItem($name, $sku, $price, $imageUrl, $catalogSupplierKey, $productUrl !== '' ? $productUrl : $catalogUrl, $supplierAvailability, $supplierStockQty);
             if ($result === 'added') {
