@@ -6,6 +6,20 @@
  */
 return [
     [
+        'version' => '1.11.0',
+        'date' => '2026-07-17',
+        'time' => '02:05',
+        'title' => 'Novinka: Klientská věrnostní karta (Apple / Google Peněženka)',
+        'items' => [
+            'Každý klient dostane při zadání do systému vlastní věrnostní kartu s QR kódem — vygeneruje se automaticky, ať už zakládáš klienta se zakázkou, nebo jen samotného klienta.',
+            'Klient si kartu přidá do Apple Peněženky nebo Google Peněženky (v klientském portálu tlačítko „Moje karta"). Karta ukazuje počet zařízení, která u nás měl/má, a nasbírané věrnostní body.',
+            'Recepce: naskenováním QR z karty (firemní iPhone / čtečka) se okamžitě otevře klient i všechny jeho zakázky — bez ručního hledání. Sken funguje jak čtečkou do vyhledávacího pole, tak fotoaparátem.',
+            'Věrnostní body: za každou vyzvednutou opravu se automaticky přičtou body (výchozí 20 bonus + 5 za každých 100 Kč z ceny). Interní zakázky se nepočítají. Vše nastavitelné.',
+            'Nové nastavení: Nastavení → Věrnostní karta — zapnutí systému, výše bodů a nahrání certifikátů pro Apple / Google Peněženku.',
+            'Pozn.: skutečné „pípnutí" NFC není běžným obchodníkům dostupné; QR sken je jeho okamžitá a spolehlivá náhrada.',
+        ],
+    ],
+    [
         'version' => '1.10.5',
         'date' => '2026-07-16',
         'time' => '01:51',

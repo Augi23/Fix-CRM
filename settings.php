@@ -111,6 +111,43 @@ if (isset($_POST['update_integrations']) && $is_admin_check) {
     exit;
 }
 
+// ── VĚRNOSTNÍ KARTA / PENĚŽENKY ──
+if (isset($_POST['update_loyalty']) && $is_admin_check) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    set_setting('loyalty_enabled', isset($_POST['loyalty_enabled']) ? '1' : '0');
+    set_setting('loyalty_points_per_order', (string) max(0, (int)($_POST['loyalty_points_per_order'] ?? 20)));
+    set_setting('loyalty_points_per_100', (string) max(0, (int)($_POST['loyalty_points_per_100'] ?? 5)));
+
+    // Apple Wallet
+    set_setting('wallet_apple_enabled', isset($_POST['wallet_apple_enabled']) ? '1' : '0');
+    set_setting('wallet_apple_pass_type_id', trim($_POST['wallet_apple_pass_type_id'] ?? ''));
+    set_setting('wallet_apple_team_id', trim($_POST['wallet_apple_team_id'] ?? ''));
+    if (trim((string)($_POST['wallet_apple_p12_pass'] ?? '')) !== '') {
+        set_setting('wallet_apple_p12_pass', trim($_POST['wallet_apple_p12_pass']));
+    }
+    // Google Wallet
+    set_setting('wallet_google_enabled', isset($_POST['wallet_google_enabled']) ? '1' : '0');
+    set_setting('wallet_google_issuer_id', trim($_POST['wallet_google_issuer_id'] ?? ''));
+
+    // Nahrání certifikátů do /secure/wallet (mimo web root pro čtení, chráněno .htaccess)
+    $secureDir = crmWalletCertDir();
+    if (!is_dir($secureDir)) { @mkdir($secureDir, 0700, true); }
+    $uploadMap = [
+        'wallet_apple_p12'      => 'apple_cert.p12',
+        'wallet_apple_wwdr'     => 'apple_wwdr.pem',
+        'wallet_google_json'    => 'google_service_account.json',
+    ];
+    foreach ($uploadMap as $field => $destName) {
+        if (!empty($_FILES[$field]['tmp_name']) && is_uploaded_file($_FILES[$field]['tmp_name'])) {
+            @move_uploaded_file($_FILES[$field]['tmp_name'], $secureDir . '/' . $destName);
+            @chmod($secureDir . '/' . $destName, 0600);
+        }
+    }
+    crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Změna nastavení — Věrnostní karta / peněženky']);
+    header("Location: settings.php?tab=loyalty&updated=1");
+    exit;
+}
+
 if (isset($_POST['add_tech']) && $is_admin_check) {
     settingsDebugLog(['event' => 'add_tech_hit', 'post' => $_POST, 'time' => date('c')]);
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
@@ -450,7 +487,7 @@ if (isset($_POST['delete_greeting']) && hasPermission('admin_access')) {
 // Security for technicians
 if (!$is_admin_user) {
     // Aktualizace smí i manažer/Boss (crmCanRunUpdates); ostatní admin taby ne.
-    if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'backups'
+    if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'loyalty' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'backups'
         || ($active_tab == 'updates' && !crmCanRunUpdates())) {
         $active_tab = 'staff';
     }
@@ -492,6 +529,9 @@ require_once 'includes/header.php';
         </li>
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'integrations' ? 'active' : 'text-white-75'; ?>" href="?tab=integrations"><i class="fas fa-plug me-2"></i><?php echo __('integrations_tab'); ?></a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active_tab == 'loyalty' ? 'active' : 'text-white-75'; ?>" href="?tab=loyalty"><i class="fas fa-id-card me-2"></i>Věrnostní karta</a>
         </li>
         <?php endif; ?>
         <li class="nav-item">
@@ -819,6 +859,116 @@ require_once 'includes/header.php';
                         <button type="submit" name="update_integrations" class="btn btn-primary px-5"><?php echo __('save'); ?></button>
                     </div>
                 </div>
+            </form>
+        </div>
+
+        <!-- VĚRNOSTNÍ KARTA TAB -->
+        <div class="tab-pane fade <?php echo $active_tab == 'loyalty' ? 'show active' : ''; ?>">
+            <?php
+                $lc = crmLoyaltyConfig();
+                $secDir = crmWalletCertDir();
+                $hasP12  = is_file($secDir . '/apple_cert.p12');
+                $hasWwdr = is_file($secDir . '/apple_wwdr.pem');
+                $hasGoog = is_file($secDir . '/google_service_account.json');
+                $appleOk = crmWalletAppleReady();
+                $googOk  = crmWalletGoogleReady();
+                $cardCount = 0;
+                try { $cardCount = (int)$pdo->query("SELECT COUNT(*) FROM customers WHERE card_token IS NOT NULL AND card_token <> ''")->fetchColumn(); } catch (Throwable $e) {}
+            ?>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0 text-white"><i class="fas fa-id-card me-2 text-primary"></i>Věrnostní karta &amp; peněženky</h5>
+                <span class="badge bg-secondary"><?php echo $cardCount; ?> vydaných karet</span>
+            </div>
+
+            <div class="alert border-info bg-transparent text-white-75 small mb-4" style="border-left:3px solid #0dcaf0;">
+                <b class="text-info">Jak to funguje:</b> Každému klientovi se při zadání do systému vygeneruje karta s QR kódem.
+                Klient si ji přidá do Apple / Google Peněženky. Při další návštěvě recepce QR naskenuje (firemní iPhone/čtečka)
+                a systém okamžitě otevře klienta i jeho zakázky. Za každou vyzvednutou opravu se přičtou věrnostní body.
+                <br><span class="text-white-50">Pozn.: skutečné „pípnutí" NFC není běžným obchodníkům dostupné — QR sken je okamžitá a spolehlivá náhrada.</span>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data">
+                <?php echo csrfField(); ?>
+
+                <!-- Body -->
+                <div class="glass-panel p-3 border-secondary mb-4">
+                    <h6 class="text-info mb-3"><i class="fas fa-star me-2"></i>Věrnostní body</h6>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="loyalty_enabled" name="loyalty_enabled" <?php echo $lc['enabled'] ? 'checked' : ''; ?>>
+                        <label class="form-check-label text-white" for="loyalty_enabled">Věrnostní systém zapnutý</label>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-white-75">Body za dokončenou zakázku</label>
+                            <input type="number" min="0" class="form-control" name="loyalty_points_per_order" value="<?php echo (int)$lc['points_per_order']; ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white-75">Body za každých 100 Kč ceny opravy</label>
+                            <input type="number" min="0" class="form-control" name="loyalty_points_per_100" value="<?php echo (int)$lc['points_per_100']; ?>">
+                        </div>
+                    </div>
+                    <div class="small text-white-50 mt-2">Body se připíší jednou při vyzvednutí zakázky. Interní zakázky se nepočítají.</div>
+                </div>
+
+                <!-- Apple Wallet -->
+                <div class="glass-panel p-3 border-secondary mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0 text-white"><i class="fab fa-apple me-2"></i>Apple Wallet</h6>
+                        <span class="badge <?php echo $appleOk ? 'bg-success' : 'bg-secondary'; ?>"><?php echo $appleOk ? 'Připraveno' : 'Nenakonfigurováno'; ?></span>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="wallet_apple_enabled" name="wallet_apple_enabled" <?php echo get_setting('wallet_apple_enabled','0')==='1' ? 'checked' : ''; ?>>
+                        <label class="form-check-label text-white" for="wallet_apple_enabled">Nabízet „Přidat do Apple Wallet"</label>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-white-75">Pass Type ID <span class="text-white-50">(pass.type.…)</span></label>
+                            <input type="text" class="form-control" name="wallet_apple_pass_type_id" value="<?php echo e(get_setting('wallet_apple_pass_type_id','')); ?>" placeholder="pass.cloud.applefix.loyalty">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white-75">Team ID <span class="text-white-50">(10 znaků)</span></label>
+                            <input type="text" class="form-control" name="wallet_apple_team_id" value="<?php echo e(get_setting('wallet_apple_team_id','')); ?>" placeholder="ABCDE12345">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white-75">Certifikát Pass Type ID (.p12) <?php echo $hasP12 ? '<span class="badge bg-success ms-1">nahráno</span>' : ''; ?></label>
+                            <input type="file" class="form-control" name="wallet_apple_p12" accept=".p12">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white-75">Heslo k .p12</label>
+                            <input type="password" class="form-control" name="wallet_apple_p12_pass" placeholder="<?php echo get_setting('wallet_apple_p12_pass','')!=='' ? '•••••• (uloženo)' : 'heslo z exportu'; ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white-75">Apple WWDR certifikát (.pem) <?php echo $hasWwdr ? '<span class="badge bg-success ms-1">nahráno</span>' : ''; ?></label>
+                            <input type="file" class="form-control" name="wallet_apple_wwdr" accept=".pem,.cer,.crt">
+                        </div>
+                    </div>
+                    <div class="small text-white-50 mt-2">Certifikát vytvoříš v <a href="https://developer.apple.com/account/resources/certificates" target="_blank" rel="noopener" class="text-info">Apple Developer</a> (Pass Type ID + certifikát), exportuješ z Keychain jako .p12. WWDR G4 stáhneš z Apple.</div>
+                </div>
+
+                <!-- Google Wallet -->
+                <div class="glass-panel p-3 border-secondary mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0 text-white"><i class="fab fa-google me-2"></i>Google Wallet</h6>
+                        <span class="badge <?php echo $googOk ? 'bg-success' : 'bg-secondary'; ?>"><?php echo $googOk ? 'Připraveno' : 'Nenakonfigurováno'; ?></span>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="wallet_google_enabled" name="wallet_google_enabled" <?php echo get_setting('wallet_google_enabled','0')==='1' ? 'checked' : ''; ?>>
+                        <label class="form-check-label text-white" for="wallet_google_enabled">Nabízet „Přidat do Google Wallet"</label>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-white-75">Issuer ID</label>
+                            <input type="text" class="form-control" name="wallet_google_issuer_id" value="<?php echo e(get_setting('wallet_google_issuer_id','')); ?>" placeholder="3388000000000000000">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-white-75">Service-account JSON <?php echo $hasGoog ? '<span class="badge bg-success ms-1">nahráno</span>' : ''; ?></label>
+                            <input type="file" class="form-control" name="wallet_google_json" accept=".json,application/json">
+                        </div>
+                    </div>
+                    <div class="small text-white-50 mt-2">Issuer ID a service-account získáš v <a href="https://pay.google.com/business/console" target="_blank" rel="noopener" class="text-info">Google Pay &amp; Wallet Console</a> → API access.</div>
+                </div>
+
+                <button type="submit" name="update_loyalty" class="btn btn-primary px-5"><?php echo __('save'); ?></button>
             </form>
         </div>
 

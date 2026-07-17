@@ -60,6 +60,7 @@ try {
     $stmt = $pdo->prepare('INSERT INTO customers (customer_type, first_name, last_name, phone, email, address, ico, dic, company, preferred_language) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     $stmt->execute([$customer_type, $first_name, $last_name, $phone, $email, $address, $ico, $dic, $company_name, $language]);
     $id = $pdo->lastInsertId();
+    if (function_exists('crmGetOrCreateCardToken')) { crmGetOrCreateCardToken((int)$id); }   // věrnostní karta hned
     crmAuditLog('customer.create', [
         'entity_type' => 'customer', 'entity_id' => (int)$id,
         'entity_label' => trim($first_name . ' ' . $last_name),

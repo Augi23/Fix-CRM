@@ -1,0 +1,3 @@
+# Zákaz přístupu z webu k certifikátům peněženek
+Require all denied
+Deny from all

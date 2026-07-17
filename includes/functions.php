@@ -1671,6 +1671,7 @@ function crmNotifyOrderLifecycleEvent(array $event): void {
     if ($type === 'order_status_changed' && $newStatus !== '' && isOrderStatusIn($newStatus, 'collected')
         && !($oldStatus !== '' && isOrderStatusIn($oldStatus, 'collected'))) {
         crmSendOrderReviewEmail($orderId);
+        crmAwardLoyaltyPoints($orderId);   // věrnostní body za dokončenou zakázku
     }
 
     $assignedTechId = isset($event['technician_id'])
@@ -3498,6 +3499,169 @@ function crmSendPickupReadyEmail(int $orderId): void
 }
 
 /** Sloupec orders.review_email_sent_at — žádost o recenzi se každé zakázce pošle max. jednou. */
+/* ═══════════════════ VĚRNOSTNÍ / KLIENTSKÁ KARTA ═══════════════════
+   Každý klient má kartu (card_token) → QR na recepci ho okamžitě dohledá,
+   a jde přidat do Apple/Google Peněženky. Body za dokončené zakázky.
+   Nastavení v Nastavení → Integrace (loyalty_*). */
+
+function ensureLoyaltyColumns(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        $cols = $pdo->query("SHOW COLUMNS FROM customers")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('card_token', $cols, true)) {
+            $pdo->exec("ALTER TABLE customers ADD COLUMN card_token VARCHAR(32) NULL DEFAULT NULL");
+            $pdo->exec("ALTER TABLE customers ADD UNIQUE KEY uq_card_token (card_token)");
+        }
+        if (!in_array('loyalty_points', $cols, true)) {
+            $pdo->exec("ALTER TABLE customers ADD COLUMN loyalty_points INT NOT NULL DEFAULT 0");
+        }
+        if (!in_array('card_created_at', $cols, true)) {
+            $pdo->exec("ALTER TABLE customers ADD COLUMN card_created_at TIMESTAMP NULL DEFAULT NULL");
+        }
+        // orders.loyalty_awarded — pojistka proti dvojímu připsání bodů za tutéž zakázku
+        $oc = $pdo->query("SHOW COLUMNS FROM orders")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('loyalty_awarded', $oc, true)) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN loyalty_awarded INT NOT NULL DEFAULT 0");
+        }
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureLoyaltyColumns: ' . $e->getMessage()); }
+}
+
+/** Nastavení věrnostního programu (s výchozími hodnotami). */
+function crmLoyaltyConfig(): array {
+    return [
+        'enabled'         => get_setting('loyalty_enabled', '1') === '1',
+        'points_per_100'  => (int)get_setting('loyalty_points_per_100', '5'),   // bodů za každých 100 Kč z ceny opravy
+        'points_per_order'=> (int)get_setting('loyalty_points_per_order', '20'),// bonus za každou dokončenou zakázku
+    ];
+}
+
+/** Vrátí (a případně poprvé vygeneruje) token karty klienta. */
+function crmGetOrCreateCardToken(int $customerId): string {
+    global $pdo;
+    if ($customerId <= 0) return '';
+    ensureLoyaltyColumns();
+    try {
+        $st = $pdo->prepare("SELECT card_token FROM customers WHERE id = ?");
+        $st->execute([$customerId]);
+        $tok = (string)($st->fetchColumn() ?: '');
+        if ($tok !== '') return $tok;
+        // nový token — krátký, čitelný, unikátní: AFXC-<10 hex>
+        for ($i = 0; $i < 5; $i++) {
+            $cand = 'AFXC-' . strtoupper(bin2hex(random_bytes(5)));
+            try {
+                $pdo->prepare("UPDATE customers SET card_token = ?, card_created_at = COALESCE(card_created_at, NOW()) WHERE id = ? AND card_token IS NULL")
+                    ->execute([$cand, $customerId]);
+                $re = $pdo->prepare("SELECT card_token FROM customers WHERE id = ?");
+                $re->execute([$customerId]);
+                $tok = (string)($re->fetchColumn() ?: '');
+                if ($tok !== '') return $tok;
+            } catch (Throwable $e) { /* kolize unique → zkusit znovu */ }
+        }
+    } catch (Throwable $e) { error_log('crmGetOrCreateCardToken: ' . $e->getMessage()); }
+    return '';
+}
+
+/** Připíše věrnostní body za dokončenou (vydanou) zakázku — jen jednou. */
+function crmAwardLoyaltyPoints(int $orderId): void {
+    global $pdo;
+    $cfg = crmLoyaltyConfig();
+    if (!$cfg['enabled'] || $orderId <= 0) return;
+    ensureLoyaltyColumns();
+    try {
+        $st = $pdo->prepare("SELECT customer_id, final_cost, estimated_cost, COALESCE(loyalty_awarded,0) awarded FROM orders WHERE id = ?");
+        $st->execute([$orderId]);
+        $o = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$o || (int)$o['awarded'] > 0) return;               // už připsáno
+        $custId = (int)($o['customer_id'] ?? 0);
+        if ($custId <= 0 || crmIsInternalCustomer($custId)) return; // interní zakázky bez bodů
+        $price = (float)($o['final_cost'] ?: $o['estimated_cost'] ?: 0);
+        $pts = $cfg['points_per_order'] + (int)floor($price / 100) * $cfg['points_per_100'];
+        if ($pts <= 0) $pts = $cfg['points_per_order'];
+        $pdo->prepare("UPDATE orders SET loyalty_awarded = ? WHERE id = ?")->execute([$pts, $orderId]);
+        $pdo->prepare("UPDATE customers SET loyalty_points = loyalty_points + ? WHERE id = ?")->execute([$pts, $custId]);
+        crmGetOrCreateCardToken($custId);   // pojistka, ať má klient kartu
+    } catch (Throwable $e) { error_log('crmAwardLoyaltyPoints: ' . $e->getMessage()); }
+}
+
+/** Kompletní data karty klienta pro zobrazení / pass / recepci. */
+function crmClientCardData(int $customerId): ?array {
+    global $pdo;
+    if ($customerId <= 0) return null;
+    ensureLoyaltyColumns();
+    try {
+        $st = $pdo->prepare("SELECT id, first_name, last_name, company, phone, email, loyalty_points, card_token, card_created_at FROM customers WHERE id = ?");
+        $st->execute([$customerId]);
+        $c = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$c) return null;
+        $token = (string)($c['card_token'] ?? '');
+        if ($token === '') $token = crmGetOrCreateCardToken($customerId);
+        $cnt = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE customer_id = ?");
+        $cnt->execute([$customerId]);
+        $active = $pdo->prepare("SELECT COUNT(*) FROM orders WHERE customer_id = ? AND status IN (" . orderStatusSqlIn($pdo, 'active') . ")");
+        $active->execute([$customerId]);
+        $name = trim((string)$c['company']) !== '' ? (string)$c['company'] : trim(($c['first_name'] ?? '') . ' ' . ($c['last_name'] ?? ''));
+        return [
+            'customer_id' => $customerId,
+            'name'        => $name !== '' ? $name : ('Klient #' . $customerId),
+            'phone'       => (string)($c['phone'] ?? ''),
+            'email'       => (string)($c['email'] ?? ''),
+            'points'      => (int)($c['loyalty_points'] ?? 0),
+            'token'       => $token,
+            'devices_total' => (int)$cnt->fetchColumn(),
+            'devices_active' => (int)$active->fetchColumn(),
+            'since'       => $c['card_created_at'] ? date('Y', strtotime((string)$c['card_created_at'])) : date('Y'),
+        ];
+    } catch (Throwable $e) { error_log('crmClientCardData: ' . $e->getMessage()); return null; }
+}
+
+/** Najde klienta podle tokenu karty (recepce — sken QR). */
+function crmCustomerIdByCardToken(string $token): int {
+    global $pdo;
+    $token = trim($token);
+    if ($token === '') return 0;
+    try {
+        ensureLoyaltyColumns();
+        $st = $pdo->prepare("SELECT id FROM customers WHERE card_token = ? LIMIT 1");
+        $st->execute([$token]);
+        return (int)($st->fetchColumn() ?: 0);
+    } catch (Throwable $e) { return 0; }
+}
+
+/** URL, kterou nese QR na kartě (recepce ji naskenuje). */
+function crmCardScanUrl(string $token): string {
+    $host = $_SERVER['HTTP_HOST'] ?? 'admin.applefix.cloud';
+    // vždy na adminskou doménu (recepce), ne na klientskou
+    if (function_exists('crmIsClientDomain') && crmIsClientDomain()) { $host = 'admin.applefix.cloud'; }
+    return 'https://' . $host . '/klient-karta.php?t=' . rawurlencode($token);
+}
+
+/** Adresář s certifikáty pro peněženky (mimo web root, jen pro čtení serverem). */
+function crmWalletCertDir(): string {
+    $dir = __DIR__ . '/../secure/wallet';
+    return $dir;
+}
+
+/** Je nativní Apple Wallet karta připravena? (nahrán Pass Type cert + WWDR + nastaveny ID) */
+function crmWalletAppleReady(): bool {
+    $dir = crmWalletCertDir();
+    return get_setting('wallet_apple_enabled', '0') === '1'
+        && get_setting('wallet_apple_pass_type_id', '') !== ''
+        && get_setting('wallet_apple_team_id', '') !== ''
+        && is_file($dir . '/apple_cert.p12')
+        && is_file($dir . '/apple_wwdr.pem');
+}
+
+/** Je Google Wallet karta připravena? (nahrán service-account JSON + issuer ID) */
+function crmWalletGoogleReady(): bool {
+    $dir = crmWalletCertDir();
+    return get_setting('wallet_google_enabled', '0') === '1'
+        && get_setting('wallet_google_issuer_id', '') !== ''
+        && is_file($dir . '/google_service_account.json');
+}
+
 function ensureReviewEmailColumn(): void {
     global $pdo;
     static $done = false;
@@ -4814,6 +4978,7 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
                     implode(', ', $addressBits) ?: null, $businessName !== '' ? mb_substr($businessName, 0, 100) : null,
                 ]);
             $customerId = (int)$pdo->lastInsertId();
+            if (function_exists('crmGetOrCreateCardToken') && $customerId > 0) { crmGetOrCreateCardToken($customerId); }
         }
 
         // ── Zařízení / oprava ──

@@ -700,6 +700,7 @@ if ($selectedOrder && isset($pdo)) {
                 </div>
                 <span class="client-chip"><i class="fas fa-calendar-day"></i> <?php echo e($today); ?></span>
                 <span class="client-chip"><i class="fas fa-user"></i> <?php echo e($customerDisplayName ?: __('client_default_name')); ?></span>
+                <a href="karta.php" class="btn btn-sm rounded-pill px-3" style="background:linear-gradient(135deg,#0A84FF,#BF5AF2);color:#fff;border:0;"><i class="fas fa-id-card me-2"></i><?php echo __('client_loyalty_card'); ?></a>
                 <a href="logout.php" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-right-from-bracket me-2"></i><?php echo __('logout'); ?></a>
             </div>
         </div>

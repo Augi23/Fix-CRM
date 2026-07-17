@@ -340,11 +340,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // New Order modal helpers (open from #newOrderModal links across pages)
+    const applyCustomerPrefill = () => {
+        // Recepce (klient-karta.php) předá klienta přes sessionStorage → předvyber ho
+        try {
+            var pid = sessionStorage.getItem('afx_prefill_customer');
+            var plabel = sessionStorage.getItem('afx_prefill_customer_label');
+            if (!pid) return;
+            var $sel = (typeof jQuery !== 'undefined') ? jQuery('.select2-customer') : null;
+            if ($sel && $sel.length) {
+                var opt = new Option(plabel || ('#' + pid), pid, true, true);
+                $sel.append(opt).trigger('change');
+            }
+            sessionStorage.removeItem('afx_prefill_customer');
+            sessionStorage.removeItem('afx_prefill_customer_label');
+        } catch (e) {}
+    };
     const openNewOrderModal = () => {
         const modalEl = document.getElementById('newOrderModal');
         if (!modalEl || typeof bootstrap === 'undefined') return false;
         const instance = bootstrap.Modal.getOrCreateInstance(modalEl);
         instance.show();
+        setTimeout(applyCustomerPrefill, 200);
         return true;
     };
 
@@ -1136,6 +1152,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function navigateToScanned(text) {
         text = (text || '').toString().trim();
         if (!text) return false;
+        // klientská karta (Apple/Google Peněženka) — QR nese token AFXC-… nebo klient-karta.php?t=
+        var ck = text.match(/klient-karta\.php\?t=([A-Za-z0-9\-]+)/i) || text.match(/^(AFXC-[A-Za-z0-9]+)$/i);
+        if (ck) { window.location.href = 'klient-karta.php?t=' + encodeURIComponent(ck[1]); return true; }
         // celý odkaz na zakázku
         var m = text.match(/view_order\.php\?id=(\d+)/i);
         if (m) { window.location.href = 'view_order.php?id=' + m[1]; return true; }

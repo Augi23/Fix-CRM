@@ -6,6 +6,16 @@
    Musí se includovat PŘED includes/header.php (ten už posílá HTML).
    Používá index.php (dashboard hledání) i orders.php. */
 if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '' && function_exists('resolveScannedOrderId')) {
+    // Klientská karta (QR z peněženky) → recepční dohledání klienta
+    if (function_exists('crmCustomerIdByCardToken')) {
+        $_ctok = null;
+        if (preg_match('~klient-karta\.php\?t=([A-Za-z0-9\-]+)~i', $_scan, $mm)) { $_ctok = $mm[1]; }
+        elseif (preg_match('~^AFXC-[A-Za-z0-9]+$~i', $_scan)) { $_ctok = strtoupper($_scan); }
+        if ($_ctok && crmCustomerIdByCardToken($_ctok) > 0) {
+            header("Location: klient-karta.php?t=" . rawurlencode($_ctok));
+            exit;
+        }
+    }
     // Vypadá to jako naskenovaný kód? (přepis háčky NEBO souvislý alfanumerický token bez mezer)
     $_looksCode = preg_match('/[+ěščřžýáíéĚŠČŘŽÝÁÍÉ]/u', $_scan) || preg_match('/^[A-Za-z0-9\-]{6,}$/', $_scan);
     if ($_looksCode) {
