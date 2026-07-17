@@ -4,9 +4,10 @@
  * Klient vidí svou kartu, body, počet zařízení a QR pro recepci —
  * a přidá si ji do Apple / Google Peněženky (pokud je nakonfigurováno).
  */
-require_once '../includes/config.php';
-require_once '../includes/functions.php';
-require_once '../includes/auth.php';
+require_once 'includes/config.php';
+require_once 'includes/auth.php';
+
+clientRequireAuth();
 
 $customerId = (int)($_SESSION['client_customer_id'] ?? 0);
 if ($customerId <= 0) { header('Location: index.php'); exit; }

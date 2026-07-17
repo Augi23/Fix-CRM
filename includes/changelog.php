@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '1.11.3',
+        'date' => '2026-07-17',
+        'time' => '03:06',
+        'title' => 'Oprava: stránka „Moje karta" v klientském portálu padala',
+        'items' => [
+            'Stránka s věrnostní kartou v klientském portálu používala špatnou cestu k přihlašovací kontrole a končila chybou serveru. Opraveno — karta se načte a nabídne přidání do Apple/Google Peněženky.',
+        ],
+    ],
+    [
         'version' => '1.11.2',
         'date' => '2026-07-17',
         'time' => '02:59',
