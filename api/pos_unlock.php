@@ -1,8 +1,10 @@
 <?php
 /**
  * Odemčení kasy po nečinnosti — ověří heslo PRÁVĚ přihlášeného zaměstnance
- * (session zůstává, nejde o nový login). Po 5 špatných pokusech session končí
- * a jde se na plné přihlášení.
+ * (session zůstává, nejde o nový login).
+ * Blokace je PER ÚČET: po 10 špatných pokusech se na 15 minut zablokuje jen
+ * konkrétní osoba (odemčení i login) — jiný zaměstnanec se přihlásí normálně
+ * přes „Přihlásit jiného zaměstnance" a kasa jede dál.
  */
 ob_start();
 require_once '../includes/config.php';
@@ -18,6 +20,20 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     echo json_encode(['ok' => false, 'message' => __('csrf_token_invalid')]); exit;
 }
 
+$accountKey = !empty($_SESSION['tech_id']) ? 't' . (int)$_SESSION['tech_id']
+    : (is_numeric($_SESSION['user_id'] ?? null) ? 'u' . (int)$_SESSION['user_id'] : '');
+if ($accountKey === '') {
+    echo json_encode(['ok' => false, 'redirect' => 'login.php']); exit;
+}
+
+// běžící blokace platí i při správném hesle — jinak by limit nic neznamenal
+$remain = crmPosUnlockBlockRemaining($accountKey);
+if ($remain > 0) {
+    echo json_encode(['ok' => false, 'blocked' => true,
+        'message' => 'Účet je zablokovaný ještě ' . (int)ceil($remain / 60) . ' min. Mezitím se může přihlásit jiný zaměstnanec.']);
+    exit;
+}
+
 $password = (string)($_POST['password'] ?? '');
 if ($password === '') {
     echo json_encode(['ok' => false, 'message' => 'Zadej heslo.']); exit;
@@ -29,7 +45,7 @@ try {
         $st = $pdo->prepare("SELECT password FROM technicians WHERE id = ? AND is_active = 1");
         $st->execute([(int)$_SESSION['tech_id']]);
         $hash = $st->fetchColumn();
-    } elseif (!empty($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+    } else {
         $st = $pdo->prepare("SELECT password FROM users WHERE id = ?");
         $st->execute([(int)$_SESSION['user_id']]);
         $hash = $st->fetchColumn();
@@ -43,17 +59,18 @@ if (!$hash) {   // účet mezitím zmizel/deaktivován → plné přihlášení
 }
 
 if (password_verify($password, (string)$hash)) {
-    unset($_SESSION['pos_unlock_fails']);
+    crmPosUnlockClearFails($accountKey);
     echo json_encode(['ok' => true]); exit;
 }
 
-// špatné heslo: brzda proti zkoušení + po 5 pokusech konec session
+// špatné heslo: brzda proti zkoušení + per-účet počítadlo (10 pokusů → 15 min blok)
 usleep(600000);
-$fails = (int)($_SESSION['pos_unlock_fails'] ?? 0) + 1;
-$_SESSION['pos_unlock_fails'] = $fails;
-if ($fails >= 5) {
-    crmAuditLog('auth.logout', ['entity_type' => 'auth', 'summary' => 'Kasa: 5× špatné heslo při odemykání — odhlášeno']);
-    session_destroy();
-    echo json_encode(['ok' => false, 'redirect' => 'login.php']); exit;
+[$fails, $blockSeconds] = crmPosUnlockRegisterFail($accountKey, 10, 900);
+if ($blockSeconds > 0) {
+    crmAuditLog('auth.logout', ['entity_type' => 'auth',
+        'summary' => 'Kasa: 10× špatné heslo — účet „' . ($_SESSION['full_name'] ?? $_SESSION['username'] ?? '') . '" na 15 minut zablokován']);
+    echo json_encode(['ok' => false, 'blocked' => true,
+        'message' => 'Účet je po 10 špatných pokusech na 15 minut zablokovaný. Mezitím se může přihlásit jiný zaměstnanec.']);
+    exit;
 }
-echo json_encode(['ok' => false, 'message' => 'Špatné heslo (' . $fails . '/5).']);
+echo json_encode(['ok' => false, 'message' => 'Špatné heslo (' . $fails . '/10).']);

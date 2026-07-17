@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.1.1',
+        'date' => '2026-07-17',
+        'time' => '17:13',
+        'title' => 'Zámek kasy: 10 pokusů a blokace jen konkrétní osoby',
+        'items' => [
+            'Limit špatných hesel při odemykání kasy zvýšen z 5 na 10 pokusů.',
+            'Po vyčerpání pokusů se už neukončuje celá kasa — na 15 minut se zablokuje jen účet dotyčného zaměstnance (odemčení i přihlášení). Kdokoli jiný se mezitím normálně přihlásí přes „Přihlásit jiného zaměstnance" a prodává dál.',
+            'Blokace se zapisuje do Historie úprav; po 15 minutách vyprší sama, úspěšné odemčení počítadlo nuluje.',
+        ],
+    ],
+    [
         'version' => '2.1.0',
         'date' => '2026-07-17',
         'time' => '17:05',

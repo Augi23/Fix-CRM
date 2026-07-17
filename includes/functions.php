@@ -1322,6 +1322,36 @@ function crmCanCancelPosSale(): bool {
 }
 
 /**
+ * Blokace odemykání kasy — PER ÚČET (jen konkrétní osoba), ne per session/kasa:
+ * po 10 špatných heslech se na 15 minut zablokuje daný účet (odemčení i login),
+ * ostatní zaměstnanci se ke kase normálně dostanou. Stav v system_settings.
+ * Klíč účtu: 'u<id>' (users) / 't<id>' (technicians).
+ */
+function crmPosUnlockBlockRemaining(string $accountKey): int {
+    $raw = (string)get_setting('pos_unlock_block_' . $accountKey, '');
+    if ($raw === '') return 0;
+    $d = json_decode($raw, true);
+    $until = is_array($d) ? (int)($d['until'] ?? 0) : 0;
+    return $until > time() ? $until - time() : 0;
+}
+
+/** Zapíše špatný pokus; vrací [počet_pokusů, sekund_blokace (0 = zatím neblokováno)].
+ *  Počítadlo starší 30 minut se resetuje — dávno zapomenuté překlepy se nesčítají. */
+function crmPosUnlockRegisterFail(string $accountKey, int $limit = 10, int $blockSeconds = 900): array {
+    $raw = (string)get_setting('pos_unlock_block_' . $accountKey, '');
+    $d = json_decode($raw, true);
+    $fails = (is_array($d) && (time() - (int)($d['ts'] ?? 0)) < 1800) ? (int)($d['fails'] ?? 0) : 0;
+    $fails++;
+    $until = $fails >= $limit ? time() + $blockSeconds : 0;
+    set_setting('pos_unlock_block_' . $accountKey, json_encode(['fails' => $fails, 'ts' => time(), 'until' => $until]));
+    return [$fails, $until > 0 ? $blockSeconds : 0];
+}
+
+function crmPosUnlockClearFails(string $accountKey): void {
+    set_setting('pos_unlock_block_' . $accountKey, '');
+}
+
+/**
  * Faktura z prodeje na kase — INSERT do stávajících invoices/invoice_items.
  * Volat UVNITŘ běžící transakce checkoutu (proto ne InvoiceManager: ten si otevírá
  * vlastní transakci a má admin-only gate, prodávat smí i ne-admin).

@@ -121,6 +121,19 @@ if (isset($_POST['login'])) {
             $stmt->execute([$username]);
             $user = $stmt->fetch();
 
+            // dočasná blokace PER ÚČET po 10 špatných heslech na kase — platí
+            // pro odemčení i login té konkrétní osoby, ostatní se přihlásí normálně
+            if ($user && ($__posBlk = crmPosUnlockBlockRemaining('u' . (int)$user['id'])) > 0) {
+                $__msg = 'Účet je dočasně zablokovaný (' . (int)ceil($__posBlk / 60) . ' min) po opakovaně špatném heslu na kase.';
+                if (!empty($_POST['ajax'])) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => false, 'error' => $__msg], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                $error = $__msg;
+                $user = false;   // nepustit ani ke kontrole hesla
+            }
+
             if ($user && password_verify($password, $user['password'])) {
                 session_regenerate_id(true);
                 clearClientSession();
@@ -149,6 +162,17 @@ if (isset($_POST['login'])) {
             $stmt = $pdo->prepare("SELECT * FROM technicians WHERE username = ? AND is_active = 1");
             $stmt->execute([$username]);
             $tech = $stmt->fetch();
+
+            if ($tech && ($__posBlkT = crmPosUnlockBlockRemaining('t' . (int)$tech['id'])) > 0) {
+                $__msg = 'Účet je dočasně zablokovaný (' . (int)ceil($__posBlkT / 60) . ' min) po opakovaně špatném heslu na kase.';
+                if (!empty($_POST['ajax'])) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => false, 'error' => $__msg], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                $error = $__msg;
+                $tech = false;
+            }
 
             if ($tech && password_verify($password, $tech['password'])) {
                 session_regenerate_id(true);
