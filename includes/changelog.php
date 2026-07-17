@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.1.2',
+        'date' => '2026-07-17',
+        'time' => '17:36',
+        'title' => 'Pokladna: ještě větší Celkem a nadpisy sloupců košíku',
+        'items' => [
+            'Celková částka v košíku je teď opravdu velká (58 px) i s větším popiskem „Celkem" — na kase ji přečteš přes celý pult.',
+            'Nadpisy sloupců nad položkami (Položka / Ks / Cena za ks / Celkem) jsou větší, tučné a verzálkami — lépe se v košíku orientuje.',
+        ],
+    ],
+    [
         'version' => '2.1.1',
         'date' => '2026-07-17',
         'time' => '17:13',

@@ -39,14 +39,14 @@ try {
 .pos-type.product { background: rgba(48,209,88,.16); color: #6fe08d; }
 /* Košík = hlavní plocha kasy — všechno velké a čitelné jako na skutečné pokladně */
 .pos-cart td { vertical-align: middle; padding: 12px 8px; }
-.pos-cart thead th { font-size: 13px; }
+.pos-cart thead th { font-size: 15.5px; font-weight: 700; color: rgba(255,255,255,.75) !important; text-transform: uppercase; letter-spacing: .04em; }
 .pos-item-name { font-size: 16px; font-weight: 600; line-height: 1.25; }
 .pos-item-code { font-size: 12.5px; color: rgba(255,255,255,.5); }
 .pos-cart input.pos-qty, .pos-cart input.pos-price { font-size: 18px; font-weight: 600; text-align: center; padding: 9px 6px; }
 .pos-line-total { font-size: 18px; font-weight: 700; white-space: nowrap; }
 .pos-remove { font-size: 15px; padding: 9px 12px; }
-.pos-total { font-size: 46px; font-weight: 700; letter-spacing: -.02em; }
-.pos-total-label { font-size: 17px; }
+.pos-total { font-size: 58px; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
+.pos-total-label { font-size: 22px; font-weight: 600; }
 .pos-pay { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
   flex: 1; padding: 19px 10px; border-radius: 19px; border: 0; cursor: pointer; font-weight: 700; font-size: 15.5px;
   background: rgba(255,255,255,.05); color: #a7b1c2; box-shadow: inset 0 0 0 1px rgba(255,255,255,.09);
