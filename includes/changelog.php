@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.7.7',
+        'date' => '2026-07-20',
+        'time' => '09:22',
+        'title' => 'Sklad Produkty: Historie naskladnění (jako v Mac appce) + kdo produkt naskladnil',
+        'items' => [
+            'Vedle tlačítka „Naskladnit produkt" přibylo tlačítko „Historie naskladnění" — otevře posledních 20 naskladněných produktů s cenou, kódem, KDO produkt naskladnil (podle přihlášení) a KDY (u naskladnění v CRM včetně času). Stejný přehled, jaký měla naskladňovací Mac appka v panelu „Naposledy přidané".',
+            'Ve sloupci „Naskladněno" v tabulce skladu se nově u každého produktu zobrazuje i jméno toho, kdo ho naskladnil.',
+            'Import souboru z appky si nově pamatuje, kdo soubor nahrál — nové kusy z importu ponesou jeho jméno (u kusů importovaných dřív, kde autor není znám, se ukazuje „appka").',
+        ],
+    ],
+    [
         'version' => '2.7.6',
         'date' => '2026-07-20',
         'time' => '09:17',

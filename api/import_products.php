@@ -135,13 +135,18 @@ $fields['raw_csv'] = static function (array $row) use ($idx): string {
     return (string)json_encode($assoc, JSON_UNESCAPED_UNICODE);
 };
 
+// kdo soubor nahrál — u NOVÝCH kusů se zapíše jako „naskladnil" (Historie
+// naskladnění); u kusů, které už v DB jsou, se původní autor NEpřepisuje.
+$__importer = mb_substr(trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? '')), 0, 64) ?: null;
+$fields['created_by'] = static fn(array $row) => $__importer;
+
 $colNames = array_keys($fields);   // pevný seznam výše — do SQL nejde nic ze souboru
 $updateParts = [];
 foreach ($colNames as $c) {
     if ($c === 'product_code') continue;
-    $updateParts[] = $c === 'added_at'
-        ? "added_at = COALESCE(VALUES(added_at), added_at)"
-        : "$c = VALUES($c)";
+    if ($c === 'added_at')   { $updateParts[] = "added_at = COALESCE(VALUES(added_at), added_at)"; continue; }
+    if ($c === 'created_by') { $updateParts[] = "created_by = COALESCE(created_by, VALUES(created_by))"; continue; }
+    $updateParts[] = "$c = VALUES($c)";
 }
 $updateParts[] = "last_seen_at = NOW()";
 

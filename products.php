@@ -72,6 +72,9 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
         <button class="btn btn-outline-info" data-bs-toggle="collapse" data-bs-target="#filterPanel">
             <i class="fas fa-filter me-2"></i> <?php echo __('filters'); ?>
         </button>
+        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#stockHistoryModal" title="Posledních 20 naskladněných produktů — kdo je naskladnil a kdy">
+            <i class="fas fa-clock-rotate-left me-2"></i> Historie naskladnění
+        </button>
         <?php if ($canManage): ?>
         <button class="btn btn-success" id="productCreateOpen" data-bs-toggle="modal" data-bs-target="#productCreateModal">
             <i class="fas fa-box-open me-2"></i> Naskladnit produkt
@@ -87,6 +90,61 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
 </div>
 
 <?php require 'includes/inventory_tabs.php'; ?>
+
+<?php
+// Historie naskladnění — posledních 20 produktů (obdoba panelu „Naposledy přidané"
+// v Mac appce): kdo kus naskladnil (created_by dle přihlášení) a kdy (added_at).
+$__histRows = [];
+try {
+    $__histRows = $pdo->query(
+        "SELECT title, product_code, price, source, created_by,
+                COALESCE(added_at, first_seen_at) AS stocked_at
+         FROM products
+         ORDER BY COALESCE(added_at, first_seen_at) DESC, id DESC
+         LIMIT 20"
+    )->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) { $__histRows = []; }
+?>
+<div class="modal fade" id="stockHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-secondary text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="fas fa-clock-rotate-left me-2 text-info"></i>Historie naskladnění — posledních 20 produktů</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0">
+                        <thead><tr><th>Produkt</th><th class="text-end">Cena</th><th>Naskladnil</th><th>Kdy</th></tr></thead>
+                        <tbody>
+                        <?php if (empty($__histRows)): ?>
+                            <tr><td colspan="4" class="text-center text-white-50 py-4">Zatím žádné naskladněné produkty.</td></tr>
+                        <?php else: foreach ($__histRows as $hr):
+                            $__hrTs = $hr['stocked_at'] ? strtotime((string)$hr['stocked_at']) : false;
+                            // čas 00:00 = appka poslala jen datum → hodiny nezobrazovat
+                            $__hrWhen = $__hrTs ? date(date('H:i', $__hrTs) === '00:00' ? 'j.n.Y' : 'j.n.Y H:i', $__hrTs) : '—';
+                            $__hrWho = trim((string)($hr['created_by'] ?? ''));
+                        ?>
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold"><?php echo e($hr['title']); ?></div>
+                                    <div class="small text-white-50 font-monospace"><?php echo e($hr['product_code']); ?></div>
+                                </td>
+                                <td class="text-end fw-bold" style="white-space:nowrap;"><?php echo number_format((float)$hr['price'], 0, ',', ' '); ?> Kč</td>
+                                <td>
+                                    <?php echo $__hrWho !== '' ? e($__hrWho) : '<span class="text-white-50">appka</span>'; ?>
+                                    <?php if (($hr['source'] ?? 'app') !== 'crm'): ?><div class="small text-white-50">import z appky</div><?php endif; ?>
+                                </td>
+                                <td style="white-space:nowrap;"><?php echo e($__hrWhen); ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="collapse mb-4 <?php echo ($search !== '' || $avail !== '') ? 'show' : ''; ?>" id="filterPanel">
     <div class="card card-body shadow-sm">
@@ -199,6 +257,9 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
                                             <span class="small"><?php echo date('j.n.Y', strtotime($p['added_at'])); ?></span>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>
+                                        <?php endif; ?>
+                                        <?php if (trim((string)($p['created_by'] ?? '')) !== ''): ?>
+                                            <div class="small text-white-50"><i class="fas fa-user me-1"></i><?php echo e($p['created_by']); ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <?php if ($canManage): ?>
