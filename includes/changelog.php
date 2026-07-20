@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.14.2',
+        'date' => '2026-07-20',
+        'time' => '19:04',
+        'title' => 'Migrace: ostrý importní skript + opravy z bezpečnostní revize',
+        'items' => [
+            'Nový interní skript scripts/migrace_import.php překlopí zakázky, klienty i reklamace ze zakazkovylist.cz do našeho CRM. Cílové stavy jsou VÝHRADNĚ náš nový model — reklamace se z listových „stavů zakázek" (Vydáno/Nevyzvednuto) mapují na reklamační stavy (Vyřízeno/Zamítnuto/…).',
+            'Skript je bezpečný: bez přepínače jede jako simulace (vše v transakci, na konci vrátí zpět), teprve s potvrzením zapíše; hlídá dvojí spuštění a při nesouladu kontrolních počtů vše vrátí.',
+            'Opraveno dle nezávislé revize: rozbité řádky klientů ze starého systému (jméno = číslo, e‑mail = telefon) se už neimportují jako paskvil (klientů správně 370 místo 490); prázdná předpokládaná cena zůstává prázdná (ne 0 Kč); reklamace bez jména klienta („…") nezaloží nesmyslného klienta.',
+        ],
+    ],
+    [
         'version' => '2.14.1',
         'date' => '2026-07-20',
         'time' => '18:14',

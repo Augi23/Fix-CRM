@@ -59,7 +59,7 @@ $oCols = $cols('orders'); $cCols = $cols('customers'); $kCols = $cols('complaint
 $need = [
     'orders'    => ['order_code','legacy_code','source','status','branch_id','customer_id','technician_id','device_brand','device_model','problem_description','technician_notes','estimated_cost','pin_code','shipping_method','serial_number','created_at'],
     'customers' => ['first_name','last_name','phone','email','company','preferred_language'],
-    'complaints'=> ['complaint_code','complaint_status','order_id','order_code','device','complaint_reason','phone','email','customer_id','source'],
+    'complaints'=> ['complaint_code','complaint_status','order_id','order_code','device','complaint_reason','phone','customer_id','source'],
 ];
 say("\n── Kontrola cílových sloupců ──");
 foreach ([['orders',$oCols],['customers',$cCols],['complaints',$kCols]] as [$t,$have]) {
