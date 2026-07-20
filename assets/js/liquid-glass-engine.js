@@ -27,8 +27,9 @@
   // Presety odsouhlasené v náhledu (dok / okno-modál / jemný panel)
   var PRESETS = {
     dock:  { radius: 24, ior: 1.7, thickness: 34, bezel: 16, scaleRatio: 0.8, blur: 3.2,
-             specularOpacity: 0.3, tintColor: '#04060a', tintOpacity: 72,
-             shadowColor: 'rgba(255,255,255,0.14)', shadowBlur: 9, shadowSpread: -7, outerShadowBlur: 30 },
+             /* světle šedé sklo s černými texty (přání 20.7.2026) — glass/refrakce beze změny */
+             specularOpacity: 0.3, tintColor: '#dfe3e8', tintOpacity: 78,
+             shadowColor: 'rgba(255,255,255,0.6)', shadowBlur: 9, shadowSpread: -7, outerShadowBlur: 30 },
     modal: { radius: 18, ior: 2.0, thickness: 52, bezel: 24, scaleRatio: 1.0, blur: 1.8,
              specularOpacity: 0.3, tintColor: '#0d1119', tintOpacity: 30,
              shadowColor: 'rgba(255,255,255,0.14)', shadowBlur: 10, shadowSpread: -7, outerShadowBlur: 40 },

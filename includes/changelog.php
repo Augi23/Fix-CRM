@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.9.1',
+        'date' => '2026-07-20',
+        'time' => '12:10',
+        'title' => 'Hlavní menu ve světle šedé s černými texty (Liquid Glass zachován)',
+        'items' => [
+            'Plovoucí hlavní menu (dok) je nově SVĚTLE ŠEDÉ sklo s ČERNÝMI texty a ikonami — výrazně čitelnější. Liquid Glass efekt (lom světla, průhlednost, lesk) zůstal beze změny, změnil se jen barevný tón skla.',
+            'Aktivní stránka se zvýrazňuje bílou buňkou, najetí myší jemným ztmavením. Oddělovač i kroužky badge počtů přizpůsobeny světlému podkladu.',
+            'Barevné rychlé akce (Nová zakázka · Reklamace · Nákupní seznam · Pokladna) mají texty v tmavších odstínech svých barev, aby na světlém skle zůstaly dobře čitelné.',
+        ],
+    ],
+    [
         'version' => '2.9.0',
         'date' => '2026-07-20',
         'time' => '12:02',
