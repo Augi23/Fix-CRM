@@ -511,7 +511,9 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
 
 <!-- Plovoucí dok z buněk (Liquid Glass) -->
 <div class="afx-dockwrap">
-    <nav class="afx-dock" id="afxDock" data-afx-glass="dock">
+    <?php /* Dok = FROSTED sklo (čistý backdrop-blur v CSS, v2.9.2) — bez enginu
+             Liquid Glass (data-afx-glass), ten dělá refrakci/čočku, ne frost. */ ?>
+    <nav class="afx-dock" id="afxDock">
         <a class="afx-cell <?php echo $current_page == 'index.php' ? 'active' : ''; ?>" href="index.php">
             <i class="fas fa-home"></i><small><?php echo __('dashboard'); ?></small>
         </a>

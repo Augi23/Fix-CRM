@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.9.2',
+        'date' => '2026-07-20',
+        'time' => '12:18',
+        'title' => 'Hlavní menu: tmavě šedé FROSTED sklo s bílými texty',
+        'items' => [
+            'Hlavní menu (dok) má nový vzhled „frosted glass": tmavě šedé mléčné sklo, které rozmazává animované pozadí pod sebou, s tenkým světlým okrajem a měkkým stínem. Texty a ikony jsou zpět BÍLÉ, barevné rychlé akce ve svých původních zářivých odstínech.',
+            'Světlá varianta z v2.9.1 tím byla nahrazena (nelíbila se). Refrakční „čočkový" efekt je u doku vypnutý — frost = rozmazání, ne lom světla; okna a panely si Liquid Glass nechávají.',
+            'Ohledy na přístupnost: prohlížeč bez podpory rozmazání dostane téměř plnou barvu, uživatelé s omezenou průhledností v systému plnou barvu bez efektu.',
+        ],
+    ],
+    [
         'version' => '2.9.1',
         'date' => '2026-07-20',
         'time' => '12:10',
