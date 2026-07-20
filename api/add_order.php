@@ -55,6 +55,22 @@ if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
 // z jiné pobočky vlastní novou zakázku okamžitě „schoval" sám sobě
 // (orderBranchScopeSql by mu ji vyřadil ze seznamu).
 
+// ── OCHRANA PROTI DUPLICITĚ (dvojklik / vícenásobné odeslání formuláře) ──
+// Stejný klient + model + popis závady během posledních 30 s = skoro jistě
+// omylem několikrát odeslaný týž formulář (personál klikal na Dokončit, když
+// server pomalu odpovídal). Vrátíme první zakázku místo založení další.
+try {
+    $__dupCheck = $pdo->prepare(
+        "SELECT id FROM orders
+         WHERE customer_id = ? AND device_model = ? AND COALESCE(problem_description,'') = ?
+           AND created_at >= (NOW() - INTERVAL 30 SECOND)
+         ORDER BY id DESC LIMIT 1"
+    );
+    $__dupCheck->execute([$customer_id, $device_model, $problem_description]);
+    $__dupId = (int)$__dupCheck->fetchColumn();
+    if ($__dupId > 0) { header('Location: ../view_order.php?id=' . $__dupId . '&dedup=1'); exit; }
+} catch (Throwable $e) { /* dedup je bonus — při chybě pokračuj standardně */ }
+
 try {
     ensureOrderPriorityLowValue();
     ensureOrderCreatedByColumn();   // DDL — před transakcí

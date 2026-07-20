@@ -289,6 +289,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const form = this.closest('form');
         if (!form) return;
         e.preventDefault();
+        // OCHRANA PROTI VÍCENÁSOBNÉMU ODESLÁNÍ: jakmile jednou odešleme, další
+        // kliknutí ignorujeme. Dřív se při pomalé odpovědi serveru dala jedna
+        // zakázka založit 10× (personál klikal na Dokončit znovu a znovu).
+        if (form.dataset.afxSubmitting === '1') return;
         // Pojistka proti „tichému nic": NEVIDITELNÉ povinné pole (sbalený panel,
         // skrytý krok wizardu) nesmí zablokovat odeslání — prohlížeč na něm neumí
         // ukázat chybu ('not focusable') a formulář se bez reakce neodešle.
@@ -301,7 +305,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         } catch (err) { /* pojistka nesmí submit rozbít */ }
+        form.dataset.afxSubmitting = '1';
+        // odeslat, DOKUD je tlačítko aktivní (kvůli jeho name/value), pak zamknout
         form.requestSubmit ? form.requestSubmit(this) : form.submit();
+        const btn = this, oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + (window.LANG_SAVING || 'Ukládám…');
+        // záchranná síť: kdyby server vrátil chybu bez přesměrování, po 15 s povolit další pokus
+        setTimeout(function () { form.dataset.afxSubmitting = ''; btn.disabled = false; btn.innerHTML = oldHtml; }, 15000);
     });
 
     // Fallback for inline new-customer panel inside order modals

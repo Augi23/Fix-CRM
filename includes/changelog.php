@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.5.1',
+        'date' => '2026-07-20',
+        'time' => '04:40',
+        'title' => 'Oprava: mezera nad horní lištou + duplicitní zakázky',
+        'items' => [
+            'Zmizela prázdná mezera nad horní lištou (od minulé úpravy se kus kódu zobrazoval jako text — teď je zpět v pořádku).',
+            'OCHRANA PROTI DUPLICITÁM: tlačítko „Dokončit" u nové zakázky se hned po kliknutí zamkne (ukazuje „Ukládám…"), takže víc kliknutí už nezaloží víc zakázek. Navíc server odmítne stejnou zakázku (týž klient, model a závada) podanou do 30 vteřin — pojistka i pro rychlé opakované odeslání. (Dřív při pomalé odezvě serveru mohla vzniknout jedna zakázka i 10×.)',
+        ],
+    ],
+    [
         'version' => '2.5.0',
         'date' => '2026-07-18',
         'time' => '04:06',
