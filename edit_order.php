@@ -83,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
             if ($is_starting || $technician_changed) {
                 $active_count = getTechnicianInProgressCount((int)$technician_id, (int)$id);
-                if ($active_count >= 2) {
-                    throw new Exception('Technik může mít současně maximálně 2 rozdělané zakázky.');
+                if ($active_count >= CRM_TECH_IN_PROGRESS_LIMIT) {
+                    throw new Exception('Technik může mít současně maximálně ' . CRM_TECH_IN_PROGRESS_LIMIT . ' rozdělaných zakázek.');
                 }
             }
         }

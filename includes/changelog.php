@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.9.4',
+        'date' => '2026-07-20',
+        'time' => '12:39',
+        'title' => 'Technik může mít rozpracovaných až 5 zakázek (dřív 2)',
+        'items' => [
+            'Limit současně rozpracovaných zakázek („Provádí se") na jednoho technika zvýšen ze 2 na 5. Platí všude — změna stavu, rychlá změna i úprava zakázky.',
+            'Upraveny i hlášky ve všech jazycích a návod „Změna stavu zakázky". Limit je nově na jednom místě v kódu, případná další změna čísla je otázka chvilky.',
+        ],
+    ],
+    [
         'version' => '2.9.3',
         'date' => '2026-07-20',
         'time' => '12:35',

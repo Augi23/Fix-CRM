@@ -87,7 +87,7 @@ try {
             throw new Exception($t('in_progress_requires_technician'));
         }
         $active_count = getTechnicianInProgressCount($target_tech_id, (int)$order_id);
-        if ($active_count >= 2 && !$was_finished) {
+        if ($active_count >= CRM_TECH_IN_PROGRESS_LIMIT && !$was_finished) {
             throw new Exception($t('technician_in_progress_limit_reached'));
         }
     }

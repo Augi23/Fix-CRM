@@ -170,7 +170,7 @@ $guides['crm'] = [
         ],
         'conditions' => [
             ['typ' => 'role', 'text' => 'Stav smí měnit <b>každý zaměstnanec</b> u kterékoliv zakázky (od v1.6).'],
-            ['typ' => 'warn', 'text' => '<b>„V opravě" vyžaduje technika</b> — nepřiřazená zakázka jde do práce až po výběru technika. Jeden technik smí mít max. <b>2 rozdělané</b> zakázky současně.'],
+            ['typ' => 'warn', 'text' => '<b>„V opravě" vyžaduje technika</b> — nepřiřazená zakázka jde do práce až po výběru technika. Jeden technik smí mít max. <b>5 rozdělaných</b> zakázek současně.'],
             ['typ' => 'warn', 'text' => 'Po <b>Vydáno</b> se stav zamyká — zpět ho vrátí jen vedení.'],
             ['typ' => 'info', 'text' => 'Při „Připraveno k převzetí" odejde klientovi e-mail (a SMS, je-li zapnuta) s výzvou k vyzvednutí.'],
         ],
