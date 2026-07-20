@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '2.9.3',
+        'date' => '2026-07-20',
+        'time' => '12:35',
+        'title' => 'Hlavní menu: stín pod texty a ikonami',
+        'items' => [
+            'Texty a ikony všech buněk hlavního menu dostaly jemný tmavý stín — na frosted skle jsou čitelnější a působí plastičtěji. Platí i pro barevné rychlé akce (Nová zakázka · Reklamace · Nákupní seznam · Pokladna), kde se stín kombinuje s jejich barevným zářením.',
+        ],
+    ],
+    [
         'version' => '2.9.2',
         'date' => '2026-07-20',
         'time' => '12:18',

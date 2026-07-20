@@ -165,13 +165,14 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
   min-width: 72px; padding: 9px 11px 7px; border-radius: 17px;
   color: #a7b1c2; text-decoration: none; cursor: pointer; position: relative; z-index: 2;
   transition: background .16s, color .16s, transform .16s; white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0,0,0,.55);   /* stín pod textem — čitelnost na frost skle */
 }
 .afx-cell i { font-size: 16px; opacity: .9; }
 .afx-cell small { font-size: 10.5px; font-weight: 500; letter-spacing: .01em; }
 .afx-cell:hover {
   background: rgba(255,255,255,.09); color: #fff; transform: translateY(-1px);
   box-shadow: 0 0 18px rgba(255,255,255,.13), inset 0 0 0 1px rgba(255,255,255,.10);
-  text-shadow: 0 0 10px rgba(255,255,255,.4);
+  text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 10px rgba(255,255,255,.4);
 }
 .afx-cell.active { background: rgba(255,255,255,.12); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), 0 4px 14px rgba(0,0,0,.25); }
 .afx-cell.active small { font-weight: 600; }
@@ -187,7 +188,7 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
 .afx-dock .afx-div { flex: 0 0 1px; width: 1px; background: linear-gradient(180deg, transparent, rgba(255,255,255,.16), transparent); margin: 6px 5px; z-index: 2; }
 /* Barevné akční buňky: stálé barevné pozadí (dřívější hover stav), hover o stupeň silnější */
 .afx-cell.act-blue {
-  color: #5fd2ff; text-shadow: 0 0 12px rgba(95,210,255,.5);
+  color: #5fd2ff; text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 12px rgba(95,210,255,.5);
   background: rgba(0,163,255,.16); box-shadow: inset 0 0 0 1px rgba(0,163,255,.24);
 }
 .afx-cell.act-blue:hover {
@@ -195,7 +196,7 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
   box-shadow: inset 0 0 0 1px rgba(0,163,255,.45), 0 0 16px rgba(0,163,255,.28);
 }
 .afx-cell.act-orange {
-  color: #ffbe55; text-shadow: 0 0 12px rgba(255,190,85,.5);
+  color: #ffbe55; text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 12px rgba(255,190,85,.5);
   background: rgba(255,158,32,.14); box-shadow: inset 0 0 0 1px rgba(255,158,32,.24);
 }
 .afx-cell.act-orange:hover {
@@ -203,7 +204,7 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
   box-shadow: inset 0 0 0 1px rgba(255,158,32,.45), 0 0 16px rgba(255,158,32,.26);
 }
 .afx-cell.act-green {
-  color: #4df0b8; text-shadow: 0 0 12px rgba(77,240,184,.5);
+  color: #4df0b8; text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 12px rgba(77,240,184,.5);
   background: rgba(16,226,155,.14); box-shadow: inset 0 0 0 1px rgba(16,226,155,.24);
 }
 .afx-cell.act-green:hover {
@@ -212,7 +213,7 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
 }
 .afx-cell.act-green .afx-badge { background: #10e29b; box-shadow: 0 0 10px rgba(16,226,155,.55); }
 .afx-cell.act-purple {
-  color: #d9a1ff; text-shadow: 0 0 12px rgba(217,161,255,.5);
+  color: #d9a1ff; text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 12px rgba(217,161,255,.5);
   background: rgba(191,90,242,.16); box-shadow: inset 0 0 0 1px rgba(191,90,242,.26);
 }
 .afx-cell.act-purple:hover {
