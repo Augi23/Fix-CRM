@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.6.0',
+        'date' => '2026-07-20',
+        'time' => '06:16',
+        'title' => 'Jazyky: základ pro plnou češtinu i angličtinu (příprava)',
+        'items' => [
+            'Doplněny všechny chybějící anglické překlady (67 textů) — po přepnutí do angličtiny se už nikde neukáže „název klíče" místo textu. Výchozí jazyk systému je nově čeština (dřív se v některých místech chybně bral jako ruština, kvůli čemuž třeba faktura mohla vyjet rusky).',
+            'Toto je základ — v dalších krocích se doplní překlady natvrdo psaných textů ve Skladu/Účetnictví, klientský portál a doklady, ať vše respektuje zvolený jazyk.',
+        ],
+    ],
+    [
         'version' => '2.5.1',
         'date' => '2026-07-20',
         'time' => '04:40',

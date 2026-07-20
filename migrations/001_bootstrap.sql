@@ -300,7 +300,7 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`) VALUES
 ('company_address', ''),
 ('company_phone', ''),
 ('currency', 'Kc'),
-('language', 'ru'),
+('language', 'cs'),
 ('next_order_number', '1001'),
 ('acc_company_name', ''),
 ('acc_address', ''),

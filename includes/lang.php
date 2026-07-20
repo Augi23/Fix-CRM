@@ -1360,7 +1360,7 @@ function crm_get_language($override_lang = null): string {
     global $pdo;
 
     if ($override_lang !== null) {
-        return crm_normalize_language((string)$override_lang) ?? 'ru';
+        return crm_normalize_language((string)$override_lang) ?? 'cs';
     }
 
     if (!empty($_GET['lang'])) {
@@ -1385,13 +1385,13 @@ function crm_get_language($override_lang = null): string {
     }
 
     if (isset($pdo) && function_exists('get_setting')) {
-        $dbLang = crm_normalize_language((string)get_setting('language', 'ru'));
+        $dbLang = crm_normalize_language((string)get_setting('language', 'cs'));
         if ($dbLang !== null) {
             return $dbLang;
         }
     }
 
-    return 'ru';
+    return 'cs';
 }
 
 function crm_humanize_lang_key(string $key): string {
