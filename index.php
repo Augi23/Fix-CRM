@@ -234,7 +234,9 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                             ?>
                             <?php [$staleCls, $staleTitle] = orderStaleRowAttrs($r); ?>
                             <?php $__isInternal = crmIsInternalCustomer($r['customer_id'] ?? 0); ?>
-                            <tr <?php echo $staleTitle ? 'title="' . e($staleTitle) . '" ' : ''; ?>class="clickable-order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($r['status'])); ?><?php echo $staleCls; ?><?php echo $__isInternal ? ' order-row--internal' : (!empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''); ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
+                            <?php // Importované zakázky (source='legacy') = šedý řádek bez stavové barvy; stav barevně jen v pilulce Stav
+                                  $__rowCls = (($r['source'] ?? 'crm') === 'legacy') ? 'order-row--legacy' : 'order-row--status-' . getOrderStatusBadgeToken($r['status']); ?>
+                            <tr <?php echo $staleTitle ? 'title="' . e($staleTitle) . '" ' : ''; ?>class="clickable-order-row <?php echo e($__rowCls); ?><?php echo $staleCls; ?><?php echo $__isInternal ? ' order-row--internal' : (!empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''); ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
                                 <td>
                                     <a href="view_order.php?id=<?php echo (int)$r['id']; ?>" class="fw-bold text-decoration-none"><?php echo e($display_code); ?></a>
                                     <?php if($has_media): ?>

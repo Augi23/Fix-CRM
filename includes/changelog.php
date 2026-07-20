@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.13.0',
+        'date' => '2026-07-20',
+        'time' => '17:52',
+        'title' => 'Příprava migrace: importované zakázky poznáte na první pohled',
+        'items' => [
+            'Zakázky importované ze starého systému (zakazkovylist.cz) budou mít v seznamu zakázek i na Nástěnce celý řádek tmavě šedý — barvu stavu ponese jen barevná pilulka ve sloupci Stav.',
+            'Zakázky vzniklé v našem CRM (včetně těch, které se při migraci přečíslují) zůstávají plnobarevné jako dosud — na první pohled tak poznáte, co je „naše" a co je historie z importu.',
+            'Funguje ve tmavém i světlém režimu. Projeví se až po ostrém běhu migrace — do té doby vypadá vše stejně.',
+        ],
+    ],
+    [
         'version' => '2.12.0',
         'date' => '2026-07-20',
         'time' => '17:44',

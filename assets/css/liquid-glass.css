@@ -287,6 +287,14 @@ html[data-lg-theme="light"] .order-row--status-handoff:hover     > td { backgrou
 html[data-lg-theme="light"] .order-row--status-cancelled:hover   > td { background: #E3E5E9 !important; }
 html[data-lg-theme="light"] .order-row--status-default:hover     > td { background: #E4E8ED !important; }
 
+/* Importované zakázky (source='legacy', migrace ze zakazkovylist.cz 7/2026):
+   celý řádek tmavě šedý BEZ stavové barvy — stav zůstává barevný jen v pilulce
+   ve sloupci Stav (rozhodnutí majitele 20.7.2026). CRM-native řádky beze změny. */
+.order-row--legacy > td { background: rgba(44,47,54,0.60) !important; }
+.order-row--legacy:hover > td { background: rgba(58,62,70,0.68) !important; }
+html[data-lg-theme="light"] .order-row--legacy > td { background: #E9EAEC !important; }
+html[data-lg-theme="light"] .order-row--legacy:hover > td { background: #DDDFE3 !important; }
+
 
 /* ------------------------------------------------------------
    ZAKÁZKY BEZ POHYBU — decentní dýchání celého řádku v jeho

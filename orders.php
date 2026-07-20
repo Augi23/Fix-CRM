@@ -344,7 +344,9 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                         ?>
                         <?php [$staleCls, $staleTitle] = orderStaleRowAttrs($order); ?>
                         <?php $__isInternal = crmIsInternalCustomer($order['customer_id'] ?? 0); ?>
-                        <tr class="order-row order-row--status-<?php echo e(getOrderStatusBadgeToken($order['status'])); ?><?php echo $staleCls; ?><?php echo $__isInternal ? ' order-row--internal' : ''; ?>"<?php echo $staleTitle ? ' title="' . e($staleTitle) . '"' : ''; ?> data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
+                        <?php // Importované zakázky (source='legacy') = šedý řádek bez stavové barvy; stav barevně jen v pilulce Stav
+                              $__rowCls = (($order['source'] ?? 'crm') === 'legacy') ? 'order-row--legacy' : 'order-row--status-' . getOrderStatusBadgeToken($order['status']); ?>
+                        <tr class="order-row <?php echo e($__rowCls); ?><?php echo $staleCls; ?><?php echo $__isInternal ? ' order-row--internal' : ''; ?>"<?php echo $staleTitle ? ' title="' . e($staleTitle) . '"' : ''; ?> data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
                             <td class="ps-4">
                                 <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none"><?php echo e(orderDisplayCode($order)); ?></a>
                                 <?php if($has_media): ?>
