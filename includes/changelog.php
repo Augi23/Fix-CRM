@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.7.1',
+        'date' => '2026-07-20',
+        'time' => '08:00',
+        'title' => 'Návod k recepci: jak sken „doskočí" + oprava pozice tlačítka',
+        'items' => [
+            'Návody → „Věrnostní karta klienta — sken na recepci": doplněno vysvětlení, jak sken funguje při zapnutém režimu — počítač recepce se každé 3 vteřiny ptá serveru a po pípnutí kartou na iPhonu naskočí profil klienta sám do ~3 vteřin.',
+            'Doplněno, že recepce nepřeruší rozdělanou práci (když píšeš/máš otevřené okno, počká), každý sken naskočí jen jednou, a že „doskočí" jen na počítač recepce dané pobočky (iPhone i počítač musí být přihlášené).',
+            'Opraven návod: tlačítko „Režim recepce" je nově vpravo dole (dřív návod uváděl vlevo dole).',
+        ],
+    ],
+    [
         'version' => '2.7.0',
         'date' => '2026-07-20',
         'time' => '07:55',

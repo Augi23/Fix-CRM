@@ -57,13 +57,16 @@ $guides['crm'] = [
         'title' => 'Věrnostní karta klienta — sken na recepci',
         'intro' => 'Každý klient má věrnostní kartu s QR kódem (v mobilu v Apple/Google Peněžence). Skenem karty se okamžitě otevře jeho profil se zakázkami a body — bez ručního hledání.',
         'steps' => [
-            '<b>Na počítači recepce (jednorázově):</b> na Nástěnce klikni vlevo dole na <b>„Režim recepce"</b> — pilulka zezelená a počítač začne poslouchat skeny. Stačí zapnout jednou, vydrží zapnuto.',
+            '<b>Na počítači recepce (jednorázově):</b> na Nástěnce klikni <b>vpravo dole</b> na <b>„Režim recepce"</b> — pilulka zezelená („Recepce poslouchá skeny") a počítač začne poslouchat skeny. Stačí zapnout jednou, vydrží zapnuto (i po zavření a otevření).',
             '<b>Při návštěvě klienta:</b> klient ukáže kartu v Peněžence → naskenuj její QR <b>fotoaparátem firemního iPhonu</b> (iPhone musí být přihlášený do CRM).',
             'Na iPhonu se otevře profil klienta — a do ~3 vteřin <b>vyskočí i na počítači recepce</b>.',
             'Z profilu rovnou: <b>Nová zakázka pro klienta</b> (předvyplní ho), telefon, historie zakázek, věrnostní body.',
             'Alternativa bez iPhonu: USB/Bluetooth 2D čtečka u počítače — kurzor do vyhledávání a pípnout kartu; funguje i sken čísla karty (AFXC-…).',
         ],
         'conditions' => [
+            ['typ' => 'info', 'text' => '<b>Jak sken „doskočí" na recepci (když je režim zapnutý):</b> počítač recepce se každé <b>3 vteřiny</b> tiše ptá serveru, jestli někdo neskenoval kartu. Po pípnutí kartou na iPhonu se profil klienta objeví na recepci <b>sám do ~3 vteřin</b> — nemusíš nic přepínat ani klikat.'],
+            ['typ' => 'info', 'text' => '<b>Nepřeruší ti rozdělanou práci:</b> když máš zrovna otevřené okno nebo píšeš do políčka, recepce <b>počká</b> a nepřeskočí — klient naskočí, až budeš volný. Každý sken naskočí jen <b>jednou</b>; přenačtení stránky ani Zpět/Vpřed už nic znovu „nevystřelí".'],
+            ['typ' => 'info', 'text' => '<b>Platí po pobočkách:</b> sken „doskočí" jen na počítač recepce <b>té pobočky</b>, kde je personál přihlášený — Karlín a druhá pobočka si do skenů neskáčou. Podmínka: iPhone i počítač recepce musí být oba přihlášené do CRM.'],
             ['typ' => 'info', 'text' => 'Karta se klientovi vytvoří automaticky při zadání do systému. Klient si ji přidá do peněženky v klientském portálu (tlačítko „Moje karta").'],
             ['typ' => 'info', 'text' => '<b>Body:</b> za každou vyzvednutou opravu se přičtou automaticky (bonus za zakázku + body z ceny). Interní zakázky body nedostávají. Nastavení: Nastavení → Věrnostní karta.'],
             ['typ' => 'role', 'text' => 'Sken funguje jen pro přihlášený personál — klient skenem vlastní karty na recepci nic neovlivní (uvidí přihlašovací stránku).'],
