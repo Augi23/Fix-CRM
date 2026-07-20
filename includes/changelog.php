@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.7.4',
+        'date' => '2026-07-20',
+        'time' => '08:42',
+        'title' => 'Po odeslání zakázkového listu e-mailem se ukáže, na jakou adresu se odeslalo',
+        'items' => [
+            'Po kliknutí na „Odeslat e-mailem klientovi" hláška „Odesláno na" dřív neukazovala adresu — server ji nevracel. Nově ukáže konkrétní e-mail klienta, na který zakázkový list odešel.',
+            'Stejně tak u „Podepsat na tabletu a poslat e-mailem": v hlášce se rovnou zobrazí e-mail klienta, na který se list po podpisu automaticky odešle.',
+        ],
+    ],
+    [
         'version' => '2.7.3',
         'date' => '2026-07-20',
         'time' => '08:31',

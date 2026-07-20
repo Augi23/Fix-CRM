@@ -1350,9 +1350,10 @@ window.openOrderDocChoice = function (orderId, code) {
                 .then(function (r) { return r.json(); })
                 .then(function (j) {
                     if (!j.ok) { msg.textContent = j.error || 'Chyba'; signBtn.disabled = false; return; }
-                    msg.innerHTML = j.notice === 'no_email'
-                        ? '✍️ ' + (window.AFX_DOC_L10N && AFX_DOC_L10N.sentNoEmail || 'Odesláno na tablet. Klient nemá e-mail — list se po podpisu jen uloží s podpisem.')
-                        : '✍️ ' + (window.AFX_DOC_L10N && AFX_DOC_L10N.sent || 'Odesláno na podpisový tablet — po podpisu klienta se zakázkový list (i s podpisem) automaticky pošle na jeho e-mail.');
+                    var __sfBase = j.notice === 'no_email'
+                        ? (window.AFX_DOC_L10N && AFX_DOC_L10N.sentNoEmail || 'Odesláno na tablet. Klient nemá e-mail — list se po podpisu jen uloží s podpisem.')
+                        : (window.AFX_DOC_L10N && AFX_DOC_L10N.sent || 'Odesláno na podpisový tablet — po podpisu klienta se zakázkový list (i s podpisem) automaticky pošle na jeho e-mail.');
+                    msg.innerHTML = '✍️ ' + __sfBase + (j.email ? '<div class="mt-1 text-info"><i class="fas fa-envelope me-1"></i>' + escapeHtml(j.email) + '</div>' : '');
                 })
                 .catch(function () { msg.textContent = 'Chyba spojení'; signBtn.disabled = false; });
         };
@@ -1376,7 +1377,7 @@ window.openOrderDocChoice = function (orderId, code) {
                 emailBtn.disabled = false; emailBtn.innerHTML = old;
                 if (d.ok) {
                     msg.className = 'small mt-3 text-success';
-                    msg.innerHTML = '<i class="fas fa-check-circle me-1"></i>Odesláno na ' + d.to;
+                    msg.innerHTML = '<i class="fas fa-check-circle me-1"></i>Odesláno na <b>' + escapeHtml(d.to || '—') + '</b>';
                 } else {
                     msg.className = 'small mt-3 text-warning';
                     msg.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>' + (d.error || 'Nepodařilo se odeslat');

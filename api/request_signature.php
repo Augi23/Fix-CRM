@@ -69,7 +69,9 @@ try {
     $pdo->prepare("INSERT INTO signature_requests (order_id, sig_type, branch_id, requested_by, email_after) VALUES (?, ?, ?, ?, ?)")
         ->execute([$orderId, $sigType, (int)($order['branch_id'] ?? 0) ?: null, $by !== '' ? mb_substr($by, 0, 100) : null, $emailAfter ? 1 : 0]);
 
-    echo json_encode(['ok' => true, 'request_id' => (int)$pdo->lastInsertId(), 'notice' => $notice]);
+    // e-mail klienta (kam po podpisu půjde list) — ať to UI může rovnou ukázat
+    $emailForUi = (isset($cliEmail) && filter_var($cliEmail, FILTER_VALIDATE_EMAIL)) ? $cliEmail : '';
+    echo json_encode(['ok' => true, 'request_id' => (int)$pdo->lastInsertId(), 'notice' => $notice, 'email' => $emailForUi]);
 } catch (Throwable $e) {
     echo json_encode(['ok' => false, 'error' => 'Chyba serveru']);
 }

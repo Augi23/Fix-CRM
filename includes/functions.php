@@ -2948,11 +2948,11 @@ function crmSendOrderSheetEmail(int $orderId, ?string $toOverride = null): array
                          FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?");
     $st->execute([$orderId]);
     $order = $st->fetch();
-    if (!$order) { return [false, 'Zakázka nenalezena']; }
+    if (!$order) { return [false, 'Zakázka nenalezena', '']; }
 
     $to = trim((string)($toOverride ?? $order['email'] ?? ''));
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
-        return [false, 'Klient nemá platný e-mail.'];
+        return [false, 'Klient nemá platný e-mail.', $to];
     }
 
     $it = $pdo->prepare("SELECT oi.*, i.part_name FROM order_items oi JOIN inventory i ON oi.inventory_id = i.id WHERE oi.order_id = ?");
@@ -2967,7 +2967,9 @@ function crmSendOrderSheetEmail(int $orderId, ?string $toOverride = null): array
     $html = ob_get_clean();
 
     $subject = (get_setting('company_name', 'AppleFix')) . ' — ' . __('order_sheet', $target_lang) . ' ' . orderDisplayCode($order);
-    return smtpSendMail($to, $subject, $html);
+    // 3. prvek = skutečná adresa příjemce, ať ji UI může zobrazit („Odesláno na …").
+    [$__sok, $__smsg] = smtpSendMail($to, $subject, $html);
+    return [$__sok, $__smsg, $to];
 }
 
 /** Fronta požadavků pro podpisovou stanici (iPad na pultu): zaměstnanec pošle

@@ -16,9 +16,11 @@ $order_id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
 if ($order_id <= 0) { echo json_encode(['ok' => false, 'error' => 'Chybí zakázka']); exit; }
 
 $to = trim((string)($_POST['email'] ?? ''));
-[$ok, $err] = crmSendOrderSheetEmail($order_id, $to !== '' ? $to : null);
+// 3. prvek = skutečná adresa, na kterou se odeslalo (když $to prázdné, funkce
+// vezme e-mail klienta ze zakázky) — vrátíme ji do UI, ať zobrazí „Odesláno na …".
+[$ok, $err, $sentTo] = crmSendOrderSheetEmail($order_id, $to !== '' ? $to : null);
 if ($ok) {
-    echo json_encode(['ok' => true, 'to' => $to]);
+    echo json_encode(['ok' => true, 'to' => $sentTo]);
 } else {
     echo json_encode(['ok' => false, 'error' => $err]);
 }
