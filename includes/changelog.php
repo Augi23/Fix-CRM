@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.14.0',
+        'date' => '2026-07-20',
+        'time' => '18:02',
+        'title' => 'Příprava migrace: statistiky rozlišují naše zakázky a import',
+        'items' => [
+            'Hlavní čísla ve statistikách (dlaždice Nástěnky i Zakázek, badge u Zakázek v menu, denní tržba, přehled poboček) počítají JEN zakázky vzniklé v našem CRM — včetně těch, které se při migraci přečíslují.',
+            'Zakázky importované ze zakazkovylist.cz se ukazují šedě menším písmem v závorce hned za hlavním číslem, např. „12 (38)". Když je importovaných nula, závorka se vůbec nezobrazí — do ostrého běhu migrace tedy vše vypadá jako dosud.',
+            'Do denní tržby a měsíčních grafů tržeb vstupují jen naše CRM zakázky; import tržby nikdy nezkreslí.',
+        ],
+    ],
+    [
         'version' => '2.13.0',
         'date' => '2026-07-20',
         'time' => '17:52',

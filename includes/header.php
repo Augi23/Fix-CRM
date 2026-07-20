@@ -107,7 +107,8 @@ $langRedirect = $_SERVER['REQUEST_URI'] ?? basename($_SERVER['PHP_SELF']);
 
 $ordersBadgeCount = 0;
 try {
-    $ordersBadgeCount = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE status IN (" . orderStatusSqlIn($pdo, 'active') . ")" . orderBranchScopeSql('branch_id'))->fetchColumn() ?: 0);
+    ensureOrdersSourceColumn();   // migrace 7/2026: badge v menu = jen primární zakázky (bez importu z listu)
+    $ordersBadgeCount = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE source <> 'legacy' AND status IN (" . orderStatusSqlIn($pdo, 'active') . ")" . orderBranchScopeSql('branch_id'))->fetchColumn() ?: 0);
 } catch (Throwable $e) {
     $ordersBadgeCount = 0;
 }

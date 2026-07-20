@@ -27,32 +27,36 @@ $__tilesGlobal = isBranchGlobalViewer();
 $__myBranchId = (int)getCurrentStaffBranchId();
 $__branch_cond = (!$__tilesGlobal && $__myBranchId > 0) ? " AND branch_id = " . $__myBranchId : '';
 $__tilesBranchLabel = $__tilesGlobal ? 'Obě pobočky' : getBranchLabel($__myBranchId);
-$unassigned_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($activeStatuses) AND (technician_id IS NULL OR technician_id = 0)" . $__branch_cond)->fetchColumn();
-$unfinished_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($activeStatuses)" . $__branch_cond)->fetchColumn();
+// Migrace 7/2026: číselné údaje Nástěnky = jen zakázky vzniklé v CRM (source <> 'legacy');
+// importované ze zakazkovylist.cz do hlavních čísel ani tržeb nevstupují
+ensureOrdersSourceColumn();
+$noLegacy = " AND source <> 'legacy'";
+$unassigned_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($activeStatuses) AND (technician_id IS NULL OR technician_id = 0)" . $noLegacy . $__branch_cond)->fetchColumn();
+$unfinished_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($activeStatuses)" . $noLegacy . $__branch_cond)->fetchColumn();
 
-$new_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($newStatuses)" . $tech_cond)->fetchColumn();
-$pending_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($pendingStatuses)" . $tech_cond)->fetchColumn();
-$progress_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($progressStatuses)" . $tech_cond)->fetchColumn();
-$ready_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($doneStatuses)" . $tech_cond)->fetchColumn();
+$new_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($newStatuses)" . $noLegacy . $tech_cond)->fetchColumn();
+$pending_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($pendingStatuses)" . $noLegacy . $tech_cond)->fetchColumn();
+$progress_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($progressStatuses)" . $noLegacy . $tech_cond)->fetchColumn();
+$ready_count = $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($doneStatuses)" . $noLegacy . $tech_cond)->fetchColumn();
 
 // Design-system stats
-$waiting_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($waitingStatuses)" . $tech_cond)->fetchColumn();
+$waiting_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($waitingStatuses)" . $noLegacy . $tech_cond)->fetchColumn();
 $active_count = (int)$new_count + (int)$pending_count + (int)$progress_count + $waiting_count;
-$urgent_waiting = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($waitingStatuses) AND priority = 'High'" . $tech_cond)->fetchColumn();
+$urgent_waiting = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($waitingStatuses) AND priority = 'High'" . $noLegacy . $tech_cond)->fetchColumn();
 try {
-    $completed_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE()" . $tech_cond)->fetchColumn();
-    $planned_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()" . $tech_cond)->fetchColumn();
-    $new_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($newStatuses) AND DATE(created_at) = CURDATE()" . $tech_cond)->fetchColumn();
-    $revenue_today = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE()" . $tech_cond)->fetchColumn();
-    $revenue_yesterday = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE() - INTERVAL 1 DAY" . $tech_cond)->fetchColumn();
+    $completed_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE()" . $noLegacy . $tech_cond)->fetchColumn();
+    $planned_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()" . $noLegacy . $tech_cond)->fetchColumn();
+    $new_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($newStatuses) AND DATE(created_at) = CURDATE()" . $noLegacy . $tech_cond)->fetchColumn();
+    $revenue_today = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE()" . $noLegacy . $tech_cond)->fetchColumn();
+    $revenue_yesterday = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE() - INTERVAL 1 DAY" . $noLegacy . $tech_cond)->fetchColumn();
     $revenue_today_trend = $revenue_yesterday > 0 ? round((($revenue_today - $revenue_yesterday) / $revenue_yesterday) * 100) : 0;
 
-    $revenue_month = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND MONTH(updated_at) = MONTH(CURDATE()) AND YEAR(updated_at) = YEAR(CURDATE())" . $tech_cond)->fetchColumn();
-    $revenue_prev = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND MONTH(updated_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(updated_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)" . $tech_cond)->fetchColumn();
+    $revenue_month = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND MONTH(updated_at) = MONTH(CURDATE()) AND YEAR(updated_at) = YEAR(CURDATE())" . $noLegacy . $tech_cond)->fetchColumn();
+    $revenue_prev = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND MONTH(updated_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(updated_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)" . $noLegacy . $tech_cond)->fetchColumn();
     $revenue_trend = $revenue_prev > 0 ? round((($revenue_month - $revenue_prev) / $revenue_prev) * 100) : 0;
     $revenue_12m = [];
     for ($i = 11; $i >= 0; $i--) {
-        $m = $pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND YEAR(updated_at)*12+MONTH(updated_at) = YEAR(CURDATE())*12+MONTH(CURDATE()) - $i" . $tech_cond)->fetchColumn();
+        $m = $pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND YEAR(updated_at)*12+MONTH(updated_at) = YEAR(CURDATE())*12+MONTH(CURDATE()) - $i" . $noLegacy . $tech_cond)->fetchColumn();
         $revenue_12m[] = (float)$m;
     }
 } catch (Throwable $e) {
@@ -72,7 +76,7 @@ if (isBranchGlobalViewer()) {
                 SUM(o.status IN ($doneStatuses)) AS done_orders,
                 COALESCE(SUM(CASE WHEN o.status IN ($doneStatuses) THEN o.final_cost ELSE 0 END), 0) AS revenue
             FROM branches b
-            LEFT JOIN orders o ON o.branch_id = b.id
+            LEFT JOIN orders o ON o.branch_id = b.id AND o.source <> 'legacy'
             WHERE b.is_active = 1
             GROUP BY b.id, b.name
             ORDER BY b.id ASC")->fetchAll();

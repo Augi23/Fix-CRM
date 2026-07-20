@@ -35,6 +35,16 @@
 .sl-stat-ordered  .sl-stat-num { color: var(--afx-ice) !important;    text-shadow: 0 0 18px rgba(85,212,255,.4); }
 .sl-stat-received .sl-stat-num { color: var(--afx-mint) !important;   text-shadow: 0 0 18px rgba(59,232,168,.4); }
 
+/* Sekundární hodnota statistik = zakázky importované ze zakazkovylist.cz
+   (migrace 7/2026) — šedě, menším písmem, v závorce za hlavním číslem */
+.crm-stat-secondary {
+  color: rgba(255,255,255,.45) !important;
+  font-size: .55em;
+  font-weight: 500;
+  text-shadow: none;
+}
+html[data-lg-theme="light"] .crm-stat-secondary { color: rgba(60,60,67,.55) !important; }
+
 /* ============================================================
    2) POZADÍ — futuristické halftone vlny (canvas #crmBgWaves)
    Generuje se JS na míru oknu (header.php) a při resize/zoomu se

@@ -136,12 +136,18 @@ if (isset($pdo)) {
             $stats_where = ' AND branch_id = ?';
             $stats_params[] = (int)$_GET['branch_id'];
         }
+        // Migrace 7/2026: hlavní číslo = jen zakázky vzniklé v CRM (source <> 'legacy');
+        // importované ze zakazkovylist.cz šedě v závorce za číslem (skryto při 0)
         $s = $pdo->prepare(
             "SELECT
-                SUM(status IN (" . orderStatusSqlIn($pdo, 'new') . ")) as cnt_new,
-                SUM(status IN (" . orderStatusSqlIn($pdo, 'pending_approval') . ")) as cnt_pending,
-                SUM(status IN (" . orderStatusSqlIn($pdo, 'in_progress') . ")) as cnt_progress,
-                SUM(status IN (" . orderStatusSqlIn($pdo, 'done') . ")) as cnt_ready
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'new') . ") AND source <> 'legacy') as cnt_new,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'pending_approval') . ") AND source <> 'legacy') as cnt_pending,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'in_progress') . ") AND source <> 'legacy') as cnt_progress,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'done') . ") AND source <> 'legacy') as cnt_ready,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'new') . ") AND source = 'legacy') as leg_new,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'pending_approval') . ") AND source = 'legacy') as leg_pending,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'in_progress') . ") AND source = 'legacy') as leg_progress,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'done') . ") AND source = 'legacy') as leg_ready
              FROM orders WHERE 1=1" . $stats_where
         );
         $s->execute($stats_params);
@@ -150,10 +156,16 @@ if (isset($pdo)) {
         $s_pending  = (int)($stats_row['cnt_pending'] ?? 0);
         $s_progress = (int)($stats_row['cnt_progress'] ?? 0);
         $s_ready    = (int)($stats_row['cnt_ready'] ?? 0);
+        $s_new_leg      = (int)($stats_row['leg_new'] ?? 0);
+        $s_pending_leg  = (int)($stats_row['leg_pending'] ?? 0);
+        $s_progress_leg = (int)($stats_row['leg_progress'] ?? 0);
+        $s_ready_leg    = (int)($stats_row['leg_ready'] ?? 0);
     } catch (PDOException $e) {
         error_log('orders.php stats error: ' . $e->getMessage());
     }
 }
+$s_new_leg = $s_new_leg ?? 0; $s_pending_leg = $s_pending_leg ?? 0;
+$s_progress_leg = $s_progress_leg ?? 0; $s_ready_leg = $s_ready_leg ?? 0;
 
 // Nepřidělené / Nedokončené (stejná čísla jako dlaždice na nástěnce):
 // vedení = obě pobočky, řadoví zaměstnanci = jen svoje pobočka
@@ -163,9 +175,17 @@ $__uCond = (!$__uGlobal && $__uBranch > 0) ? " AND branch_id = " . $__uBranch : 
 $__uLabel = $__uGlobal ? 'Obě pobočky' : getBranchLabel($__uBranch);
 $__uActive = orderStatusSqlIn($pdo, 'active');
 try {
-    $__unassigned = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($__uActive) AND (technician_id IS NULL OR technician_id = 0)" . $__uCond)->fetchColumn();
-    $__unfinished = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($__uActive)" . $__uCond)->fetchColumn();
-} catch (Throwable $e) { $__unassigned = $__unfinished = 0; }
+    $__uRow = $pdo->query("SELECT
+            SUM((technician_id IS NULL OR technician_id = 0) AND source <> 'legacy') AS ua,
+            SUM(source <> 'legacy') AS uf,
+            SUM((technician_id IS NULL OR technician_id = 0) AND source = 'legacy') AS ua_leg,
+            SUM(source = 'legacy') AS uf_leg
+        FROM orders WHERE status IN ($__uActive)" . $__uCond)->fetch();
+    $__unassigned = (int)($__uRow['ua'] ?? 0);
+    $__unfinished = (int)($__uRow['uf'] ?? 0);
+    $__unassigned_leg = (int)($__uRow['ua_leg'] ?? 0);
+    $__unfinished_leg = (int)($__uRow['uf_leg'] ?? 0);
+} catch (Throwable $e) { $__unassigned = $__unfinished = $__unassigned_leg = $__unfinished_leg = 0; }
 
 // FIX #5: Load technicians once (used in both New Order and Quick Edit modals)
 $techs_list = getActiveTechnicians(true);   // volny vyber technika — vsichni aktivni
@@ -180,7 +200,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
                 <div class="d-flex align-items-center">
                     <i class="fas fa-clipboard-list text-primary fa-2x me-3"></i>
                     <div>
-                        <h4 class="mb-0 text-white"><?php echo $s_new; ?></h4>
+                        <h4 class="mb-0 text-white"><?php echo $s_new; ?><?php if ($s_new_leg > 0): ?> <span class="crm-stat-secondary">(<?php echo $s_new_leg; ?>)</span><?php endif; ?></h4>
                         <p class="text-white-75 mb-0 small"><?php echo __('new_orders'); ?></p>
                     </div>
                 </div>
@@ -193,7 +213,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
                 <div class="d-flex align-items-center">
                     <i class="fas fa-handshake text-info fa-2x me-3"></i>
                     <div>
-                        <h4 class="mb-0 text-white"><?php echo $s_pending; ?></h4>
+                        <h4 class="mb-0 text-white"><?php echo $s_pending; ?><?php if ($s_pending_leg > 0): ?> <span class="crm-stat-secondary">(<?php echo $s_pending_leg; ?>)</span><?php endif; ?></h4>
                         <p class="text-white-75 mb-0 small"><?php echo __('pending_approval_orders'); ?></p>
                     </div>
                 </div>
@@ -206,7 +226,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
                 <div class="d-flex align-items-center">
                     <i class="fas fa-spinner text-warning fa-2x me-3"></i>
                     <div>
-                        <h4 class="mb-0 text-white"><?php echo $s_progress; ?></h4>
+                        <h4 class="mb-0 text-white"><?php echo $s_progress; ?><?php if ($s_progress_leg > 0): ?> <span class="crm-stat-secondary">(<?php echo $s_progress_leg; ?>)</span><?php endif; ?></h4>
                         <p class="text-white-75 mb-0 small"><?php echo __('in_progress_orders'); ?></p>
                     </div>
                 </div>
@@ -219,7 +239,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
                 <div class="d-flex align-items-center">
                     <i class="fas fa-check-double text-success fa-2x me-3"></i>
                     <div>
-                        <h4 class="mb-0 text-white"><?php echo $s_ready; ?></h4>
+                        <h4 class="mb-0 text-white"><?php echo $s_ready; ?><?php if ($s_ready_leg > 0): ?> <span class="crm-stat-secondary">(<?php echo $s_ready_leg; ?>)</span><?php endif; ?></h4>
                         <p class="text-white-75 mb-0 small"><?php echo __('completed_orders'); ?></p>
                     </div>
                 </div>
@@ -233,7 +253,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
                 <div class="d-flex align-items-center">
                     <i class="fas fa-user-slash text-danger fa-2x me-3"></i>
                     <div>
-                        <h4 class="mb-0 text-white"><?php echo $__unassigned; ?></h4>
+                        <h4 class="mb-0 text-white"><?php echo $__unassigned; ?><?php if ($__unassigned_leg > 0): ?> <span class="crm-stat-secondary">(<?php echo $__unassigned_leg; ?>)</span><?php endif; ?></h4>
                         <p class="text-white-75 mb-0 small">Nepřidělené zakázky</p>
                     </div>
                 </div>
@@ -246,7 +266,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
                 <div class="d-flex align-items-center">
                     <i class="fas fa-list-check fa-2x me-3" style="color:#BF5AF2;"></i>
                     <div>
-                        <h4 class="mb-0 text-white"><?php echo $__unfinished; ?></h4>
+                        <h4 class="mb-0 text-white"><?php echo $__unfinished; ?><?php if ($__unfinished_leg > 0): ?> <span class="crm-stat-secondary">(<?php echo $__unfinished_leg; ?>)</span><?php endif; ?></h4>
                         <p class="text-white-75 mb-0 small">Nedokončené zakázky</p>
                     </div>
                 </div>
