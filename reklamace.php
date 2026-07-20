@@ -100,7 +100,7 @@ if (!empty($rows) && isset($pdo)) {
                         <th><?php echo __('customer_col'); ?></th>
                         <th><?php echo __('phone'); ?></th>
                         <th><?php echo __('device'); ?></th>
-                        <th>IMEI/SN</th>
+                        <th style="width:1%;">IMEI/SN</th>
                         <th><?php echo __('complaint_reason_col'); ?></th>
                         <th><?php echo __('source_order_col'); ?></th>
                         <th><?php echo __('technician'); ?></th>
@@ -137,7 +137,8 @@ if (!empty($rows) && isset($pdo)) {
                         <td><?php echo e(trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''))); ?></td>
                         <td><?php echo e($r['phone'] ?? ''); ?></td>
                         <td><?php echo e($r['device'] ?? ''); ?></td>
-                        <td><?php echo e($r['serial_number'] ?? ''); ?></td>
+                        <?php /* width:1% v hlavičce + nowrap = sloupec přesně na šířku čísla, bez hluchého místa */ ?>
+                        <td class="text-nowrap font-monospace small"><?php echo e($r['serial_number'] ?? ''); ?></td>
                         <td style="min-width:280px;"><?php echo nl2br(e($r['complaint_reason'] ?? '')); ?></td>
                         <td class="text-nowrap">
                             <?php if (($r['source'] ?? '') === 'client'): ?>

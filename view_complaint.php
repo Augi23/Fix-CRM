@@ -41,7 +41,13 @@ if ($curStatus !== '' && !in_array($curStatus, $statusOptions, true)) { array_un
 require_once 'includes/header.php';
 ?>
 
-<div class="container-fluid" style="max-width: 1200px;">
+<style>
+/* Panely v detailu reklamace mají PŘIROZENOU výšku — globální pravidlo
+   .row > [col] > .glass-panel { height:100% } (dlaždice Nástěnky) je tady
+   natahovalo na výšku celého sloupce (638 px při pár řádcích obsahu). */
+.cmpl-detail .row > [class*="col-"] > .glass-panel { height: auto !important; }
+</style>
+<div class="container-fluid cmpl-detail" style="max-width: 1200px;">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h2 class="mb-0 text-white">
             <i class="fas fa-rotate-left me-2" style="color:#f97316"></i><?php echo __('cmpl_detail'); ?>

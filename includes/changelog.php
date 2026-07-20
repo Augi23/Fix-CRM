@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.11.1',
+        'date' => '2026-07-20',
+        'time' => '16:41',
+        'title' => 'Detail reklamace: panely bez zbytečného prázdného místa + užší sloupec IMEI',
+        'items' => [
+            'Panely v detailu reklamace (Stav, Řeší technik, Řešení, Přílohy, Dokumenty) měly nesmyslně velkou výšku — natahovalo je obecné pravidlo pro dlaždice Nástěnky. Teď mají přirozenou výšku podle obsahu.',
+            'Sloupec IMEI/SN v seznamu reklamací je užší — přesně na šířku čísla (celé viditelné, bez hluchého místa za ním), navíc písmem s pevnou šířkou pro lepší čitelnost.',
+        ],
+    ],
+    [
         'version' => '2.11.0',
         'date' => '2026-07-20',
         'time' => '16:03',
