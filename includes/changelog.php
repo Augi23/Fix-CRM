@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '2.7.8',
+        'date' => '2026-07-20',
+        'time' => '09:31',
+        'title' => 'Oprava datumů v Historii úprav (18. 7. → 20. 7.)',
+        'items' => [
+            'Záznamy v2.4.1, v2.4.2 a v2.5.0 měly v Historii úprav chybně napsané datum 18. 7. 2026, přestože byly provedeny 20. 7. 2026 v noci (ověřeno proti historii commitů). Datumy opraveny — časy byly správně.',
+        ],
+    ],
+    [
         'version' => '2.7.7',
         'date' => '2026-07-20',
         'time' => '09:22',
@@ -169,7 +178,7 @@ return [
     ],
     [
         'version' => '2.5.0',
-        'date' => '2026-07-18',
+        'date' => '2026-07-20',
         'time' => '04:06',
         'title' => 'Práva zaměstnanců: všichni mohou opravovat zakázky i kontakty',
         'items' => [
@@ -180,7 +189,7 @@ return [
     ],
     [
         'version' => '2.4.2',
-        'date' => '2026-07-18',
+        'date' => '2026-07-20',
         'time' => '03:41',
         'title' => 'Přehledy: výchozí rozsah od začátku roku (ne jen tento týden)',
         'items' => [
@@ -190,7 +199,7 @@ return [
     ],
     [
         'version' => '2.4.1',
-        'date' => '2026-07-18',
+        'date' => '2026-07-20',
         'time' => '03:41',
         'title' => 'Konec hlášky „Neplatný token" — místo ní obnovení přihlášení',
         'items' => [
