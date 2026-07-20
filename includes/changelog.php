@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '2.9.0',
+        'date' => '2026-07-20',
+        'time' => '12:02',
+        'title' => 'Štíhlejší horní lišta: Nákupy pod Sklad, Historie pod Přehledy',
+        'items' => [
+            'SKLAD má nově tři podzáložky: Servis — náhradní díly | Produkty — e-shop | Nákupy. Samostatná buňka „Nákupy" z horní lišty zmizela; počet čekajících nákupů (oranžový badge) se teď ukazuje na buňce Sklad i na podzáložce Nákupy.',
+            'Kdo nemá právo na sklad, buňku Sklad vidí dál a vede ho rovnou na Nákupy (objednávání dílů zůstává dostupné všem jako dosud — o nic nepřišel).',
+            'PŘEHLEDY mají podzáložky Statistiky | Historie úprav — samostatná buňka „Historie" z lišty zmizela. Historii vidí stejný okruh lidí jako dřív.',
+            'Horní lišta se tím zkrátila z 12 na 10 položek. Staré přímé odkazy (procurement.php, history.php) fungují beze změny — stránky zůstaly, jen se jinak otevírají z menu. Stejně upraveno i mobilní menu (☰).',
+        ],
+    ],
+    [
         'version' => '2.8.2',
         'date' => '2026-07-20',
         'time' => '10:13',

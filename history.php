@@ -112,6 +112,8 @@ require_once 'includes/header.php';
     <span class="text-white-50 small"><?php echo number_format($activeTab === 'kasa' ? $kTotal : $total, 0, ',', ' '); ?> záznamů</span>
 </div>
 
+<?php require 'includes/reports_tabs.php'; ?>
+
 <ul class="nav nav-pills mb-3 glass-panel p-2 border-secondary">
     <li class="nav-item">
         <a class="nav-link <?php echo $activeTab === 'audit' ? 'active' : 'text-white-75'; ?>" href="history.php"><i class="fas fa-clock-rotate-left me-2"></i>Historie úprav</a>

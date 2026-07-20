@@ -210,6 +210,8 @@ $can_add_procurement = $can_order;
     </div>
 </div>
 
+<?php require 'includes/inventory_tabs.php'; ?>
+
 <?php
 // Flash: přidání katalogu dodavatele
 if (isset($_GET['catalog_source_added'])): ?>

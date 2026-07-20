@@ -193,6 +193,8 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
         </form>
     </div>
 
+    <?php require 'includes/reports_tabs.php'; ?>
+
     <?php if ($is_admin): ?>
     <!-- Tab Navigation -->
     <ul class="nav nav-pills mb-4 glass-panel p-2">
