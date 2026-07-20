@@ -5,7 +5,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
 
-if (!isset($_SESSION['user_id']) || !hasPermission('admin_access')) {
+if (!isset($_SESSION['user_id']) || !crmCanManageSettings()) {
     echo json_encode(['ok' => false, 'error' => 'Jen pro administrátora.']); exit;
 }
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {

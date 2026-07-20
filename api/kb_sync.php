@@ -45,7 +45,7 @@ try {
 
     // throttle: KB tarif — min. 61 minut mezi syncy (admin smí vynutit)
     $last = (string)get_setting('kb_last_sync_at', '');
-    $force = !empty($_POST['force']) && hasPermission('admin_access');
+    $force = !empty($_POST['force']) && crmCanManageSettings();
     if (!$force && $last !== '' && (time() - strtotime($last)) < 61 * 60) {
         $wait = (int)ceil((61 * 60 - (time() - strtotime($last))) / 60);
         echo json_encode(['success' => false, 'throttled' => true,

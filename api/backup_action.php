@@ -9,7 +9,7 @@ header('Content-Type: application/json; charset=utf-8');
 // max. času na dump/import — u větší DB ať to nespadne v polovině
 @set_time_limit(300);
 
-if (!isset($_SESSION['user_id']) || !hasPermission('admin_access')) {
+if (!isset($_SESSION['user_id']) || !crmCanManageSettings()) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Jen administrátor.']); exit;
 }

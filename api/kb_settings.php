@@ -9,7 +9,7 @@ require_once '../includes/functions.php';
 ob_clean();
 header('Content-Type: application/json; charset=utf-8');
 
-if (empty($_SESSION['user_id']) || !hasPermission('admin_access')) {
+if (empty($_SESSION['user_id']) || !crmCanManageSettings()) {
     echo json_encode(['success' => false, 'message' => 'Jen administrátor.']); exit;
 }
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {

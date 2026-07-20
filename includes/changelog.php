@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.6.4',
+        'date' => '2026-07-20',
+        'time' => '07:11',
+        'title' => 'Boss má plný přístup do všech Nastavení',
+        'items' => [
+            'Boss (majitel) teď vidí a může upravovat všech 7 záložek Nastavení stejně jako administrátor — Údaje o společnosti, Věrnostní karta, Banka, Zaměstnanci, Tisk štítků, Správa administrátorů i Systém (Integrace/Databáze/Aktualizace).',
+            'Funguje i ukládání a akce v těchto záložkách: serverové zálohy (Zálohovat teď / Obnovit), nastavení a synchronizace Banky (KB), test SMS a Telegramu, synchronizace ceníku.',
+            'Přístup je úzce omezený POUZE na Nastavení — mimo Nastavení se Bossovi nic nemění (účetnictví, nákupy, reporty zůstávají jako dosud). Řízeno novou funkcí crmCanManageSettings().',
+        ],
+    ],
+    [
         'version' => '2.6.3',
         'date' => '2026-07-20',
         'time' => '06:49',

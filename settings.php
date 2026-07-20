@@ -11,7 +11,7 @@ if (!function_exists('settingsDebugLog')) {
 }
 
 // Processing before header to avoid header already sent
-$is_admin_check = (($_SESSION['role'] ?? '') == 'admin') || (hasPermission('admin_access'));
+$is_admin_check = crmCanManageSettings();
 
 if (isset($_POST['set_lang']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
@@ -455,7 +455,7 @@ if (isset($_POST['update_system_settings']) && $is_admin_check) {
     exit;
 }
 
-$is_admin_user = hasPermission('admin_access');
+$is_admin_user = crmCanManageSettings();
 $can_view_all_staff = $is_admin_user || in_array(getCurrentStaffRole(), ['manager', 'boss'], true) || hasPermission('view_reports_all');
 
 $active_tab = $_GET['tab'] ?? ($is_admin_user ? 'company' : 'staff');
@@ -493,7 +493,7 @@ $sysSubnav = function (string $cur) use ($sys_subs_allowed) {
 };
 
 // Uvítací zvuky při přihlášení (admin)
-if (isset($_POST['upload_greeting']) && hasPermission('admin_access')) {
+if (isset($_POST['upload_greeting']) && crmCanManageSettings()) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { header('Location: settings.php?tab=staff&error=csrf'); exit; }
     $gUser = preg_replace('/[^a-zA-Z0-9._-]/', '_', trim((string)($_POST['greeting_username'] ?? '')));
     $gDir = __DIR__ . '/uploads/greetings/';
@@ -509,7 +509,7 @@ if (isset($_POST['upload_greeting']) && hasPermission('admin_access')) {
     }
     header('Location: settings.php?tab=staff&error=greeting_invalid'); exit;
 }
-if (isset($_POST['delete_greeting']) && hasPermission('admin_access')) {
+if (isset($_POST['delete_greeting']) && crmCanManageSettings()) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { header('Location: settings.php?tab=staff&error=csrf'); exit; }
     $gUser = preg_replace('/[^a-zA-Z0-9._-]/', '_', trim((string)($_POST['greeting_username'] ?? '')));
     foreach (['mp3', 'm4a', 'wav', 'ogg'] as $e) { @unlink(__DIR__ . '/uploads/greetings/' . $gUser . '.' . $e); }

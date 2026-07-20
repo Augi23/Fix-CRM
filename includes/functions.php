@@ -173,6 +173,14 @@ function crmCanRunUpdates(): bool {
     return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 }
 
+/** Kdo smí spravovat NASTAVENÍ (všechny záložky vč. správy administrátorů, záloh
+ *  a banky) — administrátor a Boss (majitel firmy). ÚZKÉ oprávnění POUZE pro
+ *  Nastavení a jeho endpointy; záměrně NEROZŠIŘUJE admin_access do zbytku CRM
+ *  (účetnictví/nákupy/reporty zůstávají beze změny). Rozhodnutí majitele 20.7.2026. */
+function crmCanManageSettings(): bool {
+    return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
+}
+
 /** ID interního klienta („Interní zakázka" — evidence neveřejných zakázek
  *  pobočky Karlín). Nastavuje setting 'internal_customer_id'; 0 = nepoužívá se. */
 function crmInternalCustomerId(): int {
