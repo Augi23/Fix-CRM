@@ -6,6 +6,7 @@
 
 $lang_overrides = [
     'cs' => [
+        'system_tab' => 'Systém',
         'imei_min_digits' => 'Zadej alespoň 14 číslic IMEI.',
         'check_could_not_complete' => 'Kontrolu se nepodařilo dokončit.',
         'result_unknown' => 'Neznámý výsledek',
@@ -498,6 +499,7 @@ $lang_overrides = [
         'complaint_protocol' => 'Reklamační protokol',
     ],
     'ru' => [
+        'system_tab' => 'Система',
         'imei_min_digits' => 'Введите минимум 14 цифр IMEI.',
         'check_could_not_complete' => 'Проверку не удалось завершить.',
         'result_unknown' => 'Неизвестный результат',
@@ -984,6 +986,7 @@ $lang_overrides = [
         'complaint_protocol' => 'Рекламационный протокол',
     ],
     'en' => [
+        'system_tab' => 'System',
         'imei_min_digits' => 'Enter at least 14 IMEI digits.',
         'check_could_not_complete' => 'The check could not be completed.',
         'result_unknown' => 'Unknown result',

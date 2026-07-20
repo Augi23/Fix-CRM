@@ -436,7 +436,7 @@ if (isset($_POST['delete_admin']) && $is_admin_check) {
 if (isset($_POST['clear_logs']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     try { $pdo->query("DELETE FROM system_errors"); } catch (Exception $e) {}
-    header("Location: settings.php?tab=system&logs_cleared=1");
+    header("Location: settings.php?tab=system&sub=databaze&logs_cleared=1");
     exit;
 }
 
@@ -451,7 +451,7 @@ if (isset($_POST['update_system_settings']) && $is_admin_check) {
     set_setting('sla_new_hours', $sla_new);
     set_setting('sla_progress_hours', $sla_progress);
     crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Změna nastavení — Systém']);
-    header("Location: settings.php?tab=system&updated=1");
+    header("Location: settings.php?tab=system&sub=databaze&updated=1");
     exit;
 }
 
@@ -459,6 +459,38 @@ $is_admin_user = hasPermission('admin_access');
 $can_view_all_staff = $is_admin_user || in_array(getCurrentStaffRole(), ['manager', 'boss'], true) || hasPermission('view_reports_all');
 
 $active_tab = $_GET['tab'] ?? ($is_admin_user ? 'company' : 'staff');
+
+// ── Sloučení do záložky „Systém": Integrace + Databáze + Aktualizace ──────────
+// Staré přímé odkazy i POST přesměrování (?tab=integrations|updates|backups)
+// mapujeme na system + odpovídající pod-sekci, ať staré URL a záložky fungují dál.
+$__sysMerge = ['integrations' => 'integrace', 'updates' => 'aktualizace', 'backups' => 'databaze'];
+if (isset($__sysMerge[$active_tab])) {
+    if (!isset($_GET['sub'])) { $_GET['sub'] = $__sysMerge[$active_tab]; }
+    $active_tab = 'system';
+}
+// Pod-sekce Systému a kdo je smí: Integrace/Databáze jen admin, Aktualizace i vedení.
+$sys_subs_allowed = [];
+if ($is_admin_user) { $sys_subs_allowed[] = 'integrace'; $sys_subs_allowed[] = 'databaze'; }
+if (crmCanRunUpdates()) { $sys_subs_allowed[] = 'aktualizace'; }
+$sys_sub = (string)($_GET['sub'] ?? '');
+if (!in_array($sys_sub, $sys_subs_allowed, true)) { $sys_sub = $sys_subs_allowed[0] ?? 'integrace'; }
+// Pod-navigace Systému — vykreslí se nahoře v právě aktivní pod-sekci.
+$sysSubnav = function (string $cur) use ($sys_subs_allowed) {
+    $items = [
+        'integrace'   => ['fa-plug', __('integrations_tab')],
+        'databaze'    => ['fa-database', __('database_header')],
+        'aktualizace' => ['fa-cloud-download-alt', __('updates_tab')],
+    ];
+    echo '<ul class="nav nav-pills mb-4 gap-2 border-bottom border-secondary pb-3">';
+    foreach ($items as $key => $it) {
+        if (!in_array($key, $sys_subs_allowed, true)) { continue; }
+        $isActive = ($cur === $key);
+        echo '<li class="nav-item"><a class="nav-link ' . ($isActive ? 'active' : 'text-white-75')
+           . '" href="?tab=system&sub=' . $key . '"><i class="fas ' . $it[0] . ' me-2"></i>'
+           . htmlspecialchars($it[1]) . '</a></li>';
+    }
+    echo '</ul>';
+};
 
 // Uvítací zvuky při přihlášení (admin)
 if (isset($_POST['upload_greeting']) && hasPermission('admin_access')) {
@@ -486,11 +518,10 @@ if (isset($_POST['delete_greeting']) && hasPermission('admin_access')) {
 
 // Security for technicians
 if (!$is_admin_user) {
-    // Aktualizace smí i manažer/Boss (crmCanRunUpdates); ostatní admin taby ne.
-    if ($active_tab == 'company' || $active_tab == 'integrations' || $active_tab == 'loyalty' || $active_tab == 'banka' || $active_tab == 'system' || $active_tab == 'admins' || $active_tab == 'backups'
-        || ($active_tab == 'updates' && !crmCanRunUpdates())) {
-        $active_tab = 'staff';
-    }
+    // Systém smí manažer/Boss jen kvůli Aktualizacím; jinak je celý admin-only.
+    $__blocked = in_array($active_tab, ['company', 'loyalty', 'banka', 'admins'], true)
+        || ($active_tab === 'system' && !crmCanRunUpdates());
+    if ($__blocked) { $active_tab = 'staff'; }
 }
 require_once 'includes/header.php';
 ?>
@@ -528,9 +559,6 @@ require_once 'includes/header.php';
             <a class="nav-link <?php echo $active_tab == 'company' ? 'active' : 'text-white-75'; ?>" href="?tab=company"><i class="fas fa-building me-2"></i><?php echo __('company_data'); ?></a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php echo $active_tab == 'integrations' ? 'active' : 'text-white-75'; ?>" href="?tab=integrations"><i class="fas fa-plug me-2"></i><?php echo __('integrations_tab'); ?></a>
-        </li>
-        <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'loyalty' ? 'active' : 'text-white-75'; ?>" href="?tab=loyalty"><i class="fas fa-id-card me-2"></i>Věrnostní karta</a>
         </li>
         <li class="nav-item">
@@ -545,19 +573,13 @@ require_once 'includes/header.php';
         </li>
         <?php if ($is_admin_user): ?>
         <li class="nav-item">
-            <a class="nav-link <?php echo $active_tab == 'system' ? 'active' : 'text-white-75'; ?>" href="?tab=system"><i class="fas fa-server me-2"></i><?php echo __('system_db'); ?></a>
-        </li>
-        <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'admins' ? 'active' : 'text-white-75'; ?>" href="?tab=admins"><i class="fas fa-user-shield me-2"></i><?php echo __('admin_tab'); ?></a>
         </li>
-        <li class="nav-item">
-            <a class="nav-link <?php echo $active_tab == 'backups' ? 'active' : 'text-white-75'; ?>" href="?tab=backups"><i class="fas fa-database me-2"></i>Zálohy</a>
-        </li>
         <?php endif; ?>
-        <?php /* Aktualizace smí celé vedení (admin, manažer, Boss) — 16.7.2026 */ ?>
-        <?php if (crmCanRunUpdates()): ?>
+        <?php /* Systém = Integrace + Databáze + Aktualizace. Admin vidí vše; manažer/Boss jen kvůli Aktualizacím. */ ?>
+        <?php if ($is_admin_user || crmCanRunUpdates()): ?>
         <li class="nav-item">
-            <a class="nav-link <?php echo $active_tab == 'updates' ? 'active' : 'text-white-75'; ?>" href="?tab=updates" id="updatesNavLink"><i class="fas fa-cloud-download-alt me-2"></i><?php echo __('updates_tab'); ?> <span id="updateBadgeNav" class="badge bg-warning text-dark ms-1" style="display:none;">!</span></a>
+            <a class="nav-link <?php echo $active_tab == 'system' ? 'active' : 'text-white-75'; ?>" href="?tab=system" id="updatesNavLink"><i class="fas fa-server me-2"></i><?php echo __('system_tab'); ?> <span id="updateBadgeNav" class="badge bg-warning text-dark ms-1" style="display:none;">!</span></a>
         </li>
         <?php endif; ?>
     </ul>
@@ -642,8 +664,9 @@ require_once 'includes/header.php';
             </div>
         </div>
 
-        <!-- INTEGRATIONS TAB -->
-        <div class="tab-pane fade <?php echo $active_tab == 'integrations' ? 'show active' : ''; ?>">
+        <!-- SYSTÉM › INTEGRACE -->
+        <div class="tab-pane fade <?php echo ($active_tab == 'system' && $sys_sub == 'integrace' && $is_admin_user) ? 'show active' : ''; ?>">
+            <?php $sysSubnav('integrace'); ?>
             <form method="POST">
                 <?php echo csrfField(); ?>
                 <div class="row g-4 settings-integrations-row">
@@ -1217,15 +1240,11 @@ require_once 'includes/header.php';
 
         </div>
 
-        <!-- SYSTEM & DB TAB -->
-        <div class="tab-pane fade <?php echo $active_tab == 'system' ? 'show active' : ''; ?>">
+        <!-- SYSTÉM › DATABÁZE (jazyk + systémová nastavení + logy; serverové zálohy níže) -->
+        <div class="tab-pane fade <?php echo ($active_tab == 'system' && $sys_sub == 'databaze' && $is_admin_user) ? 'show active' : ''; ?>">
+            <?php $sysSubnav('databaze'); ?>
             <div class="row g-4">
                 <div class="col-md-6 border-end border-secondary">
-                    <h5 class="mb-3 text-white"><i class="fas fa-database me-2 text-secondary"></i><?php echo __('database_header'); ?></h5>
-                    <div class="d-grid gap-2 mb-4">
-                        <button type="button" class="btn btn-success" onclick="runBackup(this)"><i class="fas fa-file-download me-2"></i><?php echo __('create_backup'); ?></button>
-                        <div id="backupResult" class="small"></div>
-                    </div>
                     <h5 class="mb-3 text-white"><i class="fas fa-globe me-2 text-info"></i><?php echo __('system_langs'); ?></h5>
                     <form method="POST" class="row g-2 align-items-center">
                         <?php echo csrfField(); ?>
@@ -1587,9 +1606,10 @@ require_once 'includes/header.php';
             <?php endif; ?>
         </div>
 
-        <!-- UPDATES TAB — vedení (admin, manažer, Boss) -->
+        <!-- SYSTÉM › AKTUALIZACE — vedení (admin, manažer, Boss) -->
         <?php if (crmCanRunUpdates()): ?>
-        <div class="tab-pane fade <?php echo $active_tab == 'updates' ? 'show active' : ''; ?>">
+        <div class="tab-pane fade <?php echo ($active_tab == 'system' && $sys_sub == 'aktualizace') ? 'show active' : ''; ?>">
+            <?php $sysSubnav('aktualizace'); ?>
             <div class="row g-4">
                 <!-- Left: Version & Update -->
                 <div class="col-md-6">
@@ -1712,9 +1732,9 @@ require_once 'includes/header.php';
             <?php endif; ?>
         </div>
 
-        <!-- BACKUPS TAB -->
-        <div class="tab-pane fade <?php echo $active_tab == 'backups' ? 'show active' : ''; ?>">
-            <?php if ($active_tab == 'backups'):
+        <!-- SYSTÉM › DATABÁZE (serverové zálohy — zobrazí se pod databázovou kartou) -->
+        <div class="tab-pane fade <?php echo ($active_tab == 'system' && $sys_sub == 'databaze' && $is_admin_user) ? 'show active' : ''; ?>">
+            <?php if ($active_tab == 'system' && $sys_sub == 'databaze' && $is_admin_user):
                 $__backups = crmListBackups();
                 $__bkLastStatus = get_setting('backup_last_status', '');
                 $__bkLastRun = (int)get_setting('backup_last_run', '0');

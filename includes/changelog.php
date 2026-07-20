@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '2.6.3',
+        'date' => '2026-07-20',
+        'time' => '06:49',
+        'title' => 'Nastavení přehlednější — nová záložka „Systém" (Integrace · Databáze · Aktualizace)',
+        'items' => [
+            'Z deseti záložek je sedm. Integrace, Databáze i Aktualizace se sloučily do jedné záložky „Systém" s pod-záložkami — méně hledání, logičtější uspořádání.',
+            'ZÁLOHY: databázová karta teď zálohuje na SERVER (celá databáze + soubory + kód, automaticky každých 15 minut, s možností obnovy) — zmizelo zbytečné stahování .sql souboru do prohlížeče. Seznam serverových záloh i tlačítko „Zálohovat teď" najdeš v Systém → Databáze.',
+            'Aktualizace zůstávají přístupné i vedení (manažer/Boss) — po sloučení je najdou v Systém → Aktualizace; ostatní pod-sekce zůstávají jen pro administrátory.',
+            'Staré odkazy a záložky (na Integrace / Zálohy / Aktualizace) fungují dál — samy se přesměrují do nové záložky Systém.',
+        ],
+    ],
+    [
         'version' => '2.6.2',
         'date' => '2026-07-20',
         'time' => '07:20',
