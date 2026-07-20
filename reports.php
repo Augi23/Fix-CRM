@@ -213,10 +213,104 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                 <i class="fas fa-user me-2"></i><?php echo __('individual_stats'); ?>
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active_tab == 'times' ? 'active' : 'text-white'; ?>" href="?tab=times&start_date=<?php echo $start_date; ?>&end_date=<?php echo $end_date; ?>">
+                <i class="fas fa-clock me-2"></i><?php echo __('rpt_times_tab'); ?>
+            </a>
+        </li>
     </ul>
     <?php endif; ?>
 
     <div class="tab-content glass-panel p-4">
+
+        <!-- PROVOZNÍ ČASY: příjem (vytvořeno) a výdej (Vydáno) po hodinách a dnech (v2.11.0) -->
+        <?php if ($active_tab == 'times' && $is_admin): ?>
+            <?php
+            $__tStart = $start_date . ' 00:00:00';
+            $__tEnd   = $end_date . ' 23:59:59';
+            $__intakeH = array_fill(0, 24, 0); $__intakeD = array_fill(0, 7, 0);
+            $__pickH   = array_fill(0, 24, 0); $__pickD   = array_fill(0, 7, 0);
+            try {
+                $__bc = orderBranchScopeSql('branch_id');
+                $q = $pdo->prepare("SELECT HOUR(created_at) h, COUNT(*) n FROM orders WHERE created_at BETWEEN ? AND ?" . $__bc . " GROUP BY h");
+                $q->execute([$__tStart, $__tEnd]);
+                foreach ($q->fetchAll() as $r) { $__intakeH[(int)$r['h']] = (int)$r['n']; }
+                // WEEKDAY(): 0 = pondělí … 6 = neděle
+                $q = $pdo->prepare("SELECT WEEKDAY(created_at) d, COUNT(*) n FROM orders WHERE created_at BETWEEN ? AND ?" . $__bc . " GROUP BY d");
+                $q->execute([$__tStart, $__tEnd]);
+                foreach ($q->fetchAll() as $r) { $__intakeD[(int)$r['d']] = (int)$r['n']; }
+            } catch (Throwable $e) { /* bez příjmů */ }
+            try {
+                // výdej = PRVNÍ přechod zakázky do stavu skupiny „Vydáno" (collected)
+                $__col = getOrderStatusList('collected');
+                if ($__col) {
+                    $__phC = sqlPlaceholders($__col);
+                    $__bo = orderBranchScopeSql('o.branch_id');
+                    $__base = "FROM (SELECT order_id, MIN(changed_at) ts FROM order_status_log WHERE new_status IN ($__phC) GROUP BY order_id) t
+                               JOIN orders o ON o.id = t.order_id WHERE t.ts BETWEEN ? AND ?" . $__bo;
+                    $q = $pdo->prepare("SELECT HOUR(t.ts) h, COUNT(*) n " . $__base . " GROUP BY h");
+                    $q->execute(array_merge($__col, [$__tStart, $__tEnd]));
+                    foreach ($q->fetchAll() as $r) { $__pickH[(int)$r['h']] = (int)$r['n']; }
+                    $q = $pdo->prepare("SELECT WEEKDAY(t.ts) d, COUNT(*) n " . $__base . " GROUP BY d");
+                    $q->execute(array_merge($__col, [$__tStart, $__tEnd]));
+                    foreach ($q->fetchAll() as $r) { $__pickD[(int)$r['d']] = (int)$r['n']; }
+                }
+            } catch (Throwable $e) { /* starší DB bez logu stavů */ }
+
+            $__dayLabels = [__('rpt_day_mo'), __('rpt_day_tu'), __('rpt_day_we'), __('rpt_day_th'), __('rpt_day_fr'), __('rpt_day_sa'), __('rpt_day_su')];
+            $__renderBars = function (array $data, array $labels, string $color) {
+                $max = max(1, max($data));
+                echo '<div class="rpt-bars">';
+                foreach ($data as $i => $n) {
+                    $hPct = $n > 0 ? max(4, (int)round($n / $max * 100)) : 0;
+                    echo '<div class="rpt-col">'
+                       . '<div class="rpt-val">' . ($n > 0 ? $n : '') . '</div>'
+                       . '<div class="rpt-track"><div class="rpt-bar" style="height:' . $hPct . '%;background:' . $color . ';"></div></div>'
+                       . '<div class="rpt-lbl">' . e((string)$labels[$i]) . '</div>'
+                       . '</div>';
+                }
+                echo '</div>';
+            };
+            $__hourLabels = range(0, 23);
+            ?>
+            <style>
+            .rpt-bars { display: flex; align-items: flex-end; gap: 3px; }
+            .rpt-col { flex: 1 1 0; min-width: 0; text-align: center; }
+            .rpt-val { font-size: 9.5px; color: rgba(255,255,255,.75); height: 15px; font-variant-numeric: tabular-nums; }
+            .rpt-track { height: 130px; display: flex; align-items: flex-end; }
+            .rpt-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 0; box-shadow: 0 0 10px rgba(10,132,255,.18); }
+            .rpt-lbl { font-size: 9px; color: rgba(255,255,255,.5); margin-top: 4px; white-space: nowrap; }
+            .rpt-chart { border: 1px solid rgba(255,255,255,.09); border-radius: 14px; padding: 16px 18px; height: 100%; }
+            .rpt-chart h6 { font-size: 12.5px; }
+            </style>
+            <div class="small text-white-75 mb-3"><i class="fas fa-circle-info me-1"></i><?php echo __('rpt_times_hint'); ?></div>
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="rpt-chart">
+                        <h6 class="text-white mb-3"><i class="fas fa-inbox me-2 text-primary"></i><?php echo __('rpt_intake_hours'); ?></h6>
+                        <?php $__renderBars($__intakeH, $__hourLabels, 'linear-gradient(180deg,#0a84ff,#5ac8fa)'); ?>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="rpt-chart">
+                        <h6 class="text-white mb-3"><i class="fas fa-box-open me-2 text-success"></i><?php echo __('rpt_pickup_hours'); ?></h6>
+                        <?php $__renderBars($__pickH, $__hourLabels, 'linear-gradient(180deg,#30d158,#7ce7a0)'); ?>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="rpt-chart">
+                        <h6 class="text-white mb-3"><i class="fas fa-inbox me-2 text-primary"></i><?php echo __('rpt_intake_days'); ?></h6>
+                        <?php $__renderBars($__intakeD, $__dayLabels, 'linear-gradient(180deg,#0a84ff,#5ac8fa)'); ?>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="rpt-chart">
+                        <h6 class="text-white mb-3"><i class="fas fa-box-open me-2 text-success"></i><?php echo __('rpt_pickup_days'); ?></h6>
+                        <?php $__renderBars($__pickD, $__dayLabels, 'linear-gradient(180deg,#30d158,#7ce7a0)'); ?>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
         
         <!-- STAFF STATS TAB -->
         <?php if ($active_tab == 'staff_stats'): ?>

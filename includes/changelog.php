@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.11.0',
+        'date' => '2026-07-20',
+        'time' => '16:03',
+        'title' => 'Přehledy: nová záložka „Provozní časy" — příjem a výdej po hodinách a dnech',
+        'items' => [
+            'V Přehledech přibyla záložka „Provozní časy": čtyři grafy ukazují, KDY zakázky přicházejí (vytvořeno) a KDY si je klienti vyzvedávají (první přechod do stavu „Vydáno") — po hodinách dne (0–23) a po dnech v týdnu (Po–Ne).',
+            'Grafy respektují zvolený datumový rozsah nahoře i pobočkovou viditelnost. Modrá = příjem, zelená = výdej. Pomůže naplánovat směny podle skutečné špičky na pultu.',
+        ],
+    ],
+    [
         'version' => '2.10.0',
         'date' => '2026-07-20',
         'time' => '16:00',
