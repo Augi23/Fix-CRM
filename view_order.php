@@ -172,7 +172,7 @@ function localizedOrderStatusLabel(string $status): string {
                     <?php endif; ?>
                     <div>
                         <h5 class="mb-0">
-                            <?php echo __('order'); ?> <?php echo e(orderDisplayCode($order)); ?> - <?php echo htmlspecialchars($order['device_model']); ?>
+                            <?php echo __('order'); ?> <?php echo e(orderDisplayCode($order)); ?><?php if (($__legacySfx = orderLegacySuffix($order)) !== ''): ?><span class="text-white-50 fw-normal"><?php echo e($__legacySfx); ?></span><?php endif; ?> - <?php echo htmlspecialchars($order['device_model']); ?>
                             <span class="text-white-75 fw-normal ms-2" style="font-size: 0.9rem;">
                                 (<?php echo __('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?>)
                             </span>

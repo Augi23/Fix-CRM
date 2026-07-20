@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.12.0',
+        'date' => '2026-07-20',
+        'time' => '17:44',
+        'title' => 'Příprava migrace: staré číslo zakázky zůstane dohledatelné',
+        'items' => [
+            'Zakázka si nově umí pamatovat své PŮVODNÍ číslo (před přečíslováním při přechodu ze zakazkovylist.cz). Zobrazuje se šedě jako „(dřív APFAZ…)" — v seznamu zakázek, v detailu zakázky, v našeptávači hledání i v klientském portálu.',
+            'Staré číslo funguje všude, kde se zakázka dohledává: vyhledávání na Nástěnce a v Zakázkách, našeptávač, i sken QR/čárového kódu ze starého papírového zakázkového listu — vše otevře správnou (přečíslovanou) zakázku.',
+            'Vizuálně se zatím nic nemění — původní čísla se doplní až při ostrém běhu migrace. Tato verze jen připravuje půdu, aby po přečíslování žádné staré číslo „nezmizelo".',
+        ],
+    ],
+    [
         'version' => '2.11.2',
         'date' => '2026-07-20',
         'time' => '16:43',

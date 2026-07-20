@@ -175,7 +175,10 @@ function crmCanRunUpdates(): bool {
 
 /** Původ zakázky: 'crm' = vznikla v našem CRM, 'legacy' = import ze zakazkovylist.cz.
  *  Základ pro šedé řádky, sekundární statistiky a vyloučení importu z grafů
- *  (migrace 7/2026 — ostrý běh nastaví 'legacy' všem importovaným). */
+ *  (migrace 7/2026 — ostrý běh nastaví 'legacy' všem importovaným).
+ *  Zajišťuje i orders.legacy_code — PŮVODNÍ číslo přečíslované zakázky (kolizní
+ *  CRM kódy dostanou při migraci novou řadu za maximem listu); staré číslo musí
+ *  zůstat dohledatelné: hledání, sken QR/čárového kódu, „(dřív …)" v UI. */
 function ensureOrdersSourceColumn(): void {
     global $pdo;
     static $done = false;
@@ -184,6 +187,9 @@ function ensureOrdersSourceColumn(): void {
     try {
         if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'source'")->fetch()) {
             $pdo->exec("ALTER TABLE orders ADD COLUMN source VARCHAR(16) NOT NULL DEFAULT 'crm', ADD KEY idx_orders_source (source)");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'legacy_code'")->fetch()) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN legacy_code VARCHAR(32) NULL DEFAULT NULL, ADD KEY idx_orders_legacy_code (legacy_code)");
         }
     } catch (Throwable $e) { error_log('ensureOrdersSourceColumn: ' . $e->getMessage()); }
 }
@@ -675,6 +681,15 @@ function orderDisplayCode(array $order): string
 {
     $orderCode = trim((string)($order['order_code'] ?? ''));
     return $orderCode !== '' ? $orderCode : '#' . (int)($order['id'] ?? 0);
+}
+
+/** „ (dřív APFAZ…)" — původní číslo přečíslované zakázky (migrace 7/2026).
+ *  Prázdný řetězec, pokud zakázka legacy_code nemá; $lang pro klientský portál/dokumenty. */
+function orderLegacySuffix(array $order, ?string $lang = null): string
+{
+    $legacy = trim((string)($order['legacy_code'] ?? ''));
+    if ($legacy === '') return '';
+    return ' (' . __('ord_prev_code', $lang) . ' ' . $legacy . ')';
 }
 
 /**
@@ -2926,9 +2941,15 @@ function resolveScannedOrderId(PDO $pdo, string $raw): ?int
 {
     $cands = scanNormalizeCandidates($raw);
     if (!$cands) return null;
+    ensureOrdersSourceColumn();   // legacy_code — QR/čárové kódy ze starých papírů musí najít zakázku i po přečíslování
     try {
         $in = implode(',', array_fill(0, count($cands), '?'));
         $st = $pdo->prepare("SELECT id FROM orders WHERE order_code IN ($in) ORDER BY id DESC LIMIT 1");
+        $st->execute($cands);
+        $id = $st->fetchColumn();
+        if ($id) return (int)$id;
+        // Stará čísla přečíslovaných zakázek (papír/QR ze zakazkovylist.cz)
+        $st = $pdo->prepare("SELECT id FROM orders WHERE legacy_code IN ($in) ORDER BY id DESC LIMIT 1");
         $st->execute($cands);
         $id = $st->fetchColumn();
         if ($id) return (int)$id;

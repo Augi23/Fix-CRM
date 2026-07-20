@@ -20,15 +20,17 @@ try {
 
     addOrderBranchScope($where, $params, 'o');
 
+    ensureOrdersSourceColumn();   // legacy_code (migrace 7/2026) — hledání i SELECT níže s ním počítají
+
     if ($q !== '') {
-        $where[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_brand LIKE ? OR o.device_model LIKE ?)';
+        $where[] = '(o.order_code LIKE ? OR o.legacy_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_brand LIKE ? OR o.device_model LIKE ?)';
         $like = '%' . $q . '%';
-        for ($i = 0; $i < 7; $i++) {
+        for ($i = 0; $i < 8; $i++) {
             $params[] = $like;
         }
     }
 
-    $sql = "SELECT o.id, o.order_code, o.status, o.device_brand, o.device_model, c.first_name, c.last_name, t.name AS tech_name
+    $sql = "SELECT o.id, o.order_code, o.legacy_code, o.status, o.device_brand, o.device_model, c.first_name, c.last_name, t.name AS tech_name
             FROM orders o
             JOIN customers c ON c.id = o.customer_id
             LEFT JOIN technicians t ON t.id = o.technician_id
@@ -47,7 +49,7 @@ try {
     $results = [];
     foreach ($rows as $row) {
         $displayCode = trim((string)($row['order_code'] ?? ''));
-        $label = ($displayCode !== '' ? $displayCode : '#' . (int)$row['id']) . ' ' . trim((string)($row['device_brand'] ?? '') . ' ' . (string)($row['device_model'] ?? ''));
+        $label = ($displayCode !== '' ? $displayCode : '#' . (int)$row['id']) . orderLegacySuffix($row) . ' ' . trim((string)($row['device_brand'] ?? '') . ' ' . (string)($row['device_model'] ?? ''));
         $client = trim((string)($row['first_name'] ?? '') . ' ' . (string)($row['last_name'] ?? ''));
         if ($client !== '') {
             $label .= ' · ' . $client;

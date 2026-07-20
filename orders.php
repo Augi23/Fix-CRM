@@ -5,6 +5,7 @@ require_once 'includes/functions.php';
 require_once 'includes/scan_resolver.php';
 
 ensureOrderCreatedByColumn();   // sloupec „kdo zakázku vytvořil" (levý sloupec seznamu)
+ensureOrdersSourceColumn();     // source + legacy_code (migrace 7/2026) — hledání níže se na legacy_code ptá
 
 require_once 'includes/header.php';
 
@@ -38,12 +39,12 @@ if (isset($pdo)) {
         if ($search !== '') {
             $term = "%$search%";
             if (is_numeric($search)) {
-                $where_clauses[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ? OR o.id = ?)';
-                for ($i = 0; $i < 9; $i++) $sql_params[] = $term;
+                $where_clauses[] = '(o.order_code LIKE ? OR o.legacy_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ? OR o.id = ?)';
+                for ($i = 0; $i < 10; $i++) $sql_params[] = $term;
                 $sql_params[] = (int)$search;
             } else {
-                $where_clauses[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ?)';
-                for ($i = 0; $i < 9; $i++) $sql_params[] = $term;
+                $where_clauses[] = '(o.order_code LIKE ? OR o.legacy_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ?)';
+                for ($i = 0; $i < 10; $i++) $sql_params[] = $term;
             }
         }
 
@@ -348,6 +349,9 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                 <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none"><?php echo e(orderDisplayCode($order)); ?></a>
                                 <?php if($has_media): ?>
                                     <i class="fas fa-camera text-info ms-1" title="<?php echo __('media_files'); ?>"></i>
+                                <?php endif; ?>
+                                <?php if (($__legacyCode = trim((string)($order['legacy_code'] ?? ''))) !== ''): ?>
+                                    <div class="small text-white-50">(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
                                 <?php endif; ?>
                                 <div class="small text-white-75"><?php echo date('d.m.Y', strtotime($order['created_at'])); ?></div>
                                 <div class="small text-white-75"><i class="far fa-clock me-1" style="font-size:.7rem;"></i><?php echo date('H:i:s', strtotime($order['created_at'])); ?></div>

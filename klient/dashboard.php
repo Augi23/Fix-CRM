@@ -718,7 +718,7 @@ if ($selectedOrder && isset($pdo)) {
                             </span>
                             <span class="status-badge-large light">
                                 <i class="fas fa-hashtag"></i>
-                                <?php echo __('client_order_label'); ?> <?php echo e($selectedOrderCode); ?>
+                                <?php echo __('client_order_label'); ?> <?php echo e($selectedOrderCode . orderLegacySuffix($selectedOrder)); ?>
                             </span>
                         </div>
 
@@ -884,7 +884,7 @@ if ($selectedOrder && isset($pdo)) {
                                 <?php [$statusLabel, $statusClass] = clientStatusMeta((string)$order['status']); ?>
                                 <a class="repair-item <?php echo (int)$order['id'] === (int)$selectedOrderId ? 'active' : ''; ?>" href="?order=<?php echo (int)$order['id']; ?>">
                                     <div>
-                                        <div class="title"><?php echo htmlspecialchars(trim((string)($order['order_code'] ?? '')), ENT_QUOTES); ?> · <?php echo e(trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? '')) ?: __('client_device_fallback')); ?></div>
+                                        <div class="title"><?php echo htmlspecialchars(trim((string)($order['order_code'] ?? '')) . orderLegacySuffix($order), ENT_QUOTES); ?> · <?php echo e(trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? '')) ?: __('client_device_fallback')); ?></div>
                                         <div class="sub">
                                             <?php echo e($statusLabel); ?> · <?php echo e(clientMoney(clientOrderAmount($order))); ?>
                                         </div>

@@ -173,14 +173,15 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
                             // Same search fields as orders.php
                             if ($search !== '') {
+                                ensureOrdersSourceColumn();   // legacy_code (migrace 7/2026) — dotaz níže se na něj ptá
                                 $searchTerm = "%$search%";
                                 if (is_numeric($search)) {
-                                    $where_clauses[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ? OR o.id = ?)';
-                                    for ($i = 0; $i < 9; $i++) $params[] = $searchTerm;
+                                    $where_clauses[] = '(o.order_code LIKE ? OR o.legacy_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ? OR o.id = ?)';
+                                    for ($i = 0; $i < 10; $i++) $params[] = $searchTerm;
                                     $params[] = (int)$search;
                                 } else {
-                                    $where_clauses[] = '(o.order_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ?)';
-                                    for ($i = 0; $i < 9; $i++) $params[] = $searchTerm;
+                                    $where_clauses[] = '(o.order_code LIKE ? OR o.legacy_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ?)';
+                                    for ($i = 0; $i < 10; $i++) $params[] = $searchTerm;
                                 }
                             }
 
