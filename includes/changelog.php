@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '2.8.2',
+        'date' => '2026-07-20',
+        'time' => '10:13',
+        'title' => 'Pokladna v liště už jen jednou (fialová rychlá akce)',
+        'items' => [
+            'Původní šedá položka „Pokladna" v hlavním menu byla odstraněna — po přidání fialové rychlé akce tam byla dvakrát. Platí to i pro mobilní menu (☰). Pokladna je teď v liště jen jednou, jako fialová buňka vedle Nákupního seznamu.',
+        ],
+    ],
+    [
         'version' => '2.8.1',
         'date' => '2026-07-20',
         'time' => '09:45',

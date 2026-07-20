@@ -540,9 +540,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <?php if ($procurementBadgeCount > 0): ?><span class="afx-badge"><?php echo $procurementBadgeCount; ?></span><?php endif; ?>
             <i class="fas fa-truck-loading"></i><small><?php echo __('procurement'); ?></small>
         </a>
-        <a class="afx-cell <?php echo $current_page == 'pokladna.php' ? 'active' : ''; ?>" href="pokladna.php">
-            <i class="fas fa-cash-register"></i><small>Pokladna</small>
-        </a>
+        <?php /* Pokladna je nově jen jako fialová rychlá akce vpravo (v2.8.2) */ ?>
         <?php if ($afxIsManager): ?>
         <a class="afx-cell <?php echo in_array($current_page, ['accounting.php', 'banka.php'], true) ? 'active' : ''; ?>" href="accounting.php">
             <i class="fas fa-file-invoice-dollar"></i><small><?php echo __('accounting'); ?></small>
@@ -630,7 +628,6 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <a class="afx-sheet-link <?php echo in_array($current_page, ['inventory.php', 'products.php'], true) ? 'active' : ''; ?>" href="inventory.php"><i class="fas fa-boxes"></i><?php echo __('inventory'); ?></a>
             <?php endif; ?>
             <a class="afx-sheet-link <?php echo $current_page == 'procurement.php' ? 'active' : ''; ?>" href="procurement.php"><i class="fas fa-truck-loading"></i><?php echo __('procurement'); ?></a>
-            <a class="afx-sheet-link <?php echo $current_page == 'pokladna.php' ? 'active' : ''; ?>" href="pokladna.php"><i class="fas fa-cash-register"></i>Pokladna</a>
             <?php if ($afxIsManager): ?>
             <a class="afx-sheet-link <?php echo in_array($current_page, ['accounting.php', 'banka.php'], true) ? 'active' : ''; ?>" href="accounting.php"><i class="fas fa-file-invoice-dollar"></i><?php echo __('accounting'); ?></a>
             <?php endif; ?>
