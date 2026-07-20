@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.7.6',
+        'date' => '2026-07-20',
+        'time' => '09:17',
+        'title' => 'Nový návod: Jazyk klienta — e-maily a dokumenty v jeho řeči',
+        'items' => [
+            'Do Návodů přibyla karta „Jazyk klienta": kde se jazyk komunikace nastavuje (nová zakázka, Nový klient, úprava klienta), co všechno se jím řídí (doklady, e-maily, klientský portál), jak funguje ukrajinština (e-maily ukrajinsky, tisk anglicky) a jak jednorázově vytisknout doklad v jiném jazyce přes &lang=en.',
+            'Součástí jsou i upozornění: data zakázky (popis závady…) se nepřekládají — u cizojazyčného klienta je piš jeho jazykem; rozhodné znění právních textů je vždy české.',
+        ],
+    ],
+    [
         'version' => '2.7.5',
         'date' => '2026-07-20',
         'time' => '09:14',

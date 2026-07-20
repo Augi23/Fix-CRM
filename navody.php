@@ -133,6 +133,23 @@ $guides['crm'] = [
         ],
     ],
     [
+        'id' => 'jazyk-klienta', 'icon' => 'fa-language', 'color' => '#64D2FF',
+        'title' => 'Jazyk klienta — e-maily a dokumenty v jeho řeči',
+        'intro' => 'Každý klient má zvolený „Jazyk komunikace" (čeština / angličtina / ukrajinština). Podle něj pak automaticky odchází e-maily, tisknou se doklady a zobrazuje se klientský portál — při tisku ani odesílání už nic přepínat nemusíš.',
+        'steps' => [
+            '<b>U nového klienta:</b> jazyk vybereš rovnou při zakládání — v okně <b>Nová zakázka</b> (sekce Klient, pole „Jazyk komunikace") nebo ve formuláři <b>Nový klient</b> na stránce Klienti.',
+            '<b>Změna u stávajícího klienta:</b> Klienti → <b>tužka (Upravit)</b> → pole <b>„Jazyk komunikace"</b> → Uložit. Platí hned pro všechny další dokumenty a e-maily (už odeslané se zpětně nemění).',
+            '<b>Co se jazykem klienta řídí:</b> zakázkový list (tisk i e-mail, včetně obchodních podmínek), faktura, účtenka, reklamační protokol, podpisová stanice, e-maily (výzva k vyzvednutí, žádost o recenzi, zakázkový list) a celý klientský portál.',
+            '<b>Ukrajinština:</b> e-maily odejdou ukrajinsky; tištěné doklady jdou <b>anglicky</b> (ukrajinská tisková verze neexistuje).',
+            '<b>Jednorázový tisk v jiném jazyce</b> (bez změny nastavení klienta): k adrese tiskového dokumentu přidej <b>&lang=en</b> / <b>&lang=cs</b> — např. print_order.php?id=123<b>&lang=en</b>.',
+        ],
+        'conditions' => [
+            ['typ' => 'warn', 'text' => '<b>Data zakázky se nepřekládají:</b> popis závady, poznámky apod. se na dokladu tisknou přesně tak, jak jsi je zapsal. U cizojazyčného klienta je proto piš jeho jazykem (nebo anglicky).'],
+            ['typ' => 'info', 'text' => '<b>Právní texty:</b> rozhodné je vždy české znění — angličtina/ruština na dokladech je jeho věrný překlad.'],
+            ['typ' => 'info', 'text' => 'Klient si v <b>klientském portálu</b> může jazyk kdykoliv přepnout sám; přepnutí platí po dobu přihlášení, po novém přihlášení se vrátí jeho nastavený „Jazyk komunikace".'],
+        ],
+    ],
+    [
         'id' => 'zmena-stavu', 'icon' => 'fa-bolt', 'color' => '#0A84FF',
         'title' => 'Změna stavu zakázky',
         'intro' => 'Stav změníš dvěma způsoby: velkými tlačítky v detailu zakázky, nebo bleskem ⚡ přímo v seznamu.',
