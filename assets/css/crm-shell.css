@@ -80,17 +80,36 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
 .afx-page-title { color: rgba(255,255,255,.45); font-size: 12.5px; font-weight: 500; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.12); max-width: 32vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .afx-utility-sep { flex: 1; }
 
+/* Vyhledávání: bílý obrys + bílé texty (#ffffff) pro lepší viditelnost — přání 20.7.2026 */
 .afx-search { margin: 0; }
 .afx-search .input-group {
-  background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.09);
+  background: rgba(255,255,255,.055); border: 1px solid #ffffff;
   border-radius: 999px; overflow: hidden; flex-wrap: nowrap; min-width: 250px;
 }
-.afx-search .input-group-text { background: transparent !important; border: none !important; color: rgba(255,255,255,.4) !important; padding: 4px 4px 4px 12px !important; }
+.afx-search .input-group-text { background: transparent !important; border: none !important; color: #ffffff !important; padding: 4px 4px 4px 12px !important; }
 .afx-search .form-control {
   background: transparent !important; border: none !important; box-shadow: none !important;
-  color: #eef2f8 !important; font-size: 12.5px !important; padding: 6px 8px !important; min-height: 0 !important;
+  color: #ffffff !important; font-size: 12.5px !important; padding: 6px 8px !important; min-height: 0 !important;
 }
-.afx-search .crm-kbd-hint { background: transparent !important; border: none !important; color: rgba(255,255,255,.3) !important; font-size: 10.5px !important; padding-right: 12px !important; }
+.afx-search .form-control::placeholder { color: #ffffff !important; opacity: 1 !important; }
+.afx-search .crm-kbd-hint { background: transparent !important; border: none !important; color: #ffffff !important; font-size: 10.5px !important; padding-right: 12px !important; }
+
+/* PC (≥1200 px): vyhledávání VYCENTROVANÉ doprostřed lišty. Absolutní pozice ho
+   vyjme z flexu — pružný oddělovač pak drží pravou skupinu tlačítek na místě.
+   Na užších oknech zůstává vpravo (tlouklo by se s dlouhým názvem stránky);
+   na mobilu je pole skryté úplně (viz níže). */
+@media (min-width: 1200px) {
+  .afx-search { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: clamp(280px, 30vw, 480px); }
+  .afx-search .input-group { min-width: 0; width: 100%; }
+  .afx-page-title { max-width: 22vw; }  /* dlouhý název stránky nesmí podlézt vycentrované pole */
+}
+
+/* Světlý motiv: lišta je bílá → vyhledávání tmavé, jinak by bílé zmizelo */
+html[data-lg-theme="light"] .afx-search .input-group { border-color: #10151d; background: rgba(0,0,0,.04); }
+html[data-lg-theme="light"] .afx-search .input-group-text,
+html[data-lg-theme="light"] .afx-search .form-control,
+html[data-lg-theme="light"] .afx-search .crm-kbd-hint { color: #10151d !important; }
+html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba(16,21,29,.65) !important; }
 
 .afx-utility .crm-v2-icon-btn {
   width: 32px; height: 32px; border-radius: 999px !important;

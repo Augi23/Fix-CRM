@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.7.9',
+        'date' => '2026-07-20',
+        'time' => '09:37',
+        'title' => 'Horní lišta: vyhledávání vycentrované a výraznější (bílý obrys i texty)',
+        'items' => [
+            'Na počítači (šířka okna od 1200 px) je vyhledávací pole v horní liště nově VYCENTROVANÉ doprostřed obrazovky — dřív bylo zastrčené vpravo u ikon.',
+            'Pole je výraznější: obrys, ikona lupy, psaný text, našeptávací text („Klienti (ID, Klient, Telefon…)") i zkratka ⌘K jsou nyní čistě bílé (#ffffff).',
+            'Ve světlém motivu (bílá lišta) má pole naopak tmavý obrys a texty, aby nezmizelo. Na užších oknech zůstává vpravo, na mobilu je skryté jako dosud.',
+        ],
+    ],
+    [
         'version' => '2.7.8',
         'date' => '2026-07-20',
         'time' => '09:31',
