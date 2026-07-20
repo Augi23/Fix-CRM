@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.0.3',
+        'date' => '2026-07-20',
+        'time' => '19:32',
+        'title' => 'Výdej zakázky: dopravce „Zásilkovna" správně česky',
+        'items' => [
+            'Ve výběru dopravy při výdeji zakázky (před označením „Vydáno") se přepravce zobrazoval jako „Zasilkovna" bez diakritiky — teď je správně „Zásilkovna". Ostatní volby (Osobní odběr, Česká pošta, Kurýr servisu, PPL/DPD/GLS) i hlášky výdeje jsou v pořádku česky.',
+        ],
+    ],
+    [
         'version' => '3.0.2',
         'date' => '2026-07-20',
         'time' => '19:28',
