@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.7.3',
+        'date' => '2026-07-20',
+        'time' => '08:31',
+        'title' => 'Tiskový doklad „Potvrzení (A4)" přejmenován na „Zakázkový list (A4)"',
+        'items' => [
+            'V tiskovém menu u zakázky se dokument „Potvrzení (A4)" nově jmenuje „Zakázkový list (A4)" — přesně odpovídá tomu, co se vytiskne. Přejmenováno ve všech jazycích (cs „Zakázkový list (A4)", en „Order sheet (A4)", ru „Заказ-наряд (A4)").',
+            'Šlo jen o popisek v nabídce — samotný dokument i jeho tisk zůstávají beze změny (interně to vždy byl zakázkový list).',
+        ],
+    ],
+    [
         'version' => '2.7.2',
         'date' => '2026-07-20',
         'time' => '08:15',
