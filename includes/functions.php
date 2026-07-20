@@ -1349,6 +1349,35 @@ function crmCanUsePos(): bool {
     return !empty($_SESSION['user_id']) || !empty($_SESSION['tech_id']);
 }
 
+/** Stabilní klíč přihlášeného pracovníka napříč dual-loginem (users vs technicians)
+ *  — pro per-pracovník evidence typu „přečtené návody". Technik má přednost,
+ *  protože tech session může nést i user_id. */
+function crmStaffKey(): string {
+    if (!empty($_SESSION['tech_id'])) return 'tech:' . (int)$_SESSION['tech_id'];
+    if (!empty($_SESSION['user_id'])) return 'user:' . (int)$_SESSION['user_id'];
+    return '';
+}
+
+/** Přečtené návody (Návody): ikonka návodu svítí bíle, dokud si ho DANÝ pracovník
+ *  aspoň jednou neotevře — první rozbalení zapíše řádek sem a glow zhasne.
+ *  Serverová evidence (ne localStorage), ať platí i na jiném počítači. */
+function ensureGuideViewsTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS guide_views (
+            id INT NOT NULL AUTO_INCREMENT,
+            staff_key VARCHAR(32) NOT NULL,
+            guide_id VARCHAR(64) NOT NULL,
+            viewed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_guide_view (staff_key, guide_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('ensureGuideViewsTable: ' . $e->getMessage()); }
+}
+
 /** STORNO prodeje jen admin/Boss — vrací zboží i peníze z evidence (stejná citlivost
  *  jako faktury; manažer faktury nesmí — pravidlo 16.7.2026). */
 function crmCanCancelPosSale(): bool {

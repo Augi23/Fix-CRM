@@ -10,6 +10,16 @@ require_once 'includes/header.php';
 
 $tab = ($_GET['tab'] ?? 'crm') === 'opravy' ? 'opravy' : 'crm';
 
+// Přečtené návody TOHOTO pracovníka — nepřečtené mají svítící (glow) ikonku.
+// První rozbalení návodu zapíše api/guide_viewed.php a glow zhasne (v2.8.0).
+ensureGuideViewsTable();
+$__guidesSeen = [];
+try {
+    $__gvs = $pdo->prepare("SELECT guide_id FROM guide_views WHERE staff_key = ?");
+    $__gvs->execute([crmStaffKey()]);
+    $__guidesSeen = $__gvs->fetchAll(PDO::FETCH_COLUMN);
+} catch (Throwable $e) { $__guidesSeen = []; }
+
 /* ── Návody CRM (odpovídají chování systému k v1.8.2) ─────────────────────── */
 $guides = [];
 $guides['crm'] = [
@@ -428,7 +438,8 @@ $guides['opravy'] = [];
     <?php else: ?>
         <div class="accordion afx-guides" id="guidesAcc">
             <?php foreach ($guides[$tab] as $i => $g): ?>
-            <div class="accordion-item afx-guide glass-panel border-secondary mb-2" data-search="<?php echo e(mb_strtolower($g['title'] . ' ' . strip_tags($g['intro']))); ?>">
+            <?php $__gNew = !in_array($g['id'], $__guidesSeen, true); ?>
+            <div class="accordion-item afx-guide glass-panel border-secondary mb-2<?php echo $__gNew ? ' afx-guide-new' : ''; ?>" data-guide-id="<?php echo e($g['id']); ?>" data-search="<?php echo e(mb_strtolower($g['title'] . ' ' . strip_tags($g['intro']))); ?>">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed afx-guide-head" type="button" data-bs-toggle="collapse" data-bs-target="#g<?php echo $i; ?>">
                         <span class="afx-guide-ico" style="--gcol: <?php echo e($g['color']); ?>;"><i class="fas <?php echo e($g['icon']); ?>"></i></span>
@@ -483,6 +494,16 @@ $guides['opravy'] = [];
     color: #fff; background: rgba(10,132,255,.25); border: 1px solid rgba(10,132,255,.5);
 }
 .afx-cond { border: 1px solid; border-radius: 10px; padding: 8px 12px; font-size: .87rem; color: rgba(255,255,255,.92); margin-top: 8px; }
+
+/* Nepřečtený návod: ikonka jemně svítí bíle, dokud si ho pracovník poprvé neotevře */
+.afx-guide-new .afx-guide-ico {
+    border-color: rgba(255,255,255,.95);
+    animation: afxGuideGlow 2.4s ease-in-out infinite;
+}
+@keyframes afxGuideGlow {
+    0%, 100% { box-shadow: 0 0 6px rgba(255,255,255,.45); }
+    50%      { box-shadow: 0 0 18px rgba(255,255,255,.95); }
+}
 </style>
 
 <script>
@@ -500,6 +521,21 @@ $guides['opravy'] = [];
         });
         var nr = document.getElementById('guideNoResults');
         if (nr) nr.style.display = any ? 'none' : '';
+    });
+}());
+
+// glow „nepřečteného" návodu: první rozbalení ho zapíše na server a zhasne hned
+(function () {
+    var acc = document.getElementById('guidesAcc');
+    if (!acc) return;
+    acc.addEventListener('show.bs.collapse', function (e) {
+        var item = e.target.closest('.afx-guide');
+        if (!item || !item.classList.contains('afx-guide-new')) return;
+        item.classList.remove('afx-guide-new');
+        var fd = new FormData();
+        fd.append('guide_id', item.dataset.guideId || '');
+        fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+        fetch('api/guide_viewed.php', { method: 'POST', body: fd, credentials: 'same-origin' }).catch(function () {});
     });
 }());
 </script>

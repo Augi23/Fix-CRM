@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.8.0',
+        'date' => '2026-07-20',
+        'time' => '09:41',
+        'title' => 'Návody: nepřečtený návod svítí — glow zhasne po prvním otevření',
+        'items' => [
+            'Ikonka každého návodu, který si daný pracovník ještě NEotevřel, jemně svítí bílým glow — na první pohled je vidět, co je nového k přečtení.',
+            'Jakmile si pracovník návod poprvé rozbalí, glow pro něj zhasne (ihned, bez obnovení stránky) a ikonka vypadá jako dřív. Eviduje se to pro každého pracovníka zvlášť a na serveru — platí tedy i při přihlášení z jiného počítače.',
+            'Startujeme naostro: nikdo zatím nemá nic přečteno, takže teď všem svítí všechny návody — každému zhasínají postupně, jak si je prochází.',
+        ],
+    ],
+    [
         'version' => '2.7.9',
         'date' => '2026-07-20',
         'time' => '09:37',
