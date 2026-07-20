@@ -5439,16 +5439,30 @@ function crmTranslateWebServiceMethod(string $raw, ?string $lang = null): string
     $raw = trim($raw);
     if ($raw === '') return '';
     $lang = $lang ?: (function_exists('crm_get_language') ? crm_get_language() : 'cs');
+    // 1) Kanonické hodnoty ULOŽENÉ v CRM (dropdown ve view_order.php) — přesná shoda,
+    //    štítky IDENTICKÉ s dropdownem (přes existující jazykové klíče).
+    switch ($raw) {
+        case 'Self Pickup': return __('self_pickup', $lang);   // Osobní odběr
+        case 'Ceska Posta': return __('czech_post', $lang);    // Česká pošta
+        case 'Courier':     return __('courier', $lang);       // Kurýr servisu
+        case 'Zasilkovna':  return 'Zásilkovna';               // značka — jen doplnit diakritiku
+        case 'PPL': case 'DPD': case 'GLS': return $raw;       // značky přepravců
+    }
     $t = crmFoldText($raw);
     // kanonické klíče → [cs, en, ru]
+    // POZOR: „Self Pickup" (zákazník si přijde SÁM = osobní odběr) vs. „Pickup Service"
+    // (vyzvedáváme MY u zákazníka = kurýr) — opačný význam, proto samostatné klíče a
+    // selfpickup se MUSÍ testovat PŘED obecným pickup.
     $map = [
-        'store'  => ['cs' => 'Osobně na prodejně', 'en' => 'Come by our store', 'ru' => 'Лично в магазине'],
-        'ship'   => ['cs' => 'Zaslání poštou',      'en' => 'Ship device',       'ru' => 'Отправка почтой'],
-        'pickup' => ['cs' => 'Vyzvednutí u zákazníka','en' => 'Pickup service',   'ru' => 'Забор у клиента'],
+        'store'      => ['cs' => 'Osobně na prodejně',     'en' => 'Come by our store', 'ru' => 'Лично в магазине'],
+        'selfpickup' => ['cs' => 'Osobní odběr',           'en' => 'Personal pickup',   'ru' => 'Клиент забрал сам'],
+        'ship'       => ['cs' => 'Zaslání poštou',         'en' => 'Ship device',       'ru' => 'Отправка почтой'],
+        'pickup'     => ['cs' => 'Vyzvednutí u zákazníka', 'en' => 'Pickup service',    'ru' => 'Забор у клиента'],
     ];
     $key = null;
-    if (preg_match('/come ?by|our ?store|\bstore\b|osobn|prodejn|na ?prodejn/', $t))      $key = 'store';
-    elseif (preg_match('/ship|posta|postou|postou|mail|posli|zasl/', $t))                 $key = 'ship';
+    if (preg_match('/self ?-?pickup|osobni ?odber|vyzved.*(osobn|sam)|zakaznik.*(vyzved|odebr|zabral)/', $t)) $key = 'selfpickup';
+    elseif (preg_match('/come ?by|our ?store|\bstore\b|osobn|prodejn|na ?prodejn/', $t))  $key = 'store';
+    elseif (preg_match('/ship|posta|postou|mail|posli|zasl/', $t))                        $key = 'ship';
     elseif (preg_match('/pick ?up|vyzvednu|svoz|kuryr|courier/', $t))                     $key = 'pickup';
     if ($key === null) return $raw;                       // neznámé → nechat originál
     return $map[$key][$lang] ?? $map[$key]['cs'];

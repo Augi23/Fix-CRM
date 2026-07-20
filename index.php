@@ -299,7 +299,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                     </div>
                                     <?php endif; ?>
                                     <?php if(!empty($r['shipping_method'])): ?>
-                                        <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars($r['shipping_method']); ?></div>
+                                        <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars(crmTranslateWebServiceMethod((string)$r['shipping_method'])); ?></div>
                                     <?php endif; ?>
                                     <?php if($_SESSION['role'] == 'admin' && ($r['extra_expenses'] ?? 0) > 0): ?>
                                         <div class="mt-1 small text-danger"><i class="fas fa-minus-circle me-1"></i><?php echo __('extra_expenses'); ?>: <?php echo e($r['extra_expenses']); ?></div>

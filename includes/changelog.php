@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.0.2',
+        'date' => '2026-07-20',
+        'time' => '19:28',
+        'title' => 'Způsob předání se překládá i v seznamu a na Nástěnce (Self Pickup → Osobní odběr)',
+        'items' => [
+            'V seznamu zakázek, na Nástěnce i v rychlém náhledu se způsob předání zobrazoval anglicky tak, jak přišel z webu (např. „Self Pickup"). Nově se překládá do jazyka CRM stejnými popisky jako v dropdownu detailu: Self Pickup → Osobní odběr, Ceska Posta → Česká pošta, Courier → Kurýr servisu, Zasilkovna → Zásilkovna.',
+            'Opravena záměna významu: „Self Pickup" (zákazník si přijde SÁM = osobní odběr) se nově nepletlo s „Pickup Service" (vyzvedáváme MY u zákazníka = kurýr) — dřív hrozilo přeložení na opačný význam.',
+            'Importované zakázky s „Osobní předání na pobočce" se ukazují jako „Osobně na prodejně".',
+        ],
+    ],
+    [
         'version' => '3.0.1',
         'date' => '2026-07-20',
         'time' => '19:22',

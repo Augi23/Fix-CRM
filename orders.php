@@ -435,7 +435,7 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                 </div>
                                 <?php endif; ?>
                                 <?php if(!empty($order['shipping_method'])): ?>
-                                    <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars($order['shipping_method']); ?></div>
+                                    <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars(crmTranslateWebServiceMethod((string)$order['shipping_method'])); ?></div>
                                 <?php endif; ?>
                                 <?php if($_SESSION['role'] == 'admin' && $order['extra_expenses'] > 0): ?>
                                     <div class="mt-1 small text-danger"><i class="fas fa-minus-circle me-1"></i><?php echo __('extra_expenses'); ?>: <?php echo e($order['extra_expenses']); ?></div>

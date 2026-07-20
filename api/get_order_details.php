@@ -46,6 +46,11 @@ try {
     $stmt->execute([$id]);
     $items = $stmt->fetchAll();
 
+    // Způsob předání přeložit do jazyka CRM (uloženo anglicky z webu/RepairPluginu)
+    if (!empty($order['shipping_method'])) {
+        $order['shipping_method'] = crmTranslateWebServiceMethod((string)$order['shipping_method']);
+    }
+
     echo json_encode([
         'success' => true,
         'order' => $order,
