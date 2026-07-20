@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '2.6.2',
+        'date' => '2026-07-20',
+        'time' => '07:20',
+        'title' => 'Jazyky – Fáze 1: Sklad, Účetnictví a Nastavení respektují zvolený jazyk',
+        'items' => [
+            'SKLAD: hlavička tabulky i okno „Použít k opravě" už nejsou natvrdo anglicky — „Dodavatel", „Dostupnost", „Naše skladem", „ks", „Vybraný díl", „Zakázka", „Množství", „Přiřadit k zakázce" i hledání zakázky se teď zobrazují podle zvoleného jazyka (Čeština / English / Русский).',
+            'ÚČETNICTVÍ: potvrzovací dotazy „Smazat fakturu?" a „Vytvořit opravný daňový doklad?" byly dřív jen anglicky, teď jsou přeložené.',
+            'NASTAVENÍ: výběr jazyka, tlačítko „Načíst znovu" po aktualizaci, test Telegramu (dřív rusky „Тест уведомления"), nápovědy k Service ID a k Telegram ID zaměstnance a popisky „Admin"/„E-mail" se teď řídí zvoleným jazykem.',
+            'NÁKUPY a REPORTY: nápověda „Vyber dodavatele a URL se doplní" i štítek role „Admin" už také respektují jazyk.',
+            'Doplněny i chybějící ruské překlady — parita překladů CS/EN/RU je teď úplná, ruskému uživateli se nikde neukáže český text místo ruského.',
+        ],
+    ],
+    [
         'version' => '2.6.1',
         'date' => '2026-07-20',
         'time' => '06:30',

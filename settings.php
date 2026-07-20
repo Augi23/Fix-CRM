@@ -697,7 +697,7 @@ require_once 'includes/header.php';
                             <input type="password" name="ifreeicloud_api_key" class="form-control mb-3" value="<?php echo htmlspecialchars(get_setting_with_fallback('ifreeicloud_api_key', IFREEICLOUD_API_KEY_FALLBACK, 'IFREEICLOUD_API_KEY')); ?>" placeholder="83L-...">
                             <label class="form-label small text-white-75">Service ID z iFreeiCloud dashboardu</label>
                             <input type="number" name="ifreeicloud_service_id" class="form-control" value="<?php echo htmlspecialchars(get_setting_with_fallback('ifreeicloud_service_id', (string) IFREEICLOUD_SERVICE_ID_FALLBACK, 'IFREEICLOUD_SERVICE_ID')); ?>" min="0" step="1">
-                            <div class="form-text small text-white-75 mt-2">Used as secondary verification below the Police DB result. Enter the real service ID for the selected iFreeiCloud check (e.g. FMI / model / serial from dashboard).</div>
+                            <div class="form-text small text-white-75 mt-2"><?php echo __('service_id_hint'); ?></div>
 
                             <hr class="border-secondary my-4">
                             <h6 class="small fw-bold text-info mb-3"><i class="fas fa-comment-sms me-2"></i>SMS brána GoSMS.cz</h6>
@@ -1112,7 +1112,7 @@ require_once 'includes/header.php';
                             <td>
                                 <?php if (!empty($t['telegram_id'])): ?>
                                     <code class="small"><?php echo htmlspecialchars($t['telegram_id']); ?></code>
-                                    <button class="btn btn-link btn-sm p-0 ms-1 text-info" title="Тест уведомления" onclick="testTechTG(<?php echo $t['id']; ?>)"><i class="fab fa-telegram-plane"></i></button>
+                                    <button class="btn btn-link btn-sm p-0 ms-1 text-info" title="<?php echo __('test_notification'); ?>" onclick="testTechTG(<?php echo $t['id']; ?>)"><i class="fab fa-telegram-plane"></i></button>
                                 <?php else: ?>
                                     <span class="text-muted small"><?php echo __('not_linked'); ?></span>
                                 <?php endif; ?>
@@ -1231,9 +1231,9 @@ require_once 'includes/header.php';
                         <?php echo csrfField(); ?>
                         <div class="col-auto">
                             <select name="lang" class="form-select bg-dark text-white border-secondary">
-                                <option value="ru" <?php echo crm_get_language() === 'ru' ? 'selected' : ''; ?>>Русский (RU)</option>
-                                <option value="cs" <?php echo crm_get_language() === 'cs' ? 'selected' : ''; ?>>Czech (CS)</option>
-                                <option value="en" <?php echo crm_get_language() === 'en' ? 'selected' : ''; ?>>English (EN)</option>
+                                <option value="ru" <?php echo crm_get_language() === 'ru' ? 'selected' : ''; ?>><?php echo __('lang_ru'); ?> (RU)</option>
+                                <option value="cs" <?php echo crm_get_language() === 'cs' ? 'selected' : ''; ?>><?php echo __('lang_cs'); ?> (CS)</option>
+                                <option value="en" <?php echo crm_get_language() === 'en' ? 'selected' : ''; ?>><?php echo __('lang_en'); ?> (EN)</option>
                             </select>
                         </div>
                         <div class="col-auto"><button type="submit" name="set_lang" class="btn btn-primary"><?php echo __('save'); ?></button></div>
@@ -1388,7 +1388,7 @@ require_once 'includes/header.php';
                         <tr>
                             <td><strong><?php echo htmlspecialchars($admin['username']); ?></strong></td>
                             <td><?php echo htmlspecialchars($admin['full_name']); ?></td>
-                            <td><span class="badge bg-danger">Admin</span></td>
+                            <td><span class="badge bg-danger"><?php echo __('role_admin'); ?></span></td>
                             <td class="text-end">
                                 <div class="btn-group btn-group-sm">
                                     <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#adminPwdModal<?php echo $admin['id']; ?>"><i class="fas fa-key me-1"></i> <?php echo __('password_btn'); ?></button>
@@ -1409,7 +1409,7 @@ require_once 'includes/header.php';
                         <tr>
                             <td><strong>@<?php echo htmlspecialchars((string)($ta['username'] ?? '-')); ?></strong></td>
                             <td><?php echo htmlspecialchars($ta['name']); ?><?php echo ($ta['is_active'] ?? 1) ? '' : ' <span class="badge bg-secondary ms-1">neaktivní</span>'; ?></td>
-                            <td><span class="badge bg-danger">Admin</span> <span class="text-white-50 small">zaměstnanecký účet</span></td>
+                            <td><span class="badge bg-danger"><?php echo __('role_admin'); ?></span> <span class="text-white-50 small">zaměstnanecký účet</span></td>
                             <td class="text-end">
                                 <div class="btn-group btn-group-sm">
                                     <a href="settings.php?tab=staff" class="btn btn-outline-secondary" title="Heslo a údaje se spravují na kartě zaměstnance"><i class="fas fa-user-edit me-1"></i>Karta zaměstnance</a>
@@ -1831,11 +1831,11 @@ require_once 'includes/header.php';
                     </select>
                 </div>
             </div>
-            <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Email</label><input type="email" name="tech_email" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('phone_label'); ?></label><input type="text" name="tech_phone" class="form-control"></div></div>
+            <div class="row"><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('email'); ?></label><input type="email" name="tech_email" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('phone_label'); ?></label><input type="text" name="tech_phone" class="form-control"></div></div>
             <div class="mb-3">
                 <label class="form-label">Telegram ID nebo @username</label>
                 <input type="text" name="tech_tg" class="form-control" value="" placeholder="<?php echo __('tg_placeholder'); ?>">
-                <div class="form-text small">You can enter numeric ID or @username. If you enter username, the employee must message the bot first and CRM will auto-pair the ID.</div>
+                <div class="form-text small"><?php echo __('tech_tg_hint'); ?></div>
             </div>
             <hr><h6 class="mb-3"><?php echo __('system_access_header'); ?></h6>
             <div class="row"><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('login_col'); ?></label><input type="text" name="tech_username" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('password_btn'); ?></label><input type="password" name="tech_password" class="form-control"></div></div>
@@ -1924,7 +1924,7 @@ require_once 'includes/header.php';
             </div>
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Email</label>
+                    <label class="form-label"><?php echo __('email'); ?></label>
                     <input type="email" name="tech_email" class="form-control" value="<?php echo htmlspecialchars($t['email'] ?? ''); ?>">
                 </div>
                 <div class="col-md-6 mb-3">
@@ -2331,7 +2331,7 @@ function installUpdate() {
                 <strong>${escapeHtml(headline)}</strong>
                 ${verLine}
                 ${migrationsHtml}
-                <div class="mt-2"><a href="settings.php?tab=updates" class="btn btn-sm btn-outline-light"><i class="fas fa-redo me-1"></i> Reload</a></div>
+                <div class="mt-2"><a href="settings.php?tab=updates" class="btn btn-sm btn-outline-light"><i class="fas fa-redo me-1"></i> <?php echo __('reload_btn'); ?></a></div>
             </div>`;
             const badge = document.getElementById('updateBadgeNav');
             if (badge) badge.style.display = 'none';

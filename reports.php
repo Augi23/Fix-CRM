@@ -313,7 +313,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             $totals['earnings'] += $auPay;
                         ?>
                         <tr>
-                            <td><strong><?php echo htmlspecialchars($au['name']); ?></strong> <span class="badge bg-danger ms-1">Admin</span></td>
+                            <td><strong><?php echo htmlspecialchars($au['name']); ?></strong> <span class="badge bg-danger ms-1"><?php echo __('role_admin'); ?></span></td>
                             <td class="text-center text-white-50">—</td>
                             <td class="text-end text-white-50">—</td>
                             <?php /* far fa-clock (stejně jako u brigádníků) — fa-laptop-code se

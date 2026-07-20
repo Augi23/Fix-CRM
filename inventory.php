@@ -106,9 +106,9 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
                                 <th class="ps-4"><?php echo __('photo_col'); ?></th>
                                 <th><?php echo __('part_name'); ?></th>
                                 <th><?php echo __('sku'); ?></th>
-                                <th>Supplier</th>
-                                <th>Availability</th>
-                                <th>Our stock</th>
+                                <th><?php echo __('supplier_col'); ?></th>
+                                <th><?php echo __('availability_col'); ?></th>
+                                <th><?php echo __('our_stock_col'); ?></th>
                                 <th><?php echo __('buy_price'); ?></th>
                                 <th><?php echo __('sell_price'); ?></th>
                                 <th><?php echo __('status'); ?></th>
@@ -163,7 +163,7 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
                                         <?php if ($availabilityText !== ''): ?>
                                             <div class="fw-medium"><?php echo htmlspecialchars($availabilityText); ?></div>
                                             <?php if ($availabilityQty !== null): ?>
-                                                <div class="small text-white-75"><?php echo $availabilityQty; ?> pcs</div>
+                                                <div class="small text-white-75"><?php echo $availabilityQty; ?> <?php echo __('pcs_short'); ?></div>
                                             <?php endif; ?>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>
@@ -323,21 +323,21 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info border-0 mb-3">
-                        <div class="small text-muted mb-1">Selected part</div>
+                        <div class="small text-muted mb-1"><?php echo __('proc_sel_part'); ?></div>
                         <div class="fw-semibold" id="assignInventoryName"></div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Order</label>
+                        <label class="form-label"><?php echo __('order'); ?></label>
                         <select name="order_id" id="assignOrderSelect" class="form-select" required></select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Quantity</label>
+                        <label class="form-label"><?php echo __('quantity'); ?></label>
                         <input type="number" name="quantity" class="form-control" id="assignQuantity" value="1" min="1" required>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
-                    <button type="submit" class="btn btn-success">Assign</button>
+                    <button type="submit" class="btn btn-success"><?php echo __('assign_to_order'); ?></button>
                 </div>
             </form>
         </div>
@@ -352,7 +352,7 @@ $(document).ready(function() {
     $('#assignOrderSelect').select2({
         dropdownParent: $('#assignToOrderModal'),
         width: '100%',
-        placeholder: 'Search order',
+        placeholder: '<?php echo __('search_order_placeholder'); ?>',
         ajax: {
             url: 'api/search_orders.php',
             dataType: 'json',

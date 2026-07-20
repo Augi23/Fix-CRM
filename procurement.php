@@ -780,7 +780,7 @@ if (isset($_GET['catalog_imported'])):
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <div class="form-text text-white-75">Pick a supplier and the URL will autofill.</div>
+                        <div class="form-text text-white-75"><?php echo __('supplier_url_autofill_hint'); ?></div>
                     </div>
                     <div class="mb-3">
                         <label for="catalogUrl" class="form-label"><?php echo __('catalog_url'); ?></label>

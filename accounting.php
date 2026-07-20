@@ -609,7 +609,7 @@ function loadFromOrder() {
 }
 
 function deleteInvoice(id) {
-    showConfirm('Delete this invoice?', function() {
+    showConfirm('<?php echo __('confirm_delete_invoice'); ?>', function() {
         const formData = new FormData();
         formData.append('action', 'delete_invoice');
         formData.append('id', id);
@@ -619,7 +619,7 @@ function deleteInvoice(id) {
 }
 
 function createCreditNote(id) {
-    showConfirm('Create a Credit Note (Opravný daňový doklad) from this invoice?', function() {
+    showConfirm('<?php echo __('confirm_create_credit_note'); ?>', function() {
         const formData = new FormData();
         formData.append('action', 'create_credit_note');
         formData.append('id', id);
