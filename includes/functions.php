@@ -2960,6 +2960,10 @@ function crmSendOrderSheetEmail(int $orderId, ?string $toOverride = null): array
     $items = $it->fetchAll();
 
     $target_lang = crmCustomerDocLang($order['preferred_language'] ?? 'cs');
+    // ⚠️ _l() v šabloně čte `global $target_lang` — include tady běží UVNITŘ funkce,
+    // takže lokální proměnná do globálu nedoteče a tělo e-mailu padalo do jazyka
+    // přihlášeného zaměstnance (klientovi s EN odešel český list, jen předmět EN).
+    $GLOBALS['target_lang'] = $target_lang;
     $__EMAIL_MODE = true;
     if (!defined('ORDER_DOC_EMBED')) { define('ORDER_DOC_EMBED', true); }
     ob_start();

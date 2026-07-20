@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '2.7.5',
+        'date' => '2026-07-20',
+        'time' => '09:14',
+        'title' => 'Zakázkový list e-mailem: celý v jazyce klienta + oprava rozsypaného vzhledu v Gmailu',
+        'items' => [
+            'OPRAVA JAZYKA: e-mail se zakázkovým listem odcházel anglickému klientovi s anglickým předmětem, ale ČESKÝM obsahem. Příčina: při skládání e-mailu se jazyk klienta nedostal k překladům šablony (technicky: include běží uvnitř funkce a _l() čte globální proměnnou) — tělo tak spadlo do jazyka přihlášeného zaměstnance. Nyní jde celý dokument v jazyce klienta.',
+            'OPRAVA VZHLEDU V GMAILU: řádky „Zařízení / Heslo / Požadovaná oprava…" se v e-mailu slévaly dohromady („ZařízeníApple iPhone…"), protože Gmail zahazuje část moderního CSS (flex). Řádky jsou nově poskládané jako tabulky — v Gmailu drží popisek vlevo a hodnotu vpravo s oddělovací linkou, v prohlížeči a tisku vypadá dokument stejně jako dosud.',
+            'PŘEKLAD PRÁVNÍCH TEXTŮ: obchodní podmínky drobným písmem, věta o nesděleném heslu i podpisová doložka převzetí jsou nyní na anglickém dokladu ANGLICKY (a rusky na ruském) — na přání majitele je celý dokument v jazyce klienta. České znění zůstává beze změny slova od slova.',
+            'Způsob převzetí „Osobní předání na pobočce" se na cizojazyčném dokladu také překládá; dynamický <html lang> podle jazyka dokumentu.',
+        ],
+    ],
+    [
         'version' => '2.7.4',
         'date' => '2026-07-20',
         'time' => '08:42',

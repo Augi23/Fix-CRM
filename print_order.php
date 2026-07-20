@@ -1,6 +1,7 @@
 <?php
 /* Zakázkový list (A4) — obsah dle firemního vzoru: typy polí + KOMPLETNÍ text
-   podmínek drobným písmem (sepsáno speciálně, NEMĚNIT — jen vzhled/rozvržení).
+   podmínek drobným písmem (české znění NEMĚNIT — žije v lang_custom.php jako
+   ord_terms_p1/p2, EN/RU jsou překlady; rozhodné je české znění).
    Lze vložit i pro e-mail: includer nastaví ORDER_DOC_EMBED ($order,$items,$target_lang) + $__EMAIL_MODE. */
 if (!defined('ORDER_DOC_EMBED')) {
     require_once 'includes/config.php';
@@ -61,7 +62,11 @@ $deviceStr = trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model']
 $pin       = trim((string)($order['pin_code'] ?? ''));
 $estimated = ($order['estimated_cost'] !== null && $order['estimated_cost'] !== '') ? (float)$order['estimated_cost'] : null;
 $receivedAt = !empty($order['created_at']) ? date('d.m.Y', strtotime((string)$order['created_at'])) : date('d.m.Y');
-$pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: _l('ord_pickup_in_person');
+$__rawShip = trim((string)($order['shipping_method'] ?? ''));
+// prázdné NEBO historicky ukládaný český default → přeložit dle jazyka dokladu;
+// jakákoli jiná hodnota je data zakázky a tiskne se, jak je uložená
+$pickupMethod = ($__rawShip === '' || $__rawShip === 'Osobní předání na pobočce')
+    ? _l('ord_pickup_in_person') : $__rawShip;
 
 // datum ukončení opravy (den) = kdy zakázka přešla do dokončeného stavu; prázdné při příjmu
 $completedAt = '';
@@ -98,7 +103,7 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="<?php echo e($target_lang ?? 'cs'); ?>">
 <head>
     <meta charset="UTF-8">
     <title><?php echo _l('order_sheet'); ?> <?php echo e($orderCode); ?></title>
@@ -141,9 +146,14 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
         .client .contact { margin-top: 8px; font-size: 12.5px; color: var(--sub); line-height: 1.7; }
         .client .contact .ic { display: inline-block; width: 15px; color: var(--muted); }
 
-        .kv { display: flex; justify-content: space-between; gap: 14px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
-        .kv:last-child { border-bottom: none; }
-        .kv .k { font-size: 11px; color: var(--muted); flex: 0 0 auto; padding-top: 1px; font-weight: 300; }
+        /* .kv jako TABULKA, ne flex: Gmail zahazuje justify-content/gap i var(--x),
+           takže se v e-mailu popisek a hodnota slévaly („ZařízeníApple iPhone…").
+           Tabulka drží rozvržení ve všech klientech; v prohlížeči i tisku vypadá
+           stejně jako dřív. Barvy tu jsou záměrně natvrdo (var() v mailu nefunguje). */
+        table.kv { width: 100%; border-collapse: collapse; border-bottom: 1px dashed #e8ebf0; }
+        table.kv:last-child { border-bottom: none; }
+        .kv td { padding: 6px 0; vertical-align: top; }
+        .kv .k { font-size: 11px; color: #949aa4; font-weight: 300; text-align: left; padding-right: 14px; }
         .kv .v { font-size: 13px; font-weight: 700; text-align: right; word-break: break-word; }
         .kv .v.mono { font-family: ui-monospace, Menlo, monospace; }
         .kv .v.price { font-size: 15px; font-weight: 800; }
@@ -218,36 +228,36 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
                     <?php if (!empty($order['email'])): ?><div><span class="ic">✉</span> <?php echo e($order['email']); ?></div><?php endif; ?>
                     <?php if (!empty($order['address'])): ?><div><span class="ic">⌂</span> <?php echo nl2br(e($order['address'])); ?></div><?php endif; ?>
                 </div>
-                <div class="kv" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;">
-                    <div class="k"><?php echo _l('ord_pickup_by_customer'); ?></div>
-                    <div class="v"><?php echo e($pickupMethod); ?></div>
-                </div>
+                <table class="kv" style="margin-top:12px;border-top:1px solid #e8ebf0;border-bottom:none;"><tr>
+                    <td class="k" style="padding-top:10px;"><?php echo _l('ord_pickup_by_customer'); ?></td>
+                    <td class="v" align="right" style="padding-top:10px;"><?php echo e($pickupMethod); ?></td>
+                </tr></table>
             </div>
 
             <div class="panel">
                 <div class="title"><?php echo _l('ord_device_and_repair'); ?></div>
-                <div class="kv"><div class="k"><?php echo _l('device'); ?></div><div class="v"><?php echo e($deviceStr ?: '—'); ?></div></div>
-                <div class="kv"><div class="k"><?php echo _l('ord_device_passcode'); ?></div><div class="v mono"><?php echo e($pin !== '' ? $pin : '—'); ?></div></div>
-                <div class="kv"><div class="k"><?php echo _l('ord_requested_repair'); ?></div><div class="v repair"><?php echo e((string)($order['problem_description'] ?? '') ?: '—'); ?></div></div>
+                <table class="kv"><tr><td class="k"><?php echo _l('device'); ?></td><td class="v" align="right"><?php echo e($deviceStr ?: '—'); ?></td></tr></table>
+                <table class="kv"><tr><td class="k"><?php echo _l('ord_device_passcode'); ?></td><td class="v mono" align="right"><?php echo e($pin !== '' ? $pin : '—'); ?></td></tr></table>
+                <table class="kv"><tr><td class="k"><?php echo _l('ord_requested_repair'); ?></td><td class="v repair" align="right"><?php echo e((string)($order['problem_description'] ?? '') ?: '—'); ?></td></tr></table>
                 <?php if (count($priceLines) >= 2): ?>
                     <?php foreach ($priceLines as $pl): ?>
-                    <div class="kv"><div class="k"><?php echo e($pl['label']); ?></div><div class="v"><?php echo e(formatMoney((float)$pl['amount'])); ?></div></div>
+                    <table class="kv"><tr><td class="k"><?php echo e($pl['label']); ?></td><td class="v" align="right"><?php echo e(formatMoney((float)$pl['amount'])); ?></td></tr></table>
                     <?php endforeach; ?>
-                    <div class="kv"><div class="k"><?php echo _l('ord_estimated_price_total'); ?></div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : _l('ord_by_diagnostics'); ?></div></div>
+                    <table class="kv"><tr><td class="k"><?php echo _l('ord_estimated_price_total'); ?></td><td class="v price" align="right"><?php echo $estimated !== null ? e(formatMoney($estimated)) : _l('ord_by_diagnostics'); ?></td></tr></table>
                 <?php else: ?>
-                    <div class="kv"><div class="k"><?php echo _l('ord_estimated_price'); ?></div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : _l('ord_by_diagnostics'); ?></div></div>
+                    <table class="kv"><tr><td class="k"><?php echo _l('ord_estimated_price'); ?></td><td class="v price" align="right"><?php echo $estimated !== null ? e(formatMoney($estimated)) : _l('ord_by_diagnostics'); ?></td></tr></table>
                 <?php endif; ?>
-                <div class="kv"><div class="k"><?php echo _l('ord_device_received'); ?></div><div class="v"><?php echo e($receivedAt); ?></div></div>
-                <div class="kv"><div class="k"><?php echo _l('ord_repair_completion_date'); ?></div><div class="v done"><?php echo e($completedAt !== '' ? $completedAt : '—'); ?></div></div>
+                <table class="kv"><tr><td class="k"><?php echo _l('ord_device_received'); ?></td><td class="v" align="right"><?php echo e($receivedAt); ?></td></tr></table>
+                <table class="kv"><tr><td class="k"><?php echo _l('ord_repair_completion_date'); ?></td><td class="v done" align="right"><?php echo e($completedAt !== '' ? $completedAt : '—'); ?></td></tr></table>
                 <?php if ($pin === ''): ?>
-                    <div class="note">Zákazník heslo nesdělil a je si vědom toho, že zařízení není možné po opravě plně otestovat.</div>
+                    <div class="note"><?php echo _l('ord_note_no_pin'); ?></div>
                 <?php endif; ?>
             </div>
         </div>
 
         <div class="legal">
-            <p>Podpisem zakázkového listu se zhotovitel zavazuje provést pro zákazníka diagnostiku vad a následnou opravu výše identifikovaného elektronického zařízení (dále jen „oprava“) a zákazník se zavazuje za opravu zaplatit ujednanou cenu. Pokud bude cena opravy vyšší než výše uvedená předpokládaná cena opravy, zhotovitel zákazníka kontaktuje s žádostí o schválení navýšené ceny opravy. Zákazník výslovně bere na vědomí, že zhotovitel neodpovídá za případnou ztrátu či poškození dat z elektronického zařízení po provedení nebo během provádění opravy. Zhotovitel zákazníkovi doporučuje, aby před předáním elektronického zařízení zhotoviteli provedl zákazník zálohu veškerých dat umístěných na elektronickém zařízení. Nedomluví-li se zhotovitel a zákazník jinak, zhotovitel vyměněné vadné díly elektronického zařízení nevrací a ekologicky je zlikviduje. Zhotovitel dále výslovně upozorňuje zákazníka a zákazník bere na vědomí, že při provádění opravy může v některých případech dojít k projevu skrytých vad elektronického zařízení, které mohou vést ke „zhroucení“ elektronického zařízení, případně může mít elektronické zařízení jiné vady nežli zákazníkem uvedené. Za takové vady a případně zhroucení zhotovitel nenese odpovědnost. Zhotovitel neodpovídá za vady funkčnosti elektronického zařízení, které nesouvisejí s opravami provedenými zhotovitelem. Zhotovitel rovněž neodpovídá za skryté vady, které se vyskytly po provedení opravy, avšak nesouvisejí s funkčností dílů instalovaných zhotovitelem. Zhotovitel rovněž výslovně upozorňuje zákazníka a zákazník bere na vědomí, že zhotovitel nezaručuje funkčnost elektronického zařízení jako celku, když vada ve funkčnosti může být způsobena jinou vadou, nežli vadou označenou zákazníkem. Zákazník je povinen opravené, případně neopravitelné, elektronické zařízení vyzvednout osobně na pobočce zhotovitele nejpozději do 30 dnů od zaslání informace o provedení opravy. Pokud zákazník elektronické zařízení nepřevezme ve lhůtě uvedené v předchozím odstavci je zhotovitel oprávněn požadovat na zákazníkovi uhrazení poplatku za uskladnění ve výši 20,– Kč denně za každý den prodlení zákazníka s převzetím elektronického zařízení. V případě, že si zákazník nevyzvedne zařízení ve shora uvedené lhůtě, stanoví mu zhotovitel k vyzvednutí náhradní lhůtu, která nesmí být kratší než 5 měsíců od uplynutí původní lhůty k vyzvednutí opraveného elektronického zařízení a na tuto lhůtu zákazníka upozorní formou SMS zprávy, případně zasláním emailu, společně s upozorněním, že pokud si zákazník elektronické zařízení nevyzvedne, je zhotovitel oprávněn jej prodat. Pokud si zákazník elektronické zařízení nevyzvedne ani v dodatečné lhůtě stanovené za tímto účelem zhotovitelem, je zhotovitel oprávněn elektronické zařízení prodat a z jeho prodeje pokrýt náklady na uskladnění elektronického zařízení. V případě, že zákazník odmítne uhradit zhotoviteli cenu za provedenou opravu, má zhotovitel právo využít zadržovací právo dle § 1395 zákona č. 89/2012 Sb., občanského zákoníku, a elektronické zařízení zákazníkovi nevydat až do úplného zaplacení ceny a jejího příslušenství.</p>
-            <p>Zákazník svým podpisem potvrzuje, že se s výše uvedenými právy a povinnosti seznámil, porozuměl jim a souhlasí s nimi. Pokud zhotovitel zveřejnil obchodní podmínky, práva a povinnosti mezi zákazníkem a zhotovitelem se rovněž řídí obchodními podmínkami zhotovitele dostupnými na jeho webových stránkách. Svým podpisem zákazník potvrzuje, že se s obchodními podmínkami seznámil.</p>
+            <p><?php echo _l('ord_terms_p1'); ?></p>
+            <p><?php echo _l('ord_terms_p2'); ?></p>
         </div>
 
         <div class="sigs">
@@ -261,7 +271,7 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
 
         <div class="pickup">
             <h3><?php echo _l('sign_pickup'); ?></h3>
-            <div class="sub">Svým podpisem stvrzuji převzetí výše uvedeného zařízení z opravy.</div>
+            <div class="sub"><?php echo _l('ord_pickup_confirm_sub'); ?></div>
             <div class="sigs">
                 <div class="sig"></div>
                 <div class="sig">
