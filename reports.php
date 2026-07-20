@@ -5,9 +5,11 @@ require_once 'includes/header.php';
 
 ensureOrderWorkTrackingSchema();
 
-// Filter by date range (default to current week)
-$start_date = $_GET['start_date'] ?? date('Y-m-d', strtotime('monday this week'));
-$end_date = $_GET['end_date'] ?? date('Y-m-d', strtotime('sunday this week'));
+// Výchozí rozsah = od začátku aktuálního roku do dneška (dřív jen tento týden —
+// vypadalo to, jako by starší statistiky „zmizely"). date('Y-01-01') se posune sám
+// s rokem, takže teď 1.1.2026, příští rok 1.1.2027.
+$start_date = $_GET['start_date'] ?? date('Y-01-01');
+$end_date = $_GET['end_date'] ?? date('Y-m-d');
 $active_tab = $_GET['tab'] ?? 'staff_stats';
 $selected_tech_id = $_GET['tech_id'] ?? null;
 

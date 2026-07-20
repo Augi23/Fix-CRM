@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.4.2',
+        'date' => '2026-07-18',
+        'time' => '03:41',
+        'title' => 'Přehledy: výchozí rozsah od začátku roku (ne jen tento týden)',
+        'items' => [
+            'Sekce Přehledy nově zobrazuje statistiky ve výchozím stavu od 1. ledna do dneška — dřív byl výchozí filtr jen aktuální týden, takže to vypadalo, jako by starší statistiky „zmizely" (nezmizely, jen nebyly ve zvoleném období).',
+            'Rozsah jde samozřejmě dál libovolně měnit filtrem. Výchozí začátek roku se sám posouvá s kalendářním rokem.',
+        ],
+    ],
+    [
         'version' => '2.4.1',
         'date' => '2026-07-18',
         'time' => '03:41',
