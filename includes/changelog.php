@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.1.1',
+        'date' => '2026-07-20',
+        'time' => '20:32',
+        'title' => 'Oprava: pobočková práva nezpůsobí pád pro zaměstnance',
+        'items' => [
+            'Interní oprava v návaznosti na v3.1.0 — v kontrole oprávnění vznikala nekonečná smyčka, která by po nasazení shodila každou stránku pro zaměstnance mimo hlavního administrátora. Odchyceno kontrolou ještě před ostrým během. Model práv zůstává beze změny (admin+Boss globální, manažer i technik jen svá pobočka).',
+        ],
+    ],
+    [
         'version' => '3.1.0',
         'date' => '2026-07-20',
         'time' => '20:24',

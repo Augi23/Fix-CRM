@@ -57,9 +57,11 @@ function hasPermission($permission) {
             $implicitPermissions[] = 'procurement_manage';
         }
         // Přehledy NAPŘÍČ pobočkami (vidět vše, Reporty) jen pro globální diváky = admin + Boss.
-        // Manažer je nově pobočkový (vidí jen svou pobočku), proto tato práva NEdostává —
-        // jinak by přes reporty/„view all" viděl data druhé pobočky (rozhodnutí majitele 20.7.2026).
-        if (isBranchGlobalViewer()) {
+        // Manažer je nově pobočkový (vidí jen svou pobočku), proto tato práva NEdostává.
+        // POZOR: zde NESMÍ být isBranchGlobalViewer() — ta volá hasPermission('admin_access')
+        // a vznikla by nekonečná rekurze. Admin_access už vrátil true výše (ř.30/43), takže
+        // sem doteče jen NE-admin technik → z globálních diváků tedy stačí otestovat Bosse.
+        if (getCurrentStaffRole() === 'boss') {
             $implicitPermissions[] = 'view_all_orders';
             $implicitPermissions[] = 'view_reports_all';
         }
