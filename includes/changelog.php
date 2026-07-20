@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.0.0',
+        'date' => '2026-07-20',
+        'time' => '19:15',
+        'title' => '🎉 Přechod na jediný systém — kompletní migrace ze zakazkovylist.cz',
+        'items' => [
+            'Všechny zakázky, klienti i reklamace ze zakazkovylist.cz jsou přeneseny do Fix-CRM. Celkem 1707 zakázek (1625 importovaných + 82 našich), 1298 klientů a 64 reklamací. Fix-CRM je teď jediný pracovní systém.',
+            'Importované zakázky mají šedý řádek (barva stavu jen v buňce Stav), naše původní jsou plnobarevné. Původní datum přijetí, PIN i technik zůstaly zachované; stavy i reklamace jsou převedené výhradně na náš nový model.',
+            'Zakázka na pobočce „Černá růže" = Na Příkopě (432 zakázek). Našich 82 zakázek s kolizním číslem bylo přečíslováno za konec řady (2600878–2600959), původní číslo zůstává dohledatelné jako „(dřív …)" v hledání, detailu i klientském portálu. Nové zakázky pokračují od 2600960.',
+            'DŮLEŽITÉ: starý systém zakazkovylist.cz se tímto opouští — nová zakázka se od teď zakládá VÝHRADNĚ ve Fix-CRM (jinak hrozí kolize čísel). Bezpečnostní záloha před migrací: backup_20260720_191239.',
+        ],
+    ],
+    [
         'version' => '2.14.2',
         'date' => '2026-07-20',
         'time' => '19:04',
