@@ -20,6 +20,7 @@ function complaintStatusUi(?string $status): array
 $hasClientCols = false;
 if (isset($pdo)) {
     ensureComplaintsClientColumns($pdo);
+    ensureComplaintsWorkflowColumns($pdo);   // technik + řešení (v2.10.0)
     try {
         $cc = $pdo->query("SHOW COLUMNS FROM complaints")->fetchAll(PDO::FETCH_COLUMN);
         $hasClientCols = in_array('source', $cc, true) && in_array('staff_ack_at', $cc, true);
@@ -42,11 +43,11 @@ if (isset($pdo)) {
             $count->execute([$term,$term,$term,$term,$term,$term]);
             $total = (int)$count->fetchColumn();
 
-            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id WHERE c.complaint_code LIKE ? OR c.device LIKE ? OR c.complaint_reason LIKE ? OR cu.first_name LIKE ? OR cu.last_name LIKE ? OR cu.phone LIKE ? ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id WHERE c.complaint_code LIKE ? OR c.device LIKE ? OR c.complaint_reason LIKE ? OR cu.first_name LIKE ? OR cu.last_name LIKE ? OR cu.phone LIKE ? ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
             $stmt->execute([$term,$term,$term,$term,$term,$term]);
         } else {
             $total = (int)$pdo->query("SELECT COUNT(*) FROM complaints")->fetchColumn();
-            $stmt = $pdo->query("SELECT c.*, cu.first_name, cu.last_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt = $pdo->query("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
         }
 
         $rows = $stmt->fetchAll();
@@ -102,6 +103,7 @@ if (!empty($rows) && isset($pdo)) {
                         <th>IMEI/SN</th>
                         <th><?php echo __('complaint_reason_col'); ?></th>
                         <th><?php echo __('source_order_col'); ?></th>
+                        <th><?php echo __('technician'); ?></th>
                         <th><?php echo __('status_col'); ?></th>
                         <th></th>
                     </tr>
@@ -121,7 +123,7 @@ if (!empty($rows) && isset($pdo)) {
                     ?>
                     <tr class="<?php echo e($rowClass); ?>" data-cid="<?php echo (int)$r['id']; ?>">
                         <td>
-                            <?php echo e($r['complaint_code']); ?>
+                            <a class="fw-semibold text-decoration-none" href="view_complaint.php?id=<?php echo (int)$r['id']; ?>" title="<?php echo e(__('cmpl_detail')); ?>"><?php echo e($r['complaint_code']); ?></a>
                             <?php if ($isNewClient): ?>
                                 <span class="badge bg-warning text-dark ms-1" title="<?php echo e(__('new_complaint_from_client')); ?>"><?php echo __('new_badge'); ?></span>
                             <?php endif; ?>
@@ -152,6 +154,7 @@ if (!empty($rows) && isset($pdo)) {
                                 </a>
                             <?php endif; ?>
                         </td>
+                        <td class="text-nowrap small"><?php echo !empty($r['tech_name']) ? e((string)$r['tech_name']) : '<span class="text-white-50">' . __('cmpl_unassigned') . '</span>'; ?></td>
                         <td style="min-width:170px;">
                             <select class="form-select form-select-sm complaint-status-select" data-cid="<?php echo (int)$r['id']; ?>">
                                 <?php foreach ($opts as $st): ?>
@@ -160,6 +163,9 @@ if (!empty($rows) && isset($pdo)) {
                             </select>
                         </td>
                         <td class="text-nowrap">
+                            <a class="btn btn-sm btn-outline-info" href="view_complaint.php?id=<?php echo (int)$r['id']; ?>" title="<?php echo e(__('cmpl_detail')); ?>">
+                                <i class="fas fa-folder-open"></i>
+                            </a>
                             <a class="btn btn-sm btn-outline-secondary" href="print_complaint.php?id=<?php echo (int)$r['id']; ?>" target="_blank" rel="noopener" title="<?php echo e(__('complaint_protocol')); ?>">
                                 <i class="fas fa-print"></i>
                             </a>

@@ -2703,6 +2703,151 @@ function complaintIsNewFromClient(array $row): bool
     return ($row['source'] ?? '') === 'client' && empty($row['staff_ack_at']);
 }
 
+/** Doplní do `complaints` sloupce pro práci s reklamací jako se zakázkou
+ *  (idempotentně, bez migrace — vzor ensureComplaintsClientColumns):
+ *  - technician_id   : technik, který si reklamaci převzal / dostal přiřazenou
+ *  - resolution_text : řešení / závěr technika (tiskne se ve vyrozumění)
+ *  - resolved_at     : kdy byl závěr zapsán
+ *  - resolved_by     : kdo závěr zapsal (jméno natvrdo — přežije smazání účtu) */
+function ensureComplaintsWorkflowColumns(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $cols = $pdo->query("SHOW COLUMNS FROM complaints")->fetchAll(PDO::FETCH_COLUMN);
+        if (!$cols) return;
+        $add = [];
+        if (!in_array('technician_id', $cols, true))   $add[] = "ADD COLUMN `technician_id` INT(11) NULL DEFAULT NULL";
+        if (!in_array('resolution_text', $cols, true)) $add[] = "ADD COLUMN `resolution_text` TEXT NULL";
+        if (!in_array('resolved_at', $cols, true))     $add[] = "ADD COLUMN `resolved_at` DATETIME NULL DEFAULT NULL";
+        if (!in_array('resolved_by', $cols, true))     $add[] = "ADD COLUMN `resolved_by` VARCHAR(100) NULL DEFAULT NULL";
+        if ($add) {
+            $pdo->exec("ALTER TABLE `complaints` " . implode(', ', $add));
+        }
+    } catch (Throwable $e) {
+        error_log('ensureComplaintsWorkflowColumns: ' . $e->getMessage());
+    }
+}
+
+/** Tabulka příloh reklamace nahrávaných z detailu (fotky/PDF) — analogie
+ *  order_attachments u zakázek. Starší fotky z založení žijí v complaint_attachments;
+ *  obě sady slévá crmGetComplaintMedia(). Soubory: uploads/complaints/<id>/. */
+function ensureComplaintMediaTable(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    // DDL nikdy uvnitř transakce (implicitní COMMIT v MariaDB) — zkusí se příště
+    if ($pdo->inTransaction()) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `complaint_media` (
+            `id`           INT(11)      NOT NULL AUTO_INCREMENT,
+            `complaint_id` INT(11)      NOT NULL,
+            `file_path`    VARCHAR(255) NOT NULL,
+            `file_type`    VARCHAR(100) DEFAULT NULL,
+            `file_name`    VARCHAR(255) DEFAULT NULL,
+            `uploaded_by`  VARCHAR(100) DEFAULT NULL,
+            `created_at`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `complaint_id` (`complaint_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        error_log('ensureComplaintMediaTable: ' . $e->getMessage());
+    }
+}
+
+/** Vedení reklamací (mazání příloh, přeřazení technika) = admin / Boss / manažer.
+ *  Prohlížet, převzít a řešit reklamaci smí každý přihlášený zaměstnanec. */
+function crmComplaintCanManage(): bool
+{
+    return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['boss', 'manager'], true);
+}
+
+/** Jméno přihlášeného zaměstnance pro zápis natvrdo (resolved_by, uploaded_by). */
+function crmStaffDisplayName(): string
+{
+    $name = trim((string)($_SESSION['full_name'] ?? ''));
+    if ($name !== '') return $name;
+    if (!empty($_SESSION['username'])) return (string)$_SESSION['username'];
+    if (!empty($_SESSION['tech_id'])) return 'Technik #' . (int)$_SESSION['tech_id'];
+    return 'Systém';
+}
+
+/** Všechny přílohy reklamace: nové z detailu (complaint_media, src='media')
+ *  + fotky z založení (complaint_attachments, src='attachment'), seřazené od nejstarší. */
+function crmGetComplaintMedia(PDO $pdo, int $complaintId): array
+{
+    $out = [];
+    try {
+        ensureComplaintMediaTable($pdo);
+        $st = $pdo->prepare("SELECT id, file_path, file_type, file_name, uploaded_by, created_at
+                             FROM complaint_media WHERE complaint_id = ? ORDER BY id ASC");
+        $st->execute([$complaintId]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $r['src'] = 'media'; $out[] = $r; }
+    } catch (Throwable $e) { /* bez nových příloh */ }
+    try {
+        $st = $pdo->prepare("SELECT id, file_path, file_type, file_name, created_at
+                             FROM complaint_attachments WHERE complaint_id = ? ORDER BY id ASC");
+        $st->execute([$complaintId]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) { $r['src'] = 'attachment'; $r['uploaded_by'] = null; $out[] = $r; }
+    } catch (Throwable $e) { /* starší instalace bez tabulky */ }
+    usort($out, static function (array $a, array $b): int {
+        return strcmp((string)($a['created_at'] ?? ''), (string)($b['created_at'] ?? ''));
+    });
+    return $out;
+}
+
+/** Pošle klientovi VYROZUMĚNÍ o vyřízení reklamace e-mailem (HTML =
+ *  print_complaint_result.php v embed módu vč. fotek jako data: URI).
+ *  Vrací [ok, chyba, skutečný_příjemce] — vzor crmSendOrderSheetEmail. */
+function crmSendComplaintResultEmail(int $complaintId, ?string $toOverride = null): array
+{
+    global $pdo;
+    ensureComplaintsClientColumns($pdo);
+    ensureComplaintsWorkflowColumns($pdo);
+    $st = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, cu.phone AS cust_phone, cu.email, cu.address, cu.preferred_language
+                         FROM complaints c
+                         LEFT JOIN customers cu ON cu.id = c.customer_id
+                         WHERE c.id = ?");
+    $st->execute([$complaintId]);
+    $complaint = $st->fetch();
+    if (!$complaint) { return [false, 'Reklamace nenalezena.', '']; }
+
+    $to = trim((string)($toOverride ?? $complaint['email'] ?? ''));
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return [false, 'Klient nemá platný e-mail.', $to];
+    }
+    if (trim((string)($complaint['resolution_text'] ?? '')) === '') {
+        return [false, 'Nejdřív vyplň a ulož řešení / závěr technika.', $to];
+    }
+
+    $complaintMedia = crmGetComplaintMedia($pdo, $complaintId);
+
+    $target_lang = crmCustomerDocLang($complaint['preferred_language'] ?? 'cs');
+    // ⚠️ _l() v šabloně čte `global $target_lang` — include tady běží UVNITŘ funkce,
+    // takže lokální proměnná do globálu nedoteče a tělo e-mailu by spadlo do jazyka
+    // přihlášeného zaměstnance (stejná past jako u zakázkového listu, oprava v2.7.5).
+    $GLOBALS['target_lang'] = $target_lang;
+    $__EMAIL_MODE = true;
+    if (!defined('COMPLAINT_RESULT_EMBED')) { define('COMPLAINT_RESULT_EMBED', true); }
+    ob_start();
+    include __DIR__ . '/../print_complaint_result.php';
+    $html = ob_get_clean();
+
+    $subject = (get_setting('company_name', 'AppleFix')) . ' — ' . __('cmpl_result_doc_title', $target_lang) . ' ' . (string)$complaint['complaint_code'];
+    [$__sok, $__smsg] = smtpSendMail($to, $subject, $html);
+    if ($__sok) {
+        crmAuditLog('complaint.result_email', [
+            'entity_type' => 'complaint', 'entity_id' => $complaintId,
+            'entity_label' => (string)$complaint['complaint_code'],
+            'summary' => 'Vyrozumění o reklamaci ' . $complaint['complaint_code'] . ' odesláno na ' . $to,
+        ]);
+    }
+    // 3. prvek = skutečná adresa příjemce, ať ji UI může zobrazit („Odesláno na …").
+    return [$__sok, $__smsg, $to];
+}
+
 /** Tabulka pro popup „nová přidělená zakázka" (per technik, doručí se pollingem). */
 function ensureTechPopupTable(PDO $pdo): void
 {
@@ -3762,10 +3907,16 @@ function crmAuditActionLabel(string $action): string {
         'invoice.delete' => 'Smazání faktury', 'invoice.status_change' => 'Změna stavu faktury',
         'invoice.credit_note' => 'Vystavení dobropisu',
         'complaint.create' => 'Vytvoření reklamace', 'complaint.status_change' => 'Změna stavu reklamace',
+        'complaint.assign' => 'Převzetí/přiřazení reklamace', 'complaint.resolution' => 'Zápis řešení reklamace',
+        'complaint.media_upload' => 'Nahrání přílohy reklamace', 'complaint.media_delete' => 'Smazání přílohy reklamace',
+        'complaint.result_email' => 'Odeslání vyrozumění o reklamaci',
         'procurement.create' => 'Požadavek na díl', 'procurement.status_change' => 'Změna stavu nákupu',
         'products.import' => 'Import produktů (e-shop)', 'products.delete' => 'Smazání produktu (e-shop)',
         'kasa.sale' => 'Prodej na kase', 'kasa.cancel' => 'Storno prodeje na kase',
         'banka.sync' => 'Synchronizace banky', 'banka.match' => 'Párování platby s fakturou',
+        'complaint.assign' => 'Převzetí/přiřazení reklamace', 'complaint.resolution' => 'Řešení reklamace',
+        'complaint.media_upload' => 'Příloha k reklamaci', 'complaint.media_delete' => 'Smazání přílohy reklamace',
+        'complaint.result_email' => 'Vyrozumění o reklamaci e-mailem',
         'products.create' => 'Naskladnění produktu', 'products.update' => 'Úprava produktu (e-shop)',
         'product_image.upload' => 'Nahrání fotky produktu',
         'procurement.assign_order' => 'Přiřazení dílu k zakázce', 'procurement.delete' => 'Smazání požadavku na díl',

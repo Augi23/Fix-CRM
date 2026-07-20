@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '2.10.0',
+        'date' => '2026-07-20',
+        'time' => '16:00',
+        'title' => 'Reklamace: plnohodnotná práce jako se zakázkami',
+        'items' => [
+            'DETAIL REKLAMACE: reklamace jde nově rozkliknout (číslo v seznamu nebo ikona složky) — detail ukazuje klienta, zařízení, původní popis problému, stav i původní zakázku.',
+            'PŘEVZETÍ TECHNIKEM: technik si reklamaci převezme tlačítkem jako zakázku; vedení (admin/Boss/manažer) může přeřadit na kohokoliv. V seznamu reklamací přibyl sloupec Technik. Vše se zapisuje do Historie.',
+            'ŘEŠENÍ / ZÁVĚR: v detailu je pole „Řešení / závěr technika" — uloží se s časem a jménem, kdo reklamaci vyřídil.',
+            'PŘÍLOHY: k reklamaci jde nahrávat fotky a PDF (průběh řešení) s galerií v detailu; mazat přílohy smí jen vedení. Je doložitelné, jak se reklamace opravdu řešila.',
+            'VYROZUMĚNÍ PRO KLIENTA: nový dokument „Vyrozumění o reklamaci" — původní problém, odpověď technika, datum a fotopřílohy. Jde vytisknout NEBO poslat e-mailem klientovi jedním tlačítkem (v jazyce klienta; po odeslání se ukáže, na jakou adresu odešlo).',
+        ],
+    ],
+    [
         'version' => '2.9.4',
         'date' => '2026-07-20',
         'time' => '12:39',
