@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.14.1',
+        'date' => '2026-07-20',
+        'time' => '18:14',
+        'title' => 'Migrace: nástroj pro zkušební porovnání importu (nic nezapisuje)',
+        'items' => [
+            'Nový interní skript scripts/migrace_dry_run.php — porovná data ze zakazkovylist.cz s naším CRM a vypíše, co by ostrý běh migrace udělal: kolik zakázek/klientů/reklamací by se vložilo, kolik jen dorovnalo stav, návrh přečíslování kolizních čísel, nespárované techniky a sporné případy.',
+            'Skript POUZE ČTE — do databáze nikdy nezapisuje. Slouží ke schválení migrace majitelem před ostrým během.',
+        ],
+    ],
+    [
         'version' => '2.14.0',
         'date' => '2026-07-20',
         'time' => '18:02',
