@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.0.1',
+        'date' => '2026-07-20',
+        'time' => '19:22',
+        'title' => 'Detail zakázky: původní číslo („dříve …") na vlastním řádku pod kódem',
+        'items' => [
+            'U přečíslovaných zakázek (z migrace) se původní číslo v detailu zakázky nově zobrazuje jako samostatný řádek „(dříve APFAZ…)" hned pod aktuálním kódem — dřív bylo vmáčknuté inline vedle názvu a splývalo.',
+            'Sjednocen výraz na „dříve" i v seznamu zakázek a našeptávači.',
+        ],
+    ],
+    [
         'version' => '3.0.0',
         'date' => '2026-07-20',
         'time' => '19:15',

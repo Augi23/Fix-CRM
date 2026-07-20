@@ -172,11 +172,14 @@ function localizedOrderStatusLabel(string $status): string {
                     <?php endif; ?>
                     <div>
                         <h5 class="mb-0">
-                            <?php echo __('order'); ?> <?php echo e(orderDisplayCode($order)); ?><?php if (($__legacySfx = orderLegacySuffix($order)) !== ''): ?><span class="text-white-50 fw-normal"><?php echo e($__legacySfx); ?></span><?php endif; ?> - <?php echo htmlspecialchars($order['device_model']); ?>
+                            <?php echo __('order'); ?> <?php echo e(orderDisplayCode($order)); ?> - <?php echo htmlspecialchars($order['device_model']); ?>
                             <span class="text-white-75 fw-normal ms-2" style="font-size: 0.9rem;">
                                 (<?php echo __('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?>)
                             </span>
                         </h5>
+                        <?php if (($__legacyCode = trim((string)($order['legacy_code'] ?? ''))) !== ''): ?>
+                            <div class="small text-white-50 mt-1"><i class="fas fa-clock-rotate-left me-1" style="font-size:.72rem;"></i>(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
+                        <?php endif; ?>
                         <?php if (!empty($webBookingRef['wp_booking_id'])): ?>
                         <div class="small mt-1" style="color:#5fd2ff;">
                             <i class="fas fa-globe me-1"></i><?php echo __('web_booking_no'); ?>
