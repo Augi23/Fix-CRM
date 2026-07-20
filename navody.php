@@ -58,7 +58,7 @@ $guides['crm'] = [
         'intro' => 'Každý klient má věrnostní kartu s QR kódem (v mobilu v Apple/Google Peněžence). Skenem karty se okamžitě otevře jeho profil se zakázkami a body — bez ručního hledání.',
         'steps' => [
             '<b>Na počítači recepce (jednorázově):</b> na Nástěnce klikni <b>vpravo dole</b> na <b>„Režim recepce"</b> — pilulka zezelená („Recepce poslouchá skeny") a počítač začne poslouchat skeny. Stačí zapnout jednou, vydrží zapnuto (i po zavření a otevření).',
-            '<b>Při návštěvě klienta:</b> klient ukáže kartu v Peněžence → naskenuj její QR <b>fotoaparátem firemního iPhonu</b> (iPhone musí být přihlášený do CRM).',
+            '<b>Při návštěvě klienta:</b> klient ukáže kartu v Peněžence → naskenuj její QR firemním iPhonem přihlášeným do CRM. <b>Žádná zvláštní aplikace není potřeba</b> — buď klepni v horní liště CRM na <b>ikonu QR kódu</b> (vedle zvonku) a namiř foťák na kód, nebo otevři <b>Fotoaparát</b> iPhonu a klepni na nabídnutý odkaz. Skener v liště je tentýž jako na zakázky — pozná QR zakázky i klientské karty.',
             'Na iPhonu se otevře profil klienta — a do ~3 vteřin <b>vyskočí i na počítači recepce</b>.',
             'Z profilu rovnou: <b>Nová zakázka pro klienta</b> (předvyplní ho), telefon, historie zakázek, věrnostní body.',
             'Alternativa bez iPhonu: USB/Bluetooth 2D čtečka u počítače — kurzor do vyhledávání a pípnout kartu; funguje i sken čísla karty (AFXC-…).',

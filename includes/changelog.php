@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.7.2',
+        'date' => '2026-07-20',
+        'time' => '08:15',
+        'title' => 'Sken karty na iPhonu: jasnější, kde je skener (je to ikona QR v liště)',
+        'items' => [
+            'QR skener v horní liště (ikona vedle zvonku) nově v popisku i v titulku okna uvádí, že skenuje „zakázku NEBO kartu klienta" — dřív psal jen „Skenovat QR zakázky", takže nebylo poznat, že umí i věrnostní karty. Funkčnost byla stejná, jen popis mátl.',
+            'Návod k recepci upřesněn: na iPhonu není potřeba žádná zvláštní aplikace — buď se klepne na ikonu QR v liště CRM, nebo se použije Fotoaparát iPhonu a otevře se nabídnutý odkaz. iPhone musí být přihlášený do CRM.',
+        ],
+    ],
+    [
         'version' => '2.7.1',
         'date' => '2026-07-20',
         'time' => '08:00',
