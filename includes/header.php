@@ -178,21 +178,174 @@ try {
     <script src="assets/js/liquid-glass-engine.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/liquid-glass-engine.js'); ?>" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js"></script>
+    <?php if (!empty($_SESSION['user_id']) || !empty($_SESSION['tech_id'])): ?>
     <script>
+    // aktuální CSRF token VŽDY čteme z meta tagu (ne z closure) — po obnovení
+    // přihlášení se meta aktualizuje a všechny další požadavky jedou s novým tokenem
+    window.afxCsrf = function () { var m = document.querySelector('meta[name="csrf-token"]'); return m ? m.getAttribute('content') : ''; };
+    window.afxCurrentUser = <?php echo json_encode((string)($_SESSION['username'] ?? ''), JSON_UNESCAPED_UNICODE); ?>;
+    window.afxCurrentName = <?php echo json_encode((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''), JSON_UNESCAPED_UNICODE); ?>;
+
     $(function() {
-        var csrfToken = $('meta[name="csrf-token"]').attr('content');
         $.ajaxSetup({
             beforeSend: function(xhr, settings) {
                 if (settings.type === 'POST' || settings.type === 'post') {
+                    var tok = window.afxCsrf();
                     if (typeof settings.data === 'string') {
-                        settings.data += '&csrf_token=' + encodeURIComponent(csrfToken);
+                        // přepiš případný starý token, jinak přidej
+                        if (/(^|&)csrf_token=/.test(settings.data)) {
+                            settings.data = settings.data.replace(/(^|&)csrf_token=[^&]*/, '$1csrf_token=' + encodeURIComponent(tok));
+                        } else {
+                            settings.data += '&csrf_token=' + encodeURIComponent(tok);
+                        }
                     } else if (settings.data instanceof FormData) {
-                        settings.data.append('csrf_token', csrfToken);
+                        settings.data.set('csrf_token', tok);
                     }
                 }
             }
         });
+        // $.post/$.ajax chyby na CSRF → okno se znovupřihlášením
+        $(document).ajaxError(function (e, xhr) {
+            if (window.afxLooksLikeCsrf(xhr.status, xhr.responseText)) { window.afxReauth.open(); }
+        });
     });
+
+    // detekce „neplatný token" napříč jazyky (CZ/EN/RU) — JEN v CHYBOVÝCH odpovědích.
+    // KRITICKÉ: nesmí skenovat úspěšná data (chat, vyhledávání, notify_poll vrací text
+    // se slovy token/csrf a vracejí "ok":true/"success":true → jinak by okno vyskakovalo
+    // donekonečna). Chybová = HTTP >= 400 nebo tělo s "success":false / "ok":false.
+    window.afxLooksLikeCsrf = function (status, text) {
+        text = String(text || '');
+        var isError = status >= 400 || /"(success|ok)"\s*:\s*false/.test(text);
+        if (!isError) return false;
+        return /csrf|neplatný (bezpečnostní )?token|invalid (security |csrf )?token|токен/i.test(text);
+    };
+
+    // Fetch wrapper: (1) přepíše csrf_token na aktuální z meta (auto-heal i u akcí se
+    // zapečeným starým tokenem), (2) při CSRF chybě v odpovědi otevře okno reauth.
+    window.afxRawFetch = window.fetch.bind(window);   // původní fetch pro reauth (mimo wrapper)
+    (function () {
+        var _fetch = window.afxRawFetch;
+        window.fetch = function (input, init) {
+            init = init || {};
+            var tok = window.afxCsrf();
+            try {
+                if (init.body instanceof FormData && init.body.has('csrf_token')) {
+                    init.body.set('csrf_token', tok);
+                } else if (typeof init.body === 'string' && init.body.indexOf('csrf_token') !== -1) {
+                    // JSON tělo
+                    if (init.body.charAt(0) === '{') {
+                        var o = JSON.parse(init.body);
+                        if (o && Object.prototype.hasOwnProperty.call(o, 'csrf_token')) { o.csrf_token = tok; init.body = JSON.stringify(o); }
+                    } else if (/(^|&)csrf_token=/.test(init.body)) {
+                        init.body = init.body.replace(/(^|&)csrf_token=[^&]*/, '$1csrf_token=' + encodeURIComponent(tok));
+                    }
+                }
+            } catch (err) { /* tělo nechme být */ }
+            return _fetch(input, init).then(function (resp) {
+                try {
+                    // některé endpointy hlásí CSRF chybu i s HTTP 200 + "success":false,
+                    // proto peekneme i 200; ROZHODUJE ale afxLooksLikeCsrf (isError guard),
+                    // který úspěšná data ("ok":true / "success":true) NIKDY nechytne
+                    if (resp.status === 200 || resp.status >= 400) {
+                        resp.clone().text().then(function (t) {
+                            if (window.afxLooksLikeCsrf(resp.status, t)) { window.afxReauth.open(); }
+                        }).catch(function () {});
+                    }
+                } catch (err) {}
+                return resp;
+            });
+        };
+    })();
+
+    // ── Okno „Obnovit přihlášení" ──
+    window.afxReauth = (function () {
+        var open = false, pending = false, elModal, elPass, elErr, elName;
+        function ensure() {
+            if (elModal) return;
+            var html =
+                '<div class="afx-reauth-ov" id="afxReauthOv">' +
+                  '<div class="afx-reauth-card">' +
+                    '<div class="afx-reauth-ic"><i class="fas fa-user-lock"></i></div>' +
+                    '<h4>Přihlášení vypršelo</h4>' +
+                    '<div class="afx-reauth-who">Zadej heslo a pokračuj — nic se neztratí.</div>' +
+                    '<div class="afx-reauth-name" id="afxReauthName"></div>' +
+                    '<input type="password" id="afxReauthPass" class="form-control" placeholder="Heslo" autocomplete="current-password">' +
+                    '<div class="afx-reauth-err" id="afxReauthErr"></div>' +
+                    '<button type="button" class="afx-reauth-btn" id="afxReauthBtn"><i class="fas fa-unlock me-2"></i>Obnovit přihlášení</button>' +
+                    '<a href="login.php" class="afx-reauth-other">Přihlásit jiného zaměstnance →</a>' +
+                  '</div>' +
+                '</div>';
+            var wrap = document.createElement('div');
+            wrap.innerHTML = html;
+            document.body.appendChild(wrap.firstChild);
+            elModal = document.getElementById('afxReauthOv');
+            elPass = document.getElementById('afxReauthPass');
+            elErr = document.getElementById('afxReauthErr');
+            elName = document.getElementById('afxReauthName');
+            document.getElementById('afxReauthBtn').addEventListener('click', submit);
+            elPass.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+        }
+        function submit() {
+            if (pending) return;
+            var pass = elPass.value;
+            if (!pass) { elErr.textContent = 'Zadej heslo.'; return; }
+            pending = true;
+            elErr.textContent = 'Ověřuji…';
+            var fd = new FormData();
+            fd.append('username', window.afxCurrentUser || '');
+            fd.append('password', pass);
+            _fetchRaw('api/reauth.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    pending = false;
+                    if (!d.success) { elErr.textContent = d.message || 'Nepodařilo se.'; elPass.value = ''; elPass.focus(); return; }
+                    // propíšeme nový token všude (meta + skrytá pole formulářů)
+                    var meta = document.querySelector('meta[name="csrf-token"]');
+                    if (meta) meta.setAttribute('content', d.csrf_token);
+                    document.querySelectorAll('input[name="csrf_token"]').forEach(function (i) { i.value = d.csrf_token; });
+                    close();
+                    if (window.showAlert) showAlert('Přihlášení obnoveno. Zopakuj prosím poslední akci.');
+                })
+                .catch(function () { pending = false; elErr.textContent = 'Síťová chyba — zkus to znovu.'; });
+        }
+        function show() {
+            if (open) return;
+            ensure();
+            open = true;
+            elErr.textContent = '';
+            elPass.value = '';
+            elName.textContent = window.afxCurrentName ? ('Přihlášen: ' + window.afxCurrentName) : '';
+            elModal.classList.add('show');
+            setTimeout(function () { elPass.focus(); }, 60);
+        }
+        function close() { open = false; if (elModal) elModal.classList.remove('show'); }
+        // reauth samotný jede přes původní fetch (mimo wrapper) — jinak by CSRF-detekce
+        // nad jeho vlastní odpovědí mohla okno otevřít donekonečna
+        var _fetchRaw = window.afxRawFetch;
+        return { open: show, close: close };
+    })();
+    </script>
+    <style>
+    .afx-reauth-ov { position: fixed; inset: 0; z-index: 13000; display: none; align-items: center; justify-content: center;
+      background: rgba(5,8,14,.72); backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2); }
+    .afx-reauth-ov.show { display: flex; }
+    .afx-reauth-card { width: min(390px, 92vw); background: rgba(14,18,26,.94); border: 1px solid rgba(255,255,255,.12);
+      border-radius: 22px; padding: 28px 26px; text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+    .afx-reauth-ic { font-size: 32px; color: #5fd2ff; margin-bottom: 10px; }
+    .afx-reauth-card h4 { font-weight: 700; margin-bottom: 4px; color: #fff; }
+    .afx-reauth-who { color: rgba(255,255,255,.6); font-size: 13.5px; margin-bottom: 4px; }
+    .afx-reauth-name { color: #fff; font-weight: 600; margin-bottom: 14px; font-size: 13.5px; }
+    .afx-reauth-card input[type=password] { font-size: 18px; text-align: center; padding: 11px; letter-spacing: .1em; }
+    .afx-reauth-err { color: #ff7a7a; font-size: 13px; min-height: 19px; margin-top: 9px; }
+    .afx-reauth-btn { width: 100%; margin-top: 8px; padding: 13px; border: 0; border-radius: 14px; font-size: 16px; font-weight: 700;
+      color: #eaf6ff; background: linear-gradient(135deg, rgba(0,163,255,.34), rgba(90,200,250,.22));
+      box-shadow: inset 0 0 0 1px rgba(0,163,255,.5); cursor: pointer; }
+    .afx-reauth-btn:hover { filter: brightness(1.15); }
+    .afx-reauth-other { display: inline-block; margin-top: 13px; font-size: 12.5px; color: rgba(255,255,255,.5); text-decoration: none; }
+    .afx-reauth-other:hover { color: #5fd2ff; }
+    </style>
+    <?php endif; ?>
     window.LANG_NOTICE = '<?php echo __("notice_title"); ?>';
     window.LANG_CONFIRM = '<?php echo __("confirm_title"); ?>';
     window.LANG_PREVIEW = '<?php echo __("preview_btn"); ?>';

@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.4.1',
+        'date' => '2026-07-18',
+        'time' => '03:41',
+        'title' => 'Konec hlášky „Neplatný token" — místo ní obnovení přihlášení',
+        'items' => [
+            'Když zaměstnanci po delší nečinnosti vyprší přihlášení, místo záhadné červené hlášky „Neplatný token" (a nefungující akce) vyskočí okno se zadáním hesla. Zaměstnanec zadá heslo, přihlášení se obnoví a pokračuje v práci — rozdělaná věc na stránce se neztratí.',
+            'Jméno přihlášeného je předvyplněné; je tam i odkaz „Přihlásit jiného zaměstnance" pro střídání směny. Chráněno stejnou brzdou proti hádání hesla jako přihlašovací stránka.',
+            'Zároveň se opravila příčina: bezpečnostní token se teď čte vždy aktuální, takže po obnovení přihlášení fungují všechny další akce bez nutnosti obnovovat stránku.',
+        ],
+    ],
+    [
         'version' => '2.4.0',
         'date' => '2026-07-17',
         'time' => '19:38',

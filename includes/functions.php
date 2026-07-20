@@ -3686,7 +3686,7 @@ function crmAuditLog(string $action, array $opts = []): void {
 /** Lidský český název úkonu pro zobrazení v historii. */
 function crmAuditActionLabel(string $action): string {
     static $map = [
-        'auth.login' => 'Přihlášení', 'auth.logout' => 'Odhlášení',
+        'auth.login' => 'Přihlášení', 'auth.logout' => 'Odhlášení', 'auth.reauth' => 'Obnovení přihlášení',
         'order.create' => 'Vytvoření zakázky', 'order.update' => 'Úprava zakázky',
         'order.status_change' => 'Změna stavu zakázky', 'order.delete' => 'Smazání zakázky',
         'customer.create' => 'Vytvoření klienta', 'customer.update' => 'Úprava klienta',
