@@ -160,7 +160,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
                 <div class="col-12 mt-4 d-flex justify-content-between">
                     <button type="submit" class="btn btn-primary px-5"><?php echo __('save'); ?></button>
+                    <?php if (crmCanDeleteOrders()): /* mazání klienta jen vedení (admin/Boss) */ ?>
                     <button type="button" class="btn btn-outline-danger" onclick="deleteCustomer(<?php echo $id; ?>)"><?php echo __('delete'); ?> <?php echo __('client'); ?></button>
+                    <?php endif; ?>
                 </div>
             </div>
         </form>

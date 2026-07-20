@@ -6,8 +6,10 @@ require_once '../includes/functions.php';
 if (ob_get_length()) ob_clean();
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || !hasPermission('edit_customers')) {
-    echo json_encode(['success' => false, 'message' => __('unauthorized')]);
+// Mazání klienta je nevratné → jen admin a Boss (úpravu kontaktu smí každý,
+// ale smazat záznam ne). Sladěno s mazáním zakázek (rozhodnutí majitele 18.7.2026).
+if (!isset($_SESSION['user_id']) || !crmCanDeleteOrders()) {
+    echo json_encode(['success' => false, 'message' => __('no_delete_permission')]);
     exit;
 }
 

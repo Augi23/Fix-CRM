@@ -45,17 +45,20 @@ function hasPermission($permission) {
         }
 
         $implicitPermissions = [];
-        // Boss = tatáž práva jako manažer (o stupeň výš jen u přiřazování techniků,
-        // což řeší isBranchGlobalViewer + edit_orders níže).
+        // VŠICHNI zaměstnanci smí upravovat zakázky I kontakty klientů — chyby si
+        // opraví sami a viník je vždy dohledatelný v Historii (rozhodnutí majitele
+        // 18.7.2026; střídají se za kasou a zakládají zakázky). Mazání zakázek ale
+        // zůstává jen adminovi a Bossovi — viz crmCanDeleteOrders().
+        $implicitPermissions[] = 'edit_orders';
+        $implicitPermissions[] = 'edit_customers';
+        // Boss/manažer mají navíc přehled přes pobočky, sklad a reporty.
         if (in_array(getCurrentStaffRole(), ['manager', 'boss'], true)) {
-            $implicitPermissions = [
+            $implicitPermissions = array_merge($implicitPermissions, [
                 'view_all_orders',
-                'edit_orders',
-                'edit_customers',
                 'manage_inventory',
                 'procurement_manage',
                 'view_reports_all',
-            ];
+            ]);
         }
 
         return in_array($permission, $_SESSION['_perms'], true)
@@ -1341,6 +1344,13 @@ function crmCanUsePos(): bool {
 /** STORNO prodeje jen admin/Boss — vrací zboží i peníze z evidence (stejná citlivost
  *  jako faktury; manažer faktury nesmí — pravidlo 16.7.2026). */
 function crmCanCancelPosSale(): bool {
+    return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
+}
+
+/** MAZÁNÍ zakázek jen admin a Boss — je to nevratné. Ostatní zaměstnanci zakázky
+ *  jen upravují (opravují chyby), smazání je vyhrazené vedení. Rozhodnutí majitele
+ *  18.7.2026. */
+function crmCanDeleteOrders(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 

@@ -477,7 +477,7 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                         <i class="fas fa-file-invoice-dollar text-success"></i>
                                     </button>
                                     <?php endif; ?>
-                                    <?php if (hasPermission('admin_access')): ?>
+                                    <?php if (crmCanDeleteOrders()): ?>
                                     <button type="button" class="btn btn-outline-danger" onclick="event.stopPropagation(); deleteOrder(<?php echo (int)$order['id']; ?>);" title="<?php echo __('delete'); ?>">
                                         <i class="fas fa-trash"></i>
                                     </button>

@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '2.5.0',
+        'date' => '2026-07-18',
+        'time' => '04:06',
+        'title' => 'Práva zaměstnanců: všichni mohou opravovat zakázky i kontakty',
+        'items' => [
+            'Každý přihlášený zaměstnanec teď může upravovat JAKOUKOLIV zakázku (i cizí) a opravovat kontaktní údaje klientů — když se u kasy střídáte a zakládáte zakázky, chyby si každý opraví sám. Kdo co změnil, je vždy dohledatelné v Historii úprav.',
+            'MAZÁNÍ zakázek zůstává jen adminovi a Bossovi (je to nevratné). Ostatní zakázky pouze upravují — tlačítko koše ostatním zmizí. Stejně tak mazání klienta smí jen admin a Boss.',
+            'Vytváření zakázek a prodej na Pokladně mají všichni zaměstnanci i nadále. Faktury a účetnictví zůstávají vedení (admin, Boss).',
+        ],
+    ],
+    [
         'version' => '2.4.2',
         'date' => '2026-07-18',
         'time' => '03:41',

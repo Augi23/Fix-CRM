@@ -17,8 +17,8 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     exit;
 }
 
-// Trvalé smazání zakázky je nevratné → jen administrátor.
-if (!hasPermission('admin_access')) {
+// Trvalé smazání zakázky je nevratné → jen administrátor a Boss.
+if (!crmCanDeleteOrders()) {
     echo json_encode(['success' => false, 'message' => __('no_delete_permission')]);
     exit;
 }
