@@ -178,7 +178,7 @@ function localizedOrderStatusLabel(string $status): string {
                             </span>
                         </h5>
                         <?php if (($__legacyCode = trim((string)($order['legacy_code'] ?? ''))) !== ''): ?>
-                            <div class="small text-white-50 mt-1"><i class="fas fa-clock-rotate-left me-1" style="font-size:.72rem;"></i>(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
+                            <div class="mt-1" style="font-size:.9rem; color:rgba(255,255,255,.72);"><i class="fas fa-clock-rotate-left me-1" style="font-size:.8rem;"></i>(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
                         <?php endif; ?>
                         <?php if (!empty($webBookingRef['wp_booking_id'])): ?>
                         <div class="small mt-1" style="color:#5fd2ff;">

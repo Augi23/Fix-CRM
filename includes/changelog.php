@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.0.5',
+        'date' => '2026-07-20',
+        'time' => '20:03',
+        'title' => 'Čitelnost čísla zakázky: aktuální bílé, „dříve" o kousek větší',
+        'items' => [
+            'Aktuální číslo zakázky v seznamu je teď čistě bílé (#FFFFFF) — lépe vyniká.',
+            'Původní číslo „(dříve APFAZ…)" je o něco větší a světlejší, aby bylo čitelnější — v seznamu i v detailu zakázky.',
+        ],
+    ],
+    [
         'version' => '3.0.4',
         'date' => '2026-07-20',
         'time' => '19:43',

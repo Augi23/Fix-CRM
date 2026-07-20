@@ -368,12 +368,12 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                               $__rowCls = (($order['source'] ?? 'crm') === 'legacy') ? 'order-row--legacy' : 'order-row--status-' . getOrderStatusBadgeToken($order['status']); ?>
                         <tr class="order-row <?php echo e($__rowCls); ?><?php echo $staleCls; ?><?php echo $__isInternal ? ' order-row--internal' : ''; ?>"<?php echo $staleTitle ? ' title="' . e($staleTitle) . '"' : ''; ?> data-order-url="view_order.php?id=<?php echo (int)$order['id']; ?>" style="cursor: pointer;">
                             <td class="ps-4">
-                                <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none"><?php echo e(orderDisplayCode($order)); ?></a>
+                                <a href="view_order.php?id=<?php echo (int)$order['id']; ?>" class="fw-bold text-decoration-none" style="color:#FFFFFF;"><?php echo e(orderDisplayCode($order)); ?></a>
                                 <?php if($has_media): ?>
                                     <i class="fas fa-camera text-info ms-1" title="<?php echo __('media_files'); ?>"></i>
                                 <?php endif; ?>
                                 <?php if (($__legacyCode = trim((string)($order['legacy_code'] ?? ''))) !== ''): ?>
-                                    <div class="small text-white-50">(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
+                                    <div style="font-size:.82rem; color:rgba(255,255,255,.72); margin-top:1px;">(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
                                 <?php endif; ?>
                                 <div class="small text-white-75"><?php echo date('d.m.Y', strtotime($order['created_at'])); ?></div>
                                 <div class="small text-white-75"><i class="far fa-clock me-1" style="font-size:.7rem;"></i><?php echo date('H:i:s', strtotime($order['created_at'])); ?></div>
