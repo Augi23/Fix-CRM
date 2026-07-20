@@ -231,7 +231,10 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
             $__intakeH = array_fill(0, 24, 0); $__intakeD = array_fill(0, 7, 0);
             $__pickH   = array_fill(0, 24, 0); $__pickD   = array_fill(0, 7, 0);
             try {
-                $__bc = orderBranchScopeSql('branch_id');
+                // Importované zakázky (source='legacy') do provozních časů NEpatří —
+                // hromadný import starého systému by zkreslil den/hodiny importu.
+                ensureOrdersSourceColumn();
+                $__bc = orderBranchScopeSql('branch_id') . " AND source <> 'legacy'";
                 $q = $pdo->prepare("SELECT HOUR(created_at) h, COUNT(*) n FROM orders WHERE created_at BETWEEN ? AND ?" . $__bc . " GROUP BY h");
                 $q->execute([$__tStart, $__tEnd]);
                 foreach ($q->fetchAll() as $r) { $__intakeH[(int)$r['h']] = (int)$r['n']; }
@@ -245,7 +248,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                 $__col = getOrderStatusList('collected');
                 if ($__col) {
                     $__phC = sqlPlaceholders($__col);
-                    $__bo = orderBranchScopeSql('o.branch_id');
+                    $__bo = orderBranchScopeSql('o.branch_id') . " AND o.source <> 'legacy'";
                     $__base = "FROM (SELECT order_id, MIN(changed_at) ts FROM order_status_log WHERE new_status IN ($__phC) GROUP BY order_id) t
                                JOIN orders o ON o.id = t.order_id WHERE t.ts BETWEEN ? AND ?" . $__bo;
                     $q = $pdo->prepare("SELECT HOUR(t.ts) h, COUNT(*) n " . $__base . " GROUP BY h");

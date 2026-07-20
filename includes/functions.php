@@ -173,6 +173,21 @@ function crmCanRunUpdates(): bool {
     return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 }
 
+/** Původ zakázky: 'crm' = vznikla v našem CRM, 'legacy' = import ze zakazkovylist.cz.
+ *  Základ pro šedé řádky, sekundární statistiky a vyloučení importu z grafů
+ *  (migrace 7/2026 — ostrý běh nastaví 'legacy' všem importovaným). */
+function ensureOrdersSourceColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'source'")->fetch()) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN source VARCHAR(16) NOT NULL DEFAULT 'crm', ADD KEY idx_orders_source (source)");
+        }
+    } catch (Throwable $e) { error_log('ensureOrdersSourceColumn: ' . $e->getMessage()); }
+}
+
 /** Kdo smí spravovat NASTAVENÍ (všechny záložky vč. správy administrátorů, záloh
  *  a banky) — administrátor a Boss (majitel firmy). ÚZKÉ oprávnění POUZE pro
  *  Nastavení a jeho endpointy; záměrně NEROZŠIŘUJE admin_access do zbytku CRM

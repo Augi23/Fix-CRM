@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.11.2',
+        'date' => '2026-07-20',
+        'time' => '16:43',
+        'title' => 'Provozní časy: importované zakázky se do grafů nepočítají',
+        'items' => [
+            'Grafy příjmu a výdeje (Přehledy → Provozní časy) počítají POUZE zakázky vzniklé v našem CRM. Zakázky z importu starého systému (zakazkovylist.cz) se do nich nikdy nezapočítají — hromadný import by jinak vytvořil obří špičku v den importu a zkreslil ostatní dny.',
+            'Technický základ: u zakázky se nově eviduje původ (CRM vs. import) — stejný příznak brzy ponesou i šedé řádky importovaných zakázek a oddělené statistiky (hlavní číslo vs. závorka).',
+        ],
+    ],
+    [
         'version' => '2.11.1',
         'date' => '2026-07-20',
         'time' => '16:41',
