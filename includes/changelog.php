@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '2.6.5',
+        'date' => '2026-07-20',
+        'time' => '07:52',
+        'title' => 'Tlačítko „Režim recepce" přesunuto vpravo dolů',
+        'items' => [
+            'Plovoucí tlačítko „Režim recepce" na Nástěnce se přesunulo z levého do pravého dolního rohu — už se nepřekrývá s ovladačem zvětšení (zoom 100 % −/+), který je vlevo dole.',
+        ],
+    ],
+    [
         'version' => '2.6.4',
         'date' => '2026-07-20',
         'time' => '07:11',

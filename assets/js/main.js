@@ -1865,7 +1865,7 @@ window.afxSignaturePad = function (opts) {
         var pill = document.createElement('button');
         pill.type = 'button';
         pill.id = 'afxReceptionPill';
-        pill.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2000;border:0;border-radius:999px;'
+        pill.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2000;border:0;border-radius:999px;'
             + 'padding:9px 16px;font:600 13px -apple-system,system-ui,sans-serif;cursor:pointer;'
             + 'box-shadow:0 6px 18px rgba(0,0,0,.35);backdrop-filter:blur(8px);'
             + (on ? 'background:rgba(52,199,89,.9);color:#04170a;' : 'background:rgba(60,64,80,.85);color:#e8ecf5;');
