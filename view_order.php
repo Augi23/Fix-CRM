@@ -1027,23 +1027,29 @@ $(document).ready(function() {
         form.submit();
     });
 
-    // Naskladnit zařízení ze zakázky jako díl na sklad dílů (admin + Boss)
-    $('#stockAsPartBtn').on('click', function() {
+    // Naskladnit zařízení ze zakázky jako díl na sklad dílů (admin + Boss) — okno s rozpisem + poznámkami
+    $('#stockAsPartBtn').on('click', function() { $('#stockAsPartModal').modal('show'); });
+    $('#stockAsPartConfirm').on('click', function() {
         var $btn = $(this);
-        showConfirm('<?php echo __('stock_as_part_confirm'); ?>', function() {
-            $btn.prop('disabled', true);
-            $.post('api/stock_order_as_part.php', { order_id: <?php echo (int)$order['id']; ?>, csrf_token: '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>' }, function(res) {
-                if (res && res.success) {
-                    showAlert('<?php echo __('stock_as_part_done'); ?>: ' + (res.part_name || ''));
-                    setTimeout(function() { window.location.reload(); }, 900);
-                } else {
-                    $btn.prop('disabled', false);
-                    showAlert('<?php echo __('error'); ?>: ' + (res && res.message ? res.message : '<?php echo __('stock_as_part_error'); ?>'));
-                }
-            }, 'json').fail(function() {
+        $btn.prop('disabled', true);
+        $.post('api/stock_order_as_part.php', {
+            order_id: <?php echo (int)$order['id']; ?>,
+            csrf_token: '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>',
+            part_name: $('#stockPartName').val(),
+            quantity: $('#stockPartQty').val(),
+            cost_price: $('#stockPartCost').val(),
+            notes: $('#stockPartNotes').val()
+        }, function(res) {
+            if (res && res.success) {
+                showAlert('<?php echo __('stock_as_part_done'); ?>: ' + (res.part_name || ''));
+                setTimeout(function() { window.location.reload(); }, 900);
+            } else {
                 $btn.prop('disabled', false);
-                showAlert('<?php echo __('stock_as_part_error'); ?>');
-            });
+                showAlert('<?php echo __('error'); ?>: ' + (res && res.message ? res.message : '<?php echo __('stock_as_part_error'); ?>'));
+            }
+        }, 'json').fail(function() {
+            $btn.prop('disabled', false);
+            showAlert('<?php echo __('stock_as_part_error'); ?>');
         });
     });
 
@@ -1454,6 +1460,58 @@ function deleteOrder(id) {
         </div>
     </div>
 </div>
+
+<?php if (hasPermission('admin_access')): ?>
+<!-- Naskladnit jako díl — okno s rozpisem dílů zakázky + poznámkami (admin + Boss) -->
+<div class="modal fade" id="stockAsPartModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-warning border-2 text-white">
+            <div class="modal-header bg-warning bg-opacity-10 border-bottom-0">
+                <h5 class="modal-title"><i class="fas fa-boxes-stacked me-2 text-warning"></i><?php echo __('stock_as_part'); ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-white-75 mb-3"><?php echo __('stock_as_part_hint'); ?></div>
+                <?php if (!empty($order_items)): ?>
+                <div class="mb-3 p-2 rounded" style="background:rgba(255,255,255,.05);">
+                    <div class="fw-medium small mb-1"><i class="fas fa-list-ul me-1 text-info"></i><?php echo __('stock_as_part_order_parts'); ?></div>
+                    <ul class="small text-white-75 mb-0 ps-3">
+                        <?php foreach ($order_items as $it): ?>
+                            <li><?php echo htmlspecialchars($it['part_name']); ?> — <?php echo (int)$it['quantity']; ?> ks</li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
+                <div class="mb-2">
+                    <label class="form-label mb-1"><?php echo __('part_name'); ?></label>
+                    <input type="text" id="stockPartName" class="form-control" value="<?php echo htmlspecialchars(preg_replace('/\s+/', ' ', trim(((string)($order['device_brand'] ?? '')) . ' ' . ((string)($order['device_model'] ?? ''))))); ?>">
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label mb-1"><?php echo __('quantity'); ?></label>
+                        <input type="number" id="stockPartQty" class="form-control" value="1" min="1" step="1">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1"><?php echo __('cost_price'); ?></label>
+                        <div class="input-group">
+                            <input type="number" id="stockPartCost" class="form-control" value="<?php echo (int)round((float)($order['final_cost'] ?: $order['estimated_cost'] ?: 0)); ?>" step="1">
+                            <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label mb-1"><?php echo __('stock_as_part_notes'); ?></label>
+                    <textarea id="stockPartNotes" class="form-control" rows="3" placeholder="<?php echo e(__('stock_as_part_notes_ph')); ?>"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
+                <button type="button" class="btn btn-warning" id="stockAsPartConfirm"><i class="fas fa-boxes-stacked me-2"></i><?php echo __('stock_as_part'); ?></button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Full Edit Order Modal -->
 <div class="modal fade" id="editOrderFullModal" tabindex="-1" data-bs-focus="false">

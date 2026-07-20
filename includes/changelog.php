@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.3.1',
+        'date' => '2026-07-20',
+        'time' => '22:25',
+        'title' => 'Naskladnit jako díl: potvrzovací okno s rozpisem dílů a poznámkami',
+        'items' => [
+            'Tlačítko „Naskladnit jako díl" teď otevře okno, kde je vidět rozpis dílů použitých na této zakázce (ze skladu) a lze upravit název dílu, počet kusů, nákupní cenu a doplnit poznámky / rozpis toho, co se naskladňuje.',
+            'Poznámky se uloží k pohybu skladu a do zakázky (dohledatelnost). Vidí a používá administrátor a Boss.',
+        ],
+    ],
+    [
         'version' => '3.3.0',
         'date' => '2026-07-20',
         'time' => '22:20',
