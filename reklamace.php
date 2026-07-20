@@ -37,17 +37,35 @@ if (isset($pdo)) {
         $offset = ($page - 1) * $limit;
         $search = trim($_GET['search'] ?? '');
 
+        // Pobočková izolace: reklamace patří pobočce SVÉ napojené zakázky. Ne-globální
+        // divák (manažer/technik) vidí jen reklamace své pobočky + reklamace bez zakázky
+        // (e-shopové APFARE bez order_id). Admin/Boss vidí vše (isBranchGlobalViewer).
+        $cmplJoin = " LEFT JOIN orders o ON o.id = c.order_id";
+        $cmplBranch = ''; $cmplBranchParams = [];
+        if (!isBranchGlobalViewer()) {
+            $cmplBranch = " AND (o.branch_id = ? OR c.order_id IS NULL OR c.order_id = 0)";
+            $cmplBranchParams[] = getCurrentStaffBranchId();
+        }
+
         if ($search !== '') {
             $term = "%$search%";
-            $count = $pdo->prepare("SELECT COUNT(*) FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id WHERE c.complaint_code LIKE ? OR c.device LIKE ? OR c.complaint_reason LIKE ? OR cu.first_name LIKE ? OR cu.last_name LIKE ? OR cu.phone LIKE ?");
-            $count->execute([$term,$term,$term,$term,$term,$term]);
+            $searchWhere = "(c.complaint_code LIKE ? OR c.device LIKE ? OR c.complaint_reason LIKE ? OR cu.first_name LIKE ? OR cu.last_name LIKE ? OR cu.phone LIKE ?)";
+            $searchParams = [$term,$term,$term,$term,$term,$term];
+
+            $count = $pdo->prepare("SELECT COUNT(*) FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id" . $cmplJoin . " WHERE " . $searchWhere . $cmplBranch);
+            $count->execute(array_merge($searchParams, $cmplBranchParams));
             $total = (int)$count->fetchColumn();
 
-            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id WHERE c.complaint_code LIKE ? OR c.device LIKE ? OR c.complaint_reason LIKE ? OR cu.first_name LIKE ? OR cu.last_name LIKE ? OR cu.phone LIKE ? ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
-            $stmt->execute([$term,$term,$term,$term,$term,$term]);
+            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . " WHERE " . $searchWhere . $cmplBranch . " ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt->execute(array_merge($searchParams, $cmplBranchParams));
         } else {
-            $total = (int)$pdo->query("SELECT COUNT(*) FROM complaints")->fetchColumn();
-            $stmt = $pdo->query("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $whereBranch = $cmplBranch !== '' ? (' WHERE 1=1' . $cmplBranch) : '';
+            $count = $pdo->prepare("SELECT COUNT(*) FROM complaints c" . $cmplJoin . $whereBranch);
+            $count->execute($cmplBranchParams);
+            $total = (int)$count->fetchColumn();
+
+            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . $whereBranch . " ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt->execute($cmplBranchParams);
         }
 
         $rows = $stmt->fetchAll();

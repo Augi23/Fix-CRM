@@ -18,8 +18,10 @@ ensureProductsPosColumn();
 // je záměrně JEN v Historie → Kasa prodejna, kasa je čistě prodejní plocha
 $todaySums = ['cash' => 0.0, 'card' => 0.0, 'invoice' => 0.0];
 try {
+    // Denní uzávěrka jen za SVOU pobočku (admin/Boss vidí celofiremní součet).
+    $__posBranch = orderBranchScopeSql('branch_id');
     foreach ($pdo->query("SELECT payment_method, SUM(total) s FROM pos_sales
-        WHERE DATE(created_at) = CURDATE() AND status = 'completed' GROUP BY payment_method") as $r) {
+        WHERE DATE(created_at) = CURDATE() AND status = 'completed'" . $__posBranch . " GROUP BY payment_method") as $r) {
         $todaySums[(string)$r['payment_method']] = (float)$r['s'];
     }
 } catch (Throwable $e) {}

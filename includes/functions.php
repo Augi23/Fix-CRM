@@ -51,14 +51,17 @@ function hasPermission($permission) {
         // zůstává jen adminovi a Bossovi — viz crmCanDeleteOrders().
         $implicitPermissions[] = 'edit_orders';
         $implicitPermissions[] = 'edit_customers';
-        // Boss/manažer mají navíc přehled přes pobočky, sklad a reporty.
+        // Sklad a Nákupy jsou CELOFIREMNÍ (ne pobočkové) → smí je spravovat manažer i Boss.
         if (in_array(getCurrentStaffRole(), ['manager', 'boss'], true)) {
-            $implicitPermissions = array_merge($implicitPermissions, [
-                'view_all_orders',
-                'manage_inventory',
-                'procurement_manage',
-                'view_reports_all',
-            ]);
+            $implicitPermissions[] = 'manage_inventory';
+            $implicitPermissions[] = 'procurement_manage';
+        }
+        // Přehledy NAPŘÍČ pobočkami (vidět vše, Reporty) jen pro globální diváky = admin + Boss.
+        // Manažer je nově pobočkový (vidí jen svou pobočku), proto tato práva NEdostává —
+        // jinak by přes reporty/„view all" viděl data druhé pobočky (rozhodnutí majitele 20.7.2026).
+        if (isBranchGlobalViewer()) {
+            $implicitPermissions[] = 'view_all_orders';
+            $implicitPermissions[] = 'view_reports_all';
         }
 
         return in_array($permission, $_SESSION['_perms'], true)
@@ -148,9 +151,13 @@ function getCurrentStaffBranchId(): int {
 }
 
 function isBranchGlobalViewer(): bool {
-    // Boss vidí a přiřazuje napříč pobočkami stejně jako manažer/admin
-    // → smí určit jakéhokoliv technika k jakékoliv zakázce (canAssignTechnicianToOrder).
-    return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
+    // ── JEDINÉ PRAVIDLO VIDITELNOSTI POBOČEK (zjednodušeno 20.7.2026) ──
+    // Obě pobočky vidí a napříč nimi spravuje POUZE admin a Boss.
+    // Všichni ostatní (manažer i technik/brigádník) vidí JEN svou přidělenou
+    // pobočku (technicians.branch_id → getCurrentStaffBranchId). Manažer má na své
+    // pobočce plná manažerská práva, ale do druhé pobočky nevidí. Karlín (hlavní
+    // pobočka) už NEMÁ žádnou výjimku — je symetrický s Na Příkopě.
+    return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 
 /** Faktury a účetnictví smí administrátor a Boss (rozšířeno 16.7.2026 na žádost
@@ -167,10 +174,10 @@ function crmCanManageCatalogs(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 
-/** Aktualizace CRM (kontrola + instalace + diagnostika) smí vedení:
- *  administrátor, manažer i Boss (rozšířeno 16.7.2026 — dřív jen admin). */
+/** Aktualizace CRM (kontrola + instalace + diagnostika) = celosystémový zásah
+ *  (git pull + migrace) → jen admin a Boss. Pobočkový manažer NE (zjednodušeno 20.7.2026). */
 function crmCanRunUpdates(): bool {
-    return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
+    return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 
 /** Původ zakázky: 'crm' = vznikla v našem CRM, 'legacy' = import ze zakazkovylist.cz.
@@ -214,30 +221,19 @@ function crmIsInternalCustomer($customerId): bool {
     return $internal > 0 && (int)$customerId === $internal;
 }
 
-/**
- * Zaměstnanec HLAVNÍ pobočky (Karlín)? Pravidlo 16.7.2026: personál hlavní
- * pobočky vidí data (tržby, zakázky, historii) VŠECH poboček; personál
- * ostatních poboček (Roman, Mark — Na Příkopě) jen data svojí pobočky.
- */
-function crmIsMainBranchStaff(): bool {
-    if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
-        return false;
-    }
-    $main = getDefaultBranchId();
-    return $main > 0 && getCurrentStaffBranchId() === $main;
-}
-
-/** Kdo smí do záložky Historie: všichni zaměstnanci KROMĚ techniků
- *  vedlejších poboček (Roman, Mark). */
+/** Historie úprav (audit log) + Kasa-prodejny v Historii = celofiremní přehled napříč
+ *  pobočkami → jen admin a Boss (globální diváci). Manažer je pobočkový a audit log má
+ *  u většiny záznamů prázdný branch_id, takže by se nedal spolehlivě omezit — proto ho
+ *  do Historie NEpustíme (zjednodušeno 20.7.2026). */
 function crmCanViewHistory(): bool {
     if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
         return false;
     }
-    return hasPermission('admin_access') || isBranchGlobalViewer() || crmIsMainBranchStaff();
+    return isBranchGlobalViewer();
 }
 
 function addOrderBranchScope(array &$whereClauses, array &$params, string $orderAlias = 'o'): void {
-    if (isBranchGlobalViewer() || crmIsMainBranchStaff()) {
+    if (isBranchGlobalViewer()) {
         return;
     }
     $branchId = getCurrentStaffBranchId();
@@ -248,7 +244,7 @@ function addOrderBranchScope(array &$whereClauses, array &$params, string $order
 }
 
 function orderBranchScopeSql(string $column = 'branch_id'): string {
-    if (isBranchGlobalViewer() || crmIsMainBranchStaff()) {
+    if (isBranchGlobalViewer()) {
         return '';
     }
     $branchId = getCurrentStaffBranchId();
@@ -259,7 +255,7 @@ function canAccessOrderBranch(array $order): bool {
     if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
         return false;
     }
-    if (isBranchGlobalViewer() || crmIsMainBranchStaff()) {
+    if (isBranchGlobalViewer()) {
         return true;
     }
     $orderBranchId = (int)($order['branch_id'] ?? 0);
@@ -2019,8 +2015,19 @@ function crmGetOrderNotificationContext(int $orderId): ?array {
 
 function crmGetOversightRecipients($excludeTechnicianIds = []): array {
     global $pdo;
-    $stmt = $pdo->query("SELECT id, name, role, telegram_id FROM technicians WHERE is_active = 1 AND role IN ('admin', 'manager', 'boss')");
+    // Přehledové (oversight) notifikace = celofiremní přehled → jen admin a Boss.
+    // Manažer je pobočkový; kdyby sem patřil, dostával by Telegram detaily zakázek
+    // i druhé pobočky (notifikace nejsou pobočkově filtrované). Zjednodušeno 20.7.2026.
+    $stmt = $pdo->query("SELECT id, name, role, telegram_id FROM technicians WHERE is_active = 1 AND role IN ('admin', 'boss')");
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Admin je v tabulce `users` (ne technicians) → jeho telegram bereme z nastavení
+    // 'admin_telegram_id' (Nastavení → Integrace / ručně). Přidá se jako plnohodnotný
+    // příjemce přehledových notifikací (rozhodnutí majitele 20.7.2026).
+    $adminTg = crmNormalizeTelegramChatId(get_setting('admin_telegram_id', ''));
+    if ($adminTg) {
+        $rows[] = ['id' => 0, 'name' => 'Administrátor', 'role' => 'admin', 'telegram_id' => $adminTg];
+    }
 
     if (!is_array($excludeTechnicianIds)) {
         $excludeTechnicianIds = [$excludeTechnicianIds];

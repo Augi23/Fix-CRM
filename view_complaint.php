@@ -23,6 +23,17 @@ $stmt->execute([$id]);
 $c = $stmt->fetch();
 if (!$c) { header('Location: reklamace.php'); exit; }
 
+// Pobočková izolace: reklamaci k zakázce JINÉ pobočky ne-globální divák (manažer/technik)
+// neotevře. Reklamace bez zakázky (e-shopové) jsou přístupné všem.
+if (!isBranchGlobalViewer() && (int)($c['order_id'] ?? 0) > 0) {
+    $__ob = $pdo->prepare("SELECT branch_id FROM orders WHERE id = ?");
+    $__ob->execute([(int)$c['order_id']]);
+    $__ordBranch = (int)$__ob->fetchColumn();
+    if ($__ordBranch > 0 && $__ordBranch !== getCurrentStaffBranchId()) {
+        header('Location: reklamace.php'); exit;
+    }
+}
+
 $media = crmGetComplaintMedia($pdo, $id);
 $canManage = crmComplaintCanManage();
 $myTechId = (int)($_SESSION['tech_id'] ?? 0);

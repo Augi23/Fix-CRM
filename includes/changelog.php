@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.1.0',
+        'date' => '2026-07-20',
+        'time' => '20:24',
+        'title' => 'Zjednodušená pobočková práva: manažer i technik vidí jen svou pobočku',
+        'items' => [
+            'Nové jednoduché pravidlo: OBĚ pobočky vidí a napříč nimi spravuje jen administrátor a Boss. Všichni ostatní (manažer i technik) vidí a řídí JEN svou přidělenou pobočku — symetricky Karlín i Na Příkopě (dřív měl Karlín výjimku a viděl vše).',
+            'Manažer má na SVÉ pobočce plná práva (zakázky, pokladna, reklamace, přiřazování techniků), ale do druhé pobočky nevidí. Pokladní uzávěrka, reklamace i výběr techniků jsou nově omezené na pobočku.',
+            'Celofiremní přehledy (Historie úprav, Reporty, správa všech zaměstnanců, systémové aktualizace CRM, přehledové Telegram notifikace) zůstávají adminovi a Bossovi.',
+            'Telegram: administrátor (účet mimo seznam techniků) může nově dostávat přehledové notifikace přes nastavení admin_telegram_id.',
+        ],
+    ],
+    [
         'version' => '3.0.5',
         'date' => '2026-07-20',
         'time' => '20:03',

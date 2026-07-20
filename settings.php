@@ -456,7 +456,9 @@ if (isset($_POST['update_system_settings']) && $is_admin_check) {
 }
 
 $is_admin_user = crmCanManageSettings();
-$can_view_all_staff = $is_admin_user || in_array(getCurrentStaffRole(), ['manager', 'boss'], true) || hasPermission('view_reports_all');
+// Celý seznam personálu (obě pobočky, vč. loginů a Telegram ID) vidí jen admin a Boss.
+// Pobočkový manažer/technik vidí v této záložce jen svůj vlastní záznam (viz ř.~1104).
+$can_view_all_staff = isBranchGlobalViewer();
 
 $active_tab = $_GET['tab'] ?? ($is_admin_user ? 'company' : 'staff');
 

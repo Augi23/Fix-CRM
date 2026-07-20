@@ -4,7 +4,7 @@
  * This file is included in footer.php so it's available on all pages.
  */
 require_once __DIR__ . '/../functions.php';
-$techs_list_modal = getActiveTechnicians(true);   // výběr technika je volný — všichni aktivní technici
+$techs_list_modal = getActiveTechnicians();   // technici SVÉ pobočky (admin/Boss všichni) — pobočková izolace
 $branches_modal = getBranches();
 $order_templates_modal = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)get_setting('order_templates', '')))));
 $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)get_setting('order_note_templates', '')))));
