@@ -349,6 +349,14 @@ function showCustomerOrders(id, name) {
                             <input type="email" name="email" class="form-control">
                         </div>
                         <div class="col-12">
+                            <label class="form-label"><?php echo __('customer_language'); ?></label>
+                            <select name="language" class="form-select">
+                                <option value="cs" selected>🇨🇿 Čeština</option>
+                                <option value="en">🇬🇧 English</option>
+                                <option value="uk">🇺🇦 Українська</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
                             <label class="form-label"><?php echo __('address'); ?></label>
                             <textarea name="address" id="ares_address" class="form-control" rows="2"></textarea>
                         </div>

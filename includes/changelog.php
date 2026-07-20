@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.6.1',
+        'date' => '2026-07-20',
+        'time' => '06:30',
+        'title' => 'Jazyk komunikace klienta i ve formuláři „Nový klient"',
+        'items' => [
+            'Volba jazyka komunikace (Čeština / English / Українська) je teď i v samostatném formuláři „Nový klient" na stránce Klienti — dřív chyběla a nový klient se zakládal vždy s češtinou. Nabídka tří jazyků je tak jednotná všude: nová zakázka, úprava klienta i nový klient.',
+            'Podle uloženého jazyka klienta mu automaticky odchází e-mail „Připraveno k vyzvednutí" i žádost o recenzi v jeho jazyce (česky / anglicky / ukrajinsky).',
+        ],
+    ],
+    [
         'version' => '2.6.0',
         'date' => '2026-07-20',
         'time' => '06:16',
