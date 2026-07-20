@@ -15,20 +15,20 @@ function cc_fail(string $msg, int $code = 400): void {
     exit;
 }
 
-if (!clientIsLoggedIn()) cc_fail('Nejste přihlášeni.', 401);
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') cc_fail('Neplatný požadavek.', 405);
-if (!validateCsrfToken($_POST['csrf_token'] ?? '')) cc_fail('Neplatný bezpečnostní token. Obnovte stránku.', 419);
+if (!clientIsLoggedIn()) cc_fail(__('cl_err_not_logged_in'), 401);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') cc_fail(__('cl_err_invalid_request'), 405);
+if (!validateCsrfToken($_POST['csrf_token'] ?? '')) cc_fail(__('csrf_invalid'), 419);
 
 $customerId = (int)($_SESSION['client_customer_id'] ?? 0);
 $orderId    = (int)($_POST['order_id'] ?? 0);
 $reason     = trim((string)($_POST['reason'] ?? ''));
 $resolution = trim((string)($_POST['resolution'] ?? ''));
 
-if ($customerId <= 0) cc_fail('Neznámý zákazník.', 403);
-if ($orderId <= 0)    cc_fail('Chybí zakázka.');
-if ($reason === '')   cc_fail('Popište prosím, co reklamujete.');
+if ($customerId <= 0) cc_fail(__('cl_err_unknown_customer'), 403);
+if ($orderId <= 0)    cc_fail(__('cl_err_missing_order'));
+if ($reason === '')   cc_fail(__('client_complaint_reason_required'));
 
-if (!isset($pdo)) cc_fail('Databáze není dostupná.', 500);
+if (!isset($pdo)) cc_fail(__('cl_err_db_unavailable'), 500);
 
 /* --- zakázka musí patřit zákazníkovi a být vydaná --- */
 $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.email
@@ -36,10 +36,10 @@ $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.email
                        WHERE o.id = ? AND o.customer_id = ? LIMIT 1");
 $stmt->execute([$orderId, $customerId]);
 $order = $stmt->fetch();
-if (!$order) cc_fail('Zakázka nenalezena.', 404);
+if (!$order) cc_fail(__('order_not_found'), 404);
 
 if (!isOrderStatusIn((string)$order['status'], 'collected')) {
-    cc_fail('Reklamovat lze až dokončenou a vydanou opravu.');
+    cc_fail(__('cl_complaint_only_collected'));
 }
 
 ensureComplaintsClientColumns($pdo);
@@ -58,7 +58,7 @@ try {
     $chk->execute([$orderId]);
     if ($existing = $chk->fetchColumn()) {
         echo json_encode(['ok' => true, 'code' => $existing, 'already' => true,
-            'message' => 'Reklamaci k této zakázce už evidujeme.'], JSON_UNESCAPED_UNICODE);
+            'message' => __('cl_complaint_already_exists')], JSON_UNESCAPED_UNICODE);
         exit;
     }
 } catch (Throwable $e) { /* pokračuj */ }
@@ -85,7 +85,7 @@ try {
     $pdo->commit();
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
-    cc_fail('Reklamaci se nepodařilo uložit. Zkuste to prosím znovu.', 500);
+    cc_fail(__('cl_complaint_save_failed'), 500);
 }
 
 /* --- upozornění na e-mail (best-effort, neblokuje výsledek) --- */
@@ -107,4 +107,4 @@ try {
 } catch (Throwable $e) { /* mail selhal — reklamace i tak založena */ }
 
 echo json_encode(['ok' => true, 'code' => $code,
-    'message' => 'Reklamace byla odeslána. Ozveme se vám co nejdříve.'], JSON_UNESCAPED_UNICODE);
+    'message' => __('client_complaint_sent')], JSON_UNESCAPED_UNICODE);

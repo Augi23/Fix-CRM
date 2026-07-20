@@ -13,9 +13,9 @@ $type = (string)($_GET['type'] ?? '');
 $orderId = (int)($_GET['order'] ?? 0);
 $target_lang = crm_get_language();
 
-if ($customerId <= 0) { http_response_code(403); die('Přístup odepřen.'); }
+if ($customerId <= 0) { http_response_code(403); die(e(__('access_denied'))); }
 
-function clientDocDeny(): void { http_response_code(404); die('Dokument nenalezen.'); }
+function clientDocDeny(): void { http_response_code(404); die(e(__('print_not_found'))); }
 
 /* ------- reklamační protokol (nemá order, ale complaint id) ------- */
 if ($type === 'complaint') {

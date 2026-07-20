@@ -906,7 +906,7 @@ if ($selectedOrder && isset($pdo)) {
         <div class="claim-modal-card">
             <div class="claim-modal-head">
                 <h3><i class="fas fa-rotate-left me-2" style="color:#f97316"></i><?php echo __('client_complaint_title'); ?></h3>
-                <button type="button" class="claim-x" onclick="afxCloseClaim()" aria-label="Zavřít">&times;</button>
+                <button type="button" class="claim-x" onclick="afxCloseClaim()" aria-label="<?php echo e(__('close')); ?>">&times;</button>
             </div>
             <div class="claim-modal-body">
                 <div class="claim-order"><?php echo __('client_complaint_for_order'); ?> <strong><?php echo e($selectedOrderCode); ?></strong> · <?php echo e(trim(($selectedOrder['device_brand'] ?? '') . ' ' . ($selectedOrder['device_model'] ?? ''))); ?></div>
@@ -948,7 +948,7 @@ if ($selectedOrder && isset($pdo)) {
                 .then(function(r){ return r.json(); })
                 .then(function(d){
                     if (d.ok){ afxCloseClaim(); alert(d.message || <?php echo json_encode(__('client_complaint_sent')); ?>); location.reload(); }
-                    else { err.textContent = d.error || 'Chyba'; err.style.display='block'; btn.disabled=false; }
+                    else { err.textContent = d.error || <?php echo json_encode(__('error'), JSON_UNESCAPED_UNICODE); ?>; err.style.display='block'; btn.disabled=false; }
                 })
                 .catch(function(){ err.textContent = <?php echo json_encode(__('client_complaint_conn_error')); ?>; err.style.display='block'; btn.disabled=false; });
         }

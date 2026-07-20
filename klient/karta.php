@@ -22,7 +22,7 @@ $qr = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=0&data=' 
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Věrnostní karta — <?php echo e($company); ?></title>
+<title><?php echo e(__('client_loyalty_card')); ?> — <?php echo e($company); ?></title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
@@ -52,34 +52,34 @@ $qr = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=0&data=' 
 </head>
 <body>
 <div class="wrap">
-    <a href="dashboard.php" class="text-white-50 text-decoration-none small"><i class="fas fa-arrow-left me-1"></i> Zpět</a>
+    <a href="dashboard.php" class="text-white-50 text-decoration-none small"><i class="fas fa-arrow-left me-1"></i> <?php echo e(__('back')); ?></a>
     <?php if (!$card): ?>
-        <div class="text-center mt-5"><i class="fas fa-id-card fa-3x mb-3 text-secondary"></i><p>Kartu se nepodařilo načíst.</p></div>
+        <div class="text-center mt-5"><i class="fas fa-id-card fa-3x mb-3 text-secondary"></i><p><?php echo e(__('cl_card_load_failed')); ?></p></div>
     <?php else: ?>
     <div class="loyalty-card mt-3">
-        <div class="lc-brand"><i class="fas fa-id-card me-2"></i><?php echo e($company); ?> · Klub</div>
+        <div class="lc-brand"><i class="fas fa-id-card me-2"></i><?php echo e($company); ?> · <?php echo e(__('cl_card_club')); ?></div>
         <div class="lc-name"><?php echo e($card['name']); ?></div>
         <div class="lc-stats">
-            <div class="lc-stat"><b><?php echo (int)$card['points']; ?></b><span>věrnostních bodů</span></div>
-            <div class="lc-stat"><b><?php echo (int)$card['devices_total']; ?></b><span>zařízení u nás</span></div>
-            <div class="lc-stat"><b><?php echo (int)$card['devices_active']; ?></b><span>právě v servisu</span></div>
+            <div class="lc-stat"><b><?php echo (int)$card['points']; ?></b><span><?php echo e(__('cl_card_points_label')); ?></span></div>
+            <div class="lc-stat"><b><?php echo (int)$card['devices_total']; ?></b><span><?php echo e(__('cl_card_devices_total')); ?></span></div>
+            <div class="lc-stat"><b><?php echo (int)$card['devices_active']; ?></b><span><?php echo e(__('cl_card_devices_active')); ?></span></div>
         </div>
-        <div class="muted mt-3" style="color:rgba(255,255,255,.8)"><i class="fas fa-hashtag me-1"></i><?php echo e($card['token']); ?> · člen od <?php echo e($card['since']); ?></div>
+        <div class="muted mt-3" style="color:rgba(255,255,255,.8)"><i class="fas fa-hashtag me-1"></i><?php echo e($card['token']); ?> · <?php echo e(__('cl_card_member_since')); ?> <?php echo e($card['since']); ?></div>
     </div>
 
     <div class="qr-box">
-        <img src="<?php echo e($qr); ?>" alt="QR karty">
-        <div class="text-dark small mt-1">Ukaž na recepci — hned tě najdeme</div>
+        <img src="<?php echo e($qr); ?>" alt="<?php echo e(__('cl_card_qr_alt')); ?>">
+        <div class="text-dark small mt-1"><?php echo e(__('cl_card_show_reception')); ?></div>
     </div>
 
     <?php if ($appleReady): ?>
-        <a class="wallet-btn wallet-apple" href="../wallet/apple_pass.php?t=<?php echo e($card['token']); ?>"><i class="fab fa-apple fa-lg"></i> Přidat do Apple Wallet</a>
+        <a class="wallet-btn wallet-apple" href="../wallet/apple_pass.php?t=<?php echo e($card['token']); ?>"><i class="fab fa-apple fa-lg"></i> <?php echo e(__('cl_card_add_apple_wallet')); ?></a>
     <?php endif; ?>
     <?php if ($googleReady): ?>
-        <a class="wallet-btn wallet-google" href="../wallet/google_pass.php?t=<?php echo e($card['token']); ?>"><i class="fab fa-google fa-lg"></i> Přidat do Google Wallet</a>
+        <a class="wallet-btn wallet-google" href="../wallet/google_pass.php?t=<?php echo e($card['token']); ?>"><i class="fab fa-google fa-lg"></i> <?php echo e(__('cl_card_add_google_wallet')); ?></a>
     <?php endif; ?>
     <?php if (!$appleReady && !$googleReady): ?>
-        <p class="muted text-center mt-3">Digitální karta do Apple / Google Peněženky se připravuje. Zatím ukazuj na recepci QR kód výše.</p>
+        <p class="muted text-center mt-3"><?php echo e(__('cl_card_wallet_soon')); ?></p>
     <?php endif; ?>
     <?php endif; ?>
 </div>

@@ -29,6 +29,9 @@ if (!defined('COMPLAINT_DOC_EMBED')) {
 }
 $complaintPhotos = $complaintPhotos ?? [];
 $target_lang = $target_lang ?? 'cs';
+if (!function_exists('_l')) {
+    function _l($key) { global $target_lang; return __($key, $target_lang); }
+}
 
 $__cust_name = trim(((string)($complaint['first_name'] ?? '')) . ' ' . ((string)($complaint['last_name'] ?? '')));
 if ($__cust_name === '') $__cust_name = (string)($complaint['customer_name'] ?? '—');
@@ -60,7 +63,7 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
 <html lang="<?php echo htmlspecialchars($target_lang); ?>">
 <head>
     <meta charset="UTF-8">
-    <title>Reklamační protokol <?php echo htmlspecialchars((string)$complaint['complaint_code']); ?></title>
+    <title><?php echo htmlspecialchars(_l('complaint_protocol')); ?> <?php echo htmlspecialchars((string)$complaint['complaint_code']); ?></title>
     <link rel="stylesheet" href="<?php echo defined('COMPLAINT_DOC_EMBED') ? '../' : ''; ?>assets/css/sf-pro.css">
     <style>
         /* Jednotný vizuál klientských dokumentů (dle zakázkového listu): SF Pro,
@@ -114,7 +117,7 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
     <div class="doc-head">
         <?php if ($__logo_data): ?><img src="<?php echo $__logo_data; ?>" alt="<?php echo htmlspecialchars($__company); ?>"><?php endif; ?>
         <div class="doc-meta">
-            <div class="doc-kicker">Reklamační protokol</div>
+            <div class="doc-kicker"><?php echo htmlspecialchars(_l('complaint_protocol')); ?></div>
             <div class="doc-code"><?php echo htmlspecialchars((string)$complaint['complaint_code']); ?></div>
             <div class="doc-date"><?php echo htmlspecialchars($__created); ?></div>
         </div>
@@ -124,32 +127,32 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
     <div class="body">
         <div class="grid2">
             <div class="panel">
-                <h3>Zákazník</h3>
+                <h3><?php echo htmlspecialchars(_l('customer_col')); ?></h3>
                 <div class="big"><?php echo htmlspecialchars($__cust_name ?: '—'); ?></div>
-                <?php if ($__cust_phone): ?><div class="row"><span class="k">Telefon:</span> <?php echo htmlspecialchars($__cust_phone); ?></div><?php endif; ?>
-                <?php if ($__cust_email): ?><div class="row"><span class="k">E-mail:</span> <?php echo htmlspecialchars($__cust_email); ?></div><?php endif; ?>
+                <?php if ($__cust_phone): ?><div class="row"><span class="k"><?php echo htmlspecialchars(_l('phone')); ?>:</span> <?php echo htmlspecialchars($__cust_phone); ?></div><?php endif; ?>
+                <?php if ($__cust_email): ?><div class="row"><span class="k"><?php echo htmlspecialchars(_l('email')); ?>:</span> <?php echo htmlspecialchars($__cust_email); ?></div><?php endif; ?>
             </div>
             <div class="panel">
-                <h3>Zařízení</h3>
+                <h3><?php echo htmlspecialchars(_l('device')); ?></h3>
                 <div class="big"><?php echo htmlspecialchars((string)($complaint['device'] ?? '—') ?: '—'); ?></div>
                 <?php if (!empty($complaint['serial_number'])): ?><div class="row"><span class="k">SN/IMEI:</span> <?php echo htmlspecialchars((string)$complaint['serial_number']); ?></div><?php endif; ?>
-                <?php if (!empty($complaint['order_code'])): ?><div class="row"><span class="k">Původní zakázka:</span> <?php echo htmlspecialchars((string)$complaint['order_code']); ?></div><?php endif; ?>
+                <?php if (!empty($complaint['order_code'])): ?><div class="row"><span class="k"><?php echo htmlspecialchars(_l('cmpl_original_order')); ?>:</span> <?php echo htmlspecialchars((string)$complaint['order_code']); ?></div><?php endif; ?>
             </div>
         </div>
 
         <div class="block">
-            <h3>Stav reklamace</h3>
+            <h3><?php echo htmlspecialchars(_l('cmpl_status')); ?></h3>
             <span class="status-chip"><?php echo htmlspecialchars((string)($complaint['complaint_status'] ?? 'Přijato') ?: 'Přijato'); ?></span>
         </div>
 
         <div class="block">
-            <h3>Předmět reklamace</h3>
+            <h3><?php echo htmlspecialchars(_l('cmpl_subject')); ?></h3>
             <div class="reason"><?php echo htmlspecialchars((string)($complaint['complaint_reason'] ?? '')); ?></div>
         </div>
 
         <?php if (!empty($complaintPhotos)): ?>
         <div class="block">
-            <h3>Fotodokumentace</h3>
+            <h3><?php echo htmlspecialchars(_l('photo_documentation')); ?></h3>
             <div class="photos">
                 <?php foreach ($complaintPhotos as $ph):
                     $pp = (string)($ph['file_path'] ?? '');
@@ -169,8 +172,8 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
         </div>
 
         <div class="sign">
-            <div class="slot">Za zákazníka</div>
-            <div class="slot">Za servis <?php echo htmlspecialchars($__company); ?></div>
+            <div class="slot"><?php echo htmlspecialchars(_l('cmpl_sign_customer')); ?></div>
+            <div class="slot"><?php echo htmlspecialchars(_l('cmpl_sign_service')); ?> <?php echo htmlspecialchars($__company); ?></div>
         </div>
 
         <div class="foot">

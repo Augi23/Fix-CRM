@@ -5,6 +5,17 @@ require_once __DIR__ . '/klient/includes/auth.php';
 $lang = $_GET['lang'] ?? $_POST['lang'] ?? null;
 if ($lang !== null) {
     crm_set_language((string)$lang);
+
+    // Přihlášený klient: jeho ruční přepnutí jazyka musí přežít i pro klientský
+    // portál, který jinak pro každý request vynucuje $_SESSION['client_lang'].
+    // Zapíšeme volbu do tohoto klientského klíče (neovlivní zaměstnance). Bez
+    // toho by přepínač CS/EN/RU v klientském portálu neměl trvalý efekt.
+    if (function_exists('clientIsLoggedIn') && clientIsLoggedIn()) {
+        $clientLang = crm_normalize_language((string)$lang);
+        if ($clientLang !== null) {
+            $_SESSION['client_lang'] = $clientLang;
+        }
+    }
 }
 
 $defaultTarget = 'login.php';

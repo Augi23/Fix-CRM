@@ -74,7 +74,7 @@ function clientLookupCustomerAndOrders($pdo, string $identifier): array {
         // 1) Order number first, if the identifier is numeric and matches an existing order.
         if (ctype_digit($identifier)) {
             $stmt = $pdo->prepare(
-                "SELECT o.id as order_id, o.*, c.first_name, c.last_name, c.phone, c.email, c.company, c.customer_type
+                "SELECT o.id as order_id, o.*, c.first_name, c.last_name, c.phone, c.email, c.company, c.customer_type, c.preferred_language
                  FROM orders o
                  INNER JOIN customers c ON c.id = o.customer_id
                  WHERE o.id = ?
@@ -91,6 +91,7 @@ function clientLookupCustomerAndOrders($pdo, string $identifier): array {
                     'email' => $row['email'] ?? '',
                     'company' => $row['company'] ?? '',
                     'customer_type' => $row['customer_type'] ?? 'private',
+                    'preferred_language' => $row['preferred_language'] ?? 'cs',
                 ];
                 $result['matched_order'] = $row;
             }
@@ -99,7 +100,7 @@ function clientLookupCustomerAndOrders($pdo, string $identifier): array {
         // 2) Email lookup.
         if (!$customer && filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
             $stmt = $pdo->prepare(
-                "SELECT id, first_name, last_name, phone, email, company, customer_type
+                "SELECT id, first_name, last_name, phone, email, company, customer_type, preferred_language
                  FROM customers
                  WHERE LOWER(email) = LOWER(?)
                  LIMIT 1"
@@ -113,7 +114,7 @@ function clientLookupCustomerAndOrders($pdo, string $identifier): array {
             $needleDigits = clientNormalizePhone($identifier);
             if ($needleDigits !== '') {
                 $stmt = $pdo->query(
-                    "SELECT id, first_name, last_name, phone, email, company, customer_type
+                    "SELECT id, first_name, last_name, phone, email, company, customer_type, preferred_language
                      FROM customers
                      WHERE phone IS NOT NULL AND phone <> ''"
                 );

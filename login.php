@@ -223,6 +223,10 @@ if (isset($_POST['login'])) {
                 $_SESSION['client_full_name'] = trim(($customer['first_name'] ?? '') . ' ' . ($customer['last_name'] ?? ''));
                 $_SESSION['client_company'] = $customer['company'] ?? '';
                 $_SESSION['client_last_login'] = time();
+                // Klientský portál poběží v jazyce klienta (customers.preferred_language:
+                // cs/en, uk→en přes crmCustomerDocLang). Ukládáme do klientského klíče,
+                // který NEovlivní zaměstnanecké UI ($_SESSION['lang'] / cookie neměníme).
+                $_SESSION['client_lang'] = crmCustomerDocLang($customer['preferred_language'] ?? 'cs');
                 recordLoginAttempt($pdo, true);
                 if (!empty($_POST['ajax'])) {
                     header('Content-Type: application/json; charset=utf-8');
@@ -371,12 +375,12 @@ if (!empty($_POST['ajax'])) {
                         <input type="hidden" name="redirect" value="<?php echo e($__lr); ?>">
                     <?php endif; ?>
                     <div class="mb-3">
-                        <label class="form-label"><?php echo $isClientDom ? 'E-mail nebo telefon' : __('username_label'); ?></label>
-                        <input type="text" name="username" class="form-control" required autofocus autocomplete="username" placeholder="<?php echo $isClientDom ? 'zadejte e-mail nebo telefon ze zakázky' : e(__('login_username_placeholder')); ?>">
+                        <label class="form-label"><?php echo $isClientDom ? e(__('cl_login_email_or_phone')) : __('username_label'); ?></label>
+                        <input type="text" name="username" class="form-control" required autofocus autocomplete="username" placeholder="<?php echo $isClientDom ? e(__('cl_login_email_or_phone_ph')) : e(__('login_username_placeholder')); ?>">
                     </div>
                     <div class="mb-4">
-                        <label class="form-label"><?php echo $isClientDom ? 'PIN zakázky' : __('password'); ?></label>
-                        <input type="password" name="password" class="form-control" required autocomplete="current-password" placeholder="<?php echo $isClientDom ? 'PIN najdete na zakázkovém listu' : e(__('login_password_placeholder')); ?>">
+                        <label class="form-label"><?php echo $isClientDom ? e(__('cl_login_pin')) : __('password'); ?></label>
+                        <input type="password" name="password" class="form-control" required autocomplete="current-password" placeholder="<?php echo $isClientDom ? e(__('cl_login_pin_ph')) : e(__('login_password_placeholder')); ?>">
                     </div>
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary"><?php echo __('login_btn'); ?></button>

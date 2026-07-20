@@ -15,6 +15,7 @@ ensureSignatureRequestsTable();
 $branchId = (int)getCurrentStaffBranchId();
 $sql = "SELECT r.id, r.order_id, r.sig_type, r.requested_by,
                o.order_code, o.device_brand, o.device_model, o.estimated_cost, o.final_cost,
+               c.preferred_language,
                TRIM(CONCAT(COALESCE(c.first_name,''),' ',COALESCE(c.last_name,''))) AS customer
         FROM signature_requests r
         JOIN orders o ON o.id = r.order_id
@@ -36,6 +37,7 @@ try {
             'device'       => trim(((string)($r['device_brand'] ?? '')) . ' ' . ((string)($r['device_model'] ?? ''))),
             'amount'       => $amount > 0 ? formatMoney($amount) : '',
             'requested_by' => trim((string)($r['requested_by'] ?? '')),
+            'lang'         => crmCustomerDocLang($r['preferred_language'] ?? 'cs'), // jazyk dokladů klienta (uk→en) pro podpisovou obrazovku
         ];
     }
     echo json_encode(['ok' => true,

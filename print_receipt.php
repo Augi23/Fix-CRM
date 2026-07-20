@@ -8,25 +8,32 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-if (!crmCanUsePos()) { die('Přístup jen pro přihlášené.'); }
+if (!crmCanUsePos()) { die(__('unauthorized')); }
 
 $id = (int)($_GET['id'] ?? 0);
-if ($id <= 0) { die('Chybí doklad.'); }
+if ($id <= 0) { die(__('missing_id')); }
 
 ensurePosTables();
 
-$st = $pdo->prepare("SELECT s.*, c.first_name, c.last_name, c.company, i.invoice_number
+$st = $pdo->prepare("SELECT s.*, c.first_name, c.last_name, c.company, c.preferred_language, i.invoice_number
     FROM pos_sales s
     LEFT JOIN customers c ON s.customer_id = c.id
     LEFT JOIN invoices i ON s.invoice_id = i.id
     WHERE s.id = ?");
 $st->execute([$id]);
 $sale = $st->fetch();
-if (!$sale) { die('Doklad nenalezen.'); }
+if (!$sale) { die(__('print_not_found')); }
 
 // technici vedlejší pobočky vidí jen doklady své pobočky (stejná hranice jako Historie)
 if (!crmCanViewHistory() && (int)($sale['branch_id'] ?? 0) !== (int)getCurrentStaffBranchId()) {
-    die('Doklad patří jiné pobočce.');
+    die(__('rcpt_wrong_branch'));
+}
+
+// jazyk dokladu: dle zákazníka prodeje; walk-in bez zákazníka → česky (vzor print_order.php)
+$__pref = (string)($sale['preferred_language'] ?? '');
+$target_lang = $_GET['lang'] ?? ($__pref !== '' ? crmCustomerDocLang($__pref) : 'cs');
+if (!function_exists('_l')) {
+    function _l($key) { global $target_lang; return __($key, $target_lang); }
 }
 
 $it = $pdo->prepare("SELECT * FROM pos_sale_items WHERE sale_id = ? ORDER BY id");
@@ -60,15 +67,15 @@ $baseKc = ($isVat && $vatRate > 0) ? (int)round($stdTotal * 100 / (100 + $vatRat
 $vatKc  = $stdKc - $baseKc;
 $hasUsed = $usedTotal > 0 && $isVat;   // §90 má smysl jen u plátce DPH
 
-$payLabel = ['cash' => 'Hotově', 'card' => 'Kartou (platební terminál)', 'invoice' => 'Na fakturu'][(string)$sale['payment_method']] ?? (string)$sale['payment_method'];
+$payLabel = ['cash' => _l('rcpt_pay_cash'), 'card' => _l('rcpt_pay_card'), 'invoice' => _l('rcpt_pay_invoice')][(string)$sale['payment_method']] ?? (string)$sale['payment_method'];
 $custName = trim((string)($sale['company'] ?? '')) ?: trim((string)($sale['first_name'] ?? '') . ' ' . (string)($sale['last_name'] ?? ''));
 $cancelled = (string)$sale['status'] === 'cancelled';
 ?>
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="<?php echo e($target_lang); ?>">
 <head>
 <meta charset="utf-8">
-<title>Prodejní doklad <?php echo e($sale['sale_number']); ?></title>
+<title><?php echo _l('rcpt_doc_title'); ?> <?php echo e($sale['sale_number']); ?></title>
 <link rel="stylesheet" href="assets/css/sf-pro.css">
 <style>
 :root { --ink:#111318; --sub:#4d5560; --muted:#949aa4; --line:#e8ebf0; --accent:#0a84ff; --soft:#f6f8fb; }
@@ -112,7 +119,7 @@ table.items .num { text-align:right; white-space:nowrap; }
 </head>
 <body>
 <div class="toolbar no-print">
-    <button onclick="window.print()">🖨 Vytisknout</button>
+    <button onclick="window.print()">🖨 <?php echo _l('print'); ?></button>
 </div>
 <div class="sheet">
     <div class="accent-bar"></div>
@@ -122,26 +129,26 @@ table.items .num { text-align:right; white-space:nowrap; }
                 <?php if ($__logo_data): ?><img src="<?php echo $__logo_data; ?>" alt="<?php echo e($co_name); ?>"><?php endif; ?>
             </div>
             <div class="doc">
-                <div class="t">Prodejní doklad</div>
+                <div class="t"><?php echo _l('rcpt_doc_title'); ?></div>
                 <div class="n"><?php echo e($sale['sale_number']); ?></div>
                 <div class="d"><?php echo date('d.m.Y H:i', strtotime((string)$sale['created_at'])); ?></div>
             </div>
         </div>
 
         <?php if ($cancelled): ?>
-            <div class="cancelstamp">STORNOVÁNO <?php echo $sale['cancelled_at'] ? date('d.m.Y H:i', strtotime((string)$sale['cancelled_at'])) : ''; ?></div>
+            <div class="cancelstamp"><?php echo _l('rcpt_cancelled'); ?> <?php echo $sale['cancelled_at'] ? date('d.m.Y H:i', strtotime((string)$sale['cancelled_at'])) : ''; ?></div>
         <?php endif; ?>
 
         <div class="meta">
-            <div><span>Prodejce:</span> <b><?php echo e($sale['seller_name'] ?: '—'); ?></b></div>
-            <div><span>Platba:</span> <b><?php echo e($payLabel); ?></b></div>
-            <?php if ($custName !== ''): ?><div><span>Zákazník:</span> <b><?php echo e($custName); ?></b></div><?php endif; ?>
-            <?php if (!empty($sale['invoice_number'])): ?><div><span>Faktura:</span> <b><?php echo e($sale['invoice_number']); ?></b></div><?php endif; ?>
+            <div><span><?php echo _l('rcpt_seller'); ?>:</span> <b><?php echo e($sale['seller_name'] ?: '—'); ?></b></div>
+            <div><span><?php echo _l('payment_method'); ?>:</span> <b><?php echo e($payLabel); ?></b></div>
+            <?php if ($custName !== ''): ?><div><span><?php echo _l('customer_col'); ?>:</span> <b><?php echo e($custName); ?></b></div><?php endif; ?>
+            <?php if (!empty($sale['invoice_number'])): ?><div><span><?php echo _l('invoice'); ?>:</span> <b><?php echo e($sale['invoice_number']); ?></b></div><?php endif; ?>
         </div>
 
         <table class="items">
             <thead>
-                <tr><th>Položka</th><th class="num">Ks</th><th class="num">Cena/ks</th><th class="num">Celkem</th></tr>
+                <tr><th><?php echo _l('item_name'); ?></th><th class="num"><?php echo _l('rcpt_qty'); ?></th><th class="num"><?php echo _l('price_per_unit'); ?></th><th class="num"><?php echo _l('table_total'); ?></th></tr>
             </thead>
             <tbody>
             <?php foreach ($items as $l): ?>
@@ -161,11 +168,11 @@ table.items .num { text-align:right; white-space:nowrap; }
         <div class="sum">
             <table>
                 <?php if ($isVat && $stdTotal > 0): ?>
-                <tr><td>Základ DPH <?php echo rtrim(rtrim(number_format($vatRate, 1, ',', ' '), '0'), ','); ?> %</td><td class="num" style="text-align:right;"><?php echo formatMoney($baseKc); ?></td></tr>
-                <tr><td>DPH</td><td style="text-align:right;"><?php echo formatMoney($vatKc); ?></td></tr>
-                <?php if ($hasUsed): ?><tr><td>Použité zboží (§ 90)</td><td style="text-align:right;"><?php echo formatMoney($usedTotal); ?></td></tr><?php endif; ?>
+                <tr><td><?php echo _l('rcpt_vat_base'); ?> <?php echo rtrim(rtrim(number_format($vatRate, 1, ',', ' '), '0'), ','); ?> %</td><td class="num" style="text-align:right;"><?php echo formatMoney($baseKc); ?></td></tr>
+                <tr><td><?php echo _l('vat_short'); ?></td><td style="text-align:right;"><?php echo formatMoney($vatKc); ?></td></tr>
+                <?php if ($hasUsed): ?><tr><td><?php echo _l('rcpt_used_goods'); ?> (§ 90)</td><td style="text-align:right;"><?php echo formatMoney($usedTotal); ?></td></tr><?php endif; ?>
                 <?php endif; ?>
-                <tr class="total"><td>Celkem</td><td style="text-align:right;"><?php echo formatMoney((float)$sale['total']); ?></td></tr>
+                <tr class="total"><td><?php echo _l('table_total'); ?></td><td style="text-align:right;"><?php echo formatMoney((float)$sale['total']); ?></td></tr>
             </table>
         </div>
 
@@ -173,8 +180,8 @@ table.items .num { text-align:right; white-space:nowrap; }
             <?php if ($hasUsed): ?>
                 Zvláštní režim – použité zboží dle § 90 zákona č. 235/2004 Sb., o DPH. U položek označených „§ 90" se DPH na dokladu nevyčísluje.<br>
             <?php endif; ?>
-            <?php if (!$isVat): ?>Nejsme plátci DPH.<br><?php endif; ?>
-            Zboží si prosím překontrolujte při převzetí. Doklad uschovejte pro případ reklamace.
+            <?php if (!$isVat): ?><?php echo _l('rcpt_not_vat_payer'); ?><br><?php endif; ?>
+            <?php echo _l('rcpt_check_notice'); ?>
         </div>
 
         <div class="foot">

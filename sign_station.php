@@ -8,13 +8,44 @@ require_once 'includes/functions.php';
 if (!isset($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 
 $branchLabel = getBranchLabel((int)getCurrentStaffBranchId()) ?: get_setting('company_name', 'AppleFix');
+
+/* Sdílená stanice (iPad na pultu): konkrétní zákazník a jeho jazyk přicházejí až
+   v poll odpovědi z api/sign_station.php (pole req.lang). Server proto vykreslí
+   statický „shell" v DEFAULTNÍM jazyce dokladů (bez zákazníka → 'cs') a JS přepne
+   texty pro zákazníka podle jazyka konkrétní zakázky (SIGN_L10N níže).
+   ?lang= umožní stanici napevno přepnout — stejně jako u ostatních dokladů. */
+$target_lang = $_GET['lang'] ?? crmCustomerDocLang('cs');
+if (!function_exists('_l')) { function _l($key) { global $target_lang; return __($key, $target_lang); } }
+
+/* Slovník viditelných textů pro ZÁKAZNÍKA ve všech jazycích dokladů (uk→en → cs/en;
+   ru pro paritu), aby JS přepnul podpisové plátno i potvrzení dle jazyka zakázky. */
+$__sign_l10n = [];
+foreach (['cs', 'en', 'ru'] as $__l) {
+    $__sign_l10n[$__l] = [
+        'doc_reception'   => __('sign_doc_title_reception', $__l),
+        'doc_pickup'      => __('sign_doc_title_pickup', $__l),
+        'not_now'         => __('sign_not_now', $__l),
+        'sign'            => __('sign_btn', $__l),
+        'signed'          => __('sign_signed', $__l),
+        'saved_emailed'   => __('sign_saved_emailed', $__l),
+        'saved_stored'    => __('sign_saved_stored', $__l),
+        'clear'           => __('sign_clear', $__l),
+        'save'            => __('sign_save', $__l),
+        'signing_by'      => __('sign_signing_by', $__l),
+        'sub_reception'   => __('sign_intake_short', $__l),
+        'sub_pickup'      => __('sign_pickup', $__l),
+        'terms_reception' => __('sign_terms_reception', $__l),
+        'terms_pickup'    => __('sign_terms_pickup', $__l),
+        'served_by'       => __('sign_served_by', $__l),
+    ];
+}
 ?>
 <!DOCTYPE html>
-<html lang="cs" data-bs-theme="dark">
+<html lang="<?php echo e($target_lang); ?>" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Podpisová stanice — AppleFix</title>
+    <title><?php echo e(_l('sign_station_link')); ?> — AppleFix</title>
     <link rel="icon" type="image/png" href="/assets/img/favicon.png">
     <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.webmanifest">
@@ -49,16 +80,16 @@ $branchLabel = getBranchLabel((int)getCurrentStaffBranchId()) ?: get_setting('co
 
 <div class="station-idle">
     <img src="assets/img/logo-black.png" alt="AppleFix">
-    <h1>Podpisová stanice</h1>
-    <div class="sub">Čekám na podpis — požadavek pošlete z detailu zakázky.</div>
+    <h1><?php echo e(_l('sign_station_link')); ?></h1>
+    <div class="sub"><?php echo e(_l('sign_station_idle')); ?></div>
     <div class="pulse"></div>
 </div>
-<div class="station-branch"><?php echo e($branchLabel); ?> · přihlášen: <?php echo e($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''); ?></div>
+<div class="station-branch"><?php echo e($branchLabel); ?> · <?php echo e(_l('sign_logged_in_as')); ?>: <?php echo e($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''); ?></div>
 
 <!-- Výběr z fronty (víc čekajících podpisů = klient si vybere SVOU zakázku) -->
 <div id="queueChooser" style="display:none; position:fixed; inset:0; z-index:3050; background:#070a09; flex-direction:column; align-items:center; justify-content:center; padding:24px;">
-    <div style="color:#eef2f8; font-size:22px; font-weight:800; margin-bottom:6px;">Kdo jde podepsat?</div>
-    <div style="color:rgba(255,255,255,.45); font-size:13px; font-weight:300; margin-bottom:22px;">Klepněte na svou zakázku — zkontrolujte jméno a zařízení.</div>
+    <div style="color:#eef2f8; font-size:22px; font-weight:800; margin-bottom:6px;"><?php echo e(_l('sign_chooser_title')); ?></div>
+    <div style="color:rgba(255,255,255,.45); font-size:13px; font-weight:300; margin-bottom:22px;"><?php echo e(_l('sign_chooser_hint')); ?></div>
     <div id="queueList" style="display:flex; flex-direction:column; gap:12px; width:min(560px,92vw);"></div>
 </div>
 
@@ -66,12 +97,12 @@ $branchLabel = getBranchLabel((int)getCurrentStaffBranchId()) ?: get_setting('co
 <div id="docView" style="display:none; position:fixed; inset:0; z-index:3100; background:#eceff3; flex-direction:column;">
     <div style="flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px; background:#0d1512; color:#eef2f8;">
         <div>
-            <div style="font-size:15px; font-weight:800;" id="docViewTitle">Zakázkový list</div>
+            <div style="font-size:15px; font-weight:800;" id="docViewTitle"><?php echo e(_l('order_sheet')); ?></div>
             <div style="font-size:12px; font-weight:300; color:rgba(255,255,255,.55);" id="docViewSub"></div>
         </div>
         <div style="display:flex; gap:10px;">
-            <button type="button" class="btn btn-outline-light" onclick="stationDocCancel()">Teď ne</button>
-            <button type="button" class="btn btn-success btn-lg px-4" onclick="stationDocSign()"><i class="fas fa-pen-nib me-2"></i>Podepsat</button>
+            <button type="button" class="btn btn-outline-light" id="docViewCancelBtn" onclick="stationDocCancel()"><?php echo e(_l('sign_not_now')); ?></button>
+            <button type="button" class="btn btn-success btn-lg px-4" onclick="stationDocSign()"><i class="fas fa-pen-nib me-2"></i><span id="docViewSignLbl"><?php echo e(_l('sign_btn')); ?></span></button>
         </div>
     </div>
     <iframe id="docViewFrame" style="flex:1 1 auto; width:100%; border:0; background:#eceff3;"></iframe>
@@ -83,7 +114,7 @@ $branchLabel = getBranchLabel((int)getCurrentStaffBranchId()) ?: get_setting('co
         <div style="width:84px; height:84px; margin:0 auto 20px; border-radius:50%; background:rgba(59,232,168,.16); border:2px solid #3be8a8; display:flex; align-items:center; justify-content:center;">
             <i class="fas fa-check" style="font-size:36px; color:#3be8a8;"></i>
         </div>
-        <div style="font-size:24px; font-weight:800;">Podepsáno</div>
+        <div id="doneFlashTitle" style="font-size:24px; font-weight:800;"><?php echo e(_l('sign_signed')); ?></div>
         <div id="doneFlashSub" style="font-size:14px; font-weight:300; color:rgba(255,255,255,.55); margin-top:6px;"></div>
     </div>
 </div>
@@ -91,7 +122,12 @@ $branchLabel = getBranchLabel((int)getCurrentStaffBranchId()) ?: get_setting('co
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="assets/js/main.js?v=<?php echo (int)@filemtime(__DIR__ . '/assets/js/main.js'); ?>"></script>
 <script>
-window.AFX_SIGN_L10N = { clear: 'Smazat', cancel: 'Teď ne', save: 'Uložit podpis' };
+// Texty pro zákazníka ve všech jazycích dokladů; JS vybere dle jazyka konkrétní zakázky (req.lang).
+var SIGN_L10N = <?php echo json_encode($__sign_l10n, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+var SIGN_DEFAULT_LANG = <?php echo json_encode($target_lang, JSON_UNESCAPED_UNICODE); ?>;
+function afxSignL(lang) { return SIGN_L10N[lang] || SIGN_L10N[SIGN_DEFAULT_LANG] || SIGN_L10N.cs; }
+// výchozí popisky podpisového plátna — přepíšou se dle jazyka zakázky ve stationDocSign()
+window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_now, save: t.save }; })(afxSignL(SIGN_DEFAULT_LANG));
 (function () {
     var busy = false;
     var current = null;
@@ -131,7 +167,7 @@ window.AFX_SIGN_L10N = { clear: 'Smazat', cancel: 'Teď ne', save: 'Uložit podp
             b.innerHTML = '<div style="font-size:19px;font-weight:800;">' + esc(r.customer) + '</div>' +
                 '<div style="font-size:13px;font-weight:300;color:rgba(255,255,255,.55);margin-top:3px;">' +
                 esc(r.order_code) + ' · ' + esc(r.device) + (r.amount ? ' · ' + esc(r.amount) : '') +
-                (r.requested_by ? ' · obsluhuje ' + esc(r.requested_by) : '') + '</div>';
+                (r.requested_by ? ' · ' + esc(afxSignL(SIGN_DEFAULT_LANG).served_by) + ' ' + esc(r.requested_by) : '') + '</div>';
             b.addEventListener('click', function () {
                 chooser.style.display = 'none';
                 current = r;
@@ -145,8 +181,12 @@ window.AFX_SIGN_L10N = { clear: 'Smazat', cancel: 'Teď ne', save: 'Uložit podp
 
     // 1) Klientovi se ukáže CELÝ zakázkový list (v jeho jazyce, bez ovládání)
     function showDocument(req) {
+        var t = afxSignL(req.lang);
+        try { document.documentElement.lang = req.lang || SIGN_DEFAULT_LANG; } catch (e) {}
         document.getElementById('docViewTitle').textContent =
-            req.sig_type === 'vydej' ? 'Zakázkový list — převzetí hotové zakázky' : 'Zakázkový list — převzetí do opravy';
+            req.sig_type === 'vydej' ? t.doc_pickup : t.doc_reception;
+        var cBtn = document.getElementById('docViewCancelBtn'); if (cBtn) cBtn.textContent = t.not_now;
+        var sLbl = document.getElementById('docViewSignLbl'); if (sLbl) sLbl.textContent = t.sign;
         document.getElementById('docViewSub').textContent =
             req.order_code + ' · ' + req.customer + ' · ' + req.device + (req.amount ? ' · ' + req.amount : '');
         document.getElementById('docViewFrame').src = 'print_order.php?id=' + encodeURIComponent(req.order_id) + '&plain=1';
@@ -172,14 +212,14 @@ window.AFX_SIGN_L10N = { clear: 'Smazat', cancel: 'Teď ne', save: 'Uložit podp
     window.stationDocSign = function () {
         if (!current) return;
         var req = current;
-        var terms = {
-            prijem: 'Podpisem potvrzuji souhlas s podmínkami opravy uvedenými na zakázkovém listu (dostupné též na applefix.cz).',
-            vydej: 'Podpisem potvrzuji převzetí zařízení z opravy.'
-        };
+        var t = afxSignL(req.lang);
+        // popisky podpisového plátna v jazyce zakázky (Smazat / Teď ne / Uložit podpis)
+        window.AFX_SIGN_L10N = { clear: t.clear, cancel: t.not_now, save: t.save };
         afxSignaturePad({
-            title: 'Podepisuje: ' + req.customer,
-            subtitle: (req.sig_type === 'vydej' ? 'Převzetí hotové zakázky' : 'Převzetí do opravy') + ' · ' + req.order_code + ' · ' + req.device + (req.amount ? ' · ' + req.amount : ''),
-            terms: terms[req.sig_type] || '',
+            title: t.signing_by + ' ' + req.customer,
+            subtitle: (req.sig_type === 'vydej' ? t.sub_pickup : t.sub_reception) + ' · ' + req.order_code + ' · ' + req.device + (req.amount ? ' · ' + req.amount : ''),
+            // ⚖️ Souhlasná/právní věta: rozhodná je ČESKÁ verze, cizí jazyk je jen zdvořilostní překlad.
+            terms: req.sig_type === 'vydej' ? t.terms_pickup : t.terms_reception,
             onSave: function (dataUrl) {
                 var fd = new FormData();
                 fd.append('order_id', req.order_id);
@@ -192,9 +232,10 @@ window.AFX_SIGN_L10N = { clear: 'Smazat', cancel: 'Teď ne', save: 'Uložit podp
                     .then(function (j) {
                         hideDocument();
                         // 3) potvrzení: dokument uložen k zakázce (+ e-mail, pokud odešel)
+                        var ft = document.getElementById('doneFlashTitle'); if (ft) ft.textContent = t.signed;
                         document.getElementById('doneFlashSub').textContent = (j && j.emailed)
-                            ? 'Podepsaný zakázkový list byl uložen a odeslán na e-mail.'
-                            : 'Podepsaný zakázkový list byl uložen k zakázce.';
+                            ? t.saved_emailed
+                            : t.saved_stored;
                         doneFlash.style.display = 'flex';
                         setTimeout(function () { doneFlash.style.display = 'none'; current = null; busy = false; }, 3500);
                     })

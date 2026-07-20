@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '2.7.0',
+        'date' => '2026-07-20',
+        'time' => '07:55',
+        'title' => 'Vícejazyčnost dokončena — klientský portál i všechny doklady v jazyce zákazníka',
+        'items' => [
+            'DOKLADY: faktura, zakázkový list, účtenka z pokladny, reklamační protokol i podpisová stanice se teď tisknou v jazyce zákazníka (podle volby jazyka u zakázky/klienta; ukrajinština → angličtina). Dřív se řídily jazykem zaměstnance.',
+            'FAKTURA: opraveno, že anglickému/ukrajinskému zákazníkovi vycházela faktura česky — nově respektuje jazyk klienta. Zároveň opravena chyba, kdy se při chybě (chybějící doklad) místo hlášky vypsal kus zdrojového kódu.',
+            'KLIENTSKÝ PORTÁL: přihlášený zákazník teď vidí celý portál (nástěnka, věrnostní karta, dokumenty, reklamační formulář) automaticky ve svém jazyce. Ruční přepnutí jazyka v portálu vydrží. Zaměstnanecké prostředí to nijak neovlivní.',
+            'E-MAILY: předmět e-mailu se zakázkovým listem je nově také v jazyce zákazníka (těla e-mailů už trojjazyčná byla).',
+            'Právně závazné české texty (obchodní podmínky, §90 DPH, souhlasy u podpisu) zůstávají česky jako rozhodné znění — anglicky/rusky jsou jen popisky a hlavičky. Kompletní parita překladů CS/EN/RU (1079 textů, chybí 0).',
+        ],
+    ],
+    [
         'version' => '2.6.5',
         'date' => '2026-07-20',
         'time' => '07:52',

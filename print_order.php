@@ -7,7 +7,7 @@ if (!defined('ORDER_DOC_EMBED')) {
     require_once 'includes/functions.php';
 
     if (!isset($_SESSION['user_id'])) die(__("unauthorized"));
-    if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
+    if (!isset($_GET['id']) && !isset($_GET['order_id'])) die(__("ord_id_missing"));
 
     $id = $_GET['id'] ?? $_GET['order_id'];
     $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.address, c.email, c.preferred_language
@@ -61,7 +61,7 @@ $deviceStr = trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model']
 $pin       = trim((string)($order['pin_code'] ?? ''));
 $estimated = ($order['estimated_cost'] !== null && $order['estimated_cost'] !== '') ? (float)$order['estimated_cost'] : null;
 $receivedAt = !empty($order['created_at']) ? date('d.m.Y', strtotime((string)$order['created_at'])) : date('d.m.Y');
-$pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: 'Osobní předání na pobočce';
+$pickupMethod = trim((string)($order['shipping_method'] ?? '')) ?: _l('ord_pickup_in_person');
 
 // datum ukončení opravy (den) = kdy zakázka přešla do dokončeného stavu; prázdné při příjmu
 $completedAt = '';
@@ -101,7 +101,7 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Zakázkový list <?php echo e($orderCode); ?></title>
+    <title><?php echo _l('order_sheet'); ?> <?php echo e($orderCode); ?></title>
     <?php if (!$__EMAIL_MODE): ?><link rel="stylesheet" href="assets/css/sf-pro.css?v=<?php echo (int)@filemtime(__DIR__ . '/assets/css/sf-pro.css'); ?>"><?php endif; ?>
     <style>
         :root {
@@ -201,9 +201,9 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
         <div class="head">
             <?php if ($__logo_data): ?><img src="<?php echo $__logo_data; ?>" alt="<?php echo e($co_name); ?>"><?php endif; ?>
             <div class="doc">
-                <div class="kick">Zakázkový list</div>
+                <div class="kick"><?php echo _l('order_sheet'); ?></div>
                 <h1><?php echo e($orderCode); ?></h1>
-                <div class="date">Vytvořeno: <?php echo e($receivedAt); ?></div>
+                <div class="date"><?php echo _l('created'); ?>: <?php echo e($receivedAt); ?></div>
             </div>
         </div>
 
@@ -211,7 +211,7 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
 
         <div class="cols">
             <div class="panel client">
-                <div class="title">Klient</div>
+                <div class="title"><?php echo _l('client'); ?></div>
                 <div class="name"><?php echo e($custName ?: '—'); ?></div>
                 <div class="contact">
                     <?php if (!empty($order['phone'])): ?><div><span class="ic">☎</span> <?php echo e($order['phone']); ?></div><?php endif; ?>
@@ -219,26 +219,26 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
                     <?php if (!empty($order['address'])): ?><div><span class="ic">⌂</span> <?php echo nl2br(e($order['address'])); ?></div><?php endif; ?>
                 </div>
                 <div class="kv" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px;">
-                    <div class="k">Převzetí zařízení zákazníkem</div>
+                    <div class="k"><?php echo _l('ord_pickup_by_customer'); ?></div>
                     <div class="v"><?php echo e($pickupMethod); ?></div>
                 </div>
             </div>
 
             <div class="panel">
-                <div class="title">Zařízení a oprava</div>
-                <div class="kv"><div class="k">Zařízení</div><div class="v"><?php echo e($deviceStr ?: '—'); ?></div></div>
-                <div class="kv"><div class="k">Heslo zařízení / Kód obrazovky</div><div class="v mono"><?php echo e($pin !== '' ? $pin : '—'); ?></div></div>
-                <div class="kv"><div class="k">Požadovaná oprava</div><div class="v repair"><?php echo e((string)($order['problem_description'] ?? '') ?: '—'); ?></div></div>
+                <div class="title"><?php echo _l('ord_device_and_repair'); ?></div>
+                <div class="kv"><div class="k"><?php echo _l('device'); ?></div><div class="v"><?php echo e($deviceStr ?: '—'); ?></div></div>
+                <div class="kv"><div class="k"><?php echo _l('ord_device_passcode'); ?></div><div class="v mono"><?php echo e($pin !== '' ? $pin : '—'); ?></div></div>
+                <div class="kv"><div class="k"><?php echo _l('ord_requested_repair'); ?></div><div class="v repair"><?php echo e((string)($order['problem_description'] ?? '') ?: '—'); ?></div></div>
                 <?php if (count($priceLines) >= 2): ?>
                     <?php foreach ($priceLines as $pl): ?>
                     <div class="kv"><div class="k"><?php echo e($pl['label']); ?></div><div class="v"><?php echo e(formatMoney((float)$pl['amount'])); ?></div></div>
                     <?php endforeach; ?>
-                    <div class="kv"><div class="k">Předpokládaná cena opravy celkem</div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : 'dle diagnostiky'; ?></div></div>
+                    <div class="kv"><div class="k"><?php echo _l('ord_estimated_price_total'); ?></div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : _l('ord_by_diagnostics'); ?></div></div>
                 <?php else: ?>
-                    <div class="kv"><div class="k">Předpokládaná cena opravy</div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : 'dle diagnostiky'; ?></div></div>
+                    <div class="kv"><div class="k"><?php echo _l('ord_estimated_price'); ?></div><div class="v price"><?php echo $estimated !== null ? e(formatMoney($estimated)) : _l('ord_by_diagnostics'); ?></div></div>
                 <?php endif; ?>
-                <div class="kv"><div class="k">Přijetí zařízení do opravy</div><div class="v"><?php echo e($receivedAt); ?></div></div>
-                <div class="kv"><div class="k">Datum ukončení opravy</div><div class="v done"><?php echo e($completedAt !== '' ? $completedAt : '—'); ?></div></div>
+                <div class="kv"><div class="k"><?php echo _l('ord_device_received'); ?></div><div class="v"><?php echo e($receivedAt); ?></div></div>
+                <div class="kv"><div class="k"><?php echo _l('ord_repair_completion_date'); ?></div><div class="v done"><?php echo e($completedAt !== '' ? $completedAt : '—'); ?></div></div>
                 <?php if ($pin === ''): ?>
                     <div class="note">Zákazník heslo nesdělil a je si vědom toho, že zařízení není možné po opravě plně otestovat.</div>
                 <?php endif; ?>
@@ -254,20 +254,20 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
             <div class="sig"></div>
             <div class="sig">
                 <?php if ($__sigs['prijem']): ?><img class="sig-img" src="<?php echo $__sigs['prijem']['img']; ?>" alt="podpis"><?php endif; ?>
-                <div class="line">Podpis zákazníka</div>
-                <?php if ($__sigs['prijem']): ?><div class="sig-at">Podepsáno elektronicky <?php echo e(date('j. n. Y H:i', strtotime($__sigs['prijem']['at']))); ?></div><?php endif; ?>
+                <div class="line"><?php echo _l('ord_customer_signature'); ?></div>
+                <?php if ($__sigs['prijem']): ?><div class="sig-at"><?php echo _l('ord_signed_electronically'); ?> <?php echo e(date('j. n. Y H:i', strtotime($__sigs['prijem']['at']))); ?></div><?php endif; ?>
             </div>
         </div>
 
         <div class="pickup">
-            <h3>Převzetí hotové zakázky</h3>
+            <h3><?php echo _l('sign_pickup'); ?></h3>
             <div class="sub">Svým podpisem stvrzuji převzetí výše uvedeného zařízení z opravy.</div>
             <div class="sigs">
                 <div class="sig"></div>
                 <div class="sig">
                     <?php if ($__sigs['vydej']): ?><img class="sig-img" src="<?php echo $__sigs['vydej']['img']; ?>" alt="podpis"><?php endif; ?>
-                    <div class="line">Podpis zákazníka</div>
-                    <?php if ($__sigs['vydej']): ?><div class="sig-at">Podepsáno elektronicky <?php echo e(date('j. n. Y H:i', strtotime($__sigs['vydej']['at']))); ?></div><?php endif; ?>
+                    <div class="line"><?php echo _l('ord_customer_signature'); ?></div>
+                    <?php if ($__sigs['vydej']): ?><div class="sig-at"><?php echo _l('ord_signed_electronically'); ?> <?php echo e(date('j. n. Y H:i', strtotime($__sigs['vydej']['at']))); ?></div><?php endif; ?>
                 </div>
             </div>
         </div>

@@ -7,10 +7,10 @@ if (!defined('INVOICE_DOC_EMBED')) {
     require_once 'includes/functions.php';
 
     if (!isset($_SESSION['user_id'])) die(__("unauthorized"));
-    if (!isset($_GET['id'])) die("<?php echo __('missing_id'); ?>");
+    if (!isset($_GET['id'])) die(__('missing_id'));
 
     $id = (int)$_GET['id'];
-    $stmt = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, o.device_brand, o.device_model, o.serial_number
+    $stmt = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, c.preferred_language, o.device_brand, o.device_model, o.serial_number
                            FROM invoices i
                            JOIN customers c ON i.customer_id = c.id
                            LEFT JOIN orders o ON i.order_id = o.id
@@ -18,7 +18,7 @@ if (!defined('INVOICE_DOC_EMBED')) {
     $stmt->execute([$id]);
     $invoice = $stmt->fetch();
 
-    if (!$invoice) die("<?php echo __('print_not_found'); ?>");
+    if (!$invoice) die(__('print_not_found'));
 
     // Fetch invoice items
     $stmt = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC");
@@ -26,13 +26,19 @@ if (!defined('INVOICE_DOC_EMBED')) {
     $items = $stmt->fetchAll();
 
     $is_vat_payer = $invoice['is_vat_payer'];
+
+    // bez ?lang → doklad v jazyce KLIENTA (customers.preferred_language); uk → en
+    $target_lang = $_GET['lang'] ?? crmCustomerDocLang($invoice['preferred_language'] ?? 'cs');
+}
+if (!function_exists('_l')) {
+    function _l($key) { global $target_lang; return __($key, $target_lang); }
 }
 ?>
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="<?php echo htmlspecialchars($target_lang); ?>">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo __('print_title_invoice'); ?> <?php echo $invoice['invoice_number']; ?></title>
+    <title><?php echo _l('print_title_invoice'); ?> <?php echo $invoice['invoice_number']; ?></title>
     <style>
         body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #000; margin: 0; padding: 0; background-color: #f5f5f5; }
         .page { width: 210mm; min-height: 297mm; padding: 15mm; margin: 10mm auto; background: white; border: 1px solid #ddd; box-sizing: border-box; box-shadow: 0 0 10px rgba(0,0,0,0.1); position: relative; }
@@ -79,22 +85,22 @@ if (!defined('INVOICE_DOC_EMBED')) {
 <body>
 
 <div class="no-print" style="text-align: center; margin: 20px;">
-    <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px;"><?php echo __('print_btn'); ?></button>
-    <a href="accounting.php" style="padding: 10px 20px; text-decoration: none; background: #6c757d; color: white; border-radius: 4px; margin-left: 10px;"><?php echo __('back'); ?></a>
+    <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px;"><?php echo _l('print_btn'); ?></button>
+    <a href="accounting.php" style="padding: 10px 20px; text-decoration: none; background: #6c757d; color: white; border-radius: 4px; margin-left: 10px;"><?php echo _l('back'); ?></a>
 </div>
 
 <div class="page">
     <table class="header-table">
         <tr>
             <td>
-                <div class="doc-title"><?php echo ($invoice['invoice_type'] == 'credit_note') ? 'CREDIT NOTE' : 'INVOICE - TAX DOCUMENT'; ?></div>
-                <div class="doc-number">number: <?php echo $invoice['invoice_number']; ?></div>
+                <div class="doc-title"><?php echo ($invoice['invoice_type'] == 'credit_note') ? _l('credit_note') : _l('inv_tax_document_title'); ?></div>
+                <div class="doc-number"><?php echo _l('invoice_number'); ?>: <?php echo $invoice['invoice_number']; ?></div>
             </td>
             <td class="text-right">
                 <?php if ($invoice['variable_symbol']): ?>
-                    <div><strong>Variable symbol:</strong> <?php echo $invoice['variable_symbol']; ?></div>
+                    <div><strong><?php echo _l('variable_symbol'); ?>:</strong> <?php echo $invoice['variable_symbol']; ?></div>
                 <?php endif; ?>
-                <div><strong>Constant symbol:</strong> 0308</div>
+                <div><strong><?php echo _l('inv_constant_symbol'); ?>:</strong> 0308</div>
             </td>
         </tr>
     </table>
@@ -102,7 +108,7 @@ if (!defined('INVOICE_DOC_EMBED')) {
     <table class="addresses-table">
         <tr>
             <td>
-                <div class="addr-title">Dodavatel</div>
+                <div class="addr-title"><?php echo _l('inv_supplier'); ?></div>
                 <div class="addr-name"><?php echo htmlspecialchars(get_setting('acc_company_name')); ?></div>
                 <div><?php echo nl2br(htmlspecialchars(get_setting('acc_address'))); ?></div>
                 <div style="margin-top: 10px;">
@@ -114,7 +120,7 @@ if (!defined('INVOICE_DOC_EMBED')) {
                 </div>
             </td>
             <td>
-                <div class="addr-title">Customer</div>
+                <div class="addr-title"><?php echo _l('customer'); ?></div>
                 <?php 
                 $cust_name = $invoice['cust_name_override'] ?: ($invoice['company'] ?: $invoice['first_name'] . ' ' . $invoice['last_name']);
                 $cust_address = $invoice['cust_address_override'] ?: $invoice['address'];
@@ -129,7 +135,7 @@ if (!defined('INVOICE_DOC_EMBED')) {
                 </div>
                 <?php if ($invoice['order_id']): ?>
                     <div style="margin-top: 5px; font-size: 10px; color: #666;">
-                        For order: #<?php echo $invoice['order_id']; ?> (<?php echo $invoice['device_brand'] . ' ' . $invoice['device_model']; ?>)
+                        <?php echo _l('inv_for_order'); ?>: #<?php echo $invoice['order_id']; ?> (<?php echo $invoice['device_brand'] . ' ' . $invoice['device_model']; ?>)
                     </div>
                 <?php endif; ?>
             </td>
@@ -139,26 +145,26 @@ if (!defined('INVOICE_DOC_EMBED')) {
     <table class="payment-table">
         <tr>
             <td>
-                <div class="pay-label">Bank</div>
+                <div class="pay-label"><?php echo _l('inv_bank'); ?></div>
                 <div class="pay-value"><?php echo htmlspecialchars(get_setting('acc_bank_name')); ?></div>
             </td>
             <td>
-                <div class="pay-label">Account number</div>
+                <div class="pay-label"><?php echo _l('account_number'); ?></div>
                 <div class="pay-value"><?php echo htmlspecialchars(get_setting('acc_bank_account')); ?></div>
             </td>
             <td>
-                <div class="pay-label">Issue date</div>
+                <div class="pay-label"><?php echo _l('date_issue'); ?></div>
                 <div class="pay-value"><?php echo date('d.m.Y', strtotime($invoice['date_issue'])); ?></div>
             </td>
             <td>
-                <div class="pay-label">Payment method</div>
+                <div class="pay-label"><?php echo _l('payment_method'); ?></div>
                 <div class="pay-value">
-                    <?php 
+                    <?php
                     $p_method = $invoice['payment_method'];
-                    if ($p_method == 'cash') echo 'Cash';
-                    elseif ($p_method == 'card') echo 'Kartou';
-                    elseif ($p_method == 'cod') echo 'Cash on delivery';
-                    else echo 'Bank transfer';
+                    if ($p_method == 'cash') echo _l('cash');
+                    elseif ($p_method == 'card') echo _l('card');
+                    elseif ($p_method == 'cod') echo _l('cod');
+                    else echo _l('bank_transfer');
                     ?>
                 </div>
             </td>
@@ -173,11 +179,11 @@ if (!defined('INVOICE_DOC_EMBED')) {
                 <div class="pay-value"><?php echo htmlspecialchars(get_setting('acc_swift')); ?></div>
             </td>
             <td>
-                <div class="pay-label">Datum splatnosti</div>
+                <div class="pay-label"><?php echo _l('date_due'); ?></div>
                 <div class="pay-value"><?php echo date('d.m.Y', strtotime($invoice['date_due'])); ?></div>
             </td>
             <td>
-                <div class="pay-label">Tax date</div>
+                <div class="pay-label"><?php echo _l('date_tax'); ?></div>
                 <div class="pay-value"><?php echo date('d.m.Y', strtotime($invoice['date_tax'])); ?></div>
             </td>
         </tr>
@@ -199,8 +205,8 @@ if (!defined('INVOICE_DOC_EMBED')) {
     <div style="display:flex;align-items:center;gap:14px;margin:10px 0 4px;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;">
         <div id="qrPlatba" style="line-height:0;"></div>
         <div>
-            <div style="font-weight:bold;font-size:12px;">QR Platba</div>
-            <div style="font-size:9px;color:#666;">Naskenujte v bankovní aplikaci — částka, účet i variabilní symbol se předvyplní.</div>
+            <div style="font-weight:bold;font-size:12px;"><?php echo _l('inv_qr_payment'); ?></div>
+            <div style="font-size:9px;color:#666;"><?php echo _l('inv_qr_hint'); ?></div>
         </div>
     </div>
     <script src="assets/js/qrcode.js"></script>
@@ -219,15 +225,15 @@ if (!defined('INVOICE_DOC_EMBED')) {
     <table class="items-table">
         <thead>
             <tr>
-                <th style="width: <?php echo $is_vat_payer ? '40%' : '70%'; ?>">Item</th>
-                <th class="text-right"><?php echo __('table_quantity'); ?></th>
-                <th class="text-right"><?php echo __('table_price'); ?></th>
+                <th style="width: <?php echo $is_vat_payer ? '40%' : '70%'; ?>"><?php echo _l('item_name'); ?></th>
+                <th class="text-right"><?php echo _l('table_quantity'); ?></th>
+                <th class="text-right"><?php echo _l('table_price'); ?></th>
                 <?php if ($is_vat_payer): ?>
-                    <th class="text-right">DPH %</th>
-                    <th class="text-right">Base</th>
-                    <th class="text-right">DPH</th>
+                    <th class="text-right"><?php echo _l('table_vat_rate'); ?></th>
+                    <th class="text-right"><?php echo _l('inv_vat_base'); ?></th>
+                    <th class="text-right"><?php echo _l('inv_vat'); ?></th>
                 <?php endif; ?>
-                <th class="text-right"><?php echo __('table_total'); ?></th>
+                <th class="text-right"><?php echo _l('table_total'); ?></th>
             </tr>
         </thead>
         <tbody>
@@ -265,10 +271,10 @@ if (!defined('INVOICE_DOC_EMBED')) {
         <table class="vat-summary-table">
             <thead>
                 <tr>
-                    <th><?php echo __('table_vat_rate'); ?></th>
-                    <th class="text-right">Base</th>
-                    <th class="text-right">DPH</th>
-                    <th class="text-right"><?php echo __('table_total'); ?></th>
+                    <th><?php echo _l('table_vat_rate'); ?></th>
+                    <th class="text-right"><?php echo _l('inv_vat_base'); ?></th>
+                    <th class="text-right"><?php echo _l('inv_vat'); ?></th>
+                    <th class="text-right"><?php echo _l('table_total'); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -284,33 +290,33 @@ if (!defined('INVOICE_DOC_EMBED')) {
         </table>
         <?php else: ?>
             <div style="flex: 1; font-weight: bold; font-size: 12px; color: #666;">
-                Non-VAT payer
+                <?php echo _l('inv_non_vat_payer'); ?>
             </div>
         <?php endif; ?>
 
         <div class="grand-total-box">
-            <div class="grand-label">TOTAL DUE</div>
+            <div class="grand-label"><?php echo _l('inv_total_due'); ?></div>
             <div class="grand-value"><?php echo number_format($invoice['total_amount'], 2, ',', ' ') . ' ' . $invoice['currency']; ?></div>
         </div>
     </div>
 
     <div class="footer-note">
         <?php if (!$is_vat_payer): ?>
-            <p>I am not a VAT payer.</p>
+            <p><?php echo _l('inv_not_vat_payer_note'); ?></p>
         <?php endif; ?>
         <?php if ($invoice['notes']): ?>
-            <p><strong>Note:</strong> <?php echo nl2br(htmlspecialchars($invoice['notes'])); ?></p>
+            <p><strong><?php echo _l('inv_note_label'); ?>:</strong> <?php echo nl2br(htmlspecialchars($invoice['notes'])); ?></p>
         <?php endif; ?>
-        <p><?php echo __('print_title_invoice'); ?> also serves as delivery and warranty note. By accepting goods/services, you agree to payment terms.</p>
+        <p><?php echo _l('print_title_invoice'); ?> <?php echo _l('inv_footer_legal_note'); ?></p>
     </div>
 
     <div class="signatures">
         <div style="margin-top: 40px;">
-            <strong>Vystavil:</strong> <?php echo $_SESSION['full_name'] ?? 'Admin'; ?>
+            <strong><?php echo _l('inv_issued_by'); ?>:</strong> <?php echo $_SESSION['full_name'] ?? 'Admin'; ?>
         </div>
         <div class="signature-box">
             <div style="height: 60px;"></div>
-            Stamp and signature
+            <?php echo _l('inv_stamp_signature'); ?>
         </div>
     </div>
 </div>

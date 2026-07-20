@@ -2966,7 +2966,7 @@ function crmSendOrderSheetEmail(int $orderId, ?string $toOverride = null): array
     include __DIR__ . '/../print_order.php';
     $html = ob_get_clean();
 
-    $subject = (get_setting('company_name', 'AppleFix')) . ' — zakázkový list ' . orderDisplayCode($order);
+    $subject = (get_setting('company_name', 'AppleFix')) . ' — ' . __('order_sheet', $target_lang) . ' ' . orderDisplayCode($order);
     return smtpSendMail($to, $subject, $html);
 }
 
