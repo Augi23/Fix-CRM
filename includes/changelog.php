@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.3.0',
+        'date' => '2026-07-20',
+        'time' => '22:20',
+        'title' => 'Naskladnit zakázku jako díl na sklad dílů',
+        'items' => [
+            'V detailu zakázky (u sekce výdeje/dopravy) je nové tlačítko „Naskladnit jako díl (sklad dílů)" — zařízení, které se nevrací klientovi (neopravitelné, výkup apod.), se jedním klikem přidá na sklad dílů jako 1 ks. Název dílu = značka + model, sériové číslo jde do SKU, nákupní cena se předvyplní z ceny zakázky (upravitelné ve Skladu).',
+            'Do zakázky se doplní stopa („naskladněno jako díl …") a akce se zapíše do Historie. Tlačítko vidí administrátor a Boss.',
+        ],
+    ],
+    [
         'version' => '3.2.0',
         'date' => '2026-07-20',
         'time' => '22:10',

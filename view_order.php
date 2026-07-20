@@ -535,6 +535,17 @@ function localizedOrderStatusLabel(string $status): string {
                     <div class="text-white-75 small mb-2"><?php echo __('shipping_available_after_completed'); ?></div>
                 <?php endif; ?>
 
+                <?php /* Naskladnit zařízení ze zakázky jako díl na sklad dílů — jen admin a Boss.
+                         Zařízení, které se nevrací klientovi (neopravitelné, výkup) → 1 ks na sklad. */ ?>
+                <?php if (hasPermission('admin_access')): ?>
+                <div class="mb-3">
+                    <button type="button" class="btn btn-outline-warning btn-sm w-100" id="stockAsPartBtn">
+                        <i class="fas fa-boxes-stacked me-2"></i><?php echo __('stock_as_part'); ?>
+                    </button>
+                    <div class="text-white-50 mt-1" style="font-size:.72rem;"><?php echo __('stock_as_part_hint'); ?></div>
+                </div>
+                <?php endif; ?>
+
                 <form id="statusForm">
                     <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
                     <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">
@@ -1015,7 +1026,27 @@ $(document).ready(function() {
         form.find('select[name="status"]').val(nextStatus);
         form.submit();
     });
-    
+
+    // Naskladnit zařízení ze zakázky jako díl na sklad dílů (admin + Boss)
+    $('#stockAsPartBtn').on('click', function() {
+        var $btn = $(this);
+        showConfirm('<?php echo __('stock_as_part_confirm'); ?>', function() {
+            $btn.prop('disabled', true);
+            $.post('api/stock_order_as_part.php', { order_id: <?php echo (int)$order['id']; ?>, csrf_token: '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>' }, function(res) {
+                if (res && res.success) {
+                    showAlert('<?php echo __('stock_as_part_done'); ?>: ' + (res.part_name || ''));
+                    setTimeout(function() { window.location.reload(); }, 900);
+                } else {
+                    $btn.prop('disabled', false);
+                    showAlert('<?php echo __('error'); ?>: ' + (res && res.message ? res.message : '<?php echo __('stock_as_part_error'); ?>'));
+                }
+            }, 'json').fail(function() {
+                $btn.prop('disabled', false);
+                showAlert('<?php echo __('stock_as_part_error'); ?>');
+            });
+        });
+    });
+
     // ... existing scripts ...
     $('#editOrderDatesForm').on('submit', function(e) {
         e.preventDefault();
