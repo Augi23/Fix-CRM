@@ -475,11 +475,15 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                             <i class="fas fa-bolt text-primary"></i>
                                         </button>
                                         <ul class="dropdown-menu shadow dropdown-menu-end">
+                                            <?php // Kontextový DALŠÍ krok podle aktuálního stavu ?>
                                             <?php if (isOrderStatusIn($order['status'], 'new')): ?>
                                                 <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="V opravě"><i class="fas fa-play me-2 text-primary"></i><?php echo __('move_to_in_progress'); ?></a></li>
                                             <?php elseif (isOrderStatusIn($order['status'], 'pending_approval') || isOrderStatusIn($order['status'], 'waiting_parts') || isOrderStatusIn($order['status'], 'in_progress')): ?>
                                                 <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="Připraveno k převzetí"><i class="fas fa-check me-2 text-success"></i><?php echo __('move_to_completed'); ?></a></li>
-                                            <?php elseif (isOrderStatusIn($order['status'], 'completed') || isOrderStatusIn($order['status'], 'uncollected')): ?>
+                                            <?php endif; ?>
+                                            <?php // Přímý skok na „Vydáno" — kdykoli když zakázka ještě není vydaná/stornovaná
+                                                  // (rychlé uzavření na recepci bez proklikávání mezikroků). ?>
+                                            <?php if (!isOrderStatusIn($order['status'], 'collected') && !isOrderStatusIn($order['status'], 'cancelled')): ?>
                                                 <li><a class="dropdown-item quick-status-btn" href="javascript:void(0)" data-id="<?php echo (int)$order['id']; ?>" data-status="Vydáno"><i class="fas fa-box me-2 text-info"></i><?php echo __('move_to_collected'); ?></a></li>
                                             <?php endif; ?>
                                             <?php if ($can_cancel): ?>

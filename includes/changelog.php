@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.0.4',
+        'date' => '2026-07-20',
+        'time' => '19:43',
+        'title' => 'Rychlá akce (blesk): přímý skok na „Vydáno" z každého stavu',
+        'items' => [
+            'Blesková nabídka u zakázky v seznamu nově vedle dalšího kroku (např. „Přesunout do práce") nabízí i přímé „Označit vydané" — u každé zakázky, která ještě není vydaná ani stornovaná. Recepce tak může zakázku uzavřít jedním klikem bez proklikávání mezikroků.',
+            'Platí pro obě pobočky. Rychlé „Vydáno" nevyžaduje vyplnění dopravy (datum výdeje i finální cenu doplní systém sám); pokud chcete zadat způsob odeslání a sledovací číslo, použijte jako dřív detail zakázky.',
+        ],
+    ],
+    [
         'version' => '3.0.3',
         'date' => '2026-07-20',
         'time' => '19:32',
