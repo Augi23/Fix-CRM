@@ -578,6 +578,9 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <?php if (!empty($shoppingListBadgeCount) && $shoppingListBadgeCount > 0): ?><span class="afx-badge"><?php echo (int)$shoppingListBadgeCount; ?></span><?php endif; ?>
             <i class="fas fa-cart-shopping"></i><small><?php echo __('shopping_list'); ?></small>
         </a>
+        <a class="afx-cell act-purple <?php echo $current_page == 'pokladna.php' ? 'active' : ''; ?>" href="pokladna.php">
+            <i class="fas fa-cash-register"></i><small>Pokladna</small>
+        </a>
     </nav>
 </div>
 
@@ -614,6 +617,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
                 <?php if (!empty($shoppingListBadgeCount) && $shoppingListBadgeCount > 0): ?><span class="afx-badge"><?php echo (int)$shoppingListBadgeCount; ?></span><?php endif; ?>
                 <i class="fas fa-cart-shopping"></i><?php echo __('shopping_list'); ?>
             </a>
+            <a class="afx-sheet-act p <?php echo $current_page == 'pokladna.php' ? 'active' : ''; ?>" href="pokladna.php"><i class="fas fa-cash-register"></i>Pokladna</a>
         </div>
         <div class="afx-sheet-grid">
             <a class="afx-sheet-link <?php echo $current_page == 'index.php' ? 'active' : ''; ?>" href="index.php"><i class="fas fa-home"></i><?php echo __('dashboard'); ?></a>

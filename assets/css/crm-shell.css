@@ -194,6 +194,14 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
   box-shadow: inset 0 0 0 1px rgba(16,226,155,.45), 0 0 16px rgba(16,226,155,.26);
 }
 .afx-cell.act-green .afx-badge { background: #10e29b; box-shadow: 0 0 10px rgba(16,226,155,.55); }
+.afx-cell.act-purple {
+  color: #d9a1ff; text-shadow: 0 0 12px rgba(217,161,255,.5);
+  background: rgba(191,90,242,.16); box-shadow: inset 0 0 0 1px rgba(191,90,242,.26);
+}
+.afx-cell.act-purple:hover {
+  background: rgba(191,90,242,.26); color: #ecd2ff;
+  box-shadow: inset 0 0 0 1px rgba(191,90,242,.48), 0 0 16px rgba(191,90,242,.28);
+}
 
 /* ============================================================
    6) LIQUID GLASS vrstvy (nastavuje engine přes --afx-*)
@@ -318,6 +326,7 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
   .afx-sheet-act.b { background: rgba(0,163,255,.14);  color: #5fd2ff; border: 1px solid rgba(0,163,255,.34);  text-shadow: 0 0 10px rgba(95,210,255,.45); }
   .afx-sheet-act.o { background: rgba(255,158,32,.12); color: #ffbe55; border: 1px solid rgba(255,158,32,.32); text-shadow: 0 0 10px rgba(255,190,85,.45); }
   .afx-sheet-act.g { background: rgba(16,226,155,.12); color: #4df0b8; border: 1px solid rgba(16,226,155,.32); text-shadow: 0 0 10px rgba(77,240,184,.45); }
+  .afx-sheet-act.p { background: rgba(191,90,242,.12); color: #d9a1ff; border: 1px solid rgba(191,90,242,.32); text-shadow: 0 0 10px rgba(217,161,255,.45); }
   .afx-sheet-act { position: relative; }
   .afx-sheet-act .afx-badge {
     position: absolute; top: 6px; right: 8px;

@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '2.8.1',
+        'date' => '2026-07-20',
+        'time' => '09:45',
+        'title' => 'Rychlá akce „Pokladna" v horní liště (fialová)',
+        'items' => [
+            'K barevným rychlým akcím v horní liště (Nová zakázka · Reklamace · Nákupní seznam) přibyla čtvrtá buňka „Pokladna" ve fialové barvě — jedním klikem rovnou na kasu.',
+            'Stejná fialová akce je i v mobilním menu (☰), aby to sedělo i na iPadu/telefonu.',
+        ],
+    ],
+    [
         'version' => '2.8.0',
         'date' => '2026-07-20',
         'time' => '09:41',
