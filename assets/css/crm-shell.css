@@ -45,6 +45,42 @@
 }
 html[data-lg-theme="light"] .crm-stat-secondary { color: rgba(60,60,67,.55) !important; }
 
+/* ── Číslo zakázky v seznamu / na Nástěnce ──────────────────────────────────
+   Aktuální (platné) číslo = VĚTŠÍ a jasně bílé se září; původní „(dříve …)"
+   výrazně menší a tlumené, ať je kontrast na první pohled jasný. */
+.order-code-main {
+  font-size: 1.14rem !important;
+  font-weight: 800 !important;
+  color: #FFFFFF !important;
+  text-shadow: 0 0 12px rgba(255,255,255,.42), 0 0 3px rgba(255,255,255,.55);
+  letter-spacing: .2px;
+}
+.order-code-main:hover { color: #FFFFFF !important; text-decoration: none; }
+.order-code-prev {
+  font-size: .76rem;
+  color: rgba(255,255,255,.48);
+  margin-top: 1px;
+  letter-spacing: .1px;
+}
+html[data-lg-theme="light"] .order-code-main { color: #0b1220 !important; text-shadow: none; }
+html[data-lg-theme="light"] .order-code-prev { color: rgba(60,60,67,.6); }
+
+/* Model zařízení (např. „AirPods Max") o něco větší a jasnější; značka (Apple) beze změny. */
+.device-model-lg { font-size: .98rem !important; color: rgba(255,255,255,.92) !important; line-height: 1.25; }
+html[data-lg-theme="light"] .device-model-lg { color: rgba(30,34,44,.92) !important; }
+
+/* ── Oprava blikajícího blesk/akce dropdownu v seznamu zakázek ──────────────
+   Dýchací opacity-animace řádku (order-stale / new) vytváří vlastní stacking
+   context, který „uvěznil" rozbalené menu za sousední řádky → problikávání a
+   nešlo prokliknout. Aktivní řádek zvedneme nad ostatní a jeho animaci vypneme. */
+.table tbody tr.order-row:has(.dropdown-menu.show),
+.table tbody tr.clickable-order-row:has(.dropdown-menu.show) {
+  position: relative;
+  z-index: 1000;
+  animation: none !important;
+}
+.table tbody tr .dropdown-menu.show { z-index: 1002 !important; }
+
 /* ============================================================
    2) POZADÍ — futuristické halftone vlny (canvas #crmBgWaves)
    Generuje se JS na míru oknu (header.php) a při resize/zoomu se

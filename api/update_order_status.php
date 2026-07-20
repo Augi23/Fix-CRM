@@ -112,6 +112,10 @@ try {
 
     if (isOrderStatusIn($new_status, 'collected')) {
         $sql .= ', shipping_date = IFNULL(shipping_date, CURRENT_TIMESTAMP)';
+        // Výdej bez zvoleného způsobu předání → automaticky „Osobní odběr" (Self Pickup).
+        // Umožní bleskové „Vydáno" z jakéhokoli stavu bez proklikávání dopravy
+        // (rozhodnutí majitele: jiná volba stejně nefunguje).
+        $sql .= ", shipping_method = IFNULL(NULLIF(shipping_method, ''), 'Self Pickup')";
     }
 
     if (isOrderStatusIn($new_status, 'collected') && ($final_cost === null || $final_cost === '')) {

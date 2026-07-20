@@ -242,9 +242,12 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                   $__rowCls = (($r['source'] ?? 'crm') === 'legacy') ? 'order-row--legacy' : 'order-row--status-' . getOrderStatusBadgeToken($r['status']); ?>
                             <tr <?php echo $staleTitle ? 'title="' . e($staleTitle) . '" ' : ''; ?>class="clickable-order-row <?php echo e($__rowCls); ?><?php echo $staleCls; ?><?php echo $__isInternal ? ' order-row--internal' : (!empty($r['company']) || ($r['customer_type'] ?? '') === 'company' ? ' order-row--company' : ''); ?><?php echo $r['priority'] == 'High' ? ' order-row--high' : ''; ?>" style="cursor: pointer;" onclick="window.location.href='view_order.php?id=<?php echo (int)$r['id']; ?>'" tabindex="0" role="link">
                                 <td>
-                                    <a href="view_order.php?id=<?php echo (int)$r['id']; ?>" class="fw-bold text-decoration-none"><?php echo e($display_code); ?></a>
+                                    <a href="view_order.php?id=<?php echo (int)$r['id']; ?>" class="order-code-main text-decoration-none"><?php echo e($display_code); ?></a>
                                     <?php if($has_media): ?>
                                         <i class="fas fa-camera text-info ms-1" title="<?php echo __('has_media'); ?>"></i>
+                                    <?php endif; ?>
+                                    <?php if (($__legacyCode = trim((string)($r['legacy_code'] ?? ''))) !== ''): ?>
+                                        <div class="order-code-prev">(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
                                     <?php endif; ?>
                                     <div class="small text-white-75"><?php echo date('d.m.Y', strtotime($r['created_at'])); ?></div>
                                     <div class="small text-white-75"><i class="far fa-clock me-1" style="font-size:.7rem;"></i><?php echo date('H:i:s', strtotime($r['created_at'])); ?></div>
@@ -274,7 +277,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                 </td>
                                 <td>
                                     <?php echo $icon; ?> <strong><?php echo htmlspecialchars($r['device_brand']); ?></strong><br>
-                                    <small class="text-white-75"><?php echo htmlspecialchars($r['device_model']); ?></small>
+                                    <span class="device-model-lg"><?php echo htmlspecialchars($r['device_model']); ?></span>
                                     <?php if(!empty($r['serial_number'])): ?>
                                         <div class="small text-white-75"><i class="fas fa-barcode me-1"></i><?php echo __('sn1'); ?>: <?php echo htmlspecialchars($r['serial_number']); ?></div>
                                     <?php endif; ?>

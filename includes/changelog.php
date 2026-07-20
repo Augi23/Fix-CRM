@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.2.0',
+        'date' => '2026-07-20',
+        'time' => '22:10',
+        'title' => 'Boss = administrátor + čitelnější zakázky a rychlejší výdej',
+        'items' => [
+            'BOSS má nově ÚPLNĚ stejná práva jako administrátor — nadřazené pravidlo nad vším ostatním. Vidí a smí vše co admin (obě pobočky, všechna nastavení, změna jazyka klienta, režim recepce atd.).',
+            'Seznam zakázek i Nástěnka: aktuální číslo zakázky je výrazně větší a jasně bílé se září; původní „(dříve …)" je menší a tlumené — kontrast je teď jasný. Název modelu zařízení (např. „AirPods Max") je větší a čitelnější (značka zůstává).',
+            'Opraveno problikávání a občasná neproklikatelnost rozbalovacího menu u ikony blesku v seznamu zakázek (dýchací animace řádku „věznila" menu za sousedy).',
+            'Rychlý výdej: označení „Vydáno" už nikdy neblokuje na výběru dopravy — pokud není zvolená, doplní se automaticky „Osobní odběr". Lze tak vydat zakázku z jakéhokoli stavu jedním klikem (blesk i detail).',
+        ],
+    ],
+    [
         'version' => '3.1.1',
         'date' => '2026-07-20',
         'time' => '20:32',

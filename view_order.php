@@ -984,22 +984,25 @@ $(document).ready(function() {
         const shippingMethod = $('select[name="shipping_method"]').val();
         const collectedStatuses = <?php echo json_encode(getOrderStatusList('collected'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
         
-        if (collectedStatuses.includes(status) && (!shippingMethod || shippingMethod === '')) {
-            showShippingRequiredModal();
-            return false;
-        }
-        
         if (collectedStatuses.includes(status)) {
-            const shippingForm = $('#shippingForm');
-            $.post('api/update_shipping.php', shippingForm.serialize(), function(res) {
-                if (res.success) {
+            // Výdej NEblokujeme na dopravě: když není zvolena, doplní se automaticky
+            // „Osobní odběr" (Self Pickup) — umožní vydat z jakéhokoli stavu jedním krokem.
+            const $shipForm = $('#shippingForm');
+            if ($shipForm.length) {
+                const $sel = $shipForm.find('select[name="shipping_method"]');
+                if ($sel.length && (!$sel.val() || $sel.val() === '')) { $sel.val('Self Pickup'); }
+                $.post('api/update_shipping.php', $shipForm.serialize(), function(res) {
+                    // I kdyby uložení dopravy selhalo, výdej nezastavíme — stav se změní
+                    // a API u „Vydáno" dopravu stejně doplní na Osobní odběr.
                     showStatusConfirmModal(form);
-                } else {
-                    showAlert('<?php echo __('error'); ?>: ' + (res.message || '<?php echo __('error_shipping_update'); ?>'));
-                }
-            }).fail(function() {
-                showAlert('<?php echo __('error'); ?>: <?php echo __('error_shipping_connect'); ?>');
-            });
+                }).fail(function() {
+                    showStatusConfirmModal(form);
+                });
+            } else {
+                // Formulář dopravy není (zakázka nebyla ve stavu „hotovo") → API doplní
+                // způsob předání (Osobní odběr) samo při přechodu na „Vydáno".
+                showStatusConfirmModal(form);
+            }
         } else {
             showStatusConfirmModal(form);
         }

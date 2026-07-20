@@ -31,6 +31,14 @@ function hasPermission($permission) {
         return true;
     }
 
+    // ── BOSS = ADMIN (nadřazené pravidlo nad vším ostatním, majitel 20.7.2026) ──
+    // Boss (majitel firmy) má ÚPLNĚ stejná práva jako administrátor pro JAKÉKOLI
+    // oprávnění. Musí být PŘED technik-větví. getCurrentStaffRole() jen čte session
+    // (žádné hasPermission → žádná rekurze). Pobočkově zůstává globální (vidí obě).
+    if (getCurrentStaffRole() === 'boss') {
+        return true;
+    }
+
     // Technicians/Staff – use session-level cache
     if (($_SESSION['role'] ?? '') === 'technician' && isset($_SESSION['tech_id'])) {
         if (!isset($_SESSION['_perms'])) {
