@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.4.5',
+        'date' => '2026-07-21',
+        'time' => '18:09',
+        'title' => 'Upozornění: nové objednávky z e-shopu (applefix.click)',
+        'items' => [
+            'Zvoneček upozornění teď hlásí i nové objednávky z vlastního e-shopu (dřív četl jen opravy a reklamace, takže e-shop prodeje byly neviditelné). Nová objednávka se objeví v seznamu upozornění a přehraje zvuk jako u zakázek.',
+        ],
+    ],
+    [
         'version' => '3.4.4',
         'date' => '2026-07-21',
         'time' => '15:52',

@@ -30,6 +30,8 @@ try { $lastLog = (int)($pdo->query("SELECT MAX(id) FROM order_status_log")->fetc
 try { $ordersBadge = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE status IN (" . orderStatusSqlIn($pdo, 'active') . ")" . orderBranchScopeSql('branch_id'))->fetchColumn() ?: 0); } catch (Throwable $e) { $ordersBadge = 0; }
 try { $complaintsBadge = (int)($pdo->query("SELECT COUNT(*) FROM complaints WHERE complaint_status NOT IN ('Vyřízeno','Zamítnuto')")->fetchColumn() ?: 0); } catch (Throwable $e) { $complaintsBadge = 0; }
 try { $procurementBadge = (int)($pdo->query("SELECT COUNT(*) FROM purchase_requests WHERE status IN ('pending','ordered')")->fetchColumn() ?: 0); } catch (Throwable $e) { $procurementBadge = 0; }
+// nová e-shop objednávka (applefix.click) → zvuk + odznak jako u zakázek
+try { $lastEshopOrder = (int)($pdo->query("SELECT MAX(id) FROM eshop_orders")->fetchColumn() ?: 0); } catch (Throwable $e) { $lastEshopOrder = 0; }
 
 // Týmový chat: poslední zpráva od JINÉHO (zvuk) + počet nepřečtených (badge)
 $lastChatOther = 0; $chatUnread = 0;
@@ -55,6 +57,7 @@ echo json_encode([
     'last_chat_other_id' => $lastChatOther,
     'chat_unread' => $chatUnread,
     'last_order_id' => $lastOrder,
+    'last_eshop_order_id' => $lastEshopOrder,
     'last_status_log_id' => $lastLog,
     'orders_badge' => $ordersBadge,
     'complaints_badge' => $complaintsBadge,

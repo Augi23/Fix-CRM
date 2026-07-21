@@ -4746,6 +4746,26 @@ function getCrmNotifications(int $limit = 15): array
         }
     } catch (Throwable $e) { /* tabulka nemusí existovat */ }
 
+    try {
+        // 4) nové objednávky z vlastního e-shopu (applefix.click) — go-live+.
+        //    Dřív feed četl jen opravy/reklamace, takže e-shop prodeje byly v upozorněních neviditelné.
+        if (function_exists('ensureEshopOrdersTable')) { ensureEshopOrdersTable(); }
+        $st = $pdo->prepare(
+            "SELECT id, order_ref, customer_name, total, created_at FROM eshop_orders
+             WHERE created_at >= ? ORDER BY created_at DESC LIMIT 10");
+        $st->execute([$golive]);
+        foreach ($st as $r) {
+            $who = trim((string)($r['customer_name'] ?? ''));
+            $sub = ($who !== '' ? $who . ' · ' : '') . number_format((float)$r['total'], 0, ',', ' ') . ' Kč';
+            $items[] = [
+                'type' => 'success', 'icon' => 'fa-cart-shopping',
+                'title' => 'E-shop objednávka: ' . $r['order_ref'],
+                'sub' => $sub,
+                'ts' => strtotime((string)$r['created_at']), 'url' => 'products.php',
+            ];
+        }
+    } catch (Throwable $e) { /* tabulka nemusí existovat */ }
+
     // seřadit: nejnovější nahoře, deduplikovat podle title+ts, oříznout
     usort($items, fn($a, $b) => ($b['ts'] ?? 0) <=> ($a['ts'] ?? 0));
     $seen = []; $out = [];

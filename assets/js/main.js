@@ -1724,15 +1724,18 @@ $(document).on('change', '#pricelistRepair', function () {
                         el.classList.toggle('afx-chat-glow', chatGlow);
                     });
                     var prev = getState();
-                    var now = { o: d.last_order_id, l: d.last_status_log_id, c: d.last_chat_other_id || 0 };
+                    var now = { o: d.last_order_id, l: d.last_status_log_id, c: d.last_chat_other_id || 0, e: d.last_eshop_order_id || 0 };
                     if (!prev) { setState(now); return; }          // první běh: jen zapamatovat
                     var chatNew = now.c > (prev.c || 0);
-                    if (now.o === prev.o && now.l === prev.l && !chatNew) return;
+                    var eshopNew = now.e > (prev.e || 0);           // nová objednávka z e-shopu
+                    if (now.o === prev.o && now.l === prev.l && !chatNew && !eshopNew) return;
                     setState(now);                                  // rezervace: další karty už nehrají
                     if (window.afxChime) {
                         // zprávu na otevřené stránce chatu ohlásí chat sám
                         if (chatNew && location.pathname.indexOf('chat.php') === -1) {
                             window.afxChime('chat');
+                        } else if (eshopNew) {
+                            window.afxChime('order');
                         } else if (now.o !== prev.o || now.l !== prev.l) {
                             window.afxChime(now.o > prev.o ? 'order' : 'status');
                         }
