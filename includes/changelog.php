@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.4.0',
+        'date' => '2026-07-21',
+        'time' => '07:05',
+        'title' => 'Feed produktů pro vlastní e-shop (CRM jako zdroj produktů)',
+        'items' => [
+            'Nový čtecí JSON endpoint api/eshop_feed.php — vlastní e-shop na stejném serveru si odsud bere aktuální produkty ze Skladu → Produkty (název, cena, sklad, fotka, kompletní parametry). Ceny jsou s DPH; použité zboží nese příznak režimu §90 (e-shop nevyčísluje DPH).',
+            'Podporuje inkrementální sync (jen změněné od data), filtr „jen skladem", jeden produkt podle kódu i stránkování. Lokálně (stejný server) funguje bez tokenu, vzdáleně přes token.',
+            'Feed URL a token najdete v Nastavení → Systém → Integrace.',
+        ],
+    ],
+    [
         'version' => '3.3.1',
         'date' => '2026-07-20',
         'time' => '22:25',

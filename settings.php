@@ -672,6 +672,17 @@ require_once 'includes/header.php';
             <form method="POST">
                 <?php echo csrfField(); ?>
                 <div class="row g-4 settings-integrations-row">
+                    <div class="col-12">
+                        <div class="glass-panel p-3 border-secondary">
+                            <h5 class="mb-2 text-warning"><i class="fas fa-store me-2"></i>Feed produktů pro vlastní e-shop</h5>
+                            <div class="small text-white-75 mb-2">E-shop na <strong>stejném serveru</strong> si bere produkty ze Skladu → Produkty přes tento čtecí JSON endpoint. Lokálně (stejný server) funguje bez tokenu; vzdáleně s tokenem níže (hlavička <code>X-Feed-Token</code> nebo <code>?token=</code>).</div>
+                            <div class="row g-2">
+                                <div class="col-md-5"><label class="form-label small text-white-75">Feed URL</label><input type="text" class="form-control" readonly onclick="this.select()" value="https://admin.applefix.cloud/api/eshop_feed.php"></div>
+                                <div class="col-md-7"><label class="form-label small text-white-75">Token</label><input type="text" class="form-control" readonly onclick="this.select()" value="<?php echo htmlspecialchars(crmEshopFeedToken()); ?>"></div>
+                            </div>
+                            <div class="small text-white-50 mt-2">Parametry: <code>?in_stock=1</code> (jen skladem) · <code>&amp;updated_since=2026-07-20T00:00:00</code> (inkrementální sync) · <code>&amp;code=…</code> · <code>&amp;limit=&amp;offset=</code>. Ceny jsou s DPH; použité zboží má <code>vat_margin_scheme_90=true</code> (režim §90 — e-shop nevyčísluje DPH). Fotka v poli <code>image</code>, kompletní data v <code>attributes</code>.</div>
+                        </div>
+                    </div>
                     <div class="col-md-6 border-end border-secondary">
                         <h5 class="mb-3 text-info"><i class="fab fa-telegram-plane me-2"></i>Telegram Bot</h5>
                         <div class="mb-3">

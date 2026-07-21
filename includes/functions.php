@@ -1291,6 +1291,19 @@ function productImageDisplayUrl(?string $url): string {
     return '';
 }
 
+/** Token pro čtecí produktový feed vlastního e-shopu (api/eshop_feed.php).
+ *  Get-or-create: při prvním použití vygeneruje stabilní token a uloží ho do
+ *  settings 'eshop_feed_token'. E-shop na stejném serveru feed volá i bez tokenu
+ *  (localhost), token je pro případný vzdálený přístup. */
+function crmEshopFeedToken(): string {
+    $t = (string)get_setting('eshop_feed_token', '');
+    if ($t === '') {
+        try { $t = bin2hex(random_bytes(24)); } catch (Throwable $e) { $t = md5(uniqid('afxeshop', true)); }
+        set_setting('eshop_feed_token', $t);
+    }
+    return $t;
+}
+
 /**
  * POKLADNA (kasa prodejna) — přímý prodej dílů a produktů bez zakázky.
  * pos_sales = hlavička dokladu (číslo KP…, platba, prodavač, celkem),
