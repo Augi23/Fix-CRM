@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.4.4',
+        'date' => '2026-07-21',
+        'time' => '15:52',
+        'title' => 'Přihlášení do administrace e-shopu přes účty CRM (jen admin a Boss)',
+        'items' => [
+            'Nový endpoint api/eshop_admin_auth.php — administrace vlastního e-shopu ověřuje přihlášení proti účtům CRM. Do e-shop adminu se dostanou ZÁMĚRNĚ jen administrátor a Boss; ostatní role (manažer, technik, brigádník) jsou odmítnuty i se správným heslem.',
+            'Heslo se ověřuje na straně CRM (stejně jako běžný login), e-shop dostane jen ano/ne + jméno a roli. Volání je chráněné feed tokenem (nemůže brute-forcovat kdokoli).',
+        ],
+    ],
+    [
         'version' => '3.4.3',
         'date' => '2026-07-21',
         'time' => '15:41',
