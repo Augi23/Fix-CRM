@@ -3077,6 +3077,48 @@ function ensurePickupReadyColumns(PDO $pdo): void
     } catch (Throwable $e) { /* starší DB / bez oprávnění — funguje i bez těchto sloupců */ }
 }
 
+/** IP tiskárny štítků PER POBOČKU: branches.label_printer_ip (NULL/'' = použij globální
+ *  label_printer_ip). Umožňuje, aby štítek zakázky vyjel na tiskárně TÉ pobočky, které
+ *  zakázka patří — Karlín i Na Příkopě mají každá svou Brother QL-810W. Idempotentní.
+ *  POZOR: serverový tisk (tcp 9100) funguje jen na tiskárnu, na kterou server DOSÁHNE
+ *  (stejná LAN / VPN). Pobočka v jiné síti potřebuje lokálního agenta/VPN — IP se tu
+ *  přesto uloží, ať je vše připravené. */
+function ensureBranchPrinterColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $bc = $pdo->query("SHOW COLUMNS FROM branches")->fetchAll(PDO::FETCH_COLUMN);
+        if ($bc && !in_array('label_printer_ip', $bc, true)) {
+            $pdo->exec("ALTER TABLE `branches` ADD COLUMN `label_printer_ip` VARCHAR(64) NULL DEFAULT NULL");
+            // Karlín zdědí dosavadní globální IP, ať dosavadní tisk beze změny běží dál
+            $global = trim((string)get_setting('label_printer_ip', ''));
+            if ($global !== '') {
+                $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ? WHERE code = 'karlin' AND (label_printer_ip IS NULL OR label_printer_ip = '')");
+                $st->execute([$global]);
+            }
+        }
+    } catch (Throwable $e) { /* starší DB / bez oprávnění — tisk spadne na globální IP */ }
+}
+
+/** Vrátí IP tiskárny štítků pro danou pobočku: branches.label_printer_ip, a když je prázdné
+ *  (nebo je pobočka neznámá), spadne na globální nastavení label_printer_ip (default Karlín). */
+function branchPrinterIp(?int $branchId): string {
+    global $pdo;
+    $fallback = trim((string)get_setting('label_printer_ip', '192.168.1.220'));
+    if ($branchId) {
+        try {
+            ensureBranchPrinterColumn();
+            $st = $pdo->prepare("SELECT label_printer_ip FROM branches WHERE id = ? LIMIT 1");
+            $st->execute([(int)$branchId]);
+            $ip = trim((string)$st->fetchColumn());
+            if ($ip !== '') { return $ip; }
+        } catch (Throwable $e) { /* fallback níže */ }
+    }
+    return $fallback;
+}
+
 /** Jazyk komunikace zákazníka: customers.preferred_language (cs/en/ru, default cs).
  *  Volí se při zakládání zakázky u údajů klienta; e-maily klientovi odcházejí v tomto jazyce. */
 function ensureCustomerLanguageColumn(): void {

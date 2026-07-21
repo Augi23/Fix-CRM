@@ -1,11 +1,13 @@
 <?php
-/* SERVEROVÝ tisk štítků (Brother QL-810W na pobočce Karlín):
-   prohlížeč → HTTPS → server → tiskárna (tcp 9100). Bez můstku na počítačích,
-   funguje ze Safari, iPadu i telefonu.
-     POST action=print, id=<order_id>   → tisk štítku zakázky
-     POST action=test                   → testovací štítek
-     GET  action=status                 → dosažitelnost tiskárny + stav prostředí
-     POST action=save_ip, ip=<IP>       → uložení IP tiskárny (admin) */
+/* SERVEROVÝ tisk štítků (Brother QL-810W) — IP tiskárny PER POBOČKU:
+   prohlížeč → HTTPS → server → tiskárna té pobočky (tcp 9100). Bez můstku na počítačích,
+   funguje ze Safari, iPadu i telefonu. Štítek zakázky vyjede na tiskárně pobočky, které
+   zakázka patří (branchPrinterIp). Pobočka v jiné síti než server potřebuje agenta/VPN.
+     POST action=print, id=<order_id>          → tisk štítku zakázky (tiskárna pobočky zakázky)
+     POST action=test [branch_id]              → testovací štítek (tiskárna pobočky / zvolené admin)
+     POST action=print_product, id=<prod_id>   → cenový štítek produktu
+     GET  action=status [branch_id]            → dosažitelnost tiskárny pobočky + stav prostředí
+     POST action=save_ip, ip=<IP> [branch_id]  → uložení IP tiskárny pobočky (admin) */
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 require_once __DIR__ . '/../includes/config.php';
@@ -16,7 +18,8 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $action = (string)($_REQUEST['action'] ?? 'print');
-$printerIp = trim((string)get_setting('label_printer_ip', '192.168.1.220'));
+// IP tiskárny se řeší PER POBOČKU (branchPrinterIp) — až po zjištění pobočky dané akce.
+ensureBranchPrinterColumn();
 
 $VENV_DIR = realpath(__DIR__ . '/../print-bridge') . '/.venv';
 $PY = $VENV_DIR . '/bin/python3';
@@ -51,26 +54,59 @@ if ($action === 'save_ip') {
         echo json_encode(['ok' => false, 'error' => 'Bez oprávnění']); exit;
     }
     $ip = trim((string)($_POST['ip'] ?? ''));
-    if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+    $bid = (int)($_POST['branch_id'] ?? 0);
+    if ($ip !== '' && !filter_var($ip, FILTER_VALIDATE_IP)) {
         echo json_encode(['ok' => false, 'error' => 'Neplatná IP adresa']); exit;
     }
+    if ($bid > 0) {
+        // per pobočku: prázdná IP = smazat (pobočka pak použije globální fallback)
+        $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ? WHERE id = ?");
+        $st->execute([$ip !== '' ? $ip : null, $bid]);
+        echo json_encode(['ok' => true, 'ip' => $ip, 'branch_id' => $bid]); exit;
+    }
+    // bez pobočky = globální fallback (zpětná kompatibilita)
+    if ($ip === '') { echo json_encode(['ok' => false, 'error' => 'Neplatná IP adresa']); exit; }
     set_setting('label_printer_ip', $ip);
     echo json_encode(['ok' => true, 'ip' => $ip]); exit;
 }
 
 if ($action === 'status') {
+    $bid = (int)($_REQUEST['branch_id'] ?? 0);
+    $printerIp = branchPrinterIp($bid ?: null);
     echo json_encode([
         'ok' => true,
+        'branch_id' => $bid,
         'printer_ip' => $printerIp,
         'printer_reachable' => afxPrinterReachable($printerIp),
         'env_ready' => is_file($PY),
     ]); exit;
 }
 
-// ── tisk (print / test) ──
+// ── tisk (print / test / print_product) ──
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     echo json_encode(['ok' => false, 'error' => 'Neplatný token']); exit;
 }
+
+// Pobočku (a tím tiskárnu) urči PŘED kontrolou dosažitelnosti:
+//   print         → pobočka ZAKÁZKY (štítek vyjede na tiskárně té pobočky),
+//   test/produkt  → pobočka přihlášeného (admin může přes branch_id otestovat konkrétní pobočku).
+$order = null;
+if ($action !== 'test' && $action !== 'print_product') {
+    $orderId = (int)($_POST['id'] ?? 0);
+    $st = $pdo->prepare('SELECT o.id, o.order_code, o.problem_description, o.created_at, o.branch_id, o.technician_id,
+        TRIM(CONCAT(COALESCE(c.first_name, ""), " ", COALESCE(c.last_name, ""))) AS client_name, c.company
+        FROM orders o LEFT JOIN customers c ON c.id = o.customer_id WHERE o.id = ?');
+    $st->execute([$orderId]);
+    $order = $st->fetch();
+    if (!$order) { echo json_encode(['ok' => false, 'error' => 'Zakázka nenalezena']); exit; }
+    if (!canAccessOrderBranch($order)) { echo json_encode(['ok' => false, 'error' => 'Bez oprávnění']); exit; }
+    $branchId = (int)($order['branch_id'] ?? 0) ?: getCurrentStaffBranchId();
+} else {
+    $reqBid = (int)($_POST['branch_id'] ?? 0);
+    $branchId = ($reqBid > 0 && hasPermission('admin_access')) ? $reqBid : getCurrentStaffBranchId();
+}
+$printerIp = branchPrinterIp($branchId);
+
 if (!afxPrinterReachable($printerIp)) {
     echo json_encode(['ok' => false, 'error' => 'Tiskárna ' . $printerIp . ' neodpovídá (port 9100). Je zapnutá a na síti pobočky?']); exit;
 }
@@ -135,15 +171,7 @@ if ($action === 'print_product') {
 } elseif ($action === 'test') {
     $args = ['--code' => 'TEST' . date('His'), '--defect' => 'Testovací štítek ze serveru', '--date' => date('d.m.Y'), '--client' => 'Fix-CRM'];
 } else {
-    $orderId = (int)($_POST['id'] ?? 0);
-    $st = $pdo->prepare('SELECT o.id, o.order_code, o.problem_description, o.created_at, o.branch_id, o.technician_id,
-        TRIM(CONCAT(COALESCE(c.first_name, ""), " ", COALESCE(c.last_name, ""))) AS client_name, c.company
-        FROM orders o LEFT JOIN customers c ON c.id = o.customer_id WHERE o.id = ?');
-    $st->execute([$orderId]);
-    $order = $st->fetch();
-    if (!$order) { echo json_encode(['ok' => false, 'error' => 'Zakázka nenalezena']); exit; }
-    if (!canAccessOrderBranch($order)) { echo json_encode(['ok' => false, 'error' => 'Bez oprávnění']); exit; }
-
+    // print — $order už načtený a ověřený (canAccessOrderBranch) výše
     $defect = trim((string)($order['problem_description'] ?? ''));
     if (mb_strlen($defect) > 80) { $defect = mb_substr($defect, 0, 77) . '…'; }
     $client = trim((string)($order['client_name'] ?? '')) ?: trim((string)($order['company'] ?? ''));

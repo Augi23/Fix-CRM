@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.4.6',
+        'date' => '2026-07-21',
+        'time' => '19:09',
+        'title' => 'Tisk štítků: IP tiskárny zvlášť pro každou pobočku',
+        'items' => [
+            'Serverový tisk štítků nově rozlišuje pobočky — štítek zakázky vyjede na tiskárně TÉ pobočky, které zakázka patří (dřív šlo vše na jednu tiskárnu v Karlíně). V Nastavení → Tisk štítků má teď každá pobočka vlastní pole na IP tiskárny + testovací štítek a stav.',
+            'Karlín beze změny (zdědil dosavadní IP 192.168.1.220). Praha 1 – Na Příkopě má vlastní tiskárnu; IP se dá uložit, ale server na ni musí po síti dosáhnout — protože je pobočka v jiné síti, zprovoznění tisku tam vyžaduje ještě lokálního agenta nebo VPN (chystá se).',
+        ],
+    ],
+    [
         'version' => '3.4.5',
         'date' => '2026-07-21',
         'time' => '18:09',
