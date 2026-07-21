@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.4.2',
+        'date' => '2026-07-21',
+        'time' => '12:54',
+        'title' => 'E-shop prodej odečítá sklad v CRM (obousměrné propojení)',
+        'items' => [
+            'Nový endpoint api/eshop_sale.php — když se něco prodá na vlastním e-shopu, kus se rovnou odečte ze Skladu → Produkty v CRM (stejná pojistka proti souběhu jako kasa, takže stejný kus nejde prodat dvakrát na prodejně i online).',
+            'Objednávky z e-shopu se ukládají do nové tabulky eshop_orders; opakované doručení téže objednávky (webhook) sklad neodečte podruhé (idempotence přes unikátní číslo objednávky).',
+            'Dohromady s feedem (api/eshop_feed.php) tak sklad drží jen CRM: e-shop čte stavy z CRM a prodeje zapisuje zpět.',
+        ],
+    ],
+    [
         'version' => '3.4.1',
         'date' => '2026-07-21',
         'time' => '10:59',

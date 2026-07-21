@@ -1396,6 +1396,32 @@ function ensureProductsCrmColumns(): void {
     } catch (Throwable $e) { error_log('ensureProductsCrmColumns: ' . $e->getMessage()); }
 }
 
+/** Objednávky z vlastního e-shopu (applefix.online). E-shop čte sklad z feedu a při
+ *  dokončení objednávky sem přes api/eshop_sale.php zapíše prodej → CRM odečte kus.
+ *  order_ref je UNIQUE = idempotence (opakovaný webhook prodej neodečte dvakrát). */
+function ensureEshopOrdersTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS eshop_orders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_ref VARCHAR(64) NOT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'paid',
+            items_json MEDIUMTEXT NULL,
+            total DECIMAL(10,2) NOT NULL DEFAULT 0,
+            customer_name VARCHAR(160) NULL DEFAULT NULL,
+            customer_email VARCHAR(160) NULL DEFAULT NULL,
+            customer_phone VARCHAR(48) NULL DEFAULT NULL,
+            note VARCHAR(500) NULL DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_eshop_order_ref (order_ref),
+            KEY idx_eshop_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('ensureEshopOrdersTable: ' . $e->getMessage()); }
+}
+
 /** Prodávat na kase smí KAŽDÝ přihlášený zaměstnanec (pultová operace, obě pobočky).
  *  Guard akceptuje obě session varianty dual-loginu (users i technicians). */
 function crmCanUsePos(): bool {
