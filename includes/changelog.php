@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.4.1',
+        'date' => '2026-07-21',
+        'time' => '10:59',
+        'title' => 'Naskladňování produktů smí každý s právem Sklad (nejen vedení)',
+        'items' => [
+            'Kdo má oprávnění „Správa skladu" (manage_inventory) a otevře Sklad → Produkty, teď vidí i tlačítka na naskladnění produktů pro e-shop (přidat produkt, import, foto, PČR, export). Dřív tlačítka viděl jen administrátor, Boss a manažer — brigádníci se správou skladu koukali na prázdnou stránku bez tlačítek.',
+            'Sladěno s přístupem na stránku: kdo Sklad smí spravovat, smí i naskladňovat produkty.',
+        ],
+    ],
+    [
         'version' => '3.4.0',
         'date' => '2026-07-21',
         'time' => '07:05',

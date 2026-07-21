@@ -1274,10 +1274,14 @@ function ensureProductsTable(): void {
     } catch (Throwable $e) { error_log('ensureProductsTable: ' . $e->getMessage()); }
 }
 
-/** Import/mazání produktů (e-shopové ceny) smí jen vedení — prohlížet je může
- *  každý s manage_inventory, ale zápis je admin / Boss / manažer. */
+/** Naskladňování produktů pro e-shop (vytvoření, import, foto, PČR, export, mazání).
+ *  Sladěno s přístupem na Sklad → Produkty: header.php hlídá stránku přes 'manage_inventory',
+ *  takže kdo Sklad smí spravovat, smí i naskladňovat produkty — jinak by viděl stránku bez
+ *  tlačítek (přesně případ Andrey/brigádnice 21.7.2026: má manage_inventory, ale role není
+ *  manažer, takže dřív tlačítko „Přidat produkt" nedostala). hasPermission('manage_inventory')
+ *  pokrývá i admina a Bosse (vrací true globálně) a manažera (implicitní právo). */
 function crmCanManageProducts(): bool {
-    return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['boss', 'manager'], true);
+    return hasPermission('manage_inventory');
 }
 
 /** Fotku produktu renderovat jen z našeho úložiště — [IMAGES] v CSV je text
