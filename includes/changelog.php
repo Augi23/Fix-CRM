@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.4.3',
+        'date' => '2026-07-21',
+        'time' => '15:41',
+        'title' => 'Čtecí přehled e-shop objednávek pro administraci',
+        'items' => [
+            'Nový endpoint api/eshop_orders.php — administrace vlastního e-shopu si odsud čte seznam objednávek (tabulka eshop_orders), aby je bylo vidět v sekci Objednávky. Jen čtení, stejné zabezpečení jako feed (token).',
+        ],
+    ],
+    [
         'version' => '3.4.2',
         'date' => '2026-07-21',
         'time' => '12:54',
