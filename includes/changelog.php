@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.4.8',
+        'date' => '2026-07-22',
+        'time' => '23:14',
+        'title' => 'E-shop: potvrzovací e-maily objednávek (+ QR platba u převodu)',
+        'items' => [
+            'Objednávky z e-shopu (applefix.click) teď zákazníkovi automaticky pošlou potvrzovací e-mail — dřív se neposílalo nic, i když web sliboval „potvrzení na e-mail" a „údaje k platbě e-mailem". E-mail obsahuje souhrn položek a celkovou cenu ve stejném vzhledu jako ostatní firemní e-maily.',
+            'U platby bankovním převodem e-mail nese platební údaje: číslo účtu, částku, variabilní symbol i QR platbu (SPD/SPAYD) k naskenování v bankovní aplikaci. Účet se bere z Nastavení → Banka (acc_bank_account); když není vyplněný, QR se prostě nezobrazí.',
+            'U platby kartou (Stripe) e-mail potvrzuje „zaplaceno online". Odesílá se přesně jednou (idempotentně přes eshop_sale.php — opakovaný webhook ho znovu nepošle) a neblokuje odpověď objednávky (posílá se na pozadí přes fastcgi_finish_request).',
+        ],
+    ],
+    [
         'version' => '3.4.7',
         'date' => '2026-07-22',
         'time' => '16:49',

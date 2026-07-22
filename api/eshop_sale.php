@@ -83,6 +83,17 @@ $cEmail  = mb_substr(trim((string)($cust['email'] ?? '')), 0, 160) ?: null;
 $cPhone  = mb_substr(trim((string)($cust['phone'] ?? '')), 0, 48) ?: null;
 $note    = mb_substr(trim((string)($body['note'] ?? '')), 0, 500) ?: null;
 
+// volitelná metadata z e-shopu (jen pro potvrzovací e-mail) — zpětně kompatibilní
+$payId     = mb_substr(trim((string)($body['pay_id'] ?? '')), 0, 32);
+$shipId    = mb_substr(trim((string)($body['ship_id'] ?? '')), 0, 32);
+$shipLabel = mb_substr(trim((string)($body['ship_label'] ?? '')), 0, 120);
+$addrIn    = is_array($body['address'] ?? null) ? $body['address'] : [];
+$address   = [
+    'street' => mb_substr(trim((string)($addrIn['street'] ?? '')), 0, 160),
+    'zip'    => mb_substr(trim((string)($addrIn['zip'] ?? '')), 0, 20),
+    'city'   => mb_substr(trim((string)($addrIn['city'] ?? '')), 0, 120),
+];
+
 // ── transakce: idempotentní zápis objednávky + atomický odečet skladu ──────────
 try {
     $pdo->beginTransaction();
@@ -98,6 +109,7 @@ try {
             json_encode(array_map(fn($c, $q) => ['code' => $c, 'qty' => $q], array_keys($items), array_values($items)), JSON_UNESCAPED_UNICODE),
             $total, $cName, $cEmail, $cPhone, $note,
         ]);
+        $eshopOrderId = (int)$pdo->lastInsertId();
     } catch (PDOException $e) {
         $dup = ($e->getCode() === '23000') || ((int)($e->errorInfo[1] ?? 0) === 1062);
         if ($dup) {
@@ -118,13 +130,14 @@ try {
     }
 
     // 2) Atomický odečet každého produktu (guard proti souběhu / zápornému stavu).
-    $find = $pdo->prepare("SELECT id, title, stock_qty FROM products WHERE product_code = ? LIMIT 1");
+    $find = $pdo->prepare("SELECT id, title, price, stock_qty FROM products WHERE product_code = ? LIMIT 1");
     $dec  = $pdo->prepare("UPDATE products
         SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at)
         WHERE id = ? AND stock_qty >= ?");
     $after = $pdo->prepare("SELECT stock_qty FROM products WHERE id = ?");
 
     $results = [];
+    $emailItems = [];
     foreach ($items as $code => $qty) {
         $find->execute([$code]);
         $p = $find->fetch(PDO::FETCH_ASSOC);
@@ -139,6 +152,7 @@ try {
         }
         $after->execute([(int)$p['id']]);
         $results[] = ['code' => $code, 'qty' => $qty, 'stock_after' => (int)$after->fetchColumn()];
+        $emailItems[] = ['title' => (string)$p['title'], 'qty' => $qty, 'price' => (float)$p['price']];
     }
 
     $pdo->commit();
@@ -146,6 +160,29 @@ try {
         'ok' => true, 'order_ref' => $orderRef, 'status' => 'paid',
         'already_processed' => false, 'items' => $results,
     ], JSON_UNESCAPED_UNICODE);
+
+    // odpověď e-shopu odešli hned; potvrzovací e-mail pošli „na pozadí" (SMTP je pomalé).
+    // Jsme na větvi PRVNÍHO zpracování → e-mail se pošle právě jednou (opakovaný webhook
+    // spadne do already_processed a sem se nedostane).
+    if (function_exists('fastcgi_finish_request')) { @fastcgi_finish_request(); }
+    if ($cEmail && function_exists('crmSendEshopOrderEmail')) {
+        try {
+            crmSendEshopOrderEmail([
+                'order_ref'      => $orderRef,
+                'eshop_order_id' => $eshopOrderId ?? 0,
+                'to'             => $cEmail,
+                'name'           => $cName,
+                'total'          => $total,
+                'items'          => $emailItems,
+                'pay_id'         => $payId,
+                'ship_id'        => $shipId,
+                'ship_label'     => $shipLabel,
+                'address'        => $address,
+            ]);
+        } catch (Throwable $mailEx) {
+            error_log('eshop_sale email: ' . $mailEx->getMessage());
+        }
+    }
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log('eshop_sale: ' . $e->getMessage());
