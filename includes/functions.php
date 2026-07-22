@@ -4556,30 +4556,39 @@ function crmEshopOrderEmailHtml(array $o): string
     $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     $money = fn($v) => number_format((float)$v, 0, ',', "\u{00A0}") . "\u{00A0}Kč";
 
-    $company = $e(get_setting('company_name', 'AppleFix'));
+    $company = 'AppleFix';
     $ref     = (string)($o['order_ref'] ?? '');
     $payId   = (string)($o['pay_id'] ?? '');
     $logo    = 'https://admin.applefix.cloud/assets/img/logo-black.png';
-    $firstName = trim((string)($o['name'] ?? ''));
-    $firstName = $firstName !== '' ? explode(' ', $firstName)[0] : '';
+    $fn = trim((string)($o['name'] ?? ''));
+    $fn = $fn !== '' ? ' ' . explode(' ', $fn)[0] : '';
 
-    // ── položky + celkem ──────────────────────────────────────────────────────
+    // Apple paleta — plochá bílá, žádné gradienty/sklo/stíny
+    $ink = '#1d1d1f'; $mut = '#6e6e73'; $fnt = '#86868b';
+    $hair = '#e8e8ed'; $hairS = '#d2d2d7'; $blue = '#0066cc';
+    $ff = "-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif";
+    // helper na text (explicitní vlastnosti = spolehlivé napříč klienty)
+    $t = fn($size, $w, $lh, $color, $extra = '') => "font-family:$ff;font-size:{$size}px;font-weight:$w;line-height:$lh;color:$color;$extra";
+    // micro-label sekce (verzálky, prostrkání)
+    $label = fn($x) => '<div style="' . $t(11, 600, '1', $fnt, 'letter-spacing:.09em;text-transform:uppercase;padding-bottom:15px;') . '">' . $x . '</div>';
+
+    // ── položky + celkem ────────────────────────────────────────
     $rows = '';
     foreach (($o['items'] ?? []) as $it) {
         $qty  = max(1, (int)($it['qty'] ?? 1));
         $line = (float)($it['price'] ?? 0) * $qty;
         $rows .= '<tr>'
-            . '<td style="padding:11px 0;border-bottom:1px solid rgba(160,180,215,.16);font-size:14px;color:#16202e;line-height:1.4;">'
-            . $e($it['title'] ?? '') . ($qty > 1 ? ' <span style="color:#9aa4b5;">×&nbsp;' . $qty . '</span>' : '') . '</td>'
-            . '<td align="right" style="padding:11px 0;border-bottom:1px solid rgba(160,180,215,.16);font-size:14px;color:#16202e;white-space:nowrap;font-weight:600;">'
+            . '<td class="px-item" style="padding:15px 0;border-top:1px solid ' . $hair . ';' . $t(15, 400, '1.45', $ink) . '">'
+            . $e($it['title'] ?? '') . ($qty > 1 ? '<span style="color:' . $fnt . ';"> · ' . $qty . '&nbsp;ks</span>' : '') . '</td>'
+            . '<td align="right" style="padding:15px 0 15px 20px;border-top:1px solid ' . $hair . ';' . $t(15, 400, '1.45', $ink, 'white-space:nowrap;font-variant-numeric:tabular-nums;') . '">'
             . $money($line) . '</td></tr>';
     }
     $rows .= '<tr>'
-        . '<td style="padding:14px 0 2px;font-size:15px;color:#16202e;font-weight:800;">Celkem</td>'
-        . '<td align="right" style="padding:14px 0 2px;font-size:18px;color:#16202e;font-weight:800;white-space:nowrap;">' . $money($o['total'] ?? 0) . '</td>'
-        . '</tr>';
+        . '<td style="padding:18px 0 0;border-top:1px solid ' . $hairS . ';' . $t(16, 600, '1.2', $ink) . '">Celkem</td>'
+        . '<td align="right" style="padding:18px 0 0 20px;border-top:1px solid ' . $hairS . ';' . $t(19, 600, '1.2', $ink, 'white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:-.01em;') . '">'
+        . $money($o['total'] ?? 0) . '</td></tr>';
 
-    // ── platební blok dle metody ──────────────────────────────────────────────
+    // ── platba dle metody ───────────────────────────────────────
     if ($payId === 'prevod') {
         $acc = trim((string)get_setting('acc_bank_account', ''));
         if (!function_exists('crmCzAccountToIban') && is_file(__DIR__ . '/kb_api.php')) { require_once __DIR__ . '/kb_api.php'; }
@@ -4589,97 +4598,101 @@ function crmEshopOrderEmailHtml(array $o): string
         $msgRaw = 'Objednavka ' . $ref;
         $msgAscii = strtoupper(preg_replace('/[^A-Za-z0-9 .,\/-]/', '', iconv('UTF-8', 'ASCII//TRANSLIT', $msgRaw) ?: $msgRaw));
 
-        $ln = fn($k, $v) => '<tr><td style="padding:5px 0;font-size:13px;color:#8b96aa;">' . $k
-            . '</td><td align="right" style="padding:5px 0;font-size:14px;color:#16202e;font-weight:600;">' . $v . '</td></tr>';
+        $ln = fn($k, $v) => '<tr>'
+            . '<td style="padding:9px 0;border-top:1px solid ' . $hair . ';' . $t(13, 400, '1.3', $mut, 'white-space:nowrap;') . '">' . $k . '</td>'
+            . '<td align="right" style="padding:9px 0 9px 16px;border-top:1px solid ' . $hair . ';' . $t(14, 500, '1.3', $ink, 'font-variant-numeric:tabular-nums;') . '">' . $v . '</td></tr>';
         $lines = ($acc !== '' ? $ln('Číslo účtu', $e($acc)) : '')
             . $ln('Částka', $money($o['total'] ?? 0))
             . ($vs !== '0' ? $ln('Variabilní symbol', $e($vs)) : '')
-            . $ln('Zpráva pro příjemce', $e($msgRaw));
+            . $ln('Zpráva', $e($msgRaw));
 
         $qrCell = '';
         if ($iban !== '') {
             $spayd = 'SPD*1.0*ACC:' . $iban . '*AM:' . $amount . '*CC:CZK'
                 . ($vs !== '0' ? '*X-VS:' . $vs : '') . '*MSG:' . mb_substr($msgAscii, 0, 60);
-            $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=' . rawurlencode($spayd);
-            $qrCell = '<td align="center" style="vertical-align:top;width:150px;padding-left:16px;">'
-                . '<img src="' . $qrUrl . '" width="132" height="132" alt="QR platba" style="display:block;border:0;border-radius:12px;background:#fff;">'
-                . '<div style="font-size:11px;color:#8b96aa;margin-top:6px;line-height:1.4;">Naskenujte v bankovní<br>aplikaci (QR&nbsp;platba)</div></td>';
+            $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=324x324&margin=0&data=' . rawurlencode($spayd);
+            $qrCell = '<td class="qrc" width="134" style="vertical-align:top;padding-left:24px;">'
+                . '<div style="border:1px solid ' . $hair . ';border-radius:14px;padding:12px;background:#ffffff;">'
+                . '<img src="' . $qrUrl . '" width="108" height="108" alt="QR platba" style="display:block;border:0;width:108px;height:108px;"></div>'
+                . '<div style="' . $t(11, 400, '1.4', $fnt, 'text-align:center;padding-top:8px;') . '">QR&nbsp;platba</div></td>';
         }
-        $payTitle = 'K úhradě bankovním převodem';
-        $payBody  = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+        $payHead = $label('Platba převodem');
+        $payInner = '<div style="' . $t(15, 400, '1.55', $ink, 'padding-bottom:18px;') . '">K dokončení objednávky zbývá úhrada bankovním převodem.</div>'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
             . '<td style="vertical-align:top;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' . $lines . '</table></td>'
             . $qrCell . '</tr></table>'
-            . '<div style="font-size:13px;color:#39445a;line-height:1.6;margin-top:12px;">Jakmile platbu přijmeme, objednávku připravíme a dáme vám vědět. Uveďte prosím variabilní symbol.</div>';
+            . '<div style="' . $t(13, 400, '1.6', $mut, 'padding-top:16px;') . '">Uveďte prosím variabilní symbol. Jakmile platbu přijmeme, dáme vám vědět.</div>';
     } elseif ($payId === 'karta') {
-        $payTitle = 'Platba kartou';
-        $payBody  = '<div style="font-size:15px;color:#15803d;font-weight:700;">✓&nbsp;Zaplaceno online</div>'
-            . '<div style="font-size:13px;color:#39445a;line-height:1.6;margin-top:6px;">Platba kartou proběhla úspěšně. Objednávku připravujeme.</div>';
+        $payHead = $label('Platba');
+        $payInner = '<div style="' . $t(15, 500, '1.4', $ink) . '">Uhrazeno online kartou.</div>'
+            . '<div style="' . $t(13, 400, '1.6', $mut, 'padding-top:6px;') . '">Platba proběhla úspěšně, objednávku připravujeme.</div>';
     } elseif ($payId === 'dobirka') {
-        $payTitle = 'Dobírka';
-        $payBody  = '<div style="font-size:13px;color:#39445a;line-height:1.6;">Zaplatíte dopravci při převzetí zásilky.</div>';
+        $payHead = $label('Platba dobírkou');
+        $payInner = '<div style="' . $t(15, 400, '1.55', $ink) . '">Zaplatíte dopravci při převzetí zásilky.</div>';
     } else {
-        $payTitle = 'Platba při vyzvednutí';
-        $payBody  = '<div style="font-size:13px;color:#39445a;line-height:1.6;">Zaplatíte na prodejně při vyzvednutí — hotově nebo kartou.</div>';
+        $payHead = $label('Platba při vyzvednutí');
+        $payInner = '<div style="' . $t(15, 400, '1.55', $ink) . '">Zaplatíte při vyzvednutí na prodejně — hotově nebo kartou.</div>';
     }
 
-    // ── doručení ──────────────────────────────────────────────────────────────
+    // ── doručení ────────────────────────────────────────────────
     $shipLabel = trim((string)($o['ship_label'] ?? ''));
     $addr = $o['address'] ?? null;
     $addrHtml = '';
     if (is_array($addr) && trim((string)($addr['street'] ?? '')) !== '') {
-        $addrHtml = '<div style="font-size:13px;color:#39445a;margin-top:4px;">'
+        $addrHtml = '<div style="' . $t(14, 400, '1.5', $mut, 'padding-top:4px;') . '">'
             . $e($addr['street']) . ', ' . $e(trim(($addr['zip'] ?? '') . ' ' . ($addr['city'] ?? ''))) . '</div>';
     }
 
-    // ── patička: kontakty firmy ───────────────────────────────────────────────
-    $cAddr  = $e(get_setting('company_address', ''));
-    $cPhone = $e(get_setting('company_phone', ''));
-    $cEmail = $e(get_setting('company_email', '') ?: 'info@applefix.cz');
-    $footContacts = implode(' &nbsp;·&nbsp; ', array_filter([$cAddr, $cPhone, $cEmail]));
-
-    $card = fn($title, $inner) => '<tr><td style="padding:8px 44px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-        . 'style="background:rgba(240,245,252,.85);background-image:linear-gradient(180deg,rgba(255,255,255,.75),rgba(233,240,250,.7));border:1px solid rgba(160,180,215,.32);border-radius:16px;">'
-        . '<tr><td style="padding:18px 22px;">'
-        . '<div style="font-size:12px;color:#8b96aa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">' . $title . '</div>'
-        . $inner . '</td></tr></table></td></tr>';
+    // ── patička ─────────────────────────────────────────────────
+    $cAddr  = trim((string)get_setting('company_address', ''));
+    $cPhone = trim((string)get_setting('company_phone', ''));
+    $cEmail = trim((string)get_setting('company_email', '')) ?: 'info@applefix.cz';
+    $foot   = implode('&nbsp;&nbsp;·&nbsp;&nbsp;', array_map($e, array_filter([$cAddr, $cPhone])));
 
     return '<!doctype html><html lang="cs"><head><meta charset="utf-8">'
-        . '<meta name="viewport" content="width=device-width,initial-scale=1"><title>' . $company . '</title></head>'
-        . '<body style="margin:0;padding:0;background:#e9eef7;">'
-        . '<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Potvrzení vaší objednávky ' . $e($ref) . ' v ' . $company . '.</div>'
-        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e9eef7;background-image:linear-gradient(165deg,#eef2fa 0%,#e6ecf8 55%,#e9eef4 100%);padding:36px 12px;"><tr><td align="center">'
-        . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;background-image:linear-gradient(180deg,rgba(255,255,255,.96),rgba(250,252,255,.92));border:1px solid rgba(255,255,255,.9);outline:1px solid rgba(160,180,215,.28);border-radius:24px;overflow:hidden;box-shadow:0 18px 50px rgba(70,100,160,.16),0 2px 8px rgba(70,100,160,.08);font-family:-apple-system,BlinkMacSystemFont,\'SF Pro Text\',\'Segoe UI\',Arial,sans-serif;">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        . '<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">'
+        . '<title>' . $company . '</title>'
+        . '<style>@media only screen and (max-width:620px){.px{padding-left:26px!important;padding-right:26px!important}.qrc{padding-left:18px!important}}</style>'
+        . '</head>'
+        . '<body style="margin:0;padding:0;background:#f5f5f7;-webkit-font-smoothing:antialiased;">'
+        . '<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Souhrn vaší objednávky ' . $e($ref) . '.</div>'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;"><tr><td align="center" style="padding:28px 0;">'
+        . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;">'
 
-        // hlavička
-        . '<tr><td style="padding:26px 36px 20px;border-bottom:1px solid rgba(160,180,215,.18);">'
-        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
-        . '<td style="vertical-align:middle;"><img src="' . $logo . '" width="150" alt="' . $company . '" style="display:block;border:0;height:auto;"></td>'
-        . '<td align="right" style="vertical-align:middle;font-size:12px;color:#9aa4b5;">Objednávka <span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#111;">' . $e($ref) . '</span></td>'
-        . '</tr></table></td></tr>'
+        // header — logo vlevo
+        . '<tr><td class="px" style="padding:46px 48px 0;">'
+        . '<img src="' . $logo . '" width="116" alt="' . $company . '" style="display:block;border:0;height:auto;"></td></tr>'
 
-        // hero
-        . '<tr><td style="padding:30px 44px 4px;">'
-        . '<div style="font-size:23px;font-weight:800;color:#16202e;letter-spacing:-.01em;">Děkujeme za objednávku' . ($firstName !== '' ? ', ' . $e($firstName) : '') . '!</div>'
-        . '<div style="font-size:15px;line-height:1.7;color:#39445a;margin-top:8px;">Vaši objednávku jsme přijali. Níže najdete její souhrn'
-        . ($payId === 'prevod' ? ' <b>a platební údaje</b>' : '') . '.</div></td></tr>'
+        // eyebrow + titulek + úvod
+        . '<tr><td class="px" style="padding:36px 48px 0;">'
+        . '<div style="' . $t(12, 500, '1', $fnt, 'letter-spacing:.02em;font-variant-numeric:tabular-nums;') . '">Objednávka&nbsp;&nbsp;' . $e($ref) . '</div>'
+        . '<div style="' . $t(30, 600, '1.12', $ink, 'letter-spacing:-.021em;padding-top:9px;') . '">Objednávka přijata</div>'
+        . '<div style="' . $t(16, 400, '1.55', $mut, 'padding-top:13px;') . '">Dobrý den' . $e($fn) . ', děkujeme za váš nákup. Níže je souhrn'
+        . ($payId === 'prevod' ? ' a údaje k platbě' : '') . '.</div></td></tr>'
 
         // položky
-        . '<tr><td style="padding:16px 44px 6px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' . $rows . '</table></td></tr>'
+        . '<tr><td class="px" style="padding:34px 48px 0;">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' . $rows . '</table></td></tr>'
 
-        // platební karta
-        . $card($payTitle, $payBody)
+        // platba
+        . '<tr><td class="px" style="padding:42px 48px 0;">' . $payHead . $payInner . '</td></tr>'
 
         // doručení
-        . $card('Doručení', '<div style="font-size:14px;color:#16202e;font-weight:600;">' . ($shipLabel !== '' ? $e($shipLabel) : 'Dle volby v objednávce') . '</div>' . $addrHtml)
+        . '<tr><td class="px" style="padding:42px 48px 0;">' . $label('Doručení')
+        . '<div style="' . $t(15, 500, '1.4', $ink) . '">' . ($shipLabel !== '' ? $e($shipLabel) : 'Dle volby v objednávce') . '</div>' . $addrHtml . '</td></tr>'
 
-        // podpis
-        . '<tr><td style="padding:20px 44px 26px;"><div style="font-size:14px;line-height:1.7;color:#39445a;">Máte dotaz? Stačí odpovědět na tento e-mail.<br><b>Tým ' . $company . '</b></div></td></tr>'
+        // dotaz
+        . '<tr><td class="px" style="padding:42px 48px 0;">'
+        . '<div style="' . $t(14, 400, '1.6', $mut) . '">Máte dotaz? Napište na <a href="mailto:' . $e($cEmail) . '" style="color:' . $blue . ';text-decoration:none;">' . $e($cEmail) . '</a> nebo odpovězte na tento e-mail.</div></td></tr>'
 
         // patička
-        . '<tr><td style="padding:18px 36px 22px;border-top:1px solid rgba(160,180,215,.18);background:rgba(244,247,252,.7);">'
-        . '<div style="font-size:11px;line-height:1.7;color:#9aa4b5;text-align:center;">' . $footContacts . '</div>'
-        . '<div style="font-size:11px;line-height:1.7;color:#9aa4b5;text-align:center;margin-top:2px;"><a href="https://applefix.click" style="color:#5b7bb0;text-decoration:none;">applefix.click</a></div>'
-        . '</td></tr>'
+        . '<tr><td class="px" style="padding:38px 48px 48px;">'
+        . '<div style="border-top:1px solid ' . $hair . ';padding-top:24px;">'
+        . '<div style="' . $t(13, 600, '1.3', $ink, 'letter-spacing:-.01em;') . '">AppleFix</div>'
+        . ($foot !== '' ? '<div style="' . $t(12, 400, '1.6', $fnt, 'padding-top:5px;') . '">' . $foot . '</div>' : '')
+        . '<div style="padding-top:5px;"><a href="https://applefix.click" style="' . $t(12, 400, '1.6', $mut, 'text-decoration:none;') . '">applefix.click</a></div>'
+        . '</div></td></tr>'
 
         . '</table></td></tr></table></body></html>';
 }

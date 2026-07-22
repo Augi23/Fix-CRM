@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.4.9',
+        'date' => '2026-07-23',
+        'time' => '00:05',
+        'title' => 'E-shop e-maily: prémiový Apple redesign',
+        'items' => [
+            'Potvrzovací e-maily z e-shopu dostaly zcela nový, uměřený „Apple účtenka" vzhled — plochá bílá, zarovnání vlevo, jemné vlasové linky, SF Pro s přesnou vahovou hierarchií a tabulární čísla. Pryč jsou gradienty, sklo i stíny; e-mail teď působí luxusně a nadčasově, ne genericky.',
+        ],
+    ],
+    [
         'version' => '3.4.8',
         'date' => '2026-07-22',
         'time' => '23:14',
