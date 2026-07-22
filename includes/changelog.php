@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.4.7',
+        'date' => '2026-07-22',
+        'time' => '16:49',
+        'title' => 'E-shop: účty zákazníků — profil a historie objednávek',
+        'items' => [
+            'Nový endpoint api/eshop_customer.php — přihlášený zákazník na e-shopu (applefix.click, login přes Apple/Google) si podle svého e-mailu načte profil klienta (jméno, telefon — pro předvyplnění pokladny) a historii svých e-shop objednávek. Jen čtení, stejné zabezpečení jako feed (token); žádné zakládání klientů (klient v CRM vzniká až reálnou objednávkou).',
+        ],
+    ],
+    [
         'version' => '3.4.6',
         'date' => '2026-07-21',
         'time' => '19:09',
