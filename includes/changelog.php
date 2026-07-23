@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.4.10',
+        'date' => '2026-07-23',
+        'time' => '14:16',
+        'title' => 'Limit aktivně opravovaných zakázek na technika zvýšen na 10',
+        'items' => [
+            'Počet zakázek přidělených technikovi zůstává neomezený, ale <b>aktivně opravovat</b> (stav „Provádí se") smí každý technik současně nejvýše <b>10</b> zakázek (dříve 5). Limit se uplatní všude — změna stavu, rychlá změna i úprava zakázky.',
+        ],
+    ],
+    [
         'version' => '3.4.9',
         'date' => '2026-07-23',
         'time' => '00:05',

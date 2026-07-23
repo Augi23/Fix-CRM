@@ -2555,9 +2555,11 @@ function workSegmentOpen(int $orderId, ?int $technicianId): void {
 }
 
 /** Max. počet současně rozpracovaných zakázek („Provádí se") na jednoho technika.
- *  2 → 5 na přání majitele 20.7.2026. Při změně uprav i texty hlášek
- *  (technician_in_progress_limit_reached v lang_custom.php) a návod zmena-stavu. */
-if (!defined('CRM_TECH_IN_PROGRESS_LIMIT')) { define('CRM_TECH_IN_PROGRESS_LIMIT', 5); }
+ *  2 → 5 (20.7.2026) → 10 na přání majitele 23.7.2026. Přidělení zakázek technikovi
+ *  je neomezené; limit platí jen na aktivně opravované (stav „Provádí se"). Při změně
+ *  uprav i texty hlášek (technician_in_progress_limit_reached v lang_custom.php)
+ *  a návod zmena-stavu. */
+if (!defined('CRM_TECH_IN_PROGRESS_LIMIT')) { define('CRM_TECH_IN_PROGRESS_LIMIT', 10); }
 
 function getTechnicianInProgressCount($technicianId, $excludeOrderId = null) {
     global $pdo;
