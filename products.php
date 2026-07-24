@@ -448,6 +448,13 @@ try {
                                             <img id="pcStudioThumb" src="" alt="studio" class="rounded" style="max-height:78px;max-width:120px;object-fit:contain;background:rgba(255,255,255,.05);padding:4px;">
                                             <button type="button" id="pcStudioClear" class="btn btn-sm btn-link text-danger p-0">odebrat</button>
                                         </div>
+                                        <div class="form-check form-switch mt-2">
+                                            <input class="form-check-input" type="checkbox" id="pcStudioWholeModel" checked>
+                                            <label class="form-check-label small text-white-75" for="pcStudioWholeModel">
+                                                Použít pro <b>celý model</b> <span class="text-white-50">(všechny kusy + budoucí)</span>
+                                            </label>
+                                        </div>
+                                        <div id="pcStudioModelNote" class="small mt-1"></div>
                                     </div>
                                     <div class="col-md-8">
                                         <label class="form-label small mb-1">2. Klasické fotky
@@ -736,13 +743,30 @@ $(document).on('click', '.product-label-btn', function () {
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 pending--; if (gen !== formGen) return;
-                if (d.success) { $studioUrl.value = d.url; $studioThumb.src = d.url; $studioWrap.style.setProperty('display', 'flex', 'important'); }
-                else { showAlert('Studiová fotka se nenahrála: ' + (d.message || '')); }
+                if (!d.success) { showAlert('Studiová fotka se nenahrála: ' + (d.message || '')); return; }
+                $studioUrl.value = d.url; $studioThumb.src = d.url; $studioWrap.style.setProperty('display', 'flex', 'important');
+                // „Použít pro celý model" → zapiš i do knihovny fotek modelů (zdědí ji všechny kusy modelu)
+                var note = el('pcStudioModelNote');
+                if (!el('pcStudioWholeModel').checked) { note.textContent = ''; return; }
+                var mv = modelVal(), cv = colorVal();
+                if (!mv) { note.textContent = '⚠ Doplň model, ať se fotka přiřadí celému modelu.'; note.className = 'small mt-1 text-warning'; return; }
+                note.textContent = 'Přiřazuji celému modelu…'; note.className = 'small mt-1 text-white-50';
+                var mf = new FormData();
+                mf.append('action', 'set'); mf.append('model', mv); mf.append('color', cv);
+                mf.append('studio_url', d.url); mf.append('csrf_token', CSRF);
+                fetch('api/model_photos.php', { method: 'POST', body: mf, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (s) {
+                        note.textContent = s.success ? ('✓ přiřazeno celému modelu (' + mv + (cv ? ' · ' + cv : '') + ')') : ('Model se nepřiřadil: ' + (s.message || ''));
+                        note.className = 'small mt-1 ' + (s.success ? 'text-success' : 'text-danger');
+                    })
+                    .catch(function () { note.textContent = 'Model se nepřiřadil (síť).'; note.className = 'small mt-1 text-danger'; });
             })
             .catch(function () { pending--; if (gen === formGen) showAlert('Studiová fotka se nenahrála (síť).'); });
     });
     el('pcStudioClear').addEventListener('click', function () {
         $studioUrl.value = ''; $studioThumb.src = ''; $studioWrap.style.setProperty('display', 'none', 'important'); $studioPhoto.value = '';
+        el('pcStudioModelNote').textContent = '';
     });
 
     // (2) klasické fotky — dynamické sloty (3 → max 10)
@@ -839,7 +863,7 @@ $(document).on('click', '.product-label-btn', function () {
 
     // reset / naplnění celé Galerie (nový produkt = prázdno, editace = z produktu)
     function resetGalleryAll(gallery, studio, video) {
-        $studioUrl.value = studio || ''; $studioPhoto.value = '';
+        $studioUrl.value = studio || ''; $studioPhoto.value = ''; el('pcStudioModelNote').textContent = '';
         if (studio) { $studioThumb.src = studio; $studioWrap.style.setProperty('display', 'flex', 'important'); }
         else { $studioThumb.src = ''; $studioWrap.style.setProperty('display', 'none', 'important'); }
         galUrls = []; $gallerySlots.innerHTML = ''; $galleryAdd.style.display = '';

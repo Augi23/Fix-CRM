@@ -71,8 +71,12 @@ try {
 
     if ($action === 'set') {
         $key = trim((string)($_POST['model_key'] ?? ''));
+        // z Galerie u produktu přijde rovnou model+barva → klíč spočítáme tady (shodně s feedem)
+        if ($key === '' && trim((string)($_POST['model'] ?? '')) !== '') {
+            $key = productModelKey((string)$_POST['model'], (string)($_POST['color'] ?? ''));
+        }
         $url = trim((string)($_POST['studio_url'] ?? ''));
-        if ($key === '') mp_fail('Chybí model_key.');
+        if ($key === '') mp_fail('Chybí model_key nebo model.');
         if (mb_strlen($key) > 160) mp_fail('model_key je příliš dlouhý.');
         $clean = productImageDisplayUrl($url);
         if ($clean === '') mp_fail('Neplatná nebo nepovolená URL fotky.');

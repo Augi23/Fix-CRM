@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.8.0',
+        'date' => '2026-07-25',
+        'time' => '00:15',
+        'title' => 'Fotku pro celý model přidáš přímo u produktu (Galerie)',
+        'items' => [
+            'V <b>Galerii u produktu</b> (Sklad → Produkty → úprava) je u studiové fotky nové zaškrtávátko <b>„použít pro celý model"</b> (výchozí zapnuto): nahraješ fotku u jednoho kusu a přiřadí se <b>všem</b> kusům toho modelu + barvy (i budoucím). Nemusíš nikam jinam — vše na jednom místě.',
+            'Když necháš odškrtnuté, fotka platí jen pro ten konkrétní kus (výjimka/override).',
+            'Samostatná stránka <b>Fotky modelů</b> zůstává jako <b>přehled pokrytí</b> a hromadné nahrání; její karty jsou nově plné (animované pozadí přes ně neprosvítá).',
+        ],
+    ],
+    [
         'version' => '3.7.1',
         'date' => '2026-07-24',
         'time' => '23:45',

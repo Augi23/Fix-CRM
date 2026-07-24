@@ -27,9 +27,10 @@ $CSRF = $_SESSION['csrf_token'] ?? '';
         <div>
             <h4 class="mb-1"><i class="fas fa-images me-2"></i>Studiové fotky modelů</h4>
             <div class="text-white-50 small" style="max-width:640px">
-                Nahraj <strong>jednu</strong> studiovou fotku pro model + barvu — přiřadí se
-                <strong>všem</strong> kusům toho modelu (i těm, co teprve naskladníš). Fotka se
-                pak zobrazí jako hlavní obrázek na e-shopu a půjde do Meta/Google katalogu.
+                Přehled pokrytí + hromadné nahrání: <strong>jedna</strong> studiová fotka pro model + barvu
+                se přiřadí <strong>všem</strong> kusům toho modelu (i budoucím) a zobrazí se jako hlavní obrázek
+                na e-shopu i v Meta/Google katalogu. <span class="text-white-75">Totéž jde i přímo u produktu —
+                Galerie → zaškrtni „použít pro celý model".</span>
             </div>
         </div>
         <a href="products.php" class="btn btn-outline-light btn-sm"><i class="fas fa-arrow-left me-1"></i>Zpět na Produkty</a>
