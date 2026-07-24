@@ -248,8 +248,18 @@ function addOrderBranchScope(array &$whereClauses, array &$params, string $order
     }
     $branchId = getCurrentStaffBranchId();
     if ($branchId > 0) {
-        $whereClauses[] = $orderAlias . '.branch_id = ?';
-        $params[] = $branchId;
+        // Technik musí VŽDY vidět zakázky, které jsou mu přiřazené — i na cizí pobočce.
+        // Cross-branch přiřazení je od 1.6.0 povolené, ale scope ho dřív schovával
+        // (např. zakázka přijatá Na Příkopě přiřazená technikovi z Karlína).
+        $tid = (int)($_SESSION['tech_id'] ?? 0);
+        if ($tid > 0) {
+            $whereClauses[] = '(' . $orderAlias . '.branch_id = ? OR ' . $orderAlias . '.technician_id = ?)';
+            $params[] = $branchId;
+            $params[] = $tid;
+        } else {
+            $whereClauses[] = $orderAlias . '.branch_id = ?';
+            $params[] = $branchId;
+        }
     }
 }
 
@@ -274,6 +284,11 @@ function canAccessOrderBranch(array $order): bool {
     // zakázek a starších/importovaných zakázek, které vznikly bez branch_id. Jinak by
     // je viděl a měnil jen admin/Boss (globální diváci) a technik dostal „Přístup odepřen".
     if ($orderBranchId <= 0) {
+        return true;
+    }
+    // Přiřazený technik smí na svou zakázku vždy (cross-branch přiřazení, viz addOrderBranchScope).
+    $tid = (int)($_SESSION['tech_id'] ?? 0);
+    if ($tid > 0 && (int)($order['technician_id'] ?? 0) === $tid) {
         return true;
     }
     return $orderBranchId === getCurrentStaffBranchId();

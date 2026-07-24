@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.8.1',
+        'date' => '2026-07-25',
+        'time' => '01:00',
+        'title' => 'Oprava: technik nyní vždy vidí zakázky, které jsou mu přiřazené (i z jiné pobočky)',
+        'items' => [
+            'Od 1.6.0 lze zakázce přiřadit technika z kterékoliv pobočky, ale pobočkový filtr mu ji pak <b>schovával</b> — např. Khalil (Karlín) neviděl zakázku APFAZ2600871 přijatou Na Příkopě, přestože byla přiřazená jemu.',
+            'Opraveno v seznamu zakázek, na nástěnce, ve vyhledávání i v detailu/úpravě/tisku štítku: <b>svoje přiřazené zakázky vidíš vždy</b>, bez ohledu na pobočku. Pobočková izolace pro ostatní zakázky zůstává beze změny.',
+        ],
+    ],
+    [
         'version' => '3.8.0',
         'date' => '2026-07-25',
         'time' => '00:15',
