@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.7.1',
+        'date' => '2026-07-24',
+        'time' => '23:45',
+        'title' => 'Fotky modelů — čitelnost (plné karty, animované pozadí neprosvítá)',
+        'items' => [
+            'Na stránce <b>Sklad → Fotky modelů</b> byly karty skoro průhledné, takže se přes ně valilo animované pozadí a bylo to nepřehledné. Karty i přehled jsou teď <b>plné (neprůhledné)</b> na klidném podkladu.',
+        ],
+    ],
+    [
         'version' => '3.7.0',
         'date' => '2026-07-24',
         'time' => '23:00',

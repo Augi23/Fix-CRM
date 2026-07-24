@@ -35,6 +35,7 @@ $CSRF = $_SESSION['csrf_token'] ?? '';
         <a href="products.php" class="btn btn-outline-light btn-sm"><i class="fas fa-arrow-left me-1"></i>Zpět na Produkty</a>
     </div>
 
+    <div id="mpWrap">
     <!-- Coverage přehled -->
     <div id="mpStats" class="row g-2 mb-3"></div>
 
@@ -52,13 +53,18 @@ $CSRF = $_SESSION['csrf_token'] ?? '';
     <div id="mpGrid" class="row g-3">
         <div class="col-12 text-center text-white-50 py-5"><span class="spinner-border spinner-border-sm me-2"></span>Načítám modely…</div>
     </div>
+    </div><!-- /mpWrap -->
 </div>
 
 <style>
-.mp-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:12px;height:100%;display:flex;flex-direction:column;gap:10px}
+/* plné (neprůhledné) karty — animované pozadí shellu skrz ně nesmí prosvítat */
+#mpGrid .mp-card{background:#111419;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:12px;height:100%;display:flex;flex-direction:column;gap:10px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
 .mp-thumb{width:100%;aspect-ratio:1/1;border-radius:10px;background:#fff center/contain no-repeat;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.mp-thumb.empty{background:repeating-linear-gradient(45deg,rgba(255,255,255,.03),rgba(255,255,255,.03) 10px,rgba(255,255,255,.06) 10px,rgba(255,255,255,.06) 20px);color:rgba(255,255,255,.35);font-size:.8rem}
-.mp-card.covered{border-color:rgba(52,199,89,.45)}
+.mp-thumb.empty{background:#1a1e26;color:rgba(255,255,255,.4);font-size:.8rem}
+#mpGrid .mp-card.covered{border-color:rgba(52,199,89,.5)}
+/* klidné neprůhledné podklady i pod přehledem a filtry */
+#mpStats .glass-panel{background:#111419 !important;border-color:rgba(255,255,255,.08) !important}
+#mpWrap{background:rgba(10,12,16,.72);border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:18px 18px 6px}
 .mp-badge-count{font-variant-numeric:tabular-nums}
 </style>
 
