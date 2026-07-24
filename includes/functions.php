@@ -1309,6 +1309,104 @@ function crmEshopFeedToken(): string {
 }
 
 /**
+ * KNIHOVNA STUDIOVÝCH FOTEK MODELŮ (model_photos).
+ * Studiová fotka zepředu závisí jen na RODINĚ modelu + velikosti + BARVĚ (ne na čipu,
+ * roku ani kapacitě) — jedna fotka „MacBook Pro 16 Space Gray" tak legitimně pokrývá
+ * M1 Pro / M2 Max / … Produkt bez vlastní studiovky ji ve feedu ZDĚDÍ z knihovny podle
+ * klíče productModelKey(model,color). Naskladní-li se nový kus známého modelu, dostane
+ * fotku automaticky. Per-produkt studiovka v Galerii má vždy přednost (override).
+ *
+ * productModelKey() MUSÍ zůstat deterministický a shodný s párovacím enginem, kterým se
+ * knihovna plní (scratchpad/match_engine.py) — jinak by dědičnost minula.
+ */
+function productColorCanon(?string $c): string {
+    $c = trim((string)$c);
+    if ($c === '') return '';
+    $c = mb_strtolower($c, 'UTF-8');
+    $c = str_replace(['_', '-'], ' ', $c);
+    $c = trim(preg_replace('/\s+/', ' ', $c));
+    static $map = [
+        'spacegray' => 'space gray', 'space grey' => 'space gray', 'spacegrey' => 'space gray',
+        'spaceblack' => 'space black',
+        'deeppurple' => 'deep purple',
+        'hvězdně bílé' => 'starlight', 'hvezdne bile' => 'starlight',
+    ];
+    return $map[$c] ?? $c;
+}
+/** Rodina modelu bez čipu/roku/kapacity, zachovává velikost a Pro/Plus/Max/mini/Air. */
+function productModelFamily(?string $model): string {
+    $m = trim((string)$model);
+    if ($m === '') return '';
+    $m = mb_strtolower($m, 'UTF-8');
+    $m = str_replace(["″", '"', "''", "\u{201C}", "\u{201D}"], '', $m);   // palcové značky pryč
+    $m = preg_replace('/\(20\d\d\)/u', ' ', $m);                          // rok (2021)
+    $m = preg_replace('/\bintel\b/u', ' ', $m);
+    // čip M1/M2/… strhni JEN u Apple silicon (Mac/iPad) — ať regex nesežere „M2" v názvu
+    // ne-Apple telefonu (Sony Xperia M2 apod.) a nesloučí dva různé přístroje pod jeden klíč.
+    if (preg_match('/\b(macbook|imac|ipad|mac ?studio|mac ?mini|mac ?pro)\b/u', $m)) {
+        $m = preg_replace('/\bm[1-5]\s*(pro|max|ultra)?\b/u', ' ', $m);   // čip M1 / M2 Pro …
+    }
+    $m = preg_replace('/\b\d{1,4}\s*(gb|tb)\b/u', ' ', $m);               // kapacita (GB i TB)
+    $m = preg_replace('/[^a-z0-9 ]/u', ' ', $m);                          // ostatní znaky → mezera
+    $m = preg_replace('/\s+/', ' ', $m);
+    return trim($m);
+}
+/** Kanonický klíč „rodina|barva" pro dědičnost studiové fotky. '' = nelze určit. */
+function productModelKey(?string $model, ?string $color): string {
+    $fam = productModelFamily($model);
+    if ($fam === '') return '';
+    return $fam . '|' . productColorCanon($color);
+}
+/** Hezký lidský popis klíče modelu pro UI (např. „MacBook Pro 16 · Space Gray"). */
+function productModelKeyLabel(string $key): string {
+    [$fam, $col] = array_pad(explode('|', $key, 2), 2, '');
+    static $caseMap = ['iphone'=>'iPhone','ipad'=>'iPad','macbook'=>'MacBook','macstudio'=>'Mac Studio',
+        'pro'=>'Pro','max'=>'Max','air'=>'Air','mini'=>'mini','plus'=>'Plus','ultra'=>'Ultra',
+        'samsung'=>'Samsung','galaxy'=>'Galaxy','xiaomi'=>'Xiaomi','redmi'=>'Redmi','se'=>'SE'];
+    $words = array_map(function ($w) use ($caseMap) {
+        return $caseMap[$w] ?? ($w === '' ? '' : ucfirst($w));
+    }, explode(' ', $fam));
+    $famLabel = trim(implode(' ', $words));
+    $colLabel = $col === '' ? '' : ucwords($col);
+    return $colLabel === '' ? $famLabel : ($famLabel . ' · ' . $colLabel);
+}
+/** Tabulka knihovny studiových fotek modelů (klíč → studiová fotka). */
+function ensureModelPhotosTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        // model_key má utf8mb4_bin (byte-exact) — PK rovnost pak odpovídá přesnému porovnání
+        // PHP polí (isset($map[$key])); jinak by akcentované/velikostně odlišné klíče kolidovaly.
+        $pdo->exec("CREATE TABLE IF NOT EXISTS model_photos (
+            model_key VARCHAR(160) COLLATE utf8mb4_bin NOT NULL,
+            studio_image_url VARCHAR(500) NULL DEFAULT NULL,
+            label VARCHAR(200) NULL DEFAULT NULL,
+            updated_by VARCHAR(64) NULL DEFAULT NULL,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (model_key)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('ensureModelPhotosTable: ' . $e->getMessage()); }
+}
+/** Mapa model_key → studiová URL z knihovny (pro dědičnost ve feedu). Cache v rámci requestu. */
+function crmModelPhotoMap(): array {
+    global $pdo;
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $cache = [];
+    if (!isset($pdo)) return $cache;
+    try {
+        ensureModelPhotosTable();
+        $rows = $pdo->query("SELECT model_key, studio_image_url FROM model_photos
+                             WHERE studio_image_url IS NOT NULL AND studio_image_url <> ''")
+                    ->fetchAll(PDO::FETCH_KEY_PAIR);
+        if (is_array($rows)) $cache = $rows;
+    } catch (Throwable $e) { $cache = []; }
+    return $cache;
+}
+
+/**
  * POKLADNA (kasa prodejna) — přímý prodej dílů a produktů bez zakázky.
  * pos_sales = hlavička dokladu (číslo KP…, platba, prodavač, celkem),
  * pos_sale_items = položky (snapshot názvu/ceny v okamžiku prodeje —

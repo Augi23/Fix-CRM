@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.6.0',
+        'date' => '2026-07-24',
+        'time' => '21:30',
+        'title' => 'Fotky modelů — hromadné přiřazení studiové fotky (Sklad → Produkty → Fotky modelů)',
+        'items' => [
+            'Nová záložka <b>Fotky modelů</b> ve Skladu: nahraješ <b>jednu</b> studiovou fotku pro <b>model + barvu</b> a přiřadí se <b>všem</b> takovým kusům naráz — konec klikání u stovek produktů.',
+            'Funguje přes <b>dědičnost</b>: studiová fotka se váže na rodinu modelu + barvu (ne na čip/rok/kapacitu), takže jedna fotka „MacBook Pro 16″ Space Gray" pokryje M1 Pro / M2 Max / … i <b>budoucí naskladněné</b> kusy stejného modelu. Vlastní studiovka u konkrétního kusu (Galerie) má vždy přednost.',
+            'Přehled pokrytí (kolik produktů má fotku), filtr „jen bez fotky", vyhledávání modelu. Fotka jde na eshop jako hlavní obrázek i do Meta/Google katalogu.',
+            'Technicky: tabulka <code>model_photos</code> (klíč <code>rodina|barva</code>), feed <code>eshop_feed.php</code> studiovku zdědí, endpoint <code>api/model_photos.php</code>.',
+        ],
+    ],
+    [
         'version' => '3.5.0',
         'date' => '2026-07-24',
         'time' => '18:30',

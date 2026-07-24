@@ -31,6 +31,8 @@ header('Cache-Control: no-store');
 ensureProductsTable();
 if (function_exists('ensureProductsPosColumn')) { try { ensureProductsPosColumn(); } catch (Throwable $e) {} }
 if (function_exists('ensureProductsCrmColumns')) { try { ensureProductsCrmColumns(); } catch (Throwable $e) {} }
+// Knihovna studiových fotek modelů — produkt bez vlastní studiovky ji zdědí (viz níže).
+$modelPhotos = function_exists('crmModelPhotoMap') ? crmModelPhotoMap() : [];
 
 // ── auth ─────────────────────────────────────────────────────────────────────
 $remote   = (string)($_SERVER['REMOTE_ADDR'] ?? '');
@@ -91,6 +93,16 @@ try {
         $img = $absUrl($p['image_url'] ?? '');
         // Galerie média: studiová fotka (hlavní), klasické fotky (pole), 360° video.
         $studio = $absUrl($p['studio_image_url'] ?? '');
+        // Dědičnost: chybí-li vlastní studiovka, vezmi ji z knihovny fotek modelů podle
+        // rodiny+barvy (productModelKey). Per-produkt studiovka má vždy přednost.
+        $studioInherited = false;
+        if ($studio === '' && $modelPhotos && function_exists('productModelKey')) {
+            $mk = productModelKey($p['model'] ?? '', $p['color'] ?? '');
+            if ($mk !== '' && isset($modelPhotos[$mk])) {
+                $studio = $absUrl($modelPhotos[$mk]);
+                $studioInherited = ($studio !== '');
+            }
+        }
         $gallery = [];
         $galRaw = json_decode((string)($p['gallery_images'] ?? ''), true);
         if (is_array($galRaw)) { foreach ($galRaw as $g) { $u = $absUrl(is_string($g) ? $g : ''); if ($u !== '') { $gallery[] = $u; } } }
@@ -116,6 +128,7 @@ try {
             'short_description'    => $shortDesc,
             'image'                => $img !== '' ? $img : null,
             'studio_image'         => $studio !== '' ? $studio : null,
+            'studio_inherited'     => $studioInherited,   // true = zděděná z knihovny modelů (ne per-produkt)
             'gallery_images'       => $gallery,           // vždy pole (i prázdné) → eshop může map()
             'video_360_url'        => $video360 !== '' ? $video360 : null,
             'has_360'              => $video360 !== '',   // odvozeno z videa

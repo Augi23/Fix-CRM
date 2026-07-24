@@ -9,7 +9,9 @@
  * Nákupy vidí KAŽDÝ (bez gate — historicky, např. brigádník objednává díly).
  */
 $__invTab = basename($_SERVER['PHP_SELF']);
-$__invTab = $__invTab === 'products.php' ? 'products' : ($__invTab === 'procurement.php' ? 'procurement' : 'service');
+$__invTab = $__invTab === 'products.php' ? 'products'
+    : ($__invTab === 'procurement.php' ? 'procurement'
+    : ($__invTab === 'model_photos.php' ? 'modelphotos' : 'service'));
 ?>
 <ul class="nav nav-pills mb-4 glass-panel p-2 border-secondary">
     <?php if (hasPermission('manage_inventory')): ?>
@@ -18,6 +20,9 @@ $__invTab = $__invTab === 'products.php' ? 'products' : ($__invTab === 'procurem
     </li>
     <li class="nav-item">
         <a class="nav-link <?php echo $__invTab === 'products' ? 'active' : 'text-white-75'; ?>" href="products.php"><i class="fas fa-mobile-alt me-2"></i>Produkty — e-shop</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?php echo $__invTab === 'modelphotos' ? 'active' : 'text-white-75'; ?>" href="model_photos.php"><i class="fas fa-images me-2"></i>Fotky modelů</a>
     </li>
     <?php endif; ?>
     <li class="nav-item">
