@@ -56,6 +56,9 @@ if ($action === 'get') {
         'gallery_images'   => (string)($p['gallery_images'] ?? ''),   // JSON, UI si rozparsuje
         'video_360_url'    => productImageDisplayUrl((string)($p['video_360_url'] ?? '')),
         'has_360'          => (int)($p['has_360'] ?? 0),
+        'show_studio'      => (int)($p['show_studio'] ?? 1),
+        'show_gallery'     => (int)($p['show_gallery'] ?? 1),
+        'show_360'         => (int)($p['show_360'] ?? 1),
 
         'ram' => (string)($raw['[PARAMETER "RAM"]'] ?? ''),
         'cpu' => (string)($raw['CPU_JADRA'] ?? ''),
@@ -95,6 +98,10 @@ $in = [
     'studio_image_url' => trim((string)($_POST['studio_url'] ?? '')),
     'gallery_images'   => trim((string)($_POST['gallery_urls'] ?? '')),
     'video_360_url'    => trim((string)($_POST['video360_url'] ?? '')),
+    // per-produkt volba sekcí Galerie (checkboxy v UI); nepřítomné pole = zapnuto (výchozí)
+    'show_studio'  => isset($_POST['show_studio'])  ? (((string)$_POST['show_studio']  === '1') ? 1 : 0) : 1,
+    'show_gallery' => isset($_POST['show_gallery']) ? (((string)$_POST['show_gallery'] === '1') ? 1 : 0) : 1,
+    'show_360'     => isset($_POST['show_360'])     ? (((string)$_POST['show_360']     === '1') ? 1 : 0) : 1,
 ];
 $serial = trim((string)($_POST['serial'] ?? ''));
 $force = !empty($_POST['force']);
@@ -193,6 +200,7 @@ try {
         $pdo->prepare("UPDATE products SET product_code = ?, title = ?, manufacturer = ?, category_code = ?,
                 model = ?, capacity = ?, color = ?, grade = ?, battery = ?, price = ?, stock_qty = ?,
                 stock_key = ?, image_url = ?, studio_image_url = ?, gallery_images = ?, video_360_url = ?, has_360 = ?,
+                show_studio = ?, show_gallery = ?, show_360 = ?,
                 pcr_result = ?, pcr_status = ?, pcr_checked_at = COALESCE(?, pcr_checked_at),
                 raw_csv = ?, source = 'crm', created_by = COALESCE(created_by, ?), pos_sold_at = NULL, last_seen_at = NOW()
             WHERE id = ?")
@@ -201,6 +209,7 @@ try {
                 $asm['battery_csv'] ?: null, $priceNum, $stockQty,
                 $in['stock_key'], $in['image_url'] ?: null,
                 $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
+                $in['show_studio'], $in['show_gallery'], $in['show_360'],
                 $pcr['text'] ?: null,
                 $pcr['status'] ?: null, $codeChanged ? $pcrCheckedAt : null,
                 json_encode($asm['assoc'], JSON_UNESCAPED_UNICODE), $who ?: null, $editId]);
@@ -213,9 +222,10 @@ try {
         $ins = $pdo->prepare("INSERT INTO products
                 (product_code, title, manufacturer, category_code, model, capacity, color, grade, battery,
                  price, stock_qty, stock_key, image_url, studio_image_url, gallery_images, video_360_url, has_360,
+                 show_studio, show_gallery, show_360,
                  pcr_result, pcr_status, pcr_checked_at,
                  added_at, raw_csv, source, created_by, first_seen_at, last_seen_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
         for ($try = 0; $try < 3; $try++) {
             try {
                 $ins->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
@@ -223,6 +233,7 @@ try {
                     $asm['battery_csv'] ?: null, $priceNum, $stockQty,
                     $in['stock_key'], $in['image_url'] ?: null,
                     $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
+                    $in['show_studio'], $in['show_gallery'], $in['show_360'],
                     $pcr['text'] ?: null,
                     $pcr['status'] ?: null, $pcrCheckedAt,
                     json_encode($asm['assoc'], JSON_UNESCAPED_UNICODE), $who ?: null]);

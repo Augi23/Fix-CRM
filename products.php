@@ -441,8 +441,10 @@ try {
                                 </div>
                                 <div class="row g-3">
                                     <div class="col-md-4">
-                                        <label class="form-label small mb-1">1. Studiová fotka
-                                            <span class="text-white-50">(bez pozadí, jako Apple → eshop + katalog)</span></label>
+                                        <label class="form-label small mb-1 d-flex align-items-center gap-2">
+                                            <input class="form-check-input mt-0" type="checkbox" id="pcShowStudio" checked>
+                                            <span>1. Studiová fotka <span class="text-white-50">(bez pozadí → hlavní fotka na eshopu + Meta/Google katalog)</span></span>
+                                        </label>
                                         <input type="file" id="pcStudioPhoto" class="form-control form-control-sm" accept="image/*">
                                         <div id="pcStudioWrap" class="mt-2 d-flex align-items-center gap-2" style="display:none!important;">
                                             <img id="pcStudioThumb" src="" alt="studio" class="rounded" style="max-height:78px;max-width:120px;object-fit:contain;background:rgba(255,255,255,.05);padding:4px;">
@@ -457,14 +459,18 @@ try {
                                         <div id="pcStudioModelNote" class="small mt-1"></div>
                                     </div>
                                     <div class="col-md-8">
-                                        <label class="form-label small mb-1">2. Klasické fotky
-                                            <span class="text-white-50">(běžné fotky kusu — Sbazar/Bazos + galerie na eshopu, max 10)</span></label>
+                                        <label class="form-label small mb-1 d-flex align-items-center gap-2">
+                                            <input class="form-check-input mt-0" type="checkbox" id="pcShowGallery" checked>
+                                            <span>2. Klasické fotky <span class="text-white-50">(fotky kusu — Sbazar/Bazos + galerie na eshopu, max 10)</span></span>
+                                        </label>
                                         <div id="pcGallerySlots" class="d-flex flex-wrap gap-2"></div>
                                         <button type="button" id="pcGalleryAdd" class="btn btn-sm btn-outline-secondary mt-2"><i class="fas fa-plus me-1"></i>Přidat foto</button>
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label small mb-1">3. 360° video
-                                            <span class="text-white-50">(dvě celé otočky — eshop z něj po naskladnění vyrobí 360° bez pozadí)</span></label>
+                                        <label class="form-label small mb-1 d-flex align-items-center gap-2">
+                                            <input class="form-check-input mt-0" type="checkbox" id="pcShow360" checked>
+                                            <span>3. 360° video <span class="text-white-50">(dvě celé otočky — server vyrobí 360° prohlídku na eshop)</span></span>
+                                        </label>
                                         <input type="file" id="pcVideo360" class="form-control form-control-sm" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm">
                                         <div id="pcVideoStatus" class="small mt-1"></div>
                                         <div id="pcVideo360Proc" class="small mt-1" style="display:none"></div>
@@ -862,7 +868,11 @@ $(document).on('click', '.product-label-btn', function () {
     });
 
     // reset / naplnění celé Galerie (nový produkt = prázdno, editace = z produktu)
-    function resetGalleryAll(gallery, studio, video) {
+    function resetGalleryAll(gallery, studio, video, flags) {
+        flags = flags || {};
+        el('pcShowStudio').checked  = flags.studio  !== 0;   // výchozí zapnuto
+        el('pcShowGallery').checked = flags.gallery !== 0;
+        el('pcShow360').checked     = flags.v360    !== 0;
         $studioUrl.value = studio || ''; $studioPhoto.value = ''; el('pcStudioModelNote').textContent = '';
         if (studio) { $studioThumb.src = studio; $studioWrap.style.setProperty('display', 'flex', 'important'); }
         else { $studioThumb.src = ''; $studioWrap.style.setProperty('display', 'none', 'important'); }
@@ -910,6 +920,10 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('studio_url', $studioUrl.value);
         fd.append('gallery_urls', $galleryUrls.value);
         fd.append('video360_url', $video360Url.value);
+        // volba sekcí: co z Galerie se u tohohle kusu použije na eshopu/v katalogu
+        fd.append('show_studio', el('pcShowStudio').checked ? '1' : '0');
+        fd.append('show_gallery', el('pcShowGallery').checked ? '1' : '0');
+        fd.append('show_360', el('pcShow360').checked ? '1' : '0');
         if (force) fd.append('force', '1');
         fetch('api/product_create.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
@@ -1025,7 +1039,8 @@ $(document).on('click', '.product-label-btn', function () {
                 if (p.image_url) { el('pcPreviewImg').src = p.image_url; el('pcPreviewImgWrap').style.display = ''; }
                 else { el('pcPreviewImgWrap').style.display = 'none'; }
                 var galArr = []; try { galArr = p.gallery_images ? JSON.parse(p.gallery_images) : []; } catch (e) { galArr = []; }
-                resetGalleryAll(Array.isArray(galArr) ? galArr : [], p.studio_image_url || '', p.video_360_url || '');
+                resetGalleryAll(Array.isArray(galArr) ? galArr : [], p.studio_image_url || '', p.video_360_url || '',
+                    { studio: p.show_studio, gallery: p.show_gallery, v360: p.show_360 });
                 setBadge(p.pcr_status || 'none');
                 $msg.textContent = p.source === 'app' ? 'Pozor: kus z appky — uložením ho převezme CRM (import appky ho už nepřepíše).' : '';
                 refreshPreview();

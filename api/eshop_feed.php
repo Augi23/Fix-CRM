@@ -107,6 +107,14 @@ try {
         $galRaw = json_decode((string)($p['gallery_images'] ?? ''), true);
         if (is_array($galRaw)) { foreach ($galRaw as $g) { $u = $absUrl(is_string($g) ? $g : ''); if ($u !== '') { $gallery[] = $u; } } }
         $video360 = $absUrl($p['video_360_url'] ?? '');
+        // Per-produkt volba sekcí Galerie (checkboxy v CRM): vypnutá sekce se na eshop nepošle.
+        // show_studio vypne i DĚDĚNOU studiovku (platí pro celý produkt) → katalog spadne na image.
+        $showStudio  = !isset($p['show_studio'])  || (int)$p['show_studio']  === 1;
+        $showGallery = !isset($p['show_gallery']) || (int)$p['show_gallery'] === 1;
+        $show360     = !isset($p['show_360'])     || (int)$p['show_360']     === 1;
+        if (!$showStudio)  { $studio = ''; $studioInherited = false; }
+        if (!$showGallery) { $gallery = []; }
+        if (!$show360)     { $video360 = ''; }
 
         $products[] = [
             'code'                 => (string)$p['product_code'],
@@ -132,6 +140,7 @@ try {
             'gallery_images'       => $gallery,           // vždy pole (i prázdné) → eshop může map()
             'video_360_url'        => $video360 !== '' ? $video360 : null,
             'has_360'              => $video360 !== '',   // odvozeno z videa
+            'show_360'             => $show360,           // eshop podle toho gate-uje 360° prohlídku (snímky čte z disku)
             'pcr_result'           => $p['pcr_result'] !== null ? (string)$p['pcr_result'] : null,
             'added_at'             => $p['added_at'] !== null ? (string)$p['added_at'] : null,
             'updated_at'           => (string)$p['updated_at'],

@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.9.0',
+        'date' => '2026-07-25',
+        'time' => '02:30',
+        'title' => 'Galerie: u každé sekce volíš zaškrtnutím, co se u produktu použije na e-shopu',
+        'items' => [
+            'Podle původního zadání: každá ze tří sekcí Galerie má <b>zaškrtávátko</b> — <b>1) studiová fotka</b> (hlavní fotka na e-shopu + Meta/Google katalog), <b>2) klasické fotky</b> (galerie na e-shopu), <b>3) 360° prohlídka</b>. Co zaškrtneš, to se u produktu použije; odškrtnutá sekce se na e-shop nepošle (média zůstávají uložená, jen se nezobrazují).',
+            'Vypnutí sekce 1 vypne i <b>děděnou</b> fotku modelu u tohoto kusu (katalog pak použije běžnou fotku). Vypnutí sekce 3 schová 360° prohlídku i náhled z ní.',
+            'Výchozí stav = vše zaškrtnuto (dosavadní chování). Nastavení se pamatuje per produkt a při editaci se předvyplní.',
+        ],
+    ],
+    [
         'version' => '3.8.2',
         'date' => '2026-07-25',
         'time' => '01:45',

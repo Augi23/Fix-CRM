@@ -1515,6 +1515,11 @@ function ensureProductsCrmColumns(): void {
             'gallery_images'   => "ALTER TABLE products ADD COLUMN gallery_images MEDIUMTEXT NULL DEFAULT NULL",
             'video_360_url'    => "ALTER TABLE products ADD COLUMN video_360_url VARCHAR(500) NULL DEFAULT NULL",
             'has_360'          => "ALTER TABLE products ADD COLUMN has_360 TINYINT(1) NOT NULL DEFAULT 0",
+            // Per-produkt volba sekcí Galerie (zaškrtnutí v UI): která média se použijí na e-shopu.
+            // show_studio řídí i obrázek do Meta/Google katalogu; výchozí = vše zapnuto.
+            'show_studio'  => "ALTER TABLE products ADD COLUMN show_studio TINYINT(1) NOT NULL DEFAULT 1",
+            'show_gallery' => "ALTER TABLE products ADD COLUMN show_gallery TINYINT(1) NOT NULL DEFAULT 1",
+            'show_360'     => "ALTER TABLE products ADD COLUMN show_360 TINYINT(1) NOT NULL DEFAULT 1",
         ];
         foreach ($add as $col => $ddl) {
             if (!$pdo->query("SHOW COLUMNS FROM products LIKE '" . $col . "'")->fetch()) {
