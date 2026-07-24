@@ -52,6 +52,10 @@ if ($action === 'get') {
         'sold' => (int)$p['stock_qty'] <= 0,
         'stock_key' => (string)($p['stock_key'] ?? ''),
         'image_url' => productImageDisplayUrl((string)($p['image_url'] ?? '')),   // jen naše úložiště — cizí URL z CSV nejde do <img>
+        'studio_image_url' => productImageDisplayUrl((string)($p['studio_image_url'] ?? '')),
+        'gallery_images'   => (string)($p['gallery_images'] ?? ''),   // JSON, UI si rozparsuje
+        'video_360_url'    => productImageDisplayUrl((string)($p['video_360_url'] ?? '')),
+        'has_360'          => (int)($p['has_360'] ?? 0),
 
         'ram' => (string)($raw['[PARAMETER "RAM"]'] ?? ''),
         'cpu' => (string)($raw['CPU_JADRA'] ?? ''),
@@ -87,6 +91,10 @@ $in = [
     'sold' => !empty($_POST['sold']),
     'stock_key' => in_array((string)($_POST['stock_key'] ?? ''), ['karlin', 'vaclavak'], true) ? (string)$_POST['stock_key'] : 'karlin',
     'image_url' => trim((string)($_POST['image_url'] ?? '')),
+    // Galerie média (sekce v modalu): studiová fotka, klasické fotky (JSON pole URL), 360° video
+    'studio_image_url' => trim((string)($_POST['studio_url'] ?? '')),
+    'gallery_images'   => trim((string)($_POST['gallery_urls'] ?? '')),
+    'video_360_url'    => trim((string)($_POST['video360_url'] ?? '')),
 ];
 $serial = trim((string)($_POST['serial'] ?? ''));
 $force = !empty($_POST['force']);
@@ -103,6 +111,24 @@ $in['price'] = rtrim(rtrim(number_format($priceNum, 2, '.', ''), '0'), '.');   /
 if (mb_strlen($in['image_url']) > 500 || ($in['image_url'] !== '' && productImageDisplayUrl($in['image_url']) === '')) {
     $in['image_url'] = '';   // jen fotky z našeho úložiště
 }
+// Galerie: stejný whitelist (jen naše úložiště) pro studio i video; galerie = JSON pole URL (max 10)
+if (mb_strlen($in['studio_image_url']) > 500 || ($in['studio_image_url'] !== '' && productImageDisplayUrl($in['studio_image_url']) === '')) {
+    $in['studio_image_url'] = '';
+}
+if (mb_strlen($in['video_360_url']) > 500 || ($in['video_360_url'] !== '' && productImageDisplayUrl($in['video_360_url']) === '')) {
+    $in['video_360_url'] = '';
+}
+$galIn = json_decode($in['gallery_images'] ?: '[]', true);
+$galClean = [];
+if (is_array($galIn)) {
+    foreach ($galIn as $g) {
+        $g = trim((string)$g);
+        if ($g !== '' && mb_strlen($g) <= 500 && productImageDisplayUrl($g) !== '') { $galClean[] = $g; }
+        if (count($galClean) >= 10) break;
+    }
+}
+$in['gallery_images'] = $galClean ? json_encode($galClean, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+$in['has_360'] = ($in['video_360_url'] !== '') ? 1 : 0;
 
 try {
     $existing = null;
@@ -166,13 +192,16 @@ try {
     if ($action === 'update') {
         $pdo->prepare("UPDATE products SET product_code = ?, title = ?, manufacturer = ?, category_code = ?,
                 model = ?, capacity = ?, color = ?, grade = ?, battery = ?, price = ?, stock_qty = ?,
-                stock_key = ?, image_url = ?, pcr_result = ?, pcr_status = ?, pcr_checked_at = COALESCE(?, pcr_checked_at),
+                stock_key = ?, image_url = ?, studio_image_url = ?, gallery_images = ?, video_360_url = ?, has_360 = ?,
+                pcr_result = ?, pcr_status = ?, pcr_checked_at = COALESCE(?, pcr_checked_at),
                 raw_csv = ?, source = 'crm', created_by = COALESCE(created_by, ?), pos_sold_at = NULL, last_seen_at = NOW()
             WHERE id = ?")
             ->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
                 $asm['display_model'], $in['cap'] ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
                 $asm['battery_csv'] ?: null, $priceNum, $stockQty,
-                $in['stock_key'], $in['image_url'] ?: null, $pcr['text'] ?: null,
+                $in['stock_key'], $in['image_url'] ?: null,
+                $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
+                $pcr['text'] ?: null,
                 $pcr['status'] ?: null, $codeChanged ? $pcrCheckedAt : null,
                 json_encode($asm['assoc'], JSON_UNESCAPED_UNICODE), $who ?: null, $editId]);
         $productId = $editId;
@@ -183,15 +212,18 @@ try {
     } else {
         $ins = $pdo->prepare("INSERT INTO products
                 (product_code, title, manufacturer, category_code, model, capacity, color, grade, battery,
-                 price, stock_qty, stock_key, image_url, pcr_result, pcr_status, pcr_checked_at,
+                 price, stock_qty, stock_key, image_url, studio_image_url, gallery_images, video_360_url, has_360,
+                 pcr_result, pcr_status, pcr_checked_at,
                  added_at, raw_csv, source, created_by, first_seen_at, last_seen_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
         for ($try = 0; $try < 3; $try++) {
             try {
                 $ins->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
                     $asm['display_model'], $in['cap'] ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
                     $asm['battery_csv'] ?: null, $priceNum, $stockQty,
-                    $in['stock_key'], $in['image_url'] ?: null, $pcr['text'] ?: null,
+                    $in['stock_key'], $in['image_url'] ?: null,
+                    $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
+                    $pcr['text'] ?: null,
                     $pcr['status'] ?: null, $pcrCheckedAt,
                     json_encode($asm['assoc'], JSON_UNESCAPED_UNICODE), $who ?: null]);
                 break;

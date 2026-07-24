@@ -48,6 +48,12 @@ if ($code === '') { afx_img_fail('Chybí kód produktu.'); }
 $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', $code);
 $safe = trim($safe, '._-');
 if ($safe === '') { $safe = 'produkt-' . substr(md5($code), 0, 8); }
+// varianta = přípona názvu (studio / g0..g9) → víc fotek jednoho produktu bez přepisu hlavní fotky
+$variant = preg_replace('/[^a-z0-9]/', '', strtolower((string)($_POST['variant'] ?? '')));
+if ($variant !== '') { $safe .= '-' . $variant; }
+// keep_alpha = zachovat průhlednost (PNG) — pro studiovou fotku bez pozadí; jinak JPEG na bílé
+$keepAlpha = !empty($_POST['keep_alpha']);
+$ext = $keepAlpha ? 'png' : 'jpg';
 
 if (empty($_FILES['image']['tmp_name']) || !is_uploaded_file($_FILES['image']['tmp_name'])) {
     afx_img_fail('Chybí soubor s obrázkem.');
@@ -65,7 +71,7 @@ if ($info === false || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGE
 // ── Cílová složka (veřejná) ──
 $dir = __DIR__ . '/../media/products';
 if (!is_dir($dir)) { @mkdir($dir, 0755, true); }
-$destJpg = $dir . '/' . $safe . '.jpg';
+$destJpg = $dir . '/' . $safe . '.' . $ext;
 
 // ── Zmenšení + převod na JPEG přes GD (Meta i Upgates mají rády ~1600 px, <8 MB) ──
 $saved = false;
@@ -85,11 +91,19 @@ if (function_exists('imagecreatetruecolor')) {
             $nw = max(1, (int)round($w * $scale));
             $nh = max(1, (int)round($h * $scale));
             $dst = imagecreatetruecolor($nw, $nh);
-            // bílé pozadí (JPEG nemá průhlednost) — hodí se pro produktové fotky
-            $white = imagecolorallocate($dst, 255, 255, 255);
-            imagefilledrectangle($dst, 0, 0, $nw, $nh, $white);
+            if ($keepAlpha) {
+                // studiová fotka bez pozadí → zachovat průhlednost (PNG)
+                imagealphablending($dst, false);
+                imagesavealpha($dst, true);
+                $bg = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+                imagefilledrectangle($dst, 0, 0, $nw, $nh, $bg);
+            } else {
+                // bílé pozadí (JPEG nemá průhlednost) — hodí se pro produktové fotky
+                $white = imagecolorallocate($dst, 255, 255, 255);
+                imagefilledrectangle($dst, 0, 0, $nw, $nh, $white);
+            }
             imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
-            $saved = imagejpeg($dst, $destJpg, 88);
+            $saved = $keepAlpha ? imagepng($dst, $destJpg, 6) : imagejpeg($dst, $destJpg, 88);
             imagedestroy($src); imagedestroy($dst);
         }
     } catch (Throwable $e) { $saved = false; }
@@ -101,7 +115,7 @@ if (!$saved) {
 @chmod($destJpg, 0644);
 
 $host = $_SERVER['HTTP_HOST'] ?? 'admin.applefix.cloud';
-$url = 'https://' . $host . '/media/products/' . rawurlencode($safe) . '.jpg?v=' . (int)@filemtime($destJpg);
+$url = 'https://' . $host . '/media/products/' . rawurlencode($safe) . '.' . $ext . '?v=' . (int)@filemtime($destJpg);
 
 crmAuditLog('product_image.upload', [
     'entity_type' => 'product', 'entity_label' => $code,

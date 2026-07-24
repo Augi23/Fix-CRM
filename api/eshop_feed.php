@@ -82,11 +82,19 @@ try {
                      || (mb_stripos($shortDesc, '§90') !== false)
                      || (mb_stripos($shortDesc, 'zvláštní režim') !== false);
 
-        // Fotka jen z whitelistovaného hostu (admin.applefix.cloud / media/products).
-        $img = productImageDisplayUrl((string)($p['image_url'] ?? ''));
-        if ($img !== '' && str_starts_with($img, 'media/products/')) {
-            $img = 'https://admin.applefix.cloud/' . ltrim($img, '/');
-        }
+        // Média jen z whitelistovaného hostu (admin.applefix.cloud / media/products) → absolutní URL.
+        $absUrl = static function (?string $u): string {
+            $u = productImageDisplayUrl((string)$u);
+            if ($u !== '' && str_starts_with($u, 'media/products/')) { $u = 'https://admin.applefix.cloud/' . ltrim($u, '/'); }
+            return $u;
+        };
+        $img = $absUrl($p['image_url'] ?? '');
+        // Galerie média: studiová fotka (hlavní), klasické fotky (pole), 360° video.
+        $studio = $absUrl($p['studio_image_url'] ?? '');
+        $gallery = [];
+        $galRaw = json_decode((string)($p['gallery_images'] ?? ''), true);
+        if (is_array($galRaw)) { foreach ($galRaw as $g) { $u = $absUrl(is_string($g) ? $g : ''); if ($u !== '') { $gallery[] = $u; } } }
+        $video360 = $absUrl($p['video_360_url'] ?? '');
 
         $products[] = [
             'code'                 => (string)$p['product_code'],
@@ -107,6 +115,10 @@ try {
             'stock_location'       => (string)($p['stock_key'] ?? ''),
             'short_description'    => $shortDesc,
             'image'                => $img !== '' ? $img : null,
+            'studio_image'         => $studio !== '' ? $studio : null,
+            'gallery_images'       => $gallery,           // vždy pole (i prázdné) → eshop může map()
+            'video_360_url'        => $video360 !== '' ? $video360 : null,
+            'has_360'              => $video360 !== '',   // odvozeno z videa
             'pcr_result'           => $p['pcr_result'] !== null ? (string)$p['pcr_result'] : null,
             'added_at'             => $p['added_at'] !== null ? (string)$p['added_at'] : null,
             'updated_at'           => (string)$p['updated_at'],

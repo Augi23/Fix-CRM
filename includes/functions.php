@@ -1387,6 +1387,12 @@ function ensureProductsCrmColumns(): void {
             'created_by' => "ALTER TABLE products ADD COLUMN created_by VARCHAR(64) NULL DEFAULT NULL",
             'pcr_status' => "ALTER TABLE products ADD COLUMN pcr_status VARCHAR(16) NULL DEFAULT NULL",
             'pcr_checked_at' => "ALTER TABLE products ADD COLUMN pcr_checked_at DATETIME NULL DEFAULT NULL",
+            // Galerie média (studiová fotka, klasické fotky pro Sbazar/Bazos, 360° video) — vše
+            // spravováno v CRM, import appky je nikdy nepřepisuje (jsou to source='crm' data).
+            'studio_image_url' => "ALTER TABLE products ADD COLUMN studio_image_url VARCHAR(500) NULL DEFAULT NULL",
+            'gallery_images'   => "ALTER TABLE products ADD COLUMN gallery_images MEDIUMTEXT NULL DEFAULT NULL",
+            'video_360_url'    => "ALTER TABLE products ADD COLUMN video_360_url VARCHAR(500) NULL DEFAULT NULL",
+            'has_360'          => "ALTER TABLE products ADD COLUMN has_360 TINYINT(1) NOT NULL DEFAULT 0",
         ];
         foreach ($add as $col => $ddl) {
             if (!$pdo->query("SHOW COLUMNS FROM products LIKE '" . $col . "'")->fetch()) {

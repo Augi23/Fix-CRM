@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.5.0',
+        'date' => '2026-07-24',
+        'time' => '18:30',
+        'title' => 'Galerie média u produktu (studiová fotka · klasické fotky · 360° video)',
+        'items' => [
+            'V naskladnění/úpravě produktu (Sklad → Produkty) přibyla sekce <b>Galerie</b> se třemi částmi: <b>1) studiová fotka</b> (bez pozadí, jako oficiální Apple — hlavní obrázek na eshopu i pro Meta/Google katalog), <b>2) klasické fotky</b> (běžné snímky kusu pro Sbazar/Bazos + galerii na eshopu; 3 pole + ➕ až do 10), <b>3) 360° video</b> (dvě otočky — eshop z něj po naskladnění vyrobí 360° bez pozadí; příprava, zpracování ve fázi 2).',
+            'Studiová fotka se ukládá jako <b>průhledné PNG</b> (zachová se odstraněné pozadí); klasické fotky jako JPEG. Vše přes naše úložiště <code>media/products/</code>, video přes nový endpoint <code>upload_product_video.php</code>.',
+            'Feed pro e-shop nese nová pole (<code>studio_image</code>, <code>gallery_images</code>, <code>video_360_url</code>, <code>has_360</code>) — produkt na applefix.click používá studiovou fotku jako hlavní obrázek a klasické fotky jako galerii s lightboxem; do Meta/Google katalogu jde studiová fotka.',
+            'Import z naskladňovací appky (source=app) tyhle sloupce nikdy nepřepíše (jsou to CRM data).',
+        ],
+    ],
+    [
         'version' => '3.4.10',
         'date' => '2026-07-23',
         'time' => '14:16',

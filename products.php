@@ -341,6 +341,9 @@ try {
                     <div class="col-lg-7">
                         <input type="hidden" id="pcEditId" value="">
                         <input type="hidden" id="pcImageUrl" value="">
+                        <input type="hidden" id="pcStudioUrl" value="">
+                        <input type="hidden" id="pcGalleryUrls" value="">
+                        <input type="hidden" id="pcVideo360Url" value="">
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <label class="form-label small">Typ zařízení</label>
@@ -425,6 +428,39 @@ try {
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="pcSold">
                                     <label class="form-check-label small" for="pcSold">Prodáno (uloží se jako Vyprodáno)</label>
+                                </div>
+                            </div>
+
+                            <!-- ── Galerie média ── -->
+                            <div class="col-12">
+                                <hr class="border-secondary opacity-25 my-1">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-images text-primary"></i>
+                                    <span class="fw-semibold">Galerie média</span>
+                                    <span class="text-white-50 small">— studiová fotka · klasické fotky (Sbazar/Bazos) · 360° video</span>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">1. Studiová fotka
+                                            <span class="text-white-50">(bez pozadí, jako Apple → eshop + katalog)</span></label>
+                                        <input type="file" id="pcStudioPhoto" class="form-control form-control-sm" accept="image/*">
+                                        <div id="pcStudioWrap" class="mt-2 d-flex align-items-center gap-2" style="display:none!important;">
+                                            <img id="pcStudioThumb" src="" alt="studio" class="rounded" style="max-height:78px;max-width:120px;object-fit:contain;background:rgba(255,255,255,.05);padding:4px;">
+                                            <button type="button" id="pcStudioClear" class="btn btn-sm btn-link text-danger p-0">odebrat</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label small mb-1">2. Klasické fotky
+                                            <span class="text-white-50">(běžné fotky kusu — Sbazar/Bazos + galerie na eshopu, max 10)</span></label>
+                                        <div id="pcGallerySlots" class="d-flex flex-wrap gap-2"></div>
+                                        <button type="button" id="pcGalleryAdd" class="btn btn-sm btn-outline-secondary mt-2"><i class="fas fa-plus me-1"></i>Přidat foto</button>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small mb-1">3. 360° video
+                                            <span class="text-white-50">(dvě celé otočky — eshop z něj po naskladnění vyrobí 360° bez pozadí)</span></label>
+                                        <input type="file" id="pcVideo360" class="form-control form-control-sm" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm">
+                                        <div id="pcVideoStatus" class="small mt-1"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -639,7 +675,7 @@ $(document).on('click', '.product-label-btn', function () {
     // formGen: generace formuláře — pozdní odpovědi (PČR, foto) z PŘEDCHOZÍHO kusu
     // nesmí zapsat do už vyčištěného/nového formuláře
     var formGen = 0;
-    var photoBusy = false;
+    var pending = 0;   // počet BĚŽÍCÍCH uploadů (hlavní foto + studio + galerie + video) — save() počká na všechny
 
     $serial.addEventListener('blur', function () {
         var v = $serial.value.trim();
@@ -663,12 +699,12 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('image', $photo.files[0]);
         fd.append('code', code);
         fd.append('csrf_token', CSRF);
-        photoBusy = true;
+        pending++;
         $msg.textContent = 'Nahrávám fotku…';
         fetch('api/upload_product_image.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                photoBusy = false;
+                pending--;
                 if (gen !== formGen) return;   // formulář mezitím přešel na další kus
                 if (d.success) {
                     $imageUrl.value = d.url;
@@ -677,15 +713,112 @@ $(document).on('click', '.product-label-btn', function () {
                     $msg.textContent = 'Foto přiloženo.';
                 } else { $msg.textContent = 'Foto se nenahrálo: ' + (d.message || ''); }
             })
-            .catch(function () { photoBusy = false; if (gen === formGen) $msg.textContent = 'Foto se nenahrálo (síť).'; });
+            .catch(function () { pending--; if (gen === formGen) $msg.textContent = 'Foto se nenahrálo (síť).'; });
     });
+
+    // ── Galerie média: studiová fotka, klasické fotky (dynamické sloty), 360° video ──
+    var $studioPhoto = el('pcStudioPhoto'), $studioUrl = el('pcStudioUrl'),
+        $studioWrap = el('pcStudioWrap'), $studioThumb = el('pcStudioThumb'),
+        $gallerySlots = el('pcGallerySlots'), $galleryUrls = el('pcGalleryUrls'), $galleryAdd = el('pcGalleryAdd'),
+        $video360 = el('pcVideo360'), $video360Url = el('pcVideo360Url'), $videoStatus = el('pcVideoStatus');
+    var galUrls = [];                                        // URL nahraných klasických fotek (dle pořadí slotů)
+    function baseCode() { return $serial.value.trim() || ('foto-' + Date.now()); }
+
+    // (1) studiová fotka — průhledné PNG (variant=studio, keep_alpha)
+    $studioPhoto.addEventListener('change', function () {
+        if (!this.files.length) return;
+        var gen = formGen; pending++;
+        var fd = new FormData();
+        fd.append('image', this.files[0]); fd.append('code', baseCode());
+        fd.append('variant', 'studio'); fd.append('keep_alpha', '1'); fd.append('csrf_token', CSRF);
+        fetch('api/upload_product_image.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                pending--; if (gen !== formGen) return;
+                if (d.success) { $studioUrl.value = d.url; $studioThumb.src = d.url; $studioWrap.style.setProperty('display', 'flex', 'important'); }
+                else { showAlert('Studiová fotka se nenahrála: ' + (d.message || '')); }
+            })
+            .catch(function () { pending--; if (gen === formGen) showAlert('Studiová fotka se nenahrála (síť).'); });
+    });
+    el('pcStudioClear').addEventListener('click', function () {
+        $studioUrl.value = ''; $studioThumb.src = ''; $studioWrap.style.setProperty('display', 'none', 'important'); $studioPhoto.value = '';
+    });
+
+    // (2) klasické fotky — dynamické sloty (3 → max 10)
+    function syncGalleryHidden() {
+        $galleryUrls.value = JSON.stringify(galUrls.filter(function (u) { return !!u; }));
+    }
+    function addGallerySlot(url) {
+        var idx = $gallerySlots.children.length;
+        if (idx >= 10) return;
+        var slot = document.createElement('div'); slot.style.width = '98px';
+        var thumb = document.createElement('img');
+        thumb.className = 'rounded d-block mb-1';
+        thumb.style.cssText = 'width:98px;height:74px;object-fit:cover;background:rgba(255,255,255,.05);' + (url ? '' : 'display:none;');
+        if (url) { thumb.src = url; }
+        var inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = 'image/*'; inp.className = 'form-control form-control-sm';
+        inp.style.cssText = 'font-size:10px;padding:2px 4px;';
+        inp.addEventListener('change', function () {
+            if (!this.files.length) return;
+            var gen = formGen; pending++;
+            var fd = new FormData();
+            fd.append('image', this.files[0]); fd.append('code', baseCode());
+            fd.append('variant', 'g' + idx); fd.append('csrf_token', CSRF);
+            fetch('api/upload_product_image.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    pending--; if (gen !== formGen) return;
+                    if (d.success) { galUrls[idx] = d.url; thumb.src = d.url; thumb.style.display = ''; syncGalleryHidden(); }
+                    else { showAlert('Fotka se nenahrála: ' + (d.message || '')); }
+                })
+                .catch(function () { pending--; if (gen === formGen) showAlert('Fotka se nenahrála (síť).'); });
+        });
+        slot.appendChild(thumb); slot.appendChild(inp);
+        $gallerySlots.appendChild(slot);
+        $galleryAdd.style.display = ($gallerySlots.children.length >= 10) ? 'none' : '';
+    }
+    $galleryAdd.addEventListener('click', function () { addGallerySlot(''); });
+
+    // (3) 360° video → vlastní endpoint (obrázkový by ho odmítl)
+    $video360.addEventListener('change', function () {
+        if (!this.files.length) return;
+        var gen = formGen; pending++;
+        $videoStatus.textContent = 'Nahrávám video…'; $videoStatus.className = 'small mt-1 text-white-50';
+        var fd = new FormData();
+        fd.append('video', this.files[0]); fd.append('code', baseCode()); fd.append('csrf_token', CSRF);
+        fetch('api/upload_product_video.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                pending--; if (gen !== formGen) return;
+                if (d.success) { $video360Url.value = d.url; $videoStatus.textContent = '✓ Video nahráno (360° se vytvoří po naskladnění).'; $videoStatus.className = 'small mt-1 text-success'; }
+                else { $videoStatus.textContent = 'Video se nenahrálo: ' + (d.message || ''); $videoStatus.className = 'small mt-1 text-danger'; }
+            })
+            .catch(function () { pending--; if (gen === formGen) { $videoStatus.textContent = 'Video se nenahrálo (síť).'; $videoStatus.className = 'small mt-1 text-danger'; } });
+    });
+
+    // reset / naplnění celé Galerie (nový produkt = prázdno, editace = z produktu)
+    function resetGalleryAll(gallery, studio, video) {
+        $studioUrl.value = studio || ''; $studioPhoto.value = '';
+        if (studio) { $studioThumb.src = studio; $studioWrap.style.setProperty('display', 'flex', 'important'); }
+        else { $studioThumb.src = ''; $studioWrap.style.setProperty('display', 'none', 'important'); }
+        galUrls = []; $gallerySlots.innerHTML = ''; $galleryAdd.style.display = '';
+        var list = (gallery && gallery.length) ? gallery : [];
+        var n = Math.min(10, Math.max(3, list.length));
+        for (var i = 0; i < n; i++) { if (list[i]) { galUrls[i] = list[i]; } addGallerySlot(list[i] || ''); }
+        syncGalleryHidden();
+        $video360Url.value = video || ''; $video360.value = '';
+        if (video) { $videoStatus.textContent = '✓ Video nahráno (360° se vytvoří po naskladnění).'; $videoStatus.className = 'small mt-1 text-success'; }
+        else { $videoStatus.textContent = ''; $videoStatus.className = 'small mt-1'; }
+    }
+    resetGalleryAll([], '', '');                              // úvodní stav = 3 prázdné sloty
 
     // ── uložení (create/update), stolen force flow, sériové naskladňování ──
     var saving = false;
     var savedSomething = false;   // řídí reload po zavření modalu (ne křehký text v $msg)
     function save(printAfter, force) {
         if (saving) return;
-        if (photoBusy) { $msg.textContent = 'Počkej — fotka se ještě nahrává…'; return; }
+        if (pending > 0) { $msg.textContent = 'Počkej — média se ještě nahrávají…'; return; }
         if (!modelVal()) { $msg.textContent = 'Vyplň model.'; return; }
         if (!$price.value.trim()) { $msg.textContent = 'Vyplň cenu.'; return; }
         saving = true;
@@ -710,6 +843,9 @@ $(document).on('click', '.product-label-btn', function () {
         if ($sold.checked) fd.append('sold', '1');
         fd.append('stock_key', $stockKey.value);
         fd.append('image_url', $imageUrl.value);
+        fd.append('studio_url', $studioUrl.value);
+        fd.append('gallery_urls', $galleryUrls.value);
+        fd.append('video360_url', $video360Url.value);
         if (force) fd.append('force', '1');
         fetch('api/product_create.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
@@ -745,6 +881,7 @@ $(document).on('click', '.product-label-btn', function () {
                 $modelC.style.display = 'none'; $colorC.style.display = 'none';
                 $sold.checked = false;
                 $photo.value = ''; $imageUrl.value = '';
+                resetGalleryAll([], '', '');
                 el('pcPreviewImgWrap').style.display = 'none';
                 setBadge('none');
                 refreshPreview();
@@ -774,6 +911,7 @@ $(document).on('click', '.product-label-btn', function () {
         $modelC.style.display = 'none'; $colorC.style.display = 'none';
         $sold.checked = false;
         $photo.value = ''; $imageUrl.value = '';
+        resetGalleryAll([], '', '');
         el('pcPreviewImgWrap').style.display = 'none';
         $hint.style.display = 'none';
         $msg.textContent = '';
@@ -822,6 +960,8 @@ $(document).on('click', '.product-label-btn', function () {
                 $imageUrl.value = p.image_url || '';
                 if (p.image_url) { el('pcPreviewImg').src = p.image_url; el('pcPreviewImgWrap').style.display = ''; }
                 else { el('pcPreviewImgWrap').style.display = 'none'; }
+                var galArr = []; try { galArr = p.gallery_images ? JSON.parse(p.gallery_images) : []; } catch (e) { galArr = []; }
+                resetGalleryAll(Array.isArray(galArr) ? galArr : [], p.studio_image_url || '', p.video_360_url || '');
                 setBadge(p.pcr_status || 'none');
                 $msg.textContent = p.source === 'app' ? 'Pozor: kus z appky — uložením ho převezme CRM (import appky ho už nepřepíše).' : '';
                 refreshPreview();
