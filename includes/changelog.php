@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.7.0',
+        'date' => '2026-07-24',
+        'time' => '23:00',
+        'title' => '360° prohlídka z videa — automatické zpracování na serveru (fáze 2)',
+        'items' => [
+            'Nahraješ v Galerii <b>360° video</b> (dvě otočky) a server z něj <b>sám</b> vyrobí 360° prohlídku: vytáhne 36 snímků = jedno otočení, odstraní pozadí (rembg) a složí průhlednou sadu. Na produktu na e-shopu se objeví <b>otočná 360° prohlídka</b> (tažení, autorotace, lupa) — bez dalšího klikání.',
+            'V Galerii u videa je teď <b>stav zpracování</b> („zpracovává se… / hotovo ✓ s náhledem") a tlačítko <b>Přegenerovat</b>.',
+            'Technicky: dispatcher na serveru (cron) hlídá nahraná videa a spouští pipeline <code>video_to_360.py</code> → snímky jdou do <code>public/produkty-360/&lt;kód&gt;/</code>, odkud si je detail produktu čte sám. Stav se odvozuje z disku (endpoint <code>api/status_360.php</code>), žádná další DB.',
+        ],
+    ],
+    [
         'version' => '3.6.0',
         'date' => '2026-07-24',
         'time' => '21:30',

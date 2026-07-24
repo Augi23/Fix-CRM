@@ -460,6 +460,7 @@ try {
                                             <span class="text-white-50">(dvě celé otočky — eshop z něj po naskladnění vyrobí 360° bez pozadí)</span></label>
                                         <input type="file" id="pcVideo360" class="form-control form-control-sm" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm">
                                         <div id="pcVideoStatus" class="small mt-1"></div>
+                                        <div id="pcVideo360Proc" class="small mt-1" style="display:none"></div>
                                     </div>
                                 </div>
                             </div>
@@ -791,10 +792,49 @@ $(document).on('click', '.product-label-btn', function () {
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 pending--; if (gen !== formGen) return;
-                if (d.success) { $video360Url.value = d.url; $videoStatus.textContent = '✓ Video nahráno (360° se vytvoří po naskladnění).'; $videoStatus.className = 'small mt-1 text-success'; }
+                if (d.success) { $video360Url.value = d.url; $videoStatus.textContent = '✓ Video nahráno — 360° se teď vyrobí na serveru.'; $videoStatus.className = 'small mt-1 text-success'; poll360(baseCode(), true); }
                 else { $videoStatus.textContent = 'Video se nenahrálo: ' + (d.message || ''); $videoStatus.className = 'small mt-1 text-danger'; }
             })
             .catch(function () { pending--; if (gen === formGen) { $videoStatus.textContent = 'Video se nenahrálo (síť).'; $videoStatus.className = 'small mt-1 text-danger'; } });
+    });
+
+    // ── 360° zpracování (fáze 2): stav se odvozuje z disku na serveru, průběžně se pollne ──
+    var $video360Proc = document.getElementById('pcVideo360Proc');
+    var poll360Timer = null, poll360Left = 0;
+    function render360(st) {
+        if (!st || st.status === 'none') { $video360Proc.style.display = 'none'; $video360Proc.innerHTML = ''; return; }
+        $video360Proc.style.display = '';
+        if (st.status === 'ready') {
+            $video360Proc.innerHTML = '<span class="text-success">✓ 360° prohlídka hotová (' + st.frames + ' snímků)</span>' +
+                (st.preview ? ' <img src="' + st.preview + '" alt="" style="height:34px;vertical-align:middle;border-radius:5px;margin-left:6px;background:#fff">' : '') +
+                ' <button type="button" id="pcRegen360" class="btn btn-outline-secondary btn-sm py-0 ms-1">Přegenerovat</button>';
+        } else { // processing
+            $video360Proc.innerHTML = '<span class="text-info"><span class="spinner-border spinner-border-sm me-1" style="width:.8rem;height:.8rem"></span>360° se zpracovává na serveru… (pár minut)</span>';
+        }
+    }
+    function poll360(code, first) {
+        if (poll360Timer) { clearTimeout(poll360Timer); poll360Timer = null; }
+        if (!code) return;
+        if (first) { poll360Left = 60; }               // ~5 min stropu (60×5 s)
+        fetch('api/status_360.php?code=' + encodeURIComponent(code), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (st) {
+                if (!st || !st.success) { render360({ status: 'none' }); return; }
+                render360(st);
+                if (st.status === 'processing' && poll360Left-- > 0) {
+                    poll360Timer = setTimeout(function () { poll360(code, false); }, 5000);
+                }
+            }).catch(function () {});
+    }
+    $video360Proc.addEventListener('click', function (e) {
+        if (e.target && e.target.id === 'pcRegen360') {
+            var code = baseCode(); if (!code) return;
+            $video360Proc.innerHTML = '<span class="text-info">Spouštím přegenerování…</span>';
+            var fd = new FormData(); fd.append('action', 'regen'); fd.append('code', code); fd.append('csrf_token', CSRF);
+            fetch('api/status_360.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); }).then(function () { poll360(code, true); })
+                .catch(function () {});
+        }
     });
 
     // reset / naplnění celé Galerie (nový produkt = prázdno, editace = z produktu)
@@ -808,8 +848,8 @@ $(document).on('click', '.product-label-btn', function () {
         for (var i = 0; i < n; i++) { if (list[i]) { galUrls[i] = list[i]; } addGallerySlot(list[i] || ''); }
         syncGalleryHidden();
         $video360Url.value = video || ''; $video360.value = '';
-        if (video) { $videoStatus.textContent = '✓ Video nahráno (360° se vytvoří po naskladnění).'; $videoStatus.className = 'small mt-1 text-success'; }
-        else { $videoStatus.textContent = ''; $videoStatus.className = 'small mt-1'; }
+        if (video) { $videoStatus.textContent = '✓ Video nahráno.'; $videoStatus.className = 'small mt-1 text-success'; poll360(baseCode(), true); }
+        else { $videoStatus.textContent = ''; $videoStatus.className = 'small mt-1'; render360({ status: 'none' }); }
     }
     resetGalleryAll([], '', '');                              // úvodní stav = 3 prázdné sloty
 

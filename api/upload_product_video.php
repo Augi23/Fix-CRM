@@ -69,6 +69,12 @@ foreach (['mp4', 'mov', 'webm'] as $e) { if ($e !== $ext) { @unlink($dir . '/' .
 if (!@move_uploaded_file($tmp, $dest)) { afx_vid_fail('Uložení videa selhalo.', 500); }
 @chmod($dest, 0644);
 
+// Sidecar s PŘESNÝM kódem produktu — dispatcher (fáze 2) podle něj pojmenuje složku snímků
+// public/produkty-360/<kód>/ (název videa je sanitizovaný $safe, kód může mít jiné znaky).
+// Zápis do vlastní složky CRM (žádný cross-user problém); dispatcher ho jen ČTE.
+@file_put_contents($dir . '/' . $safe . '.code', $code);
+@chmod($dir . '/' . $safe . '.code', 0644);
+
 $host = $_SERVER['HTTP_HOST'] ?? 'admin.applefix.cloud';
 $url = 'https://' . $host . '/media/products/360/' . rawurlencode($safe) . '.' . $ext . '?v=' . (int)@filemtime($dest);
 
