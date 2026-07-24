@@ -7,7 +7,7 @@
  * Scoping: první čtyři dlaždice dle orderBranchScopeSql (Karlín vidí vše);
  * Nepřidělené/Nedokončené: vedení = obě pobočky, zaměstnanci = jen svá pobočka.
  */
-$__st_cond = orderBranchScopeSql('branch_id');
+$__st_cond = orderBranchScopeSql('branch_id', 'technician_id');
 $__st_new = orderStatusSqlIn($pdo, 'new');
 $__st_pending = orderStatusSqlIn($pdo, 'pending_approval');
 $__st_progress = orderStatusSqlIn($pdo, 'in_progress');

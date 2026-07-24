@@ -9,8 +9,8 @@ $allowed_statuses = getAllowedOrderFilterStatuses();
 $filter_status = in_array($_GET['filter'] ?? '', $allowed_statuses, true) ? $_GET['filter'] : null;
 
 // Branch scope for stats: managers/admins see all, branch staff see only their branch.
-$tech_cond = orderBranchScopeSql('branch_id');
-$tech_cond_o = orderBranchScopeSql('o.branch_id');
+$tech_cond = orderBranchScopeSql('branch_id', 'technician_id');
+$tech_cond_o = orderBranchScopeSql('o.branch_id', 'o.technician_id');
 
 // Count for Stats
 $newStatuses = orderStatusSqlIn($pdo, 'new');

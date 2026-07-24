@@ -38,7 +38,7 @@ try {
 $activeOrders = [];
 try {
     $activeSt = orderStatusSqlIn($pdo, 'active');
-    $scope = orderBranchScopeSql('o.branch_id');
+    $scope = orderBranchScopeSql('o.branch_id', 'o.technician_id');
     $activeOrders = $pdo->query("SELECT o.id, o.order_code, o.device_brand, o.device_model, c.first_name, c.last_name
         FROM orders o JOIN customers c ON c.id = o.customer_id
         WHERE o.status IN ($activeSt)$scope ORDER BY o.id DESC LIMIT 50")->fetchAll();

@@ -130,8 +130,16 @@ if (isset($pdo)) {
         $stats_where  = '';
         $stats_params = [];
         if (!isBranchGlobalViewer()) {
-            $stats_where  = ' AND branch_id = ?';
-            $stats_params[] = getCurrentStaffBranchId();
+            // stejná logika jako addOrderBranchScope: svoje přiřazené zakázky se počítají vždy
+            $__stTid = (int)($_SESSION['tech_id'] ?? 0);
+            if ($__stTid > 0) {
+                $stats_where  = ' AND (branch_id = ? OR technician_id = ?)';
+                $stats_params[] = getCurrentStaffBranchId();
+                $stats_params[] = $__stTid;
+            } else {
+                $stats_where  = ' AND branch_id = ?';
+                $stats_params[] = getCurrentStaffBranchId();
+            }
         } elseif ((int)($_GET['branch_id'] ?? 0) > 0) {
             $stats_where = ' AND branch_id = ?';
             $stats_params[] = (int)$_GET['branch_id'];

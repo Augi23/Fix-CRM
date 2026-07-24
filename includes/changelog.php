@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.8.2',
+        'date' => '2026-07-25',
+        'time' => '01:45',
+        'title' => 'Počítadla srovnaná s viditelností: přiřazené zakázky se ti počítají všude',
+        'items' => [
+            'Navazuje na 3.8.1: <b>dlaždice na nástěnce, badge u Zakázek, statistiky v seznamu, výběr zakázky ve Skladu i reporty</b> teď počítají i zakázky přiřazené tobě na jiné pobočce — stejné pravidlo jako viditelnost.',
+            'Opraven i <b>živý poller</b>: badge už nepřeblikává zpět na staré číslo a zvonek nové zakázky zazní i u zakázky z druhé pobočky přiřazené tobě.',
+            'Srovnání personálu v reportech měří všem <b>stejný pobočkový základ</b> (žádný řádek se nenafukuje cross-branch zakázkami).',
+        ],
+    ],
+    [
         'version' => '3.8.1',
         'date' => '2026-07-25',
         'time' => '01:00',

@@ -263,12 +263,21 @@ function addOrderBranchScope(array &$whereClauses, array &$params, string $order
     }
 }
 
-function orderBranchScopeSql(string $column = 'branch_id'): string {
+function orderBranchScopeSql(string $column = 'branch_id', string $technicianColumn = ''): string {
     if (isBranchGlobalViewer()) {
         return '';
     }
     $branchId = getCurrentStaffBranchId();
-    return $branchId > 0 ? ' AND ' . $column . ' = ' . (int)$branchId : '';
+    if ($branchId <= 0) {
+        return '';
+    }
+    // Zakázky přiřazené mně počítám/vidím vždy (cross-branch přiřazení, viz addOrderBranchScope).
+    // Zapíná se JEN předáním sloupce technika — jiné tabulky (pos_sales…) technician_id nemají.
+    $tid = (int)($_SESSION['tech_id'] ?? 0);
+    if ($technicianColumn !== '' && $tid > 0) {
+        return ' AND (' . $column . ' = ' . (int)$branchId . ' OR ' . $technicianColumn . ' = ' . $tid . ')';
+    }
+    return ' AND ' . $column . ' = ' . (int)$branchId;
 }
 
 function canAccessOrderBranch(array $order): bool {

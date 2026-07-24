@@ -23,11 +23,13 @@ crmTrackStaffActivity();
 ensureOrdersHaveBranch();
 
 try {
-    $scope = orderBranchScopeSql('branch_id');   // '' nebo ' AND branch_id = N'
+    // stejný scope jako header badge/list: svoje přiřazené zakázky se počítají vždy (v3.8.x),
+    // jinak poller každý tick přepíše badge starým číslem a zvonek u cross-branch přiřazení nezazní
+    $scope = orderBranchScopeSql('branch_id', 'technician_id');   // '' nebo ' AND (…)'
     $lastOrder = (int)($pdo->query("SELECT MAX(id) FROM orders" . ($scope !== '' ? ' WHERE ' . substr($scope, 5) : ''))->fetchColumn() ?: 0);
 } catch (Throwable $e) { $lastOrder = 0; }
 try { $lastLog = (int)($pdo->query("SELECT MAX(id) FROM order_status_log")->fetchColumn() ?: 0); } catch (Throwable $e) { $lastLog = 0; }
-try { $ordersBadge = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE status IN (" . orderStatusSqlIn($pdo, 'active') . ")" . orderBranchScopeSql('branch_id'))->fetchColumn() ?: 0); } catch (Throwable $e) { $ordersBadge = 0; }
+try { $ordersBadge = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE status IN (" . orderStatusSqlIn($pdo, 'active') . ")" . orderBranchScopeSql('branch_id', 'technician_id'))->fetchColumn() ?: 0); } catch (Throwable $e) { $ordersBadge = 0; }
 try { $complaintsBadge = (int)($pdo->query("SELECT COUNT(*) FROM complaints WHERE complaint_status NOT IN ('Vyřízeno','Zamítnuto')")->fetchColumn() ?: 0); } catch (Throwable $e) { $complaintsBadge = 0; }
 try { $procurementBadge = (int)($pdo->query("SELECT COUNT(*) FROM purchase_requests WHERE status IN ('pending','ordered')")->fetchColumn() ?: 0); } catch (Throwable $e) { $procurementBadge = 0; }
 // nová e-shop objednávka (applefix.click) → zvuk + odznak jako u zakázek

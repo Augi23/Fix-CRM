@@ -25,7 +25,9 @@ if (!$is_admin && $is_tech) {
 // Helper to get stats for a specific period and optional technician
 function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     $params = [$start . ' 00:00:00', $end . ' 23:59:59'];
-    $branch_cond = orderBranchScopeSql('branch_id');
+    // Per-technik řádek (srovnání personálu) = čistě pobočkový základ pro všechny řádky STEJNĚ.
+    // OR technician_id=já by divákův vlastní řádek počítal cross-branch a kolegům ne (asymetrie).
+    $branch_cond = $tech_id ? orderBranchScopeSql('branch_id') : orderBranchScopeSql('branch_id', 'technician_id');
     $tech_cond = ($tech_id ? " AND technician_id = ?" : "") . $branch_cond;
     if ($tech_id) $params[] = $tech_id;
 
@@ -63,10 +65,11 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     // Therefore we count both Completed + Collected and primarily date them by
     // work_finished_at, with invoice / shipping / updated_at only as fallbacks.
     $fin_params = [$start, $end];
-    $fin_branch_cond = orderBranchScopeSql('o.branch_id');
+    $fin_branch_cond = orderBranchScopeSql('o.branch_id', 'o.technician_id');
     $fin_tech_cond = $fin_branch_cond;
     if ($tech_id) {
-        $fin_tech_cond = " AND o.technician_id = ?" . $fin_branch_cond;
+        // per-technik: jednotný pobočkový základ (viz $branch_cond výše)
+        $fin_tech_cond = " AND o.technician_id = ?" . orderBranchScopeSql('o.branch_id');
         $fin_params[] = $tech_id;
     }
 
@@ -134,8 +137,9 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
     // Count labour only for FINISHED orders (same basis as the per-order table below) so the
     // headline 'worked'/'earned' totals reconcile with the order list.
     $seg_params = array_merge([$start . ' 00:00:00', $end . ' 23:59:59'], $doneStatuses);
-    $seg_cond = orderBranchScopeSql('o.branch_id');
+    $seg_cond = orderBranchScopeSql('o.branch_id', 'o.technician_id');
     if ($tech_id) {
+        // per-technik: jednotný pobočkový základ (viz $branch_cond výše)
         $seg_cond = " AND wl.technician_id = ?" . orderBranchScopeSql('o.branch_id');
         $seg_params[] = $tech_id;
     }
@@ -234,7 +238,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                 // Importované zakázky (source='legacy') do provozních časů NEpatří —
                 // hromadný import starého systému by zkreslil den/hodiny importu.
                 ensureOrdersSourceColumn();
-                $__bc = orderBranchScopeSql('branch_id') . " AND source <> 'legacy'";
+                $__bc = orderBranchScopeSql('branch_id', 'technician_id') . " AND source <> 'legacy'";
                 $q = $pdo->prepare("SELECT HOUR(created_at) h, COUNT(*) n FROM orders WHERE created_at BETWEEN ? AND ?" . $__bc . " GROUP BY h");
                 $q->execute([$__tStart, $__tEnd]);
                 foreach ($q->fetchAll() as $r) { $__intakeH[(int)$r['h']] = (int)$r['n']; }
@@ -248,7 +252,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                 $__col = getOrderStatusList('collected');
                 if ($__col) {
                     $__phC = sqlPlaceholders($__col);
-                    $__bo = orderBranchScopeSql('o.branch_id') . " AND o.source <> 'legacy'";
+                    $__bo = orderBranchScopeSql('o.branch_id', 'o.technician_id') . " AND o.source <> 'legacy'";
                     $__base = "FROM (SELECT order_id, MIN(changed_at) ts FROM order_status_log WHERE new_status IN ($__phC) GROUP BY order_id) t
                                JOIN orders o ON o.id = t.order_id WHERE t.ts BETWEEN ? AND ?" . $__bo;
                     $q = $pdo->prepare("SELECT HOUR(t.ts) h, COUNT(*) n " . $__base . " GROUP BY h");
@@ -506,7 +510,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                 <div class="col-md-6">
                     <h5 class="mb-3 border-bottom pb-2"><?php echo __('device_types_stats'); ?></h5>
                     <?php
-                    $stmt = $pdo->prepare("SELECT device_type, COUNT(*) as count FROM orders WHERE (created_at BETWEEN ? AND ?)" . orderBranchScopeSql('branch_id') . " GROUP BY device_type ORDER BY count DESC");
+                    $stmt = $pdo->prepare("SELECT device_type, COUNT(*) as count FROM orders WHERE (created_at BETWEEN ? AND ?)" . orderBranchScopeSql('branch_id', 'technician_id') . " GROUP BY device_type ORDER BY count DESC");
                     $stmt->execute([$start_date . ' 00:00:00', $end_date . ' 23:59:59']);
                     $types = $stmt->fetchAll();
                     foreach ($types as $t):
@@ -788,7 +792,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 FROM orders o
                                 JOIN customers c ON o.customer_id = c.id
                                 LEFT JOIN invoices inv ON inv.order_id = o.id AND inv.status = 'paid'
-                                WHERE o.technician_id = ? AND o.status IN (" . sqlPlaceholders($doneStatuses) . ")" . orderBranchScopeSql('o.branch_id') . "
+                                WHERE o.technician_id = ? AND o.status IN (" . sqlPlaceholders($doneStatuses) . ")" . orderBranchScopeSql('o.branch_id', 'o.technician_id') . "
                                   AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
                                 ORDER BY finance_date DESC
                             ");
