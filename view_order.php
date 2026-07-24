@@ -559,6 +559,18 @@ function localizedOrderStatusLabel(string $status): string {
                         </div>
                     </div>
                     <?php endif; ?>
+                    <?php if (($order['status'] ?? '') === 'Přijato z RepairPluginu'): ?>
+                    <?php /* Onboard: klient z webové rezervace (RepairPlugin) fyzicky dorazil →
+                             stejná automatika jako po ručním založení: tisk štítku + okno
+                             zakázkového listu s podpisem (openOrderDocChoice). */ ?>
+                    <div class="d-grid mb-2">
+                        <button type="button" class="btn btn-info fw-semibold" id="onboardClientBtn"
+                            onclick="var b=this;b.disabled=true;try{printOrderLabel(<?php echo (int)$order['id']; ?>);}catch(e){}setTimeout(function(){openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>');b.disabled=false;},450);">
+                            <i class="fas fa-user-check me-2"></i>Onboard zákazníka
+                        </button>
+                        <div class="small text-white-50 mt-1 text-center">vytiskne štítek a otevře podpis / zakázkový list</div>
+                    </div>
+                    <?php endif; ?>
                     <div class="d-grid gap-2 mb-2">
                         <?php if ($next_status): ?>
                             <?php

@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.9.1',
+        'date' => '2026-07-25',
+        'time' => '11:30',
+        'title' => 'Onboard zákazníka — jednoklikový příjem webové rezervace (RepairPlugin)',
+        'items' => [
+            'Když fyzicky dorazí klient s rezervací z webu, v detailu zakázky (stav <b>Přijato z RepairPluginu</b>) je nově <b>první tlačítko vpravo „Onboard zákazníka"</b>: jedním klikem <b>vytiskne štítek</b> a <b>otevře okno zakázkového listu s podpisem</b> (tablet/tisk/e-mail) — přesně jako při ručním založení zakázky. Konec ručního dohledávání.',
+        ],
+    ],
+    [
         'version' => '3.9.0',
         'date' => '2026-07-25',
         'time' => '02:30',
