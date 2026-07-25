@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.11.0',
+        'date' => '2026-07-25',
+        'time' => '22:40',
+        'title' => 'Fotky MacBooků podle správné generace — konec sdílené tapety napříč čipy',
+        'items' => [
+            'Knihovna fotek modelů dosud slučovala <b>všechny generace MacBooků pod jednu fotku</b> (M1 až M5 sdílely stejný render) — novější kusy tak dědily <b>starou tapetu</b> (např. 16″ M5 Max ukazoval render z éry M1).',
+            'Klíč modelu (<code>productModelFamily</code>) nově u MacBooků nese <b>designovou éru</b>: samostatně <b>Intel</b>, <b>M1–M3</b>, <b>M4/M5</b> (nová tapeta + Space Black) a <b>flat Air (M2/M3)</b> vs. wedge Air. Každá éra dostává svůj oficiální Apple render ve správné barvě.',
+            'Přeseedováno <b>17 kombinací model+barva</b> pokrývajících 64 skladových MacBooků z Apple compare renderů (věrné tapety, čisté průhledné pozadí).',
+            'Pozn.: 29 MacBooků má v datech <b>prázdnou barvu/velikost</b> → fotku nelze přiřadit, dokud se údaj nedoplní (datová vada u produktu, ne render).',
+        ],
+    ],
+    [
         'version' => '3.10.0',
         'date' => '2026-07-25',
         'time' => '19:47',

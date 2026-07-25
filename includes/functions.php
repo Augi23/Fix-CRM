@@ -1357,17 +1357,33 @@ function productColorCanon(?string $c): string {
     ];
     return $map[$c] ?? $c;
 }
-/** Rodina modelu bez čipu/roku/kapacity, zachovává velikost a Pro/Plus/Max/mini/Air. */
+/** Rodina modelu; u MacBooku nese i DESIGNOVOU ÉRU (intel/'' M1-M3/m4/flat), aby se
+ *  generace neslily pod jednu fotku (M5 nesmí dědit render éry M1). Zachovává velikost
+ *  a Pro/Plus/Max/mini/Air. MUSÍ zůstat shodná se scratchpad/seed_macs.py::model_family. */
 function productModelFamily(?string $model): string {
     $m = trim((string)$model);
     if ($m === '') return '';
     $m = mb_strtolower($m, 'UTF-8');
-    $m = str_replace(["″", '"', "''", "\u{201C}", "\u{201D}"], '', $m);   // palcové značky pryč
-    $m = preg_replace('/\(20\d\d\)/u', ' ', $m);                          // rok (2021)
+    $m = preg_replace('/[\x{2033}"\x{201C}\x{201D}\x{2019}\']/u', '', $m); // palcové značky + uvozovky
+    $m = preg_replace('/\(20\d\d\)/u', ' ', $m);                          // rok v závorkách (2021)
+    // MacBook: éru urči PŘED strhnutím čipu (M5 nesmí dědit render éry M1).
+    if (preg_match('/\bmacbook\b/u', $m)) {
+        $isAir = (bool)preg_match('/\bair\b/u', $m);
+        $era = '';
+        if (preg_match('/\bm[45]\b/u', $m))                          $era = 'm4';    // M4/M5 = nová éra (space black)
+        elseif (preg_match('/\bintel\b|\b(core\s*)?i[357]\b/u', $m)) $era = 'intel';
+        if ($isAir && preg_match('/\bm[23]\b/u', $m))               $era = 'flat';  // M2/M3 Air = flat design (ne wedge)
+        $m = preg_replace('/\bm[1-5]\s*(pro|max|ultra)?\b/u', ' ', $m);   // čip
+        $m = preg_replace('/\bintel\b|\b(core\s*)?i[357]\b/u', ' ', $m);  // Intel/Core i
+        $m = preg_replace('/\b\d{1,4}\s*(gb|tb)\b/u', ' ', $m);           // kapacita
+        $m = preg_replace('/\b(19|20)\d\d\b/u', ' ', $m);                 // holý rok (2013/2015…)
+        $m = preg_replace('/[^a-z0-9 ]/u', ' ', $m);
+        $m = trim(preg_replace('/\s+/', ' ', $m));
+        return $era === '' ? $m : trim($m . ' ' . $era);
+    }
+    // Ostatní: Intel vždy pryč; čip jen u Apple silicon iPad/iMac (gate proti „Xperia M2").
     $m = preg_replace('/\bintel\b/u', ' ', $m);
-    // čip M1/M2/… strhni JEN u Apple silicon (Mac/iPad) — ať regex nesežere „M2" v názvu
-    // ne-Apple telefonu (Sony Xperia M2 apod.) a nesloučí dva různé přístroje pod jeden klíč.
-    if (preg_match('/\b(macbook|imac|ipad|mac ?studio|mac ?mini|mac ?pro)\b/u', $m)) {
+    if (preg_match('/\b(imac|ipad|mac ?studio|mac ?mini|mac ?pro)\b/u', $m)) {
         $m = preg_replace('/\bm[1-5]\s*(pro|max|ultra)?\b/u', ' ', $m);   // čip M1 / M2 Pro …
     }
     $m = preg_replace('/\b\d{1,4}\s*(gb|tb)\b/u', ' ', $m);               // kapacita (GB i TB)
