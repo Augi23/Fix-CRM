@@ -332,6 +332,77 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                 </div>
             </div>
         </div>
+
+        <?php
+        /* Globální hledání musí najít i SKLAD — dosud prohledávalo jen zakázky,
+           takže naskladněný kus podle IMEI/kódu/názvu nešlo z nástěnky dohledat.
+           Panel se ukáže jen při hledání a jen tomu, kdo na sklad má právo. */
+        if ($search !== '' && hasPermission('manage_inventory')):
+            $sk_term = "%$search%";
+            $st = $pdo->prepare("SELECT id, title, product_code, price, stock_qty, grade, stock_key
+                FROM products WHERE title LIKE ? OR product_code LIKE ? OR model LIKE ?
+                ORDER BY (stock_qty > 0) DESC, added_at DESC, id DESC LIMIT 8");
+            $st->execute([$sk_term, $sk_term, $sk_term]);
+            $sk_products = $st->fetchAll();
+            $st = $pdo->prepare("SELECT id, part_name, sku, quantity, sale_price
+                FROM inventory WHERE part_name LIKE ? OR sku LIKE ?
+                ORDER BY (quantity > 0) DESC, part_name ASC LIMIT 6");
+            $st->execute([$sk_term, $sk_term]);
+            $sk_parts = $st->fetchAll();
+            if ($sk_products || $sk_parts): ?>
+        <div class="card glass-card border-0 mt-4">
+            <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-warehouse text-info me-2"></i><?php echo __('inventory'); ?></h5>
+                <span class="small text-white-75"><?php echo __('search_placeholder'); ?>: <strong><?php echo e($search); ?></strong></span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <tbody>
+                        <?php foreach ($sk_products as $sp): ?>
+                            <tr>
+                                <td style="width:120px"><span class="badge bg-success">Produkt</span></td>
+                                <td>
+                                    <a class="text-decoration-none" href="products.php?search=<?php echo urlencode((string)$sp['product_code']); ?>"><strong><?php echo e($sp['title']); ?></strong></a>
+                                    <div class="small text-white-75">
+                                        <?php echo e($sp['product_code']); ?>
+                                        <?php if (!empty($sp['grade'])): ?> · <?php echo e($sp['grade']); ?><?php endif; ?>
+                                        <?php if (!empty($sp['stock_key'])): ?> · <?php echo $sp['stock_key'] === 'karlin' ? 'Karlín' : 'Václavák'; ?><?php endif; ?>
+                                    </div>
+                                </td>
+                                <td class="text-nowrap">
+                                    <?php if ((int)$sp['stock_qty'] > 0): ?>
+                                        <span class="text-success">Skladem <?php echo (int)$sp['stock_qty']; ?> ks</span>
+                                    <?php else: ?>
+                                        <span class="text-white-75">Vyprodáno</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-end"><strong><?php echo formatMoney((float)$sp['price']); ?></strong></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php foreach ($sk_parts as $pp): ?>
+                            <tr>
+                                <td><span class="badge bg-secondary">Díl</span></td>
+                                <td>
+                                    <a class="text-decoration-none" href="inventory.php?search=<?php echo urlencode((string)$pp['sku']); ?>"><strong><?php echo e($pp['part_name']); ?></strong></a>
+                                    <div class="small text-white-75"><?php echo e($pp['sku']); ?></div>
+                                </td>
+                                <td class="text-nowrap">
+                                    <?php if ((int)$pp['quantity'] > 0): ?>
+                                        <span class="text-success">Skladem <?php echo (int)$pp['quantity']; ?> ks</span>
+                                    <?php else: ?>
+                                        <span class="text-white-75">Vyprodáno</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-end"><strong><?php echo formatMoney((float)$pp['sale_price']); ?></strong></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <?php endif; endif; ?>
     </div>
     <div class="col-12 col-lg-3">
         <!-- Revenue chart (design-system) -->

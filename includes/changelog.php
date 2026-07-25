@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.9.2',
+        'date' => '2026-07-25',
+        'time' => '19:40',
+        'title' => 'Vyhledávání najde i sklad — naskladněný kus podle IMEI, kódu i názvu',
+        'items' => [
+            'Horní vyhledávání dosud prohledávalo <b>jen zakázky</b>. Když jste na Nástěnce (nebo na kterékoli stránce mimo Zakázky/Klienty/Sklad) zadali <b>IMEI, sériové číslo nebo název naskladněného zařízení</b>, CRM hlásilo „Nenalezeno", přestože kus byl skladem.',
+            'Nástěnka nově pod seznamem zakázek zobrazí panel <b>Sklad</b> s nalezenými <b>produkty pro e-shop</b> (název, kód/IMEI, stav, pobočka, dostupnost, cena) i <b>náhradními díly</b> (název, SKU, počet ks, cena). Klik na název otevře příslušnou skladovou stránku s předvyplněným hledáním.',
+            'Panel vidí jen ten, kdo má právo na sklad; vyprodané kusy se zobrazují až za skladovými.',
+        ],
+    ],
+    [
         'version' => '3.9.1',
         'date' => '2026-07-25',
         'time' => '11:30',
