@@ -156,6 +156,10 @@ try {
     }
 
     $pdo->commit();
+
+    // Push notifikace na novou e-shop objednávku (bezpečný no-op bez APNs klíče).
+    try { require_once __DIR__ . '/../includes/notify_push.php'; crmPushEshopOrder($pdo, $eshopOrderId ?? 0, $orderRef, $total, $cName); } catch (Throwable $e) {}
+
     echo json_encode([
         'ok' => true, 'order_ref' => $orderRef, 'status' => 'paid',
         'already_processed' => false, 'items' => $results,

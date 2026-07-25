@@ -83,6 +83,9 @@ try {
     $ins->execute([$code, $customerId, $orderId, $orderCode, $phone, $device, $serial, $fullReason]);
 
     $pdo->commit();
+
+    // Push notifikace servisu na novou reklamaci (bezpečný no-op bez APNs klíče).
+    try { require_once __DIR__ . '/../../includes/notify_push.php'; crmPushComplaint($pdo, $code, $orderCode, $device); } catch (Throwable $e) {}
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     cc_fail(__('cl_complaint_save_failed'), 500);

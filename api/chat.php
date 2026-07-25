@@ -27,6 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $st = $pdo->prepare("INSERT INTO staff_chat (actor_type, actor_id, author_name, message) VALUES (?, ?, ?, ?)");
         $st->execute([$actor[0], $actor[1], $author, $msg]);
+        // Push všem ostatním zaměstnancům (bezpečný no-op bez APNs klíče).
+        try { require_once __DIR__ . '/../includes/notify_push.php'; crmPushChat($pdo, (int)($_SESSION['user_id'] ?? 0), $author, $msg); } catch (Throwable $e) {}
         echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
     } catch (Throwable $e) {
         echo json_encode(['ok' => false, 'message' => 'Uložení selhalo']);

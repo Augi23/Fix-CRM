@@ -4157,6 +4157,12 @@ function crmAuditLog(string $action, array $opts = []): void {
     } catch (Throwable $e) {
         error_log('crmAuditLog selhal (' . $action . '): ' . $e->getMessage());
     }
+
+    // Push notifikace na iOS appku (bezpečný no-op bez APNs klíče; nikdy neshodí audit).
+    try {
+        require_once __DIR__ . '/notify_push.php';
+        crmPushDispatch($pdo, $action, $opts);
+    } catch (Throwable $e) { /* push je bonus */ }
 }
 
 /** Lidský český název úkonu pro zobrazení v historii. */

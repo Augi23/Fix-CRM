@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.10.0',
+        'date' => '2026-07-25',
+        'time' => '19:47',
+        'title' => 'Push notifikace do iOS appky (základ) — nová zakázka, stav, chat, reklamace, e-shop',
+        'items' => [
+            'Serverová infrastruktura pro <b>push notifikace</b> do nativní iOS appky: tabulka <code>push_tokens</code>, endpoint <code>api/register_push_token.php</code> a APNs odesílač (<code>includes/push.php</code>, token-auth přes .p8, HTTP/2).',
+            'Napojení na události — <b>nová zakázka</b> a <b>změna stavu</b> (centrálně přes <code>crmAuditLog</code>, push přiřazenému technikovi u změny stavu), <b>nová zpráva ve firemním chatu</b>, <b>nová reklamace z klientského portálu</b> a <b>nová e-shop objednávka</b>.',
+            'Vše je bezpečný <b>no-op, dokud není nastavený APNs klíč</b> (<code>.env</code>: APNS_KEY_PATH/KEY_ID/TEAM_ID/BUNDLE_ID/ENV) — na běh CRM to zatím nemá žádný vliv. Vyžaduje spuštění migrace <code>029</code>.',
+        ],
+    ],
+    [
         'version' => '3.9.2',
         'date' => '2026-07-25',
         'time' => '19:40',
