@@ -15,9 +15,31 @@
  *   pushToAll($pdo, 'Nová zpráva', '...', ['sound'=>'chat.caf'], [$excludeUserId]);
  */
 
+/** Hodnota konfigurace: nejdřív z nastavení CRM (system_settings), pak .env. */
+function apnsCfg(string $settingKey, string $envKey, string $default = ''): string {
+    if (function_exists('get_setting_with_fallback')) {
+        return (string) get_setting_with_fallback($settingKey, $default, $envKey);
+    }
+    $v = getenv($envKey);
+    return ($v !== false && $v !== '') ? (string)$v : $default;
+}
+
+/** Privátní klíč (.p8 PEM): z nastavení (apns_key_pem), jinak ze souboru dle .env. */
+function apnsKeyPem(): string {
+    if (function_exists('get_setting')) {
+        $pem = trim((string) get_setting('apns_key_pem', ''));
+        if ($pem !== '') return $pem;
+    }
+    $path = (string) getenv('APNS_KEY_PATH');
+    if ($path !== '' && is_readable($path)) return (string) file_get_contents($path);
+    return '';
+}
+
 function apnsConfigured(): bool {
-    return getenv('APNS_KEY_ID') && getenv('APNS_TEAM_ID') && getenv('APNS_BUNDLE_ID')
-        && getenv('APNS_KEY_PATH') && is_readable((string)getenv('APNS_KEY_PATH'));
+    return apnsCfg('apns_key_id', 'APNS_KEY_ID') !== ''
+        && apnsCfg('apns_team_id', 'APNS_TEAM_ID') !== ''
+        && apnsCfg('apns_bundle_id', 'APNS_BUNDLE_ID', 'cloud.applefix.crm') !== ''
+        && trim(apnsKeyPem()) !== '';
 }
 
 /** Vytvoří (a ~50 min cachuje) podepsaný APNs JWT. */
@@ -26,14 +48,14 @@ function apnsJwt(): ?string {
     static $cachedAt = 0;
     if ($cached !== null && (time() - $cachedAt) < 3000) return $cached;
 
-    $key = @file_get_contents((string)getenv('APNS_KEY_PATH'));
-    if ($key === false || $key === '') return null;
+    $key = apnsKeyPem();
+    if ($key === '') return null;
     $pkey = openssl_pkey_get_private($key);
     if (!$pkey) return null;
 
     $b64 = fn($d) => rtrim(strtr(base64_encode($d), '+/', '-_'), '=');
-    $header = $b64(json_encode(['alg' => 'ES256', 'kid' => getenv('APNS_KEY_ID')]));
-    $claims = $b64(json_encode(['iss' => getenv('APNS_TEAM_ID'), 'iat' => time()]));
+    $header = $b64(json_encode(['alg' => 'ES256', 'kid' => apnsCfg('apns_key_id', 'APNS_KEY_ID')]));
+    $claims = $b64(json_encode(['iss' => apnsCfg('apns_team_id', 'APNS_TEAM_ID'), 'iat' => time()]));
     $input  = $header . '.' . $claims;
 
     $der = '';
@@ -72,8 +94,8 @@ function apnsSend(array $tokens, array $aps, array $custom = [], ?string $collap
     $jwt = apnsJwt();
     if (!$jwt) return [];
 
-    $bundle = (string)getenv('APNS_BUNDLE_ID');
-    $host = (getenv('APNS_ENV') === 'production')
+    $bundle = apnsCfg('apns_bundle_id', 'APNS_BUNDLE_ID', 'cloud.applefix.crm');
+    $host = (apnsCfg('apns_env', 'APNS_ENV', 'sandbox') === 'production')
         ? 'https://api.push.apple.com'
         : 'https://api.sandbox.push.apple.com';
     $payload = json_encode(array_merge(['aps' => $aps], $custom));

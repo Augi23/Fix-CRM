@@ -57,6 +57,22 @@ if (isset($_POST['update_company']) && $is_admin_check) {
     exit;
 }
 
+// ── Push notifikace (APNs) — .p8 klíč + identifikátory pro iOS appku ──
+if (isset($_POST['update_apns']) && $is_admin_check) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    set_setting('apns_key_id', trim($_POST['apns_key_id'] ?? ''));
+    set_setting('apns_team_id', trim($_POST['apns_team_id'] ?? ''));
+    set_setting('apns_bundle_id', trim($_POST['apns_bundle_id'] ?? '') ?: 'cloud.applefix.crm');
+    set_setting('apns_env', in_array($_POST['apns_env'] ?? '', ['sandbox', 'production'], true) ? $_POST['apns_env'] : 'sandbox');
+    if (!empty($_FILES['apns_key_file']['tmp_name']) && is_uploaded_file($_FILES['apns_key_file']['tmp_name'])) {
+        $pem = (string) file_get_contents($_FILES['apns_key_file']['tmp_name']);
+        if (strpos($pem, 'PRIVATE KEY') !== false) { set_setting('apns_key_pem', $pem); }
+    }
+    crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Změna nastavení — Push notifikace (APNs)']);
+    header("Location: settings.php?tab=integrations&updated=1");
+    exit;
+}
+
 if (isset($_POST['update_integrations']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     set_setting('tg_bot_token', trim($_POST['tg_bot_token']));
@@ -899,6 +915,47 @@ require_once 'includes/header.php';
                     </div>
                 </div>
             </form>
+
+            <!-- ── Push notifikace do iOS appky (APNs) ── -->
+            <div class="glass-panel p-4 border-secondary mt-3">
+                <h5 class="mb-1 text-white"><i class="fas fa-bell me-2 text-info"></i>Push notifikace do iOS appky (APNs)</h5>
+                <p class="text-white-50 small mb-3">Klíč <code>.p8</code> a identifikátory z Apple Developer → Keys. Klíč se uloží zabezpečeně a už se nezobrazuje.</p>
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label small text-white-75">Key ID</label>
+                            <input type="text" name="apns_key_id" class="form-control" value="<?php echo e(get_setting('apns_key_id', '')); ?>" placeholder="HSUAVLC283">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-white-75">Team ID</label>
+                            <input type="text" name="apns_team_id" class="form-control" value="<?php echo e(get_setting('apns_team_id', '43MLSD9WKF')); ?>" placeholder="43MLSD9WKF">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-white-75">Bundle ID</label>
+                            <input type="text" name="apns_bundle_id" class="form-control" value="<?php echo e(get_setting('apns_bundle_id', 'cloud.applefix.crm')); ?>" placeholder="cloud.applefix.crm">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-white-75">Prostředí</label>
+                            <?php $apnsEnv = get_setting('apns_env', 'sandbox'); ?>
+                            <select name="apns_env" class="form-select">
+                                <option value="sandbox" <?php echo $apnsEnv === 'sandbox' ? 'selected' : ''; ?>>Sandbox (vývojový build)</option>
+                                <option value="production" <?php echo $apnsEnv === 'production' ? 'selected' : ''; ?>>Production (App Store / TestFlight)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label small text-white-75">Klíč <code>.p8</code>
+                                <?php echo trim((string) get_setting('apns_key_pem', '')) !== '' ? '<span class="text-success">— nahrán ✓</span>' : '<span class="text-warning">— zatím nenahrán</span>'; ?>
+                            </label>
+                            <input type="file" name="apns_key_file" accept=".p8" class="form-control">
+                            <div class="form-text text-white-50">Ponech prázdné pro zachování stávajícího klíče.</div>
+                        </div>
+                    </div>
+                    <div class="border-top border-secondary pt-3 mt-3">
+                        <button type="submit" name="update_apns" class="btn btn-primary px-5"><?php echo __('save'); ?></button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <!-- BANKA (KB API) TAB -->

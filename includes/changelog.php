@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.11.1',
+        'date' => '2026-07-27',
+        'time' => '11:10',
+        'title' => 'APNs push: konfigurace přímo ve webovém nastavení (upload .p8)',
+        'items' => [
+            'Nastavení → Systém → Integrace má novou sekci <b>„Push notifikace do iOS appky (APNs)"</b>: nahraješ tam klíč <code>.p8</code> a vyplníš Key ID / Team ID / Bundle ID / prostředí — bez zásahu do serveru nebo <code>.env</code>.',
+            'Klíč se ukládá zabezpečeně v <code>system_settings</code> a už se nezobrazuje; odesílač push si konfiguraci bere odtud (s fallbackem na <code>.env</code>).',
+        ],
+    ],
+    [
         'version' => '3.11.0',
         'date' => '2026-07-25',
         'time' => '22:40',
