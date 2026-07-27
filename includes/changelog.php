@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.11.2',
+        'date' => '2026-07-27',
+        'time' => '11:55',
+        'title' => 'Push: tabulka push_tokens se vytvoří sama (nezávisle na migracích)',
+        'items' => [
+            'Tabulka pro APNs tokeny se zakládá lazy (<code>CREATE TABLE IF NOT EXISTS</code>) při první registraci zařízení i před odesláním push — takže push funguje, i když migrační runner uvízl na starší migraci (023).',
+        ],
+    ],
+    [
         'version' => '3.11.1',
         'date' => '2026-07-27',
         'time' => '11:10',

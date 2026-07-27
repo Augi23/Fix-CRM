@@ -35,6 +35,26 @@ function apnsKeyPem(): string {
     return '';
 }
 
+/** Vytvoří tabulku push_tokens, pokud chybí (nezávisle na migračním runneru). */
+function ensurePushTokensTable(PDO $pdo): void {
+    static $done = false;
+    if ($done) return;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `push_tokens` (
+            `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT UNSIGNED NOT NULL,
+            `device_token` VARCHAR(200) NOT NULL,
+            `platform` VARCHAR(20) NOT NULL DEFAULT 'ios',
+            `app_version` VARCHAR(40) NULL,
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `uniq_device_token` (`device_token`),
+            KEY `idx_user` (`user_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $done = true;
+    } catch (Throwable $e) { /* ignore */ }
+}
+
 function apnsConfigured(): bool {
     return apnsCfg('apns_key_id', 'APNS_KEY_ID') !== ''
         && apnsCfg('apns_team_id', 'APNS_TEAM_ID') !== ''
@@ -155,6 +175,7 @@ function pushToTokens(array $tokens, string $title, string $body, array $opts = 
 /** Push konkrétnímu uživateli (na všechna jeho zařízení). */
 function pushToUser(PDO $pdo, int $userId, string $title, string $body, array $opts = []): void {
     if (!apnsConfigured() || $userId <= 0) return;
+    ensurePushTokensTable($pdo);
     try {
         $stmt = $pdo->prepare("SELECT device_token FROM push_tokens WHERE user_id = ? AND platform = 'ios'");
         $stmt->execute([$userId]);
@@ -166,6 +187,7 @@ function pushToUser(PDO $pdo, int $userId, string $title, string $body, array $o
 /** Push všem přihlášeným zařízením (volitelně kromě uvedených uživatelů). */
 function pushToAll(PDO $pdo, string $title, string $body, array $opts = [], array $excludeUserIds = []): void {
     if (!apnsConfigured()) return;
+    ensurePushTokensTable($pdo);
     try {
         $rows = $pdo->query("SELECT device_token, user_id FROM push_tokens WHERE platform = 'ios'")
                     ->fetchAll(PDO::FETCH_ASSOC);

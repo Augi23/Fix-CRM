@@ -26,6 +26,9 @@ if (strlen($token) < 32) {
     exit;
 }
 
+require_once __DIR__ . '/../includes/push.php';
+ensurePushTokensTable($pdo);
+
 try {
     $stmt = $pdo->prepare(
         "INSERT INTO push_tokens (user_id, device_token, platform, app_version)
