@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.11.3',
+        'date' => '2026-07-27',
+        'time' => '13:05',
+        'title' => 'Verze se už nikdy nerozejde s changelogem',
+        'items' => [
+            'Dlaždice „Aktuální/Nejnovější verze" v Aktualizacích se dosud plnily ze souboru <code>VERSION</code>, který se při psaní changelogu občas zapomněl zvýšit — a UI pak ukazovalo starší verzi (např. 3.9.2), zatímco Historie úprav už byla dál (3.11.2).',
+            'Verze se nově čte přímo z <b>nejnovějšího záznamu Historie úprav</b> (lokálně i pro dostupnou aktualizaci na GitHubu) — jeden zdroj pravdy, nesoulad už nemůže nastat. Soubor <code>VERSION</code> zůstává jen jako záložní.',
+        ],
+    ],
+    [
         'version' => '3.11.2',
         'date' => '2026-07-27',
         'time' => '11:55',
