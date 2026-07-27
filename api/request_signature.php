@@ -1,8 +1,10 @@
 <?php
 /* Požadavky pro podpisovou stanici:
-   POST action=create  (order_id, sig_type)  → nový požadavek pro pobočku zakázky
-   GET  ?check=<id>                          → stav požadavku (pending/done/cancelled)
-   POST action=cancel  (request_id)          → zrušení (stanice „Přeskočit" / rozmyšlení) */
+   POST action=create  (order_id, sig_type)      → nový požadavek pro pobočku zakázky
+   POST action=create  (complaint_id, sig_type=reklamace) → podpis reklamačního protokolu
+                                                    (řádek má order_id = 0)
+   GET  ?check=<id>                              → stav požadavku (pending/done/cancelled)
+   POST action=cancel  (request_id)              → zrušení (stanice „Přeskočit" / rozmyšlení) */
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 require_once __DIR__ . '/../includes/config.php';
@@ -36,7 +38,30 @@ if ($action === 'cancel') {
 }
 
 $orderId = (int)($_POST['order_id'] ?? 0);
+$complaintId = (int)($_POST['complaint_id'] ?? 0);
 $sigType = (string)($_POST['sig_type'] ?? '');
+
+// ── Reklamace: podpis reklamačního protokolu (stejná stanice jako zakázky) ──
+if ($complaintId > 0 && $sigType === 'reklamace') {
+    ensureComplaintSignatureSupport();
+    $st = $pdo->prepare("SELECT id FROM complaints WHERE id = ? LIMIT 1");
+    $st->execute([$complaintId]);
+    if (!$st->fetchColumn()) {
+        echo json_encode(['ok' => false, 'error' => 'Reklamace nenalezena']); exit;
+    }
+    try {
+        $pdo->prepare("UPDATE signature_requests SET status = 'cancelled' WHERE complaint_id = ? AND status = 'pending'")->execute([$complaintId]);
+        $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+        $branch = (int)getCurrentStaffBranchId();
+        $pdo->prepare("INSERT INTO signature_requests (order_id, complaint_id, sig_type, branch_id, requested_by, email_after) VALUES (0, ?, 'reklamace', ?, ?, 0)")
+            ->execute([$complaintId, $branch ?: null, $by !== '' ? mb_substr($by, 0, 100) : null]);
+        echo json_encode(['ok' => true, 'request_id' => (int)$pdo->lastInsertId(), 'notice' => '', 'email' => '']);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'Chyba serveru']);
+    }
+    exit;
+}
+
 if ($orderId <= 0 || !in_array($sigType, ['prijem', 'vydej'], true)) {
     echo json_encode(['ok' => false, 'error' => 'Chybné parametry']); exit;
 }

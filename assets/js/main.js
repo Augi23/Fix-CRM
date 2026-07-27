@@ -1331,6 +1331,11 @@ window.printOrderLabel = function (orderId, opts) {
 window.openOrderDocChoice = function (orderId, code) {
     var el = document.getElementById('orderDocModal');
     if (!el || typeof bootstrap === 'undefined') { window.open('print_order.php?id=' + orderId, '_blank'); return; }
+    // modal sdílí i reklamační flow (openComplaintDocChoice) → vrátit zakázkový stav
+    var ttl = document.getElementById('orderDocTitleLbl');
+    if (ttl && ttl.dataset.orderLabel) { ttl.textContent = ttl.dataset.orderLabel; }
+    var emailBtnReset = document.getElementById('orderDocEmailBtn');
+    if (emailBtnReset) { emailBtnReset.style.display = ''; }
     document.getElementById('orderDocCode').textContent = code ? ('#' + code) : '';
     var msg = document.getElementById('orderDocMsg'); if (msg) msg.textContent = '';
     var printBtn = document.getElementById('orderDocPrintBtn');
@@ -1402,6 +1407,79 @@ window.openOrderDocChoice = function (orderId, code) {
     window.history.replaceState({}, '', clean);
     try { window.printOrderLabel(createdId, {}); } catch (e) {}
     setTimeout(function () { window.openOrderDocChoice(createdId, ''); }, 400);
+})();
+
+/* ── REKLAMACE: stejný příjmový postup jako u zakázky (štítek + podpis protokolu) ── */
+
+window.printComplaintLabel = function (complaintId, opts) {
+    opts = opts || {};
+    var fd = new FormData();
+    fd.append('action', 'print_complaint');
+    fd.append('id', complaintId);
+    fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+    fetch('api/print_label_server.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (!res.ok) { throw new Error(res.error || 'tisk selhal'); }
+            window.afxLabelToast('🏷️ Štítek reklamace ' + (res.code || '') + ' odeslán na tiskárnu', true);
+        })
+        .catch(function (e) {
+            if (!opts.silentFail) { window.afxLabelToast('⚠️ Tisk štítku selhal: ' + e.message, false); }
+        });
+};
+
+/* Reklamační protokol — volba podpis na tabletu / tisk. Sdílí modal #orderDocModal
+   (e-mail se u příjmu reklamace neposílá — vyrozumění odchází až po vyřízení). */
+window.openComplaintDocChoice = function (complaintId, code) {
+    var el = document.getElementById('orderDocModal');
+    if (!el || typeof bootstrap === 'undefined') { window.open('print_complaint.php?id=' + complaintId, '_blank'); return; }
+    var ttl = document.getElementById('orderDocTitleLbl');
+    if (ttl && ttl.dataset.complaintLabel) { ttl.textContent = ttl.dataset.complaintLabel; }
+    document.getElementById('orderDocCode').textContent = code ? String(code) : '';
+    var msg = document.getElementById('orderDocMsg'); if (msg) { msg.textContent = ''; msg.className = 'small mt-3'; }
+    var printBtn = document.getElementById('orderDocPrintBtn');
+    var emailBtn = document.getElementById('orderDocEmailBtn');
+    var signBtn = document.getElementById('orderDocSignBtn');
+    if (emailBtn) { emailBtn.style.display = 'none'; }   // příjem reklamace se needmailuje
+    if (signBtn) {
+        signBtn.disabled = false;
+        signBtn.onclick = function () {
+            signBtn.disabled = true;
+            var fd = new FormData();
+            fd.append('action', 'create');
+            fd.append('complaint_id', complaintId);
+            fd.append('sig_type', 'reklamace');
+            fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+            fetch('api/request_signature.php', { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    if (!j.ok) { msg.textContent = j.error || 'Chyba'; signBtn.disabled = false; return; }
+                    msg.innerHTML = '✍️ Odesláno na podpisový tablet — klient podepíše reklamační protokol; podpis se do něj uloží.';
+                })
+                .catch(function () { msg.textContent = 'Chyba spojení'; signBtn.disabled = false; });
+        };
+    }
+    printBtn.onclick = function () {
+        if (typeof openUniversalPreview === 'function') {
+            openUniversalPreview('print_complaint.php?id=' + complaintId, 'Reklamační protokol');
+        } else {
+            window.open('print_complaint.php?id=' + complaintId, '_blank');
+        }
+    };
+    bootstrap.Modal.getOrCreateInstance(el).show();
+};
+
+// po založení reklamace: štítek na tiskárnu + nabídka reklamačního protokolu (podpis / tisk)
+(function () {
+    var params = new URLSearchParams(window.location.search);
+    var createdId = params.get('created_id');
+    var createdCode = params.get('created') || '';
+    if (!createdId || !/reklamace\.php$/.test(window.location.pathname)) { return; }
+    params.delete('created_id');
+    var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    window.history.replaceState({}, '', clean);
+    try { window.printComplaintLabel(createdId, {}); } catch (e) {}
+    setTimeout(function () { window.openComplaintDocChoice(createdId, createdCode); }, 400);
 })();
 
 

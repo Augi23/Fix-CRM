@@ -4,6 +4,7 @@
    funguje ze Safari, iPadu i telefonu. Štítek zakázky vyjede na tiskárně pobočky, které
    zakázka patří (branchPrinterIp). Pobočka v jiné síti než server potřebuje agenta/VPN.
      POST action=print, id=<order_id>          → tisk štítku zakázky (tiskárna pobočky zakázky)
+     POST action=print_complaint, id=<cmpl_id> → štítek reklamace (RK kód, tiskárna pobočky zaměstnance)
      POST action=test [branch_id]              → testovací štítek (tiskárna pobočky / zvolené admin)
      POST action=print_product, id=<prod_id>   → cenový štítek produktu
      GET  action=status [branch_id]            → dosažitelnost tiskárny pobočky + stav prostředí
@@ -91,7 +92,18 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 //   print         → pobočka ZAKÁZKY (štítek vyjede na tiskárně té pobočky),
 //   test/produkt  → pobočka přihlášeného (admin může přes branch_id otestovat konkrétní pobočku).
 $order = null;
-if ($action !== 'test' && $action !== 'print_product') {
+$cmpl = null;
+if ($action === 'print_complaint') {
+    // štítek reklamace: RK kód + zařízení + důvod; tiskne se na pobočce zaměstnance
+    $cmplId = (int)($_POST['id'] ?? 0);
+    $st = $pdo->prepare('SELECT k.id, k.complaint_code, k.device, k.complaint_reason, k.created_at,
+        TRIM(CONCAT(COALESCE(c.first_name, ""), " ", COALESCE(c.last_name, ""))) AS client_name
+        FROM complaints k LEFT JOIN customers c ON c.id = k.customer_id WHERE k.id = ?');
+    $st->execute([$cmplId]);
+    $cmpl = $st->fetch();
+    if (!$cmpl) { echo json_encode(['ok' => false, 'error' => 'Reklamace nenalezena']); exit; }
+    $branchId = getCurrentStaffBranchId();
+} elseif ($action !== 'test' && $action !== 'print_product') {
     $orderId = (int)($_POST['id'] ?? 0);
     $st = $pdo->prepare('SELECT o.id, o.order_code, o.problem_description, o.created_at, o.branch_id, o.technician_id,
         TRIM(CONCAT(COALESCE(c.first_name, ""), " ", COALESCE(c.last_name, ""))) AS client_name, c.company
@@ -170,6 +182,19 @@ if ($action === 'print_product') {
     $args = ['--product-json' => base64_encode((string)json_encode($data, JSON_UNESCAPED_UNICODE))];
 } elseif ($action === 'test') {
     $args = ['--code' => 'TEST' . date('His'), '--defect' => 'Testovací štítek ze serveru', '--date' => date('d.m.Y'), '--client' => 'Fix-CRM'];
+} elseif ($action === 'print_complaint') {
+    // štítek reklamace — stejný formát jako zakázka: kód (Code128) + zařízení/důvod + klient
+    $defect = trim((string)($cmpl['device'] ?? ''));
+    $reason = trim(preg_replace('/\s+/', ' ', (string)($cmpl['complaint_reason'] ?? '')));
+    if ($reason !== '') { $defect = trim($defect . ($defect !== '' ? ' — ' : '') . $reason); }
+    if (mb_strlen($defect) > 80) { $defect = mb_substr($defect, 0, 77) . '…'; }
+
+    $args = [
+        '--code' => (string)($cmpl['complaint_code'] ?: ('RK-' . (int)$cmpl['id'])),
+        '--defect' => $defect,
+        '--date' => !empty($cmpl['created_at']) ? date('d.m.Y', strtotime((string)$cmpl['created_at'])) : date('d.m.Y'),
+        '--client' => trim((string)($cmpl['client_name'] ?? '')),
+    ];
 } else {
     // print — $order už načtený a ověřený (canAccessOrderBranch) výše
     $defect = trim((string)($order['problem_description'] ?? ''));

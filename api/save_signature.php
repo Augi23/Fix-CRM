@@ -14,18 +14,27 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 $orderId = (int)($_POST['order_id'] ?? 0);
+$complaintId = (int)($_POST['complaint_id'] ?? 0);
 $sigType = (string)($_POST['sig_type'] ?? '');
 $dataUrl = (string)($_POST['image'] ?? '');
 
-if ($orderId <= 0 || !in_array($sigType, ['prijem', 'vydej'], true)) {
-    echo json_encode(['ok' => false, 'error' => 'Chybné parametry']); exit;
-}
+$isComplaint = ($complaintId > 0 && $sigType === 'reklamace');
+if (!$isComplaint) {
+    if ($orderId <= 0 || !in_array($sigType, ['prijem', 'vydej'], true)) {
+        echo json_encode(['ok' => false, 'error' => 'Chybné parametry']); exit;
+    }
 
-$st = $pdo->prepare("SELECT id, branch_id, technician_id FROM orders WHERE id = ? LIMIT 1");
-$st->execute([$orderId]);
-$order = $st->fetch();
-if (!$order) { echo json_encode(['ok' => false, 'error' => 'Zakázka nenalezena']); exit; }
-if (!canAccessOrderBranch($order)) { echo json_encode(['ok' => false, 'error' => 'Bez oprávnění']); exit; }
+    $st = $pdo->prepare("SELECT id, branch_id, technician_id FROM orders WHERE id = ? LIMIT 1");
+    $st->execute([$orderId]);
+    $order = $st->fetch();
+    if (!$order) { echo json_encode(['ok' => false, 'error' => 'Zakázka nenalezena']); exit; }
+    if (!canAccessOrderBranch($order)) { echo json_encode(['ok' => false, 'error' => 'Bez oprávnění']); exit; }
+} else {
+    $st = $pdo->prepare("SELECT id, complaint_code FROM complaints WHERE id = ? LIMIT 1");
+    $st->execute([$complaintId]);
+    $complaint = $st->fetch();
+    if (!$complaint) { echo json_encode(['ok' => false, 'error' => 'Reklamace nenalezena']); exit; }
+}
 
 // data URL → PNG binárka (limit ~1.5 MB, kontrola PNG hlavičky)
 if (!preg_match('#^data:image/png;base64,(.+)$#', $dataUrl, $m)) {
@@ -41,6 +50,46 @@ $dir = __DIR__ . '/../uploads/signatures';
 if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
 if (!is_dir($dir) || !is_writable($dir)) {
     echo json_encode(['ok' => false, 'error' => 'Úložiště podpisů není zapisovatelné']); exit;
+}
+
+// ── Reklamace: podpis reklamačního protokolu → complaint_signatures ──
+if ($isComplaint) {
+    try {
+        ensureComplaintSignatureSupport();
+
+        // nahradit předchozí podpis (soubor i záznam)
+        $old = $pdo->prepare("SELECT id, file_path FROM complaint_signatures WHERE complaint_id = ?");
+        $old->execute([$complaintId]);
+        foreach ($old->fetchAll(PDO::FETCH_ASSOC) as $o) {
+            $p = __DIR__ . '/../' . ltrim((string)$o['file_path'], '/');
+            if (is_file($p)) { @unlink($p); }
+            $pdo->prepare("DELETE FROM complaint_signatures WHERE id = ?")->execute([(int)$o['id']]);
+        }
+
+        $name = 'sig_rk_' . $complaintId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.png';
+        file_put_contents($dir . '/' . $name, $bin);
+
+        $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+        $pdo->prepare("INSERT INTO complaint_signatures (complaint_id, file_path, requested_by) VALUES (?, ?, ?)")
+            ->execute([$complaintId, 'uploads/signatures/' . $name, $by !== '' ? mb_substr($by, 0, 100) : null]);
+
+        $reqId = (int)($_POST['request_id'] ?? 0);
+        if ($reqId > 0) {
+            try {
+                $pdo->prepare("UPDATE signature_requests SET status = 'done' WHERE id = ? AND complaint_id = ?")->execute([$reqId, $complaintId]);
+            } catch (Throwable $e) { /* podpis je uložen, zbytek best-effort */ }
+        }
+
+        crmAuditLog('complaint.signature_add', [
+            'entity_type' => 'complaint', 'entity_id' => (int)$complaintId,
+            'entity_label' => (string)($complaint['complaint_code'] ?? ('#' . $complaintId)),
+            'summary' => 'Uložen podpis klienta k reklamaci ' . (string)($complaint['complaint_code'] ?? ('#' . $complaintId)),
+        ]);
+        echo json_encode(['ok' => true, 'signed_at' => date('d.m.Y H:i'), 'emailed' => false]);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'Chyba serveru']);
+    }
+    exit;
 }
 
 try {

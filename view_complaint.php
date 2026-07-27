@@ -172,6 +172,12 @@ require_once 'includes/header.php';
             <div class="glass-panel p-4 border-secondary">
                 <h5 class="mb-3 text-white"><i class="fas fa-file-lines me-2 text-primary"></i><?php echo __('cmpl_documents'); ?></h5>
                 <div class="d-grid gap-2">
+                    <?php /* Přijetí reklamace: stejná automatika jako po založení — tisk štítku
+                             + okno protokolu s podpisem na tabletu (openComplaintDocChoice). */ ?>
+                    <button type="button" class="btn btn-info fw-semibold"
+                        onclick="var b=this;b.disabled=true;try{printComplaintLabel(<?php echo (int)$c['id']; ?>);}catch(e){}setTimeout(function(){openComplaintDocChoice(<?php echo (int)$c['id']; ?>, '<?php echo e((string)$c['complaint_code']); ?>');b.disabled=false;},450);">
+                        <i class="fas fa-user-check me-2"></i>Přijetí reklamace — štítek + podpis
+                    </button>
                     <button type="button" class="btn btn-outline-light" onclick="openUniversalPreview('print_complaint.php?id=<?php echo (int)$c['id']; ?>', '<?php echo e(__('complaint_protocol')); ?>')">
                         <i class="fas fa-file-alt me-2"></i><?php echo __('complaint_protocol'); ?>
                     </button>

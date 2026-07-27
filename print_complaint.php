@@ -39,6 +39,10 @@ $__cust_phone = (string)($complaint['cust_phone'] ?? $complaint['phone'] ?? '');
 $__cust_email = (string)($complaint['email'] ?? '');
 $__created = !empty($complaint['created_at']) ? date('d.m.Y H:i', strtotime((string)$complaint['created_at'])) : date('d.m.Y H:i');
 
+// Elektronický podpis klienta z podpisové stanice (pokud existuje) — vkládá se
+// nad podpisovou linku stejně jako u zakázkového listu.
+$__cmpl_sig = function_exists('crmGetComplaintSignature') ? crmGetComplaintSignature((int)($complaint['id'] ?? 0)) : null;
+
 $__company = get_setting('company_name', 'AppleFix s.r.o.');
 $__company_ico = get_setting('company_ico', '');
 // Adresa/telefon/e-mail dle pobočky: reklamaci vystavuje zaměstnanec pobočky;
@@ -101,6 +105,11 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
                      font-size: 10px; color: #495059; line-height: 1.55; font-weight: 300; text-align: justify; }
         .sign { display: flex; gap: 40px; margin-top: 38px; }
         .sign .slot { flex: 1; border-top: 1.4px solid var(--ink); padding-top: 7px; font-size: 10.5px; color: var(--muted); text-align: center; }
+        /* Elektronický podpis: obrázek NAD linkou (slot bez vlastní linky, linku nese .sigline) */
+        .sign .slot.signed { border-top: none; padding-top: 0; }
+        .sign .slot.signed .sig-img { display: block; max-height: 54px; margin: 0 auto 2px; }
+        .sign .slot.signed .sigline { border-top: 1.4px solid var(--ink); padding-top: 7px; }
+        .sign .slot.signed .sig-at { margin-top: 3px; font-size: 9px; color: #8a929c; }
         .foot { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); text-align: center; }
         .foot .foot-name { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: var(--ink); }
         .foot .foot-line { font-size: 10px; color: var(--muted); font-weight: 300; margin-top: 4px; letter-spacing: 0.02em; }
@@ -172,7 +181,15 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
         </div>
 
         <div class="sign">
+            <?php if ($__cmpl_sig): ?>
+            <div class="slot signed">
+                <img class="sig-img" src="<?php echo $__cmpl_sig['img']; ?>" alt="podpis">
+                <div class="sigline"><?php echo htmlspecialchars(_l('cmpl_sign_customer')); ?></div>
+                <div class="sig-at"><?php echo htmlspecialchars(_l('ord_signed_electronically')); ?> <?php echo htmlspecialchars(date('j. n. Y H:i', strtotime((string)$__cmpl_sig['at']))); ?></div>
+            </div>
+            <?php else: ?>
             <div class="slot"><?php echo htmlspecialchars(_l('cmpl_sign_customer')); ?></div>
+            <?php endif; ?>
             <div class="slot"><?php echo htmlspecialchars(_l('cmpl_sign_service')); ?> <?php echo htmlspecialchars($__company); ?></div>
         </div>
 

@@ -3491,6 +3491,43 @@ function ensureSignatureRequestsTable(): void {
     } catch (Throwable $e) { /* best-effort */ }
 }
 
+/** Podpisy REKLAMACÍ: sloupec complaint_id na požadavcích stanice (řádky reklamací
+ *  mají order_id = 0) + tabulka uložených podpisů reklamačního protokolu. */
+function ensureComplaintSignatureSupport(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    ensureSignatureRequestsTable();
+    try { $pdo->exec("ALTER TABLE signature_requests ADD COLUMN complaint_id INT NULL"); } catch (Throwable $e) { /* už existuje */ }
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS complaint_signatures (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            complaint_id INT NOT NULL,
+            file_path VARCHAR(255) NOT NULL,
+            signed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            requested_by VARCHAR(100) NULL,
+            INDEX idx_cs_complaint (complaint_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+/** Podpis reklamačního protokolu (nejnovější) jako ['img' => data URI, 'at' => čas], jinak null. */
+function crmGetComplaintSignature(int $complaintId): ?array {
+    global $pdo;
+    if ($complaintId <= 0) return null;
+    try {
+        ensureComplaintSignatureSupport();
+        $st = $pdo->prepare("SELECT file_path, signed_at FROM complaint_signatures WHERE complaint_id = ? ORDER BY id DESC LIMIT 1");
+        $st->execute([$complaintId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $p = __DIR__ . '/../' . ltrim((string)$row['file_path'], '/');
+        if (!is_file($p)) return null;
+        return ['img' => 'data:image/png;base64,' . base64_encode((string)file_get_contents($p)), 'at' => (string)$row['signed_at']];
+    } catch (Throwable $e) { return null; }
+}
+
 /** Podpisy zakázky jako mapa [sig_type => řádek]. */
 function crmGetOrderSignatures(int $orderId): array {
     global $pdo;
@@ -4229,6 +4266,7 @@ function crmAuditActionLabel(string $action): string {
         'complaint.assign' => 'Převzetí/přiřazení reklamace', 'complaint.resolution' => 'Zápis řešení reklamace',
         'complaint.media_upload' => 'Nahrání přílohy reklamace', 'complaint.media_delete' => 'Smazání přílohy reklamace',
         'complaint.result_email' => 'Odeslání vyrozumění o reklamaci',
+        'complaint.signature_add' => 'Podpis reklamačního protokolu',
         'procurement.create' => 'Požadavek na díl', 'procurement.status_change' => 'Změna stavu nákupu',
         'products.import' => 'Import produktů (e-shop)', 'products.delete' => 'Smazání produktu (e-shop)',
         'kasa.sale' => 'Prodej na kase', 'kasa.cancel' => 'Storno prodeje na kase',

@@ -24,6 +24,7 @@ foreach (['cs', 'en', 'ru'] as $__l) {
     $__sign_l10n[$__l] = [
         'doc_reception'   => __('sign_doc_title_reception', $__l),
         'doc_pickup'      => __('sign_doc_title_pickup', $__l),
+        'doc_complaint'   => __('sign_doc_title_complaint', $__l),
         'not_now'         => __('sign_not_now', $__l),
         'sign'            => __('sign_btn', $__l),
         'signed'          => __('sign_signed', $__l),
@@ -34,8 +35,10 @@ foreach (['cs', 'en', 'ru'] as $__l) {
         'signing_by'      => __('sign_signing_by', $__l),
         'sub_reception'   => __('sign_intake_short', $__l),
         'sub_pickup'      => __('sign_pickup', $__l),
+        'sub_complaint'   => __('sign_complaint_short', $__l),
         'terms_reception' => __('sign_terms_reception', $__l),
         'terms_pickup'    => __('sign_terms_pickup', $__l),
+        'terms_complaint' => __('sign_terms_complaint', $__l),
         'served_by'       => __('sign_served_by', $__l),
     ];
 }
@@ -184,12 +187,14 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
         var t = afxSignL(req.lang);
         try { document.documentElement.lang = req.lang || SIGN_DEFAULT_LANG; } catch (e) {}
         document.getElementById('docViewTitle').textContent =
-            req.sig_type === 'vydej' ? t.doc_pickup : t.doc_reception;
+            req.complaint_id ? t.doc_complaint : (req.sig_type === 'vydej' ? t.doc_pickup : t.doc_reception);
         var cBtn = document.getElementById('docViewCancelBtn'); if (cBtn) cBtn.textContent = t.not_now;
         var sLbl = document.getElementById('docViewSignLbl'); if (sLbl) sLbl.textContent = t.sign;
         document.getElementById('docViewSub').textContent =
             req.order_code + ' · ' + req.customer + ' · ' + req.device + (req.amount ? ' · ' + req.amount : '');
-        document.getElementById('docViewFrame').src = 'print_order.php?id=' + encodeURIComponent(req.order_id) + '&plain=1';
+        document.getElementById('docViewFrame').src = req.complaint_id
+            ? 'print_complaint.php?id=' + encodeURIComponent(req.complaint_id)
+            : 'print_order.php?id=' + encodeURIComponent(req.order_id) + '&plain=1';
         docView.style.display = 'flex';
     }
     function hideDocument() {
@@ -217,12 +222,13 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
         window.AFX_SIGN_L10N = { clear: t.clear, cancel: t.not_now, save: t.save };
         afxSignaturePad({
             title: t.signing_by + ' ' + req.customer,
-            subtitle: (req.sig_type === 'vydej' ? t.sub_pickup : t.sub_reception) + ' · ' + req.order_code + ' · ' + req.device + (req.amount ? ' · ' + req.amount : ''),
+            subtitle: (req.complaint_id ? t.sub_complaint : (req.sig_type === 'vydej' ? t.sub_pickup : t.sub_reception)) + ' · ' + req.order_code + ' · ' + req.device + (req.amount ? ' · ' + req.amount : ''),
             // ⚖️ Souhlasná/právní věta: rozhodná je ČESKÁ verze, cizí jazyk je jen zdvořilostní překlad.
-            terms: req.sig_type === 'vydej' ? t.terms_pickup : t.terms_reception,
+            terms: req.complaint_id ? t.terms_complaint : (req.sig_type === 'vydej' ? t.terms_pickup : t.terms_reception),
             onSave: function (dataUrl) {
                 var fd = new FormData();
-                fd.append('order_id', req.order_id);
+                if (req.complaint_id) { fd.append('complaint_id', req.complaint_id); }
+                else { fd.append('order_id', req.order_id); }
                 fd.append('sig_type', req.sig_type);
                 fd.append('image', dataUrl);
                 fd.append('request_id', req.id);

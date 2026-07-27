@@ -113,7 +113,9 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content glass-card border-secondary text-white">
       <div class="modal-header border-secondary">
-        <h5 class="modal-title"><i class="fas fa-file-invoice me-2 text-primary"></i><?php echo __('order_sheet'); ?> <span id="orderDocCode"></span></h5>
+        <h5 class="modal-title"><i class="fas fa-file-invoice me-2 text-primary"></i><span id="orderDocTitleLbl"
+            data-order-label="<?php echo e(__('order_sheet')); ?>"
+            data-complaint-label="<?php echo e(__('complaint_protocol')); ?>"><?php echo __('order_sheet'); ?></span> <span id="orderDocCode"></span></h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">

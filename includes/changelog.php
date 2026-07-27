@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.12.0',
+        'date' => '2026-07-27',
+        'time' => '13:55',
+        'title' => 'Reklamace: příjem jako u zakázky — tisk štítku + podpis protokolu na tabletu',
+        'items' => [
+            'Po založení reklamace proběhne <b>stejná automatika jako u nové zakázky</b>: na pobočkové tiskárně se vytiskne <b>štítek s RK kódem</b> (Code128, zařízení + důvod + klient) a otevře se okno <b>reklamačního protokolu</b> s volbou „Podepsat na tabletu" / „Vytisknout".',
+            'Podpisová stanice (iPad) nově umí i reklamace — klientovi ukáže <b>reklamační protokol</b> v jeho jazyce, podepíše se prstem a podpis se <b>vloží do protokolu</b> (stejně jako u zakázkového listu, včetně „podepsáno elektronicky" s časem).',
+            'V detailu reklamace přibylo tlačítko <b>„Přijetí reklamace — štítek + podpis"</b> (obdoba onboardu zákazníka u zakázek) — automatiku lze kdykoli zopakovat.',
+            'Technicky: štítek přes <code>print_label_server.php?action=print_complaint</code>, podpisy v nové tabulce <code>complaint_signatures</code> (vytváří se sama), požadavky stanice sdílí <code>signature_requests</code> (sloupec <code>complaint_id</code>).',
+        ],
+    ],
+    [
         'version' => '3.11.3',
         'date' => '2026-07-27',
         'time' => '13:05',

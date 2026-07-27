@@ -116,7 +116,8 @@ try {
     }
 
     $pdo->commit();
-    complaint_redirect('created=' . urlencode($code));
+    // created_id spouští automatiku po založení (tisk štítku + podpis protokolu) — viz main.js
+    complaint_redirect('created=' . urlencode($code) . '&created_id=' . (int)$complaint_id);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }
     error_log('add_complaint: ' . $e->getMessage());
