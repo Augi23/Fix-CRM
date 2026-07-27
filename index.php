@@ -30,6 +30,7 @@ $__tilesBranchLabel = $__tilesGlobal ? 'Obě pobočky' : getBranchLabel($__myBra
 // Migrace 7/2026: číselné údaje Nástěnky = jen zakázky vzniklé v CRM (source <> 'legacy');
 // importované ze zakazkovylist.cz do hlavních čísel ani tržeb nevstupují
 ensureOrdersSourceColumn();
+ensureOrderDeviceBranchColumn(); // fyzické umístění zařízení (oranžová pilulka u stavu)
 $noLegacy = " AND source <> 'legacy'";
 $unassigned_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($activeStatuses) AND (technician_id IS NULL OR technician_id = 0)" . $noLegacy . $__branch_cond)->fetchColumn();
 $unfinished_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($activeStatuses)" . $noLegacy . $__branch_cond)->fetchColumn();
@@ -291,7 +292,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                     </div>
                                 </td>
                                 <td class="cell-status">
-                                    <?php echo getStatusBadge($r['status']); ?>
+                                    <?php echo getStatusBadge($r['status']); ?><?php echo crmDeviceLocationPill($r); ?>
                                     <?php if (!empty($r['web_appointment_at'])):
                                         $wbTs = strtotime((string)$r['web_appointment_at']);
                                         $wbToday = $wbTs && date('Y-m-d', $wbTs) === date('Y-m-d');

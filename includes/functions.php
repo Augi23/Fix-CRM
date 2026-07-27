@@ -3597,6 +3597,59 @@ function crmCustomerDocLang($preferredLanguage): string {
 /** Sloupec orders.created_by_name — jméno zaměstnance, který zakázku vytvořil
  *  (natvrdo, přežije smazání účtu). Starší zakázky ho nemají (NULL) — spolehlivá
  *  zpětná rekonstrukce není možná, tak raději nic než špatné jméno. */
+/** Fyzické umístění zařízení: orders.device_branch_id (NULL = na domovské pobočce
+ *  zakázky). Nastavuje api/move_order_device.php („Přesunout zařízení na …"). */
+function ensureOrderDeviceBranchColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM orders LIKE 'device_branch_id'")->fetch();
+        if (!$col) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN device_branch_id INT NULL AFTER branch_id");
+        }
+    } catch (Throwable $e) { error_log('ensureOrderDeviceBranchColumn: ' . $e->getMessage()); }
+}
+
+/** Krátký název pobočky pro pilulky/tlačítka („Praha 8 - Karlín" → „Karlín"). */
+function crmBranchShortLabel(?int $branchId): string {
+    $name = getBranchLabel($branchId);
+    if ($name === '') return '';
+    $pos = mb_strrpos($name, ' - ');
+    return $pos !== false ? trim(mb_substr($name, $pos + 3)) : $name;
+}
+
+/** Pobočka, kde zařízení fyzicky je (device_branch_id, jinak domovská pobočka). */
+function crmOrderDeviceBranchId(array $order): int {
+    $dev = (int)($order['device_branch_id'] ?? 0);
+    return $dev > 0 ? $dev : (int)($order['branch_id'] ?? 0);
+}
+
+/** Cíl tlačítka „Přesunout zařízení na …" = opačná aktivní pobočka, než kde
+ *  zařízení právě je. Vrací [id, krátký název] nebo [0, ''] (jediná pobočka). */
+function crmOrderDeviceMoveTarget(array $order): array {
+    $current = crmOrderDeviceBranchId($order);
+    if ($current <= 0) { $current = getDefaultBranchId(); }
+    foreach (getBranches(true) as $b) {
+        if ((int)$b['id'] !== $current) {
+            return [(int)$b['id'], crmBranchShortLabel((int)$b['id'])];
+        }
+    }
+    return [0, ''];
+}
+
+/** Oranžová pilulka „zařízení je na jiné pobočce" — stejná výška/tvar jako
+ *  stavová pilulka; vykreslí se jen když je zařízení mimo domovskou pobočku. */
+function crmDeviceLocationPill(array $order): string {
+    $dev = (int)($order['device_branch_id'] ?? 0);
+    if ($dev <= 0 || $dev === (int)($order['branch_id'] ?? 0)) return '';
+    $short = crmBranchShortLabel($dev);
+    if ($short === '') return '';
+    return ' <span class="badge status-pill status-pill--moved" title="Zařízení je fyzicky na pobočce ' . e(getBranchLabel($dev)) . '">'
+        . '<i class="fas fa-truck-arrow-right"></i>' . e($short) . '</span>';
+}
+
 function ensureOrderCreatedByColumn(): void {
     global $pdo;
     static $done = false;
@@ -4257,6 +4310,7 @@ function crmAuditActionLabel(string $action): string {
         'admin.create' => 'Povýšení na administrátora', 'admin.password' => 'Změna hesla administrátora',
         'admin.delete' => 'Odstranění administrátora', 'admin.demote' => 'Odebrání admin práv',
         'order.signature_add' => 'Podpis klienta', 'order.dates_change' => 'Zpětná změna datumů',
+        'order.device_move' => 'Přesun zařízení na pobočku',
         'order.item_add' => 'Přidání dílu k zakázce', 'order.item_update' => 'Úprava dílu zakázky',
         'order.item_delete' => 'Odebrání dílu ze zakázky',
         'invoice.create' => 'Vystavení faktury', 'invoice.update' => 'Úprava faktury',

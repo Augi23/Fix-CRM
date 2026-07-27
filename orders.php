@@ -5,6 +5,7 @@ require_once 'includes/functions.php';
 require_once 'includes/scan_resolver.php';
 
 ensureOrderCreatedByColumn();   // sloupec „kdo zakázku vytvořil" (levý sloupec seznamu)
+ensureOrderDeviceBranchColumn(); // fyzické umístění zařízení (přesun mezi pobočkami)
 ensureOrdersSourceColumn();     // source + legacy_code (migrace 7/2026) — hledání níže se na legacy_code ptá
 
 require_once 'includes/header.php';
@@ -432,7 +433,7 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
                                 </div>
                             </td>
                             <td class="cell-status">
-                                <?php echo getStatusBadge($order['status']); ?>
+                                <?php echo getStatusBadge($order['status']); ?><?php echo crmDeviceLocationPill($order); ?>
                                 <?php if (!empty($order['web_appointment_at'])):
                                     $wbTs = strtotime((string)$order['web_appointment_at']);
                                     $wbToday = $wbTs && date('Y-m-d', $wbTs) === date('Y-m-d');

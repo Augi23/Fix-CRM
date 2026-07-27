@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.13.0',
+        'date' => '2026-07-27',
+        'time' => '14:45',
+        'title' => 'Přesun zařízení mezi pobočkami (Karlín ↔ Na Příkopě)',
+        'items' => [
+            'V detailu zakázky (pod výběrem stavu) je nové tlačítko <b>„Přesunout zařízení na Karlín / Na Příkopě"</b> — vždy nabízí opačnou pobočku, než kde zařízení fyzicky je. Dalším kliknutím lze zařízení poslat zpět (návrat na domovskou pobočku značku zruší).',
+            'Přesunuté zařízení se ukazuje <b>oranžovou pilulkou s názvem pobočky</b> (ikona 🚚, stejná výška i tvar jako stavová pilulka) hned <b>vedle aktuálního stavu</b> — v seznamu zakázek, na Nástěnce i v detailu zakázky.',
+            'Zakázka zůstává své pobočce (čísla ani viditelnost se nemění) — jde o fyzické umístění zařízení. Každý přesun se zapisuje do Historie (audit „Přesun zařízení").',
+            'Technicky: sloupec <code>orders.device_branch_id</code> (vytvoří se sám, bez migrací) + endpoint <code>api/move_order_device.php</code>.',
+        ],
+    ],
+    [
         'version' => '3.12.0',
         'date' => '2026-07-27',
         'time' => '13:55',

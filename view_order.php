@@ -22,7 +22,9 @@ require_once 'includes/header.php';
 $id = $_GET['id'] ?? $_GET['order_id'] ?? null;
 if (!$id) die(__('order_id_missing'));
 
-$stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.email, t.name as tech_name 
+ensureOrderDeviceBranchColumn(); // fyzické umístění zařízení (přesun mezi pobočkami)
+
+$stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.email, t.name as tech_name
                        FROM orders o 
                        JOIN customers c ON o.customer_id = c.id 
                        LEFT JOIN technicians t ON o.technician_id = t.id
@@ -191,7 +193,9 @@ function localizedOrderStatusLabel(string $status): string {
                         <?php endif; ?>
                     </div>
                 </div>
-                <?php echo getStatusBadge($order['status']); ?>
+                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                    <?php echo getStatusBadge($order['status']); ?><?php echo crmDeviceLocationPill($order); ?>
+                </div>
             </div>
             <div class="card-body">
                 <div class="row g-3 mb-4 order-summary-hl">
@@ -620,6 +624,17 @@ function localizedOrderStatusLabel(string $status): string {
                                     <option value="<?php echo e($statusValue); ?>" <?php if($order['status'] === $statusValue) echo 'selected'; ?>><?php echo e($statusLabel); ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php
+                            /* Přesun zařízení mezi pobočkami: tlačítko vždy nabízí OPAČNOU
+                               pobočku, než kde zařízení fyzicky je (návrat domů pilulku zruší). */
+                            [$__mvId, $__mvShort] = crmOrderDeviceMoveTarget($order);
+                            if ($__mvId > 0):
+                            ?>
+                            <button type="button" class="btn btn-sm btn-outline-warning w-100" id="moveDeviceBtn"
+                                onclick="afxMoveDevice(<?php echo (int)$order['id']; ?>, this)">
+                                <i class="fas fa-truck-arrow-right me-1"></i>Přesunout zařízení na <?php echo e($__mvShort); ?>
+                            </button>
+                            <?php endif; ?>
                         </div>
                         <div class="mb-3">
                             <label class="form-label"><?php echo __('work_cost'); ?></label>
@@ -680,6 +695,25 @@ function localizedOrderStatusLabel(string $status): string {
                         </div>
                         <?php endif; ?>
                         <script>
+                        /* Přesun zařízení na druhou pobočku (device_branch_id) — toast + reload,
+                           ať se hned překreslí oranžová pilulka i text tlačítka. */
+                        function afxMoveDevice(orderId, btn) {
+                            if (btn) { btn.disabled = true; }
+                            var fd = new FormData();
+                            fd.append('id', orderId);
+                            fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+                            fetch('api/move_order_device.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                                .then(function (r) { return r.json(); })
+                                .then(function (j) {
+                                    if (!j.ok) { throw new Error(j.error || 'Přesun selhal'); }
+                                    if (window.afxLabelToast) { afxLabelToast('📦 Zařízení přesunuto na ' + (j.moved_to_label || 'druhou pobočku'), true); }
+                                    setTimeout(function () { location.reload(); }, 600);
+                                })
+                                .catch(function (e) {
+                                    if (btn) { btn.disabled = false; }
+                                    if (window.afxLabelToast) { afxLabelToast('⚠️ ' + e.message, false); } else { alert(e.message); }
+                                });
+                        }
                         function afxReleaseOrder() {
                             showConfirm('<?php echo __('handoff_confirm'); ?>', function () {
                                 var fd = new FormData();
