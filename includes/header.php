@@ -177,6 +177,7 @@ try {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/main.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/main.js'); ?>"></script>
+    <script src="assets/js/draft.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/draft.js'); ?>"></script>
     <script src="assets/js/liquid-glass.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/liquid-glass.js'); ?>" defer></script>
     <script src="assets/js/liquid-glass-engine.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/liquid-glass-engine.js'); ?>" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>

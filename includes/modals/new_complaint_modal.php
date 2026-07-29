@@ -4,7 +4,7 @@
 <div class="modal fade" id="newComplaintModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content glass-card border-secondary text-white shadow-lg">
-            <form action="api/add_complaint.php" method="POST" enctype="multipart/form-data" id="newComplaintForm">
+            <form action="api/add_complaint.php" method="POST" enctype="multipart/form-data" id="newComplaintForm" data-draft-key="new-complaint">
                 <?php echo csrfField(); ?>
                 <div class="modal-header bg-transparent border-secondary py-3">
                     <h5 class="modal-title mb-0"><i class="fas fa-rotate-left me-2" style="color:#f97316"></i><?php echo __('new_complaint'); ?></h5>

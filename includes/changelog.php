@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.9.5',
+        'date' => '2026-07-29',
+        'time' => '17:20',
+        'title' => 'Rozpracované formuláře se neztratí — auto-uložení konceptu i u zakázek, klientů a skladu',
+        'items' => [
+            'Auto-uložení rozpracovaného formuláře (jako u dokumentů) je nově i u <b>Nové zakázky</b> (celý průvodce), <b>Nové reklamace</b>, <b>editace zakázky</b>, <b>klienta</b> a <b>skladového dílu</b>. Když formulář omylem zavřete, po znovuotevření se rozepsané údaje <b>obnoví</b> (hláška „Obnoveny rozpracované údaje" s možností Zahodit).',
+            'Koncept se <b>smaže až po úspěšném uložení</b> daného formuláře — do té doby jsou data v bezpečí v prohlížeči.',
+            'Hesla, PINy a přílohy (soubory) se z bezpečnostních důvodů do konceptu <b>neukládají</b>. (Pokladna je záměrně vynechána — jde o okamžitou transakci.)',
+        ],
+    ],
+    [
         'version' => '3.9.4',
         'date' => '2026-07-29',
         'time' => '17:10',

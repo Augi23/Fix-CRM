@@ -1277,6 +1277,7 @@ $(document).ready(function() {
         
         $.post('api/update_order_full.php', $(this).serialize(), function(res) {
             if(res.success) {
+                if (window.afxDraft) afxDraft.clearKey('order-<?php echo (int)$order['id']; ?>-full');
                 location.reload();
             } else {
                 btn.prop('disabled', false).html(oldHtml);
@@ -1632,7 +1633,7 @@ function deleteOrder(id) {
 <div class="modal fade" id="editOrderFullModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-xl">
         <div class="modal-content glass-card border-secondary text-white">
-            <form id="editOrderFullForm" enctype="multipart/form-data">
+            <form id="editOrderFullForm" enctype="multipart/form-data" data-draft-key="order-<?php echo (int)$order['id']; ?>-full">
                 <?php echo csrfField(); ?>
                 <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
                 <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">

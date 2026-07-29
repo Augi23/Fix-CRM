@@ -54,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <?php if ($success): ?>
     <div class="alert alert-success"><?php echo $success; ?></div>
+    <script>window.afxDraft && afxDraft.clearKey('inventory-<?php echo (int)$id; ?>');</script>
 <?php endif; ?>
 
 <?php if (!empty($item['source_supplier']) || !empty($item['supplier_availability'])): ?>
@@ -70,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <div class="card">
     <div class="card-body">
-        <form method="POST">
+        <form method="POST" data-draft-key="inventory-<?php echo (int)$id; ?>">
             <div class="row g-3">
                 <div class="col-12">
                     <label class="form-label"><?php echo __('part_name'); ?></label>

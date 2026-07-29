@@ -12,7 +12,7 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
 <div class="modal fade crm-wizard-modal" id="newOrderModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-lg">
         <div class="modal-content glass-card border-secondary text-white shadow-lg">
-            <form action="api/add_order.php" method="POST" enctype="multipart/form-data" id="newOrderForm">
+            <form action="api/add_order.php" method="POST" enctype="multipart/form-data" id="newOrderForm" data-draft-key="new-order">
                 <?php echo csrfField(); ?>
                 <div class="modal-header bg-transparent border-secondary py-3">
                     <div class="w-100">
