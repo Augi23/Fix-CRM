@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '3.16.0',
+        'date' => '2026-07-29',
+        'time' => '14:49',
+        'title' => 'Dokumenty: nová záložka — výkupní listy a zástavní formuláře s ukládáním',
+        'items' => [
+            'V horní navigaci přibyla záložka <b>Dokumenty</b> s podzáložkami <b>Výkupní listy</b> a <b>Zástavní formuláře</b>. Seznam vypadá jako seznam zakázek: <b>číslo dokumentu, jméno, telefon, e-mail, předmět, cena</b> + vyhledávání; klik otevře dokument.',
+            'Výkupní list i zástavní formulář mají nový <b>jednotný vizuál klientských dokladů</b> (A4, SF Pro, modrý akcent — jako zakázkový list a reklamační protokol) a vyplňují se přímo v dokumentu.',
+            'Nahoře je <b>přepínač jazyka dokumentu (CS/EN/RU)</b> — překládá popisky a nadpisy polí, vyplněný obsah nechává beze změny. Vedle něj tlačítka <b>Uložit</b>, <b>Tisk</b> a <b>Odeslat e-mailem</b> (kopie jde na e-mail uvedený v dokumentu).',
+            'Dokumenty se <b>ukládají automaticky</b> — před tiskem i odesláním; číslo (VL-0001 / ZF-0001) se přiděluje samo při prvním uložení. Do formuláře přibylo pole <b>E-mail klienta</b>.',
+            'Staré adresy vykup-zarizeni.php a zastava.php i rychlé odkazy na Nástěnce vedou do nového enginu. Vše se zapisuje do Historie (vytvoření / úprava / odeslání dokumentu).',
+        ],
+    ],
+    [
         'version' => '3.15.4',
         'date' => '2026-07-29',
         'time' => '13:55',
