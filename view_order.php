@@ -166,7 +166,7 @@ function localizedOrderStatusLabel(string $status): string {
                         <i class="fas fa-arrow-left"></i>
                     </a>
                     <button class="btn btn-sm btn-primary me-2" data-bs-toggle="modal" data-bs-target="#editOrderFullModal">
-                        <i class="fas fa-edit me-1"></i> <?php echo __('edit'); ?>
+                        <i class="fas fa-edit me-1"></i> <?php echo __('edit_order_btn'); ?>
                     </button>
                     <?php if(crmCanDeleteOrders()): ?>
                     <button class="btn btn-sm btn-outline-danger me-3" onclick="deleteOrder(<?php echo $order['id']; ?>)">
