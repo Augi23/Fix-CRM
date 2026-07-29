@@ -500,10 +500,10 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <?php if (hasPermission('manage_inventory')): ?>
                     <a href="inventory.php" class="btn btn-outline-info"><i class="fas fa-search me-2"></i> <?php echo __('check_stock'); ?></a>
                     <?php endif; ?>
-                    <a href="vykup-zarizeni.php" target="_blank" rel="noopener" class="btn btn-outline-light mt-2">
+                    <a href="dokument.php?type=vykup" target="_blank" rel="noopener" class="btn btn-outline-light mt-2">
                         <i class="fas fa-file-signature me-2"></i> <?php echo __('buyout_sheet_purchase_agreement'); ?>
                     </a>
-                    <a href="zastava.php" target="_blank" rel="noopener" class="btn btn-outline-light">
+                    <a href="dokument.php?type=zastava" target="_blank" rel="noopener" class="btn btn-outline-light">
                         <i class="fas fa-file-contract me-2"></i> <?php echo __('pawn_form'); ?>
                     </a>
                 </div>
