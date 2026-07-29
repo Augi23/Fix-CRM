@@ -544,7 +544,10 @@ var afxGreetWave = (function () {
                         var audio = new Audio(d.greeting);
                         audio.addEventListener('ended', finish);
                         audio.addEventListener('error', finish);
-                        audio.play().then(function () { setTimeout(finish, 8000); }).catch(finish);
+                        // 1 s prostoru pro vlny, teprve pak hláška
+                        setTimeout(function () {
+                            audio.play().then(function () { setTimeout(finish, 8000); }).catch(finish);
+                        }, 1000);
                     } catch (err) { finish(); }
                 } else {
                     go();   // bez hlášky rovnou dál — vlny běží až do načtení dashboardu
