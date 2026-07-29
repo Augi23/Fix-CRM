@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.15.1',
+        'date' => '2026-07-29',
+        'time' => '12:40',
+        'title' => 'Aktualizace: jen Historie úprav (git výpis pryč) + rychlejší vlny při přihlášení',
+        'items' => [
+            'Z karty Aktualizace zmizel technický výpis git commitů („Poslední změny") — historii teď vede <b>jen Historie úprav</b> s čísly verzí. Zobrazuje <b>posledních 100 záznamů</b> ve scrollovacím panelu vpravo vedle tlačítek aktualizace (stejná výška jako levá karta).',
+            'Pauza mezi vlnami uvítacího loadingu zkrácena na 0,05 s — vlny jedou prakticky navazující.',
+        ],
+    ],
+    [
         'version' => '3.15.0',
         'date' => '2026-07-29',
         'time' => '12:10',

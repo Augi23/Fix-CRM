@@ -1777,27 +1777,28 @@ require_once 'includes/header.php';
                         </div>
                     </div>
                 </div>
-                <!-- Right: Changelog -->
-                <div class="col-md-6">
-                    <div class="glass-panel p-4 border-secondary">
-                        <h5 class="mb-3 text-white"><i class="fas fa-list-ul me-2 text-info"></i><?php echo __('changelog_title'); ?></h5>
-                        <div id="changelogArea" class="overflow-auto" style="max-height: 480px;">
-                            <div class="text-muted small"><?php echo __('no_changelog'); ?></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Historie úprav (trvalý, ručně vedený přehled) -->
-            <?php $crm_history = @include __DIR__ . '/includes/changelog.php'; ?>
-            <?php if (is_array($crm_history) && $crm_history): ?>
-            <div class="row mt-3">
-                <div class="col-12">
-                    <div class="glass-panel p-4 border-secondary">
+                <!-- Right: Historie úprav — JEDINÝ systém číslování verzí (includes/changelog.php).
+                     Git commit výpis odstraněn 29.7.2026 na přání majitele: historie se vede a čísluje
+                     výhradně přes changelog.php. Panel má přes absolute-pozici přesně výšku levé karty
+                     s tlačítky aktualizace a obsah scrolluje uvnitř. -->
+                <?php $crm_history = @include __DIR__ . '/includes/changelog.php'; ?>
+                <style>
+                    @media (min-width: 768px) {
+                        #crmHistoryCol { position: relative; }
+                        #crmHistoryCol > .glass-panel { position: absolute; inset: 0; }
+                        #crmHistoryList { flex: 1 1 auto; min-height: 0; }
+                    }
+                    @media (max-width: 767.98px) {
+                        #crmHistoryList { max-height: 420px; }
+                    }
+                </style>
+                <div class="col-md-6" id="crmHistoryCol">
+                    <div class="glass-panel p-4 border-secondary d-flex flex-column">
                         <h5 class="mb-1 text-white"><i class="fas fa-rocket me-2 text-success"></i>Historie úprav</h5>
-                        <div class="small text-white-75 mb-3">Přehled dokončených vylepšení (posledních 50) — jak systém krok za krokem posouváme.</div>
-                        <div class="overflow-auto" style="max-height: 440px;">
-                            <?php foreach (array_slice($crm_history, 0, 50) as $hz): ?>
+                        <div class="small text-white-75 mb-3">Přehled dokončených vylepšení (posledních 100) — jak systém krok za krokem posouváme.</div>
+                        <div class="overflow-auto" id="crmHistoryList">
+                            <?php if (is_array($crm_history) && $crm_history): ?>
+                                <?php foreach (array_slice($crm_history, 0, 100) as $hz): ?>
                                 <div class="mb-3 pb-2 border-bottom border-secondary">
                                     <div class="fw-bold text-white">
                                         <?php if (!empty($hz['version'])): ?><span class="badge bg-success me-1">v<?php echo e((string)$hz['version']); ?></span><?php endif; ?>
@@ -1812,12 +1813,14 @@ require_once 'includes/header.php';
                                         </ul>
                                     <?php endif; ?>
                                 </div>
-                            <?php endforeach; ?>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div class="text-muted small">Zatím žádné záznamy.</div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
             </div>
-            <?php endif; ?>
         </div>
 
         <!-- SYSTÉM › DATABÁZE (serverové zálohy — zobrazí se pod databázovou kartou) -->
@@ -2273,8 +2276,6 @@ function checkForUpdates(force = false) {
                 statusArea.innerHTML += `<div class="text-muted small mt-2"><i class="fas fa-clock me-1"></i>${UPDATE_TRANSLATIONS.last_check}: ${mins} ${UPDATE_TRANSLATIONS.minutes_ago}</div>`;
             }
 
-            // Changelog
-            renderChangelog(data.changelog || []);
         })
         .catch(err => {
             btn.disabled = false;
@@ -2287,34 +2288,8 @@ function checkForUpdates(force = false) {
         });
 }
 
-function renderChangelog(commits) {
-    const area = document.getElementById('changelogArea');
-    if (!area) return;
-
-    if (!commits || commits.length === 0) {
-        area.innerHTML = `<div class="text-muted small">${UPDATE_TRANSLATIONS.no_changelog}</div>`;
-        return;
-    }
-
-    let html = '';
-    commits.forEach(c => {
-        const sha = c.sha || c.version || '';
-        const rawDate = c.date || c.release_date || '';
-        const date = rawDate ? new Date(rawDate).toLocaleString() : '';
-        const msgRaw = c.message || c.description || '';
-        const msg = String(msgRaw).split('\n')[0];
-        const shortMsg = msg.length > 120 ? msg.slice(0, 117) + '…' : msg;
-
-        html += `<div class="d-flex align-items-start mb-2 pb-2 border-bottom border-secondary">
-            <code class="text-info me-2 flex-shrink-0" style="font-size:0.75rem;">${escapeHtml(sha)}</code>
-            <div class="flex-grow-1">
-                <div class="text-white small">${escapeHtml(shortMsg)}</div>
-                <div class="text-muted" style="font-size:0.7rem;">${escapeHtml(date)}${c.author ? ' · ' + escapeHtml(c.author) : ''}</div>
-            </div>
-        </div>`;
-    });
-    area.innerHTML = html;
-}
+// renderChangelog (git commit výpis) odstraněn 29.7.2026 — historie se zobrazuje
+// výhradně z includes/changelog.php (Historie úprav) v pravém panelu.
 
 function escapeHtml(s) {
     const div = document.createElement('div');
