@@ -1701,7 +1701,7 @@ require_once 'includes/header.php';
             <div class="row g-4">
                 <!-- Left: Version & Update -->
                 <div class="col-md-6">
-                    <div class="glass-panel p-4 mb-4 border-secondary">
+                    <div class="glass-panel p-4 mb-4 border-secondary" id="crmUpdateCard">
                         <?php
                         $gitInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo(__DIR__) : [];
                         $branchLabel = $gitInfo['branch'] ?? 'main';
@@ -1779,24 +1779,14 @@ require_once 'includes/header.php';
                 </div>
                 <!-- Right: Historie úprav — JEDINÝ systém číslování verzí (includes/changelog.php).
                      Git commit výpis odstraněn 29.7.2026 na přání majitele: historie se vede a čísluje
-                     výhradně přes changelog.php. Panel má přes absolute-pozici přesně výšku levé karty
-                     s tlačítky aktualizace a obsah scrolluje uvnitř. -->
+                     výhradně přes changelog.php. Výšku panelu drží JS (ResizeObserver) přesně podle
+                     levé karty s tlačítky; obsah scrolluje uvnitř. (CSS absolute-trik selhal — proto JS.) -->
                 <?php $crm_history = @include __DIR__ . '/includes/changelog.php'; ?>
-                <style>
-                    @media (min-width: 768px) {
-                        #crmHistoryCol { position: relative; }
-                        #crmHistoryCol > .glass-panel { position: absolute; inset: 0; }
-                        #crmHistoryList { flex: 1 1 auto; min-height: 0; }
-                    }
-                    @media (max-width: 767.98px) {
-                        #crmHistoryList { max-height: 420px; }
-                    }
-                </style>
                 <div class="col-md-6" id="crmHistoryCol">
-                    <div class="glass-panel p-4 border-secondary d-flex flex-column">
+                    <div class="glass-panel p-4 border-secondary d-flex flex-column" id="crmHistoryPanel">
                         <h5 class="mb-1 text-white"><i class="fas fa-rocket me-2 text-success"></i>Historie úprav</h5>
                         <div class="small text-white-75 mb-3">Přehled dokončených vylepšení (posledních 100) — jak systém krok za krokem posouváme.</div>
-                        <div class="overflow-auto" id="crmHistoryList">
+                        <div class="overflow-auto flex-grow-1" id="crmHistoryList" style="min-height:0;">
                             <?php if (is_array($crm_history) && $crm_history): ?>
                                 <?php foreach (array_slice($crm_history, 0, 100) as $hz): ?>
                                 <div class="mb-3 pb-2 border-bottom border-secondary">
@@ -1808,7 +1798,9 @@ require_once 'includes/header.php';
                                     <?php if (!empty($hz['items'])): ?>
                                         <ul class="small text-white-75 mb-0 mt-2">
                                             <?php foreach ((array)$hz['items'] as $hi): ?>
-                                                <li><?php echo e((string)$hi); ?></li>
+                                                <?php /* položky píšeme sami v changelog.php → povolit jen formátovací tagy,
+                                                         dřív se <b>/<code> ukazovaly jako text (escapováno) */ ?>
+                                                <li><?php echo strip_tags((string)$hi, '<b><i><u><code><br>'); ?></li>
                                             <?php endforeach; ?>
                                         </ul>
                                     <?php endif; ?>
@@ -1821,6 +1813,29 @@ require_once 'includes/header.php';
                     </div>
                 </div>
             </div>
+            <script>
+            // Výška panelu Historie úprav = přesně výška levé karty Aktualizace CRM.
+            // ResizeObserver reaguje i na změny levé karty (otevření diagnostiky apod.).
+            (function () {
+                var left = document.getElementById('crmUpdateCard');
+                var panel = document.getElementById('crmHistoryPanel');
+                if (!left || !panel) return;
+                function sync() {
+                    var h = left.offsetHeight;
+                    if (window.innerWidth >= 768 && h > 100) {
+                        panel.style.height = h + 'px';
+                    } else if (window.innerWidth < 768) {
+                        panel.style.height = '';
+                        var list = document.getElementById('crmHistoryList');
+                        if (list) list.style.maxHeight = '420px';   // mobil: karty pod sebou
+                    }
+                }
+                if (window.ResizeObserver) { new ResizeObserver(sync).observe(left); }
+                window.addEventListener('resize', sync);
+                document.addEventListener('shown.bs.tab', sync);
+                sync();
+            })();
+            </script>
         </div>
 
         <!-- SYSTÉM › DATABÁZE (serverové zálohy — zobrazí se pod databázovou kartou) -->

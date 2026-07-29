@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.15.3',
+        'date' => '2026-07-29',
+        'time' => '13:35',
+        'title' => 'Oprava: Historie úprav má správnou výšku a scrollbar',
+        'items' => [
+            'Panel Historie úprav se roztahoval přes celou stránku — teď má <b>přesně výšku levé karty</b> s tlačítky aktualizace a obsah <b>scrolluje uvnitř panelu</b> (drží se i při změnách levé karty, např. otevření diagnostiky).',
+            'Tučné zvýraznění v záznamech historie se dřív ukazovalo jako text (<i>&lt;b&gt;</i>) — teď se vykresluje správně.',
+        ],
+    ],
+    [
         'version' => '3.15.2',
         'date' => '2026-07-29',
         'time' => '13:05',
