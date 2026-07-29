@@ -207,7 +207,7 @@ function localizedOrderStatusLabel(string $status): string {
                             <?php /* rychlá editace klienta přímo ze zakázky (stejné jako Upravit v seznamu
                                      klientů); &return= vrátí tlačítko „Zpět" na tuhle zakázku */ ?>
                             <a href="edit_customer.php?id=<?php echo (int)$order['customer_id']; ?>&return=<?php echo (int)$order['id']; ?>"
-                               class="btn btn-sm btn-outline-info py-0 px-2" title="<?php echo e(__('edit_client_btn')); ?>">
+                               class="btn btn-sm btn-outline-info py-0 px-2" style="font-size:.7rem; line-height:1.5;" title="<?php echo e(__('edit_client_btn')); ?>">
                                 <i class="fas fa-edit me-1"></i><?php echo __('edit_client_btn'); ?>
                             </a>
                         </h6>
