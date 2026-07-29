@@ -248,6 +248,23 @@ $guides['crm'] = [
         'conditions' => [],
     ],
     [
+        'id' => 'umisteni', 'icon' => 'fa-map-location-dot', 'color' => '#30D158',
+        'title' => 'Umístění skladu — regály, police a krabičky',
+        'intro' => 'Každý díl má v CRM své fyzické místo: regál → police → krabička. Dražší díly mají vlastní kartu a QR, drobné levné díly sdílí krabičku svého modelu.',
+        'steps' => [
+            'Otevři <b>Sklad → Umístění</b> a založ strukturu: <b>regály</b> (R1, R2…), na nich <b>police</b> (R1-P1…) a <b>krabičky</b> (K001…) — jde jich založit víc najednou.',
+            'Vytiskni <b>štítky umístění</b> (u řádku, nebo Arch štítků) a nalep je na regály, police a krabičky.',
+            'Ve <b>Skladu → Servis</b> zaškrtej díly (klidně vyfiltrované podle modelu) a v liště dole zvol <b>Přiřadit umístění</b> — díly se „nastěhují" do krabičky. Stejně hromadně nastavíš i <b>model zařízení</b> (iPhone 12…).',
+            'Skenem <b>QR na krabičce</b> mobilem uvidíš její obsah — ťukni na díl a rovnou ho naskladníš nebo vydáš na zakázku. Přiřadit díl do krabičky jde i přímo z jejího QR („Přiřadit díl sem").',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => 'Krabička má <b>trvalý kód</b> — když ji přestěhuješ, změníš jí v Umístěních jen polici. Štítek se <b>nepřetiskuje</b>.'],
+            ['typ' => 'info', 'text' => 'Drobné levné díly (šroubky, flexy… do pár desítek Kč) můžeš vést <b>jednotlivě se společnou krabičkou</b> (zachová napojení na dodavatele), nebo jako jednu <b>souhrnnou kartu</b> („Drobné díly – iPhone 12") s jednotnou cenou — obojí funguje.'],
+            ['typ' => 'role', 'text' => 'Správu umístění a hromadné přiřazování smí, kdo spravuje sklad; <b>obsah krabičky přes QR vidí každý zaměstnanec</b>.'],
+            ['typ' => 'info', 'text' => 'Vedení může v obsahu krabičky rovnou <b>opravit počty kusů</b> (inventura, tužtička u dílu) — zapíše se jako korekce do deníku pohybů.'],
+        ],
+    ],
+    [
         'id' => 'nakupy', 'icon' => 'fa-cart-shopping', 'color' => '#FF9500',
         'title' => 'Nákupy — objednání a příjem dílů',
         'intro' => 'Fronta dílů k objednání: co chybí skladem, objednává se tady.',

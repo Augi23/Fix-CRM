@@ -3,6 +3,9 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
+ensureStockLocationsSchema();
+ensureInventoryMovesTable();
+
 $id = $_GET['id'] ?? null;
 if (!$id) die(__("inventory_id_missing"));
 
@@ -22,17 +25,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $cost_price = $_POST['cost_price'];
     $sale_price = $_POST['sale_price'];
     $min_stock = $_POST['min_stock'];
+    $device_model = mb_substr(trim((string)($_POST['device_model'] ?? '')), 0, 64);
+    $location_id = (int)($_POST['location_id'] ?? 0);
 
     try {
-        $update = $pdo->prepare("UPDATE inventory SET 
-            part_name = ?, 
-            sku = ?, 
-            quantity = ?, 
-            cost_price = ?, 
-            sale_price = ?, 
-            min_stock = ? 
+        $update = $pdo->prepare("UPDATE inventory SET
+            part_name = ?,
+            sku = ?,
+            quantity = ?,
+            cost_price = ?,
+            sale_price = ?,
+            min_stock = ?,
+            device_model = ?,
+            location_id = ?
             WHERE id = ?");
-        $update->execute([$part_name, $sku, $quantity, $cost_price, $sale_price, $min_stock, $id]);
+        $update->execute([$part_name, $sku, $quantity, $cost_price, $sale_price, $min_stock,
+            $device_model !== '' ? $device_model : null, $location_id > 0 ? $location_id : null, $id]);
+        // ruční přepis počtu kusů = korekce → do deníku pohybů (ať inventura sedí)
+        if ((int)$quantity !== (int)$item['quantity']) {
+            crmLogInventoryMove((int)$id, (int)$quantity - (int)$item['quantity'], 'correction', null, 'Úprava počtu v editaci dílu');
+        }
         crmAuditLog('inventory.update', [
             'entity_type' => 'inventory', 'entity_id' => (int)$id, 'entity_label' => (string)$part_name,
             'summary' => 'Upraven skladový díl „' . $part_name . '" (ks: ' . $quantity . ', nákup: ' . $cost_price . ', prodej: ' . $sale_price . ')',
@@ -45,6 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error = __("error_prefix") . $e->getMessage();
     }
 }
+
+$allLocations = stockLocationsAll($pdo);
+$modelOptions = [];
+try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -102,6 +118,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="col-12">
                     <label class="form-label"><?php echo __('min_stock_alert_limit'); ?></label>
                     <input type="number" name="min_stock" class="form-control" value="<?php echo $item['min_stock']; ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Model zařízení</label>
+                    <input type="text" name="device_model" list="editModelList" class="form-control" value="<?php echo htmlspecialchars((string)($item['device_model'] ?? '')); ?>" placeholder="iPhone 12, iPad Air…">
+                    <datalist id="editModelList">
+                        <?php foreach ($modelOptions as $m): ?><option value="<?php echo htmlspecialchars($m); ?>"></option><?php endforeach; ?>
+                    </datalist>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Umístění (regál / police / krabička)</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">— bez umístění —</option>
+                        <?php $curLoc = (string)(int)($item['location_id'] ?? 0); ?>
+                        <?php foreach (['krabicka' => 'Krabičky', 'police' => 'Police', 'regal' => 'Regály'] as $t => $glabel): ?>
+                            <?php $grp = array_filter($allLocations, fn($l) => $l['type'] === $t); if (!$grp) continue; ?>
+                            <optgroup label="<?php echo $glabel; ?>">
+                                <?php foreach ($grp as $l): ?>
+                                    <option value="<?php echo (int)$l['id']; ?>" <?php echo $curLoc === (string)(int)$l['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars(stockLocationFullLabel($l)); ?></option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="col-12 mt-4">
                     <button type="submit" class="btn btn-primary px-5"><?php echo __('save'); ?></button>

@@ -11,7 +11,8 @@
 $__invTab = basename($_SERVER['PHP_SELF']);
 $__invTab = $__invTab === 'products.php' ? 'products'
     : ($__invTab === 'procurement.php' ? 'procurement'
-    : ($__invTab === 'model_photos.php' ? 'modelphotos' : 'service'));
+    : ($__invTab === 'model_photos.php' ? 'modelphotos'
+    : ($__invTab === 'sklad_umisteni.php' ? 'locations' : 'service')));
 ?>
 <ul class="nav nav-pills mb-4 glass-panel p-2 border-secondary">
     <?php if (hasPermission('manage_inventory')): ?>
@@ -23,6 +24,9 @@ $__invTab = $__invTab === 'products.php' ? 'products'
     </li>
     <li class="nav-item">
         <a class="nav-link <?php echo $__invTab === 'modelphotos' ? 'active' : 'text-white-75'; ?>" href="model_photos.php"><i class="fas fa-images me-2"></i>Fotky modelů</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?php echo $__invTab === 'locations' ? 'active' : 'text-white-75'; ?>" href="sklad_umisteni.php"><i class="fas fa-map-location-dot me-2"></i>Umístění</a>
     </li>
     <?php endif; ?>
     <li class="nav-item">

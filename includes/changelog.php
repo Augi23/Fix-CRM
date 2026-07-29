@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '3.21.0',
+        'date' => '2026-07-29',
+        'time' => '21:45',
+        'title' => 'Fyzická organizace skladu: regály, police a krabičky s QR',
+        'items' => [
+            '<b>Umístění skladu:</b> nová záložka Sklad → <b>Umístění</b> — založíš regály (R1), police (R1-P2) a krabičky (K001…), vytiskneš na ně <b>štítky s QR</b> a CRM od té chvíle ví, kde každý díl fyzicky leží. Krabička má <b>trvalý kód</b>: při přeskládání skladu se v CRM jen přepne police, štítek se netiskne znovu.',
+            '<b>Třídění podle modelu:</b> u dílu jde nastavit model zařízení (iPhone 12, iPad Air…). Ve skladu přibyl filtr podle modelu a umístění + <b>hromadné akce</b>: zaškrtat díly → přiřadit do krabičky / nastavit model / vytisknout štítky vybraných.',
+            '<b>QR na krabičce:</b> sken mobilem ukáže <b>obsah krabičky</b> — ťuknutím na díl se rovnou naskladňuje nebo vydává na zakázku (funguje i „Vzít díl skenem QR" z detailu zakázky). Díl jde do krabičky přiřadit i přímo z jejího QR, a kód umístění (K012) jde napsat rovnou do hledání v horní liště.',
+            '<b>Drobné levné díly:</b> obě cesty podporované — jednotlivé karty se společnou krabičkou (zachová napojení na dodavatele a doobjednávání), nebo jedna souhrnná karta („Drobné díly – iPhone 12") s jednotnou cenou.',
+            '<b>Inventura po krabičkách:</b> vedení může v obsahu krabičky rovnou opravit počty kusů — zapíše se jako korekce do deníku pohybů. Úprava počtu v editaci dílu se nově do deníku píše taky. Štítek dílu ukazuje i kód jeho umístění a výběr dílu k zakázce ukazuje, kde díl leží (📍 K012).',
+        ],
+    ],
+    [
         'version' => '3.20.0',
         'date' => '2026-07-29',
         'time' => '18:10',

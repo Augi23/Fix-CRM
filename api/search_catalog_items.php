@@ -12,6 +12,7 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) {
 header('Content-Type: application/json; charset=utf-8');
 
 ensureProcurementSchema();
+ensureStockLocationsSchema();
 
 $q = trim((string)($_GET['q'] ?? $_GET['term'] ?? ''));
 $supplier = trim((string)($_GET['supplier'] ?? ''));
@@ -19,7 +20,7 @@ $stockOnly = filter_var($_GET['stock_only'] ?? false, FILTER_VALIDATE_BOOL);
 $limit = max(1, min(30, (int)($_GET['limit'] ?? 20)));
 
 try {
-    $sql = "SELECT id, part_name, sku, quantity, sale_price, source_supplier FROM inventory WHERE 1=1";
+    $sql = "SELECT inventory.id, part_name, sku, quantity, sale_price, source_supplier, sl.code AS loc_code FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id WHERE 1=1";
     $params = [];
 
     if ($supplier !== '') {
@@ -53,6 +54,9 @@ try {
         if (!empty($item['sale_price'])) {
             $label .= ' — ' . number_format((float)$item['sale_price'], 0, ',', ' ') . ' Kč';
         }
+        if (!empty($item['loc_code'])) {
+            $label .= ' · 📍 ' . $item['loc_code'];   // kde díl fyzicky leží
+        }
 
         $results[] = [
             'id' => (int)$item['id'],
@@ -62,6 +66,7 @@ try {
             'quantity' => (int)($item['quantity'] ?? 0),
             'sale_price' => (float)($item['sale_price'] ?? 0),
             'supplier_key' => $item['source_supplier'] ?? '',
+            'loc_code' => $item['loc_code'] ?? '',
         ];
     }
 

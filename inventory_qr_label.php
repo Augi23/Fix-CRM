@@ -1,23 +1,41 @@
 <?php
 /**
  * Tisk QR štítků na regály skladu.
- *   ?id=N   — jeden štítek konkrétního dílu
- *   ?all=1  — arch se štítky všech naskladněných dílů (tisk na A4 / řezané štítky)
+ *   ?id=N        — jeden štítek konkrétního dílu
+ *   ?ids=1,2,3   — štítky vybraných dílů (hromadná lišta ve Skladu)
+ *   ?location=N  — štítky všech dílů jednoho umístění (dotisk po přerovnání)
+ *   ?all=1       — arch se štítky všech naskladněných dílů (tisk na A4 / řezané štítky)
  * QR kód vede na sklad.php?qr=<id> (naskladnění / výdej mobilem).
+ * Na štítku je i kód umístění (K012…) a model zařízení, když jsou vyplněné.
  */
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
 if (!isset($_SESSION['user_id'])) { header('Location: login.php'); exit; }
+ensureStockLocationsSchema();
 
 $one = (int)($_GET['id'] ?? 0);
+$locId = (int)($_GET['location'] ?? 0);
+$idsRaw = trim((string)($_GET['ids'] ?? ''));
 $items = [];
+$sel = "SELECT inventory.id, part_name, sku, sale_price, device_model, sl.code AS loc_code FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id";
 if ($one > 0) {
-    $stmt = $pdo->prepare("SELECT id, part_name, sku, sale_price FROM inventory WHERE id = ?");
+    $stmt = $pdo->prepare($sel . " WHERE inventory.id = ?");
     $stmt->execute([$one]);
     $items = $stmt->fetchAll();
+} elseif ($idsRaw !== '') {
+    $ids = array_values(array_unique(array_filter(array_map('intval', explode(',', $idsRaw)), fn($i) => $i > 0)));
+    if ($ids) {
+        $stmt = $pdo->prepare($sel . " WHERE inventory.id IN (" . implode(',', array_fill(0, count($ids), '?')) . ") ORDER BY part_name ASC");
+        $stmt->execute($ids);
+        $items = $stmt->fetchAll();
+    }
+} elseif ($locId > 0) {
+    $stmt = $pdo->prepare($sel . " WHERE inventory.location_id = ? ORDER BY part_name ASC");
+    $stmt->execute([$locId]);
+    $items = $stmt->fetchAll();
 } elseif (!empty($_GET['all'])) {
-    $items = $pdo->query("SELECT id, part_name, sku, sale_price FROM inventory WHERE " . inventoryStockedWhereSql() . " ORDER BY part_name ASC")->fetchAll();
+    $items = $pdo->query($sel . " WHERE " . inventoryStockedWhereSql() . " ORDER BY part_name ASC")->fetchAll();
 }
 $base = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'admin.applefix.cloud') . dirname($_SERVER['PHP_SELF']);
 $base = rtrim(str_replace('\\', '/', $base), '/');
@@ -60,7 +78,8 @@ $base = rtrim(str_replace('\\', '/', $base), '/');
         <div>
             <div class="nm"><?php echo e($it['part_name']); ?></div>
             <div class="mt"><?php echo $it['sku'] ? 'SKU: ' . e($it['sku']) : '&nbsp;'; ?></div>
-            <div class="mt"><?php echo number_format((float)$it['sale_price'], 0, ',', ' '); ?> Kč · díl #<?php echo (int)$it['id']; ?></div>
+            <div class="mt"><?php echo number_format((float)$it['sale_price'], 0, ',', ' '); ?> Kč · díl #<?php echo (int)$it['id']; ?><?php echo trim((string)($it['device_model'] ?? '')) !== '' ? ' · ' . e($it['device_model']) : ''; ?></div>
+            <?php if (!empty($it['loc_code'])): ?><div class="mt"><b><?php echo e($it['loc_code']); ?></b></div><?php endif; ?>
         </div>
     </div>
     <?php endforeach; ?>

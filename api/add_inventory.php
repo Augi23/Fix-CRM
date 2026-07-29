@@ -23,6 +23,8 @@ $quantity = (float)($_POST['quantity'] ?? 0);
 $cost_price = (float)($_POST['cost_price'] ?? 0);
 $sale_price = (float)($_POST['sale_price'] ?? 0);
 $min_stock = (float)($_POST['min_stock'] ?? 5);
+$device_model = mb_substr(trim((string)($_POST['device_model'] ?? '')), 0, 64);
+$location_id = (int)($_POST['location_id'] ?? 0);
 
 if (empty($part_name)) {
     echo json_encode(['success' => false, 'message' => 'Part name is required']);
@@ -31,9 +33,16 @@ if (empty($part_name)) {
 
 try {
     ensureInventoryStockedSchema();
+    ensureStockLocationsSchema();
+    if ($location_id > 0) {
+        $lchk = $pdo->prepare("SELECT id FROM stock_locations WHERE id = ? AND is_active = 1");
+        $lchk->execute([$location_id]);
+        if (!$lchk->fetch()) { $location_id = 0; }
+    }
     // Manually added parts are real warehouse stock → always visible in Sklad.
-    $stmt = $pdo->prepare("INSERT INTO inventory (part_name, sku, quantity, cost_price, sale_price, min_stock, is_stocked) VALUES (?, ?, ?, ?, ?, ?, 1)");
-    $stmt->execute([$part_name, $sku, $quantity, $cost_price, $sale_price, $min_stock]);
+    $stmt = $pdo->prepare("INSERT INTO inventory (part_name, sku, quantity, cost_price, sale_price, min_stock, is_stocked, device_model, location_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)");
+    $stmt->execute([$part_name, $sku, $quantity, $cost_price, $sale_price, $min_stock,
+        $device_model !== '' ? $device_model : null, $location_id > 0 ? $location_id : null]);
     crmAuditLog('inventory.create', [
         'entity_type' => 'inventory', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => (string)$part_name,
         'summary' => 'Naskladněn nový díl „' . $part_name . '" (' . $quantity . ' ks)',

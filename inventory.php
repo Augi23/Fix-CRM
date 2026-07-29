@@ -3,6 +3,7 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 ensureInventoryStockedSchema();
+ensureStockLocationsSchema();
 
 // Pagination and Filters
 $limit = 50;
@@ -13,6 +14,8 @@ $offset = ($page - 1) * $limit;
 $search = $_GET['search'] ?? '';
 $min_price = $_GET['min_price'] ?? '';
 $max_price = $_GET['max_price'] ?? '';
+$f_model = trim((string)($_GET['model'] ?? ''));
+$f_location = (string)($_GET['location'] ?? '');   // id umístění | 'none' = neumístěné
 
 // Real-stock base condition: only stocked items (manually added, received, or with quantity).
 $where_clauses = [inventoryStockedWhereSql()];
@@ -34,19 +37,56 @@ if ($max_price !== '') {
     $params[] = floatval($max_price);
 }
 
+if ($f_model !== '') {
+    $where_clauses[] = "device_model = ?";
+    $params[] = $f_model;
+}
+
+if ($f_location === 'none') {
+    $where_clauses[] = "location_id IS NULL";
+} elseif ($f_location !== '' && ctype_digit($f_location)) {
+    $where_clauses[] = "location_id = ?";
+    $params[] = (int)$f_location;
+}
+
 $where_sql = " WHERE " . implode(" AND ", $where_clauses);
 
-$total_items = $pdo->prepare("SELECT COUNT(*) FROM inventory" . $where_sql);
+// LEFT JOIN kvůli kódu umístění ve sloupci; filtry jedou přes sloupce inventory
+$total_items = $pdo->prepare("SELECT COUNT(*) FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id" . $where_sql);
 $total_items->execute($params);
 $total_count = $total_items->fetchColumn();
 
 $total_pages = ceil($total_count / $limit);
 
-$stmt = $pdo->prepare("SELECT * FROM inventory" . $where_sql . " ORDER BY part_name ASC LIMIT $limit OFFSET $offset");
+$stmt = $pdo->prepare("SELECT inventory.*, sl.code AS loc_code, sl.name AS loc_name FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id" . $where_sql . " ORDER BY part_name ASC LIMIT $limit OFFSET $offset");
 $stmt->execute($params);
 $inventory = $stmt->fetchAll();
 
 $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity <= min_stock THEN 1 ELSE 0 END) as low_stock FROM inventory WHERE " . inventoryStockedWhereSql())->fetch();
+
+// nabídky pro filtry / hromadné akce / modal nového dílu
+$modelOptions = [];
+try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
+$allLocations = stockLocationsAll($pdo);
+$unplacedCount = 0;
+try { $unplacedCount = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE location_id IS NULL AND " . inventoryStockedWhereSql())->fetchColumn(); } catch (Throwable $e) {}
+
+/** <option> seznam umístění seskupený podle typu (vybraná hodnota = id) */
+function invLocationOptionsHtml(array $allLocations, string $selected): string {
+    $groups = ['krabicka' => 'Krabičky', 'police' => 'Police', 'regal' => 'Regály'];
+    $html = '';
+    foreach ($groups as $t => $glabel) {
+        $items = array_filter($allLocations, fn($l) => $l['type'] === $t);
+        if (!$items) continue;
+        $html .= '<optgroup label="' . e($glabel) . '">';
+        foreach ($items as $l) {
+            $html .= '<option value="' . (int)$l['id'] . '"' . ($selected === (string)(int)$l['id'] ? ' selected' : '') . '>'
+                . e(stockLocationFullLabel($l)) . '</option>';
+        }
+        $html .= '</optgroup>';
+    }
+    return $html;
+}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -72,18 +112,35 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
 
 <?php require 'includes/inventory_tabs.php'; ?>
 
-<div class="collapse mb-4 <?php echo (!empty($search) || !empty($min_price) || !empty($max_price)) ? 'show' : ''; ?>" id="filterPanel">
+<div class="collapse mb-4 <?php echo (!empty($search) || !empty($min_price) || !empty($max_price) || $f_model !== '' || $f_location !== '') ? 'show' : ''; ?>" id="filterPanel">
     <div class="card card-body shadow-sm">
         <form action="inventory.php" method="GET" class="row g-3">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label class="form-label small"><?php echo __('search_sku_placeholder'); ?></label>
                 <input type="text" name="search" class="form-control form-control-sm" value="<?php echo htmlspecialchars($search); ?>" placeholder="<?php echo __('name_or_sku'); ?>">
             </div>
             <div class="col-md-2">
+                <label class="form-label small">Model zařízení</label>
+                <select name="model" class="form-select form-select-sm">
+                    <option value="">— vše —</option>
+                    <?php foreach ($modelOptions as $m): ?>
+                        <option value="<?php echo htmlspecialchars($m); ?>" <?php echo $f_model === $m ? 'selected' : ''; ?>><?php echo htmlspecialchars($m); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Umístění</label>
+                <select name="location" class="form-select form-select-sm">
+                    <option value="">— vše —</option>
+                    <option value="none" <?php echo $f_location === 'none' ? 'selected' : ''; ?>>Bez umístění<?php echo $unplacedCount > 0 ? ' (' . $unplacedCount . ')' : ''; ?></option>
+                    <?php echo invLocationOptionsHtml($allLocations, $f_location); ?>
+                </select>
+            </div>
+            <div class="col-md-1">
                 <label class="form-label small"><?php echo __('price_from'); ?></label>
                 <input type="number" name="min_price" class="form-control form-control-sm" value="<?php echo htmlspecialchars($min_price); ?>" step="0.01">
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <label class="form-label small"><?php echo __('price_to'); ?></label>
                 <input type="number" name="max_price" class="form-control form-control-sm" value="<?php echo htmlspecialchars($max_price); ?>" step="0.01">
             </div>
@@ -103,9 +160,11 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-dark">
                             <tr>
-                                <th class="ps-4"><?php echo __('photo_col'); ?></th>
+                                <th class="ps-4" style="width:34px;"><input type="checkbox" class="form-check-input" id="invCheckAll" title="Vybrat vše na stránce"></th>
+                                <th><?php echo __('photo_col'); ?></th>
                                 <th><?php echo __('part_name'); ?></th>
                                 <th><?php echo __('sku'); ?></th>
+                                <th>Umístění</th>
                                 <th><?php echo __('supplier_col'); ?></th>
                                 <th><?php echo __('availability_col'); ?></th>
                                 <th><?php echo __('our_stock_col'); ?></th>
@@ -118,7 +177,7 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
                         <tbody>
                             <?php if (empty($inventory)): ?>
                                 <tr>
-                                    <td colspan="10" class="text-center py-5 text-muted">
+                                    <td colspan="12" class="text-center py-5 text-muted">
                                         <i class="fas fa-boxes fa-3x mb-3 d-block opacity-25"></i>
                                         <?php echo __('stock_real_empty'); ?>
                                     </td>
@@ -126,7 +185,8 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
                             <?php else: ?>
                                 <?php foreach ($inventory as $item): ?>
                                 <tr>
-                                    <td class="ps-4">
+                                    <td class="ps-4"><input type="checkbox" class="form-check-input inv-check" value="<?php echo (int)$item['id']; ?>"></td>
+                                    <td>
                                         <?php if(!empty($item['image_path'] ?? '')): ?>
                                             <a href="<?php echo e($item['image_path']); ?>" data-fancybox="inventory">
                                                 <img src="<?php echo e($item['image_path']); ?>" class="rounded shadow-sm" style="width: 40px; height: 40px; object-fit: cover;">
@@ -139,8 +199,20 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
                                     </td>
                                     <td>
                                         <div class="fw-bold"><?php echo htmlspecialchars($item['part_name']); ?></div>
+                                        <?php if (trim((string)($item['device_model'] ?? '')) !== ''): ?>
+                                            <div class="small text-white-75"><?php echo htmlspecialchars($item['device_model']); ?></div>
+                                        <?php endif; ?>
                                     </td>
                                     <td><code><?php echo htmlspecialchars($item['sku']); ?></code></td>
+                                    <td>
+                                        <?php if (!empty($item['loc_code'])): ?>
+                                            <a href="inventory.php?location=<?php echo (int)$item['location_id']; ?>" class="text-decoration-none" title="<?php echo htmlspecialchars((string)($item['loc_name'] ?? '')); ?>">
+                                                <span class="badge bg-info text-dark"><?php echo htmlspecialchars($item['loc_code']); ?></span>
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="text-white-75">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <?php $supplierKey = (string)($item['source_supplier'] ?? ''); ?>
                                         <?php $supplierUrl = trim((string)($item['source_url'] ?? '')); ?>
@@ -203,6 +275,26 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
             </div>
         </div>
         
+        <datalist id="modelList">
+            <?php foreach ($modelOptions as $m): ?><option value="<?php echo htmlspecialchars($m); ?>"></option><?php endforeach; ?>
+        </datalist>
+
+        <!-- Hromadné akce nad zaškrtnutými díly (třídění skladu do krabiček) -->
+        <div id="bulkBar" class="card shadow-lg border-secondary position-fixed start-50 translate-middle-x p-2 px-3" style="display:none; bottom: 18px; z-index: 1040; max-width: 96vw;">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="fw-semibold text-nowrap"><span id="bulkCount">0</span> vybráno</span>
+                <select id="bulkLocation" class="form-select form-select-sm" style="width:auto; max-width:280px;">
+                    <option value="0">— odebrat umístění —</option>
+                    <?php echo invLocationOptionsHtml($allLocations, ''); ?>
+                </select>
+                <button type="button" id="bulkAssign" class="btn btn-sm btn-primary text-nowrap">Přiřadit umístění</button>
+                <input type="text" id="bulkModel" list="modelList" class="form-control form-control-sm" style="width:160px;" placeholder="Model (iPhone 12…)">
+                <button type="button" id="bulkSetModel" class="btn btn-sm btn-outline-primary text-nowrap">Nastavit model</button>
+                <a href="#" id="bulkLabels" target="_blank" class="btn btn-sm btn-outline-info text-nowrap"><i class="fas fa-qrcode me-1"></i>Štítky</a>
+                <button type="button" id="bulkClear" class="btn btn-sm btn-outline-secondary">Zrušit</button>
+            </div>
+        </div>
+
         <!-- Pagination -->
         <?php if ($total_pages > 1): ?>
         <?php
@@ -299,6 +391,17 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
                         <div class="col-md-12">
                             <label class="form-label"><?php echo __('min_stock_label'); ?></label>
                             <input type="number" name="min_stock" class="form-control" value="5">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Model zařízení</label>
+                            <input type="text" name="device_model" list="modelList" class="form-control" placeholder="iPhone 12, iPad Air…">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Umístění</label>
+                            <select name="location_id" class="form-select">
+                                <option value="">— bez umístění —</option>
+                                <?php echo invLocationOptionsHtml($allLocations, ''); ?>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -397,6 +500,51 @@ function deletePart(id) {
         });
     });
 }
+
+// ── hromadný výběr: přiřazení do umístění / model / tisk štítků vybraných ──
+(function () {
+    var bar = document.getElementById('bulkBar');
+    if (!bar) return;
+    function selected() {
+        return Array.prototype.map.call(document.querySelectorAll('.inv-check:checked'), function (c) { return c.value; });
+    }
+    function refresh() {
+        var ids = selected();
+        bar.style.display = ids.length > 0 ? '' : 'none';
+        document.getElementById('bulkCount').textContent = ids.length;
+        document.getElementById('bulkLabels').href = 'inventory_qr_label.php?ids=' + ids.join(',');
+    }
+    document.addEventListener('change', function (e) {
+        if (e.target.id === 'invCheckAll') {
+            document.querySelectorAll('.inv-check').forEach(function (c) { c.checked = e.target.checked; });
+        }
+        if (e.target.classList && (e.target.classList.contains('inv-check') || e.target.id === 'invCheckAll')) refresh();
+    });
+    document.getElementById('bulkClear').addEventListener('click', function () {
+        document.querySelectorAll('.inv-check, #invCheckAll').forEach(function (c) { c.checked = false; });
+        refresh();
+    });
+    function bulkPost(data) {
+        var ids = selected();
+        if (!ids.length) return;
+        data.inventory_ids = ids.join(',');
+        data.csrf_token = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        var fd = new FormData();
+        Object.keys(data).forEach(function (k) { fd.append(k, data[k]); });
+        fetch('api/stock_locations.php', {method: 'POST', body: fd, credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d.success) { location.reload(); } else { showAlert(d.message || 'Chyba'); } })
+            .catch(function () { showAlert('Síťová chyba.'); });
+    }
+    document.getElementById('bulkAssign').addEventListener('click', function () {
+        bulkPost({op: 'assign', location_id: document.getElementById('bulkLocation').value || 0});
+    });
+    document.getElementById('bulkSetModel').addEventListener('click', function () {
+        var m = document.getElementById('bulkModel').value.trim();
+        if (m === '' && !confirm('Model je prázdný — opravdu ho vybraným dílům smazat?')) return;
+        bulkPost({op: 'set_model', device_model: m});
+    });
+}());
 
 // Rychlé naskladnění z řádku (desktop) — stejné API jako QR sken na regálu
 $(document).on('click', '.restock-btn', function () {

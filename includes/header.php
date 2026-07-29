@@ -37,6 +37,7 @@ $permission_pages = [
     'inventory.php' => 'manage_inventory',
     'edit_inventory.php' => 'manage_inventory',
     'products.php' => 'manage_inventory',
+    'sklad_umisteni.php' => 'manage_inventory',
     // 'reports.php' => 'admin_access', // Handled specially below
 ];
 
@@ -84,6 +85,8 @@ $pageTitleMap = [
     'customers.php' => __('customers'),
     'inventory.php' => __('inventory'),
     'products.php' => __('inventory'),
+    'sklad_umisteni.php' => __('inventory'),
+    'sklad.php' => __('inventory'),
     'pokladna.php' => 'Pokladna',
     'reports.php' => __('reports'),
     'accounting.php' => __('accounting'),

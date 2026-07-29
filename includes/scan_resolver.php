@@ -24,6 +24,25 @@ if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '' && function_exi
             exit;
         }
     }
+    // Kód umístění skladu (K012 / R1 / R1-P2) napsaný či naskenovaný do hledání
+    // → rovnou obsah krabičky/police. Přesná shoda v DB, jinak se nic neděje.
+    if (!empty($_SESSION['user_id'])) {
+        if (function_exists('ensureStockLocationsSchema')) { ensureStockLocationsSchema(); }
+        $_lcands = [$_scan];
+        if (function_exists('scanNormalizeCandidates')) { $_lcands = array_merge($_lcands, scanNormalizeCandidates($_scan)); }
+        foreach ($_lcands as $_lc) {
+            $_lc = strtoupper(trim((string)$_lc));
+            if ($_lc === '' || !preg_match('/^[KR]\d[\dA-Z\-]{0,12}$/', $_lc)) { continue; }
+            try {
+                $_lq = $pdo->prepare("SELECT id FROM stock_locations WHERE code = ?");
+                $_lq->execute([$_lc]);
+                if (($_lid = (int)$_lq->fetchColumn()) > 0) {
+                    header("Location: sklad.php?loc=" . $_lid);
+                    exit;
+                }
+            } catch (Throwable $e) { break; }
+        }
+    }
     // Vypadá to jako naskenovaný kód? (přepis háčky NEBO souvislý alfanumerický token bez mezer)
     $_looksCode = preg_match('/[+ěščřžýáíéĚŠČŘŽÝÁÍÉ]/u', $_scan) || preg_match('/^[A-Za-z0-9\-]{6,}$/', $_scan);
     if ($_looksCode) {

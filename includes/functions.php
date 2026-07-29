@@ -2918,6 +2918,101 @@ function crmLogInventoryMove(int $inventoryId, int $delta, string $reason, ?int 
     } catch (Throwable $e) { error_log('crmLogInventoryMove: ' . $e->getMessage()); }
 }
 
+/* ═══════════════ SKLAD: fyzická umístění (regál → police → krabička) ═══════════════
+   Organizace 29.7.2026: krabička má TRVALÝ kód (K001…) a štítek s QR
+   (sklad.php?loc=<id>); na které polici leží, drží parent_id v CRM — přesun
+   krabičky = změna v CRM, štítek se NEpřetiskuje. Dražší díly mají vlastní
+   kartu + svůj QR (sklad.php?qr=), drobné levné díly sdílí krabičku: buď jako
+   samostatné karty se stejným umístěním (zachová vazbu na dodavatele), nebo
+   jako jedna souhrnná karta („Drobné díly – iPhone 12") — obojí je podporované. */
+
+/** Tabulka umístění + sloupce inventory.location_id / device_model. */
+function ensureStockLocationsSchema(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS stock_locations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            code VARCHAR(20) NOT NULL UNIQUE,
+            name VARCHAR(120) NOT NULL DEFAULT '',
+            type VARCHAR(10) NOT NULL DEFAULT 'krabicka',
+            parent_id INT NULL DEFAULT NULL,
+            note VARCHAR(255) NULL DEFAULT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_locations_parent (parent_id),
+            KEY idx_locations_type (type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        if (!$pdo->query("SHOW COLUMNS FROM inventory LIKE 'location_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE inventory ADD COLUMN location_id INT NULL DEFAULT NULL");
+            try { $pdo->exec("ALTER TABLE inventory ADD INDEX idx_inventory_location (location_id)"); } catch (Throwable $e) {}
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM inventory LIKE 'device_model'")->fetch()) {
+            $pdo->exec("ALTER TABLE inventory ADD COLUMN device_model VARCHAR(64) NULL DEFAULT NULL");
+            try { $pdo->exec("ALTER TABLE inventory ADD INDEX idx_inventory_model (device_model)"); } catch (Throwable $e) {}
+        }
+    } catch (Throwable $e) { error_log('ensureStockLocationsSchema: ' . $e->getMessage()); }
+}
+
+/** Lidský název typu umístění. */
+function stockLocationTypeLabel(string $type): string {
+    return ['regal' => 'Regál', 'police' => 'Police', 'krabicka' => 'Krabička'][$type] ?? $type;
+}
+
+/** Další volný kód: regál R1, R2…; police <regál>-P1…; krabička K001… (trvalý). */
+function nextStockLocationCode(PDO $pdo, string $type, int $parentId = 0): string {
+    if ($type === 'regal') {
+        $max = 0;
+        foreach ($pdo->query("SELECT code FROM stock_locations WHERE type = 'regal'")->fetchAll(PDO::FETCH_COLUMN) as $c) {
+            if (preg_match('/^R(\d+)$/', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
+        }
+        return 'R' . ($max + 1);
+    }
+    if ($type === 'police') {
+        $parentCode = '';
+        if ($parentId > 0) {
+            $st = $pdo->prepare("SELECT code FROM stock_locations WHERE id = ?");
+            $st->execute([$parentId]);
+            $parentCode = (string)$st->fetchColumn();
+        }
+        $st = $pdo->prepare("SELECT code FROM stock_locations WHERE type = 'police' AND parent_id " . ($parentId > 0 ? '= ?' : 'IS NULL'));
+        $st->execute($parentId > 0 ? [$parentId] : []);
+        $max = 0;
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $c) {
+            if (preg_match('/P(\d+)$/', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
+        }
+        return ($parentCode !== '' ? $parentCode . '-' : '') . 'P' . ($max + 1);
+    }
+    // krabička — globální řada K001, K002… (kód se nikdy nerecykluje ani nemění)
+    $max = 0;
+    foreach ($pdo->query("SELECT code FROM stock_locations WHERE type = 'krabicka'")->fetchAll(PDO::FETCH_COLUMN) as $c) {
+        if (preg_match('/^K(\d+)$/', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
+    }
+    return 'K' . str_pad((string)($max + 1), 3, '0', STR_PAD_LEFT);
+}
+
+/** Všechna umístění (+ kód/název rodiče) pro selecty, stromy a štítky. */
+function stockLocationsAll(PDO $pdo, bool $activeOnly = true): array {
+    ensureStockLocationsSchema();
+    try {
+        $sql = "SELECT l.*, p.code AS parent_code, p.name AS parent_name
+                FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id"
+             . ($activeOnly ? " WHERE l.is_active = 1" : "")
+             . " ORDER BY FIELD(l.type,'regal','police','krabicka'), l.code ASC";
+        return $pdo->query($sql)->fetchAll();
+    } catch (Throwable $e) { return []; }
+}
+
+/** „K012 · iPhone 12 – drobné (R1-P2)" — plný popisek umístění. */
+function stockLocationFullLabel(array $loc): string {
+    $s = (string)$loc['code'];
+    if (trim((string)($loc['name'] ?? '')) !== '') { $s .= ' · ' . $loc['name']; }
+    if (trim((string)($loc['parent_code'] ?? '')) !== '') { $s .= ' (' . $loc['parent_code'] . ')'; }
+    return $s;
+}
+
 function processOrderInventoryChange($order_id, $is_finishing, $was_finished) {
     global $pdo;
     ensureOrderItemStockFlag();
@@ -4559,6 +4654,9 @@ function crmAuditActionLabel(string $action): string {
         'procurement.assign_order' => 'Přiřazení dílu k zakázce', 'procurement.delete' => 'Smazání požadavku na díl',
         'inventory.create' => 'Naskladnění dílu', 'inventory.update' => 'Úprava skladového dílu',
         'inventory.delete' => 'Smazání skladového dílu',
+        'inventory.assign_location' => 'Přiřazení dílů do umístění', 'inventory.set_model' => 'Model u skladových dílů',
+        'location.create' => 'Nové umístění skladu', 'location.update' => 'Úprava umístění skladu',
+        'location.delete' => 'Smazání umístění skladu',
         'supplier_catalog.create' => 'Přidání katalogu dodavatele',
         'settings.update' => 'Změna nastavení', 'system.update' => 'Aktualizace systému',
         'sms.sent' => 'Odeslána SMS klientovi',
