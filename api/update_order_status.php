@@ -32,6 +32,7 @@ $technician_id = $_REQUEST['technician_id'] ?? null;
 
 ensureOrderWorkTrackingSchema();
 ensureOrderWorkLogSchema(); // DDL — must run before beginTransaction()
+ensureOrderRepairSolutionColumn(); // DDL — „Provedená oprava" (povinná před dokončením)
 
 if (!$order_id || !$new_status) {
     echo json_encode(['success' => false, 'message' => $t('missing_data')]);
@@ -41,7 +42,7 @@ if (!$order_id || !$new_status) {
 try {
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, repair_solution, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $order_data = $stmt->fetch();
 
@@ -73,6 +74,22 @@ try {
 
     if (isOrderStatusIn($current_status, 'collected') && !isOrderStatusIn($new_status, 'collected')) {
         throw new Exception($t('status_locked_after_collected'));
+    }
+
+    // „Provedená oprava" je povinná pro dokončení/výdej (Připraveno k převzetí / Vydáno).
+    // UI ji může poslat rovnou s přechodem (modal doplnění) — pak se zde i uloží.
+    // 'Nevyzvednuto' je vynecháno ZÁMĚRNĚ — zařízení může být nevyzvednuté i bez
+    // provedené opravy (klient nereagoval na cenový návrh); výdej z něj už hlídaný je.
+    $posted_solution = isset($_POST['repair_solution']) ? trim((string)$_POST['repair_solution']) : '';
+    $effective_solution = $posted_solution !== '' ? $posted_solution : trim((string)($order_data['repair_solution'] ?? ''));
+    if (($effective_solution === '') && (isOrderStatusIn($new_status, 'completed') || isOrderStatusIn($new_status, 'collected'))) {
+        $pdo->rollBack();
+        echo json_encode([
+            'success' => false,
+            'code' => 'repair_solution_required',
+            'message' => $t('repair_solution_required'),
+        ]);
+        exit;
     }
 
     $finishing_statuses = getOrderStatusList('done');
@@ -137,6 +154,11 @@ try {
     if (isset($_REQUEST['extra_expenses']) && ($_SESSION['role'] ?? '') === 'admin') {
         $sql .= ', extra_expenses = ?';
         $params[] = $_REQUEST['extra_expenses'];
+    }
+
+    if ($posted_solution !== '') {
+        $sql .= ', repair_solution = ?';
+        $params[] = $posted_solution;
     }
 
     $sql .= ' WHERE id = ?';

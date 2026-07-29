@@ -652,6 +652,28 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- New Order Modal moved to includes/modals/new_order_modal.php and included via footer.php -->
 
 <!-- Quick View & Edit Modal -->
+<!-- „Provedená oprava" je povinná před dokončením/výdejem — doplnění přímo z rychlých tlačítek -->
+<div class="modal fade" id="repairSolutionQuickModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-warning border-2 text-white">
+            <div class="modal-header bg-warning bg-opacity-10 border-bottom-0">
+                <h5 class="modal-title"><i class="fas fa-screwdriver-wrench me-2 text-warning"></i><?php echo __('repair_solution'); ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-white-75 mb-2"><?php echo __('repair_solution_required'); ?></div>
+                <textarea id="repairSolutionQuickInput" class="form-control" rows="4" placeholder="<?php echo e(__('repair_solution_ph')); ?>"></textarea>
+            </div>
+            <div class="modal-footer border-top-0 justify-content-center">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
+                <button type="button" class="btn btn-warning px-4" id="repairSolutionQuickSaveBtn">
+                    <i class="fas fa-check me-2"></i><?php echo __('confirm'); ?>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="quickOrderModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
@@ -812,7 +834,11 @@ $(document).ready(function() {
                                 <label class="form-label"><?php echo __('notes'); ?></label>
                                 <textarea name="technician_notes" class="form-control" rows="3"></textarea>
                             </div>
-                            
+                            <div class="col-12">
+                                <label class="form-label"><?php echo __('repair_solution'); ?></label>
+                                <textarea name="repair_solution" class="form-control" rows="3" placeholder="<?php echo e(__('repair_solution_ph')); ?>"></textarea>
+                            </div>
+
                             <div class="col-12 mt-3">
                                 <label class="form-label"><?php echo __('media_files'); ?></label>
                                 ${mediaHtml}
@@ -829,6 +855,7 @@ $(document).ready(function() {
                 // FIX #3: Use .val() for textarea content to prevent XSS via innerHTML
                 $('#quickOrderBody textarea[name="problem_description"]').val(o.problem_description || '');
                 $('#quickOrderBody textarea[name="technician_notes"]').val(o.technician_notes || '');
+                $('#quickOrderBody textarea[name="repair_solution"]').val(o.repair_solution || '');
                 $('#quickOrderBody select[name="technician_id"]').val(o.technician_id);
                 
                 // Update print links in modal footer
@@ -911,11 +938,16 @@ $(document).ready(function() {
         toast.show();
     }
 
-    function performQuickStatusUpdate(id, status, btn) {
-        $.post('api/update_order_status.php', { order_id: id, status: status }, function(res) {
+    function performQuickStatusUpdate(id, status, btn, repairSolution) {
+        const data = { order_id: id, status: status };
+        if (repairSolution) { data.repair_solution = repairSolution; }
+        $.post('api/update_order_status.php', data, function(res) {
             if (res.success) {
                 showQuickToast('<?php echo __('updated_success'); ?>', 'success');
                 setTimeout(() => window.location.reload(), 300);
+            } else if (res.code === 'repair_solution_required') {
+                // Chybí „Provedená oprava" → doplnit rovnou v okně a přechod dokončit
+                showRepairSolutionQuickModal(id, status, btn);
             } else {
                 if (btn) btn.prop('disabled', false);
                 showQuickToast(res.message || '<?php echo __('error'); ?>', 'danger');
@@ -923,6 +955,25 @@ $(document).ready(function() {
         }, 'json').fail(function() {
             if (btn) btn.prop('disabled', false);
             showQuickToast('<?php echo __('error'); ?>', 'danger');
+        });
+    }
+
+    function showRepairSolutionQuickModal(id, status, btn) {
+        const m = $('#repairSolutionQuickModal');
+        // text z předchozí zakázky se NESMÍ přenést do jiné (seznam se mezitím nereloaduje)
+        $('#repairSolutionQuickInput').val('').removeClass('is-invalid');
+        m.modal('show');
+        setTimeout(function() { $('#repairSolutionQuickInput').trigger('focus'); }, 300);
+        m.off('hidden.bs.modal').on('hidden.bs.modal', function() { if (btn) btn.prop('disabled', false); });
+        $('#repairSolutionQuickInput').off('input').on('input', function() { $(this).removeClass('is-invalid'); });
+        $('#repairSolutionQuickSaveBtn').off('click').on('click', function() {
+            const val = ($('#repairSolutionQuickInput').val() || '').trim();
+            if (!val) { $('#repairSolutionQuickInput').addClass('is-invalid').trigger('focus'); return; }
+            // uložení: tlačítko nechat disabled (re-enable řeší chybová větev performQuickStatusUpdate);
+            // hidden handler odvázat, jinak by tlačítko povolil během letícího POSTu (dvojklik = duplicitní request)
+            m.off('hidden.bs.modal');
+            m.modal('hide');
+            performQuickStatusUpdate(id, status, btn, val);
         });
     }
 

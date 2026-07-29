@@ -23,6 +23,7 @@ $id = $_GET['id'] ?? $_GET['order_id'] ?? null;
 if (!$id) die(__('order_id_missing'));
 
 ensureOrderDeviceBranchColumn(); // fyzické umístění zařízení (přesun mezi pobočkami)
+ensureOrderRepairSolutionColumn(); // „Provedená oprava" (povinná před dokončením)
 
 $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.email, t.name as tech_name
                        FROM orders o 
@@ -298,6 +299,13 @@ function localizedOrderStatusLabel(string $status): string {
                 <h6><?php echo __('problem'); ?></h6>
                 <div class="alert alert-light bg-transparent border border-secondary text-white mb-4">
                     <?php echo nl2br(htmlspecialchars($order['problem_description'])); ?>
+                </div>
+
+                <h6><?php echo __('repair_solution'); ?></h6>
+                <div class="alert alert-light bg-transparent border border-secondary text-white mb-4">
+                    <?php echo !empty($order['repair_solution'])
+                        ? nl2br(htmlspecialchars($order['repair_solution']))
+                        : '<span class="text-white-75">— ' . e(__('repair_solution_ph')) . '</span>'; ?>
                 </div>
 
                 <?php if(!empty($order['technician_notes'])): ?>
@@ -1413,7 +1421,13 @@ function showStatusConfirmModal(form) {
                 return;
             }
 
-            btn.prop('disabled', false).html('<?php echo __("confirm"); ?>');
+            btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
+            if (res && res.code === 'repair_solution_required') {
+                // Chybí „Provedená oprava" → rovnou nabídnout doplnění a přechod dokončit
+                modal.modal('hide');
+                showRepairSolutionModal(form);
+                return;
+            }
             if (res && res.message) {
                 showAlert('<?php echo __('error'); ?>: ' + res.message);
             } else if (typeof raw === 'string' && raw.trim() !== '') {
@@ -1422,9 +1436,34 @@ function showStatusConfirmModal(form) {
                 showAlert('<?php echo __('error'); ?>');
             }
         }).fail(function(xhr) {
-            btn.prop('disabled', false).html('<?php echo __("confirm"); ?>');
+            btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
             const text = (xhr && xhr.responseText) ? xhr.responseText : '';
             showAlert('<?php echo __('error'); ?>' + (text ? ': ' + text : ''));
+        });
+    });
+}
+
+// „Provedená oprava" chybí → modal s textareou; po vyplnění se stavový přechod
+// pošle znovu i s repair_solution (API ho uloží a stav změní v jednom kroku).
+function showRepairSolutionModal(form) {
+    const m = $('#repairSolutionModal');
+    m.modal('show');
+    setTimeout(function() { $('#repairSolutionInput').trigger('focus'); }, 300);
+    $('#repairSolutionInput').off('input').on('input', function() { $(this).removeClass('is-invalid'); });
+    $('#repairSolutionSaveBtn').off('click').on('click', function() {
+        const val = ($('#repairSolutionInput').val() || '').trim();
+        if (!val) { $('#repairSolutionInput').addClass('is-invalid').trigger('focus'); return; }
+        const btn = $(this);
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ...');
+        $.post('api/update_order_status.php', form.serialize() + '&repair_solution=' + encodeURIComponent(val), function(raw) {
+            let res = null;
+            try { res = (typeof raw === 'string') ? JSON.parse(raw) : raw; } catch (e) { res = null; }
+            if (res && res.success) { location.reload(); return; }
+            btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
+            showAlert('<?php echo __('error'); ?>' + ((res && res.message) ? ': ' + res.message : ''));
+        }).fail(function() {
+            btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
+            showAlert('<?php echo __('error'); ?>');
         });
     });
 }
@@ -1500,6 +1539,28 @@ function deleteOrder(id) {
             <div class="modal-footer border-top-0 justify-content-center">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
                 <button type="button" class="btn btn-success px-4" id="confirmStatusBtn">
+                    <i class="fas fa-check me-2"></i><?php echo __('confirm'); ?>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- „Provedená oprava" je povinná před dokončením/výdejem — doplnění přímo při změně stavu -->
+<div class="modal fade" id="repairSolutionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-warning border-2 text-white">
+            <div class="modal-header bg-warning bg-opacity-10 border-bottom-0">
+                <h5 class="modal-title"><i class="fas fa-screwdriver-wrench me-2 text-warning"></i><?php echo __('repair_solution'); ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-white-75 mb-2"><?php echo __('repair_solution_required'); ?></div>
+                <textarea id="repairSolutionInput" class="form-control" rows="4" placeholder="<?php echo e(__('repair_solution_ph')); ?>"></textarea>
+            </div>
+            <div class="modal-footer border-top-0 justify-content-center">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
+                <button type="button" class="btn btn-warning px-4" id="repairSolutionSaveBtn">
                     <i class="fas fa-check me-2"></i><?php echo __('confirm'); ?>
                 </button>
             </div>
@@ -1670,6 +1731,10 @@ function deleteOrder(id) {
                         <div class="col-md-6">
                             <label class="form-label"><?php echo __('notes'); ?></label>
                             <textarea name="technician_notes" class="form-control" rows="3"><?php echo htmlspecialchars($order['technician_notes'] ?? ''); ?></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label"><?php echo __('repair_solution'); ?></label>
+                            <textarea name="repair_solution" class="form-control" rows="3" placeholder="<?php echo e(__('repair_solution_ph')); ?>"><?php echo htmlspecialchars($order['repair_solution'] ?? ''); ?></textarea>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('price_estimated'); ?></label>

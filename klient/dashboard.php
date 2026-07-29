@@ -743,6 +743,10 @@ if ($selectedOrder && isset($pdo)) {
                                 <div class="value"><?php echo e($selectedOrder['problem_description'] ?: '—'); ?></div>
                             </div>
                             <div class="detail-row">
+                                <div class="label"><?php echo __('client_label_repair_solution'); ?></div>
+                                <div class="value"><?php echo e(($selectedOrder['repair_solution'] ?? '') ?: '—'); ?></div>
+                            </div>
+                            <div class="detail-row">
                                 <div class="label"><?php echo __('client_label_serial_number'); ?></div>
                                 <div class="value"><?php echo e($selectedOrder['serial_number'] ?: '—'); ?></div>
                             </div>

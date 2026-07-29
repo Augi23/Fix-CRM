@@ -33,6 +33,7 @@ try {
     ensureOrderWorkTrackingSchema();
     ensureOrderWorkLogSchema(); // DDL — must run before beginTransaction()
     ensureOrderPriorityLowValue(); // DDL — ENUM priority musí znát 'Low'
+    ensureOrderRepairSolutionColumn(); // DDL — „Provedená oprava"
 
     $pdo->beginTransaction();
 
@@ -79,6 +80,16 @@ try {
         }
     }
 
+    // „Provedená oprava" je povinná pro dokončení/výdej (Připraveno k převzetí / Vydáno).
+    // 'Nevyzvednuto' je vynecháno ZÁMĚRNĚ — zařízení může být nevyzvednuté i bez
+    // provedené opravy (klient nereagoval na cenový návrh); výdej z něj už hlídaný je.
+    $__repairSolution = isset($_POST['repair_solution'])
+        ? trim((string)$_POST['repair_solution'])
+        : trim((string)($current['repair_solution'] ?? ''));
+    if (($__repairSolution === '') && (isOrderStatusIn($new_status, 'completed') || isOrderStatusIn($new_status, 'collected'))) {
+        throw new Exception($t('repair_solution_required'));
+    }
+
     // Klient zakázky: změnu smí provést každý s právy k zakázce, ale záměna
     // skutečného vyplněného klienta se v Historii VÝRAZNĚ označí „RUČNĚ ZMĚNĚN"
     // (rozhodnutí 14.7.2026 — místo dřívějšího admin-only zámku auditní stopa).
@@ -122,6 +133,7 @@ try {
         final_cost = ?,
         extra_expenses = ?,
         problem_description = ?,
+        repair_solution = ?,
         technician_notes = ?,
         pin_code = ?,
         appearance = ?,
@@ -144,6 +156,8 @@ try {
         isset($_POST['final_cost']) ? crmNumOrNull($_POST['final_cost']) : $current['final_cost'],
         isset($_POST['extra_expenses']) ? (crmNumOrNull($_POST['extra_expenses']) ?? 0) : $current['extra_expenses'],
         isset($_POST['problem_description']) ? $_POST['problem_description'] : $current['problem_description'],
+        // trim + prázdné → NULL (whitespace-only by v tiscích/portálu vypadal jako vyplněný)
+        isset($_POST['repair_solution']) ? (trim((string)$_POST['repair_solution']) !== '' ? trim((string)$_POST['repair_solution']) : null) : ($current['repair_solution'] ?? null),
         isset($_POST['technician_notes']) ? $_POST['technician_notes'] : $current['technician_notes'],
         isset($_POST['pin_code']) ? $_POST['pin_code'] : $current['pin_code'],
         isset($_POST['appearance']) ? $_POST['appearance'] : $current['appearance'],
@@ -344,6 +358,7 @@ try {
     $__cmp('předběžná cena', $current['estimated_cost'], $__newEst);
     $__cmp('priorita', $current['priority'], isset($_POST['priority']) ? normalizeOrderPriority($_POST['priority']) : $current['priority']);
     $__cmp('popis závady', $current['problem_description'], isset($_POST['problem_description']) ? $_POST['problem_description'] : $current['problem_description']);
+    $__cmp('provedená oprava', $current['repair_solution'] ?? '', isset($_POST['repair_solution']) ? $_POST['repair_solution'] : ($current['repair_solution'] ?? ''));
     $__cmp('poznámka', $current['technician_notes'], isset($_POST['technician_notes']) ? $_POST['technician_notes'] : $current['technician_notes']);
     $__cmp('zařízení', trim(($current['device_brand'] ?? '') . ' ' . ($current['device_model'] ?? '')), trim((isset($_POST['device_brand']) ? $_POST['device_brand'] : $current['device_brand']) . ' ' . (isset($_POST['device_model']) ? $_POST['device_model'] : $current['device_model'])));
     $__oc = trim((string)($current['order_code'] ?? '')) !== '' ? (string)$current['order_code'] : ('#' . (int)$order_id);

@@ -109,6 +109,15 @@ function _l($key) { global $target_lang; return __($key, $target_lang); }
         </div>
     </div>
 
+    <?php if(trim((string)($order['repair_solution'] ?? '')) !== ''): ?>
+    <div class="section">
+        <div class="section-title"><?php echo mb_strtoupper(_l('repair_solution')); ?></div>
+        <div class="problem-box">
+            <?php echo nl2br(htmlspecialchars($order['repair_solution'])); ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <?php if(!empty($order['technician_notes'])): ?>
     <div class="section">
         <div class="section-title"><?php echo mb_strtoupper(_l('notes')); ?></div>

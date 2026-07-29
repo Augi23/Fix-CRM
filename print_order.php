@@ -239,6 +239,9 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
                 <table class="kv"><tr><td class="k"><?php echo _l('device'); ?></td><td class="v" align="right"><?php echo e($deviceStr ?: '—'); ?></td></tr></table>
                 <table class="kv"><tr><td class="k"><?php echo _l('ord_device_passcode'); ?></td><td class="v mono" align="right"><?php echo e($pin !== '' ? $pin : '—'); ?></td></tr></table>
                 <table class="kv"><tr><td class="k"><?php echo _l('ord_requested_repair'); ?></td><td class="v repair" align="right"><?php echo e((string)($order['problem_description'] ?? '') ?: '—'); ?></td></tr></table>
+                <?php if (trim((string)($order['repair_solution'] ?? '')) !== ''): // Provedená oprava — jen po vyplnění (příjmový tisk běží před opravou) ?>
+                <table class="kv"><tr><td class="k"><?php echo _l('ord_repair_done'); ?></td><td class="v repair" align="right"><?php echo e((string)$order['repair_solution']); ?></td></tr></table>
+                <?php endif; ?>
                 <?php if (count($priceLines) >= 2): ?>
                     <?php foreach ($priceLines as $pl): ?>
                     <table class="kv"><tr><td class="k"><?php echo e($pl['label']); ?></td><td class="v" align="right"><?php echo e(formatMoney((float)$pl['amount'])); ?></td></tr></table>

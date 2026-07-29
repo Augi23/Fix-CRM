@@ -3663,6 +3663,20 @@ function ensureOrderCreatedByColumn(): void {
     } catch (Throwable $e) { error_log('ensureOrderCreatedByColumn: ' . $e->getMessage()); }
 }
 
+/** „Provedená oprava" — jak technik zakázku vyřešil; povinné před dokončením/výdejem. */
+function ensureOrderRepairSolutionColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM orders LIKE 'repair_solution'")->fetch();
+        if (!$col) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN repair_solution TEXT NULL AFTER problem_description");
+        }
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureOrderRepairSolutionColumn: ' . $e->getMessage()); }
+}
+
 /* ─────────────────────────────  SMS BRÁNA (GoSMS)  ───────────────────────────
  * Odesílání SMS klientům přes GoSMS.cz (OAuth2 client_credentials).
  * Nastavení v Integracích: gosms_client_id/secret, gosms_channel,
@@ -4439,9 +4453,10 @@ function crmSendPickupReadyEmail(int $orderId): void
     try {
         ensurePickupReadyColumns($pdo);
         ensureCustomerLanguageColumn();
+        ensureOrderRepairSolutionColumn();
         $st = $pdo->prepare(
             "SELECT o.id, o.order_code, o.status, o.device_brand, o.device_model, o.pin_code,
-                    o.problem_description, o.final_cost, o.estimated_cost,
+                    o.problem_description, o.repair_solution, o.final_cost, o.estimated_cost,
                     o.pickup_notified_at, o.branch_id,
                     c.first_name, c.last_name, c.email, c.preferred_language AS cust_lang,
                     b.name AS branch_name, b.address AS branch_address, b.opening_hours AS branch_hours,
@@ -5024,7 +5039,9 @@ function crmPickupReadyEmailHtml(array $o): string
     $device  = trim(((string)($o['device_brand'] ?? '')) . ' ' . ((string)($o['device_model'] ?? '')));
     $device  = $device !== '' ? $e($device) : $t('device_fallback');
     $code    = trim((string)($o['order_code'] ?? '')) !== '' ? $e($o['order_code']) : ('#' . (int)($o['id'] ?? 0));
-    $repair  = trim((string)($o['problem_description'] ?? ''));
+    // „Provedená oprava" (repair_solution) má přednost — label e-mailu už dnes říká
+    // „Provedená oprava"; popis závady zůstává jen jako fallback u starých zakázek.
+    $repair  = trim((string)($o['repair_solution'] ?? '')) ?: trim((string)($o['problem_description'] ?? ''));
     if ($repair !== '' && function_exists('mb_strimwidth')) { $repair = mb_strimwidth($repair, 0, 90, '…'); }
     $cost    = (float)(($o['final_cost'] ?? null) ?: ($o['estimated_cost'] ?? 0));
     $pin     = trim((string)($o['pin_code'] ?? ''));

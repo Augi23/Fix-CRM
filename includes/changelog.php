@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.15.0',
+        'date' => '2026-07-29',
+        'time' => '12:10',
+        'title' => 'Nové pole „Provedená oprava" — povinné před dokončením zakázky',
+        'items' => [
+            'Všude pod popisem závady přibylo pole <b>„Provedená oprava"</b> — technik do něj napíše, jak byla zakázka vyřešena. Je v detailu zakázky, v obou editačních oknech (detail i rychlá editace ze seznamu), na <b>zakázkovém listu</b> (jen když je vyplněné), na dílenském listu i v <b>klientském portálu</b>.',
+            '<b>Bez vyplněné „Provedené opravy" nejde zakázka dokončit ani vydat</b> („Připraveno k převzetí" / „Vydáno"). Při změně stavu se v takovém případě rovnou otevře okno pro doplnění — vyplníš a stav se změní jedním krokem. Platí to i pro rychlá tlačítka v seznamu zakázek.',
+            'E-mail „hotovo k vyzvednutí" nově v souhrnu ukazuje skutečně provedenou opravu (dřív tam byl popis závady). Změny pole se zapisují do historie zakázky.',
+            'Technicky: sloupec <code>orders.repair_solution</code> (vytvoří se sám i přes migraci 032), překlady CZ/RU/EN.',
+        ],
+    ],
+    [
         'version' => '3.14.1',
         'date' => '2026-07-29',
         'time' => '11:20',
