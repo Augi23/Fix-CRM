@@ -1452,6 +1452,44 @@ function crmModelPhotoMap(): array {
  * pos_sale_items = položky (snapshot názvu/ceny v okamžiku prodeje —
  * pozdější přejmenování dílu nesmí měnit historické doklady).
  */
+/** Pokladní deník: pohyby hotovosti mimo prodeje (výdej na výkup, vklad, výběr).
+ *  Prodeje zůstávají v pos_sales; tady je JEN hotovost, která kasou prošla navíc,
+ *  aby denní stav kasy seděl na korunu (stav = prodeje hotově − výdaje + vklady). */
+function ensurePosCashMovementsTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS pos_cash_movements (
+            id INT NOT NULL AUTO_INCREMENT,
+            branch_id INT NULL DEFAULT NULL,
+            direction ENUM('in','out') NOT NULL,
+            amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+            purpose VARCHAR(30) NOT NULL DEFAULT 'other',
+            ref_type VARCHAR(20) NULL DEFAULT NULL,
+            ref_id INT NULL DEFAULT NULL,
+            ref_label VARCHAR(40) NULL DEFAULT NULL,
+            note VARCHAR(255) NULL DEFAULT NULL,
+            created_by VARCHAR(100) NULL DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_pcm_created (created_at),
+            KEY idx_pcm_ref (ref_type, ref_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+/** Částka z volného textu („1100,-", „5 000 Kč", „1 100,50") → float. */
+function crmParseAmountCzk(?string $s): float {
+    $t = str_replace([' ', "\xc2\xa0"], '', (string)$s);
+    $t = preg_replace('/[^\d,\.]/', '', $t);
+    $t = rtrim($t, '.,');
+    if ($t === '') return 0.0;
+    if (preg_match('/^(\d+)[,\.](\d{1,2})$/', $t, $m)) { return (float)($m[1] . '.' . $m[2]); }
+    return (float)str_replace([',', '.'], '', $t);
+}
+
 function ensurePosTables(): void {
     global $pdo;
     static $done = false;
@@ -3496,6 +3534,146 @@ function crmSendOrderSheetEmail(int $orderId, ?string $toOverride = null): array
     return [$__sok, $__smsg, $to];
 }
 
+/** ── Platba při výdeji zakázky (hotově / kartou / převodem) ─────────────── */
+
+/** orders.payment_method — jak klient při výdeji zaplatil (cash|card|transfer). */
+function ensureOrderPaymentMethodColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_method'")->fetch();
+        if (!$col) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN payment_method VARCHAR(20) NULL AFTER shipping_method");
+        }
+    } catch (Throwable $e) { error_log('ensureOrderPaymentMethodColumn: ' . $e->getMessage()); }
+}
+
+/** Vrátí id faktury k zakázce; když neexistuje, vystaví ji (1 položka Oprava …).
+ *  Stejná konvence jako auto-faktura při dokončení (update_order_full). */
+function crmEnsureOrderInvoice(int $orderId, string $paymentMethod = 'bank_transfer'): int {
+    global $pdo;
+    try {
+        $ck = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND invoice_type = 'invoice' AND status <> 'cancelled' ORDER BY id DESC LIMIT 1");
+        $ck->execute([$orderId]);
+        $existing = (int)$ck->fetchColumn();
+        if ($existing > 0) return $existing;
+
+        $so = $pdo->prepare('SELECT o.*, c.first_name, c.last_name, c.company FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?');
+        $so->execute([$orderId]);
+        $orderData = $so->fetch();
+        if (!$orderData) return 0;
+
+        require_once __DIR__ . '/../models/InvoiceManager.php';
+        $manager = new InvoiceManager($pdo);
+        $prefix = get_setting('acc_invoice_prefix', date('Y'));
+        $count = $pdo->query('SELECT COUNT(*) FROM invoices')->fetchColumn();
+        $inv_number = $prefix . str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+        $final_price = (float)($orderData['final_cost'] ?: $orderData['estimated_cost']);
+
+        $manager->saveInvoice([
+            'invoice_number' => $inv_number,
+            'customer_id' => $orderData['customer_id'],
+            'order_id' => $orderId,
+            'date_issue' => date('Y-m-d'),
+            'date_tax' => date('Y-m-d'),
+            'date_due' => date('Y-m-d', strtotime('+14 days')),
+            'status' => 'issued',
+            'payment_method' => $paymentMethod,
+            'currency' => get_setting('currency', 'Kč'),
+            'is_vat_payer' => get_setting('acc_is_vat_payer', '0'),
+            'items' => [[
+                'name' => 'Oprava ' . $orderData['device_brand'] . ' ' . $orderData['device_model'],
+                'quantity' => 1,
+                'unit' => 'ks',
+                'price' => $final_price,
+                'vat_rate' => get_setting('acc_vat_rate', '21'),
+            ]],
+        ]);
+
+        $ck->execute([$orderId]);
+        $newId = (int)$ck->fetchColumn();
+        if ($newId > 0) {
+            crmAuditLog('invoice.create', [
+                'entity_type' => 'invoice', 'entity_id' => $newId, 'entity_label' => $inv_number,
+                'summary' => 'Faktura ' . $inv_number . ' vystavena při výdeji zakázky ' . orderDisplayCode($orderData),
+            ]);
+        }
+        return $newId;
+    } catch (Throwable $e) {
+        error_log('crmEnsureOrderInvoice: ' . $e->getMessage());
+        return 0;
+    }
+}
+
+/** Pošle klientovi fakturu e-mailem (HTML = print_invoice.php v embed módu)
+ *  + blok „Platba převodem" s QR platbou (SPAYD) jako v e-shopových e-mailech. */
+function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array {
+    global $pdo;
+    $st = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, c.email AS cust_email,
+                                o.device_brand, o.device_model, o.serial_number
+                         FROM invoices i
+                         JOIN customers c ON i.customer_id = c.id
+                         LEFT JOIN orders o ON i.order_id = o.id
+                         WHERE i.id = ? LIMIT 1");
+    $st->execute([$invoiceId]);
+    $invoice = $st->fetch();
+    if (!$invoice) { return [false, 'Faktura nenalezena', '']; }
+
+    $to = trim((string)($toOverride ?? $invoice['cust_email'] ?? ''));
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return [false, 'Klient nemá platný e-mail.', $to];
+    }
+
+    $it = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC");
+    $it->execute([$invoiceId]);
+    $items = $it->fetchAll();
+    $is_vat_payer = $invoice['is_vat_payer'];
+
+    if (!defined('INVOICE_DOC_EMBED')) { define('INVOICE_DOC_EMBED', true); }
+    ob_start();
+    include __DIR__ . '/../print_invoice.php';
+    $html = ob_get_clean();
+
+    // QR platba (jen u převodu a nezaplacené faktury) — stejný vzor jako e-shop.
+    if (!in_array((string)$invoice['payment_method'], ['cash', 'card', 'cod'], true)
+        && (string)$invoice['status'] !== 'paid') {
+        require_once __DIR__ . '/kb_api.php';
+        $spayd = function_exists('afxSpaydForInvoice') ? afxSpaydForInvoice($invoice) : '';
+        if ($spayd !== '') {
+            $acc = (string)get_setting('acc_bank_account', '');
+            $vs = preg_replace('/\D+/', '', (string)($invoice['variable_symbol'] ?: $invoice['invoice_number']));
+            $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=324x324&margin=0&data=' . rawurlencode($spayd);
+            $qrBlock = '<div style="max-width:840px;margin:18px auto 0;background:#fff;border:1px solid #e8ebf0;border-radius:14px;padding:18px 22px;font-family:-apple-system,Segoe UI,Arial,sans-serif;">'
+                . '<div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#86868b;font-weight:600;padding-bottom:10px;">Platba převodem</div>'
+                . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:top;font-size:14px;color:#1d1d1f;line-height:1.7;">'
+                . ($acc !== '' ? 'Číslo účtu: <strong>' . e($acc) . '</strong><br>' : '')
+                . 'Částka: <strong>' . e(formatMoney((float)$invoice['total_amount'])) . '</strong><br>'
+                . ($vs !== '' ? 'Variabilní symbol: <strong>' . e($vs) . '</strong><br>' : '')
+                . 'Splatnost: <strong>' . e(date('d.m.Y', strtotime((string)$invoice['date_due']))) . '</strong>'
+                . '</td><td width="134" style="vertical-align:top;padding-left:24px;">'
+                . '<div style="border:1px solid #e8ebf0;border-radius:14px;padding:12px;background:#fff;">'
+                . '<img src="' . $qrUrl . '" width="108" height="108" alt="QR platba" style="display:block;border:0;width:108px;height:108px;"></div>'
+                . '<div style="font-size:11px;color:#86868b;text-align:center;padding-top:8px;">QR&nbsp;platba</div>'
+                . '</td></tr></table></div>';
+            $html = (stripos($html, '</body>') !== false)
+                ? str_ireplace('</body>', $qrBlock . '</body>', $html)
+                : $html . $qrBlock;
+        }
+    }
+
+    $subject = get_setting('company_name', 'AppleFix') . ' — Faktura ' . (string)$invoice['invoice_number'];
+    [$ok, $msg] = smtpSendMail($to, $subject, $html);
+    if ($ok) {
+        crmAuditLog('invoice.email', [
+            'entity_type' => 'invoice', 'entity_id' => $invoiceId, 'entity_label' => (string)$invoice['invoice_number'],
+            'summary' => 'Faktura ' . $invoice['invoice_number'] . ' odeslána e-mailem na ' . $to,
+        ]);
+    }
+    return [$ok, $msg, $to];
+}
+
 /** Fronta požadavků pro podpisovou stanici (iPad na pultu): zaměstnanec pošle
  *  žádost z detailu zakázky, stanice si ji stáhne (poll) a po podpisu označí done. */
 function ensureSignatureRequestsTable(): void {
@@ -4369,6 +4547,9 @@ function crmAuditActionLabel(string $action): string {
         'procurement.create' => 'Požadavek na díl', 'procurement.status_change' => 'Změna stavu nákupu',
         'products.import' => 'Import produktů (e-shop)', 'products.delete' => 'Smazání produktu (e-shop)',
         'kasa.sale' => 'Prodej na kase', 'kasa.cancel' => 'Storno prodeje na kase',
+        'kasa.cash_move' => 'Pohyb hotovosti v kase',
+        'order.payment_set' => 'Platba při výdeji',
+        'invoice.email' => 'Faktura odeslána e-mailem',
         'banka.sync' => 'Synchronizace banky', 'banka.match' => 'Párování platby s fakturou',
         'complaint.assign' => 'Převzetí/přiřazení reklamace', 'complaint.resolution' => 'Řešení reklamace',
         'complaint.media_upload' => 'Příloha k reklamaci', 'complaint.media_delete' => 'Smazání přílohy reklamace',

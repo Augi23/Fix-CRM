@@ -95,6 +95,11 @@ try {
             'branch_id' => $branch,
         ]);
     }
+    // Výkup hotově = výdej z kasy (pokladní deník) — drží se v souladu s dokumentem.
+    if ($type === 'vykup') {
+        try { crmSyncVykupCashMovement($id); } catch (Throwable $e) { /* kasa je bonus */ }
+    }
+
     echo json_encode(['ok' => true, 'id' => $id, 'doc_number' => $docNumber], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     error_log('save_document: ' . $e->getMessage());

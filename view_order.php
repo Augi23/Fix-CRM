@@ -549,6 +549,19 @@ function localizedOrderStatusLabel(string $status): string {
                         </div>
                         <button type="submit" class="btn btn-outline-primary btn-sm w-100"><?php echo __('save'); ?></button>
                     </form>
+                    <?php /* Platba při výdeji: hotově → příjem do pokladny; převodem →
+                             faktura s QR platbou na e-mail; kartou → záznam pro párování
+                             s výpisem z účtu. Odesílá se spolu se změnou stavu na Vydáno. */ ?>
+                    <?php ensureOrderPaymentMethodColumn(); $__pm = (string)($order['payment_method'] ?? ''); ?>
+                    <div class="mb-2 mt-2">
+                        <label class="form-label mb-1"><i class="fas fa-money-bill-wave me-1 text-success"></i>Platba při výdeji</label>
+                        <select id="paymentMethodSelect" class="form-select">
+                            <option value="" <?php echo $__pm === '' ? 'selected' : ''; ?>>-- zvol při výdeji --</option>
+                            <option value="cash" <?php echo $__pm === 'cash' ? 'selected' : ''; ?>>💵 Hotově (zapíše se do pokladny)</option>
+                            <option value="card" <?php echo $__pm === 'card' ? 'selected' : ''; ?>>💳 Kartou (spáruje se s účtem)</option>
+                            <option value="transfer" <?php echo $__pm === 'transfer' ? 'selected' : ''; ?>>🏦 Převodem (faktura s QR na e-mail)</option>
+                        </select>
+                    </div>
                     <hr class="border-secondary my-3">
                 </div>
                 <?php else: ?>
@@ -1050,6 +1063,12 @@ $(document).ready(function() {
         });
     });
 
+    // Po reloadu ukázat výsledek platební akce z výdeje (faktura/pokladna).
+    try {
+        const __pn = sessionStorage.getItem('afx_payment_note');
+        if (__pn) { sessionStorage.removeItem('afx_payment_note'); showAlert('<i class="fas fa-money-bill-wave me-1 text-success"></i>' + __pn); }
+    } catch (e) {}
+
     $('#statusForm').on('submit', function(e) {
         e.preventDefault();
         const form = $(this);
@@ -1416,7 +1435,12 @@ function showStatusConfirmModal(form) {
         const btn = $(this);
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ...');
 
-        $.post('api/update_order_status.php', form.serialize(), function(raw) {
+        // Platba při výdeji (select mimo #statusForm) — přibalit ke změně stavu.
+        let __data = form.serialize();
+        const __pm = $('#paymentMethodSelect').val();
+        if (__pm) { __data += '&payment_method=' + encodeURIComponent(__pm); }
+
+        $.post('api/update_order_status.php', __data, function(raw) {
             let res = null;
             try {
                 res = (typeof raw === 'string') ? JSON.parse(raw) : raw;
@@ -1426,6 +1450,10 @@ function showStatusConfirmModal(form) {
 
             if (res && res.success) {
                 modal.modal('hide');
+                if (res.payment_note) {
+                    // krátce ukázat výsledek platební akce (faktura odeslána / hotovost v kase)
+                    try { sessionStorage.setItem('afx_payment_note', res.payment_note); } catch (e) {}
+                }
                 location.reload();
                 return;
             }

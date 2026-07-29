@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.20.0',
+        'date' => '2026-07-29',
+        'time' => '18:10',
+        'title' => 'Peníze pod kontrolou: pokladní deník + platba při výdeji zakázky',
+        'items' => [
+            '<b>Pokladní deník:</b> kasa nově eviduje i hotovost mimo prodeje — <b>výkup placený hotově se automaticky zapíše jako výdej z kasy</b> (s číslem výkupního listu, proklik na dokument), ručně jde přidat <b>vklad/výběr</b>. Hlavička Pokladny ukazuje vklady, výdaje a <b>stav hotovosti</b> (prodeje hotově + vklady − výdaje) + dnešní pohyby.',
+            '<b>Platba při výdeji zakázky:</b> v detailu (u dopravy) i v bleskovém „Vydáno" v seznamu se volí <b>hotově / kartou / převodem</b>. Hotově → <b>příjem do pokladny</b>; převodem → <b>vystaví se faktura a odejde klientovi e-mailem s QR platbou</b> (VS se pak sám spáruje s bankou); kartou → záznam na zakázce pro párování s výpisem.',
+            'Vše auditované (pohyby kasy, platba při výdeji, odeslané faktury); částky se počítají z konečné ceny zakázky. Když akce selže (např. klient nemá e-mail), výdej se nezastaví — CRM jen řekne, co dodělat ručně.',
+        ],
+    ],
+    [
         'version' => '3.19.3',
         'date' => '2026-07-29',
         'time' => '17:20',

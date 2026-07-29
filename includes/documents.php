@@ -221,6 +221,59 @@ function crmGetDocumentMedia(int $documentId): array {
     } catch (Throwable $e) { return []; }
 }
 
+/**
+ * Výkup placený HOTOVĚ = výdej z kasy. Drží pokladní deník v souladu s dokumentem:
+ * po každém uložení výkupního listu založí/aktualizuje výdajový pohyb (vazba
+ * ref_type='document'), a když výplata přestane být hotově, pohyb zase odebere.
+ * Kasa tak sedí na korunu a u pohybu je dohledatelné číslo výkupního listu.
+ */
+function crmSyncVykupCashMovement(int $docId): void {
+    global $pdo;
+    $doc = crmGetDocument($docId);
+    if (!$doc || (string)$doc['doc_type'] !== 'vykup') return;
+    ensurePosCashMovementsTable();
+
+    $payment = (string)($doc['fields']['sign_payment'] ?? '');
+    $isCash = $payment !== '' && mb_stripos($payment, 'hotov') !== false;
+    $amount = crmParseAmountCzk((string)($doc['price'] ?? ''));
+    $label = (string)$doc['doc_number'];
+    $note = trim((string)($doc['customer_name'] ?? '') . ' · ' . (string)($doc['subject'] ?? ''), ' ·');
+
+    try {
+        $st = $pdo->prepare("SELECT id, amount FROM pos_cash_movements WHERE ref_type = 'document' AND ref_id = ? LIMIT 1");
+        $st->execute([$docId]);
+        $existing = $st->fetch(PDO::FETCH_ASSOC);
+
+        if ($isCash && $amount > 0) {
+            if ($existing) {
+                $pdo->prepare("UPDATE pos_cash_movements SET amount = ?, branch_id = ?, ref_label = ?, note = ? WHERE id = ?")
+                    ->execute([$amount, (int)($doc['branch_id'] ?? 0) ?: null, $label, mb_substr($note, 0, 255), (int)$existing['id']]);
+                if (abs((float)$existing['amount'] - $amount) >= 0.005) {
+                    crmAuditLog('kasa.cash_move', [
+                        'entity_type' => 'document', 'entity_id' => $docId, 'entity_label' => $label,
+                        'summary' => 'Výdej z kasy na výkup ' . $label . ' upraven na ' . formatMoney($amount),
+                    ]);
+                }
+            } else {
+                $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+                $pdo->prepare("INSERT INTO pos_cash_movements (branch_id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by)
+                               VALUES (?, 'out', ?, 'vykup', 'document', ?, ?, ?, ?)")
+                    ->execute([(int)($doc['branch_id'] ?? 0) ?: null, $amount, $docId, $label, mb_substr($note, 0, 255), $by !== '' ? mb_substr($by, 0, 100) : null]);
+                crmAuditLog('kasa.cash_move', [
+                    'entity_type' => 'document', 'entity_id' => $docId, 'entity_label' => $label,
+                    'summary' => 'Výdej z kasy ' . formatMoney($amount) . ' — výkup ' . $label . ($note !== '' ? ' (' . $note . ')' : ''),
+                ]);
+            }
+        } elseif ($existing) {
+            $pdo->prepare("DELETE FROM pos_cash_movements WHERE id = ?")->execute([(int)$existing['id']]);
+            crmAuditLog('kasa.cash_move', [
+                'entity_type' => 'document', 'entity_id' => $docId, 'entity_label' => $label,
+                'summary' => 'Výdej z kasy na výkup ' . $label . ' zrušen (výplata už není hotově)',
+            ]);
+        }
+    } catch (Throwable $e) { error_log('crmSyncVykupCashMovement: ' . $e->getMessage()); }
+}
+
 /** Jazyk dokumentů: povolené cs/en/ru (uk → en řeší crmCustomerDocLang jinde). */
 function crmDocLangOrDefault(?string $lang): string {
     $lang = strtolower(trim((string)$lang));

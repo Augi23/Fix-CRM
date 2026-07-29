@@ -673,6 +673,24 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- New Order Modal moved to includes/modals/new_order_modal.php and included via footer.php -->
 
 <!-- Quick View & Edit Modal -->
+<!-- Bleskový výdej: volba platby (hotově → pokladna, převodem → faktura s QR, kartou → párování s účtem) -->
+<div class="modal fade" id="quickPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content glass-card border-secondary text-white">
+            <div class="modal-header border-secondary py-2">
+                <h6 class="modal-title"><i class="fas fa-money-bill-wave me-2 text-success"></i>Jak klient platí?</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body d-grid gap-2">
+                <button type="button" class="btn btn-success qp-btn" data-pm="cash">💵 Hotově <span class="small d-block text-white-75">zapíše se do pokladny</span></button>
+                <button type="button" class="btn btn-info qp-btn" data-pm="card">💳 Kartou <span class="small d-block text-white-75">spáruje se s výpisem z účtu</span></button>
+                <button type="button" class="btn btn-warning qp-btn" data-pm="transfer">🏦 Převodem <span class="small d-block">faktura s QR odejde na e-mail</span></button>
+                <button type="button" class="btn btn-outline-secondary btn-sm qp-btn" data-pm="">Vydat bez záznamu platby</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- „Provedená oprava" je povinná před dokončením/výdejem — doplnění přímo z rychlých tlačítek -->
 <div class="modal fade" id="repairSolutionQuickModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -959,13 +977,14 @@ $(document).ready(function() {
         toast.show();
     }
 
-    function performQuickStatusUpdate(id, status, btn, repairSolution) {
+    function performQuickStatusUpdate(id, status, btn, repairSolution, paymentMethod) {
         const data = { order_id: id, status: status };
         if (repairSolution) { data.repair_solution = repairSolution; }
+        if (paymentMethod) { data.payment_method = paymentMethod; }
         $.post('api/update_order_status.php', data, function(res) {
             if (res.success) {
-                showQuickToast('<?php echo __('updated_success'); ?>', 'success');
-                setTimeout(() => window.location.reload(), 300);
+                showQuickToast(res.payment_note ? res.payment_note : '<?php echo __('updated_success'); ?>', 'success');
+                setTimeout(() => window.location.reload(), res.payment_note ? 1600 : 300);
             } else if (res.code === 'repair_solution_required') {
                 // Chybí „Provedená oprava" → doplnit rovnou v okně a přechod dokončit
                 showRepairSolutionQuickModal(id, status, btn);
@@ -1011,8 +1030,28 @@ $(document).ready(function() {
             });
         }
 
+        // Bleskové „Vydáno" → nejdřív zvolit platbu (hotově/kartou/převodem),
+        // ať se výdej rovnou propíše do pokladny / vystaví faktura s QR.
+        const __collected = <?php echo json_encode(getOrderStatusList('collected'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+        if (__collected.includes(status)) {
+            return showQuickPaymentModal(id, status, btn);
+        }
+
         performQuickStatusUpdate(id, status, btn);
     });
+
+    function showQuickPaymentModal(id, status, btn) {
+        const m = $('#quickPaymentModal');
+        m.find('.qp-btn').off('click').on('click', function() {
+            const pm = $(this).data('pm') || '';
+            m.modal('hide');
+            performQuickStatusUpdate(id, status, btn, null, pm);
+        });
+        m.off('hidden.bs.modal').on('hidden.bs.modal', function() {
+            if (btn) btn.prop('disabled', false);
+        });
+        m.modal('show');
+    }
 
     $(document).on('click', '.order-row', function(e) {
         if ($(e.target).closest('a, button, .btn, .dropdown, .dropdown-menu, .dropdown-item, .phone-qr-trigger, .quick-status-btn, .accounting-btn, input, select, textarea, label').length) {

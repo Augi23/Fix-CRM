@@ -127,12 +127,22 @@ try {
         $params[] = $target_tech_id;
     }
 
+    // Platba při výdeji (hotově / kartou / převodem) — volitelný parametr;
+    // akce (příjem do kasy / faktura s QR e-mailem) běží až po commitu níže.
+    $payment_method = (string)($_POST['payment_method'] ?? '');
+    if (!in_array($payment_method, ['cash', 'card', 'transfer'], true)) { $payment_method = ''; }
+
     if (isOrderStatusIn($new_status, 'collected')) {
         $sql .= ', shipping_date = IFNULL(shipping_date, CURRENT_TIMESTAMP)';
         // Výdej bez zvoleného způsobu předání → automaticky „Osobní odběr" (Self Pickup).
         // Umožní bleskové „Vydáno" z jakéhokoli stavu bez proklikávání dopravy
         // (rozhodnutí majitele: jiná volba stejně nefunguje).
         $sql .= ", shipping_method = IFNULL(NULLIF(shipping_method, ''), 'Self Pickup')";
+        if ($payment_method !== '') {
+            ensureOrderPaymentMethodColumn();
+            $sql .= ', payment_method = ?';
+            $params[] = $payment_method;
+        }
     }
 
     if (isOrderStatusIn($new_status, 'collected') && ($final_cost === null || $final_cost === '')) {
@@ -220,7 +230,56 @@ try {
         error_log('update_order_status post-commit (audit/notify) selhal, zmena #' . (int)$order_id . ' ulozena: ' . $e->getMessage());
     }
 
-    echo json_encode(['success' => true, 'message' => $t('status_updated')]);
+    // ── Platba při výdeji: akce podle zvoleného způsobu (best-effort po commitu) ──
+    $payment_note = '';
+    $entering_collected = isOrderStatusIn($new_status, 'collected') && !isOrderStatusIn($current_status, 'collected');
+    if ($payment_method !== '' && $entering_collected) {
+        try {
+            $__oc = trim((string)($order_data['order_code'] ?? '')) !== '' ? (string)$order_data['order_code'] : ('#' . (int)$order_id);
+            $amount = (float)($final_cost ?? 0);
+            $payLabels = ['cash' => 'hotově', 'card' => 'kartou', 'transfer' => 'převodem'];
+            crmAuditLog('order.payment_set', [
+                'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
+                'summary' => 'Zakázka ' . $__oc . ' — výdej, platba ' . ($payLabels[$payment_method] ?? $payment_method) . ($amount > 0 ? ' (' . formatMoney($amount) . ')' : ''),
+            ]);
+
+            if ($payment_method === 'cash' && $amount > 0) {
+                // hotovost prošla kasou → příjem do pokladního deníku (idempotentně)
+                ensurePosCashMovementsTable();
+                $ck = $pdo->prepare("SELECT id FROM pos_cash_movements WHERE ref_type = 'order' AND ref_id = ? LIMIT 1");
+                $ck->execute([(int)$order_id]);
+                if (!$ck->fetchColumn()) {
+                    $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+                    $pdo->prepare("INSERT INTO pos_cash_movements (branch_id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by)
+                                   VALUES (?, 'in', ?, 'zakazka', 'order', ?, ?, ?, ?)")
+                        ->execute([(int)($order_data['branch_id'] ?? 0) ?: null, $amount, (int)$order_id, mb_substr($__oc, 0, 40),
+                                   'Výdej zakázky — platba hotově', $by !== '' ? mb_substr($by, 0, 100) : null]);
+                    crmAuditLog('kasa.cash_move', [
+                        'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
+                        'summary' => 'Příjem do kasy ' . formatMoney($amount) . ' — zakázka ' . $__oc . ' (hotově při výdeji)',
+                    ]);
+                }
+                $payment_note = 'Hotovost zapsána do pokladny (' . formatMoney($amount) . ').';
+            } elseif ($payment_method === 'transfer') {
+                $invId = crmEnsureOrderInvoice((int)$order_id, 'bank_transfer');
+                if ($invId > 0) {
+                    [$eok, $emsg, $eto] = crmSendInvoiceEmail($invId);
+                    $payment_note = $eok
+                        ? ('Faktura s QR platbou odeslána na ' . $eto . '.')
+                        : ('Faktura vystavena, e-mail se nepodařilo odeslat: ' . $emsg);
+                } else {
+                    $payment_note = 'Fakturu se nepodařilo vystavit — vystav ji ručně v Účetnictví.';
+                }
+            } elseif ($payment_method === 'card') {
+                $payment_note = 'Platba kartou zaznamenána — spáruje se s výpisem z účtu.';
+            }
+        } catch (Throwable $e) {
+            error_log('update_order_status payment action selhala, zmena #' . (int)$order_id . ' ulozena: ' . $e->getMessage());
+            $payment_note = 'Stav uložen, ale akce k platbě selhala — zkontroluj ručně.';
+        }
+    }
+
+    echo json_encode(['success' => true, 'message' => $t('status_updated'), 'payment_note' => $payment_note]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

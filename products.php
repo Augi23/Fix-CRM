@@ -975,6 +975,7 @@ $(document).on('click', '.product-label-btn', function () {
                 }
                 if (!d.success) { $msg.textContent = d.message || 'Uložení selhalo.'; return; }
                 savedSomething = true;
+                try { if (window.__clearProductDraft) window.__clearProductDraft(); } catch (e) {}   // úspěšně uloženo → koncept pryč
                 el('pcTodayCount').textContent = d.today_count;
                 $msg.textContent = ($editId.value ? 'Uloženo: ' : 'Naskladněno: ') + d.title;
                 if (d.hint) { $hint.textContent = d.hint; $hint.style.display = ''; }

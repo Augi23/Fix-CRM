@@ -25,6 +25,20 @@ try {
         $todaySums[(string)$r['payment_method']] = (float)$r['s'];
     }
 } catch (Throwable $e) {}
+
+// Pokladní deník: dnešní pohyby hotovosti mimo prodeje (výdaje na výkupy, vklady,
+// výběry) → stav kasy = prodeje hotově + přijaté zakázky hotově + vklady − výdaje.
+ensurePosCashMovementsTable();
+$cashIn = 0.0; $cashOut = 0.0; $todayMoves = [];
+try {
+    $st = $pdo->query("SELECT id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by, created_at
+        FROM pos_cash_movements WHERE DATE(created_at) = CURDATE()" . orderBranchScopeSql('branch_id') . " ORDER BY id DESC LIMIT 30");
+    foreach ($st as $m) {
+        $todayMoves[] = $m;
+        if ($m['direction'] === 'in') { $cashIn += (float)$m['amount']; } else { $cashOut += (float)$m['amount']; }
+    }
+} catch (Throwable $e) {}
+$cashState = $todaySums['cash'] + $cashIn - $cashOut;
 ?>
 
 <style>
@@ -98,8 +112,60 @@ try {
     <span class="text-white-50 small">Dnes: hotově <strong><?php echo formatMoney($todaySums['cash']); ?></strong>
         · kartou <strong><?php echo formatMoney($todaySums['card']); ?></strong>
         · fakturou <strong><?php echo formatMoney($todaySums['invoice']); ?></strong>
+        <?php if ($cashIn > 0): ?> · vklady <strong class="text-success"><?php echo formatMoney($cashIn); ?></strong><?php endif; ?>
+        <?php if ($cashOut > 0): ?> · výdaje <strong class="text-warning">−<?php echo formatMoney($cashOut); ?></strong><?php endif; ?>
+        · <span title="Prodeje hotově + vklady − výdaje (výkupy, výběry)">stav hotovosti <strong class="<?php echo $cashState < 0 ? 'text-danger' : 'text-success'; ?>"><?php echo formatMoney($cashState); ?></strong></span>
         <?php if (crmCanViewHistory()): ?> · <a href="history.php?tab=kasa" class="text-info text-decoration-none">historie kasy →</a><?php endif; ?></span>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-success" onclick="posCashMove('in')"><i class="fas fa-arrow-down me-1"></i>Vklad</button>
+        <button type="button" class="btn btn-sm btn-outline-warning" onclick="posCashMove('out')"><i class="fas fa-arrow-up me-1"></i>Výběr</button>
+    </div>
 </div>
+
+<?php if (!empty($todayMoves)): ?>
+<div class="glass-panel p-2 px-3 border-secondary mb-3">
+    <div class="small text-white-50 mb-1"><i class="fas fa-book me-1"></i>Dnešní pohyby hotovosti (mimo prodeje)</div>
+    <div class="d-flex flex-column gap-1">
+        <?php foreach ($todayMoves as $m):
+            $isOut = $m['direction'] === 'out';
+            $purposeLabels = ['vykup' => 'Výkup', 'vklad' => 'Vklad', 'vyber' => 'Výběr', 'zakazka' => 'Zakázka'];
+            $pl = $purposeLabels[(string)$m['purpose']] ?? ucfirst((string)$m['purpose']);
+        ?>
+        <div class="d-flex align-items-center gap-2 small">
+            <span class="<?php echo $isOut ? 'text-warning' : 'text-success'; ?>" style="min-width:86px;"><strong><?php echo ($isOut ? '−' : '+') . formatMoney((float)$m['amount']); ?></strong></span>
+            <span><?php echo e($pl); ?><?php if (!empty($m['ref_label'])): ?>
+                <?php if ($m['ref_type'] === 'document'): ?> <a class="text-info text-decoration-none" href="dokument.php?type=vykup&id=<?php echo (int)$m['ref_id']; ?>"><?php echo e((string)$m['ref_label']); ?></a>
+                <?php else: ?> <?php echo e((string)$m['ref_label']); ?><?php endif; ?>
+            <?php endif; ?></span>
+            <?php if (!empty($m['note'])): ?><span class="text-white-50 text-truncate" style="max-width:340px;"><?php echo e((string)$m['note']); ?></span><?php endif; ?>
+            <span class="text-white-50 ms-auto"><?php echo e(date('H:i', strtotime((string)$m['created_at']))); ?><?php if (!empty($m['created_by'])): ?> · <?php echo e((string)$m['created_by']); ?><?php endif; ?></span>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<script>
+/* Vklad/výběr hotovosti — jednoduchý prompt flow (kasa je dotyková, ale tohle je výjimečná akce) */
+function posCashMove(direction) {
+    var label = direction === 'in' ? 'VKLAD do kasy' : 'VÝBĚR z kasy';
+    var amount = prompt(label + ' — částka v Kč:');
+    if (amount === null) return;
+    var note = prompt('Poznámka (za co / proč):') || '';
+    var fd = new FormData();
+    fd.append('direction', direction);
+    fd.append('amount', amount);
+    fd.append('note', note);
+    fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+    fetch('api/pos_cash_move.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+            if (!j.ok) { alert(j.error || 'Pohyb se nepodařilo uložit'); return; }
+            location.reload();
+        })
+        .catch(function () { alert('Chyba spojení'); });
+}
+</script>
 
 <div class="row g-4">
     <!-- ── vyhledávání ── -->
