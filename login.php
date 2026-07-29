@@ -406,7 +406,7 @@ if (!empty($_POST['ajax'])) {
    efektu = střed obrazovky. Respektuje prefers-reduced-motion. */
 var afxGreetWave = (function () {
     var cv = null, ctx = null, raf = null, t0 = 0, W = 0, H = 0, dpr = 1;
-    var TRAVEL = 3.0, PAUSE = 0.2, CYCLE = TRAVEL + PAUSE;   // krátká pauza, ať stihne víc pulzů
+    var TRAVEL = 2.0, PAUSE = 0.2, CYCLE = TRAVEL + PAUSE;   // svižnější vlna, ať se stihne víc pulzů
     var STOPS = [
         [0.00, [ 12,   5,   0]],
         [0.30, [140,  58,   8]],
@@ -483,6 +483,7 @@ var afxGreetWave = (function () {
         raf = requestAnimationFrame(frame);        // pulzuje, dokud stránka nepřejde do CRM
     }
     function start() {
+        if (raf) return;                           // už běží (idempotentní)
         cv = document.getElementById('greetWave');
         if (!cv || !cv.getContext) return;
         ctx = cv.getContext('2d');
@@ -496,7 +497,11 @@ var afxGreetWave = (function () {
         t0 = 0;
         raf = requestAnimationFrame(frame);
     }
-    return { start: start };
+    function stop() {
+        if (raf) { cancelAnimationFrame(raf); raf = null; }
+        t0 = 0;
+    }
+    return { start: start, stop: stop };
 })();
 </script>
 <script>
@@ -507,12 +512,19 @@ var afxGreetWave = (function () {
         e.preventDefault();
         var btn = form.querySelector('button[type="submit"]');
         btn.disabled = true;
+        // Vlny spustit HNED při odeslání (fetch chvíli trvá) — animace nezačíná pozdě
+        // a stihne se víc pulzů. Při neúspěchu přihlášení se overlay zase schová.
+        var ov = document.getElementById('greetOverlay');
+        ov.style.display = 'block';
+        if (window.afxGreetWave) { afxGreetWave.start(); }
         var fd = new FormData(form);
         fd.append('ajax', '1');
         fetch('login.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (!d.ok) {
+                    if (window.afxGreetWave) { afxGreetWave.stop(); }
+                    ov.style.display = 'none';
                     btn.disabled = false;
                     var al = document.getElementById('loginAjaxError');
                     if (!al) {
@@ -526,9 +538,6 @@ var afxGreetWave = (function () {
                 }
                 var go = function () { window.location.href = d.redirect; };
                 if (d.greeting) {
-                    var ov = document.getElementById('greetOverlay');
-                    ov.style.display = 'block';
-                    if (window.afxGreetWave) { afxGreetWave.start(); }
                     var done = false;
                     var finish = function () { if (!done) { done = true; go(); } };
                     try {
@@ -538,7 +547,7 @@ var afxGreetWave = (function () {
                         audio.play().then(function () { setTimeout(finish, 8000); }).catch(finish);
                     } catch (err) { finish(); }
                 } else {
-                    go();
+                    go();   // bez hlášky rovnou dál — vlny běží až do načtení dashboardu
                 }
             })
             .catch(function () { form.removeEventListener('submit', arguments.callee); form.submit(); });

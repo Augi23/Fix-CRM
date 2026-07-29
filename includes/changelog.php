@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.14.1',
+        'date' => '2026-07-29',
+        'time' => '11:20',
+        'title' => 'Uvítací vlna startuje okamžitě a stihne víc pulzů',
+        'items' => [
+            'Animace se dosud spouštěla až po odpovědi serveru na přihlášení — teď se rozjede <b>hned po kliknutí na Přihlásit</b>, takže nezačíná pozdě.',
+            'Průjezd vlny zrychlen (3 s → <b>2 s</b>) a pauza 0,2 s — během hlášky se stihnou <b>2–3 pulzy</b>. Vlny běží i bez uvítací hlášky, dokud se nenačte dashboard.',
+            'Při neúspěšném přihlášení se overlay s animací schová a ukáže se chyba jako dřív.',
+        ],
+    ],
+    [
         'version' => '3.14.0',
         'date' => '2026-07-29',
         'time' => '10:45',
