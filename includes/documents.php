@@ -176,6 +176,44 @@ function crmGetDocumentSignature(int $documentId): ?array {
     } catch (Throwable $e) { return null; }
 }
 
+/** Fotky dokumentu (stav zařízení u výkupu apod.) — uploads/documents/<id>/. */
+function ensureDocumentMediaTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS document_media (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            document_id INT NOT NULL,
+            file_path VARCHAR(255) NOT NULL,
+            file_type VARCHAR(100) NULL,
+            file_name VARCHAR(255) NULL,
+            uploaded_by VARCHAR(100) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_dm_document (document_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+/** Fotky dokumentu jako [['id'=>, 'src'=>relativní cesta], …]. */
+function crmGetDocumentMedia(int $documentId): array {
+    global $pdo;
+    if ($documentId <= 0) return [];
+    try {
+        ensureDocumentMediaTable();
+        $st = $pdo->prepare("SELECT id, file_path, file_type FROM document_media WHERE document_id = ? ORDER BY id ASC");
+        $st->execute([$documentId]);
+        $out = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            if (str_starts_with((string)($r['file_type'] ?? ''), 'image/')) {
+                $out[] = ['id' => (int)$r['id'], 'src' => (string)$r['file_path']];
+            }
+        }
+        return $out;
+    } catch (Throwable $e) { return []; }
+}
+
 /** Jazyk dokumentů: povolené cs/en/ru (uk → en řeší crmCustomerDocLang jinde). */
 function crmDocLangOrDefault(?string $lang): string {
     $lang = strtolower(trim((string)$lang));
@@ -188,7 +226,7 @@ function crmDocLangOrDefault(?string $lang): string {
  * 'static' = hodnoty jako text (e-mail, případně náhled).
  * Vrací HTML VNITŘKU stránky (bez <html>/<head>) — CSS dodává volající.
  */
-function crmRenderDocumentSheet(string $type, array $values, string $lang, string $mode, string $docNumber, string $docDate, int $docId = 0): string {
+function crmRenderDocumentSheet(string $type, array $values, string $lang, string $mode, string $docNumber, string $docDate, int $docId = 0, ?array $overridePhotos = null): string {
     $cfg = crmDocTypes()[$type] ?? null;
     if (!$cfg) return '';
     $L = function (string $key) use ($lang) { return __($key, $lang); };
@@ -236,6 +274,27 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
     foreach ($cfg['sections'] as $sec) {
         $h .= '<div class="block"><h3>' . e($L($sec['h'])) . '</h3><div class="fgrid">';
         foreach ($sec['fields'] as $f) { $h .= $fieldHtml($f); }
+        $h .= '</div></div>';
+    }
+
+    // Fotodokumentace (stav zařízení): uložené fotky + ve formuláři tlačítko
+    // „Přidat fotky / vyfotit" (na telefonu otevře rovnou foťák).
+    $photos = $overridePhotos !== null ? $overridePhotos : ($docId > 0 ? crmGetDocumentMedia($docId) : []);
+    if ($photos || $mode === 'form') {
+        $h .= '<div class="block"><h3>' . e($L('photo_documentation')) . '</h3><div class="photos">';
+        foreach ($photos as $ph) {
+            $h .= '<span class="photo-item">';
+            $h .= '<img src="' . e((string)$ph['src']) . '" alt="foto">';
+            if ($mode === 'form' && !empty($ph['id'])) {
+                $h .= '<button type="button" class="photo-del" data-media-id="' . (int)$ph['id'] . '" title="Smazat">&times;</button>';
+            }
+            $h .= '</span>';
+        }
+        if ($mode === 'form') {
+            $h .= '<label class="photo-add" id="docPhotoAdd" title="Přidat fotky / vyfotit">'
+                . '<input type="file" id="docPhotoInput" accept="image/*" capture="environment" multiple style="display:none;">'
+                . '<span>+</span></label>';
+        }
         $h .= '</div></div>';
     }
 
@@ -299,6 +358,17 @@ function crmDocumentSheetCss(): string {
         .dinput:focus { border-bottom-color: var(--accent); }
         .dinput--date { text-align: right; font-weight: 300; font-size: 11px; color: var(--muted); border-bottom: 1px dashed #d8dde4; width: 130px; }
         .dvalue { min-height: 21px; border-bottom: 1px solid var(--line); padding: 2px 0 4px; font-weight: 700; }
+        .photos { display: flex; flex-wrap: wrap; gap: 8px; }
+        .photo-item { position: relative; display: inline-block; }
+        .photos img { width: 110px; height: 110px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); display: block; }
+        .photo-del { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%;
+                     border: none; background: #ff375f; color: #fff; font-size: 14px; line-height: 1; cursor: pointer;
+                     box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+        .photo-add { width: 110px; height: 110px; border: 2px dashed #c9cfd8; border-radius: 10px; display: flex;
+                     align-items: center; justify-content: center; cursor: pointer; color: #949aa4; font-size: 34px;
+                     font-weight: 300; transition: border-color .15s, color .15s; }
+        .photo-add:hover { border-color: var(--accent); color: var(--accent); }
+        @media print { .photo-add, .photo-del { display: none !important; } }
         .fineprint { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--line);
                      font-size: 10px; color: #495059; line-height: 1.55; font-weight: 300; text-align: justify; }
         .fineprint ol { margin: 0; padding-left: 16px; }
@@ -326,7 +396,22 @@ function crmRenderDocumentEmailHtml(array $doc): string {
     $type = (string)$doc['doc_type'];
     $lang = crmDocLangOrDefault($doc['lang'] ?? 'cs');
     $date = !empty($doc['doc_date']) ? date('d.m.Y', strtotime((string)$doc['doc_date'])) : date('d.m.Y');
-    $sheet = crmRenderDocumentSheet($type, $doc['fields'] ?? [], $lang, 'static', (string)$doc['doc_number'], $date, (int)$doc['id']);
+    // Fotky do e-mailu jako data: URI s rozpočtem (max 4 fotky / ~6 MB base64),
+    // ať e-mail projde běžnými SMTP limity.
+    $emailPhotos = [];
+    $budget = 6 * 1024 * 1024;
+    foreach (crmGetDocumentMedia((int)$doc['id']) as $ph) {
+        if (count($emailPhotos) >= 4 || $budget <= 0) break;
+        $p = __DIR__ . '/../' . ltrim((string)$ph['src'], '/');
+        if (!is_file($p)) continue;
+        $bin = (string)file_get_contents($p);
+        $b64 = base64_encode($bin);
+        if (strlen($b64) > $budget) continue;
+        $budget -= strlen($b64);
+        $mime = function_exists('mime_content_type') ? (string)mime_content_type($p) : 'image/jpeg';
+        $emailPhotos[] = ['id' => 0, 'src' => 'data:' . $mime . ';base64,' . $b64];
+    }
+    $sheet = crmRenderDocumentSheet($type, $doc['fields'] ?? [], $lang, 'static', (string)$doc['doc_number'], $date, (int)$doc['id'], $emailPhotos);
     $css = crmDocumentSheetCss();
     return '<!DOCTYPE html><html lang="' . e($lang) . '"><head><meta charset="UTF-8"><style>'
         . 'body { margin:0; padding:24px 12px; background:#eceff3; }' . $css

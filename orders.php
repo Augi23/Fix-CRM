@@ -36,6 +36,13 @@ if (isset($pdo)) {
             $sql_params[] = $branch_filter;
         }
 
+        // Filtr podle technika (?tech=<technician_id>)
+        $tech_filter = (int)($_GET['tech'] ?? 0);
+        if ($tech_filter > 0) {
+            $where_clauses[] = 'o.technician_id = ?';
+            $sql_params[] = $tech_filter;
+        }
+
         // FIX #1: exact ID match also via PDO parameter
         if ($search !== '') {
             $term = "%$search%";
@@ -323,18 +330,32 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
 $status_defs = getOrderStatusDefinitions();
 $branch_qs   = ($active_branch_filter > 0 && isBranchGlobalViewer()) ? '&branch_id=' . (int)$active_branch_filter : '';
 $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '';
+$tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
 ?>
-<div class="orders-status-filter d-flex flex-wrap gap-2 mb-3">
-    <a href="orders.php?<?php echo ltrim($branch_qs . $search_qs, '&'); ?>"
+<div class="orders-status-filter d-flex flex-wrap gap-2 mb-3 align-items-center">
+    <a href="orders.php?<?php echo ltrim($branch_qs . $search_qs . $tech_qs, '&'); ?>"
        class="crm-filter-chip<?php echo $filter_status ? '' : ' active'; ?>">
         <i class="fas fa-layer-group"></i> <?php echo __('all_orders'); ?>
     </a>
     <?php foreach ($status_defs as $st => $meta): if (!empty($meta['legacy'])) continue; ?>
-        <a href="orders.php?filter=<?php echo urlencode($st) . $branch_qs . $search_qs; ?>"
+        <a href="orders.php?filter=<?php echo urlencode($st) . $branch_qs . $search_qs . $tech_qs; ?>"
            class="crm-filter-chip chip--<?php echo e($meta['badge']); ?><?php echo ($filter_status === $st) ? ' active' : ''; ?>">
             <span class="chip-dot"></span><?php echo e(getOrderStatusLabel($st)); ?>
         </a>
     <?php endforeach; ?>
+    <?php /* Filtr podle technika — zachovává ostatní filtry (stav/pobočka/hledání) */ ?>
+    <form method="GET" class="ms-auto d-flex align-items-center gap-1">
+        <?php if ($filter_status): ?><input type="hidden" name="filter" value="<?php echo e($filter_status); ?>"><?php endif; ?>
+        <?php if ($active_branch_filter > 0): ?><input type="hidden" name="branch_id" value="<?php echo (int)$active_branch_filter; ?>"><?php endif; ?>
+        <?php if (!empty($_GET['search'])): ?><input type="hidden" name="search" value="<?php echo e((string)$_GET['search']); ?>"><?php endif; ?>
+        <i class="fas fa-user-gear text-white-75 me-1"></i>
+        <select name="tech" class="form-select form-select-sm" style="width:auto;min-width:170px;" onchange="this.form.submit()">
+            <option value="0"><?php echo __('all_technicians') !== 'all_technicians' ? __('all_technicians') : 'Všichni technici'; ?></option>
+            <?php foreach (getActiveTechnicians(true) as $__t): ?>
+                <option value="<?php echo (int)$__t['id']; ?>" <?php echo $tech_filter === (int)$__t['id'] ? 'selected' : ''; ?>><?php echo e((string)$__t['name']); ?></option>
+            <?php endforeach; ?>
+        </select>
+    </form>
 </div>
 
 

@@ -196,6 +196,41 @@ $pageTitle = __($cfg['title_key'], $lang);
           .finally(function () { b.disabled = false; });
     };
 
+    // Fotodokumentace: výběr fotek (na telefonu rovnou foťák) → uložit dokument
+    // → nahrát fotky → reload s vloženými fotkami. Křížek fotku smaže.
+    var photoInput = document.getElementById('docPhotoInput');
+    if (photoInput) {
+        photoInput.onchange = function () {
+            if (!photoInput.files || !photoInput.files.length) { return; }
+            save().then(function () {
+                var fd = new FormData();
+                fd.append('action', 'upload');
+                fd.append('document_id', docId);
+                fd.append('csrf_token', CSRF);
+                for (var i = 0; i < photoInput.files.length; i++) { fd.append('files[]', photoInput.files[i]); }
+                return fetch('api/document_media.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); });
+            }).then(function (j) {
+                if (!j.ok) { throw new Error(j.error || 'Nahrání selhalo'); }
+                window.location.reload();
+            }).catch(function (e) { toast('⚠️ ' + e.message, false); photoInput.value = ''; });
+        };
+    }
+    document.querySelectorAll('.photo-del').forEach(function (btn) {
+        btn.onclick = function () {
+            var fd = new FormData();
+            fd.append('action', 'delete');
+            fd.append('media_id', btn.dataset.mediaId);
+            fd.append('csrf_token', CSRF);
+            fetch('api/document_media.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    if (!j.ok) { throw new Error(j.error || 'Smazání selhalo'); }
+                    var item = btn.closest('.photo-item'); if (item) { item.remove(); }
+                }).catch(function (e) { toast('⚠️ ' + e.message, false); });
+        };
+    });
+
     // Přepnutí jazyka: nejdřív uložit (ať se nic neztratí), pak reload s ?lang=
     document.querySelectorAll('.lang-seg button').forEach(function (btn) {
         btn.onclick = function () {

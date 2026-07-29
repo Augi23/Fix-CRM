@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.17.0',
+        'date' => '2026-07-29',
+        'time' => '15:55',
+        'title' => 'Fotky ve výkupním listu · filtr dle technika · odebrána Fronta dnes',
+        'items' => [
+            'Výkupní list (i zástavní formulář) má novou sekci <b>Fotodokumentace</b>: tlačítkem <b>+</b> lze nahrát fotky nebo na telefonu <b>rovnou vyfotit</b> stav zařízení. Fotky se ukládají k dokumentu, zobrazují se v tisku i v e-mailové kopii (do e-mailu max 4 s rozpočtem velikosti) a dají se křížkem smazat.',
+            'Na <b>Nástěnce i v seznamu Zakázek</b> přibyl <b>filtr podle technika</b> (rozbalovací nabídka u filtrů) — kombinuje se se stavem, pobočkou i hledáním.',
+            'Z pravého sloupce Nástěnky byla <b>odebrána sekce „Fronta dnes"</b> — stejné informace jsou v hlavní tabulce.',
+        ],
+    ],
+    [
         'version' => '3.16.1',
         'date' => '2026-07-29',
         'time' => '15:20',

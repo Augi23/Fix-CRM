@@ -144,11 +144,25 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     }
                     ?>
                 </h5>
-                <?php if ($filter_status): ?>
-                    <a href="index.php" class="btn btn-sm btn-outline-secondary"><?php echo __('show_all'); ?></a>
-                <?php else: ?>
-                    <a href="orders.php" class="btn btn-sm btn-primary"><?php echo __('all_orders'); ?></a>
-                <?php endif; ?>
+                <div class="d-flex align-items-center gap-2">
+                    <?php /* Filtr podle technika (zachová případný stavový filtr) */ ?>
+                    <?php $dash_tech_filter = (int)($_GET['tech'] ?? 0); ?>
+                    <form method="GET" class="d-flex align-items-center gap-1">
+                        <?php if ($filter_status): ?><input type="hidden" name="filter" value="<?php echo e($filter_status); ?>"><?php endif; ?>
+                        <i class="fas fa-user-gear text-white-75 me-1"></i>
+                        <select name="tech" class="form-select form-select-sm" style="width:auto;min-width:160px;" onchange="this.form.submit()">
+                            <option value="0">Všichni technici</option>
+                            <?php foreach (getActiveTechnicians(true) as $__t): ?>
+                                <option value="<?php echo (int)$__t['id']; ?>" <?php echo $dash_tech_filter === (int)$__t['id'] ? 'selected' : ''; ?>><?php echo e((string)$__t['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </form>
+                    <?php if ($filter_status): ?>
+                        <a href="index.php" class="btn btn-sm btn-outline-secondary"><?php echo __('show_all'); ?></a>
+                    <?php else: ?>
+                        <a href="orders.php" class="btn btn-sm btn-primary"><?php echo __('all_orders'); ?></a>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -175,6 +189,12 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                             $params = [];
 
                             addOrderBranchScope($where_clauses, $params, 'o');
+
+                            // Filtr podle technika (?tech=<technician_id>)
+                            if ((int)($_GET['tech'] ?? 0) > 0) {
+                                $where_clauses[] = 'o.technician_id = ?';
+                                $params[] = (int)$_GET['tech'];
+                            }
 
                             // Same search fields as orders.php
                             if ($search !== '') {
@@ -457,37 +477,9 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             </div>
         </div>
 
-        <!-- Fronta dnes (design-system) -->
-        <?php
-        try {
-            $queue_today = $pdo->query("SELECT o.id, o.order_code, o.device_model, o.device_brand, o.status, c.first_name, c.last_name, t.name AS tech_name FROM orders o JOIN customers c ON o.customer_id=c.id LEFT JOIN technicians t ON o.technician_id=t.id WHERE o.status IN ($activeStatuses)" . $tech_cond_o . " ORDER BY o.priority='High' DESC, " . orderSortSql('o') . " LIMIT 6")->fetchAll();
-        } catch (Throwable $e) { $queue_today = []; }
-        ?>
-        <div class="crm-queue-card mb-4 mt-5">
-            <div class="crm-queue-head">
-                <div class="crm-queue-title"><?php echo __('queue_today'); ?></div>
-                <div class="crm-queue-date"><?php echo date('j. n. Y'); ?></div>
-            </div>
-            <div class="crm-queue-body">
-                <?php if (empty($queue_today)): ?>
-                    <div class="crm-queue-empty"><?php echo __('no_open_orders'); ?></div>
-                <?php else: foreach ($queue_today as $q):
-                    $init = strtoupper(mb_substr($q['tech_name'] ?? '?', 0, 2));
-                ?>
-                    <a href="view_order.php?id=<?php echo (int)$q['id']; ?>" class="crm-queue-item text-decoration-none">
-                        <div class="crm-queue-avatar"><?php echo e($init); ?></div>
-                        <div class="crm-queue-meta">
-                            <?php // v servisu je dominantní, CO se opravuje — zařízení nahoře, klient menší pod ním ?>
-                            <div class="crm-queue-name"><?php echo e(trim($q['device_brand'].' '.$q['device_model'])); ?></div>
-                            <div class="crm-queue-device"><?php echo e(trim($q['first_name'].' '.$q['last_name'])); ?></div>
-                        </div>
-                        <?php echo getStatusBadge($q['status']); ?>
-                    </a>
-                <?php endforeach; endif; ?>
-            </div>
-        </div>
-
-        <div class="card glass-card border-0 mb-4">
+        <?php /* Sekce „Fronta dnes" odstraněna 29.7.2026 na přání majitele —
+                 stejné informace jsou v hlavní tabulce Nástěnky. */ ?>
+        <div class="card glass-card border-0 mb-4 mt-5">
             <div class="card-header bg-transparent border-bottom-0">
                 <h5 class="mb-0"><?php echo __('quick_actions'); ?></h5>
             </div>
