@@ -1545,6 +1545,34 @@ function ensureProductsCrmColumns(): void {
     } catch (Throwable $e) { error_log('ensureProductsCrmColumns: ' . $e->getMessage()); }
 }
 
+/** Zapůjčeno / komisní prodej (29.7.2026): kus fyzicky není u nás, ale ve skladu zůstává.
+ *  Dřív se to řešilo nastavením stock_qty=0 → vypadalo to jako vyprodáno a nikdo nevěděl,
+ *  že kus existuje a u koho je. loan_at je NULL = kus je normálně u nás. */
+function ensureProductsLoanColumns(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $add = [
+            'loan_to'   => "ALTER TABLE products ADD COLUMN loan_to VARCHAR(120) NULL DEFAULT NULL",
+            'loan_at'   => "ALTER TABLE products ADD COLUMN loan_at DATETIME NULL DEFAULT NULL",
+            'loan_note' => "ALTER TABLE products ADD COLUMN loan_note VARCHAR(255) NULL DEFAULT NULL",
+            'loan_by'   => "ALTER TABLE products ADD COLUMN loan_by VARCHAR(120) NULL DEFAULT NULL",
+        ];
+        foreach ($add as $col => $ddl) {
+            if (!$pdo->query("SHOW COLUMNS FROM products LIKE '" . $col . "'")->fetch()) {
+                $pdo->exec($ddl);
+            }
+        }
+    } catch (Throwable $e) { error_log('ensureProductsLoanColumns: ' . $e->getMessage()); }
+}
+
+/** Je kus zapůjčený / v komisi? (řádek z products) */
+function productIsLoaned(array $p): bool {
+    return trim((string)($p['loan_at'] ?? '')) !== '';
+}
+
 /** Objednávky z vlastního e-shopu (applefix.online). E-shop čte sklad z feedu a při
  *  dokončení objednávky sem přes api/eshop_sale.php zapíše prodej → CRM odečte kus.
  *  order_ref je UNIQUE = idempotence (opakovaný webhook prodej neodečte dvakrát). */

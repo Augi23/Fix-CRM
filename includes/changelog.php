@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.9.3',
+        'date' => '2026-07-29',
+        'time' => '16:45',
+        'title' => 'Sklad Produkty: stav „Zapůjčeno/Komisní prod."',
+        'items' => [
+            'Když kus fyzicky není u nás (půjčený, u někoho v komisi), řešilo se to nastavením <b>skladem 0</b> — jenže pak vypadal stejně jako vyprodané zboží a z evidence nešlo poznat, že existuje a u koho je.',
+            'Sklad → Produkty má nově u každého kusu tlačítko <b>Zapůjčeno / komisní prodej</b>: zeptá se <b>komu</b> a na poznámku, kus označí fialovým odznakem <b>Zapůjčeno/Komisní prod.</b> se jménem a datem, a druhým klikem ho <b>vrátí do skladu</b>.',
+            'Zapůjčený kus <b>zůstává ve skladu i v přehledech</b>, ale <b>na e-shop se neposílá</b> — nikdo si ho neobjedná. Do počtu „skladem" a do hodnoty skladu se nepočítá; ve filtru Dostupnost je nová volba <b>Zapůjčeno/Komisní prod.</b> a v hlavičce odkaz s počtem.',
+        ],
+    ],
+    [
         'version' => '3.18.0',
         'date' => '2026-07-29',
         'time' => '16:10',

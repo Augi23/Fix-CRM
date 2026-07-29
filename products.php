@@ -31,7 +31,8 @@ if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
 $search = trim((string)($_GET['search'] ?? ''));
-$avail = (string)($_GET['avail'] ?? '');   // '' = vše, 'in' = skladem, 'out' = vyprodáno
+$avail = (string)($_GET['avail'] ?? '');   // '' = vše, 'in' = skladem, 'out' = vyprodáno, 'loan' = zapůjčené
+ensureProductsLoanColumns();
 
 $where_clauses = ['1=1'];
 $params = [];
@@ -39,8 +40,9 @@ if ($search !== '') {
     $where_clauses[] = "(title LIKE ? OR product_code LIKE ? OR model LIKE ?)";
     $params[] = "%$search%"; $params[] = "%$search%"; $params[] = "%$search%";
 }
-if ($avail === 'in')  { $where_clauses[] = "stock_qty > 0"; }
-if ($avail === 'out') { $where_clauses[] = "stock_qty <= 0"; }
+if ($avail === 'in')   { $where_clauses[] = "stock_qty > 0 AND loan_at IS NULL"; }
+if ($avail === 'out')  { $where_clauses[] = "stock_qty <= 0"; }
+if ($avail === 'loan') { $where_clauses[] = "loan_at IS NOT NULL"; }
 $where_sql = " WHERE " . implode(" AND ", $where_clauses);
 
 $total_stmt = $pdo->prepare("SELECT COUNT(*) FROM products" . $where_sql);
@@ -53,8 +55,9 @@ $stmt->execute($params);
 $products = $stmt->fetchAll();
 
 $stats = $pdo->query("SELECT COUNT(*) AS total,
-        SUM(CASE WHEN stock_qty > 0 THEN 1 ELSE 0 END) AS in_stock,
-        SUM(CASE WHEN stock_qty > 0 THEN price ELSE 0 END) AS stock_value
+        SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN 1 ELSE 0 END) AS in_stock,
+        SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN price ELSE 0 END) AS stock_value,
+        SUM(CASE WHEN loan_at IS NOT NULL THEN 1 ELSE 0 END) AS loaned
     FROM products")->fetch();
 
 // poslední import — řádky, které v něm nebyly, dostanou upozornění (nemažou se samy)
@@ -66,7 +69,8 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
         <h2 class="mb-0"><?php echo __('inventory'); ?></h2>
         <small class="text-muted">Produkty pro e-shop: <?php echo (int)($stats['total'] ?? 0); ?> ·
             skladem <?php echo (int)($stats['in_stock'] ?? 0); ?> ·
-            hodnota <?php echo formatMoney((float)($stats['stock_value'] ?? 0)); ?></small>
+            hodnota <?php echo formatMoney((float)($stats['stock_value'] ?? 0)); ?><?php
+            if ((int)($stats['loaned'] ?? 0) > 0): ?> · <a href="products.php?avail=loan" style="color:#A78BFA">zapůjčeno <?php echo (int)$stats['loaned']; ?></a><?php endif; ?></small>
     </div>
     <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
         <button class="btn btn-outline-info" data-bs-toggle="collapse" data-bs-target="#filterPanel">
@@ -105,6 +109,36 @@ try {
     )->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) { $__histRows = []; }
 ?>
+
+<!-- Zapůjčeno / komisní prodej: kus fyzicky není u nás, ale ve skladu zůstává -->
+<div class="modal fade" id="productLoanModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title"><i class="fas fa-hand-holding-heart me-2" style="color:#8B5CF6"></i>Zapůjčeno / komisní prodej</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small text-white-75 mb-3" id="loanProductTitle"></div>
+        <input type="hidden" id="loanProductId">
+        <div class="mb-3">
+          <label class="form-label small">Komu <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="loanTo" placeholder="např. Štěpán Říčan" maxlength="120">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">Poznámka</label>
+          <input type="text" class="form-control" id="loanNote" placeholder="kontakt, do kdy, dohoda…" maxlength="255">
+        </div>
+        <div class="small text-white-50">Kus zůstane ve skladu i v přehledech, ale na e-shop se posílat nebude.</div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zrušit</button>
+        <button type="button" class="btn text-white" style="background:#8B5CF6" id="loanSaveBtn">Označit jako zapůjčené</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="stockHistoryModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content border-secondary text-white">
@@ -159,6 +193,7 @@ try {
                     <option value="" <?php echo $avail === '' ? 'selected' : ''; ?>>Vše</option>
                     <option value="in" <?php echo $avail === 'in' ? 'selected' : ''; ?>>Skladem</option>
                     <option value="out" <?php echo $avail === 'out' ? 'selected' : ''; ?>>Vyprodáno</option>
+                    <option value="loan" <?php echo $avail === 'loan' ? 'selected' : ''; ?>>Zapůjčeno/Komisní prod.</option>
                 </select>
             </div>
             <div class="col-md-3 d-flex align-items-end gap-2">
@@ -241,7 +276,10 @@ try {
                                     </td>
                                     <td class="fw-bold text-primary"><?php echo formatMoney((float)$p['price']); ?></td>
                                     <td>
-                                        <?php if ((int)$p['stock_qty'] > 0): ?>
+                                        <?php if (productIsLoaned($p)): ?>
+                                            <span class="badge" style="background:#8B5CF6" title="<?php echo e(($p['loan_to'] ?? '') . (!empty($p['loan_at']) ? ' · od ' . date('j.n.Y', strtotime($p['loan_at'])) : '') . (!empty($p['loan_note']) ? ' · ' . $p['loan_note'] : '')); ?>">Zapůjčeno/Komisní prod.</span>
+                                            <div class="small text-white-75 mt-1"><i class="fas fa-user-tag me-1"></i><?php echo e($p['loan_to'] ?? ''); ?></div>
+                                        <?php elseif ((int)$p['stock_qty'] > 0): ?>
                                             <span class="badge bg-success">Skladem</span>
                                         <?php elseif (!empty($p['pos_sold_at'])): ?>
                                             <span class="badge bg-warning text-dark" title="Prodáno přes Pokladnu — CRM ho automaticky drží vyprodaný, i kdyby ho soubor z appky ještě hlásil skladem">Prodáno na kase</span>
@@ -266,6 +304,7 @@ try {
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm">
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-810W)"><i class="fas fa-tag"></i></button>
+                                            <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vrátit do skladu' : 'Zapůjčeno / komisní prodej'; ?>"><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i></button>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>
                                             <button type="button" class="btn btn-white border text-danger product-delete-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>
                                         </div>
@@ -1095,6 +1134,37 @@ $(document).on('click', '.product-delete-btn', function () {
             showAlert(msg + ' — obnov stránku (⌘R) a zkus to znovu.');
         });
     });
+});
+
+// Zapůjčeno / komisní prodej — zapnutí přes modal, vrácení jedním klikem
+$(document).on('click', '.product-loan-btn', function () {
+    var d = this.dataset;
+    if (d.loaned === '1') {
+        showConfirm('Vrátit „' + escHtml(d.title || '') + '" zpět do skladu? Půjde zase na e-shop.', function () {
+            $.post('api/product_loan.php', { id: d.id, action: 'return', csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>' }, function (res) {
+                if (res.success) { location.reload(); } else { showAlert(res.message || 'Nepovedlo se'); }
+            });
+        });
+        return;
+    }
+    document.getElementById('loanProductId').value = d.id;
+    document.getElementById('loanProductTitle').textContent = d.title || '';
+    document.getElementById('loanTo').value = d.to || '';
+    document.getElementById('loanNote').value = d.note || '';
+    new bootstrap.Modal(document.getElementById('productLoanModal')).show();
+});
+$(document).on('click', '#loanSaveBtn', function () {
+    var to = document.getElementById('loanTo').value.trim();
+    if (!to) { showAlert('Vyplň, komu je kus zapůjčen.'); return; }
+    var btn = this; btn.disabled = true;
+    $.post('api/product_loan.php', {
+        id: document.getElementById('loanProductId').value, action: 'lend', loan_to: to,
+        loan_note: document.getElementById('loanNote').value.trim(),
+        csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>'
+    }, function (res) {
+        if (res.success) { location.reload(); }
+        else { btn.disabled = false; showAlert(res.message || 'Nepovedlo se'); }
+    }).fail(function () { btn.disabled = false; showAlert('Uložení selhalo — obnov stránku a zkus to znovu.'); });
 });
 <?php endif; ?>
 </script>
