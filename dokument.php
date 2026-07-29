@@ -115,6 +115,35 @@ $pageTitle = __($cfg['title_key'], $lang);
         return out;
     }
 
+    // ── AUTO-ULOŽENÍ ROZPRACOVANÉHO DOKUMENTU (draft) ─────────────────────────
+    // Rozepsaná data se průběžně ukládají do prohlížeče (localStorage). Když se
+    // formulář omylem zavře, po znovuotevření se OBNOVÍ. Smaže se TEPRVE až je
+    // dokument podepsán klientem (status==='done' níže) — ne při pouhém uložení.
+    function draftKey() { return 'afx_draft:doc:' + DOC_TYPE + ':' + (docId > 0 ? docId : 'new'); }
+    function saveDraft() {
+        try {
+            var data = collect();
+            var any = Object.keys(data).some(function (k) { return String(data[k] || '').trim() !== ''; });
+            if (any) { localStorage.setItem(draftKey(), JSON.stringify({ t: Date.now(), d: data })); }
+            else { localStorage.removeItem(draftKey()); }
+        } catch (e) {}
+    }
+    function restoreDraft() {
+        try {
+            var raw = localStorage.getItem(draftKey());
+            if (!raw) { return; }
+            var obj = JSON.parse(raw); var data = obj && obj.d; if (!data) { return; }
+            var changed = 0;
+            document.querySelectorAll('#docForm .dinput').forEach(function (el) {
+                if (el.name && Object.prototype.hasOwnProperty.call(data, el.name) && el.value !== data[el.name]) {
+                    el.value = data[el.name]; changed++;
+                }
+            });
+            if (changed) { toast('↩︎ Obnoveny rozpracované údaje (neuložené).', true); }
+        } catch (e) {}
+    }
+    function clearDraft() { try { localStorage.removeItem(draftKey()); } catch (e) {} }
+
     function save() {
         var fd = new FormData();
         fd.append('type', DOC_TYPE);
@@ -126,6 +155,15 @@ $pageTitle = __($cfg['title_key'], $lang);
             .then(function (r) { return r.json(); })
             .then(function (j) {
                 if (!j.ok) { throw new Error(j.error || 'Uložení selhalo'); }
+                // draft přesunout z klíče ':new' pod přidělené ID (data se NEmažou — jen po podpisu)
+                try {
+                    var oldKey = 'afx_draft:doc:' + DOC_TYPE + ':' + (docId > 0 ? docId : 'new');
+                    var newKey = 'afx_draft:doc:' + DOC_TYPE + ':' + j.id;
+                    if (oldKey !== newKey) {
+                        var v = localStorage.getItem(oldKey);
+                        if (v !== null) { localStorage.setItem(newKey, v); localStorage.removeItem(oldKey); }
+                    }
+                } catch (e) {}
                 docId = j.id;
                 var codeEl = document.querySelector('.doc-code');
                 if (codeEl) { codeEl.textContent = j.doc_number; }
@@ -188,7 +226,7 @@ $pageTitle = __($cfg['title_key'], $lang);
                 fetch('api/request_signature.php?check=' + j.request_id, { credentials: 'same-origin' })
                     .then(function (r) { return r.json(); })
                     .then(function (s) {
-                        if (s.status === 'done') { clearInterval(check); window.location.reload(); }
+                        if (s.status === 'done') { clearInterval(check); clearDraft(); window.location.reload(); }
                         if (s.status === 'cancelled' || s.status === 'missing') { clearInterval(check); }
                     }).catch(function () {});
             }, 3000);
@@ -246,6 +284,13 @@ $pageTitle = __($cfg['title_key'], $lang);
             }).catch(function (e) { toast('⚠️ ' + e.message, false); btn.disabled = false; });
         };
     });
+
+    // Draft: po načtení obnovit neuložené údaje + průběžně ukládat při psaní.
+    restoreDraft();
+    (function () {
+        var dt, f = document.getElementById('docForm');
+        if (f) { f.addEventListener('input', function () { clearTimeout(dt); dt = setTimeout(saveDraft, 400); }); }
+    })();
 })();
 </script>
 </body>

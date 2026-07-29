@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.18.0',
+        'date' => '2026-07-29',
+        'time' => '16:10',
+        'title' => 'Rozpracované dokumenty se neztratí — auto-uložení konceptu do podpisu',
+        'items' => [
+            'Vyplňovací dokument (výkupní list / zástavní formulář) se nově <b>průběžně ukládá do prohlížeče</b>. Když formulář omylem zavřete, po znovuotevření se <b>rozepsané údaje obnoví</b> (hláška „Obnoveny rozpracované údaje").',
+            'Koncept se <b>smaže teprve po podpisu klientem</b> (dokončení dokumentu) — ne při pouhém uložení, tisku ani přepnutí jazyka. Do té doby jsou data v bezpečí.',
+            'Draft je vázaný na konkrétní dokument (typ + číslo), takže se rozpracovaný výkup neplete se zástavou.',
+        ],
+    ],
+    [
         'version' => '3.17.0',
         'date' => '2026-07-29',
         'time' => '15:55',
