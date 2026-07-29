@@ -34,13 +34,33 @@ $newLabels = ['vykup' => 'Nový výkupní list', 'zastava' => 'Nový zástavní 
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <h2 class="mb-0 text-white"><i class="fas fa-file-signature me-3 text-primary"></i>Dokumenty</h2>
-    <?php /* Obě tlačítka vždy viditelná — zaměstnanec nemusí hledat správnou podzáložku. */ ?>
+    <?php /* Obě tlačítka vždy viditelná a graficky STEJNÁ — Apple liquid glass
+             buňka (tokeny .afx-cell.act-blue z docku, + vlastní backdrop blur,
+             protože tady nestojí na skle docku). */ ?>
+    <style>
+        .afx-glassbtn {
+            display: inline-flex; align-items: center; gap: 9px;
+            padding: 11px 18px; border-radius: 15px; text-decoration: none;
+            font-weight: 600; font-size: 14px; white-space: nowrap;
+            color: #5fd2ff; text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 12px rgba(95,210,255,.5);
+            background: rgba(0,163,255,.16);
+            box-shadow: inset 0 0 0 1px rgba(0,163,255,.24);
+            backdrop-filter: blur(16px) saturate(150%);
+            -webkit-backdrop-filter: blur(16px) saturate(150%);
+            transition: background .16s, color .16s, transform .16s, box-shadow .16s;
+        }
+        .afx-glassbtn:hover {
+            background: rgba(0,163,255,.26); color: #aee6ff; transform: translateY(-1px);
+            box-shadow: inset 0 0 0 1px rgba(0,163,255,.45), 0 0 16px rgba(0,163,255,.28);
+        }
+        .afx-glassbtn i { font-size: 14px; opacity: .9; }
+    </style>
     <div class="d-flex gap-2 flex-wrap">
-        <a class="btn <?php echo $tab === 'vykup' ? 'btn-primary' : 'btn-outline-primary'; ?>" href="dokument.php?type=vykup">
-            <i class="fas fa-plus me-2"></i>Nový výkupní list
+        <a class="afx-glassbtn" href="dokument.php?type=vykup">
+            <i class="fas fa-plus"></i>Nový výkupní list
         </a>
-        <a class="btn <?php echo $tab === 'zastava' ? 'btn-primary' : 'btn-outline-primary'; ?>" href="dokument.php?type=zastava">
-            <i class="fas fa-plus me-2"></i>Nový zástavní formulář
+        <a class="afx-glassbtn" href="dokument.php?type=zastava">
+            <i class="fas fa-plus"></i>Nový zástavní formulář
         </a>
     </div>
 </div>
