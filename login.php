@@ -406,7 +406,7 @@ if (!empty($_POST['ajax'])) {
    efektu = střed obrazovky. Respektuje prefers-reduced-motion. */
 var afxGreetWave = (function () {
     var cv = null, ctx = null, raf = null, t0 = 0, W = 0, H = 0, dpr = 1;
-    var TRAVEL = 2.0, PAUSE = 0.2, CYCLE = TRAVEL + PAUSE;   // svižnější vlna, ať se stihne víc pulzů
+    var TRAVEL = 2.0, PAUSE = 0.1, CYCLE = TRAVEL + PAUSE;   // svižnější vlna, ať se stihne víc pulzů
     var STOPS = [
         [0.00, [ 12,   5,   0]],
         [0.30, [140,  58,   8]],
