@@ -29,6 +29,33 @@ if (php_sapi_name() !== 'cli') {
  *  (neexistuje) · 1022/1826 duplicitní klíč · 1913 duplicitní constraint */
 const MIGRATION_BENIGN_CODES = [1050, 1060, 1061, 1091, 1022, 1826, 1913];
 
+/** Rozdělí SQL soubor na příkazy. Naivní explode(';') nestačí — středník se běžně
+ *  vyskytuje v komentářích (české popisy) i v řetězcích a rozsekal by příkaz vejpůl.
+ *  Proto se prochází znak po znaku a hlídá se, jestli zrovna nejsme v komentáři
+ *  nebo v uvozovkách. (29.7.2026) */
+function migration_split(string $sql): array {
+    $out = []; $buf = ''; $n = strlen($sql);
+    $inS = false; $inD = false; $inB = false;      // ' " `
+    $inLine = false; $inBlock = false;             // -- #   /* */
+    for ($i = 0; $i < $n; $i++) {
+        $c = $sql[$i]; $next = $i + 1 < $n ? $sql[$i + 1] : '';
+        if ($inLine)  { if ($c === "\n") { $inLine = false; $buf .= $c; } continue; }
+        if ($inBlock) { if ($c === '*' && $next === '/') { $inBlock = false; $i++; } continue; }
+        if (!$inS && !$inD && !$inB) {
+            if ($c === '-' && $next === '-') { $inLine = true; continue; }
+            if ($c === '#')                  { $inLine = true; continue; }
+            if ($c === '/' && $next === '*') { $inBlock = true; $i++; continue; }
+            if ($c === ';') { $t = trim($buf); if ($t !== '') { $out[] = $t; } $buf = ''; continue; }
+        }
+        if ($c === "'" && !$inD && !$inB) { $inS = !$inS; }
+        elseif ($c === '"' && !$inS && !$inB) { $inD = !$inD; }
+        elseif ($c === '`' && !$inS && !$inD) { $inB = !$inB; }
+        $buf .= $c;
+    }
+    $t = trim($buf); if ($t !== '') { $out[] = $t; }
+    return $out;
+}
+
 // ── Bootstrap: ensure migrations table exists ─────────────────────────────────
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS `migrations` (
@@ -63,10 +90,7 @@ foreach ($files as $file) {
     $sql = file_get_contents($file);
     $already = 0;
     try {
-        // Split on semicolons so multi-statement files work
-        foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
-            // samotný komentář není příkaz
-            if ($stmt === '' || preg_match('/^(--|#)/', $stmt)) { continue; }
+        foreach (migration_split($sql) as $stmt) {
             try {
                 $pdo->exec($stmt);
             } catch (PDOException $e) {
