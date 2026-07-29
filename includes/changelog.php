@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.14.0',
+        'date' => '2026-07-29',
+        'time' => '10:45',
+        'title' => 'Uvítací animace při přihlášení: pulzující vlna teček (styl Xiaomi boost)',
+        'items' => [
+            'Po přihlášení běží místo dosavadního spinneru <b>pole jantarových teček přes celou obrazovku</b>: široká zlato-oranžová vlna projede ze středu k okrajům, pak krátká černá pauza (0,5 s) a další puls — <b>opakuje se, dokud tě to nepustí do dashboardu</b>.',
+            'Efekt je <b>responzivní</b> (iPhone, tablet i PC, zvládá otočení displeje), střed vlny je vždy na středu obrazovky. Předloha: rozjezdová animace palubovky Xiaomi.',
+            'Animace se ukazuje při přihlášení s <b>uvítací hláškou</b> (uploads/greetings). Respektuje systémové „omezit pohyb" — místo animace ukáže statický snímek vlny.',
+        ],
+    ],
+    [
         'version' => '3.13.0',
         'date' => '2026-07-27',
         'time' => '14:45',
