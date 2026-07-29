@@ -6,7 +6,17 @@
  */
 return [
     [
-        'version' => '3.9.3',
+        'version' => '3.19.1',
+        'date' => '2026-07-29',
+        'time' => '17:05',
+        'title' => 'Výkupní listy: číselná řada navazuje na papírovou (202600001…)',
+        'items' => [
+            'Nové výkupní listy dostávají čísla <b>navazující na dosavadní papírovou řadu</b>: první dokument v CRM = <b>202600001</b>, další 202600002 atd. (Zástavní formuláře zůstávají v řadě ZF-0001.)',
+            'Opraveno přečíslování v Historii úprav — záznam „Sklad Produkty: Zapůjčeno/Komisní prod." měl omylem verzi 3.9.3, správně je <b>3.19.0</b>; dlaždice verzí kvůli tomu ukazovaly starší číslo.',
+        ],
+    ],
+    [
+        'version' => '3.19.0',
         'date' => '2026-07-29',
         'time' => '16:45',
         'title' => 'Sklad Produkty: stav „Zapůjčeno/Komisní prod."',

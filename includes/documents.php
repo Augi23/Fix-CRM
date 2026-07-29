@@ -41,6 +41,9 @@ function crmDocTypes(): array {
     return [
         'vykup' => [
             'prefix'     => 'VL',
+            // Číselná řada navazuje na papírové výkupní listy: 202600001, 202600002, …
+            'numbering'    => 'plain',
+            'first_number' => 202600001,
             'title_key'  => 'buyout_title',            // „Výkupní list / Kupní smlouva"
             'kicker_key' => 'cdoc_vykup_kicker',
             'sections' => [
@@ -122,6 +125,10 @@ function crmNextDocNumber(string $type): string {
         $st->execute([$type]);
         $max = (int)$st->fetchColumn();
     } catch (Throwable $e) { /* první dokument */ }
+    // „plain" = holé číslo navazující na papírovou řadu (výkupní listy: 202600001…)
+    if (($cfg['numbering'] ?? '') === 'plain') {
+        return (string)max((int)($cfg['first_number'] ?? 1), $max + 1);
+    }
     return sprintf('%s-%04d', $cfg['prefix'], $max + 1);
 }
 
