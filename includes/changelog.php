@@ -6,7 +6,7 @@
  */
 return [
     [
-        'version' => '3.9.5',
+        'version' => '3.19.3',
         'date' => '2026-07-29',
         'time' => '17:20',
         'title' => 'Rozpracované formuláře se neztratí — auto-uložení konceptu i u zakázek, klientů a skladu',
@@ -17,7 +17,7 @@ return [
         ],
     ],
     [
-        'version' => '3.9.4',
+        'version' => '3.19.2',
         'date' => '2026-07-29',
         'time' => '17:10',
         'title' => 'Migrace se už nezaseknou na „sloupec už existuje"',
