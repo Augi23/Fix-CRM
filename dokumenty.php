@@ -34,9 +34,15 @@ $newLabels = ['vykup' => 'Nový výkupní list', 'zastava' => 'Nový zástavní 
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <h2 class="mb-0 text-white"><i class="fas fa-file-signature me-3 text-primary"></i>Dokumenty</h2>
-    <a class="btn btn-primary" href="dokument.php?type=<?php echo e($tab); ?>">
-        <i class="fas fa-plus me-2"></i><?php echo e($newLabels[$tab] ?? 'Nový dokument'); ?>
-    </a>
+    <?php /* Obě tlačítka vždy viditelná — zaměstnanec nemusí hledat správnou podzáložku. */ ?>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn <?php echo $tab === 'vykup' ? 'btn-primary' : 'btn-outline-primary'; ?>" href="dokument.php?type=vykup">
+            <i class="fas fa-plus me-2"></i>Nový výkupní list
+        </a>
+        <a class="btn <?php echo $tab === 'zastava' ? 'btn-primary' : 'btn-outline-primary'; ?>" href="dokument.php?type=zastava">
+            <i class="fas fa-plus me-2"></i>Nový zástavní formulář
+        </a>
+    </div>
 </div>
 
 <ul class="nav nav-pills mb-3">
