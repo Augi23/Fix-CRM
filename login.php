@@ -395,42 +395,110 @@ if (!empty($_POST['ajax'])) {
     </div>
 </div>
 
-<div id="greetOverlay" style="display:none; position:fixed; inset:0; z-index:99999; backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%); background: rgba(8,8,12,0.55); align-items:center; justify-content:center;">
-    <div class="apple-spinner" role="status" aria-label="Přihlašování">
-        <div style="transform: rotate(0deg) translate(0, -26px); animation-delay: -1.0000s;"></div>
-        <div style="transform: rotate(30deg) translate(0, -26px); animation-delay: -0.9167s;"></div>
-        <div style="transform: rotate(60deg) translate(0, -26px); animation-delay: -0.8333s;"></div>
-        <div style="transform: rotate(90deg) translate(0, -26px); animation-delay: -0.7500s;"></div>
-        <div style="transform: rotate(120deg) translate(0, -26px); animation-delay: -0.6667s;"></div>
-        <div style="transform: rotate(150deg) translate(0, -26px); animation-delay: -0.5833s;"></div>
-        <div style="transform: rotate(180deg) translate(0, -26px); animation-delay: -0.5000s;"></div>
-        <div style="transform: rotate(210deg) translate(0, -26px); animation-delay: -0.4167s;"></div>
-        <div style="transform: rotate(240deg) translate(0, -26px); animation-delay: -0.3333s;"></div>
-        <div style="transform: rotate(270deg) translate(0, -26px); animation-delay: -0.2500s;"></div>
-        <div style="transform: rotate(300deg) translate(0, -26px); animation-delay: -0.1667s;"></div>
-        <div style="transform: rotate(330deg) translate(0, -26px); animation-delay: -0.0833s;"></div>
-    </div>
+<div id="greetOverlay" style="display:none; position:fixed; inset:0; z-index:99999; background:#000;">
+    <canvas id="greetWave" role="status" aria-label="Přihlašování" style="position:absolute; inset:0; width:100%; height:100%; display:block;"></canvas>
 </div>
-<style>
-.apple-spinner { position: relative; width: 72px; height: 72px; }
-.apple-spinner div {
-    position: absolute;
-    left: 50%; top: 50%;
-    width: 6px; height: 18px;
-    margin: -9px 0 0 -3px;
-    border-radius: 3px;
-    background: #fff;
-    opacity: 0.25;
-    animation: appleSpinnerFade 1s linear infinite;
-}
-@keyframes appleSpinnerFade {
-    0% { opacity: 1; }
-    100% { opacity: 0.25; }
-}
-@media (prefers-reduced-motion: reduce) {
-    .apple-spinner div { animation: none; opacity: 0.7; }
-}
-</style>
+<script>
+/* Uvítací loading „Xiaomi boost": pole jantarových teček přes CELOU obrazovku,
+   široká zlato-oranžová vlna projede ze středu k okrajům, pak černá pauza
+   stejně dlouhá jako vlna a další puls. Opakuje se, dokud neproběhne
+   přihlášení (redirect do dashboardu overlay ukončí). Responzivní, střed
+   efektu = střed obrazovky. Respektuje prefers-reduced-motion. */
+var afxGreetWave = (function () {
+    var cv = null, ctx = null, raf = null, t0 = 0, W = 0, H = 0, dpr = 1;
+    var TRAVEL = 3.0, PAUSE = 3.0, CYCLE = TRAVEL + PAUSE;   // pauza = délka jedné vlny
+    var STOPS = [
+        [0.00, [ 12,   5,   0]],
+        [0.30, [140,  58,   8]],
+        [0.58, [235, 122,  20]],
+        [0.82, [255, 176,  52]],
+        [1.00, [255, 208, 104]]
+    ];
+    function ramp(b) {
+        b = b < 0 ? 0 : b > 1 ? 1 : b;
+        for (var i = 1; i < STOPS.length; i++) {
+            if (b <= STOPS[i][0]) {
+                var a = STOPS[i - 1], c = STOPS[i];
+                var f = (b - a[0]) / ((c[0] - a[0]) || 1);
+                return [
+                    (a[1][0] + (c[1][0] - a[1][0]) * f) | 0,
+                    (a[1][1] + (c[1][1] - a[1][1]) * f) | 0,
+                    (a[1][2] + (c[1][2] - a[1][2]) * f) | 0
+                ];
+            }
+        }
+        return STOPS[STOPS.length - 1][1];
+    }
+    function smooth(a, b, x) { var t = (x - a) / (b - a); if (t < 0) t = 0; if (t > 1) t = 1; return t * t * (3 - 2 * t); }
+    function resize() {
+        if (!cv) return;
+        dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+        var r = cv.getBoundingClientRect();
+        W = Math.round(r.width); H = Math.round(r.height);
+        cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function draw(t) {
+        var tc = t % CYCLE;
+        var p = tc / TRAVEL;                       // p > 1 → černá pauza
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+        if (p > 1) return;
+        var pe = (p < 0.5) ? (2 * p * p) : (1 - Math.pow(-2 * p + 2, 2) / 2);  // easeInOutQuad — plynulý nástup
+        var fade = smooth(0, 0.10, p) * (1 - smooth(0.92, 1, p));              // měkký začátek i konec pulsu
+        if (fade <= 0) return;
+        var cx = W / 2, cy = H / 2;
+        var M = Math.min(W, H);
+        var GAP = Math.max(12, M / 30);            // rozteč mřížky (responzivní)
+        var rHole = M * 0.10;                      // tmavý střed
+        var Rmax = Math.sqrt(cx * cx + cy * cy);   // až do rohů obrazovky
+        var wF = M * 0.055, wT = M * 0.24;         // ostré čelo + široký zářící ohon
+        var front = pe * (Rmax + wT * 2.2);        // vlna celá odjede za okraj
+        for (var y = GAP / 2; y < H + GAP / 2; y += GAP) {
+            for (var x = GAP / 2; x < W + GAP / 2; x += GAP) {
+                var dx = x - cx, dy = y - cy;
+                var r = Math.sqrt(dx * dx + dy * dy);
+                var d = r - front;
+                var b = (d > 0)
+                    ? Math.exp(-(d * d) / (2 * wF * wF))    // před vlnou: černá
+                    : Math.exp(-(d * d) / (2 * wT * wT));   // za vlnou: dohasne do černé
+                b *= smooth(rHole * 0.8, rHole * 1.7, r) * fade;
+                if (b < 0.025) continue;                    // mimo vlnu se nekreslí nic
+                if (b > 1) b = 1;
+                var col = ramp(b);
+                var rad = 0.8 + (GAP * 0.40) * b;           // tečka roste s jasem vlny
+                ctx.globalAlpha = Math.min(1, 0.10 + 0.92 * b);
+                ctx.fillStyle = 'rgb(' + col[0] + ',' + col[1] + ',' + col[2] + ')';
+                ctx.beginPath();
+                ctx.arc(x, y, rad, 0, 6.2832);
+                ctx.fill();
+            }
+        }
+        ctx.globalAlpha = 1;
+    }
+    function frame(now) {
+        if (!t0) t0 = now;
+        draw((now - t0) / 1000);
+        raf = requestAnimationFrame(frame);        // pulzuje, dokud stránka nepřejde do CRM
+    }
+    function start() {
+        cv = document.getElementById('greetWave');
+        if (!cv || !cv.getContext) return;
+        ctx = cv.getContext('2d');
+        resize();
+        window.addEventListener('resize', resize);
+        window.addEventListener('orientationchange', resize);
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            draw(TRAVEL * 0.55);                   // statický snímek vlny
+            return;
+        }
+        t0 = 0;
+        raf = requestAnimationFrame(frame);
+    }
+    return { start: start };
+})();
+</script>
 <script>
 (function () {
     var form = document.querySelector('.login-form');
@@ -459,7 +527,8 @@ if (!empty($_POST['ajax'])) {
                 var go = function () { window.location.href = d.redirect; };
                 if (d.greeting) {
                     var ov = document.getElementById('greetOverlay');
-                    ov.style.display = 'flex';
+                    ov.style.display = 'block';
+                    if (window.afxGreetWave) { afxGreetWave.start(); }
                     var done = false;
                     var finish = function () { if (!done) { done = true; go(); } };
                     try {
