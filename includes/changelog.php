@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.16.1',
+        'date' => '2026-07-29',
+        'time' => '15:20',
+        'title' => 'Dokumenty: podpis na tabletu jako u zakázkového listu + větší nadpisy',
+        'items' => [
+            'V dokumentu přibylo tlačítko <b>„Podepsat na tabletu"</b> — funguje stejně jako u zakázkového listu: požadavek odejde na podpisovou stanici (iPad), klientovi se ukáže dokument v jeho jazyce, podepíše se prstem a <b>podpis se vloží nad podpisovou linku</b> („podepsáno elektronicky" + čas). Stránka se po podpisu sama obnoví.',
+            'Podpis je vidět i v tisku a v e-mailové kopii. V seznamu Dokumentů mají podepsané dokumenty zelenou značku <b>„podepsáno"</b> a nové oko-tlačítko otevře <b>náhled dokumentu i s podpisem</b>.',
+            'Právní ustanovení (§ texty z původních formulářů) jsou součástí dokumentu nad podpisy — nově viditelné i na obrazovce, ne až při tisku.',
+            'Vzhled: hlavní nadpis dokumentu zvětšen na úroveň loga, modré podnadpisy sekcí o polovinu větší.',
+        ],
+    ],
+    [
         'version' => '3.16.0',
         'date' => '2026-07-29',
         'time' => '14:49',

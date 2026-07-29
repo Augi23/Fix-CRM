@@ -81,12 +81,13 @@ $pageTitle = __($cfg['title_key'], $lang);
     <div class="tb-actions">
         <button type="button" class="tb-btn" id="btnSave"><i class="fas fa-floppy-disk me-1"></i> Uložit</button>
         <button type="button" class="tb-btn" id="btnPrint"><i class="fas fa-print me-1"></i> Tisk</button>
-        <button type="button" class="tb-btn tb-btn--primary" id="btnEmail"><i class="fas fa-envelope me-1"></i> Odeslat e-mailem</button>
+        <button type="button" class="tb-btn" id="btnEmail"><i class="fas fa-envelope me-1"></i> Odeslat e-mailem</button>
+        <button type="button" class="tb-btn tb-btn--primary" id="btnSign"><i class="fas fa-pen-nib me-1"></i> Podepsat na tabletu</button>
     </div>
 </div>
 
 <form id="docForm">
-<?php echo crmRenderDocumentSheet($type, $values, $lang, 'form', $docNumber, $docDate); ?>
+<?php echo crmRenderDocumentSheet($type, $values, $lang, 'form', $docNumber, $docDate, $docId); ?>
 </form>
 
 <div id="docToast"></div>
@@ -163,6 +164,34 @@ $pageTitle = __($cfg['title_key'], $lang);
         }).then(function (j) {
             if (!j.ok) { throw new Error(j.error || 'Odeslání selhalo'); }
             toast('✉️ Kopie odeslána na ' + j.to, true);
+        }).catch(function (e) { toast('⚠️ ' + e.message, false); })
+          .finally(function () { b.disabled = false; });
+    };
+
+    // Podpis na tabletu: uložit → poslat požadavek na podpisovou stanici.
+    // Po podpisu klientem se podpis vloží do dokumentu (stránka ho ukáže po reloadu).
+    document.getElementById('btnSign').onclick = function () {
+        var b = this; b.disabled = true;
+        save().then(function () {
+            var fd = new FormData();
+            fd.append('action', 'create');
+            fd.append('document_id', docId);
+            fd.append('sig_type', 'dokument');
+            fd.append('csrf_token', CSRF);
+            return fetch('api/request_signature.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); });
+        }).then(function (j) {
+            if (!j.ok) { throw new Error(j.error || 'Odeslání na tablet selhalo'); }
+            toast('✍️ Odesláno na podpisový tablet — po podpisu klienta se podpis vloží do dokumentu.', true);
+            // až klient podepíše, načíst dokument s podpisem
+            var check = setInterval(function () {
+                fetch('api/request_signature.php?check=' + j.request_id, { credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (s) {
+                        if (s.status === 'done') { clearInterval(check); window.location.reload(); }
+                        if (s.status === 'cancelled' || s.status === 'missing') { clearInterval(check); }
+                    }).catch(function () {});
+            }, 3000);
         }).catch(function (e) { toast('⚠️ ' + e.message, false); })
           .finally(function () { b.disabled = false; });
     };

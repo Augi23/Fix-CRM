@@ -187,14 +187,17 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
         var t = afxSignL(req.lang);
         try { document.documentElement.lang = req.lang || SIGN_DEFAULT_LANG; } catch (e) {}
         document.getElementById('docViewTitle').textContent =
-            req.complaint_id ? t.doc_complaint : (req.sig_type === 'vydej' ? t.doc_pickup : t.doc_reception);
+            req.document_id ? (req.station_title || 'Dokument')
+                : (req.complaint_id ? t.doc_complaint : (req.sig_type === 'vydej' ? t.doc_pickup : t.doc_reception));
         var cBtn = document.getElementById('docViewCancelBtn'); if (cBtn) cBtn.textContent = t.not_now;
         var sLbl = document.getElementById('docViewSignLbl'); if (sLbl) sLbl.textContent = t.sign;
         document.getElementById('docViewSub').textContent =
             req.order_code + ' · ' + req.customer + ' · ' + req.device + (req.amount ? ' · ' + req.amount : '');
-        document.getElementById('docViewFrame').src = req.complaint_id
-            ? 'print_complaint.php?id=' + encodeURIComponent(req.complaint_id)
-            : 'print_order.php?id=' + encodeURIComponent(req.order_id) + '&plain=1';
+        document.getElementById('docViewFrame').src = req.document_id
+            ? 'print_document.php?id=' + encodeURIComponent(req.document_id)
+            : (req.complaint_id
+                ? 'print_complaint.php?id=' + encodeURIComponent(req.complaint_id)
+                : 'print_order.php?id=' + encodeURIComponent(req.order_id) + '&plain=1');
         docView.style.display = 'flex';
     }
     function hideDocument() {
@@ -222,12 +225,13 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
         window.AFX_SIGN_L10N = { clear: t.clear, cancel: t.not_now, save: t.save };
         afxSignaturePad({
             title: t.signing_by + ' ' + req.customer,
-            subtitle: (req.complaint_id ? t.sub_complaint : (req.sig_type === 'vydej' ? t.sub_pickup : t.sub_reception)) + ' · ' + req.order_code + ' · ' + req.device + (req.amount ? ' · ' + req.amount : ''),
+            subtitle: (req.document_id ? (req.station_sub || req.station_title || '') : (req.complaint_id ? t.sub_complaint : (req.sig_type === 'vydej' ? t.sub_pickup : t.sub_reception))) + ' · ' + req.order_code + ' · ' + req.device + (req.amount ? ' · ' + req.amount : ''),
             // ⚖️ Souhlasná/právní věta: rozhodná je ČESKÁ verze, cizí jazyk je jen zdvořilostní překlad.
-            terms: req.complaint_id ? t.terms_complaint : (req.sig_type === 'vydej' ? t.terms_pickup : t.terms_reception),
+            terms: req.document_id ? (req.station_terms || '') : (req.complaint_id ? t.terms_complaint : (req.sig_type === 'vydej' ? t.terms_pickup : t.terms_reception)),
             onSave: function (dataUrl) {
                 var fd = new FormData();
-                if (req.complaint_id) { fd.append('complaint_id', req.complaint_id); }
+                if (req.document_id) { fd.append('document_id', req.document_id); }
+                else if (req.complaint_id) { fd.append('complaint_id', req.complaint_id); }
                 else { fd.append('order_id', req.order_id); }
                 fd.append('sig_type', req.sig_type);
                 fd.append('image', dataUrl);

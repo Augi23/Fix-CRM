@@ -21,9 +21,11 @@ if ($q !== '') {
     $like = '%' . $q . '%';
     array_push($params, $like, $like, $like, $like, $like);
 }
+ensureDocumentSignatureSupport();
 $docs = [];
 try {
-    $st = $pdo->prepare("SELECT * FROM crm_documents WHERE $where ORDER BY id DESC LIMIT 300");
+    $st = $pdo->prepare("SELECT d.*, (SELECT MAX(s.signed_at) FROM document_signatures s WHERE s.document_id = d.id) AS signed_at
+                         FROM crm_documents d WHERE $where ORDER BY d.id DESC LIMIT 300");
     $st->execute($params);
     $docs = $st->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) { $docs = []; }
@@ -107,7 +109,15 @@ $newLabels = ['vykup' => 'Nový výkupní list', 'zastava' => 'Nový zástavní 
                     $href = 'dokument.php?type=' . e($tab) . '&id=' . (int)$d['id'];
                 ?>
                     <tr style="cursor:pointer" onclick="window.location='<?php echo $href; ?>'">
-                        <td><strong class="text-info"><?php echo e((string)$d['doc_number']); ?></strong></td>
+                        <td>
+                            <strong class="text-info"><?php echo e((string)$d['doc_number']); ?></strong>
+                            <?php if (!empty($d['signed_at'])): ?>
+                                <span class="badge ms-1" style="background:rgba(52,199,89,.18);color:#4ade80;border:1px solid rgba(52,199,89,.4);"
+                                      title="Podepsáno <?php echo e(date('d.m.Y H:i', strtotime((string)$d['signed_at']))); ?>">
+                                    <i class="fas fa-signature me-1"></i>podepsáno
+                                </span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-white-75"><?php echo !empty($d['doc_date']) ? e(date('d.m.Y', strtotime((string)$d['doc_date']))) : '—'; ?></td>
                         <td><strong><?php echo e((string)($d['customer_name'] ?: '—')); ?></strong></td>
                         <td>
@@ -126,8 +136,12 @@ $newLabels = ['vykup' => 'Nový výkupní list', 'zastava' => 'Nový zástavní 
                         </td>
                         <td class="text-white-75"><div class="text-truncate" style="max-width: 260px;" title="<?php echo e((string)$d['subject']); ?>"><?php echo e((string)($d['subject'] ?: '—')); ?></div></td>
                         <td class="text-end"><strong><?php echo e((string)($d['price'] ?: '—')); ?></strong></td>
-                        <td class="text-end pe-3">
-                            <a class="btn btn-sm btn-outline-light" href="<?php echo $href; ?>" onclick="event.stopPropagation();" title="Otevřít">
+                        <td class="text-end pe-3 text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-info me-1" title="Zobrazit dokument<?php echo !empty($d['signed_at']) ? ' (s podpisem)' : ''; ?>"
+                                onclick="event.stopPropagation(); if (typeof openUniversalPreview === 'function') { openUniversalPreview('print_document.php?id=<?php echo (int)$d['id']; ?>', '<?php echo e((string)$d['doc_number']); ?>'); } else { window.open('print_document.php?id=<?php echo (int)$d['id']; ?>', '_blank'); }">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <a class="btn btn-sm btn-outline-light" href="<?php echo $href; ?>" onclick="event.stopPropagation();" title="Otevřít / upravit">
                                 <i class="fas fa-pen"></i>
                             </a>
                         </td>

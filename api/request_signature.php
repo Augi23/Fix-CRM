@@ -39,7 +39,29 @@ if ($action === 'cancel') {
 
 $orderId = (int)($_POST['order_id'] ?? 0);
 $complaintId = (int)($_POST['complaint_id'] ?? 0);
+$documentId = (int)($_POST['document_id'] ?? 0);
 $sigType = (string)($_POST['sig_type'] ?? '');
+
+// ── Dokumenty (výkupní list / zástavní formulář): podpis na stanici ──
+if ($documentId > 0 && $sigType === 'dokument') {
+    require_once __DIR__ . '/../includes/documents.php';
+    ensureDocumentSignatureSupport();
+    $doc = crmGetDocument($documentId);
+    if (!$doc) {
+        echo json_encode(['ok' => false, 'error' => 'Dokument nenalezen']); exit;
+    }
+    try {
+        $pdo->prepare("UPDATE signature_requests SET status = 'cancelled' WHERE document_id = ? AND status = 'pending'")->execute([$documentId]);
+        $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+        $branch = (int)getCurrentStaffBranchId();
+        $pdo->prepare("INSERT INTO signature_requests (order_id, document_id, sig_type, branch_id, requested_by, email_after) VALUES (0, ?, 'dokument', ?, ?, 0)")
+            ->execute([$documentId, $branch ?: null, $by !== '' ? mb_substr($by, 0, 100) : null]);
+        echo json_encode(['ok' => true, 'request_id' => (int)$pdo->lastInsertId(), 'notice' => '', 'email' => '']);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => 'Chyba serveru']);
+    }
+    exit;
+}
 
 // ── Reklamace: podpis reklamačního protokolu (stejná stanice jako zakázky) ──
 if ($complaintId > 0 && $sigType === 'reklamace') {

@@ -4327,6 +4327,7 @@ function crmAuditActionLabel(string $action): string {
         'order.device_move' => 'Přesun zařízení na pobočku',
         'document.create' => 'Vytvoření dokumentu', 'document.update' => 'Úprava dokumentu',
         'document.email' => 'Odeslání dokumentu e-mailem',
+        'document.signature_add' => 'Podpis dokumentu',
         'order.item_add' => 'Přidání dílu k zakázce', 'order.item_update' => 'Úprava dílu zakázky',
         'order.item_delete' => 'Odebrání dílu ze zakázky',
         'invoice.create' => 'Vystavení faktury', 'invoice.update' => 'Úprava faktury',

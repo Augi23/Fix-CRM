@@ -139,6 +139,43 @@ function crmGetDocument(int $id): ?array {
     } catch (Throwable $e) { return null; }
 }
 
+/** Podpisy dokumentů: sloupec document_id na požadavcích podpisové stanice
+ *  (řádky dokumentů mají order_id = 0) + tabulka uložených podpisů. */
+function ensureDocumentSignatureSupport(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    ensureSignatureRequestsTable();
+    try { $pdo->exec("ALTER TABLE signature_requests ADD COLUMN document_id INT NULL"); } catch (Throwable $e) { /* už existuje */ }
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS document_signatures (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            document_id INT NOT NULL,
+            file_path VARCHAR(255) NOT NULL,
+            signed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            requested_by VARCHAR(100) NULL,
+            INDEX idx_ds_document (document_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { /* best-effort */ }
+}
+
+/** Podpis dokumentu (nejnovější) jako ['img' => data URI, 'at' => čas], jinak null. */
+function crmGetDocumentSignature(int $documentId): ?array {
+    global $pdo;
+    if ($documentId <= 0) return null;
+    try {
+        ensureDocumentSignatureSupport();
+        $st = $pdo->prepare("SELECT file_path, signed_at FROM document_signatures WHERE document_id = ? ORDER BY id DESC LIMIT 1");
+        $st->execute([$documentId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $p = __DIR__ . '/../' . ltrim((string)$row['file_path'], '/');
+        if (!is_file($p)) return null;
+        return ['img' => 'data:image/png;base64,' . base64_encode((string)file_get_contents($p)), 'at' => (string)$row['signed_at']];
+    } catch (Throwable $e) { return null; }
+}
+
 /** Jazyk dokumentů: povolené cs/en/ru (uk → en řeší crmCustomerDocLang jinde). */
 function crmDocLangOrDefault(?string $lang): string {
     $lang = strtolower(trim((string)$lang));
@@ -151,7 +188,7 @@ function crmDocLangOrDefault(?string $lang): string {
  * 'static' = hodnoty jako text (e-mail, případně náhled).
  * Vrací HTML VNITŘKU stránky (bez <html>/<head>) — CSS dodává volající.
  */
-function crmRenderDocumentSheet(string $type, array $values, string $lang, string $mode, string $docNumber, string $docDate): string {
+function crmRenderDocumentSheet(string $type, array $values, string $lang, string $mode, string $docNumber, string $docDate, int $docId = 0): string {
     $cfg = crmDocTypes()[$type] ?? null;
     if (!$cfg) return '';
     $L = function (string $key) use ($lang) { return __($key, $lang); };
@@ -206,8 +243,19 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
     foreach ($cfg['legal'] as $lk) { $h .= '<li>' . e($L($lk)) . '</li>'; }
     $h .= '</ol></div>';
 
+    // Elektronický podpis klienta z podpisové stanice — nad levou podpisovou
+    // linkou (klient = prodávající / zástavce), stejně jako u zakázkového listu.
+    $sig = $docId > 0 ? crmGetDocumentSignature($docId) : null;
     $h .= '<div class="sign">';
-    $h .= '<div class="slot">' . e($L($cfg['sign_left'])) . '</div>';
+    if ($sig) {
+        $h .= '<div class="slot signed">'
+            . '<img class="sig-img" src="' . $sig['img'] . '" alt="podpis">'
+            . '<div class="sigline">' . e($L($cfg['sign_left'])) . '</div>'
+            . '<div class="sig-at">' . e($L('ord_signed_electronically')) . ' ' . e(date('j. n. Y H:i', strtotime((string)$sig['at']))) . '</div>'
+            . '</div>';
+    } else {
+        $h .= '<div class="slot">' . e($L($cfg['sign_left'])) . '</div>';
+    }
     $h .= '<div class="slot">' . e($L($cfg['sign_right'])) . ' ' . e($company) . '</div>';
     $h .= '</div>';
 
@@ -240,9 +288,9 @@ function crmDocumentSheetCss(): string {
         .doc-date { font-size: 11px; color: var(--muted); margin-top: 5px; font-weight: 300; }
         .head-sep { margin: 16px 34px 0; border-bottom: 1px solid var(--line); }
         .body { padding: 18px 34px 30px; }
-        .doc-title { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 14px; }
+        .doc-title { font-size: 27px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 16px; }
         .block { margin: 14px 0; border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px 12px; }
-        .block h3 { font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink); margin: 0 0 10px; font-weight: 800; }
+        .block h3 { font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink); margin: 0 0 10px; font-weight: 800; }
         .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 22px; }
         .dfield--wide { grid-column: 1 / -1; }
         .dfield label { display: block; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 1px; }
@@ -257,6 +305,10 @@ function crmDocumentSheetCss(): string {
         .fineprint li { margin-bottom: 4px; }
         .sign { display: flex; gap: 40px; margin-top: 44px; }
         .sign .slot { flex: 1; border-top: 1.4px solid var(--ink); padding-top: 7px; font-size: 10.5px; color: var(--muted); text-align: center; }
+        .sign .slot.signed { border-top: none; padding-top: 0; }
+        .sign .slot.signed .sig-img { display: block; max-height: 54px; margin: 0 auto 2px; }
+        .sign .slot.signed .sigline { border-top: 1.4px solid var(--ink); padding-top: 7px; }
+        .sign .slot.signed .sig-at { margin-top: 3px; font-size: 9px; color: #8a929c; }
         .foot { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); text-align: center; padding-bottom: 26px; }
         .foot .foot-name { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: var(--ink); }
         .foot .foot-line { font-size: 10px; color: var(--muted); font-weight: 300; margin-top: 4px; letter-spacing: 0.02em; }
@@ -274,7 +326,7 @@ function crmRenderDocumentEmailHtml(array $doc): string {
     $type = (string)$doc['doc_type'];
     $lang = crmDocLangOrDefault($doc['lang'] ?? 'cs');
     $date = !empty($doc['doc_date']) ? date('d.m.Y', strtotime((string)$doc['doc_date'])) : date('d.m.Y');
-    $sheet = crmRenderDocumentSheet($type, $doc['fields'] ?? [], $lang, 'static', (string)$doc['doc_number'], $date);
+    $sheet = crmRenderDocumentSheet($type, $doc['fields'] ?? [], $lang, 'static', (string)$doc['doc_number'], $date, (int)$doc['id']);
     $css = crmDocumentSheetCss();
     return '<!DOCTYPE html><html lang="' . e($lang) . '"><head><meta charset="UTF-8"><style>'
         . 'body { margin:0; padding:24px 12px; background:#eceff3; }' . $css
