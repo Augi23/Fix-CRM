@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.15.4',
+        'date' => '2026-07-29',
+        'time' => '13:55',
+        'title' => 'Historie úprav: definitivní oprava výšky panelu',
+        'items' => [
+            'Nalezena skutečná příčina (změřeno přímo v prohlížeči): levý sloupec se natahoval podle výšky pravého obsahu, takže synchronizace výšky kopírovala obří hodnotu. Levá karta teď drží přirozenou výšku a <b>Historie úprav má přesně stejnou výšku se scrollbarem uvnitř</b> — ověřeno živě na admin.applefix.cloud.',
+        ],
+    ],
+    [
         'version' => '3.15.3',
         'date' => '2026-07-29',
         'time' => '13:35',
