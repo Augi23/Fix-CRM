@@ -24,6 +24,11 @@ if (php_sapi_name() !== 'cli') {
     echo '<pre>';
 }
 
+/** Chyby, které znamenají „už hotovo" — objekt v DB existuje, migraci lze označit za provedenou.
+ *  1050 tabulka existuje · 1060 duplicitní sloupec · 1061 duplicitní index · 1091 nelze zahodit
+ *  (neexistuje) · 1022/1826 duplicitní klíč · 1913 duplicitní constraint */
+const MIGRATION_BENIGN_CODES = [1050, 1060, 1061, 1091, 1022, 1826, 1913];
+
 // ── Bootstrap: ensure migrations table exists ─────────────────────────────────
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS `migrations` (
@@ -56,18 +61,32 @@ foreach ($files as $file) {
     }
 
     $sql = file_get_contents($file);
+    $already = 0;
     try {
         // Split on semicolons so multi-statement files work
         foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
-            $pdo->exec($stmt);
+            // samotný komentář není příkaz
+            if ($stmt === '' || preg_match('/^(--|#)/', $stmt)) { continue; }
+            try {
+                $pdo->exec($stmt);
+            } catch (PDOException $e) {
+                // Sloupec/tabulka/index už existují (typicky je založila ensure* funkce
+                // za běhu aplikace dřív, než migrace doběhla). To NENÍ chyba — cíl je
+                // splněn, jen jinou cestou. Dřív to shodilo celý běh a všechny další
+                // migrace kvůli `break` nikdy neproběhly. (29.7.2026)
+                $code = (int)($e->errorInfo[1] ?? 0);
+                if (in_array($code, MIGRATION_BENIGN_CODES, true)) { $already++; continue; }
+                throw $e;
+            }
         }
         $pdo->prepare("INSERT INTO migrations (migration_name) VALUES (?)")->execute([$name]);
-        echo "OK   : $name\n";
+        echo $already > 0 ? "OK*  : $name (už bylo v DB: $already příkazů)\n" : "OK   : $name\n";
         $ok++;
     } catch (Throwable $e) {
         echo "ERROR: $name — " . $e->getMessage() . "\n";
+        echo "       (běh zastaven, další migrace neproběhly — oprav soubor a spusť znovu)\n";
         $fail++;
-        break; // Stop on first failure to preserve consistency
+        break; // skutečná chyba → stop, ať se DB nerozjede do nekonzistence
     }
 }
 

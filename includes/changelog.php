@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.9.4',
+        'date' => '2026-07-29',
+        'time' => '17:10',
+        'title' => 'Migrace se už nezaseknou na „sloupec už existuje"',
+        'items' => [
+            'Aktualizace databáze (Nastavení → Systém → Aktualizace) padala na migraci <b>023_customer_language</b> s hláškou „Duplicate column name" — sloupec už v databázi byl, protože ho za běhu založila záchranná funkce v aplikaci. Běh se tím zastavil a <b>všechny novější migrace nikdy neproběhly</b>.',
+            'Runner nově pozná chyby typu <b>„už existuje"</b> (tabulka, sloupec, index, klíč), bere je jako splněné, migraci označí za provedenou a <b>pokračuje dál</b>. U takového souboru vypíše <b>OK*</b> s počtem přeskočených příkazů. Skutečná chyba běh pořád zastaví, aby se databáze nerozjela.',
+        ],
+    ],
+    [
         'version' => '3.19.1',
         'date' => '2026-07-29',
         'time' => '17:05',
