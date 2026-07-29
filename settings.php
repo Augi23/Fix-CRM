@@ -1699,8 +1699,11 @@ require_once 'includes/header.php';
         <div class="tab-pane fade <?php echo ($active_tab == 'system' && $sys_sub == 'aktualizace') ? 'show active' : ''; ?>">
             <?php $sysSubnav('aktualizace'); ?>
             <div class="row g-4">
-                <!-- Left: Version & Update -->
-                <div class="col-md-6">
+                <!-- Left: Version & Update.
+                     align-self-start je KLÍČOVÉ: bez něj Bootstrap řádek (align-items:stretch)
+                     natáhne levý sloupec na výšku pravého obsahu a sync výšky Historie úprav
+                     pak kopíruje obří hodnotu (ověřeno živě 29.7.2026 — leftH 20522px). -->
+                <div class="col-md-6 align-self-start">
                     <div class="glass-panel p-4 mb-4 border-secondary" id="crmUpdateCard">
                         <?php
                         $gitInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo(__DIR__) : [];
@@ -1821,10 +1824,11 @@ require_once 'includes/header.php';
                 var panel = document.getElementById('crmHistoryPanel');
                 if (!left || !panel) return;
                 function sync() {
-                    var h = left.offsetHeight;
-                    if (window.innerWidth >= 768 && h > 100) {
-                        panel.style.height = h + 'px';
-                    } else if (window.innerWidth < 768) {
+                    if (window.innerWidth >= 768) {
+                        panel.style.height = '';               // reset před měřením (obrana proti stretch smyčce)
+                        var h = left.offsetHeight;             // přirozená výška levé karty (align-self-start)
+                        if (h > 100) { panel.style.height = h + 'px'; }
+                    } else {
                         panel.style.height = '';
                         var list = document.getElementById('crmHistoryList');
                         if (list) list.style.maxHeight = '420px';   // mobil: karty pod sebou
