@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.15.2',
+        'date' => '2026-07-29',
+        'time' => '13:05',
+        'title' => 'Editace klienta jedním klikem přímo ze zakázky',
+        'items' => [
+            'V detailu zakázky je u bloku <b>Klient</b> nové tlačítko <b>„Upravit"</b> — otevře stejnou editaci klienta jako v seznamu klientů, bez hledání.',
+            'Tlačítko <b>„Zpět"</b> v editaci klienta tě v tomhle případě vrátí <b>rovnou na zakázku</b>, ze které jsi přišel (ne do seznamu klientů).',
+        ],
+    ],
+    [
         'version' => '3.15.1',
         'date' => '2026-07-29',
         'time' => '12:40',

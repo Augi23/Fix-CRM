@@ -6,6 +6,11 @@ require_once 'includes/header.php';
 $id = $_GET['id'] ?? null;
 if (!$id) die(__('customer_id_missing'));
 
+// ?return=<order_id> → přišli jsme z detailu zakázky, tlačítko „Zpět" vede tam
+// (POST bez action jde na stejné URL, takže parametr přežije i uložení).
+$returnOrderId = (int)($_GET['return'] ?? 0);
+$backUrl = $returnOrderId > 0 ? 'view_order.php?id=' . $returnOrderId : 'customers.php';
+
 $stmt = $pdo->prepare("SELECT * FROM customers WHERE id = ?");
 $stmt->execute([$id]);
 $customer = $stmt->fetch();
@@ -76,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><?php echo __('edit'); ?> <?php echo __('client'); ?></h2>
-    <a href="customers.php" class="btn btn-outline-secondary"><?php echo __('back'); ?></a>
+    <a href="<?php echo e($backUrl); ?>" class="btn btn-outline-secondary"><?php echo __('back'); ?></a>
 </div>
 
 <?php if ($success): ?>

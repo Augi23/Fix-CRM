@@ -202,7 +202,15 @@ function localizedOrderStatusLabel(string $status): string {
                 <div class="row g-3 mb-4 order-summary-hl">
                     <div class="col-md-6">
                       <div class="order-summary-panel">
-                        <h6><?php echo __('client'); ?></h6>
+                        <h6 class="d-flex align-items-center justify-content-between">
+                            <span><?php echo __('client'); ?></span>
+                            <?php /* rychlá editace klienta přímo ze zakázky (stejné jako Upravit v seznamu
+                                     klientů); &return= vrátí tlačítko „Zpět" na tuhle zakázku */ ?>
+                            <a href="edit_customer.php?id=<?php echo (int)$order['customer_id']; ?>&return=<?php echo (int)$order['id']; ?>"
+                               class="btn btn-sm btn-outline-info py-0 px-2" title="<?php echo e(__('edit') . ' — ' . __('client')); ?>">
+                                <i class="fas fa-edit me-1"></i><?php echo __('edit'); ?>
+                            </a>
+                        </h6>
                         <p class="osh-title mb-2"><strong><?php echo htmlspecialchars($order['first_name'].' '.$order['last_name']); ?></strong>
                             <?php if (crmIsInternalCustomer($order['customer_id'] ?? 0)): ?>
                                 <span class="afx-internal-chip ms-2" title="Interní zakázka — není pro veřejného klienta"><i class="fas fa-screwdriver-wrench"></i>Interní</span>
