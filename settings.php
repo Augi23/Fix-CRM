@@ -969,6 +969,82 @@ require_once 'includes/header.php';
                         ? '<span class="badge bg-success">nakonfigurováno</span> <span class="text-white-50 small">prostředí: ' . e(kbApiEnv()) . ' · poslední sync: ' . (get_setting('kb_last_sync_at', '') ?: 'nikdy') . '</span>'
                         : '<span class="badge bg-secondary">nepřipojeno</span>'; ?>
                 </div>
+
+                <?php
+                /* ── Napojení krok za krokem ──────────────────────────────────────────
+                   Tajemství (client_secret, refresh token) si CRM ukládá samo z callbacku
+                   od banky — nikdo je nikam nepřepisuje ručně. Jednatel jen dvakrát
+                   potvrdí přístup ve svém internetovém bankovnictví. */
+                $__kbOk = $_SESSION['kb_connect_ok'] ?? '';
+                $__kbErr = $_SESSION['kb_connect_error'] ?? '';
+                unset($_SESSION['kb_connect_ok'], $_SESSION['kb_connect_error']);
+                $__kbAccounts = $_SESSION['kb_accounts'] ?? [];
+                unset($_SESSION['kb_accounts']);
+                $__krok = function (bool $done, string $text, string $note = ''): string {
+                    return '<li class="d-flex gap-2 align-items-start mb-1">'
+                        . ($done ? '<i class="fas fa-circle-check text-success mt-1"></i>' : '<i class="fas fa-circle text-white-50 mt-1" style="opacity:.4;"></i>')
+                        . '<span>' . $text . ($note !== '' ? ' <span class="text-white-50 small">' . $note . '</span>' : '') . '</span></li>';
+                };
+                $__hasKeys = get_setting('kb_api_key_adaa', '') !== '' && get_setting('kb_api_key_oauth', '') !== '';
+                $__hasStmt = get_setting('kb_software_statement', '') !== '';
+                $__hasClient = get_setting('kb_client_id', '') !== '' && get_setting('kb_client_secret', '') !== '';
+                $__hasToken = get_setting('kb_refresh_token', '') !== '';
+                $__hasAcc = get_setting('kb_account_id', '') !== '';
+                ?>
+                <?php if ($__kbOk !== ''): ?><div class="alert alert-success border-0 py-2 small"><i class="fas fa-circle-check me-2"></i><?php echo e($__kbOk); ?></div><?php endif; ?>
+                <?php if ($__kbErr !== ''): ?><div class="alert alert-danger border-0 py-2 small"><i class="fas fa-triangle-exclamation me-2"></i><?php echo e($__kbErr); ?></div><?php endif; ?>
+
+                <div class="glass-panel p-3 border-secondary mb-3" style="background:rgba(48,209,88,.06);">
+                    <div class="fw-semibold mb-2"><i class="fas fa-list-check me-2 text-success"></i>Napojení krok za krokem</div>
+                    <ul class="list-unstyled small mb-3">
+                        <?php
+                        echo $__krok($__hasKeys, '<b>API klíče z portálu</b> (ADAA + OAuth2)', $__hasKeys ? '' : '— vlož je do políček níže a ulož');
+                        echo $__krok($__hasStmt, '<b>Software statement</b>', kbApiEnv() === 'prod'
+                            ? ($__hasStmt ? '' : '— pro produkci POVINNÝ, vzniká s certifikátem I.CA (scripts/kb_software_statement.php)')
+                            : '— v sandboxu nepovinný');
+                        echo $__krok($__hasClient, '<b>Registrace aplikace</b> → client_id a client_secret', $__hasClient ? '(' . e(get_setting('kb_client_id', '')) . ')' : '— tlačítko 1 níže, potvrzuje jednatel v KB');
+                        echo $__krok($__hasToken, '<b>Autorizace přístupu k účtu</b> → refresh token (platí 12 měsíců)', $__hasToken ? '' : '— tlačítko 2 níže, jednatel vybere účty');
+                        echo $__krok($__hasAcc, '<b>Vybraný účet</b>, který CRM sleduje', $__hasAcc ? '(' . e(get_setting('kb_account_id', '')) . ')' : '');
+                        ?>
+                    </ul>
+                    <div class="d-flex gap-2 flex-wrap mb-3">
+                        <a href="api/kb_connect.php?step=register" class="btn btn-sm <?php echo $__hasClient ? 'btn-outline-info' : 'btn-info'; ?>"
+                           onclick="return confirm('Přesměruji tě do Komerční banky, kde jednatel potvrdí spojení aplikace. Pokračovat?');">
+                            <i class="fas fa-1 me-1"></i> Registrovat aplikaci u KB<?php echo $__hasClient ? ' (znovu)' : ''; ?>
+                        </a>
+                        <a href="api/kb_connect.php?step=authorize" class="btn btn-sm <?php echo $__hasClient ? ($__hasToken ? 'btn-outline-success' : 'btn-success') : 'btn-secondary disabled'; ?>"
+                           onclick="return confirm('Přesměruji tě do Komerční banky, kde jednatel potvrdí přístup k účtu a vybere účty. Pokračovat?');">
+                            <i class="fas fa-2 me-1"></i> Autorizovat přístup k účtu<?php echo $__hasToken ? ' (obnovit souhlas)' : ''; ?>
+                        </a>
+                        <a href="navody.php?tab=banka" class="btn btn-sm btn-outline-secondary"><i class="fas fa-circle-question me-1"></i>Návod k napojení</a>
+                    </div>
+                    <div class="small text-white-50 mb-1">Tyhle dvě adresy patří do <b>software statementu</b> (a musí zůstat stejné, jinak se banka nevrátí zpět):</div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1">redirectUris</label>
+                            <input type="text" class="form-control form-control-sm" readonly onclick="this.select()" value="<?php echo e(kbRedirectUri()); ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1">registrationBackUri</label>
+                            <input type="text" class="form-control form-control-sm" readonly onclick="this.select()" value="<?php echo e(kbRegistrationBackUri()); ?>">
+                        </div>
+                    </div>
+                </div>
+
+                <?php if (count($__kbAccounts) > 1): ?>
+                <div class="glass-panel p-3 border-secondary mb-3" style="background:rgba(10,132,255,.07);">
+                    <div class="fw-semibold mb-2"><i class="fas fa-list me-2 text-info"></i>Banka autorizovala víc účtů — vyber, který má CRM sledovat</div>
+                    <div class="d-flex flex-column gap-1 small">
+                        <?php foreach ($__kbAccounts as $__a): ?>
+                            <label class="d-flex gap-2 align-items-center">
+                                <input type="radio" name="kbAccPick" value="<?php echo e($__a['accountId']); ?>">
+                                <span><b><?php echo e($__a['iban'] ?: $__a['accountId']); ?></b> <span class="text-white-50"><?php echo e($__a['currency']); ?></span></span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="small text-white-50 mt-2">Vyber účet, pak dole klikni na <b>Uložit nastavení banky</b>.</div>
+                </div>
+                <?php endif; ?>
                 <form id="kbSettingsForm" class="row g-3" autocomplete="off">
                     <div class="col-md-3">
                         <label class="form-label small">Prostředí</label>
@@ -991,6 +1067,14 @@ require_once 'includes/header.php';
                     <div class="col-md-6">
                         <label class="form-label small">API klíč — OAuth2</label>
                         <input type="text" name="kb_api_key_oauth" class="form-control" value="<?php echo e(get_setting('kb_api_key_oauth', '')); ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">API klíč — Client Registration <span class="text-white-50">(pro software statement)</span></label>
+                        <input type="text" name="kb_api_key_client_reg" class="form-control" value="<?php echo e(get_setting('kb_api_key_client_reg', '')); ?>">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Adresa CRM <span class="text-white-50">(kam se banka vrací)</span></label>
+                        <input type="text" name="kb_base_url" class="form-control" value="<?php echo e(get_setting('kb_base_url', 'https://admin.applefix.cloud')); ?>">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small">Client ID</label>
@@ -1025,6 +1109,13 @@ require_once 'includes/header.php';
                             document.getElementById('kbSettingsMsg').textContent = d.success ? 'Uloženo.' : ('Chyba: ' + (d.message || ''));
                         })
                         .catch(function () { document.getElementById('kbSettingsMsg').textContent = 'Síťová chyba.'; });
+                });
+                // výběr účtu z autorizace (radio) → doplní se do políčka accountId
+                document.querySelectorAll('input[name=kbAccPick]').forEach(function (r) {
+                    r.addEventListener('change', function () {
+                        var inp = form.querySelector('[name=kb_account_id]');
+                        if (inp) { inp.value = this.value; }
+                    });
                 });
                 document.getElementById('kbTestBtn').addEventListener('click', function () {
                     var msg = document.getElementById('kbSettingsMsg');

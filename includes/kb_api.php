@@ -35,6 +35,144 @@ function kbAdaaBase(): string {
         : 'https://api-gateway.kb.cz/sandbox/adaa/v2';
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   NAPOJENÍ NA BANKU — cesta k client_id, client_secret a refresh tokenu
+   (postup podle oficiální dokumentace KB: github.com/komercka/adaa-client/wiki)
+
+   1) Portál developers.kb.cz: registrace, odběr služeb, API klíče        ← ruční
+   2) Software statement (JWT, platí 12 měsíců) — POST s kvalifikovaným
+      certifikátem I.CA/PostSignum (mTLS)          ← scripts/kb_software_statement.php
+   3) REGISTRACE APLIKACE: jednatel se v prohlížeči přihlásí do KB a potvrdí
+      spojení aplikace. KB se vrátí na naši registrationBackUri se ZAŠIFROVANÝMI
+      údaji → dešifrujeme naším AES klíčem → client_id + client_secret.
+   4) AUTORIZACE ÚČTU: jednatel znovu potvrdí rozsah a vybere účty. KB se vrátí
+      na naši redirect_uri s authorization code (platí 2 minuty).
+   5) Výměna kódu za refresh token (12 měsíců) + access token (3 min).
+
+   Tajemství (client_secret, refresh token) si CRM ukládá samo z callbacku —
+   nikdo je nikam nepřepisuje ručně.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/** Veřejná adresa CRM (pro callback URL, které se registrují u KB). */
+function kbBaseUrl(): string {
+    $url = trim((string)get_setting('kb_base_url', ''));
+    if ($url === '') { $url = 'https://admin.applefix.cloud'; }
+    return rtrim($url, '/');
+}
+
+/** Callback po REGISTRACI APLIKACE (registrationBackUri v software statementu). */
+function kbRegistrationBackUri(): string { return kbBaseUrl() . '/api/kb_register_back.php'; }
+
+/** Callback po AUTORIZACI ÚČTU (redirect_uri) — musí být v software statementu. */
+function kbRedirectUri(): string { return kbBaseUrl() . '/api/kb_oauth_callback.php'; }
+
+function kbSoftwareStatementUrl(): string {
+    return kbApiEnv() === 'prod'
+        ? 'https://client-registration.api-gateway.kb.cz/v3/software-statements'
+        : 'https://api-gateway.kb.cz/sandbox/client-registration/v3/software-statements';
+}
+
+/** Stránka KB, kde jednatel potvrdí spojení aplikace (krok 3). */
+function kbRegistrationUiUrl(string $registrationRequest, string $state): string {
+    $base = kbApiEnv() === 'prod'
+        ? 'https://api-gateway.kb.cz/client-registration-ui/v2/saml/register'
+        : 'https://api-gateway.kb.cz/sandbox/client-registration-ui/v2/saml/register';
+    return $base . '?' . http_build_query(['registrationRequest' => $registrationRequest, 'state' => $state]);
+}
+
+/** Stránka KB, kde jednatel potvrdí rozsah a vybere účty (krok 4). */
+function kbAuthorizeUrl(string $state): string {
+    $params = http_build_query([
+        'response_type' => 'code',
+        'client_id' => get_setting('kb_client_id', ''),
+        'redirect_uri' => kbRedirectUri(),
+        'scope' => 'adaa',
+        'state' => $state,
+    ]);
+    return kbApiEnv() === 'prod'
+        ? 'https://login.kb.cz/autfe/ssologin?' . $params
+        : 'https://api-gateway.kb.cz/sandbox/oauth2-authorization-ui/v3/?' . $params;
+}
+
+/** Náš AES-256 klíč, kterým KB zašifruje odpověď s client_id/secret.
+ *  Vznikne jednou a musí zůstat stejný, dokud registrace neproběhne. */
+function kbEncryptionKey(): string {
+    $key = (string)get_setting('kb_encryption_key', '');
+    if ($key === '' || strlen(base64_decode($key, true) ?: '') !== 32) {
+        $key = base64_encode(random_bytes(32));
+        set_setting('kb_encryption_key', $key);
+    }
+    return $key;
+}
+
+/** Data pro registraci aplikace (base64 JSON do URL parametru registrationRequest). */
+function kbBuildRegistrationRequest(): string {
+    $data = [
+        'clientName' => 'AppleFix CRM',
+        'clientNameEn' => 'AppleFix CRM',
+        'applicationType' => 'web',
+        'redirectUris' => [kbRedirectUri()],
+        'scope' => ['adaa'],
+        'encryptionKey' => kbEncryptionKey(),
+        'encryptionAlg' => 'AES-256',
+    ];
+    $stmt = trim((string)get_setting('kb_software_statement', ''));
+    if ($stmt !== '') { $data['softwareStatement'] = $stmt; }   // v sandboxu nepovinné
+    return base64_encode(json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+}
+
+/** base64url → binárka (KB posílá salt i encryptedData v base64url). */
+function kbBase64UrlDecode(string $s): string {
+    return (string)base64_decode(str_replace(['-', '_'], ['+', '/'], $s));
+}
+
+/** Dešifrování odpovědi po registraci aplikace — AES-256-GCM, ověřovací značka
+ *  je připojená na konci dat (tak to dělá javax.crypto v KB). Postup přesně podle
+ *  příkladu v dokumentaci KB. Vrací pole z JSON, nebo [] když dešifrování selže. */
+function kbDecryptRegistration(string $salt, string $encryptedData, ?string $keyBase64 = null): array {
+    // $keyBase64 slouží testu nanečisto (scripts/kb_test_napojeni.php) — POZOR:
+    // get_setting má statickou cache, kterou set_setting neinvaliduje, takže klíč
+    // uložený ve stejném běhu by se sem nedostal.
+    $key = base64_decode($keyBase64 ?? (string)get_setting('kb_encryption_key', ''), true);
+    if ($key === false || strlen($key) !== 32) { return []; }
+    $iv = kbBase64UrlDecode($salt);
+    $cipherRaw = kbBase64UrlDecode($encryptedData);
+    if ($iv === '' || strlen($cipherRaw) <= 16) { return []; }
+    $data = substr($cipherRaw, 0, -16);
+    $tag = substr($cipherRaw, -16);
+    $plain = openssl_decrypt($data, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+    if ($plain === false) { return []; }
+    $json = json_decode($plain, true);
+    return is_array($json) ? $json : [];
+}
+
+/** Výměna authorization code (platí 2 min) za refresh token (12 měsíců) + access token.
+ *  Vrací ['refresh_token' => …, 'access_token' => …, 'expires_in' => …]. */
+function kbExchangeAuthCode(string $code): array {
+    [$ok, $httpCode, $data, $raw] = kbHttp('POST', kbOauthBase() . '/access_token',
+        ['Content-Type: application/x-www-form-urlencoded',
+         'apiKey: ' . get_setting('kb_api_key_oauth', ''),
+         'x-correlation-id: ' . bin2hex(random_bytes(16))],
+        http_build_query([
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'redirect_uri' => kbRedirectUri(),
+            'client_id' => get_setting('kb_client_id', ''),
+            'client_secret' => get_setting('kb_client_secret', ''),
+        ]));
+    if (!$ok || empty($data['refresh_token'])) {
+        throw new Exception('KB: výměna kódu za token selhala (HTTP ' . $httpCode . '). '
+            . 'Kód platí jen 2 minuty — zkus autorizaci znovu. '
+            . mb_substr(preg_replace('/[^\x20-\x7E]+/', ' ', (string)$raw), 0, 160));
+    }
+    set_setting('kb_refresh_token', (string)$data['refresh_token']);
+    if (!empty($data['access_token'])) {
+        set_setting('kb_access_token', (string)$data['access_token']);
+        set_setting('kb_access_token_expires', (string)(time() + (int)($data['expires_in'] ?? 180)));
+    }
+    return is_array($data) ? $data : [];
+}
+
 /** HTTP volání s hlavičkami KB (curl, JSON). Vrací [ok, httpCode, dataOrNull, rawBody]. */
 function kbHttp(string $method, string $url, array $headers = [], ?string $body = null): array {
     $ch = curl_init($url);
@@ -72,11 +210,16 @@ function kbAccessToken(bool $forceRefresh = false): string {
         return $cached;
     }
 
+    // redirect_uri posílá KB i u obnovy tokenu (viz oficiální příklady) — bez něj
+    // banka požadavek odmítne; x-correlation-id kvůli dohledání na straně KB
     [$ok, $code, $data, $raw] = kbHttp('POST', kbOauthBase() . '/access_token',
-        ['Content-Type: application/x-www-form-urlencoded', 'apiKey: ' . get_setting('kb_api_key_oauth', '')],
+        ['Content-Type: application/x-www-form-urlencoded',
+         'apiKey: ' . get_setting('kb_api_key_oauth', ''),
+         'x-correlation-id: ' . bin2hex(random_bytes(16))],
         http_build_query([
             'grant_type' => 'refresh_token',
             'refresh_token' => $freshRefresh ?? get_setting('kb_refresh_token', ''),
+            'redirect_uri' => kbRedirectUri(),
             'client_id' => get_setting('kb_client_id', ''),
             'client_secret' => get_setting('kb_client_secret', ''),
         ]));

@@ -6,6 +6,21 @@
  */
 return [
     [
+        'version' => '3.25.0',
+        'date' => '2026-07-30',
+        'time' => '11:40',
+        'title' => 'Napojení na banku na dvě kliknutí (a nikdo nikam nepřepisuje tajné kódy)',
+        'items' => [
+            '<b>Napojení na KB je teď průvodce v Nastavení → Banka:</b> checklist ukáže, co už je hotové a co chybí, a dvě tlačítka („1. Registrovat aplikaci u KB", „2. Autorizovat přístup k účtu") pošlou jednatele do banky. Po potvrzení KB Klíčem si CRM <b>samo uloží client_id, client_secret a refresh token</b> z odpovědi banky — dosud se musely ručně opisovat, což u zašifrované odpovědi ani nebylo možné.',
+            '<b>Výběr účtu bez opisování:</b> po autorizaci CRM hned stáhne seznam autorizovaných účtů; když je jeden, vybere ho sám, u víc účtů je nabídne k zaškrtnutí.',
+            '<b>Software statement pro ostrý účet:</b> nový skript <code>scripts/kb_software_statement.php</code> udělá potvrzení aplikace u banky proti kvalifikovanému certifikátu (I.CA/PostSignum). Certifikát ani jeho heslo se nikam neukládají — použijí se jen pro jedno volání.',
+            '<b>Kontrola napojení nanečisto:</b> <code>scripts/kb_test_napojeni.php</code> vypíše, co je nastavené a co chybí, a hlavně ověří, že CRM umí <b>rozšifrovat odpověď banky</b> — testuje se na oficiálním vzorku z dokumentace KB. Kdyby to nefungovalo, napojení by ztroskotalo až v momentě, kdy jednatel stojí v bankovnictví.',
+            '<b>Opravená obnova tokenu:</b> KB u obnovy přístupu vyžaduje i adresu, kam se aplikace vrací (redirect_uri) — bez ní by po vypršení tříminutového tokenu přestalo stahování pohybů fungovat. Doplněno i dohledávací id požadavku pro podporu KB.',
+            '<b>Pojistka při přepnutí prostředí:</b> přepnutím sandbox ↔ produkce se přihlašovací údaje k bance smažou (ze sandboxu v produkci neplatí), takže se napojení netváří jako hotové a synchronizace nepadá na nesrozumitelné chyby.',
+            '<b>Nový návod:</b> Návody → Banka → <b>„Napojení CRM na bankovní účet (KB API)"</b> — celý postup včetně toho, co dělá jednatel, co platí 12 měsíců a co se stane při změně domény CRM.',
+        ],
+    ],
+    [
         'version' => '3.24.1',
         'date' => '2026-07-30',
         'time' => '10:30',
