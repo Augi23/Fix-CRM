@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.25.2',
+        'date' => '2026-07-30',
+        'time' => '14:45',
+        'title' => 'Oprava: banka se vracela na druhou adresu a CRM ji nepoznalo',
+        'items' => [
+            '<b>Co se dělo:</b> po potvrzení v bance to vyhodilo zpět na odhlášené CRM a v Historii nebyl ani záznam. Příčina: bez software statementu banka nemá kam vracet výsledek registrace, takže použije adresu určenou pro autorizaci — a ta odpověď registrace nečekala a zahodila ji <b>ještě před zápisem do historie</b>.',
+            '<b>Opraveno:</b> obě adresy teď vedou do stejného zpracování, které se rozhoduje podle <b>obsahu</b> odpovědi (zašifrované údaje registrace vs. autorizační kód), ne podle toho, kam banka zaklepe. Návrat se vždy nejdřív zapíše do Historie změn — i když se odmítne.',
+        ],
+    ],
+    [
         'version' => '3.25.1',
         'date' => '2026-07-30',
         'time' => '13:55',
