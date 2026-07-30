@@ -6,6 +6,20 @@
  */
 return [
     [
+        'version' => '3.24.0',
+        'date' => '2026-07-30',
+        'time' => '09:40',
+        'title' => 'Banka umí splátky a doplatky sama — a u nejasných plateb rovnou napoví',
+        'items' => [
+            '<b>Splátky a doplatky automaticky:</b> když variabilní symbol sedí právě jedné otevřené faktuře, platba se zapíše sama — i když je menší. Faktuře zůstane zbytek k úhradě a <b>doplatek se navázáním uzavře</b>. Dřív obojí skončilo „k prověření" a účetní to musela klikat ručně.',
+            '<b>Automat nikdy nehádá:</b> zapíše jen platbu, kde VS ukazuje na jedinou otevřenou fakturu, platba není starší než faktura a nepřišlo víc, než kolik zbývá. Navíc platbu, která fakturu <b>uzavírá</b>, smí zapsat jen pohyb se skutečnou bankovní referencí — u vkladu hotovosti bez reference nelze vyloučit, že jde o duplikát, tak ho pošle člověku.',
+            '<b>Nejasné platby dostanou nápovědu:</b> místo pouhého „k prověření" CRM napíše proč a co navrhuje — <b>číslo faktury vytažené ze zprávy pro příjemce</b>, u platby bez VS <b>fakturu klienta, který dřív platil z téhož účtu</b>, a u přeplatku informaci, že <b>částka odpovídá součtu dvou/tří faktur</b> téhož klienta (typicky firma platí víc faktur jedním převodem).',
+            '<b>CRM se učí účty klientů:</b> každé ruční spárování si zapamatuje „z tohoto účtu platí tenhle klient" a příště podle toho nabízí. Slouží to <b>jen jako návrh</b> — z jednoho účtu může platit i třetí osoba, takže automaticky se podle účtu nikdy nic nezaplatí.',
+            '<b>Přeplatek se nikdy nezapíše sám:</b> nejčastější příčina přeplatku je platba za víc faktur nebo záloha — automatické uzavření té menší faktury by tu větší poslalo do upomínek.',
+            '<b>Test nanečisto</b> pokrývá i tyhle případy (30 kontrol) a součástí každého běhu je kontrola, že u žádné faktury nesedí uložená zaplacená částka jinak než součet evidovaných plateb.',
+        ],
+    ],
+    [
         'version' => '3.23.0',
         'date' => '2026-07-30',
         'time' => '08:30',

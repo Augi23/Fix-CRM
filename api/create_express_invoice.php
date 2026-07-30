@@ -61,7 +61,14 @@ try {
             WHERE id = ?");
         
         $status = $_POST['status'] ?? 'issued';
-        $payment_date = ($status == 'paid') ? date('Y-m-d') : null;
+        // datum platby se přebírá, když faktura zaplacená už byla (jinak by editace
+        // přepsala datum, kdy peníze reálně přišly)
+        $payment_date = null;
+        if ($status == 'paid') {
+            $pv = $pdo->prepare("SELECT payment_date FROM invoices WHERE id = ?");
+            $pv->execute([$invoice_id]);
+            $payment_date = (string)$pv->fetchColumn() ?: date('Y-m-d');
+        }
 
         $stmt->execute([
             $invoice_number,
@@ -76,7 +83,12 @@ try {
             $payment_date,
             $invoice_id
         ]);
-        
+
+        // evidence plateb musí odpovídat stavu (ruční „zaplaceno" hotově/kartou si zapíše platbu)
+        if (function_exists('afxInvoiceSyncManualStatus')) {
+            afxInvoiceSyncManualStatus((int)$invoice_id, (string)$status, $_POST['payment_method'] ?? null);
+        }
+
         // Update invoice item
         $stmt_check = $pdo->prepare("SELECT id FROM invoice_items WHERE invoice_id = ?");
         $stmt_check->execute([$invoice_id]);

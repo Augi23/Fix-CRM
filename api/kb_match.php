@@ -27,6 +27,7 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 
 ensureBankTables();
 afxEnsureInvoicePayments();
+afxEnsureCustomerBankAccounts();
 $action = (string)($_POST['action'] ?? 'match');
 $txId = (int)($_POST['tx_id'] ?? 0);
 
@@ -106,6 +107,14 @@ try {
     $pdo->prepare("UPDATE bank_transactions SET matched_invoice_id = ?, match_status = 'manual',
         matched_at = NOW(), match_note = 'Ručně spárováno' WHERE id = ?")
         ->execute([$invoiceId, $txId]);
+
+    // CRM si zapamatuje, že z tohoto účtu platí tenhle klient — příště u platby bez VS
+    // nabídne jeho otevřené faktury (jen jako návrh, viz afxLearnCustomerAccount)
+    if (!empty($tx['counterparty_account'])) {
+        $cu = $pdo->prepare("SELECT customer_id FROM invoices WHERE id = ?");
+        $cu->execute([$invoiceId]);
+        afxLearnCustomerAccount((int)$cu->fetchColumn(), (string)$tx['counterparty_account']);
+    }
 
     $after = afxInvoiceRecalcPaid($invoiceId);
     $fullyPaid = $after['remaining'] <= 0;

@@ -773,9 +773,9 @@
    "faktura_stav": "paid"
   },
   {
-   "popis": "částečná platba fakturu NEZAPLATÍ (jde k prověření)",
+   "popis": "částečná platba 2 000 z 4 500 se zapíše AUTOMATICKY, faktura zůstává nezaplacená",
    "entry_ref": "KB-2026-0000003",
-   "match_status": "review",
+   "match_status": "auto",
    "faktura": "2026002",
    "faktura_stav": "issued"
   },
@@ -787,23 +787,23 @@
    "faktura_stav": "issued"
   },
   {
-   "popis": "první splátka nezaplatí fakturu 2026006",
+   "popis": "první splátka 1 500 z 3 000 se zapíše automaticky (stav faktury řeší až doplatek)",
    "entry_ref": "KB-2026-0000005",
-   "match_status": "review",
-   "faktura": "2026006",
-   "faktura_stav": "issued"
-  },
-  {
-   "popis": "druhá splátka taky ne (součet splátek zatím neumíme)",
-   "entry_ref": "KB-2026-0000006",
-   "match_status": "review",
+   "match_status": "auto",
    "faktura": "2026006"
   },
   {
-   "popis": "platba bez VS zůstane nespárovaná",
+   "popis": "druhá splátka 1 500 fakturu 2026006 doplatí → ZAPLACENO",
+   "entry_ref": "KB-2026-0000006",
+   "match_status": "auto",
+   "faktura": "2026006",
+   "faktura_stav": "paid"
+  },
+  {
+   "popis": "číslo faktury jen ve zprávě → návrh k prověření, ne automatické zaplacení",
    "entry_ref": "KB-2026-0000007",
-   "match_status": "none",
-   "faktura": ""
+   "match_status": "review",
+   "faktura": "2026007"
   },
   {
    "popis": "storno se uloží a vyřadí z párování",
@@ -837,9 +837,9 @@
    "match_status": "auto"
   },
   {
-   "popis": "vklad hotovosti bez reference zaplatí fakturu 2026010",
+   "popis": "vklad hotovosti bez bankovní reference fakturu 2026010 NEUZAVŘE sám",
    "faktura": "2026010",
-   "faktura_stav": "paid"
+   "faktura_stav": "issued"
   },
   {
    "popis": "druhá platba na už zaplacenou fakturu jde k prověření",
@@ -869,15 +869,10 @@
    "faktura": "2026012B"
   },
   {
-   "popis": "u drobné částky se musí trefit přesně (60 vs 60,50)",
+   "popis": "60 Kč z faktury na 60,50 se zapíše jako částečná platba",
    "entry_ref": "KB-2026-0000019",
-   "match_status": "review",
+   "match_status": "auto",
    "faktura": "2026013",
-   "faktura_stav": "issued"
-  },
-  {
-   "popis": "faktura 2026007 (platba bez VS) zůstává nezaplacená",
-   "faktura": "2026007",
    "faktura_stav": "issued"
   },
   {
@@ -898,6 +893,11 @@
   {
    "popis": "nezaúčtovaná platba nezaplatila fakturu 2026009",
    "faktura": "2026009",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "faktura 2026007 zůstává nezaplacená (jen návrh)",
+   "faktura": "2026007",
    "faktura_stav": "issued"
   }
  ]

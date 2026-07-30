@@ -253,6 +253,18 @@ try {
     afxInvoiceRemoveBankPayment($txRow);
     $check('odpárování platby 5 000 → zpět nezaplacená, zaplaceno 3 500', 3500.00, 'issued');
 
+    // navýšení částky faktury, na které už visí platby → není celá uhrazená
+    $pdo->prepare("UPDATE invoice_payments SET amount = 9500 WHERE invoice_id = ? AND amount = 3000")->execute([$partId]);
+    afxInvoiceRecalcPaid($partId, true);
+    $check('platby 10 000 na fakturu 8 500 → ZAPLACENO (přeplatek stavu nebrání)', 10000.00, 'paid');
+    $pdo->prepare("UPDATE invoices SET total_amount = 12000 WHERE id = ?")->execute([$partId]);
+    afxInvoiceRecalcPaid($partId, true);
+    $check('navýšení faktury na 12 000 → zpět nezaplacená (platby ji nekryjí)', 10000.00, 'issued');
+    // zpět do původního stavu pro následné výpisy
+    $pdo->prepare("UPDATE invoices SET total_amount = 8500 WHERE id = ?")->execute([$partId]);
+    $pdo->prepare("UPDATE invoice_payments SET amount = 3000 WHERE invoice_id = ? AND amount = 9500")->execute([$partId]);
+    afxInvoiceRecalcPaid($partId, true);
+
     $info = afxInvoicePaymentInfo($pdo->query("SELECT * FROM invoices WHERE id = $partId")->fetch(PDO::FETCH_ASSOC));
     if (abs($info['remaining'] - 5000.00) < 0.01 && $info['partial']) {
         out('  ' . green('OK  ') . 'zbytek k úhradě 5 000 Kč a příznak „částečně zaplaceno"');

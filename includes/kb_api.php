@@ -204,6 +204,41 @@ function kbTxCancelled(string $status): bool {
     return $status !== '' && (str_starts_with($status, 'CANC') || str_starts_with($status, 'RJCT') || str_starts_with($status, 'RVSD'));
 }
 
+/** Naučené účty klientů (migrace 038) — pojistka, když kód předběhne migraci. */
+function afxEnsureCustomerBankAccounts(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS customer_bank_accounts (
+            id INT NOT NULL AUTO_INCREMENT,
+            customer_id INT NOT NULL,
+            account VARCHAR(64) NOT NULL,
+            matched_count INT NOT NULL DEFAULT 1,
+            first_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_customer_account (customer_id, account),
+            KEY idx_cba_account (account)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('afxEnsureCustomerBankAccounts: ' . $e->getMessage()); }
+}
+
+/** Zapamatování „z tohoto účtu platí tenhle klient" — učí se z RUČNÍHO párování.
+ *  Slouží jen k návrhům u plateb bez VS, nikdy k automatickému zaplacení. */
+function afxLearnCustomerAccount(int $customerId, string $account): void {
+    global $pdo;
+    afxEnsureCustomerBankAccounts();
+    $account = trim($account);
+    if ($customerId <= 0 || $account === '') { return; }
+    try {
+        $pdo->prepare("INSERT INTO customer_bank_accounts (customer_id, account)
+            VALUES (?, ?) ON DUPLICATE KEY UPDATE matched_count = matched_count + 1, last_seen = NOW()")
+            ->execute([$customerId, mb_substr($account, 0, 64)]);
+    } catch (Throwable $e) { error_log('afxLearnCustomerAccount: ' . $e->getMessage()); }
+}
+
 /** Posledních 10 číslic z VS/čísla faktury — jediný tvar, na kterém se shodne
  *  QR platba (SPAYD dovolí max 10 znaků) i párovač. Dřív QR posílala PRVNÍCH 10
  *  číslic, ale párovač porovnával POSLEDNÍCH 10, takže platba z QR kódu u delšího
@@ -414,16 +449,25 @@ function kbApplyReversals(?string $env = null, ?string $accountId = null): int {
 /**
  * Auto-párování příchozích plateb s fakturami.
  *
- * Automaticky (a tedy bez člověka) se faktura označí ZAPLACENO jen tehdy, když
- * o tom není pochyb — VS sedí právě JEDNÉ nezaplacené faktuře, částka odpovídá
- * a platba nemohla přijít dřív, než faktura vznikla. Cokoli jiného skončí
- * „k prověření" s vysvětlením proč. Zásada: raději nechat člověka rozhodnout,
- * než tvrdit, že peníze dorazily.
+ * Rozhoduje podle jednoho pravidla: AUTOMATICKY se zapíše jen platba, u které není
+ * pochyb, komu patří — variabilní symbol musí sednout PRÁVĚ JEDNÉ otevřené faktuře,
+ * platba nesmí být starší než faktura a nesmí přijít víc, než kolik na faktuře zbývá.
+ * Částečná platba se zapíše a faktuře zůstane zbytek k úhradě; zaplacená je teprve
+ * tehdy, když ji platby pokryjí celou.
+ *
+ * Všechno ostatní jde „k prověření" — ale s konkrétním návrhem a důvodem:
+ *   • přeplatek (nejčastěji jde o platbu za dvě faktury nebo zálohu),
+ *   • VS sedící víc fakturám,
+ *   • číslo faktury nalezené jen ve zprávě pro příjemce,
+ *   • platba bez VS z účtu, který CRM zná od dřívějšího ručního párování,
+ *   • částka odpovídající SOUČTU víc otevřených faktur téhož klienta.
  *
  * Vrací [spárováno, k prověření].
  */
 function kbAutoMatchInvoices(?string $env = null, ?string $accountId = null): array {
     global $pdo;
+    afxEnsureInvoicePayments();
+    afxEnsureCustomerBankAccounts();
     $matched = 0; $review = 0;
     $env = $env ?? kbApiEnv();
     $accountId = $accountId ?? (string)get_setting('kb_account_id', '');
@@ -437,57 +481,85 @@ function kbAutoMatchInvoices(?string $env = null, ?string $accountId = null): ar
     $txq = $pdo->prepare("SELECT * FROM bank_transactions
         WHERE direction = 'in' AND currency = 'CZK' AND is_reversal = 0
           AND match_status IN ('none', 'review')
-          AND env = ? AND account_id = ? AND vs IS NOT NULL AND vs != ''
+          AND env = ? AND account_id = ?
           AND (booking_date IS NULL OR booking_date >= DATE_SUB(CURDATE(), INTERVAL 180 DAY))
         ORDER BY booking_date, id");
     $txq->execute([$env, $accountId]);
     $txs = $txq->fetchAll(PDO::FETCH_ASSOC);
 
-    // kandidáti: přesná shoda VS/čísla + shoda po odstranění nečíselných znaků
+    // kandidáti podle VS: přesná shoda VS/čísla + shoda po odstranění nečíselných znaků
     // (QR platba posílá jen číslice — nečíselná řada faktur by se jinak nikdy nespárovala)
-    $cq = $pdo->prepare("SELECT i.id, i.invoice_number, i.total_amount, i.status, i.date_issue, i.payment_method,
-            (SELECT COUNT(*) FROM bank_transactions b
-              WHERE b.matched_invoice_id = i.id AND b.match_status IN ('auto','manual') AND b.id <> ?) AS jine_platby
+    $byVs = $pdo->prepare("SELECT i.id, i.invoice_number, i.total_amount, i.paid_amount, i.status,
+                                  i.date_issue, i.payment_method, i.customer_id
         FROM invoices i
         WHERE i.invoice_type = 'invoice' AND i.status <> 'cancelled' AND (
             i.variable_symbol = ? OR i.invoice_number = ?
             OR RIGHT(REGEXP_REPLACE(COALESCE(i.variable_symbol, ''), '[^0-9]', ''), 10) = ?
             OR RIGHT(REGEXP_REPLACE(COALESCE(i.invoice_number, ''), '[^0-9]', ''), 10) = ?
         ) ORDER BY i.id DESC LIMIT 20");
-    $claim = $pdo->prepare("UPDATE invoices SET status = 'paid', payment_date = ?
-        WHERE id = ? AND status IN ('issued', 'overdue')");
+    // otevřené faktury klienta (pro platby bez VS podle naučeného účtu)
+    $byCustomer = $pdo->prepare("SELECT i.id, i.invoice_number, i.total_amount, i.paid_amount, i.status,
+                                        i.date_issue, i.payment_method, i.customer_id
+        FROM invoices i
+        WHERE i.invoice_type = 'invoice' AND i.status IN ('issued','overdue') AND i.customer_id = ?
+        ORDER BY i.id DESC LIMIT 20");
+    $accToCustomer = $pdo->prepare("SELECT customer_id FROM customer_bank_accounts
+        WHERE account = ? ORDER BY matched_count DESC LIMIT 2");
     $mark = $pdo->prepare("UPDATE bank_transactions
         SET matched_invoice_id = ?, match_status = ?, matched_at = NOW(), match_note = ? WHERE id = ?");
 
+    $remainingOf = static function (array $c): float {
+        $total = round((float)$c['total_amount'], 2);
+        $paid = round((float)($c['paid_amount'] ?? 0), 2);
+        if ((string)$c['status'] === 'paid' && $paid <= 0) { $paid = $total; }
+        return max(0.0, round($total - $paid, 2));
+    };
+
     foreach ($txs as $tx) {
-        $vs = (string)$tx['vs'];
+        $vs = trim((string)($tx['vs'] ?? ''));
         $vsDigits = afxVsDigits($vs);
         $amount = (float)$tx['amount'];
         $wasReview = (string)$tx['match_status'] === 'review';
         $payDate = (string)$tx['booking_date'] ?: date('Y-m-d');
+        // pohyb bez skutečné bankovní reference (klíč jsme si museli dopočítat) NESMÍ
+        // uzavřít fakturu automaticky — u něj nelze s jistotou vylučit, že jde o duplikát
+        $hasRealRef = !str_starts_with((string)$tx['entry_ref'], 'h-');
 
-        $cq->execute([(int)$tx['id'], $vs, $vs, $vsDigits, $vsDigits]);
-        $cands = $cq->fetchAll(PDO::FETCH_ASSOC);
-        if (!$cands) { continue; }   // VS nikam nepatří — necháváme nespárované, ať jde vidět
+        // ── 1) kdo je kandidát a jak jsme ho našli ────────────────────────────
+        $cands = []; $source = '';
+        if ($vs !== '') {
+            $byVs->execute([$vs, $vs, $vsDigits, $vsDigits]);
+            $cands = $byVs->fetchAll(PDO::FETCH_ASSOC);
+            if ($cands) { $source = 'vs'; }
+        }
+        if (!$cands) {
+            // číslo faktury napsané ve zprávě pro příjemce („uhrada faktury c. 2026007")
+            $msg = (string)($tx['message'] ?? '');
+            foreach (array_slice(array_reverse(preg_split('/\D+/', $msg, -1, PREG_SPLIT_NO_EMPTY) ?: []), 0, 4) as $num) {
+                if (strlen((string)$num) < 4) { continue; }
+                $byVs->execute([$num, $num, afxVsDigits((string)$num), afxVsDigits((string)$num)]);
+                $found = $byVs->fetchAll(PDO::FETCH_ASSOC);
+                if ($found) { $cands = $found; $source = 'zpráva'; break; }
+            }
+        }
+        if (!$cands && trim((string)($tx['counterparty_account'] ?? '')) !== '') {
+            // platba bez VS z účtu, který známe od dřívějšího ručního párování
+            $accToCustomer->execute([trim((string)$tx['counterparty_account'])]);
+            $custIds = array_map('intval', $accToCustomer->fetchAll(PDO::FETCH_COLUMN));
+            if (count($custIds) === 1) {
+                $byCustomer->execute([$custIds[0]]);
+                $cands = $byCustomer->fetchAll(PDO::FETCH_ASSOC);
+                if ($cands) { $source = 'účet'; }
+            }
+        }
+        if (!$cands) { continue; }   // nemáme se čeho chytit — pohyb zůstává nespárovaný
 
-        // vhodní kandidáti pro AUTOMATICKÉ zaplacení
-        $fit = []; $reason = '';
+        // ── 2) které z nich vůbec můžou platbu přijmout ───────────────────────
+        $open = []; $reason = '';
         foreach ($cands as $c) {
-            $total = (float)$c['total_amount'];
-            // tolerance na haléřové zaokrouhlení, ale u drobných částek se musí trefit přesně
-            $tol = $total >= 100 ? 1.0 : 0.0;
-            if (!in_array((string)$c['status'], ['issued', 'overdue'], true)) {
-                $reason = $reason ?: 'faktura ' . $c['invoice_number'] . ' už není nezaplacená (' . $c['status'] . ')';
-                continue;
-            }
-            if ((int)$c['jine_platby'] > 0) {
-                $reason = $reason ?: 'na faktuře ' . $c['invoice_number'] . ' už je navázaná jiná platba';
-                continue;
-            }
-            if (abs($total - $amount) > $tol) {
-                $reason = $reason ?: ($amount < $total
-                    ? 'přišlo méně, než je na faktuře ' . $c['invoice_number'] . ' (' . formatMoney($amount) . ' z ' . formatMoney($total) . ')'
-                    : 'přišlo více, než je na faktuře ' . $c['invoice_number'] . ' (' . formatMoney($amount) . ' místo ' . formatMoney($total) . ')');
+            $rem = $remainingOf($c);
+            if (!in_array((string)$c['status'], ['issued', 'overdue'], true) || $rem <= 0) {
+                $reason = $reason ?: 'faktura ' . $c['invoice_number'] . ' je už uhrazená';
                 continue;
             }
             // platba nemůže být starší než faktura (jinak by se dnešní VS trefil do
@@ -497,43 +569,100 @@ function kbAutoMatchInvoices(?string $env = null, ?string $accountId = null): ar
                 $reason = $reason ?: 'platba je starší než faktura ' . $c['invoice_number'];
                 continue;
             }
-            $fit[] = $c;
+            $open[] = $c + ['zbyva' => $rem];
         }
 
-        if (count($fit) === 1) {
-            $inv = $fit[0];
-            // nárok na fakturu se uplatňuje ATOMICKY — když ji mezitím zaplatil někdo
-            // jiný (druhý sync, ruční párování), UPDATE nic nezmění a platba jde k prověření
-            $claim->execute([$payDate, (int)$inv['id']]);
-            if ($claim->rowCount() === 1) {
-                $mark->execute([(int)$inv['id'], 'auto', 'VS i částka sedí', (int)$tx['id']]);
-                // evidence konkrétní platby (základ částečných plateb a doplatků)
-                afxInvoiceAddPayment((int)$inv['id'], $amount, 'bank', $payDate, (int)$tx['id'],
-                    'Automatické párování — VS ' . $vs);
-                crmAuditLog('banka.match', [
-                    'entity_type' => 'invoice', 'entity_id' => (int)$inv['id'], 'entity_label' => (string)$inv['invoice_number'],
-                    'summary' => 'Faktura ' . $inv['invoice_number'] . ' automaticky spárována s platbou '
-                        . formatMoney($amount) . ' (VS ' . $vs . ', ' . ($tx['counterparty_name'] ?: 'bez názvu') . ') a označena ZAPLACENO',
-                ]);
-                $matched++;
-                continue;
+        // ── 3) rozhodnutí ────────────────────────────────────────────────────
+        if (count($open) === 1 && $source === 'vs') {
+            $inv = $open[0];
+            $rem = (float)$inv['zbyva'];
+            $tol = afxPayTolerance((float)$inv['total_amount']);
+            if ($amount > $rem + $tol) {
+                $reason = 'přišlo víc, než na faktuře ' . $inv['invoice_number'] . ' zbývá ('
+                    . formatMoney($amount) . ' proti ' . formatMoney($rem) . ') — může jít o platbu za víc faktur';
+            } else {
+                $closes = $amount >= $rem - $tol;
+                if ($closes && !$hasRealRef) {
+                    $reason = 'platba bez bankovní reference by fakturu ' . $inv['invoice_number']
+                        . ' uzavřela — potvrď ručně';
+                } else {
+                    if (afxInvoiceAddPayment((int)$inv['id'], $amount, 'bank', $payDate, (int)$tx['id'],
+                            'Automatické párování — VS ' . $vs)) {
+                        // pojistka proti souběhu: kdyby mezitím fakturu (do)platil někdo
+                        // jiný, platba by ji přeplatila → radši ji zrušit a nechat člověku
+                        $after = afxInvoiceRecalcPaid((int)$inv['id']);
+                        if ($after['paid'] > $after['total'] + $tol) {
+                            afxInvoiceRemoveBankPayment((int)$tx['id']);
+                            $reason = 'faktura ' . $inv['invoice_number'] . ' byla mezitím uhrazena jinou platbou';
+                        } else {
+                            $note = $closes
+                                ? 'Doplatek — faktura ' . $inv['invoice_number'] . ' uhrazena'
+                                : 'Částečná platba — na faktuře ' . $inv['invoice_number'] . ' zbývá '
+                                  . formatMoney($after['remaining']);
+                            $mark->execute([(int)$inv['id'], 'auto', mb_substr($note, 0, 255), (int)$tx['id']]);
+                            crmAuditLog('banka.match', [
+                                'entity_type' => 'invoice', 'entity_id' => (int)$inv['id'],
+                                'entity_label' => (string)$inv['invoice_number'],
+                                'summary' => 'Faktura ' . $inv['invoice_number'] . ' — automaticky navázána platba '
+                                    . formatMoney($amount) . ' (VS ' . $vs . ', ' . ($tx['counterparty_name'] ?: 'bez názvu') . '); '
+                                    . ($closes ? 'označena ZAPLACENO' : 'zbývá ' . formatMoney($after['remaining'])),
+                            ]);
+                            $matched++;
+                            continue;
+                        }
+                    } else {
+                        $reason = 'platba už je k faktuře ' . $inv['invoice_number'] . ' navázaná';
+                    }
+                }
             }
-            $reason = 'faktura ' . $inv['invoice_number'] . ' byla mezitím zaplacena jinou platbou';
-        } elseif (count($fit) > 1) {
-            $reason = 'VS ' . $vs . ' sedí na víc nezaplacených faktur ('
-                . implode(', ', array_map(fn($c) => (string)$c['invoice_number'], array_slice($fit, 0, 3))) . ')';
+        } elseif (count($open) > 1 && $source === 'vs') {
+            $reason = 'VS ' . $vs . ' sedí na víc otevřených faktur ('
+                . implode(', ', array_map(fn($c) => (string)$c['invoice_number'], array_slice($open, 0, 3))) . ')';
+        } elseif ($open && $source === 'zpráva') {
+            $reason = 'platba nemá VS, číslo faktury ' . $open[0]['invoice_number']
+                . ' je jen ve zprávě pro příjemce — potvrď ručně';
+        } elseif ($open && $source === 'účet') {
+            $reason = 'platba bez VS z účtu, ze kterého dřív platil tenhle klient — nabízím fakturu '
+                . $open[0]['invoice_number'] . ' (zbývá ' . formatMoney((float)$open[0]['zbyva']) . ')';
         }
 
-        // k prověření: nabídne se nejpravděpodobnější faktura, ale NIC se neoznačí zaplacené
-        $suggest = $fit[0] ?? null;
-        foreach ($cands as $c) {
-            if ($suggest === null && in_array((string)$c['status'], ['issued', 'overdue'], true)) { $suggest = $c; }
+        // nápověda u přeplatku: neodpovídá částka SOUČTU dvou otevřených faktur klienta?
+        $suggest = $open[0] ?? $cands[0];
+        if (!empty($suggest['customer_id'])) {
+            $pair = kbFindInvoiceCombination($pdo, (int)$suggest['customer_id'], $amount);
+            if ($pair) { $reason .= ' · částka odpovídá součtu faktur ' . implode(' + ', $pair); }
         }
-        $suggest = $suggest ?? $cands[0];
+
         $mark->execute([(int)$suggest['id'], 'review', mb_substr($reason ?: 'nejednoznačná platba', 0, 255), (int)$tx['id']]);
         if (!$wasReview) { $review++; }
     }
     return [$matched, $review];
+}
+
+/** Neodpovídá částka součtu dvou nebo tří otevřených faktur téhož klienta? (nápověda
+ *  k prověření u sdružených platebních příkazů — firemní klienti platí několik faktur
+ *  jedním převodem). Vrací čísla faktur, nebo [] když nic nesedí. */
+function kbFindInvoiceCombination(PDO $pdo, int $customerId, float $amount): array {
+    if ($customerId <= 0 || $amount <= 0) { return []; }
+    $q = $pdo->prepare("SELECT invoice_number, (total_amount - paid_amount) zbyva FROM invoices
+        WHERE customer_id = ? AND invoice_type = 'invoice' AND status IN ('issued','overdue')
+          AND (total_amount - paid_amount) > 0 ORDER BY id DESC LIMIT 8");
+    $q->execute([$customerId]);
+    $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+    $n = count($rows);
+    for ($i = 0; $i < $n; $i++) {
+        for ($j = $i + 1; $j < $n; $j++) {
+            if (abs(((float)$rows[$i]['zbyva'] + (float)$rows[$j]['zbyva']) - $amount) <= 1.0) {
+                return [(string)$rows[$i]['invoice_number'], (string)$rows[$j]['invoice_number']];
+            }
+            for ($k = $j + 1; $k < $n; $k++) {
+                if (abs(((float)$rows[$i]['zbyva'] + (float)$rows[$j]['zbyva'] + (float)$rows[$k]['zbyva']) - $amount) <= 1.0) {
+                    return [(string)$rows[$i]['invoice_number'], (string)$rows[$j]['invoice_number'], (string)$rows[$k]['invoice_number']];
+                }
+            }
+        }
+    }
+    return [];
 }
 
 /** České číslo účtu („[prefix-]číslo/kód") → IBAN CZ. Prázdné/nečitelné → ''. */

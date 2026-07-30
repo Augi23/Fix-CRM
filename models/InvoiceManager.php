@@ -166,7 +166,12 @@ private function getInvoiceStatusBadge($status) {
             // změna položek mohla změnit celkovou částku → srovnat evidenci plateb
             // (bez allowUnpay: ruční „zaplaceno" se editací nesmí zrušit)
             if (function_exists('afxInvoiceRecalcPaid')) {
-                afxInvoiceRecalcPaid((int)$invoice_id);
+                // Zvýšení celkové částky u faktury s evidovanými platbami znamená, že už
+                // není celá uhrazená → smí spadnout zpět mezi nezaplacené. U faktur BEZ
+                // evidovaných plateb (hotovost, starší doklady) se stav nesnižuje nikdy.
+                $pc = $this->pdo->prepare("SELECT COUNT(*) FROM invoice_payments WHERE invoice_id = ?");
+                $pc->execute([$invoice_id]);
+                afxInvoiceRecalcPaid((int)$invoice_id, (int)$pc->fetchColumn() > 0);
                 if ($status === 'paid') { afxInvoiceSyncManualStatus((int)$invoice_id, 'paid', $payment_method); }
             }
             return ['success' => true, 'id' => $invoice_id];
