@@ -125,6 +125,7 @@ function kbHandleBankReturn(string $back): void {
         }
         if (count($accounts) === 1 && $accounts[0]['accountId'] !== '') {
             set_setting('kb_account_id', $accounts[0]['accountId']);
+            set_setting('kb_account_currency', $accounts[0]['currency'] ?: 'CZK');
         }
         $_SESSION['kb_accounts'] = $accounts;
 

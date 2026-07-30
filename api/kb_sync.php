@@ -40,6 +40,12 @@ try {
                 'currency' => (string)($a['currency'] ?? 'CZK'),
             ];
         }
+        // měna vybraného účtu — podle ní se pozná, kolik na účet doopravdy dorazilo
+        // u plateb v cizí měně (viz kbTxAmount)
+        $sel = (string)get_setting('kb_account_id', '');
+        foreach ($list as $a) {
+            if ($a['accountId'] === $sel && $a['currency'] !== '') { set_setting('kb_account_currency', $a['currency']); }
+        }
         echo json_encode(['success' => true, 'accounts' => $list], JSON_UNESCAPED_UNICODE); exit;
     }
 

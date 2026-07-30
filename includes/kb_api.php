@@ -326,26 +326,54 @@ function ensureBankTables(): void {
     }
 }
 
-/** Částka, měna a směr pohybu z odpovědi ADAA.
- *  Vrací [částka (vždy kladná) | null když je nečitelná, měna, 'in'|'out'].
- *  Směr primárně z creditDebitIndicator (CREDIT/CRDT vs DEBIT/DBIT); když ho banka
- *  nepošle, rozhodne znaménko částky — jinak by se všechny příjmy uložily jako výdaje
- *  a párování by nenašlo vůbec nic. */
-function kbTxAmount(array $t): array {
-    $raw = $t['amount'] ?? null;
-    if (is_array($raw)) {
-        $val = $raw['value'] ?? $raw['amount'] ?? null;
-        $cur = (string)($raw['currency'] ?? '');
-    } else {
-        $val = $raw;
-        $cur = (string)($t['currency'] ?? '');
+/** Měna napojeného účtu (podle ní se pozná, kolik na účet doopravdy dorazilo). */
+function kbAccountCurrency(): string {
+    $c = strtoupper(trim((string)get_setting('kb_account_currency', '')));
+    return $c !== '' ? $c : 'CZK';
+}
+
+/**
+ * Částka, měna a směr pohybu z odpovědi ADAA.
+ * Vrací [částka (vždy kladná) | null když je nečitelná, měna, 'in'|'out', původní částka].
+ *
+ * POZOR NA CIZÍ MĚNY: banka posílá dvě částky — `amount` a `instructed` — a NENÍ pevně
+ * dané, ve které z nich je měna účtu. Ověřeno na testovacích datech KB: jednou přišlo
+ * amount 681,81 CZK / instructed 27,28 EUR, jindy amount 4,21 USD / instructed 99,78 CZK.
+ * Na účet přitom vždy dorazí částka v MĚNĚ ÚČTU, a jen ta se smí párovat s fakturou —
+ * proto se vybírá ta, jejíž měna sedí na měnu účtu. Původní částka se zachová jako
+ * poznámka, ať je v pohybu vidět, že klient platil v cizí měně.
+ *
+ * Směr primárně z creditDebitIndicator (CREDIT/CRDT vs DEBIT/DBIT); když ho banka
+ * nepošle, rozhodne znaménko částky — jinak by se všechny příjmy uložily jako výdaje.
+ */
+function kbTxAmount(array $t, ?string $accountCurrency = null): array {
+    $accountCurrency = strtoupper($accountCurrency ?? kbAccountCurrency());
+    $read = static function ($node, array $t = []): ?array {
+        if (is_array($node)) {
+            $v = $node['value'] ?? $node['amount'] ?? null;
+            $c = strtoupper((string)($node['currency'] ?? ''));
+        } else {
+            $v = $node;
+            $c = strtoupper((string)($t['currency'] ?? ''));
+        }
+        return ($v === null || !is_numeric($v)) ? null : ['v' => (float)$v, 'c' => $c ?: 'CZK'];
+    };
+    $main = $read($t['amount'] ?? null, $t);
+    $instr = $read($t['instructed'] ?? null, $t);
+
+    $use = $main;
+    $orig = null;
+    if ($main && $instr && $main['c'] !== $instr['c']) {
+        if ($main['c'] === $accountCurrency)      { $use = $main;  $orig = $instr; }
+        elseif ($instr['c'] === $accountCurrency) { $use = $instr; $orig = $main; }
     }
+
     $ind = strtoupper(trim((string)($t['creditDebitIndicator'] ?? '')));
     $dir = in_array($ind, ['CREDIT', 'CRDT'], true) ? 'in'
         : (in_array($ind, ['DEBIT', 'DBIT'], true) ? 'out' : null);
-    if ($val === null || !is_numeric($val)) { return [null, $cur ?: 'CZK', $dir ?? 'in']; }
-    $val = (float)$val;
-    return [abs($val), $cur ?: 'CZK', $dir ?? ($val >= 0 ? 'in' : 'out')];
+    if (!$use) { return [null, $accountCurrency, $dir ?? 'in', null]; }
+    return [abs($use['v']), $use['c'], $dir ?? ($use['v'] >= 0 ? 'in' : 'out'),
+            $orig ? (rtrim(rtrim(number_format($orig['v'], 2, ',', ' '), '0'), ',') . ' ' . $orig['c']) : null];
 }
 
 /** Je pohyb podle banky zaúčtovaný? (ISO 20022: BOOK = zaúčtováno, PDNG = čeká,
@@ -484,7 +512,7 @@ function kbIngestTransactions(array $txs, string $accountId, ?string $env = null
         $fetched++;
         $txStatus = strtoupper(trim((string)($t['status'] ?? '')));
         $isReversal = !empty($t['reversalIndicator']) ? 1 : 0;
-        [$amount, $currency, $direction] = kbTxAmount($t);
+        [$amount, $currency, $direction, $origAmount] = kbTxAmount($t);
         // nečitelná nebo nulová částka: raději neuložit nic než uložit 0 Kč, která by
         // se tvářila jako platba (a při párování mohla „vyrovnat" fakturu)
         if ($amount === null || $amount <= 0) { $skipped++; continue; }
@@ -495,6 +523,8 @@ function kbIngestTransactions(array $txs, string $accountId, ?string $env = null
         if ($cpAcc !== '' && !empty($cp['bankCode'])) { $cpAcc .= '/' . $cp['bankCode']; }
         elseif ($cpAcc === '') { $cpAcc = (string)($cp['iban'] ?? ''); }
         $msg = trim((string)($refs['receiver'] ?? $t['additionalTransactionInformation'] ?? ''));
+        // u platby v cizí měně je vidět, kolik klient poslal původně
+        if ($origAmount !== null) { $msg = trim($msg . ' (původně ' . $origAmount . ')'); }
         $ref = trim((string)($t['entryReference'] ?? ''));
         if ($ref === '') {
             // pojistka bez reference: hash JEN ze stabilních polí (celý JSON obsahuje

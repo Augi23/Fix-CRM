@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.26.0',
+        'date' => '2026-07-30',
+        'time' => '17:05',
+        'title' => 'Platby v cizí měně: CRM bere částku, která opravdu dorazila na účet',
+        'items' => [
+            '<b>Nález z testu v sandboxu:</b> banka u pohybu posílá <b>dvě částky</b> — a není pevně dané, ve které z nich je měna účtu. U jedné testovací platby přišlo <code>681,81 CZK / 27,28 EUR</code>, u druhé obráceně <code>4,21 USD / 99,78 CZK</code>. CRM dosud bralo vždy tu první, takže u platby ze zahraničí evidovalo <b>4,21 místo 99,78 Kč</b> — a taková platba se navíc tvářila jako cizoměnová, takže se vůbec nedala spárovat s fakturou.',
+            '<b>Opraveno:</b> vybírá se ta částka, jejíž měna sedí na <b>měnu napojeného účtu</b> (na účet vždycky dorazí peníze v jeho měně). Původní částka se zapíše do zprávy u pohybu — v seznamu je tedy vidět „(původně 4,21 USD)".',
+            '<b>Měna účtu</b> se ukládá automaticky při autorizaci i při načtení účtů v Nastavení.',
+        ],
+    ],
+    [
         'version' => '3.25.6',
         'date' => '2026-07-30',
         'time' => '16:30',
