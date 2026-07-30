@@ -980,6 +980,14 @@ require_once 'includes/header.php';
                 unset($_SESSION['kb_connect_ok'], $_SESSION['kb_connect_error']);
                 $__kbAccounts = $_SESSION['kb_accounts'] ?? [];
                 unset($_SESSION['kb_accounts']);
+                // záložní hláška z callbacku (návrat z banky mohl přijít bez přihlášení)
+                $__kbSaved = trim((string)get_setting('kb_connect_msg', ''));
+                if ($__kbSaved !== '' && $__kbOk === '' && $__kbErr === '') {
+                    if (str_starts_with($__kbSaved, 'CHYBA: ')) { $__kbErr = substr($__kbSaved, 7); }
+                    else { $__kbOk = $__kbSaved; }
+                    $__kbErr .= $__kbErr !== '' ? ' (z posledního návratu z banky ' . e((string)get_setting('kb_connect_msg_at', '')) . ')' : '';
+                    set_setting('kb_connect_msg', '');
+                }
                 $__krok = function (bool $done, string $text, string $note = ''): string {
                     return '<li class="d-flex gap-2 align-items-start mb-1">'
                         . ($done ? '<i class="fas fa-circle-check text-success mt-1"></i>' : '<i class="fas fa-circle text-white-50 mt-1" style="opacity:.4;"></i>')

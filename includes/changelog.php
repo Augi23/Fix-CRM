@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.25.1',
+        'date' => '2026-07-30',
+        'time' => '13:55',
+        'title' => 'Oprava: návrat z banky se ztrácel (registrace aplikace nikdy nedoběhla)',
+        'items' => [
+            '<b>Co se dělo:</b> po potvrzení v bankovnictví to člověka vyhodilo zpátky do CRM a napojení zůstalo nedokončené. Banka se vrací na <b>SAML</b> adresu, takže údaje posílá i <b>POSTem z jiné domény</b> — a prohlížeč v takovém případě kvůli pravidlu <b>SameSite</b> nepošle přihlašovací cookie CRM. Callback tedy nikoho neviděl, odklopil na přihlášení a výsledek registrace se zahodil.',
+            '<b>Opraveno:</b> callbacky čtou údaje z URL i z POSTu (a tolerují odchylky v názvech), a už nevyžadují přihlášení — stačí, že napojení právě probíhá. Pravost dat potvrdí to, že je CRM dokáže <b>dešifrovat vlastním klíčem</b>; cizí data se dešifrovat nedají, takže se nedá nic podstrčit.',
+            '<b>Výsledek se neztratí:</b> hláška („zaregistrováno", nebo proč to selhalo) se ukládá i mimo přihlášení, takže ji uvidíš v Nastavení → Banka i po novém přihlášení.',
+            '<b>Diagnostika:</b> každý návrat z banky se zapisuje do Historie změn — metoda (GET/POST) a názvy i délky přijatých parametrů (bez obsahu, jsou v nich tajné údaje). Když se něco nepovede, jde přesně dohledat, co banka poslala.',
+        ],
+    ],
+    [
         'version' => '3.25.0',
         'date' => '2026-07-30',
         'time' => '11:40',
