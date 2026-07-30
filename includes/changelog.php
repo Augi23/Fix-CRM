@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.25.6',
+        'date' => '2026-07-30',
+        'time' => '16:30',
+        'title' => 'Návod k napojení doplněn podle skutečného průběhu',
+        'items' => [
+            '<b>Napojení na banku vyzkoušené celé</b> v testovacím prostředí: autorizace → tokeny → seznam účtů → stažení pohybů → obnova přístupu. Návod (Návody → Banka) teď popisuje i sandboxovou zkratku a pole „Stahovat pohyby od" včetně upozornění, že testovací data KB jsou z roku 2019.',
+        ],
+    ],
+    [
         'version' => '3.25.5',
         'date' => '2026-07-30',
         'time' => '16:10',
