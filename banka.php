@@ -80,6 +80,7 @@ try {
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h2 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i> <?php echo __('accounting'); ?> <span class="fs-6 text-white-50">Komerční banka<?php echo $env === 'sandbox' ? ' · SANDBOX' : ''; ?></span></h2>
     <div class="d-flex gap-2 align-items-center">
+        <a href="navody.php?tab=banka" class="btn btn-sm btn-outline-info" title="Návod: jak funguje párování plateb a co dělat, když platba nesedí"><i class="fas fa-circle-question me-1"></i>Jak fungují platby</a>
         <span class="text-white-50 small">Poslední sync: <?php echo $lastSync !== '' ? date('d.m.Y H:i', strtotime($lastSync)) : 'nikdy'; ?></span>
         <button class="btn btn-info" id="kbSyncBtn" <?php echo $configured ? '' : 'disabled'; ?>><i class="fas fa-rotate me-2"></i>Synchronizovat</button>
     </div>

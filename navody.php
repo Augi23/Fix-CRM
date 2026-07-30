@@ -8,7 +8,7 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
-$tab = ($_GET['tab'] ?? 'crm') === 'opravy' ? 'opravy' : 'crm';
+$tab = in_array($_GET['tab'] ?? 'crm', ['crm', 'banka', 'opravy'], true) ? (string)($_GET['tab'] ?? 'crm') : 'crm';
 
 // Přečtené návody TOHOTO pracovníka — nepřečtené mají svítící (glow) ikonku.
 // První rozbalení návodu zapíše api/guide_viewed.php a glow zhasne (v2.8.0).
@@ -428,6 +428,65 @@ $guides['crm'] = [
     ],
 ];
 
+/* ── Návody Banka (platby, párování) ─────────────────────────────────────── */
+$guides['banka'] = [
+    [
+        'id' => 'banka-parovani-plateb', 'icon' => 'fa-building-columns', 'color' => '#30D158',
+        'title' => 'Jak fungují platby — párování plateb',
+        'intro' => 'CRM si stahuje pohyby z firemního účtu a došlé platby samo navazuje na faktury. Tady je, čím se přitom řídí, co udělá bez tebe a co zůstává na člověku.',
+        'steps' => [
+            'Otevři <b>Účetnictví → Banka</b> a klikni na <b>Synchronizovat</b>. Systém stáhne nové pohyby z účtu (s třídenním přesahem, aby neuteklo nic, co banka zaúčtovala později) a hned je zkusí navázat na faktury.',
+            'Nejdřív se vyřídí <b>vrácené a zrušené platby</b>, teprve pak se páruje. Pořadí je schválně takové — faktura zaplacená penězi, které se mezitím vrátily, nesmí zůstat jako zaplacená.',
+            '<b>Co je jednoznačné, systém zapíše sám.</b> V seznamu má platba zelený štítek s číslem faktury a poznámku <b>auto</b> (např. „Částečná platba — na faktuře 2026010 zbývá 2 500 Kč").',
+            '<b>Co jednoznačné není, dostane žlutý štítek „K prověření"</b> — a hned pod ním <b>důvod i návrh</b>, například „přišlo víc, než na faktuře zbývá · částka odpovídá součtu faktur 2026010 + 2026011". Nikdy se přitom nic neoznačí jako zaplacené.',
+            '<b>Ruční spárování:</b> u platby klikni na 🔗, vyber fakturu (jde <b>hledat podle čísla i částky</b> a nabízí se <b>zbytek k úhradě</b>, ne celá částka) a potvrď. Menší platba se zapíše jako částečná — dozvíš se, kolik na faktuře zbývá.',
+            '<b>Odpárování:</b> u spárované platby klikni na přeškrtnutý odkaz. Faktura se vrátí mezi nezaplacené (pokud ji nekryjí další platby) a platba se <b>vyřadí z automatického párování</b>, aby ji systém sám znovu nespároval. Zpět do automatu ji pustíš tlačítkem ↺.',
+            'Přehled si filtruj podle stavu párování: <b>Spárované</b> · <b>K prověření</b> · <b>Nespárované</b> · <b>Vyřazené z párování</b>. Dlaždice „K prověření" nahoře ukazuje, kolik věcí čeká na člověka.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => '<b>Hlavní pravidlo:</b> automaticky se platba zapíše <b>jen když variabilní symbol sedí právě jedné otevřené faktuře</b>. Porovnává se i VS složený jen z číslic (posledních 10) — díky tomu se najde i platba z QR kódu u faktury s nečíselným číslem.'],
+            ['typ' => 'info', 'text' => '<b>Částka:</b> nesmí přijít víc, než na faktuře zbývá. Menší platba se zapíše jako <b>částečná</b> a faktuře zůstane zbytek k úhradě. Tolerance na zaokrouhlení je <b>1 Kč</b>; u faktur pod 100 Kč se musí trefit přesně.'],
+            ['typ' => 'info', 'text' => '<b>Faktura je zaplacená teprve tehdy, když ji platby pokryjí celou.</b> Do té doby vidíš v Účetnictví „Zaplaceno X z Y", v detailu zakázky odznak <b>Částečně zaplaceno</b> a na dokladu řádek „zbývá uhradit" — a <b>QR platba nabízí jen zbytek</b>, ne celou částku.'],
+            ['typ' => 'info', 'text' => '<b>Čas hraje roli:</b> platba nemůže být starší než faktura (5 dní tolerance na zálohy a datum zaúčtování) a platba starší než <b>180 dní</b> se automaticky nepáruje — číselné řady faktur se v dalších letech opakují a starý symbol by mohl sednout na novou fakturu.'],
+            ['typ' => 'warn', 'text' => '<b>Platbu, která fakturu uzavírá, systém zapíše sám jen když má z banky vlastní referenci.</b> U pohybu bez ní (typicky <b>vklad hotovosti na účet</b>) nelze vyloučit, že se tentýž vklad načetl dvakrát — takovou platbu proto vždy pošle člověku.'],
+            ['typ' => 'warn', 'text' => '<b>Automaticky se NIKDY nezapíše:</b> přeplatek · platba v cizí měně · platba bez variabilního symbolu · symbol sedící víc fakturám · platba na už uhrazenou fakturu · platba starší než faktura. Všechno tohle jde <b>k prověření</b>.'],
+            ['typ' => 'info', 'text' => '<b>Bere se jen firemní účet a jen příchozí platby v korunách.</b> Odchozí platby se nepárují. Testovací (sandbox) prostředí nemůže sáhnout na ostré faktury — pohyby jsou oddělené.'],
+            ['typ' => 'info', 'text' => '<b>Dvě synchronizace naráz si neškodí</b> — druhá počká, než první doběhne. Jedna platba se nemůže zapsat dvakrát a jednu fakturu nemůžou omylem „zaplatit" dvě různé platby.'],
+            ['typ' => 'warn', 'text' => '<b>Rozhodnutí člověka má vždy přednost.</b> Co jednou odpáruješ, to už systém sám nespáruje — dokud platbu výslovně nevrátíš do automatického párování.'],
+            ['typ' => 'info', 'text' => '<b>Všechno je dohledatelné:</b> každé spárování, odpárování i vrácení platby se zapisuje do <b>Historie změn</b> — kdo, kdy, jaká částka a jaká faktura.'],
+            ['typ' => 'info', 'text' => '<b>Proč se nesynchronizuje pořád:</b> banka účtuje podle počtu dotazů, proto je mezi synchronizacemi <b>61 minut</b>. Admin může vynutit stažení dřív (systém se zeptá, protože se to počítá do tarifu).'],
+            ['typ' => 'role', 'text' => 'Banku vidí a páruje <b>jen vedení</b> (admin, Boss) — stejná hranice jako u Účetnictví. Ostatní zaměstnanci se do modulu nedostanou.'],
+            ['typ' => 'warn', 'text' => '<b>Než začnou pohyby chodit:</b> napojení na Komerční banku se jednorázově dokončuje (kvalifikovaný certifikát a potvrzení přístupu jednatelem v KB, souhlas pak platí 12 měsíců). Do té doby je seznam pohybů prázdný a párování nemá co dělat.'],
+        ],
+    ],
+    [
+        'id' => 'banka-situace-plateb', 'icon' => 'fa-circle-question', 'color' => '#FF9F0A',
+        'title' => 'Když platba nesedí — situace a jejich řešení',
+        'intro' => 'Přehled všeho, co u plateb reálně nastává: co s tím udělá systém sám a co po tobě chce. Podle tohohle se dá vyřídit celý sloupec „K prověření".',
+        'steps' => [
+            'Otevři <b>Účetnictví → Banka</b> a v filtru <b>Párování</b> vyber <b>K prověření</b>.',
+            'U každé platby si přečti <b>důvod pod žlutým štítkem</b> — je tam napsané, proč to systém nezapsal sám, a většinou i návrh faktury.',
+            'Podle situace níže rozhodni: <b>🔗 spárovat</b> s nabídnutou (nebo jinou) fakturou, nebo platbu nechat ležet a vyřešit s klientem.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => '<b>Klient poslal méně (záloha, splátka).</b> → Systém platbu <b>zapíše sám</b>, faktura zůstane nezaplacená a je u ní vidět zbytek. <b>Ty neděláš nic</b> — až přijde doplatek se stejným symbolem, faktura se uzavře sama.'],
+            ['typ' => 'warn', 'text' => '<b>Klient poslal víc, než na faktuře zbývá.</b> → Platba jde <b>k prověření</b> a systém napoví, jestli částka neodpovídá součtu víc faktur. <b>Ty rozhodneš:</b> spárovat se správnou fakturou, nebo přeplatek vrátit. Navázat přeplatek na fakturu schválně nejde — v evidenci by vznikla faktura zaplacená víc, než měla být.'],
+            ['typ' => 'info', 'text' => '<b>Jedna platba za víc faktur (firemní klient platí souhrnně).</b> → K prověření s nápovědou „<i>částka odpovídá součtu faktur 2026010 + 2026011</i>". <b>Ty</b> platbu spáruješ s jednou z nich (zapíše se jako částečná) a zbytek dořešíš s účetní. Rozdělit jednu platbu mezi víc faktur systém zatím neumí.'],
+            ['typ' => 'info', 'text' => '<b>Platba bez variabilního symbolu.</b> → K prověření. Když je <b>číslo faktury napsané ve zprávě pro příjemce</b>, systém ji navrhne; když klient dřív platil <b>ze stejného účtu</b>, navrhne jeho otevřenou fakturu. <b>Ty jen zkontroluješ a potvrdíš.</b> Samo se to nikdy nezaplatí — z jednoho účtu může platit i někdo jiný.'],
+            ['typ' => 'info', 'text' => '<b>Symbol sedí dvěma fakturám</b> (opakované číslo, ručně přepsaný symbol). → K prověření se seznamem, kterých faktur se to týká. <b>Ty vybereš správnou</b> ručně.'],
+            ['typ' => 'info', 'text' => '<b>Klient napsal symbol s překlepem.</b> → Platba se nenaváže na nic a zůstane <b>nespárovaná</b>. <b>Ty</b> ji spáruješ ručně — ve výběru faktury se dá hledat i podle částky.'],
+            ['typ' => 'warn', 'text' => '<b>Platba se vrátila nebo ji banka zrušila (storno).</b> → Systém sám <b>vrátí fakturu mezi nezaplacené</b>, platbu vyřadí z párování a zapíše to do Historie. <b>Ty</b> zkontroluješ a případně pošleš klientovi upomínku — peníze na účtu nejsou.'],
+            ['typ' => 'warn', 'text' => '<b>Systém spároval platbu se špatnou fakturou.</b> → <b>Odpáruj ji</b> (přeškrtnutý odkaz u platby). Faktura se vrátí mezi nezaplacené (pokud ji nekryje jiná platba) a platba se vyřadí z automatu, aby ji systém nevrátil zpět. Pak ji spáruj se správnou fakturou.'],
+            ['typ' => 'info', 'text' => '<b>Platba v eurech nebo jiné měně.</b> → Neplatí korunovou fakturu a k párování se vůbec nenabízí. <b>Ty</b> to vyřešíš v účetnictví ručně (přepočet kurzem).'],
+            ['typ' => 'info', 'text' => '<b>Vklad hotovosti na účet.</b> → Jde <b>k prověření</b>, protože u něj chybí bankovní reference a nedá se vyloučit dvojí načtení. <b>Ty</b> ho po kontrole potvrdíš ručně.'],
+            ['typ' => 'warn', 'text' => '<b>Klient zaplatil dvakrát.</b> → Druhá platba jde <b>k prověření</b> s poznámkou, že faktura je už uhrazená. Nikdy se nepřipíše. <b>Ty</b> ji vrátíš klientovi, nebo (po dohodě) použiješ na jinou jeho fakturu.'],
+            ['typ' => 'info', 'text' => '<b>Faktura zaplacená hotově nebo kartou na kase.</b> → Banka o ní neví, platba se eviduje z kasy a faktura je zaplacená. Kdyby klient totéž poslal <b>ještě převodem</b>, přijde to k prověření jako duplicitní platba (viz výše).'],
+            ['typ' => 'info', 'text' => '<b>Změna částky na faktuře, na které už visí platby.</b> → Systém stav <b>přepočítá</b>: když platby nově nekryjí celek, faktura se vrátí mezi nezaplacené se správným zbytkem. Faktury bez evidované platby (starší doklady, hotovost) se nikdy samy „neodzaplatí".'],
+            ['typ' => 'role', 'text' => 'Párovat i odpárovat smí <b>vedení</b> (admin, Boss). Každý krok je vidět v Historii změn, takže je vždy dohledatelné, kdo platbu k faktuře přiřadil nebo ji odebral.'],
+        ],
+    ],
+];
+
 /* ── Návody Opravy (plní se postupně) ─────────────────────────────────────── */
 $guides['opravy'] = [];
 ?>
@@ -443,6 +502,7 @@ $guides['opravy'] = [];
 
     <ul class="nav nav-pills mb-3 gap-2">
         <li class="nav-item"><a class="nav-link <?php echo $tab === 'crm' ? 'active' : ''; ?>" href="navody.php?tab=crm"><i class="fas fa-desktop me-1"></i> CRM</a></li>
+        <li class="nav-item"><a class="nav-link <?php echo $tab === 'banka' ? 'active' : ''; ?>" href="navody.php?tab=banka"><i class="fas fa-building-columns me-1"></i> Banka</a></li>
         <li class="nav-item"><a class="nav-link <?php echo $tab === 'opravy' ? 'active' : ''; ?>" href="navody.php?tab=opravy"><i class="fas fa-wrench me-1"></i> Opravy</a></li>
     </ul>
 

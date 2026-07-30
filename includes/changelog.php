@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.24.1',
+        'date' => '2026-07-30',
+        'time' => '10:30',
+        'title' => 'Návody → Banka: jak fungují platby a co dělat, když platba nesedí',
+        'items' => [
+            '<b>Nová záložka Banka v Návodech</b> se dvěma texty pro vedení: <b>„Jak fungují platby — párování plateb"</b> (čím se automat řídí, co udělá sám a co nechá na člověku, včetně podmínek jako tolerance 1 Kč, časové hranice nebo šetření tarifu banky) a <b>„Když platba nesedí — situace a jejich řešení"</b> — 14 reálných situací (záloha, přeplatek, sdružená platba za víc faktur, platba bez symbolu, překlep ve symbolu, storno, dvojí platba klienta, cizí měna, vklad hotovosti, změna částky faktury…) s tím, co udělá systém a co má udělat obsluha.',
+            '<b>Odkaz přímo z Banky:</b> v hlavičce modulu je tlačítko <b>„Jak fungují platby"</b>, které návod otevře — nikdo ho nemusí hledat.',
+        ],
+    ],
+    [
         'version' => '3.24.0',
         'date' => '2026-07-30',
         'time' => '09:40',
