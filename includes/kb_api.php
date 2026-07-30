@@ -360,8 +360,10 @@ function kbApplyReversals(?string $env = null, ?string $accountId = null): int {
             $st = $pdo->prepare("SELECT invoice_number FROM invoices WHERE id = ?");
             $st->execute([$invId]);
             $num = (string)$st->fetchColumn();
-            $pdo->prepare("UPDATE invoices SET status = IF(date_due < CURDATE(), 'overdue', 'issued'), payment_date = NULL
-                WHERE id = ? AND status = 'paid'")->execute([$invId]);
+            // platba se vrátila → smazat její evidenci a přepočítat stav faktury
+            // (allowUnpay: tady peníze prokazatelně na účtu nejsou)
+            afxInvoiceRemoveBankPayment((int)$tx['id']);
+            afxInvoiceRecalcPaid($invId, true);
             crmAuditLog('banka.storno', [
                 'entity_type' => 'invoice', 'entity_id' => $invId, 'entity_label' => $num,
                 'summary' => 'Faktura ' . $num . ' vrácena mezi NEZAPLACENÉ — ' . $why . ' ('
@@ -505,6 +507,9 @@ function kbAutoMatchInvoices(?string $env = null, ?string $accountId = null): ar
             $claim->execute([$payDate, (int)$inv['id']]);
             if ($claim->rowCount() === 1) {
                 $mark->execute([(int)$inv['id'], 'auto', 'VS i částka sedí', (int)$tx['id']]);
+                // evidence konkrétní platby (základ částečných plateb a doplatků)
+                afxInvoiceAddPayment((int)$inv['id'], $amount, 'bank', $payDate, (int)$tx['id'],
+                    'Automatické párování — VS ' . $vs);
                 crmAuditLog('banka.match', [
                     'entity_type' => 'invoice', 'entity_id' => (int)$inv['id'], 'entity_label' => (string)$inv['invoice_number'],
                     'summary' => 'Faktura ' . $inv['invoice_number'] . ' automaticky spárována s platbou '
@@ -557,7 +562,11 @@ function crmCzAccountToIban(string $acc): string {
 function afxSpaydForInvoice(array $invoice): string {
     $iban = crmCzAccountToIban((string)get_setting('acc_bank_account', ''));
     if ($iban === '') return '';
-    $amount = number_format((float)$invoice['total_amount'], 2, '.', '');
+    // U částečně zaplacené faktury musí QR nabídnout ZBYTEK k úhradě, ne celou částku —
+    // jinak by klient na upomínce zaplatil znovu všechno a vznikl přeplatek.
+    $info = afxInvoicePaymentInfo($invoice);
+    $pay = $info['partial'] && $info['remaining'] > 0 ? $info['remaining'] : (float)$invoice['total_amount'];
+    $amount = number_format($pay, 2, '.', '');
     // VS musí mít stejný tvar, jaký hledá párovač (posledních 10 číslic) — jinak by
     // se platba z QR kódu u delšího čísla faktury nikdy nespárovala
     $vs = afxVsDigits((string)($invoice['variable_symbol'] ?: $invoice['invoice_number']));

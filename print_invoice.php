@@ -201,6 +201,19 @@ if (!function_exists('_l')) {
         $__qrSpayd = afxSpaydForInvoice($invoice);
     }
     ?>
+    <?php
+    // Částečně zaplacená faktura: na dokladu musí být vidět, kolik už došlo a kolik
+    // zbývá — jinak klient dostane papír, který tvrdí, že dluží celou částku.
+    $__pay = function_exists('afxInvoicePaymentInfo') ? afxInvoicePaymentInfo($invoice) : ['partial' => false];
+    ?>
+    <?php if (!empty($__pay['partial'])): ?>
+    <div style="margin:8px 0 4px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:8px;background:#fbfbfb;font-size:12px;">
+        <b>Částečně uhrazeno:</b> zaplaceno <?php echo formatMoney($__pay['paid']); ?>
+        z <?php echo formatMoney($__pay['total']); ?> — <b>zbývá uhradit <?php echo formatMoney($__pay['remaining']); ?></b>
+        <?php if ($__qrSpayd !== ''): ?><span style="color:#666;"> (QR platba je nastavená na zbývající částku)</span><?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <?php if ($__qrSpayd !== ''): ?>
     <div style="display:flex;align-items:center;gap:14px;margin:10px 0 4px;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;">
         <div id="qrPlatba" style="line-height:0;"></div>

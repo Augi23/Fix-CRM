@@ -16,6 +16,7 @@ if ((empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) || !crmCanManag
 
 require_once 'includes/header.php';
 ensureBankTables();
+afxEnsureInvoicePayments();
 
 $configured = kbApiConfigured();
 $lastSync = (string)get_setting('kb_last_sync_at', '');
@@ -67,7 +68,7 @@ $pages = max(1, (int)ceil($total / $per));
 // navrhuje (jinak by se navržená faktura mimo 300 nejnovějších v nabídce tiše ztratila)
 $openInvoices = [];
 try {
-    $openInvoices = $pdo->query("SELECT id, invoice_number, total_amount FROM invoices
+    $openInvoices = $pdo->query("SELECT id, invoice_number, total_amount, paid_amount, status FROM invoices
         WHERE invoice_type = 'invoice' AND (
             status IN ('issued','overdue')
             OR id IN (SELECT matched_invoice_id FROM bank_transactions
@@ -252,7 +253,7 @@ try {
             </div>
             <div class="modal-body">
                 <input type="hidden" id="kbMatchTx">
-                <div class="alert alert-info border-0 py-2 small">Platba: <strong id="kbMatchAmount"></strong> — po spárování se faktura označí jako <strong>ZAPLACENÁ</strong>.</div>
+                <div class="alert alert-info border-0 py-2 small">Platba: <strong id="kbMatchAmount"></strong> — faktura se označí jako <strong>ZAPLACENÁ</strong> jen když ji platba uhradí celou. Menší platba se zapíše jako <strong>částečná</strong> a u faktury zůstane zbytek k úhradě.</div>
                 <label class="form-label small">Nezaplacená faktura</label>
                 <input type="search" id="kbMatchSearch" class="form-control form-control-sm mb-2" placeholder="Hledat číslo faktury nebo částku…" autocomplete="off">
                 <select id="kbMatchInvoice" class="form-select" size="8"></select>
@@ -304,9 +305,12 @@ try {
     var matchModal = null;
     // seznam faktur se filtruje v prohlížeči — u stovek otevřených faktur by jinak
     // obsluha hledala tu správnou očima v dlouhém rolovacím seznamu
-    var INVOICES = <?php echo json_encode(array_map(fn($i) => [
-        'id' => (int)$i['id'], 'n' => (string)$i['invoice_number'], 'a' => (float)$i['total_amount'],
-    ], $openInvoices), JSON_UNESCAPED_UNICODE); ?>;
+    var INVOICES = <?php echo json_encode(array_map(function ($i) {
+        $info = afxInvoicePaymentInfo($i);
+        return ['id' => (int)$i['id'], 'n' => (string)$i['invoice_number'],
+                'a' => $info['remaining'] > 0 ? $info['remaining'] : $info['total'],
+                'p' => $info['partial'] ? $info['paid'] : 0, 't' => $info['total']];
+    }, $openInvoices), JSON_UNESCAPED_UNICODE); ?>;
 
     function renderInvoices(query, preselect) {
         var sel = document.getElementById('kbMatchInvoice');
@@ -319,7 +323,8 @@ try {
         list.slice(0, 200).forEach(function (i) {
             var o = document.createElement('option');
             o.value = String(i.id);
-            o.textContent = i.n + ' — ' + new Intl.NumberFormat('cs-CZ').format(i.a) + ' Kč';
+            o.textContent = i.n + ' — ' + new Intl.NumberFormat('cs-CZ').format(i.a) + ' Kč'
+                + (i.p ? ' (zbývá; už zaplaceno ' + new Intl.NumberFormat('cs-CZ').format(i.p) + ' z ' + new Intl.NumberFormat('cs-CZ').format(i.t) + ')' : '');
             sel.appendChild(o);
         });
         document.getElementById('kbMatchCount').textContent =
@@ -347,8 +352,10 @@ try {
             invoice_id: document.getElementById('kbMatchInvoice').value,
             csrf_token: CSRF
         }, function (res) {
-            if (res.success) { location.reload(); }
-            else { showAlert('Chyba: ' + String(res.message || '').replace(/</g, '&lt;')); }
+            if (res.success) {
+                if (res.remaining > 0) { showAlert(String(res.message || ''), function () { location.reload(); }); }
+                else { location.reload(); }
+            } else { showAlert('Chyba: ' + String(res.message || '').replace(/</g, '&lt;')); }
         }).fail(function () { showAlert('Párování selhalo — zkus to znovu.'); });
     });
     $(document).on('click', '.kb-reset-btn', function () {

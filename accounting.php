@@ -32,6 +32,7 @@ if (isset($_POST['save_acc_settings'])) {
 }
 
 // Fetch Invoices with items
+afxEnsureInvoicePayments();
 $stmt = $pdo->query("SELECT i.*, c.first_name, c.last_name, c.company,
     (SELECT GROUP_CONCAT(item_name SEPARATOR ', ') FROM invoice_items WHERE invoice_id = i.id) as item_names
     FROM invoices i JOIN customers c ON i.customer_id = c.id ORDER BY i.created_at DESC");
@@ -99,7 +100,7 @@ $customers = $stmt->fetchAll();
                                     <td><?php echo date('d.m.Y', strtotime($inv['date_issue'])); ?></td>
                                     <td><?php echo htmlspecialchars($inv['company'] ?: $inv['first_name'] . ' ' . $inv['last_name']); ?></td>
                                     <td class="small"><?php echo htmlspecialchars($inv['item_names'] ?: '—'); ?></td>
-                                    <td><?php echo getInvoiceStatusBadge($inv['status']); ?></td>
+                                    <td><?php echo getInvoiceStatusBadge($inv['status'], $inv); ?></td>
                                     <td class="fw-bold"><?php echo number_format((float)$inv['total_amount'], 0, ',', ' ') . ' ' . $inv['currency']; ?></td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
@@ -379,7 +380,22 @@ $customers = $stmt->fetchAll();
 </div>
 
 <?php
-function getInvoiceStatusBadge($status) {
+/** Odznak stavu faktury. Když je faktura zaplacená jen zčásti (došla platba, ale ne
+ *  celá částka), přidá se za odznak informace „Zaplaceno X z Y" — stav samotný zůstává
+ *  „vystaveno", protože s ním pracují filtry, reporty i exporty. */
+function getInvoiceStatusBadge($status, ?array $invoice = null) {
+    $extra = '';
+    if ($invoice !== null && function_exists('afxInvoicePaymentInfo')) {
+        $info = afxInvoicePaymentInfo($invoice);
+        if ($info['partial']) {
+            $extra = '<div class="small text-warning mt-1" title="Zbývá uhradit ' . htmlspecialchars(formatMoney($info['remaining'])) . '">'
+                . htmlspecialchars($info['label']) . '</div>';
+        }
+    }
+    return getInvoiceStatusBadgeBase($status) . $extra;
+}
+
+function getInvoiceStatusBadgeBase($status) {
     switch ($status) {
         case 'draft': return '<span class="badge bg-secondary">'.__('status_draft').'</span>';
         case 'issued': return '<span class="badge bg-info">'.__('status_issued').'</span>';

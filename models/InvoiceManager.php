@@ -80,8 +80,18 @@ private function getInvoiceStatusBadge($status) {
             $status = !empty($data['status']) ? $data['status'] : 'issued';
             $is_vat_payer = (isset($data['is_vat_payer']) && ($data['is_vat_payer'] == '1' || $data['is_vat_payer'] === true)) ? 1 : 0;
             $payment_method = !empty($data['payment_method']) ? $data['payment_method'] : 'bank_transfer';
-            $payment_date = ($status == 'paid') ? date('Y-m-d') : null;
-            
+            // u existující faktury se datum platby přebírá (viz updateStatus) — editace
+            // položek nesmí přepsat datum, kdy peníze reálně došly
+            $payment_date = null;
+            if ($status == 'paid') {
+                $payment_date = date('Y-m-d');
+                if ($id) {
+                    $pv = $this->pdo->prepare("SELECT payment_date FROM invoices WHERE id = ?");
+                    $pv->execute([$id]);
+                    $payment_date = (string)$pv->fetchColumn() ?: $payment_date;
+                }
+            }
+
             $currency = !empty($data['currency']) ? $data['currency'] : 'Kč';
             $notes = $data['notes'] ?? '';
             $variable_symbol = !empty($data['variable_symbol']) ? $data['variable_symbol'] : $invoice_number;
@@ -153,6 +163,12 @@ private function getInvoiceStatusBadge($status) {
             }
 
             $this->pdo->commit();
+            // změna položek mohla změnit celkovou částku → srovnat evidenci plateb
+            // (bez allowUnpay: ruční „zaplaceno" se editací nesmí zrušit)
+            if (function_exists('afxInvoiceRecalcPaid')) {
+                afxInvoiceRecalcPaid((int)$invoice_id);
+                if ($status === 'paid') { afxInvoiceSyncManualStatus((int)$invoice_id, 'paid', $payment_method); }
+            }
             return ['success' => true, 'id' => $invoice_id];
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
@@ -164,21 +180,34 @@ private function getInvoiceStatusBadge($status) {
      * Update only status and related payment data
      */
     public function updateStatus($id, $status, $payment_method = null) {
-        $payment_date = ($status == 'paid') ? date('Y-m-d') : null;
-        
+        // datum platby se PŘEBÍRÁ, když už faktura zaplacená byla — dřív se při každé
+        // změně stavu přepsalo na dnešek (nebo vynulovalo), takže se ztrácela informace,
+        // kdy peníze skutečně přišly
+        $prev = $this->pdo->prepare("SELECT status, payment_date FROM invoices WHERE id = ?");
+        $prev->execute([$id]);
+        $before = $prev->fetch(PDO::FETCH_ASSOC) ?: [];
+        $payment_date = ($status == 'paid')
+            ? ((string)($before['payment_date'] ?? '') ?: date('Y-m-d'))
+            : null;
+
         $sql = "UPDATE invoices SET status = ?, payment_date = ?";
         $params = [$status, $payment_date];
-        
+
         if ($payment_method) {
             $sql .= ", payment_method = ?";
             $params[] = $payment_method;
         }
-        
+
         $sql .= " WHERE id = ?";
         $params[] = $id;
-        
+
         $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute($params);
+        $ok = $stmt->execute($params);
+        // evidence plateb musí odpovídat stavu (jinak by faktura hlásila „zaplaceno 0 z …")
+        if ($ok && function_exists('afxInvoiceSyncManualStatus')) {
+            afxInvoiceSyncManualStatus((int)$id, (string)$status, $payment_method);
+        }
+        return $ok;
     }
 
     /**

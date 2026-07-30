@@ -835,10 +835,13 @@ function localizedOrderStatusLabel(string $status): string {
         <div class="card glass-card border-0 mb-4">
             <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2 text-success"></i><?php echo __('invoice'); ?></h5>
-                <?php if($existing_invoice): ?>
-                    <span class="badge <?php echo $existing_invoice['status'] == 'paid' ? 'bg-success' : 'bg-warning text-white'; ?>">
-                        <?php echo __($existing_invoice['status']); ?>
+                <?php if($existing_invoice): $__pi = afxInvoicePaymentInfo($existing_invoice); ?>
+                    <span class="badge <?php echo $existing_invoice['status'] == 'paid' ? 'bg-success' : ($__pi['partial'] ? 'bg-warning text-dark' : 'bg-warning text-white'); ?>">
+                        <?php echo $__pi['partial'] ? 'Částečně zaplaceno' : __($existing_invoice['status']); ?>
                     </span>
+                    <?php if ($__pi['partial']): ?>
+                        <span class="small text-white-50 ms-1">zbývá <?php echo formatMoney($__pi['remaining']); ?></span>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
             <div class="card-body">

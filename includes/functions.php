@@ -1611,6 +1611,183 @@ function productIsLoaned(array $p): bool {
     return trim((string)($p['loan_at'] ?? '')) !== '';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PLATBY K FAKTURÁM (částečné platby, doplatky)
+//
+// Každá došlá platba je samostatný záznam v invoice_payments. Součet se drží ve
+// invoices.paid_amount kvůli rychlosti výpisů a přepočítává ho JEDINÁ funkce
+// afxInvoiceRecalcPaid() — nikde jinde se paid_amount nepíše.
+//
+// Stav faktury zůstává dvouhodnotový (zaplaceno / nezaplaceno). „Částečně zaplaceno"
+// se odvozuje z paid_amount, protože se stavem pracují desítky míst v CRM (filtry
+// v účetnictví, klientský portál, reporty, kasa, exporty do Pohody a Money) a nová
+// hodnota v ENUMu by je tiše rozbila.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Tabulka plateb a sloupec paid_amount (migrace 037) — pojistka, když kód nasadíme dřív,
+ *  než doběhne run_migrations.php. */
+function afxEnsureInvoicePayments(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS invoice_payments (
+            id INT NOT NULL AUTO_INCREMENT,
+            invoice_id INT NOT NULL,
+            amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+            paid_on DATE NULL DEFAULT NULL,
+            kind ENUM('bank','cash','card','other') NOT NULL DEFAULT 'other',
+            bank_transaction_id INT NULL DEFAULT NULL,
+            note VARCHAR(255) NULL DEFAULT NULL,
+            created_by VARCHAR(120) NULL DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_payment_bank (bank_transaction_id, invoice_id),
+            KEY idx_payment_invoice (invoice_id),
+            KEY idx_payment_date (paid_on)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        if (!$pdo->query("SHOW COLUMNS FROM invoices LIKE 'paid_amount'")->fetch()) {
+            $pdo->exec("ALTER TABLE invoices ADD COLUMN paid_amount DECIMAL(15,2) NOT NULL DEFAULT 0");
+        }
+    } catch (Throwable $e) { error_log('afxEnsureInvoicePayments: ' . $e->getMessage()); }
+}
+
+/** Tolerance na haléřové zaokrouhlení. U drobných částek se musí trefit přesně,
+ *  aby „±1 Kč" nepokryla celou fakturu na pár desetikorun. */
+function afxPayTolerance(float $total): float {
+    return $total >= 100 ? 1.0 : 0.0;
+}
+
+/**
+ * Přepočet zaplacené částky faktury podle evidovaných plateb + srovnání stavu.
+ *
+ * $allowUnpay = smí faktura spadnout ZPĚT mezi nezaplacené? Ano jen tam, kde platba
+ * prokazatelně zmizela (storno v bance, odpárování, smazání platby). Jinak NE —
+ * faktury označené jako zaplacené ručně, z kasy nebo kartou nemají bankovní platbu
+ * a hromadný přepočet by je jinak všechny „odzaplatil" a začal upomínat klienty.
+ *
+ * Vrací ['paid' => …, 'remaining' => …, 'total' => …, 'status' => …].
+ */
+function afxInvoiceRecalcPaid(int $invoiceId, bool $allowUnpay = false): array {
+    global $pdo;
+    afxEnsureInvoicePayments();
+    $st = $pdo->prepare("SELECT id, total_amount, status, date_due, payment_date FROM invoices WHERE id = ?");
+    $st->execute([$invoiceId]);
+    $inv = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$inv) { return ['paid' => 0.0, 'remaining' => 0.0, 'total' => 0.0, 'status' => '']; }
+
+    $sq = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) s, MAX(paid_on) d FROM invoice_payments WHERE invoice_id = ?");
+    $sq->execute([$invoiceId]);
+    $sum = $sq->fetch(PDO::FETCH_ASSOC);
+    $paid = round((float)$sum['s'], 2);
+    $total = round((float)$inv['total_amount'], 2);
+    $status = (string)$inv['status'];
+
+    $pdo->prepare("UPDATE invoices SET paid_amount = ? WHERE id = ?")->execute([$paid, $invoiceId]);
+
+    $covered = $paid > 0 && $paid >= $total - afxPayTolerance($total);
+    if ($covered && in_array($status, ['issued', 'overdue'], true)) {
+        $pdo->prepare("UPDATE invoices SET status = 'paid', payment_date = ? WHERE id = ? AND status IN ('issued','overdue')")
+            ->execute([(string)($sum['d'] ?? '') ?: date('Y-m-d'), $invoiceId]);
+        $status = 'paid';
+    } elseif (!$covered && $status === 'paid' && $allowUnpay) {
+        $pdo->prepare("UPDATE invoices SET status = IF(date_due < CURDATE(), 'overdue', 'issued'), payment_date = NULL
+            WHERE id = ? AND status = 'paid'")->execute([$invoiceId]);
+        $status = strtotime((string)$inv['date_due']) < strtotime(date('Y-m-d')) ? 'overdue' : 'issued';
+    }
+    return ['paid' => $paid, 'remaining' => max(0.0, round($total - $paid, 2)), 'total' => $total, 'status' => $status];
+}
+
+/**
+ * Zápis došlé platby k faktuře. Bankovní platba se pozná podle $bankTxId a k jedné
+ * faktuře se dá navázat jen jednou (UNIQUE) — opakovaný pokus se tiše přeskočí,
+ * aby se tatáž platba nezaúčtovala dvakrát.
+ */
+function afxInvoiceAddPayment(int $invoiceId, float $amount, string $kind = 'other',
+                              ?string $paidOn = null, ?int $bankTxId = null, string $note = ''): bool {
+    global $pdo;
+    afxEnsureInvoicePayments();
+    if ($invoiceId <= 0 || $amount <= 0) { return false; }
+    $who = trim((string)($_SESSION['user_name'] ?? $_SESSION['tech_name'] ?? 'systém'));
+    try {
+        $ins = $pdo->prepare("INSERT INTO invoice_payments
+                (invoice_id, amount, paid_on, kind, bank_transaction_id, note, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $ins->execute([$invoiceId, round($amount, 2), $paidOn ?: date('Y-m-d'),
+            in_array($kind, ['bank', 'cash', 'card', 'other'], true) ? $kind : 'other',
+            $bankTxId ?: null, mb_substr($note, 0, 255) ?: null, mb_substr($who, 0, 120)]);
+    } catch (PDOException $e) {
+        if ((int)$e->errorInfo[1] === 1062) { return false; }   // už evidovaná platba
+        throw $e;
+    }
+    afxInvoiceRecalcPaid($invoiceId);
+    return true;
+}
+
+/** Smazání platby navázané na bankovní pohyb (odpárování, storno). Vrací počet faktur,
+ *  jejichž stav se přepočítal. */
+function afxInvoiceRemoveBankPayment(int $bankTxId): int {
+    global $pdo;
+    afxEnsureInvoicePayments();
+    if ($bankTxId <= 0) { return 0; }
+    $q = $pdo->prepare("SELECT DISTINCT invoice_id FROM invoice_payments WHERE bank_transaction_id = ?");
+    $q->execute([$bankTxId]);
+    $ids = array_map('intval', $q->fetchAll(PDO::FETCH_COLUMN));
+    if (!$ids) { return 0; }
+    $pdo->prepare("DELETE FROM invoice_payments WHERE bank_transaction_id = ?")->execute([$bankTxId]);
+    foreach ($ids as $id) { afxInvoiceRecalcPaid($id, true); }
+    return count($ids);
+}
+
+/**
+ * Srovnání evidence plateb po RUČNÍ změně stavu faktury (účetnictví, detail zakázky,
+ * expresní faktura, kasa). Bez toho by faktura označená ručně jako zaplacená ukazovala
+ * „zaplaceno 0 z 8 500" a naopak ruční vrácení mezi nezaplacené by nechalo v evidenci
+ * platbu, která nikdy nedošla.
+ *
+ * Bankovní platby se NIKDY nemažou — ty se ruší jen odpárováním v modulu Banka,
+ * aby ruční klik nesmazal doklad o skutečně došlých penězích.
+ */
+function afxInvoiceSyncManualStatus(int $invoiceId, string $status, ?string $paymentMethod = null): void {
+    global $pdo;
+    afxEnsureInvoicePayments();
+    if ($invoiceId <= 0) { return; }
+    $st = $pdo->prepare("SELECT id, total_amount, paid_amount, status, payment_method FROM invoices WHERE id = ?");
+    $st->execute([$invoiceId]);
+    $inv = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$inv) { return; }
+
+    if ($status === 'paid') {
+        $info = afxInvoicePaymentInfo(['total_amount' => $inv['total_amount'], 'paid_amount' => $inv['paid_amount'], 'status' => 'issued']);
+        if ($info['remaining'] > 0) {
+            $method = (string)($paymentMethod ?: $inv['payment_method'] ?: '');
+            $kind = $method === 'cash' ? 'cash' : ($method === 'card' ? 'card' : 'other');
+            afxInvoiceAddPayment($invoiceId, $info['remaining'], $kind, date('Y-m-d'), null,
+                'Označeno jako zaplacené v CRM');
+        }
+        return;
+    }
+    if (in_array($status, ['issued', 'overdue', 'draft', 'cancelled'], true)) {
+        $pdo->prepare("DELETE FROM invoice_payments WHERE invoice_id = ? AND bank_transaction_id IS NULL")
+            ->execute([$invoiceId]);
+        afxInvoiceRecalcPaid($invoiceId, true);
+    }
+}
+
+/** Přehled zaplacení faktury pro zobrazení (seznam, detail, tisk, e-mail).
+ *  Vrací ['paid','remaining','total','partial','label'] — 'partial' = něco došlo, ale ne vše. */
+function afxInvoicePaymentInfo(array $invoice): array {
+    $total = round((float)($invoice['total_amount'] ?? 0), 2);
+    $paid = round((float)($invoice['paid_amount'] ?? 0), 2);
+    $status = (string)($invoice['status'] ?? '');
+    if ($status === 'paid' && $paid <= 0) { $paid = $total; }   // starší faktura bez evidence platby
+    $remaining = max(0.0, round($total - $paid, 2));
+    $partial = $status !== 'paid' && $paid > 0 && $remaining > 0;
+    return ['paid' => $paid, 'remaining' => $remaining, 'total' => $total, 'partial' => $partial,
+        'label' => $partial ? ('Zaplaceno ' . formatMoney($paid) . ' z ' . formatMoney($total)) : ''];
+}
+
 /** Objednávky z vlastního e-shopu (applefix.online). E-shop čte sklad z feedu a při
  *  dokončení objednávky sem přes api/eshop_sale.php zapíše prodej → CRM odečte kus.
  *  order_ref je UNIQUE = idempotence (opakovaný webhook prodej neodečte dvakrát). */

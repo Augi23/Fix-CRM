@@ -6,6 +6,21 @@
  */
 return [
     [
+        'version' => '3.23.0',
+        'date' => '2026-07-30',
+        'time' => '08:30',
+        'title' => 'Částečné platby: faktura ví, kolik už došlo a kolik zbývá',
+        'items' => [
+            '<b>Evidence jednotlivých plateb:</b> dosud faktura znala jen dva stavy — zaplaceno, nebo nezaplaceno. Nešlo zaznamenat „klient poslal 3 000 z 8 500", doplatek se neměl kam navázat. Nově je <b>každá došlá platba samostatný záznam</b> (banka, hotovost, karta) a faktura se označí jako zaplacená teprve tehdy, když ji platby uhradí celou.',
+            '<b>V bance jde navázat i částečnou platbu:</b> dřív ruční párování hlásilo „faktura už je zaplacená" a doplatek nebylo kam přiřadit. Teď se menší platba zapíše jako částečná, u faktury zůstane <b>zbytek k úhradě</b> a doplatek se naváže později. Přeplatek se navázat nedá — systém řekne, o kolik je platba vyšší.',
+            '<b>Vidíš to všude, kde to potřebuješ:</b> v účetnictví u faktury přibylo „Zaplaceno X z Y", v detailu zakázky odznak <b>Částečně zaplaceno</b> se zbývající částkou a na <b>tištěném dokladu</b> řádek „zaplaceno … zbývá uhradit …". Ve výběru faktury k párování se nabízí zbytek k úhradě, ne celá částka.',
+            '<b>QR platba na zbytek:</b> u částečně zaplacené faktury QR kód nabídne <b>zbývající částku</b> — dřív by klient na upomínce zaplatil znovu celou fakturu a vznikl přeplatek.',
+            '<b>Datum platby se už nepřepisuje:</b> jakákoli editace faktury dřív vynulovala nebo přepsala datum, kdy peníze reálně přišly. Nově se přebírá. Ruční označení „zaplaceno" (hotově, kartou) si taky zapíše svou platbu, aby faktura neukazovala „zaplaceno 0".',
+            '<b>Odpárování je bezpečné:</b> když fakturu krylo víc plateb a jedna se zruší, faktura <b>zůstane zaplacená</b> a jen se zmenší uhrazená částka. Bez ostatních plateb se vrátí mezi nezaplacené. Bankovní platbu nikdy nesmaže ruční klik ve faktuře — jen odpárování v Bance.',
+            '<b>Test nanečisto rozšířen</b> na splátky, doplatek a odpárování (celkem 30 kontrol) a doplněn o trojí pojistku, aby po něm v ostré databázi nezůstal ani jeden testovací záznam.',
+        ],
+    ],
+    [
         'version' => '3.22.0',
         'date' => '2026-07-30',
         'time' => '07:20',

@@ -8,8 +8,11 @@
  * KB ADAA API, prožene je stejným kódem jako ostrý sync a porovná výsledek
  * s očekáváním.
  *
- * BEZPEČNOST: všechno běží v jedné transakci, která se na konci VŽDY vrátí zpět
- * (ROLLBACK). V databázi po skriptu nezůstane ani testovací faktura, ani pohyb.
+ * BEZPEČNOST (tři vrstvy, protože jedna nestačila):
+ *   1) všechno běží v transakci, která se na konci VŽDY vrátí zpět (ROLLBACK),
+ *   2) po rollbacku ještě proběhne ruční úklid — MySQL při DDL uvnitř transakce
+ *      udělá implicitní COMMIT a testovací data by v ostré databázi zůstala,
+ *   3) na konci se ověří, že nezůstal ani jeden testovací záznam (jinak test selže).
  * Testovací pohyby se navíc ukládají do vlastního prostředí (env='test'), takže
  * se nemíchají s ostrými ani sandboxovými daty.
  *
@@ -57,7 +60,33 @@ function green(string $s): string { return "\033[32m$s\033[0m"; }
 function red(string $s): string { return "\033[31m$s\033[0m"; }
 function yellow(string $s): string { return "\033[33m$s\033[0m"; }
 
+// POZOR — TVRDÁ LEKCE: jakýkoli CREATE TABLE / ALTER TABLE uprostřed transakce vyvolá
+// v MySQL implicitní COMMIT, a testovací data tím propadnou do ostré databáze (stalo se).
+// Proto se všechny pomocné DDL kontroly musí zavolat TEĎ, PŘED otevřením transakce.
 ensureBankTables();
+afxEnsureInvoicePayments();
+
+const TEST_NOTE = 'TEST — párování banky';
+
+/** Úklid po testu — druhá pojistka k rollbacku (viz komentář výše). */
+function afxTestCleanup(PDO $pdo): array {
+    $ids = $pdo->query("SELECT id FROM invoices WHERE notes = '" . TEST_NOTE . "'")->fetchAll(PDO::FETCH_COLUMN);
+    $n = ['faktury' => 0, 'platby' => 0, 'pohyby' => 0];
+    if ($ids) {
+        $in = implode(',', array_map('intval', $ids));
+        $n['platby'] = (int)$pdo->exec("DELETE FROM invoice_payments WHERE invoice_id IN ($in)");
+        $pdo->exec("DELETE FROM invoice_items WHERE invoice_id IN ($in)");
+        $n['faktury'] = (int)$pdo->exec("DELETE FROM invoices WHERE id IN ($in)");
+    }
+    $n['pohyby'] = (int)$pdo->exec("DELETE FROM bank_transactions WHERE env = '" . TEST_ENV . "'");
+    return $n;
+}
+
+// zbytky po případném dřívějším přerušeném běhu
+$pre = afxTestCleanup($pdo);
+if (array_sum($pre) > 0) {
+    out(yellow('Uklizeny zbytky po předchozím běhu: ' . json_encode($pre, JSON_UNESCAPED_UNICODE)));
+}
 
 $pdo->beginTransaction();
 $failures = 0;
@@ -72,7 +101,7 @@ try {
     $insInv = $pdo->prepare("INSERT INTO invoices
         (invoice_number, variable_symbol, customer_id, date_issue, date_tax, date_due,
          total_amount, status, invoice_type, currency, notes)
-        VALUES (?, ?, ?, ?, ?, DATE_ADD(?, INTERVAL 14 DAY), ?, ?, ?, 'CZK', 'TEST — párování banky')");
+        VALUES (?, ?, ?, ?, ?, DATE_ADD(?, INTERVAL 14 DAY), ?, ?, ?, 'CZK', '" . TEST_NOTE . "')");
     $invIds = [];
     foreach ($invoices as $inv) {
         $issue = date('Y-m-d', strtotime(((int)($inv['date_issue_offset'] ?? -15)) . ' days'));
@@ -183,6 +212,83 @@ try {
         out();
     }
 
+    // ── částečné platby (evidence plateb, ne párování) ────────────────────────
+    out('Částečné platby:');
+    $insInv->execute(['TEST-CAST-01', 'TEST-CAST-01', $customerId, date('Y-m-d', strtotime('-10 days')),
+        date('Y-m-d', strtotime('-10 days')), date('Y-m-d', strtotime('-10 days')), 8500.00, 'issued', 'invoice']);
+    $partId = (int)$pdo->lastInsertId();
+    $invIds['TEST-CAST-01'] = $partId;
+    $check = function (string $what, float $expPaid, string $expStatus) use ($pdo, $partId, &$failures) {
+        $r = $pdo->prepare("SELECT paid_amount, status FROM invoices WHERE id = ?");
+        $r->execute([$partId]);
+        $row = $r->fetch(PDO::FETCH_ASSOC);
+        $ok = abs((float)$row['paid_amount'] - $expPaid) < 0.01 && (string)$row['status'] === $expStatus;
+        if ($ok) { out('  ' . green('OK  ') . $what); }
+        else {
+            $failures++;
+            out('  ' . red('CHYBA ') . $what . ' → zaplaceno ' . number_format((float)$row['paid_amount'], 2)
+                . ' / stav ' . $row['status'] . ' (čekáno ' . number_format($expPaid, 2) . ' / ' . $expStatus . ')');
+        }
+    };
+
+    afxInvoiceAddPayment($partId, 3000.00, 'bank', date('Y-m-d'), null, 'TEST 1. splátka');
+    $check('první splátka 3 000 z 8 500 → faktura zůstává nezaplacená', 3000.00, 'issued');
+
+    afxInvoiceAddPayment($partId, 5000.00, 'bank', date('Y-m-d'), null, 'TEST 2. splátka');
+    $check('druhá splátka 5 000 (celkem 8 000) → pořád nezaplacená', 8000.00, 'issued');
+
+    afxInvoiceAddPayment($partId, 500.00, 'cash', date('Y-m-d'), null, 'TEST doplatek hotově');
+    $check('doplatek 500 hotově (celkem 8 500) → ZAPLACENO', 8500.00, 'paid');
+
+    // odebrání jedné bankovní platby smí fakturu vrátit mezi nezaplacené.
+    // VLASTNÍ pohyb schválně — kdyby se použil některý z pohybů výše, smazala by se
+    // s ním i platba faktury, ke které patří, a zbytek testu by měřil nesmysl.
+    $pdo->prepare("INSERT INTO bank_transactions (entry_ref, env, account_id, booking_date, amount, currency,
+            direction, counterparty_name, vs, match_status, tx_status)
+        VALUES ('TEST-CAST-TX', ?, ?, CURDATE(), 5000.00, 'CZK', 'in', 'Test splátka', 'TEST-CAST-01', 'manual', 'BOOK')")
+        ->execute([TEST_ENV, TEST_ACCOUNT]);
+    $txRow = (int)$pdo->lastInsertId();
+    $pdo->prepare("UPDATE invoice_payments SET bank_transaction_id = ? WHERE invoice_id = ? AND amount = 5000 LIMIT 1")
+        ->execute([$txRow, $partId]);
+    afxInvoiceRemoveBankPayment($txRow);
+    $check('odpárování platby 5 000 → zpět nezaplacená, zaplaceno 3 500', 3500.00, 'issued');
+
+    $info = afxInvoicePaymentInfo($pdo->query("SELECT * FROM invoices WHERE id = $partId")->fetch(PDO::FETCH_ASSOC));
+    if (abs($info['remaining'] - 5000.00) < 0.01 && $info['partial']) {
+        out('  ' . green('OK  ') . 'zbytek k úhradě 5 000 Kč a příznak „částečně zaplaceno"');
+    } else {
+        $failures++;
+        out('  ' . red('CHYBA ') . 'zbytek/příznak nesedí: ' . json_encode($info, JSON_UNESCAPED_UNICODE));
+    }
+    out();
+
+    // ── celková kontrola konzistence ──────────────────────────────────────────
+    // Nejdůležitější pravidlo celého modulu: faktura označená jako ZAPLACENÁ musí mít
+    // v evidenci platby, které ji pokrývají, a uložená částka musí sedět na jejich součet.
+    if ($invIds) {
+        $cons = $pdo->prepare("SELECT i.invoice_number, i.total_amount, i.status, i.paid_amount,
+                COALESCE((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) skutecne
+            FROM invoices i WHERE i.id IN (" . implode(',', array_fill(0, count($invIds), '?')) . ")");
+        $cons->execute(array_values($invIds));
+        $bad = 0;
+        foreach ($cons->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            if (abs((float)$r['paid_amount'] - (float)$r['skutecne']) > 0.01) {
+                $bad++;
+                out('  ' . red('CHYBA ') . 'faktura ' . $r['invoice_number'] . ': uložená částka '
+                    . number_format((float)$r['paid_amount'], 2) . ' ≠ součet plateb ' . number_format((float)$r['skutecne'], 2));
+            }
+            if ((string)$r['status'] === 'paid'
+                && (float)$r['skutecne'] < (float)$r['total_amount'] - afxPayTolerance((float)$r['total_amount'])) {
+                $bad++;
+                out('  ' . red('CHYBA ') . 'faktura ' . $r['invoice_number'] . ' je ZAPLACENÁ, ale došlo jen '
+                    . number_format((float)$r['skutecne'], 2) . ' z ' . number_format((float)$r['total_amount'], 2));
+            }
+        }
+        $failures += $bad;
+        out($bad === 0 ? '  ' . green('OK  ') . 'evidence plateb je konzistentní se stavem všech faktur' : '');
+        out();
+    }
+
     // ── faktury po testu ──────────────────────────────────────────────────────
     if ($invIds) {
         out('Faktury po zpracování plateb:');
@@ -209,7 +315,20 @@ try {
 } finally {
     // VŽDY zpět — test nesmí po sobě v ostré databázi nic nechat
     if ($pdo->inTransaction()) { $pdo->rollBack(); }
-    out('Databáze vrácena do původního stavu (rollback).');
+    // druhá pojistka: kdyby transakci rozbil implicitní commit (DDL), uklidí se ručně
+    $post = afxTestCleanup($pdo);
+    if (array_sum($post) > 0) {
+        out(yellow('Rollback nestačil (v transakci proběhlo DDL) — testovací data smazána ručně: '
+            . json_encode($post, JSON_UNESCAPED_UNICODE)));
+    }
+    $zbytky = (int)$pdo->query("SELECT COUNT(*) FROM invoices WHERE notes = '" . TEST_NOTE . "'")->fetchColumn()
+        + (int)$pdo->query("SELECT COUNT(*) FROM bank_transactions WHERE env = '" . TEST_ENV . "'")->fetchColumn();
+    if ($zbytky > 0) {
+        $failures++;
+        out(red("POZOR: v databázi zůstalo $zbytky testovacích záznamů — smaž je ručně!"));
+    } else {
+        out('Databáze je v původním stavu (žádná testovací data nezůstala).');
+    }
 }
 
 out($failures === 0 ? green('HOTOVO — všechny kontroly prošly.') : red("HOTOVO — neprošlo kontrol: $failures"));

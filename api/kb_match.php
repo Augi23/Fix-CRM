@@ -1,9 +1,11 @@
 <?php
 /**
  * Banka — ruční spárování/odpárování pohybu s fakturou.
- *   action=match   tx_id + invoice_id → pohyb 'manual' + faktura PAID
- *   action=unmatch tx_id             → zruší vazbu; fakturu vrátí na 'issued'
- *                                      jen pokud byla zaplacena právě tímto párováním
+ *   action=match   tx_id + invoice_id → zapíše platbu k faktuře (i ČÁSTEČNOU: faktura
+ *                                       se označí zaplacená až když je uhrazená celá)
+ *   action=unmatch tx_id             → smaže evidenci platby a přepočítá stav faktury;
+ *                                       platbu vyřadí z automatického párování
+ *   action=reset   tx_id             → vrátí vyřazenou platbu do automatického párování
  */
 ob_start();
 require_once '../includes/config.php';
@@ -24,6 +26,7 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 ensureBankTables();
+afxEnsureInvoicePayments();
 $action = (string)($_POST['action'] ?? 'match');
 $txId = (int)($_POST['tx_id'] ?? 0);
 
@@ -34,13 +37,11 @@ try {
     if (!$tx) { throw new Exception('Pohyb nenalezen.'); }
 
     if ($action === 'unmatch') {
-        if (!empty($tx['matched_invoice_id']) && in_array((string)$tx['match_status'], ['auto', 'manual'], true)) {
-            // vrátit správný nezaplacený stav: po splatnosti = overdue, jinak issued
-            $pdo->prepare("UPDATE invoices
-                SET status = IF(date_due < CURDATE(), 'overdue', 'issued'), payment_date = NULL
-                WHERE id = ? AND status = 'paid'")
-                ->execute([(int)$tx['matched_invoice_id']]);
-        }
+        // Smazání evidence platby stav faktury přepočítá samo: když ji krylo víc plateb
+        // a zůstávají další, faktura zaplacená ZŮSTANE (jen se zmenší uhrazená částka);
+        // bez ostatních plateb se vrátí mezi nezaplacené (po splatnosti = overdue).
+        afxInvoiceRemoveBankPayment($txId);
+        if (!empty($tx['matched_invoice_id'])) { afxInvoiceRecalcPaid((int)$tx['matched_invoice_id'], true); }
         // KRITICKÉ: stav 'ignored', NE 'none'. Do 'none' sahá automatické párování —
         // odpárovaná platba by se při nejbližší synchronizaci sama zase spárovala
         // a přebila rozhodnutí účetní. Zpět do automatu ji vrátí až člověk (action=reset).
@@ -78,40 +79,45 @@ try {
     }
     if (strtoupper((string)$tx['currency']) !== 'CZK') { throw new Exception('Platbu v cizí měně nelze párovat s korunovou fakturou — vyřeš ručně v účetnictví.'); }
 
-    // …a jen s nezaplacenou skutečnou fakturou (ne dobropis, ne už zaplacená)
+    // …a jen se skutečnou fakturou (ne dobropis, ne stornovaná), která ještě není celá uhrazená
     $invoiceId = (int)($_POST['invoice_id'] ?? 0);
-    $iv = $pdo->prepare("SELECT id, invoice_number, total_amount, status, invoice_type FROM invoices WHERE id = ?");
+    $iv = $pdo->prepare("SELECT id, invoice_number, total_amount, paid_amount, status, invoice_type FROM invoices WHERE id = ?");
     $iv->execute([$invoiceId]);
     $inv = $iv->fetch(PDO::FETCH_ASSOC);
     if (!$inv) { throw new Exception('Faktura nenalezena.'); }
     if ((string)$inv['invoice_type'] !== 'invoice') { throw new Exception('Dobropis nelze párovat s příchozí platbou.'); }
-    if ((string)$inv['status'] === 'paid') { throw new Exception('Faktura ' . $inv['invoice_number'] . ' už je zaplacená.'); }
     if ((string)$inv['status'] === 'cancelled') { throw new Exception('Faktura ' . $inv['invoice_number'] . ' je stornovaná.'); }
 
-    // na faktuře nesmí už viset jiná platba — jinak by jednu pohledávku „platily" dvě
-    $other = $pdo->prepare("SELECT COUNT(*) FROM bank_transactions
-        WHERE matched_invoice_id = ? AND match_status IN ('auto','manual') AND id <> ?");
-    $other->execute([$invoiceId, $txId]);
-    if ((int)$other->fetchColumn() > 0) {
-        throw new Exception('K faktuře ' . $inv['invoice_number'] . ' už je navázaná jiná platba — nejdřív zruš to párování.');
+    $info = afxInvoicePaymentInfo($inv);
+    if ($info['remaining'] <= 0) {
+        throw new Exception('Faktura ' . $inv['invoice_number'] . ' je už celá uhrazená (' . formatMoney($info['paid']) . ').');
+    }
+    $amount = (float)$tx['amount'];
+    // přeplatek se ručně navázat nedá — takovou platbu je potřeba rozdělit nebo vrátit,
+    // jinak by v evidenci vznikla faktura „zaplacená" víc, než kolik měla být
+    if ($amount > $info['remaining'] + afxPayTolerance($info['total'])) {
+        throw new Exception('Platba ' . formatMoney($amount) . ' je vyšší než zbytek k úhradě ('
+            . formatMoney($info['remaining']) . ') na faktuře ' . $inv['invoice_number'] . '.');
     }
 
-    // nárok na fakturu atomicky: když ji mezitím zaplatil sync, UPDATE nic nezmění
-    $claim = $pdo->prepare("UPDATE invoices SET status = 'paid', payment_date = ?
-        WHERE id = ? AND status IN ('issued', 'overdue')");
-    $claim->execute([(string)$tx['booking_date'] ?: date('Y-m-d'), $invoiceId]);
-    if ($claim->rowCount() !== 1) {
-        throw new Exception('Faktura ' . $inv['invoice_number'] . ' mezitím změnila stav — načti stránku znovu.');
+    if (!afxInvoiceAddPayment($invoiceId, $amount, 'bank', (string)$tx['booking_date'] ?: date('Y-m-d'), $txId, 'Ručně spárováno')) {
+        throw new Exception('Tato platba už je k faktuře navázaná.');
     }
     $pdo->prepare("UPDATE bank_transactions SET matched_invoice_id = ?, match_status = 'manual',
         matched_at = NOW(), match_note = 'Ručně spárováno' WHERE id = ?")
         ->execute([$invoiceId, $txId]);
+
+    $after = afxInvoiceRecalcPaid($invoiceId);
+    $fullyPaid = $after['remaining'] <= 0;
     crmAuditLog('banka.match', [
         'entity_type' => 'invoice', 'entity_id' => $invoiceId, 'entity_label' => (string)$inv['invoice_number'],
         'summary' => 'Faktura ' . $inv['invoice_number'] . ' RUČNĚ spárována s platbou '
-            . formatMoney((float)$tx['amount']) . ' (' . ($tx['counterparty_name'] ?: 'bez názvu') . ') a označena ZAPLACENO',
+            . formatMoney($amount) . ' (' . ($tx['counterparty_name'] ?: 'bez názvu') . ') — '
+            . ($fullyPaid ? 'označena ZAPLACENO' : 'částečná platba, zbývá ' . formatMoney($after['remaining'])),
     ]);
-    echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => true, 'paid' => $after['paid'], 'remaining' => $after['remaining'],
+        'message' => $fullyPaid ? 'Faktura je zaplacená.' : 'Zaplaceno ' . formatMoney($after['paid'])
+            . ' z ' . formatMoney($after['total']) . ' — zbývá ' . formatMoney($after['remaining']) . '.'], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     $msg = ($e instanceof PDOException) ? 'Databázová chyba.' : $e->getMessage();
     echo json_encode(['success' => false, 'message' => $msg], JSON_UNESCAPED_UNICODE);
