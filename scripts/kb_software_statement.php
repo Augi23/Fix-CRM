@@ -68,7 +68,7 @@ $opts = [
     CURLOPT_HTTPHEADER => [
         'Content-Type: application/json',
         'apiKey: ' . $apiKey,
-        'x-correlation-id: ' . bin2hex(random_bytes(16)),
+        'x-correlation-id: ' . kbCorrelationId(),
     ],
     CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
 ];

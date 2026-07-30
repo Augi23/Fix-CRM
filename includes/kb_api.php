@@ -154,7 +154,7 @@ function kbExchangeAuthCode(string $code): array {
     [$ok, $httpCode, $data, $raw] = kbHttp('POST', kbOauthBase() . '/access_token',
         ['Content-Type: application/x-www-form-urlencoded',
          'apiKey: ' . get_setting('kb_api_key_oauth', ''),
-         'x-correlation-id: ' . bin2hex(random_bytes(16))],
+         'x-correlation-id: ' . kbCorrelationId()],
         http_build_query([
             'grant_type' => 'authorization_code',
             'code' => $code,
@@ -173,6 +173,16 @@ function kbExchangeAuthCode(string $code): array {
         set_setting('kb_access_token_expires', (string)(time() + (int)($data['expires_in'] ?? 180)));
     }
     return is_array($data) ? $data : [];
+}
+
+/** Identifikátor požadavku pro KB (hlavička x-correlation-id). MUSÍ to být UUID
+ *  s pomlčkami — banka jiný tvar odmítne s chybou INVALID_HEADER_VALUE (a celá výměna
+ *  kódu za token pak selže na HTTP 400). */
+function kbCorrelationId(): string {
+    $b = random_bytes(16);
+    $b[6] = chr((ord($b[6]) & 0x0f) | 0x40);   // verze 4
+    $b[8] = chr((ord($b[8]) & 0x3f) | 0x80);   // varianta RFC 4122
+    return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
 }
 
 /** HTTP volání s hlavičkami KB (curl, JSON). Vrací [ok, httpCode, dataOrNull, rawBody]. */
@@ -217,7 +227,7 @@ function kbAccessToken(bool $forceRefresh = false): string {
     [$ok, $code, $data, $raw] = kbHttp('POST', kbOauthBase() . '/access_token',
         ['Content-Type: application/x-www-form-urlencoded',
          'apiKey: ' . get_setting('kb_api_key_oauth', ''),
-         'x-correlation-id: ' . bin2hex(random_bytes(16))],
+         'x-correlation-id: ' . kbCorrelationId()],
         http_build_query([
             'grant_type' => 'refresh_token',
             'refresh_token' => $freshRefresh ?? get_setting('kb_refresh_token', ''),
@@ -247,7 +257,7 @@ function kbAdaaGet(string $path, array $query = []): array {
     $mk = static fn(string $token): array => [
         'apiKey: ' . get_setting('kb_api_key_adaa', ''),
         'Authorization: Bearer ' . $token,
-        'x-correlation-id: ' . bin2hex(random_bytes(16)),
+        'x-correlation-id: ' . kbCorrelationId(),
         'Accept: application/json',
     ];
     [$ok, $code, $data, $raw] = kbHttp('GET', $url, $mk(kbAccessToken()));

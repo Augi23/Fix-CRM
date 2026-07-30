@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.25.4',
+        'date' => '2026-07-30',
+        'time' => '15:50',
+        'title' => 'Oprava: banka odmítala poslední krok napojení (chybný tvar identifikátoru)',
+        'items' => [
+            '<b>Co se dělo:</b> autorizace v bance proběhla, ale výměna kódu za přístup skončila chybou <code>INVALID_HEADER_VALUE</code>. CRM posílalo v identifikátoru požadavku náhodné číslo bez pomlček; KB vyžaduje <b>UUID</b>. Opraveno u všech volání banky (výměna kódu, obnova tokenu, stahování pohybů i software statement).',
+        ],
+    ],
+    [
         'version' => '3.25.3',
         'date' => '2026-07-30',
         'time' => '15:10',
