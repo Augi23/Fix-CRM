@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.25.5',
+        'date' => '2026-07-30',
+        'time' => '16:10',
+        'title' => 'Napojení na banku funguje + volba, odkdy stahovat pohyby',
+        'items' => [
+            '<b>Napojení na KB je hotové</b> (v testovacím prostředí ověřeno celé: autorizace → tokeny → seznam účtů → čtení pohybů).',
+            '<b>Nové pole „Stahovat pohyby od":</b> při prvním načtení si řekneš, jak hluboko do historie se má jít. Bez vyplnění se bere posledních 30 dní; další synchronizace už navazují na tu předchozí (s třídenním přesahem kvůli pozdnímu zaúčtování).',
+        ],
+    ],
+    [
         'version' => '3.25.4',
         'date' => '2026-07-30',
         'time' => '15:50',

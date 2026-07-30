@@ -1096,7 +1096,11 @@ require_once 'includes/header.php';
                         <label class="form-label small">API klíč — Client Registration <span class="text-white-50">(pro software statement)</span></label>
                         <input type="text" name="kb_api_key_client_reg" class="form-control" value="<?php echo e(get_setting('kb_api_key_client_reg', '')); ?>">
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-3">
+                        <label class="form-label small">Stahovat pohyby od <span class="text-white-50">(první načtení)</span></label>
+                        <input type="date" name="kb_sync_from" class="form-control" value="<?php echo e(get_setting('kb_sync_from', '')); ?>">
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label small">Adresa CRM <span class="text-white-50">(kam se banka vrací)</span></label>
                         <input type="text" name="kb_base_url" class="form-control" value="<?php echo e(get_setting('kb_base_url', 'https://admin.applefix.cloud')); ?>">
                     </div>

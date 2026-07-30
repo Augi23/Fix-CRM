@@ -414,9 +414,18 @@ function kbSyncTransactions(): array {
     $accountId = (string)get_setting('kb_account_id', '');
     if ($accountId === '') { throw new Exception('Není vybraný účet — Nastavení → Banka.'); }
 
-    // od posledního syncu s 3denním překryvem (pozdní zaúčtování); poprvé 30 dní
+    // od posledního syncu s 3denním překryvem (pozdní zaúčtování). Poprvé se bere
+    // datum z nastavení („Stahovat pohyby od" — pro první načtení historie), a když
+    // není vyplněné, posledních 30 dní.
     $from = (string)get_setting('kb_last_sync_at', '');
-    $fromDate = $from !== '' ? date('Y-m-d', strtotime($from) - 3 * 86400) : date('Y-m-d', time() - 30 * 86400);
+    if ($from !== '') {
+        $fromDate = date('Y-m-d', strtotime($from) - 3 * 86400);
+    } else {
+        $manual = trim((string)get_setting('kb_sync_from', ''));
+        $fromDate = ($manual !== '' && strtotime($manual))
+            ? date('Y-m-d', strtotime($manual))
+            : date('Y-m-d', time() - 30 * 86400);
+    }
 
     $env = kbApiEnv();
     $fetched = 0; $new = 0; $skippedStorno = 0; $hitPageCap = false;

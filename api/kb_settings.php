@@ -18,7 +18,7 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 $plain = ['kb_env', 'kb_api_key_adaa', 'kb_api_key_oauth', 'kb_api_key_client_reg',
-          'kb_client_id', 'kb_account_id', 'kb_base_url'];
+          'kb_client_id', 'kb_account_id', 'kb_base_url', 'kb_sync_from'];
 $secret = ['kb_client_secret', 'kb_refresh_token'];
 
 // PŘEPNUTÍ PROSTŘEDÍ = jiná banka: client_id, secret, refresh token i software statement
