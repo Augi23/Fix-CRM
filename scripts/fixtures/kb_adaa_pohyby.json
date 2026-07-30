@@ -1,0 +1,904 @@
+{
+ "_popis": "Testovací pohyby ve tvaru odpovědi KB ADAA v2 (GET /accounts/{id}/transactions). Pole ověřena proti oficiální specifikaci komercka/adaa-client. Datum '@-5' = před 5 dny (aby test nezestárl).",
+ "invoices": [
+  {
+   "invoice_number": "2026001",
+   "total_amount": 17680.0
+  },
+  {
+   "invoice_number": "FV/2026/003",
+   "total_amount": 2990.0,
+   "variable_symbol": "FV/2026/003"
+  },
+  {
+   "invoice_number": "2026002",
+   "total_amount": 4500.0
+  },
+  {
+   "invoice_number": "2026005",
+   "total_amount": 1200.0
+  },
+  {
+   "invoice_number": "2026006",
+   "total_amount": 3000.0
+  },
+  {
+   "invoice_number": "2026007",
+   "total_amount": 990.0
+  },
+  {
+   "invoice_number": "2026008",
+   "total_amount": 5500.0
+  },
+  {
+   "invoice_number": "2026009",
+   "total_amount": 7200.0
+  },
+  {
+   "invoice_number": "2026010",
+   "total_amount": 2450.0
+  },
+  {
+   "invoice_number": "2026011",
+   "total_amount": 3300.0,
+   "date_issue_offset": -3
+  },
+  {
+   "invoice_number": "2026012A",
+   "total_amount": 1000.0,
+   "variable_symbol": "2026012"
+  },
+  {
+   "invoice_number": "2026012B",
+   "total_amount": 1000.0,
+   "variable_symbol": "2026012"
+  },
+  {
+   "invoice_number": "2026013",
+   "total_amount": 60.5
+  },
+  {
+   "invoice_number": "2026099",
+   "total_amount": 349.0
+  }
+ ],
+ "transactions": [
+  {
+   "lastUpdated": "2026-07-21T06:12:44.118Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000001",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "bankTransactionCode": {
+    "code": "1000010",
+    "issuer": "CBA"
+   },
+   "amount": {
+    "value": 17680.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-9",
+   "valueDate": "@-9",
+   "instructed": {
+    "value": 17680.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ5508000000192837465501",
+    "name": "Jan Novák",
+    "accountNo": "192837465",
+    "bankBic": "GIBACZPXXXX",
+    "bankCode": "0800",
+    "bankName": "Česká spořitelna, a.s."
+   },
+   "references": {
+    "accountServicer": "SGWD000000653288",
+    "endToEndIdentification": "E2E-6xgp25qD46",
+    "variable": "2026001",
+    "constant": "0308",
+    "specific": "708090",
+    "receiver": "FAKTURA 2026001 oprava iPhone"
+   },
+   "additionalTransactionInformation": "8201701069595 BIC: GIBACZPXXXX; #71A# SHA PLATBA FAKTURY"
+  },
+  {
+   "lastUpdated": "2026-07-21T07:03:10.902Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000002",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "bankTransactionCode": {
+    "code": "1000010",
+    "issuer": "CBA"
+   },
+   "amount": {
+    "value": 2990,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-8",
+   "valueDate": "@-8",
+   "instructed": {
+    "value": 2990,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ2203000000000456789123",
+    "name": "Petra Svobodová",
+    "accountNo": "456789123",
+    "bankBic": "CEKOCZPP",
+    "bankCode": "0300",
+    "bankName": "ČSOB, a.s."
+   },
+   "references": {
+    "accountServicer": "SGWD000000653301",
+    "variable": "2026003",
+    "constant": "0008",
+    "specific": "",
+    "receiver": "QR platba"
+   },
+   "additionalTransactionInformation": "PLATBA QR KODEM"
+  },
+  {
+   "lastUpdated": "2026-07-22T08:44:02.005Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000003",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 2000.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-7",
+   "valueDate": "@-7",
+   "instructed": {
+    "value": 2000.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ9006000000000112233445",
+    "name": "Tomáš Dvořák",
+    "accountNo": "112233445",
+    "bankBic": "AGBACZPP",
+    "bankCode": "0600",
+    "bankName": "MONETA Money Bank, a.s."
+   },
+   "references": {
+    "variable": "2026002",
+    "constant": "0308",
+    "receiver": "zaloha na opravu"
+   },
+   "additionalTransactionInformation": "CASTECNA UHRADA"
+  },
+  {
+   "lastUpdated": "2026-07-22T11:20:59.441Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000004",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 1500.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-7",
+   "valueDate": "@-7",
+   "instructed": {
+    "value": 1500.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ4020100000002233445566",
+    "name": "Lucie Marková",
+    "accountNo": "2233445566",
+    "bankBic": "FIOBCZPP",
+    "bankCode": "2010",
+    "bankName": "Fio banka, a.s."
+   },
+   "references": {
+    "variable": "2026005",
+    "constant": "0558",
+    "specific": "1200",
+    "receiver": "preplatek - zaokrouhleno nahoru"
+   },
+   "additionalTransactionInformation": "PREPLATEK"
+  },
+  {
+   "lastUpdated": "2026-07-23T09:01:12.700Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000005",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 1500.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-6",
+   "valueDate": "@-6",
+   "instructed": {
+    "value": 1500.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ1027000000009988776655",
+    "name": "Servis Kolektiv s.r.o.",
+    "accountNo": "9988776655",
+    "bankBic": "BACXCZPP",
+    "bankCode": "2700",
+    "bankName": "UniCredit Bank Czech Republic and Slovakia, a.s."
+   },
+   "references": {
+    "variable": "2026006",
+    "constant": "0308",
+    "receiver": "1. splatka faktury 2026006"
+   },
+   "additionalTransactionInformation": "SPLATKA 1/2"
+  },
+  {
+   "lastUpdated": "2026-07-24T09:02:31.008Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000006",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 1500.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-5",
+   "valueDate": "@-5",
+   "instructed": {
+    "value": 1500.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ1027000000009988776655",
+    "name": "Servis Kolektiv s.r.o.",
+    "accountNo": "9988776655",
+    "bankBic": "BACXCZPP",
+    "bankCode": "2700",
+    "bankName": "UniCredit Bank Czech Republic and Slovakia, a.s."
+   },
+   "references": {
+    "variable": "2026006",
+    "constant": "0308",
+    "receiver": "2. splatka faktury 2026006"
+   },
+   "additionalTransactionInformation": "SPLATKA 2/2"
+  },
+  {
+   "lastUpdated": "2026-07-24T13:55:07.311Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000007",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 990.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-5",
+   "valueDate": "@-5",
+   "instructed": {
+    "value": 990.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ7355000000001357913579",
+    "name": "Karel Bezvýsymbolu",
+    "accountNo": "1357913579",
+    "bankBic": "RZBCCZPP",
+    "bankCode": "5500",
+    "bankName": "Raiffeisenbank a.s."
+   },
+   "references": {
+    "constant": "0308",
+    "receiver": "uhrada faktury c. 2026007 dekuji"
+   },
+   "additionalTransactionInformation": "PLATBA BEZ VS"
+  },
+  {
+   "lastUpdated": "2026-07-25T06:30:00.000Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000008-ORIG",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 5500.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-12",
+   "valueDate": "@-12",
+   "instructed": {
+    "value": 5500.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ8501000000005544332211",
+    "name": "Michal Storno",
+    "accountNo": "5544332211",
+    "bankBic": "KOMBCZPPXXX",
+    "bankCode": "0100",
+    "bankName": "Komerční banka, a.s."
+   },
+   "references": {
+    "variable": "2026008",
+    "constant": "0308",
+    "receiver": "uhrada faktury 2026008"
+   },
+   "additionalTransactionInformation": "STORNO TRANSAKCE"
+  },
+  {
+   "lastUpdated": "2026-07-25T06:30:00.000Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000008",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 5500.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-4",
+   "valueDate": "@-4",
+   "instructed": {
+    "value": 5500.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": true,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ8501000000005544332211",
+    "name": "Michal Storno",
+    "accountNo": "5544332211",
+    "bankBic": "KOMBCZPPXXX",
+    "bankCode": "0100",
+    "bankName": "Komerční banka, a.s."
+   },
+   "references": {
+    "variable": "2026008",
+    "constant": "0308",
+    "receiver": "STORNO chybne zaslane platby"
+   },
+   "additionalTransactionInformation": "STORNO TRANSAKCE"
+  },
+  {
+   "lastUpdated": "2026-07-25T10:15:41.220Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000009",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 7200.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-4",
+   "valueDate": "@-3",
+   "instructed": {
+    "value": 7200.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "PDNG",
+   "counterParty": {
+    "iban": "CZ3708000000006677889900",
+    "name": "Eva Nezauctovaná",
+    "accountNo": "6677889900",
+    "bankBic": "GIBACZPXXXX",
+    "bankCode": "0800",
+    "bankName": "Česká spořitelna, a.s."
+   },
+   "references": {
+    "variable": "2026009",
+    "constant": "0308",
+    "receiver": "faktura 2026009"
+   },
+   "additionalTransactionInformation": "NEZAUCTOVANO - CEKA NA ZPRACOVANI"
+  },
+  {
+   "lastUpdated": "2026-07-26T08:05:00.000Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000010",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "FOREIGN",
+   "amount": {
+    "value": 700.0,
+    "currency": "EUR"
+   },
+   "bookingDate": "@-3",
+   "valueDate": "@-2",
+   "instructed": {
+    "value": 700.0,
+    "currency": "EUR"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "DE89370400440532013000",
+    "name": "Hans Müller GmbH",
+    "bankBic": "COBADEFFXXX",
+    "bankName": "Commerzbank AG"
+   },
+   "references": {
+    "endToEndIdentification": "E2E-EUR-9912",
+    "variable": "2026001",
+    "receiver": "Invoice 2026001 payment"
+   },
+   "additionalTransactionInformation": "SEPA CREDIT TRANSFER; #71A# SHA"
+  },
+  {
+   "lastUpdated": "2026-07-26T12:40:18.664Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000011",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "DEBIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": -4235.5,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-3",
+   "valueDate": "@-3",
+   "instructed": {
+    "value": -4235.5,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ6501000000007007007007",
+    "name": "iSTYLE CZ s.r.o.",
+    "accountNo": "7007007007",
+    "bankBic": "KOMBCZPPXXX",
+    "bankCode": "0100",
+    "bankName": "Komerční banka, a.s."
+   },
+   "references": {
+    "variable": "2026001",
+    "constant": "0008",
+    "receiver": "nakup nahradnich dilu"
+   },
+   "additionalTransactionInformation": "ODCHOZI PLATBA"
+  },
+  {
+   "lastUpdated": "2026-07-26T18:22:03.900Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000001",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 17680.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-9",
+   "valueDate": "@-9",
+   "instructed": {
+    "value": 17680.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ5508000000192837465501",
+    "name": "Jan Novák",
+    "accountNo": "192837465",
+    "bankBic": "GIBACZPXXXX",
+    "bankCode": "0800",
+    "bankName": "Česká spořitelna, a.s."
+   },
+   "references": {
+    "accountServicer": "SGWD000000653288",
+    "variable": "2026001",
+    "constant": "0308",
+    "receiver": "FAKTURA 2026001 oprava iPhone"
+   },
+   "additionalTransactionInformation": "DUPLICITNI DORUCENI TEHOZ POHYBU (jina lastUpdated)"
+  },
+  {
+   "lastUpdated": "2026-07-27T07:10:00.000Z",
+   "accountType": "KB",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "CASH",
+   "amount": {
+    "value": 2450.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-2",
+   "valueDate": "@-2",
+   "instructed": {
+    "value": 2450.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "name": "Vklad hotovosti pobočka Karlín",
+    "accountNo": "3344556677",
+    "bankBic": "KOMBCZPPXXX",
+    "bankCode": "0100",
+    "bankName": "Komerční banka, a.s."
+   },
+   "references": {
+    "variable": "2026010",
+    "constant": "0308",
+    "receiver": "vklad hotovosti k fakture 2026010"
+   },
+   "additionalTransactionInformation": "VKLAD HOTOVOSTI"
+  },
+  {
+   "lastUpdated": "2026-07-27T19:44:52.512Z",
+   "accountType": "KB",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "CASH",
+   "amount": {
+    "value": 2450.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-2",
+   "valueDate": "@-2",
+   "instructed": {
+    "value": 2450.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "name": "Vklad hotovosti pobočka Karlín",
+    "accountNo": "3344556677",
+    "bankBic": "KOMBCZPPXXX",
+    "bankCode": "0100",
+    "bankName": "Komerční banka, a.s."
+   },
+   "references": {
+    "variable": "2026010",
+    "constant": "0308",
+    "receiver": "vklad hotovosti k fakture 2026010"
+   },
+   "additionalTransactionInformation": "TYZ VKLAD PO PREPOCTU - jina lastUpdated i jiny popis"
+  },
+  {
+   "lastUpdated": "2026-07-28T06:58:14.001Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000015",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "amount": {
+    "value": 17680.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-1",
+   "valueDate": "@-1",
+   "instructed": {
+    "value": 17680.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOKED",
+   "counterParty": {
+    "iban": "CZ5508000000192837465501",
+    "name": "Jan Novák",
+    "accountNo": "192837465",
+    "bankBic": "GIBACZPXXXX",
+    "bankCode": "0800",
+    "bankName": "Česká spořitelna, a.s."
+   },
+   "references": {
+    "variable": "2026001",
+    "constant": "0308",
+    "receiver": "omylem podruhe zaslana platba faktury 2026001"
+   },
+   "additionalTransactionInformation": "DUPLICITNI PLATBA KLIENTEM"
+  },
+  {
+   "lastUpdated": "2026-07-28T15:12:00.000Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000016",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CRDT",
+   "transactionType": "CARD",
+   "amount": {
+    "value": 349.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-1",
+   "valueDate": "@-1",
+   "instructed": {
+    "value": 349.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "iban": "CZ4855000000001111222233",
+    "name": "",
+    "bankBic": "RZBCCZPP"
+   },
+   "references": {
+    "variable": "2026099",
+    "receiver": ""
+   },
+   "additionalTransactionInformation": "VRACENI PLATBY KARTOU TERMINAL 4711; #71A# SHA"
+  },
+  {
+   "lastUpdated": "2026-07-21T06:12:44.118Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000017",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "bankTransactionCode": {
+    "code": "1000010",
+    "issuer": "CBA"
+   },
+   "amount": {
+    "value": 3300.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-60",
+   "valueDate": "@-60",
+   "instructed": {
+    "value": 3300.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "name": "Petr Svoboda",
+    "accountNo": "192837465",
+    "bankCode": "0800",
+    "iban": ""
+   },
+   "references": {
+    "variable": "2026011",
+    "constant": "0308",
+    "receiver": "platba prisla driv nez faktura",
+    "endToEndIdentification": "E2E-000017"
+   },
+   "additionalTransactionInformation": "platba prisla driv nez faktura"
+  },
+  {
+   "lastUpdated": "2026-07-21T06:12:44.118Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000018",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "bankTransactionCode": {
+    "code": "1000010",
+    "issuer": "CBA"
+   },
+   "amount": {
+    "value": 1000.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-3",
+   "valueDate": "@-3",
+   "instructed": {
+    "value": 1000.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "name": "Petr Svoboda",
+    "accountNo": "192837465",
+    "bankCode": "0800",
+    "iban": ""
+   },
+   "references": {
+    "variable": "2026012",
+    "constant": "0308",
+    "receiver": "VS sedi dvema fakturam",
+    "endToEndIdentification": "E2E-000018"
+   },
+   "additionalTransactionInformation": "VS sedi dvema fakturam"
+  },
+  {
+   "lastUpdated": "2026-07-21T06:12:44.118Z",
+   "accountType": "KB",
+   "entryReference": "KB-2026-0000019",
+   "iban": "CZ6501000000123456789012",
+   "creditDebitIndicator": "CREDIT",
+   "transactionType": "DOMESTIC",
+   "bankTransactionCode": {
+    "code": "1000010",
+    "issuer": "CBA"
+   },
+   "amount": {
+    "value": 60.0,
+    "currency": "CZK"
+   },
+   "bookingDate": "@-3",
+   "valueDate": "@-3",
+   "instructed": {
+    "value": 60.0,
+    "currency": "CZK"
+   },
+   "reversalIndicator": false,
+   "status": "BOOK",
+   "counterParty": {
+    "name": "Petr Svoboda",
+    "accountNo": "192837465",
+    "bankCode": "0800",
+    "iban": ""
+   },
+   "references": {
+    "variable": "2026013",
+    "constant": "0308",
+    "receiver": "drobna castka pod toleranci",
+    "endToEndIdentification": "E2E-000019"
+   },
+   "additionalTransactionInformation": "drobna castka pod toleranci"
+  }
+ ],
+ "expect": [
+  {
+   "popis": "přesná platba zaplatí fakturu 2026001",
+   "entry_ref": "KB-2026-0000001",
+   "match_status": "auto",
+   "faktura": "2026001",
+   "faktura_stav": "paid"
+  },
+  {
+   "popis": "VS jen jako číslice sedne na nečíselné číslo faktury FV/2026/003",
+   "entry_ref": "KB-2026-0000002",
+   "match_status": "auto",
+   "faktura": "FV/2026/003",
+   "faktura_stav": "paid"
+  },
+  {
+   "popis": "částečná platba fakturu NEZAPLATÍ (jde k prověření)",
+   "entry_ref": "KB-2026-0000003",
+   "match_status": "review",
+   "faktura": "2026002",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "přeplatek fakturu NEZAPLATÍ automaticky",
+   "entry_ref": "KB-2026-0000004",
+   "match_status": "review",
+   "faktura": "2026005",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "první splátka nezaplatí fakturu 2026006",
+   "entry_ref": "KB-2026-0000005",
+   "match_status": "review",
+   "faktura": "2026006",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "druhá splátka taky ne (součet splátek zatím neumíme)",
+   "entry_ref": "KB-2026-0000006",
+   "match_status": "review",
+   "faktura": "2026006"
+  },
+  {
+   "popis": "platba bez VS zůstane nespárovaná",
+   "entry_ref": "KB-2026-0000007",
+   "match_status": "none",
+   "faktura": ""
+  },
+  {
+   "popis": "storno se uloží a vyřadí z párování",
+   "entry_ref": "KB-2026-0000008",
+   "match_status": "ignored"
+  },
+  {
+   "popis": "vrácená platba fakturu 2026008 NENECHÁ zaplacenou",
+   "entry_ref": "KB-2026-0000008-ORIG",
+   "match_status": "ignored",
+   "faktura": ""
+  },
+  {
+   "popis": "nezaúčtovaný pohyb (PDNG) se neuloží",
+   "entry_ref": "KB-2026-0000009",
+   "ulozeno": false
+  },
+  {
+   "popis": "platba v EUR se nepáruje s korunovou fakturou",
+   "entry_ref": "KB-2026-0000010",
+   "match_status": "none"
+  },
+  {
+   "popis": "odchozí platba se nepáruje",
+   "entry_ref": "KB-2026-0000011",
+   "match_status": "none"
+  },
+  {
+   "popis": "duplicitní dodání téhož pohybu nevytvoří druhou platbu",
+   "entry_ref": "KB-2026-0000001",
+   "match_status": "auto"
+  },
+  {
+   "popis": "vklad hotovosti bez reference zaplatí fakturu 2026010",
+   "faktura": "2026010",
+   "faktura_stav": "paid"
+  },
+  {
+   "popis": "druhá platba na už zaplacenou fakturu jde k prověření",
+   "entry_ref": "KB-2026-0000015",
+   "match_status": "review",
+   "faktura": "2026001"
+  },
+  {
+   "popis": "CRDT místo CREDIT se bere jako příchozí a zaplatí 2026099",
+   "entry_ref": "KB-2026-0000016",
+   "match_status": "auto",
+   "faktura": "2026099",
+   "faktura_stav": "paid"
+  },
+  {
+   "popis": "platba starší než faktura se automaticky nespáruje",
+   "entry_ref": "KB-2026-0000017",
+   "match_status": "review",
+   "faktura": "2026011",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "VS sedící dvěma fakturám nezaplatí ani jednu",
+   "entry_ref": "KB-2026-0000018",
+   "match_status": "review",
+   "faktura_stav": "issued",
+   "faktura": "2026012B"
+  },
+  {
+   "popis": "u drobné částky se musí trefit přesně (60 vs 60,50)",
+   "entry_ref": "KB-2026-0000019",
+   "match_status": "review",
+   "faktura": "2026013",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "faktura 2026007 (platba bez VS) zůstává nezaplacená",
+   "faktura": "2026007",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "faktura 2026008 je po stornu zpět nezaplacená",
+   "faktura": "2026008",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "faktura 2026012A při kolizi VS zůstává nezaplacená",
+   "faktura": "2026012A",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "faktura 2026012B při kolizi VS zůstává nezaplacená",
+   "faktura": "2026012B",
+   "faktura_stav": "issued"
+  },
+  {
+   "popis": "nezaúčtovaná platba nezaplatila fakturu 2026009",
+   "faktura": "2026009",
+   "faktura_stav": "issued"
+  }
+ ]
+}

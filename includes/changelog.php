@@ -6,6 +6,20 @@
  */
 return [
     [
+        'version' => '3.22.0',
+        'date' => '2026-07-30',
+        'time' => '07:20',
+        'title' => 'Banka: párování plateb prověřené nanečisto a zabezpečené proti chybám',
+        'items' => [
+            '<b>Proč to bylo potřeba:</b> napojení na KB čeká na certifikát, ale logika, která označuje faktury jako <b>ZAPLACENÉ</b>, musela být prověřená dřív, než přes ni potečou skutečné peníze. Přibyl test nanečisto (<code>scripts/kb_test_parovani.php</code>), který prožene 20 modelových pohybů ve tvaru odpovědi KB stejným kódem jako ostrý provoz a ověří 24 situací. Celý test běží v transakci, která se vrací zpět — v databázi po něm nic nezůstane.',
+            '<b>Zrušené párování zůstane zrušené:</b> dřív se odpárovaná platba vracela do stavu „nespárovaná", takže ji nejbližší synchronizace znovu spárovala a fakturu zase označila zaplacenou — rozhodnutí účetní přebil automat. Nově platba přejde do stavu <b>Vyřazeno z párování</b> (v seznamu i jako filtr) a do automatu ji vrátí jen člověk tlačítkem.',
+            '<b>Vrácené a zrušené platby:</b> storno z banky se dřív mlčky zahodilo a faktura zůstala zaplacená penězi, které už na účtu nebyly. Nově se storno dohledá k původní platbě, <b>faktura se vrátí mezi nezaplacené</b> a zapíše se do historie změn. Stejně se řeší platba, kterou banka dodatečně zrušila.',
+            '<b>Nikdy dvě platby na jednu fakturu:</b> nárok na fakturu se uplatňuje atomicky, takže ani dvě synchronizace běžící naráz (nebo sync proti ručnímu párování) nemůžou jednou pohledávkou „zaplatit" dvě různé platby. Synchronizace navíc drží výhradní zámek — druhý pokus se dozví, že už běží.',
+            '<b>Automat platí jen to, co je jednoznačné:</b> faktura se sama označí zaplacenou pouze když VS sedí <b>právě jedné</b> nezaplacené faktuře, částka odpovídá a platba nemohla přijít dřív než faktura. Částečná platba, přeplatek, kolize VS, platba starší než faktura i drobná částka pod tolerancí jdou <b>k prověření s vysvětlením proč</b> (důvod je vidět přímo v seznamu).',
+            '<b>Drobnosti, které by v ostrém provozu bolely:</b> QR platba i párovač teď používají stejný tvar VS (dřív QR posílala prvních 10 číslic, ale párovač porovnával posledních 10 — platba z QR kódu u delšího čísla faktury by nikdy nesedla); platba v cizí měně ani pohyb z jiného účtu se nedá spárovat s korunovou fakturou; dvě shodné platby v jeden den se už neslijí do jedné; nečitelná nebo nulová částka se neuloží jako platba; a ve výběru faktury k ručnímu párování se dá <b>hledat</b> podle čísla i částky.',
+        ],
+    ],
+    [
         'version' => '3.21.0',
         'date' => '2026-07-29',
         'time' => '21:45',

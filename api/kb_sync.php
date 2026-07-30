@@ -52,11 +52,24 @@ try {
             'message' => 'Poslední synchronizace proběhla před chvílí — další za ~' . $wait . ' min (šetří tarif KB API).']); exit;
     }
 
-    $res = kbSyncTransactions();
+    // Výhradní zámek: throttle výše je „přečti a jednej", takže dva správci (nebo dvě
+    // záložky) jím projdou oba — a dvě párování běžící naráz by mohla dvěma platbám
+    // přiřadit tutéž fakturu. Zámek drží celý běh; při obsazení se prostě počká.
+    $lock = $pdo->query("SELECT GET_LOCK('afx_kb_sync', 0)")->fetchColumn();
+    if ((int)$lock !== 1) {
+        echo json_encode(['success' => false, 'throttled' => true,
+            'message' => 'Synchronizace už právě běží (spustil ji někdo jiný) — počkej, než doběhne.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    try {
+        $res = kbSyncTransactions();
+    } finally {
+        $pdo->query("SELECT RELEASE_LOCK('afx_kb_sync')");
+    }
     crmAuditLog('banka.sync', [
         'entity_type' => 'bank', 'entity_label' => 'KB',
         'summary' => 'Synchronizace banky: ' . $res['new'] . ' nových pohybů, '
-            . $res['matched'] . ' faktur automaticky zaplaceno, ' . $res['review'] . ' k prověření',
+            . $res['matched'] . ' faktur automaticky zaplaceno, ' . $res['review'] . ' k prověření'
+            . (!empty($res['reverted']) ? ', ' . $res['reverted'] . ' faktur vráceno mezi nezaplacené (storno)' : ''),
     ]);
     echo json_encode(['success' => true] + $res, JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {

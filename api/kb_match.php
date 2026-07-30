@@ -41,18 +41,42 @@ try {
                 WHERE id = ? AND status = 'paid'")
                 ->execute([(int)$tx['matched_invoice_id']]);
         }
-        $pdo->prepare("UPDATE bank_transactions SET matched_invoice_id = NULL, match_status = 'none' WHERE id = ?")
+        // KRITICKÉ: stav 'ignored', NE 'none'. Do 'none' sahá automatické párování —
+        // odpárovaná platba by se při nejbližší synchronizaci sama zase spárovala
+        // a přebila rozhodnutí účetní. Zpět do automatu ji vrátí až člověk (action=reset).
+        $pdo->prepare("UPDATE bank_transactions SET matched_invoice_id = NULL, match_status = 'ignored',
+            matched_at = NULL, match_note = 'Ručně odpárováno — vyřazeno z automatického párování' WHERE id = ?")
             ->execute([$txId]);
         crmAuditLog('banka.match', [
             'entity_type' => 'bank', 'entity_id' => $txId,
-            'summary' => 'Zrušeno párování platby ' . formatMoney((float)$tx['amount']) . ' (VS ' . ($tx['vs'] ?: '—') . ')',
+            'summary' => 'Zrušeno párování platby ' . formatMoney((float)$tx['amount']) . ' (VS ' . ($tx['vs'] ?: '—')
+                . ') — platba vyřazena z automatického párování',
+        ]);
+        echo json_encode(['success' => true]); exit;
+    }
+
+    if ($action === 'reset') {
+        // vrácení vyřazené platby zpět do automatického párování
+        if ((string)$tx['match_status'] !== 'ignored') { throw new Exception('Do automatického párování jde vrátit jen vyřazená platba.'); }
+        $pdo->prepare("UPDATE bank_transactions SET match_status = 'none', matched_invoice_id = NULL,
+            match_note = NULL WHERE id = ?")->execute([$txId]);
+        crmAuditLog('banka.match', [
+            'entity_type' => 'bank', 'entity_id' => $txId,
+            'summary' => 'Platba ' . formatMoney((float)$tx['amount']) . ' (VS ' . ($tx['vs'] ?: '—')
+                . ') vrácena do automatického párování',
         ]);
         echo json_encode(['success' => true]); exit;
     }
 
     // párovat jde jen PŘÍCHOZÍ, dosud nespárovaný pohyb…
     if ((string)$tx['direction'] !== 'in') { throw new Exception('Spárovat jde jen příchozí platba.'); }
-    if (!in_array((string)$tx['match_status'], ['none', 'review'], true)) { throw new Exception('Pohyb už je spárovaný — nejdřív zruš stávající párování.'); }
+    if (!empty($tx['is_reversal'])) { throw new Exception('Storno platby nelze párovat s fakturou.'); }
+    if (!in_array((string)$tx['match_status'], ['none', 'review', 'ignored'], true)) { throw new Exception('Pohyb už je spárovaný — nejdřív zruš stávající párování.'); }
+    // …a jen pohyb z právě napojeného účtu a prostředí (sandbox nesmí platit ostré faktury)
+    if ((string)$tx['env'] !== kbApiEnv() || (string)$tx['account_id'] !== (string)get_setting('kb_account_id', '')) {
+        throw new Exception('Pohyb patří k jinému účtu nebo prostředí, než je teď napojené.');
+    }
+    if (strtoupper((string)$tx['currency']) !== 'CZK') { throw new Exception('Platbu v cizí měně nelze párovat s korunovou fakturou — vyřeš ručně v účetnictví.'); }
 
     // …a jen s nezaplacenou skutečnou fakturou (ne dobropis, ne už zaplacená)
     $invoiceId = (int)($_POST['invoice_id'] ?? 0);
@@ -64,9 +88,23 @@ try {
     if ((string)$inv['status'] === 'paid') { throw new Exception('Faktura ' . $inv['invoice_number'] . ' už je zaplacená.'); }
     if ((string)$inv['status'] === 'cancelled') { throw new Exception('Faktura ' . $inv['invoice_number'] . ' je stornovaná.'); }
 
-    $pdo->prepare("UPDATE invoices SET status = 'paid', payment_date = ? WHERE id = ?")
-        ->execute([(string)$tx['booking_date'] ?: date('Y-m-d'), $invoiceId]);
-    $pdo->prepare("UPDATE bank_transactions SET matched_invoice_id = ?, match_status = 'manual' WHERE id = ?")
+    // na faktuře nesmí už viset jiná platba — jinak by jednu pohledávku „platily" dvě
+    $other = $pdo->prepare("SELECT COUNT(*) FROM bank_transactions
+        WHERE matched_invoice_id = ? AND match_status IN ('auto','manual') AND id <> ?");
+    $other->execute([$invoiceId, $txId]);
+    if ((int)$other->fetchColumn() > 0) {
+        throw new Exception('K faktuře ' . $inv['invoice_number'] . ' už je navázaná jiná platba — nejdřív zruš to párování.');
+    }
+
+    // nárok na fakturu atomicky: když ji mezitím zaplatil sync, UPDATE nic nezmění
+    $claim = $pdo->prepare("UPDATE invoices SET status = 'paid', payment_date = ?
+        WHERE id = ? AND status IN ('issued', 'overdue')");
+    $claim->execute([(string)$tx['booking_date'] ?: date('Y-m-d'), $invoiceId]);
+    if ($claim->rowCount() !== 1) {
+        throw new Exception('Faktura ' . $inv['invoice_number'] . ' mezitím změnila stav — načti stránku znovu.');
+    }
+    $pdo->prepare("UPDATE bank_transactions SET matched_invoice_id = ?, match_status = 'manual',
+        matched_at = NOW(), match_note = 'Ručně spárováno' WHERE id = ?")
         ->execute([$invoiceId, $txId]);
     crmAuditLog('banka.match', [
         'entity_type' => 'invoice', 'entity_id' => $invoiceId, 'entity_label' => (string)$inv['invoice_number'],

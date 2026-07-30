@@ -36,6 +36,7 @@ if (in_array($fDir, ['in', 'out'], true)) { $where[] = 'direction = ?'; $params[
 if ($fMatch === 'matched') { $where[] = "match_status IN ('auto','manual')"; }
 elseif ($fMatch === 'review') { $where[] = "match_status = 'review'"; }
 elseif ($fMatch === 'none') { $where[] = "match_status = 'none'"; }
+elseif ($fMatch === 'ignored') { $where[] = "match_status = 'ignored'"; }
 if ($fFrom !== '') { $where[] = 'booking_date >= ?'; $params[] = $fFrom; }
 if ($fTo !== '') { $where[] = 'booking_date <= ?'; $params[] = $fTo; }
 $wsql = 'WHERE ' . implode(' AND ', $where);
@@ -62,12 +63,16 @@ try {
 } catch (Throwable $e) {}
 $pages = max(1, (int)ceil($total / $per));
 
-// nezaplacené faktury pro ruční párování
+// nezaplacené faktury pro ruční párování — plus ty, které párovač u některé platby
+// navrhuje (jinak by se navržená faktura mimo 300 nejnovějších v nabídce tiše ztratila)
 $openInvoices = [];
 try {
     $openInvoices = $pdo->query("SELECT id, invoice_number, total_amount FROM invoices
-        WHERE status IN ('issued','overdue') AND invoice_type = 'invoice'
-        ORDER BY id DESC LIMIT 300")->fetchAll(PDO::FETCH_ASSOC);
+        WHERE invoice_type = 'invoice' AND (
+            status IN ('issued','overdue')
+            OR id IN (SELECT matched_invoice_id FROM bank_transactions
+                       WHERE match_status = 'review' AND matched_invoice_id IS NOT NULL)
+        ) ORDER BY id DESC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {}
 ?>
 
@@ -139,6 +144,7 @@ try {
                 <option value="matched" <?php echo $fMatch === 'matched' ? 'selected' : ''; ?>>Spárované</option>
                 <option value="review" <?php echo $fMatch === 'review' ? 'selected' : ''; ?>>K prověření</option>
                 <option value="none" <?php echo $fMatch === 'none' ? 'selected' : ''; ?>>Nespárované</option>
+                <option value="ignored" <?php echo $fMatch === 'ignored' ? 'selected' : ''; ?>>Vyřazené z párování</option>
             </select>
         </div>
         <div class="col-md-2 col-6">
@@ -190,15 +196,26 @@ try {
                         <span class="small text-white-50"><?php echo $t['match_status'] === 'auto' ? 'auto' : 'ručně'; ?></span>
                     <?php elseif ((string)$t['match_status'] === 'review'): ?>
                         <span class="badge bg-warning text-dark">K prověření<?php echo !empty($t['invoice_number']) ? ' · ' . htmlspecialchars($t['invoice_number']) : ''; ?></span>
+                        <?php if (!empty($t['match_note'])): ?>
+                            <div class="small text-warning-emphasis" style="max-width:280px;"><?php echo htmlspecialchars((string)$t['match_note']); ?></div>
+                        <?php endif; ?>
+                    <?php elseif ((string)$t['match_status'] === 'ignored'): ?>
+                        <span class="badge bg-secondary">Vyřazeno z párování</span>
+                        <?php if (!empty($t['match_note'])): ?>
+                            <div class="small text-white-50" style="max-width:280px;"><?php echo htmlspecialchars((string)$t['match_note']); ?></div>
+                        <?php endif; ?>
                     <?php elseif ($in): ?>
                         <span class="text-white-50 small">—</span>
                     <?php endif; ?>
                 </td>
-                <td class="text-end">
-                    <?php if ($in && in_array((string)$t['match_status'], ['none', 'review'], true)): ?>
+                <td class="text-end" style="white-space:nowrap;">
+                    <?php if ($in && !(int)($t['is_reversal'] ?? 0) && in_array((string)$t['match_status'], ['none', 'review', 'ignored'], true)): ?>
                         <button type="button" class="btn btn-sm btn-white border text-success kb-match-btn" data-id="<?php echo (int)$t['id']; ?>" data-amount="<?php echo (float)$t['amount']; ?>" data-suggest="<?php echo (int)($t['matched_invoice_id'] ?? 0); ?>" title="Spárovat s fakturou"><i class="fas fa-link"></i></button>
+                    <?php endif; ?>
+                    <?php if ((string)$t['match_status'] === 'ignored'): ?>
+                        <button type="button" class="btn btn-sm btn-white border text-info kb-reset-btn" data-id="<?php echo (int)$t['id']; ?>" title="Vrátit do automatického párování"><i class="fas fa-rotate-left"></i></button>
                     <?php elseif (in_array((string)$t['match_status'], ['auto', 'manual'], true)): ?>
-                        <button type="button" class="btn btn-sm btn-white border text-danger kb-unmatch-btn" data-id="<?php echo (int)$t['id']; ?>" title="Zrušit párování (vrátí fakturu na nezaplacenou)"><i class="fas fa-link-slash"></i></button>
+                        <button type="button" class="btn btn-sm btn-white border text-danger kb-unmatch-btn" data-id="<?php echo (int)$t['id']; ?>" title="Zrušit párování (vrátí fakturu na nezaplacenou a platbu vyřadí z automatu)"><i class="fas fa-link-slash"></i></button>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -237,12 +254,9 @@ try {
                 <input type="hidden" id="kbMatchTx">
                 <div class="alert alert-info border-0 py-2 small">Platba: <strong id="kbMatchAmount"></strong> — po spárování se faktura označí jako <strong>ZAPLACENÁ</strong>.</div>
                 <label class="form-label small">Nezaplacená faktura</label>
-                <select id="kbMatchInvoice" class="form-select">
-                    <option value="">— vyber fakturu —</option>
-                    <?php foreach ($openInvoices as $oi): ?>
-                        <option value="<?php echo (int)$oi['id']; ?>"><?php echo htmlspecialchars($oi['invoice_number']); ?> — <?php echo formatMoney((float)$oi['total_amount']); ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <input type="search" id="kbMatchSearch" class="form-control form-control-sm mb-2" placeholder="Hledat číslo faktury nebo částku…" autocomplete="off">
+                <select id="kbMatchInvoice" class="form-select" size="8"></select>
+                <div class="small text-white-50 mt-1" id="kbMatchCount"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
@@ -288,13 +302,40 @@ try {
     document.getElementById('kbSyncBtn').addEventListener('click', function () { doSync(false); });
 
     var matchModal = null;
+    // seznam faktur se filtruje v prohlížeči — u stovek otevřených faktur by jinak
+    // obsluha hledala tu správnou očima v dlouhém rolovacím seznamu
+    var INVOICES = <?php echo json_encode(array_map(fn($i) => [
+        'id' => (int)$i['id'], 'n' => (string)$i['invoice_number'], 'a' => (float)$i['total_amount'],
+    ], $openInvoices), JSON_UNESCAPED_UNICODE); ?>;
+
+    function renderInvoices(query, preselect) {
+        var sel = document.getElementById('kbMatchInvoice');
+        var q = String(query || '').trim().toLowerCase();
+        var list = INVOICES.filter(function (i) {
+            if (!q) { return true; }
+            return i.n.toLowerCase().indexOf(q) >= 0 || String(Math.round(i.a)).indexOf(q.replace(/\s/g, '')) >= 0;
+        });
+        sel.innerHTML = '';
+        list.slice(0, 200).forEach(function (i) {
+            var o = document.createElement('option');
+            o.value = String(i.id);
+            o.textContent = i.n + ' — ' + new Intl.NumberFormat('cs-CZ').format(i.a) + ' Kč';
+            sel.appendChild(o);
+        });
+        document.getElementById('kbMatchCount').textContent =
+            list.length ? ('Nabízeno faktur: ' + Math.min(list.length, 200) + (list.length > 200 ? ' z ' + list.length : '')) : 'Žádná faktura neodpovídá hledání.';
+        if (preselect && Array.prototype.some.call(sel.options, function (o) { return o.value === preselect; })) { sel.value = preselect; }
+        else { sel.value = ''; }
+    }
+    document.getElementById('kbMatchSearch').addEventListener('input', function () { renderInvoices(this.value, null); });
+
     $(document).on('click', '.kb-match-btn', function () {
         document.getElementById('kbMatchTx').value = this.dataset.id;
         document.getElementById('kbMatchAmount').textContent = new Intl.NumberFormat('cs-CZ').format(this.dataset.amount) + ' Kč';
         // předvybrat navrženou fakturu (žluté „k prověření"), jinak nutit výběr
-        var sel = document.getElementById('kbMatchInvoice');
         var suggest = this.dataset.suggest || '';
-        sel.value = (suggest !== '0' && Array.prototype.some.call(sel.options, function (o) { return o.value === suggest; })) ? suggest : '';
+        document.getElementById('kbMatchSearch').value = '';
+        renderInvoices('', suggest !== '0' ? suggest : null);
         matchModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('kbMatchModal'));
         matchModal.show();
     });
@@ -310,9 +351,18 @@ try {
             else { showAlert('Chyba: ' + String(res.message || '').replace(/</g, '&lt;')); }
         }).fail(function () { showAlert('Párování selhalo — zkus to znovu.'); });
     });
+    $(document).on('click', '.kb-reset-btn', function () {
+        var id = this.dataset.id;
+        showConfirm('Vrátit platbu do automatického párování? Systém ji při další synchronizaci znovu vyhodnotí.', function () {
+            $.post('api/kb_match.php', { action: 'reset', tx_id: id, csrf_token: CSRF }, function (res) {
+                if (res.success) { location.reload(); }
+                else { showAlert('Chyba: ' + String(res.message || '').replace(/</g, '&lt;')); }
+            }).fail(function () { showAlert('Nepovedlo se.'); });
+        });
+    });
     $(document).on('click', '.kb-unmatch-btn', function () {
         var id = this.dataset.id;
-        showConfirm('Zrušit párování? Faktura se vrátí mezi nezaplacené.', function () {
+        showConfirm('Zrušit párování? Faktura se vrátí mezi nezaplacené a platba se vyřadí z automatického párování (aby ji systém sám znovu nespároval).', function () {
             $.post('api/kb_match.php', { action: 'unmatch', tx_id: id, csrf_token: CSRF }, function (res) {
                 if (res.success) { location.reload(); }
                 else { showAlert('Chyba: ' + String(res.message || '').replace(/</g, '&lt;')); }
