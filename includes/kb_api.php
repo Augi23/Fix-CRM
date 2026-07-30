@@ -81,10 +81,12 @@ function kbRegistrationUiUrl(string $registrationRequest, string $state): string
 }
 
 /** Stránka KB, kde jednatel potvrdí rozsah a vybere účty (krok 4). */
-function kbAuthorizeUrl(string $state): string {
+function kbAuthorizeUrl(string $state, ?string $clientId = null): string {
+    // $clientId se předává tam, kde se uložil ve stejném běhu — get_setting má cache,
+    // kterou set_setting neinvaliduje, a v URL by pak byl prázdný client_id
     $params = http_build_query([
         'response_type' => 'code',
-        'client_id' => get_setting('kb_client_id', ''),
+        'client_id' => $clientId ?? get_setting('kb_client_id', ''),
         'redirect_uri' => kbRedirectUri(),
         'scope' => 'adaa',
         'state' => $state,

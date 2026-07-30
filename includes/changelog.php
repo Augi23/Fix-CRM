@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.25.3',
+        'date' => '2026-07-30',
+        'time' => '15:10',
+        'title' => 'Sandbox banky: zkratka bez přihlašování do KB (registrace tam nepatří)',
+        'items' => [
+            '<b>Proč to nešlo:</b> tlačítko „Registrovat aplikaci" posílalo i v testovacím režimu na <b>skutečné přihlášení do KB</b> — proto to po zadání jména vyhodilo zpátky, aniž šlo zadat heslo. Testovací prostředí registraci aplikace vůbec nepoužívá.',
+            '<b>Nové tlačítko „Sandbox: nastavit testovací přístup a autorizovat":</b> nastaví testovací client_id a client_secret podle manuálu KB a pošle rovnou na testovací stránku banky, kde se jen napíše jméno testovacího klienta (např. „Klient 1"). Žádné bankovnictví, žádný certifikát.',
+            '<b>V sandboxu to CRM samo vysvětlí</b> — nad tlačítky je poznámka, že registrace aplikace je jen pro ostrý účet.',
+        ],
+    ],
+    [
         'version' => '3.25.2',
         'date' => '2026-07-30',
         'time' => '14:45',

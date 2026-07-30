@@ -1015,6 +1015,22 @@ require_once 'includes/header.php';
                         echo $__krok($__hasAcc, '<b>Vybraný účet</b>, který CRM sleduje', $__hasAcc ? '(' . e(get_setting('kb_account_id', '')) . ')' : '');
                         ?>
                     </ul>
+                    <?php if (kbApiEnv() === 'sandbox'): ?>
+                    <div class="alert alert-info border-0 py-2 small mb-3">
+                        <b>Testovací prostředí (sandbox) registraci aplikace nepotřebuje.</b> Podle manuálu KB se v něm
+                        client_id volí libovolně, client_secret je „password" a autorizační kód vydá testovací stránka,
+                        kde se jen napíše jméno testovacího klienta — <b>žádné přihlašování do bankovnictví</b>.
+                        Tlačítko „Registrovat aplikaci" vede v sandboxu na skutečné přihlášení do KB, takže ho tu nepoužívej.
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap mb-3">
+                        <a href="api/kb_connect.php?step=sandbox" class="btn btn-sm btn-success"
+                           onclick="return confirm('Nastavím testovací přístup (client_id AppleFixCRM, client_secret password) a přesměruji na testovací stránku KB. Tam napiš třeba „Klient 1“ a potvrď. Pokračovat?');">
+                            <i class="fas fa-flask me-1"></i> Sandbox: nastavit testovací přístup a autorizovat
+                        </a>
+                        <a href="navody.php?tab=banka" class="btn btn-sm btn-outline-secondary"><i class="fas fa-circle-question me-1"></i>Návod k napojení</a>
+                    </div>
+                    <div class="small text-white-50 mb-2">Pro ostrý účet (produkce) se používá tato dvojice:</div>
+                    <?php endif; ?>
                     <div class="d-flex gap-2 flex-wrap mb-3">
                         <a href="api/kb_connect.php?step=register" class="btn btn-sm <?php echo $__hasClient ? 'btn-outline-info' : 'btn-info'; ?>"
                            onclick="return confirm('Přesměruji tě do Komerční banky, kde jednatel potvrdí spojení aplikace. Pokračovat?');">

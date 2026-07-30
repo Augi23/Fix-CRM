@@ -37,6 +37,30 @@ if ($step === 'register') {
     exit;
 }
 
+if ($step === 'sandbox') {
+    /* SANDBOX ZKRATKA. Testovací prostředí KB registraci aplikace vůbec nepotřebuje:
+       client_id si volíme sami, client_secret je podle manuálu KB natvrdo „password"
+       a autorizační kód vydá testovací stránka, kde se jen napíše jméno testovacího
+       klienta (žádné přihlášení do bankovnictví). Registrace aplikace v sandboxu vede
+       na SKUTEČNÉ přihlášení do KB, které tam nemá co dělat — proto tahle cesta. */
+    if (kbApiEnv() !== 'sandbox') {
+        $_SESSION['kb_connect_error'] = 'Zkratka je jen pro testovací prostředí (sandbox).';
+        header('Location: ' . $back . '&kb=error'); exit;
+    }
+    $clientId = preg_replace('/[^A-Za-z0-9._-]/', '', (string)($_GET['client_id'] ?? '')) ?: 'AppleFixCRM';
+    set_setting('kb_client_id', $clientId);
+    set_setting('kb_client_secret', 'password');
+    set_setting('kb_refresh_token', '');
+    set_setting('kb_access_token', '');
+    set_setting('kb_access_token_expires', '0');
+    set_setting('kb_auth_state', $state);
+    crmAuditLog('banka.napojeni', ['entity_type' => 'bank', 'entity_label' => 'KB',
+        'summary' => 'Sandbox: nastaven testovací přístup (client_id ' . $clientId
+            . ', client_secret dle manuálu KB) a spuštěna autorizace']);
+    header('Location: ' . kbAuthorizeUrl($state, $clientId));
+    exit;
+}
+
 if ($step === 'authorize') {
     if (get_setting('kb_client_id', '') === '' || get_setting('kb_client_secret', '') === '') {
         $_SESSION['kb_connect_error'] = 'Chybí client_id / client_secret — nejdřív projdi krok 1 (registrace aplikace).';
