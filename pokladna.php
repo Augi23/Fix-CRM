@@ -607,9 +607,51 @@ document.addEventListener('DOMContentLoaded', function () {
             <?php else: ?>
                 <div class="small text-white-50 mt-2">Požádej kolegu o uzávěrku, nebo vedení o uzavření směny.</div>
             <?php endif; ?>
+        <?php elseif (function_exists('afxAccountingClosedError')
+                      && ($__lockMsg = afxAccountingClosedError(date('Y-m-d'), 'převzetí pokladny')) !== null): ?>
+            <!-- Zamčené účetní období: říct to HNED, ne až po zadání hesla a spočítání
+                 hotovosti (afxPosShiftOpen by převzetí stejně odmítl) -->
+            <div class="lk-icon"><i class="fas fa-lock"></i></div>
+            <h4>Pokladnu teď převzít nelze</h4>
+            <div class="small text-white-75 mt-2 mb-3"><?php echo e($__lockMsg); ?></div>
+            <div class="small text-white-50">Účetní období se odemyká v Nastavení → Uzávěrka období (jen administrátor).</div>
+            <a href="index.php" class="lk-other">Zpět na přehled →</a>
         <?php else: ?>
+            <!-- KROK 1/3 — potvrzení heslem: kdo přebírá kasu, přebírá odpovědnost
+                 za hotovost v zásuvce, takže to musí potvrdit „podpisem" -->
+            <div id="tkStep1">
+                <div class="lk-icon"><i class="fas fa-user-shield"></i></div>
+                <h4>Převzetí pokladny</h4>
+                <div class="lk-who">Přihlášen: <strong><?php echo e($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''); ?></strong></div>
+                <div class="small text-white-50 mb-2">Potvrď svým heslem, že pokladnu přebíráš opravdu ty — od převzetí za hotovost v zásuvce odpovídáš.</div>
+                <form id="tkPassForm" autocomplete="off">
+                    <input type="password" class="form-control" id="tkPass" placeholder="Heslo" autocomplete="current-password">
+                    <div class="lk-err" id="tkPassErr"></div>
+                    <button type="submit" class="lk-btn"><i class="fas fa-arrow-right me-2"></i>Pokračovat</button>
+                </form>
+                <a href="index.php" class="lk-other">Odejít bez převzetí pokladny →</a>
+            </div>
+
+            <!-- KROK 2/3 — vědomé rozhodnutí + výzva SPOČÍTAT hotovost teď, dokud
+                 jde couvnout: na kroku 3 už se převzetí odmítnout nedá -->
+            <div id="tkStep2" style="display:none;">
+                <div class="lk-icon"><i class="fas fa-hand-holding-dollar"></i></div>
+                <h4>Chceš teď převzít pokladnu?</h4>
+                <div class="alert alert-warning bg-transparent border-warning text-start small py-2 px-3 mb-3">
+                    <i class="fas fa-calculator me-1"></i><strong>Nejdřív spočítej hotovost v zásuvce.</strong>
+                    V dalším kroku uvidíš, kolik v kase podle systému <em>má</em> být, a už jen potvrdíš,
+                    jestli to sedí — <strong>odejít bez převzetí tam už nejde</strong>.
+                </div>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-success px-4" id="tkYes"><i class="fas fa-check me-1"></i>ANO, mám spočítáno</button>
+                    <a href="index.php" class="btn btn-outline-light px-4"><i class="fas fa-xmark me-1"></i>Ne, teď ne</a>
+                </div>
+            </div>
+
+            <!-- KROK 3/3 — stávající obrazovka se stavem kasy -->
+            <div id="tkStep3" style="display:none;">
             <div class="lk-icon"><i class="fas fa-cash-register"></i></div>
-            <h4>Převzetí pokladny</h4>
+            <h4>Souhlasí hotovost?</h4>
             <div class="mb-2">Stav pokladny podle systému:
                 <div class="fs-3 fw-bold text-info my-1"><?php echo formatMoney($cashState); ?></div>
                 <?php if ($shiftLast): ?>
@@ -621,7 +663,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="mb-3"><strong>Souhlasí hotovost v zásuvce?</strong></div>
             <div class="d-flex gap-2 justify-content-center mb-2">
                 <button type="button" class="btn btn-success px-4" onclick="shiftOpen(1)"><i class="fas fa-check me-1"></i>ANO, souhlasí</button>
-                <button type="button" class="btn btn-outline-warning px-4" onclick="document.getElementById('shiftRecount').style.display='';this.style.display='none';"><i class="fas fa-calculator me-1"></i>NE, přepočítám</button>
+                <button type="button" class="btn btn-outline-warning px-4" id="shiftRecountBtn" onclick="document.getElementById('shiftRecount').style.display='';this.style.display='none';"><i class="fas fa-calculator me-1"></i>NE, přepočítám</button>
             </div>
             <div id="shiftRecount" style="display:none;">
                 <div class="small text-white-50 mb-1">Zapiš, kolik v pokladně reálně je — od této částky se dnes odvíjí stav pokladny:</div>
@@ -631,6 +673,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="lk-err" id="shiftErr"></div>
+            <a href="index.php" class="lk-other">Načíst znovu / odejít →</a>
+            </div>
         <?php endif; ?>
         <hr class="border-secondary">
         <button type="button" class="btn btn-sm btn-outline-light" onclick="posTestReceipt(this)"><i class="fas fa-receipt me-1"></i>Test tiskárny účtenek</button>
@@ -985,11 +1029,87 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-            if (!d.ok) { if (errEl) { errEl.textContent = d.error || 'Nepodařilo se.'; errEl.style.display = ''; } return; }
+            if (!d.ok) {
+                // platnost potvrzení heslem vypršela (počítání trvalo dlouho) →
+                // vrátit na krok 1 místo nesrozumitelné hlášky
+                if (d.need_password && document.getElementById('tkStep1')) {
+                    ['tkStep2', 'tkStep3'].forEach(function (id) {
+                        var el = document.getElementById(id); if (el) { el.style.display = 'none'; }
+                    });
+                    var s1 = document.getElementById('tkStep1');
+                    s1.style.display = '';
+                    var pe = document.getElementById('tkPassErr');
+                    if (pe) { pe.textContent = 'Potvrzení heslem vypršelo — zadej ho prosím znovu.'; }
+                    var pf = document.getElementById('tkPass'); if (pf) { pf.focus(); }
+                    return;
+                }
+                var msg = d.error || 'Nepodařilo se.';
+                if (errEl) { errEl.textContent = msg; errEl.style.display = ''; }
+                // stav se mezitím změnil (kolega předběhl, nebo je to moje druhá
+                // záložka) → obrazovka se sama přepne na skutečnost, ať uživatel
+                // nezůstane viset pod overlayem bez cesty ven
+                if (/převzatou|už má|už je otevřen/i.test(msg)) {
+                    setTimeout(function () { location.reload(); }, 1800);
+                }
+                return;
+            }
             onOk(d);
         })
         .catch(function () { if (errEl) { errEl.textContent = 'Síťová chyba.'; errEl.style.display = ''; } });
     }
+
+    // ── PŘEVZETÍ POKLADNY: heslo → vědomé potvrzení → stav hotovosti ─────────
+    // Krok 1 ověřuje heslo přes stejné API jako zámek kasy (má i brzdu proti
+    // zkoušení hesel); server si ověření pamatuje 10 minut a bez něj převzetí
+    // odmítne — obrazovka tedy není jen ozdoba.
+    (function () {
+        var f = document.getElementById('tkPassForm');
+        if (!f) { return; }                       // směnu drží někdo jiný / už je moje
+        var $pass = document.getElementById('tkPass');
+        var $err = document.getElementById('tkPassErr');
+        var $card = document.querySelector('#posShiftGate .pos-lock-card');
+        function show(step) {
+            ['tkStep1', 'tkStep2', 'tkStep3'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) { el.style.display = (id === step) ? '' : 'none'; }
+            });
+            if (step === 'tkStep3') {
+                // krok 3 vždy od začátku — po návratu z vypršelého hesla by jinak
+                // zůstalo otevřené pole přepočtu i stará chybová hláška
+                var rc = document.getElementById('shiftRecount'); if (rc) { rc.style.display = 'none'; }
+                var rb = document.getElementById('shiftRecountBtn'); if (rb) { rb.style.display = ''; }
+                var ci = document.getElementById('shiftCounted'); if (ci) { ci.value = ''; }
+                var er = document.getElementById('shiftErr'); if (er) { er.textContent = ''; }
+            }
+        }
+        setTimeout(function () { $pass.focus(); }, 80);
+
+        f.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if ($pass.value === '') { $err.textContent = 'Zadej heslo.'; return; }
+            $err.textContent = '';
+            var fd = new FormData();
+            fd.append('password', $pass.value);
+            fd.append('purpose', 'shift_open');   // ověření platí JEN pro převzetí kasy
+            fd.append('csrf_token', '<?php echo $_SESSION['csrf_token'] ?? ''; ?>');
+            fetch('api/pos_unlock.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.ok) { $pass.value = ''; show('tkStep2'); return; }
+                    if (d.redirect) { window.location = d.redirect; return; }
+                    $err.textContent = d.message || 'Špatné heslo.';
+                    $pass.value = ''; $pass.focus();
+                    if ($card) {
+                        $card.classList.remove('shake');
+                        void $card.offsetWidth;
+                        $card.classList.add('shake');
+                    }
+                })
+                .catch(function () { $err.textContent = 'Síťová chyba — zkus to znovu.'; });
+        });
+
+        document.getElementById('tkYes').addEventListener('click', function () { show('tkStep3'); });
+    })();
 
     // převzetí: ANO (match=1) / NE + napočítaná částka (match=0)
     window.shiftOpen = function (match) {
@@ -1055,8 +1175,10 @@ document.addEventListener('DOMContentLoaded', function () {
             function () {
                 try { localPrint({ slip: 'shift_close' }, function () {}); } catch (e) {}
                 setTimeout(function () {
-                    if (shiftAfterClose) { window.location.href = shiftAfterClose; }
-                    else { location.reload(); }
+                    // Po uzavření/předání pokladny → na Nástěnku. Reload kasy by hned
+                    // zase ukázal bránu „Převzetí pokladny" s počítáním hotovosti,
+                    // což pracovníka, který právě končí, jen mate (přání majitele).
+                    window.location.href = shiftAfterClose || 'index.php';
                 }, 600);
             });
     });
@@ -1132,6 +1254,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.addEventListener('keydown', function (e) {
         if (locked) return;
+        // Pole s HESLEM je pro čtečku tabu: heuristika „strojové tempo + Enter" by
+        // svižně naklepané heslo vyhodnotila jako sken, snědla Enter (formulář by
+        // se neodeslal) a heslo poslala do URL api/pos_search.php?q=… tedy do logu.
+        var __ae = document.activeElement;
+        if (__ae && __ae.tagName === 'INPUT' && __ae.type === 'password') { return; }
         var now = Date.now();
         if (e.key === 'Enter') {
             // dávka ≥4 znaků napsaná strojovým tempem = sken

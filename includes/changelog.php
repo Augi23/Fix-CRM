@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.39.1',
+        'date' => '2026-07-31',
+        'time' => '22:58',
+        'title' => 'Kasa: po uzavření/předání pokladny se přejde na Nástěnku',
+        'items' => [
+            'Po „Uzavřít / předat pokladnu" se dřív kasa načetla znovu a pracovníkovi, který právě skončil, hned vyskočila brána <b>„Převzetí pokladny"</b> s počítáním hotovosti. Nově se po uzávěrce přejde rovnou na <b>Nástěnku</b> (odhlašovací tok zůstává beze změny — pokračuje na odhlášení).',
+        ],
+    ],
+    [
         'version' => '3.39.0',
         'date' => '2026-07-31',
         'time' => '21:05',
