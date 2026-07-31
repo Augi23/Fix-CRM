@@ -440,11 +440,7 @@ html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
    prvku drží frame-loop naživu → pulzy řádků běží plynule i bez pohybu myší.
    Nezávislé na tmavém/světlém režimu (vlastní neviditelný prvek). */
 @keyframes afxKeepAlive { 0%,100% { transform: translateZ(0); } 50% { transform: translate3d(0, .02px, 0); } }
-body::after {
-  content: ""; position: fixed; left: 0; bottom: 0; width: 2px; height: 2px;
-  pointer-events: none; opacity: .01; z-index: -1;
-  animation: afxKeepAlive 3s linear infinite;
-}
+canvas.crm-bgfx { animation: afxKeepAlive 3s linear infinite; will-change: transform; }
 html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); background: #fff; } /* světlý motiv: lišta neprůhledně bílá (černá by pohřbila tmavý text) */
 html[data-lg-theme="light"] .afx-brand { color: #10151d; }
 html[data-lg-theme="light"] .afx-brand img { filter: none; } /* světlý motiv → černé logo */
