@@ -313,6 +313,9 @@ try {
                                         <?php else: ?>
                                             <span class="badge bg-secondary">Vyprodáno</span>
                                         <?php endif; ?>
+                                        <?php if (!empty($p['last_sold_at'])): ?>
+                                            <div class="small text-white-75 mt-1" title="Datum posledního prodeje (kasa i e-shop)"><i class="fas fa-cart-shopping me-1"></i>prodáno <?php echo date('j. n. Y H:i', strtotime((string)$p['last_sold_at'])); ?></div>
+                                        <?php endif; ?>
                                         <?php if (!empty($p['stock_key'])): ?>
                                             <div class="small text-white-75 mt-1"><?php echo $p['stock_key'] === 'karlin' ? 'Karlín' : 'Václavák'; ?></div>
                                         <?php endif; ?>

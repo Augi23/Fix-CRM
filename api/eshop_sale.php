@@ -132,7 +132,8 @@ try {
     // 2) Atomický odečet každého produktu (guard proti souběhu / zápornému stavu).
     $find = $pdo->prepare("SELECT id, title, price, stock_qty FROM products WHERE product_code = ? LIMIT 1");
     $dec  = $pdo->prepare("UPDATE products
-        SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at)
+        SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at),
+            last_sold_at = NOW()
         WHERE id = ? AND stock_qty >= ?");
     $after = $pdo->prepare("SELECT stock_qty FROM products WHERE id = ?");
 

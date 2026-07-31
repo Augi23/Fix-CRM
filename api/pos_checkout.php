@@ -33,6 +33,7 @@ if (!function_exists('afxEnsurePosGoodsTaxColumns')) {
                 ['pos_sale_items', 'grade', "ALTER TABLE pos_sale_items ADD COLUMN grade VARCHAR(16) NULL DEFAULT NULL"],
                 ['pos_sale_items', 'purchase_price', "ALTER TABLE pos_sale_items ADD COLUMN purchase_price DECIMAL(12,2) NULL DEFAULT NULL"],
                 ['products', 'purchase_price', "ALTER TABLE products ADD COLUMN purchase_price DECIMAL(12,2) NULL DEFAULT NULL"],
+                ['products', 'last_sold_at', "ALTER TABLE products ADD COLUMN last_sold_at DATETIME NULL DEFAULT NULL"],
             ];
             foreach ($add as [$table, $col, $ddl]) {
                 if (!$pdo->query("SHOW COLUMNS FROM `" . $table . "` LIKE '" . $col . "'")->fetch()) {
@@ -228,7 +229,8 @@ try {
             // Částečný prodej vícekusového příslušenství flag nesmí zapnout — import
             // by pak zbývající skutečné kusy vynuloval.
             $u = $pdo->prepare("UPDATE products
-                SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at)
+                SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at),
+                    last_sold_at = NOW()
                 WHERE id = ? AND stock_qty >= ?");
             $u->execute([$line['qty'], $line['id'], $line['qty']]);
             if ($u->rowCount() === 0) {

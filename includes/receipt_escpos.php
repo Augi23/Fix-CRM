@@ -245,7 +245,12 @@ function crmReceiptSendBytes(string $bytes, ?string $target = null): array {
     try {
         if (str_starts_with($target, 'usb:')) {
             $dev = substr($target, 4);
-            if (!file_exists($dev)) { return ['ok' => false, 'error' => 'Tiskárna není připojená (' . $dev . ' neexistuje).']; }
+            if (!file_exists($dev)) {
+                // tiskárna může naskočit i jako lp1/lp2 (podle pořadí zapojení)
+                $alt = glob('/dev/usb/lp*') ?: [];
+                if ($alt) { $dev = $alt[0]; }
+                else { return ['ok' => false, 'error' => 'Tiskárna není připojená (' . $dev . ' neexistuje).']; }
+            }
             $fp = @fopen($dev, 'wb');
             if (!$fp) { return ['ok' => false, 'error' => 'Nelze otevřít ' . $dev . ' — zkontroluj oprávnění (skupina lp).']; }
             fwrite($fp, $bytes); fflush($fp); fclose($fp);

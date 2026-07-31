@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.37.1',
+        'date' => '2026-07-31',
+        'time' => '21:05',
+        'title' => 'Sklad: datum posledního prodeje u produktu (kasa i e-shop)',
+        'items' => [
+            'Nový sloupec <b>products.last_sold_at</b> — zapisuje se při KAŽDÉM prodeji kusu, z kasy i z e-shopu (na rozdíl od pos_sold_at, který značí jen úplné vyprodání pro import z appky).',
+            'Sklad → Produkty ukazuje ve sloupci <b>Dostupnost</b> pod odznakem řádek „prodáno j. n. R H:M".',
+            'Tisk účtenky: cíl usb: si sám najde /dev/usb/lp1, kdyby tiskárna nenaskočila jako lp0.',
+        ],
+    ],
+    [
         'version' => '3.37.0',
         'date' => '2026-07-31',
         'time' => '20:50',
