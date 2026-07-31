@@ -432,6 +432,19 @@ html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
    Použití: přidat třídu .afx-row-actions na .btn-group u akčního sloupce. */
 .afx-row-actions .btn { padding: .26rem .5rem !important; font-size: .82rem !important; }
 .afx-row-actions .btn i { font-size: .92em; }
+
+/* ── Compositor keep-alive ─────────────────────────────────────────────────────
+   Chromium občas přestane plánovat snímky pro paint-animace (pulzy řádků přes
+   box-shadow/filter) a ty „zamrznou" dokud uživatel nehne myší. Nekonečná,
+   sub-pixelová (neviditelná), compositor-only transform animace na malém fixním
+   prvku drží frame-loop naživu → pulzy řádků běží plynule i bez pohybu myší.
+   Nezávislé na tmavém/světlém režimu (vlastní neviditelný prvek). */
+@keyframes afxKeepAlive { 0%,100% { transform: translateZ(0); } 50% { transform: translate3d(0, .02px, 0); } }
+body::after {
+  content: ""; position: fixed; left: 0; bottom: 0; width: 2px; height: 2px;
+  pointer-events: none; opacity: .01; z-index: -1;
+  animation: afxKeepAlive 3s linear infinite;
+}
 html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); background: #fff; } /* světlý motiv: lišta neprůhledně bílá (černá by pohřbila tmavý text) */
 html[data-lg-theme="light"] .afx-brand { color: #10151d; }
 html[data-lg-theme="light"] .afx-brand img { filter: none; } /* světlý motiv → černé logo */
@@ -583,23 +596,23 @@ html[data-lg-theme="light"] .afx-dock { background: rgba(40, 44, 52, .82); }
    ============================================================ */
 .crm-stat-row { display: flex; gap: 14px; align-items: stretch; }
 .crm-stat-row .crm-stat-grid { flex: 1 1 auto; min-width: 0; margin-bottom: 0 !important; }
-.crm-branch-col { flex: 0 0 290px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.crm-branch-col { flex: 0 0 246px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .crm-branch-mini {
   /* flex-direction:row PŘEBÍJÍ bootstrap .card (column) — jinak se obsah skládá
      pod sebe, karta roste do výšky a natahuje celý řádek se statistikami */
   flex: 1 1 0; display: flex !important; flex-direction: row !important;
-  align-items: center; gap: 12px; min-height: 0;
-  padding: 10px 14px !important; position: relative;
+  align-items: center; gap: 9px; min-height: 0;
+  padding: 5px 10px !important; position: relative;
   border: 1px solid var(--b1) !important; border-radius: var(--r2) !important;
   transition: border-color .15s, box-shadow .15s;
 }
 .crm-branch-mini:hover { border-color: rgba(0,163,255,.35) !important; box-shadow: 0 0 14px rgba(0,163,255,.14); }
 .crm-branch-mini-main { flex: 1; min-width: 0; }
-.crm-branch-mini-name { color: #fff; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.crm-branch-mini-sub { color: var(--fg2); font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.crm-branch-mini-num { text-align: right; line-height: 1.15; flex-shrink: 0; }
-.crm-branch-mini-num b { display: block; font-size: 17px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 14px rgba(85,212,255,.25); }
-.crm-branch-mini-num small { font-size: 10.5px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+.crm-branch-mini-name { color: #fff; font-weight: 600; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crm-branch-mini-sub { color: var(--fg2); font-size: 9.5px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crm-branch-mini-num { text-align: right; line-height: 1.1; flex-shrink: 0; }
+.crm-branch-mini-num b { display: block; font-size: 13.5px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 14px rgba(85,212,255,.25); }
+.crm-branch-mini-num small { font-size: 9px; color: var(--fg2); font-variant-numeric: tabular-nums; }
 
 /* Menší displeje: pobočky pod statistiky (vedle sebe), pak vše pod sebe */
 @media (max-width: 1280px) {
