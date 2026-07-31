@@ -65,6 +65,44 @@ try {
     $revenue_today = $revenue_yesterday = $revenue_today_trend = 0;
     $revenue_month = $revenue_prev = 0; $revenue_trend = 0; $revenue_12m = array_fill(0, 12, 0);
 }
+// ─── PŘIJATÉ PENÍZE vs. TRŽBA ────────────────────────────────────────────────
+// Tržba výše počítá dokončené zakázky. Majitel ale chce vidět i peníze, které reálně
+// přišly — včetně záloh. Záloha ÚČETNĚ NENÍ výnos (je to závazek, dokud není plnění
+// uskutečněné), proto se s tržbou NESČÍTÁ a ukazuje se jako samostatný údaj.
+// Kdyby se sečetla, měsíc by vypadal lépe, než jaký doopravdy je, a po dokončení zakázky
+// by se tytéž peníze započítaly podruhé.
+$received_today = $advance_today = 0.0;
+$received_month = $advance_month = 0.0;
+try {
+    // Pojistka pro případ, že se kód nasadí dřív než doběhne run_migrations.php.
+    if (function_exists('afxEnsureInvoicePayments')) { afxEnsureInvoicePayments(); }
+    // Faktura ještě není uhrazená celá → přijaté peníze na ní jsou zatím záloha/část.
+    // Tolerance 1 Kč nad 100 Kč = stejné pravidlo jako u párování plateb (afxPayTolerance).
+    // paid_amount = 0 u starých ručně uzavřených faktur, proto fallback na stav faktury.
+    // Kdyby sloupec paid_amount ještě nebyl (nedoběhlá migrace 037), pozná se záloha
+    // aspoň podle stavu faktury — přehled peněz se kvůli tomu nesmí vypnout celý.
+    $__hasPaidCol = (bool)$pdo->query("SHOW COLUMNS FROM invoices LIKE 'paid_amount'")->fetch();
+    $__advCond = $__hasPaidCol
+        ? " AND IF(i.paid_amount > 0,
+                   i.paid_amount < i.total_amount - IF(i.total_amount >= 100, 1.0, 0.0),
+                   i.status <> 'paid')"
+        : " AND i.status <> 'paid'";
+    // Pobočka se bere ze ZAKÁZKY; faktura bez zakázky se řadovému zaměstnanci pobočky nepočítá.
+    $__payBase = "FROM invoice_payments p
+                  JOIN invoices i ON i.id = p.invoice_id
+                  LEFT JOIN orders o ON o.id = i.order_id
+                  WHERE i.status <> 'cancelled'" . orderBranchScopeSql('o.branch_id');
+    $__payToday = " AND p.paid_on = CURDATE()";
+    $__payMonth = " AND MONTH(p.paid_on) = MONTH(CURDATE()) AND YEAR(p.paid_on) = YEAR(CURDATE())";
+    $received_today = (float)$pdo->query("SELECT COALESCE(SUM(p.amount),0) " . $__payBase . $__payToday)->fetchColumn();
+    $advance_today  = (float)$pdo->query("SELECT COALESCE(SUM(p.amount),0) " . $__payBase . $__payToday . $__advCond)->fetchColumn();
+    $received_month = (float)$pdo->query("SELECT COALESCE(SUM(p.amount),0) " . $__payBase . $__payMonth)->fetchColumn();
+    $advance_month  = (float)$pdo->query("SELECT COALESCE(SUM(p.amount),0) " . $__payBase . $__payMonth . $__advCond)->fetchColumn();
+} catch (Throwable $e) {
+    // invoice_payments ještě neexistuje → chováme se, jako by byla prázdná (nástěnka musí běžet dál)
+    $received_today = $advance_today = $received_month = $advance_month = 0.0;
+}
+
 $month_labels = explode(',', __('month_initials'));
 $rev_max = max(1, max($revenue_12m));
 
@@ -336,7 +374,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                     </div>
                                     <?php endif; ?>
                                     <?php if (isBranchGlobalViewer() && !empty($r['branch_id'])): ?>
-                                    <div class="small mt-1"><span class="badge bg-dark border border-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)$r['branch_id'])); ?></span></div>
+                                    <div class="small mt-1"><span class="badge bg-dark border border-secondary afx-branch-tag"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)$r['branch_id'])); ?></span></div>
                                     <?php endif; ?>
                                 </td>
                                 <td class="col-priority"><?php echo getOrderPriorityBadge($r['priority'] ?? 'Normal', (string)$r['status']); ?></td>
@@ -453,6 +491,24 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <text x="<?php echo $i*($bar_w+$bar_gap) + $bar_w/2; ?>" y="<?php echo $chart_h + 12; ?>" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.25)"><?php echo $lbl; ?></text>
                 <?php endforeach; ?>
             </svg>
+
+            <?php /* Peníze, které reálně přišly (i zálohy) — vedle tržby, ne místo ní.
+                     Zálohy jsou schválně vypíchnuté zvlášť: účetně to není výnos. */ ?>
+            <div class="crm-revenue-cash" style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(128,128,128,.22);font-size:12px;line-height:1.75;">
+                <div class="d-flex justify-content-between gap-2">
+                    <span style="opacity:.65;">Přijaté peníze (měsíc)</span>
+                    <strong><?php echo number_format($received_month, 0, ',', ' '); ?> Kč</strong>
+                </div>
+                <div class="d-flex justify-content-between gap-2">
+                    <span style="opacity:.65;">z toho zálohy</span>
+                    <strong class="text-warning"><?php echo number_format($advance_month, 0, ',', ' '); ?> Kč</strong>
+                </div>
+                <div class="d-flex justify-content-between gap-2">
+                    <span style="opacity:.65;">Dnes přijato / z toho zálohy</span>
+                    <strong><?php echo number_format($received_today, 0, ',', ' '); ?> / <span class="text-warning"><?php echo number_format($advance_today, 0, ',', ' '); ?></span> Kč</strong>
+                </div>
+                <div style="opacity:.5;margin-top:6px;">Zálohy nejsou tržba — výnos vzniká až dokončením zakázky.</div>
+            </div>
         </div>
 
         <div class="card glass-card border-0 mb-4 imei-check-card">

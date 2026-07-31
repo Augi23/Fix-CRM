@@ -436,6 +436,11 @@ html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
 /* Užší sloupec Priorita — zabírá jen tolik, kolik potřebuje jeho odznak */
 th.col-priority, td.col-priority { width: 1%; white-space: nowrap; }
 
+/* Buňka Stav (Zakázky i Nástěnka): odznak STAVU větší, odznak POBOČKY menší (přání) */
+.cell-status .status-pill { font-size: 13.5px !important; padding: .45em .85em !important; font-weight: 600; }
+.cell-status .afx-branch-tag { font-size: 9.5px; padding: .18em .5em; font-weight: 500; }
+.cell-status .afx-branch-tag i { font-size: .9em; }
+
 /* ── Compositor keep-alive ─────────────────────────────────────────────────────
    Chromium občas přestane plánovat snímky pro paint-animace (pulzy řádků přes
    box-shadow/filter) a ty „zamrznou" dokud uživatel nehne myší. Nekonečná,

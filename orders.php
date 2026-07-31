@@ -308,14 +308,6 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
             <div class="mt-1"><span class="badge bg-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel(getCurrentStaffBranchId())); ?></span></div>
         <?php endif; ?>
     </div>
-    <div class="d-flex gap-2">
-        <?php if(!empty($_GET['search'])): ?>
-            <a href="orders.php" class="btn btn-outline-secondary"><?php echo __('cancel'); ?></a>
-        <?php endif; ?>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newOrderModal">
-            <i class="fas fa-plus me-2"></i> <?php echo __('new_order'); ?>
-        </button>
-    </div>
 </div>
 
 <?php
@@ -378,6 +370,15 @@ $__techs     = getActiveTechnicians(true);
     <?php endif; ?>
 </div>
 
+<?php /* „Nová zakázka" — prohozeno s filtry: dřív v hlavičce vpravo, teď pod filtry */ ?>
+<div class="d-flex justify-content-end mb-3">
+    <?php if(!empty($_GET['search'])): ?>
+        <a href="orders.php" class="btn btn-outline-secondary me-2"><?php echo __('cancel'); ?></a>
+    <?php endif; ?>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newOrderModal">
+        <i class="fas fa-plus me-2"></i> <?php echo __('new_order'); ?>
+    </button>
+</div>
 
 <div class="card glass-card shadow-sm border-0">
     <div class="card-body p-0">
@@ -498,7 +499,7 @@ $__techs     = getActiveTechnicians(true);
                                 </div>
                                 <?php endif; ?>
                                 <?php if (isBranchGlobalViewer() && !empty($order['branch_id'])): ?>
-                                <div class="small mt-1"><span class="badge bg-dark border border-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)$order['branch_id'])); ?></span></div>
+                                <div class="small mt-1"><span class="badge bg-dark border border-secondary afx-branch-tag"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)$order['branch_id'])); ?></span></div>
                                 <?php endif; ?>
                             </td>
                             <td class="col-priority"><?php echo getOrderPriorityBadge($order['priority'] ?? 'Normal', (string)$order['status']); ?></td>
