@@ -433,6 +433,9 @@ html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
 .afx-row-actions .btn { padding: .26rem .5rem !important; font-size: .82rem !important; }
 .afx-row-actions .btn i { font-size: .92em; }
 
+/* Užší sloupec Priorita — zabírá jen tolik, kolik potřebuje jeho odznak */
+th.col-priority, td.col-priority { width: 1%; white-space: nowrap; }
+
 /* ── Compositor keep-alive ─────────────────────────────────────────────────────
    Chromium občas přestane plánovat snímky pro paint-animace (pulzy řádků přes
    box-shadow/filter) a ty „zamrznou" dokud uživatel nehne myší. Nekonečná,

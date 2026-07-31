@@ -508,7 +508,7 @@ $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
                                     );
                                 ?>
                                 <?php // inline quick-status buttons removed; using dropdown only ?>
-                                <div class="btn-group btn-group-sm shadow-sm">
+                                <div class="btn-group btn-group-sm shadow-sm afx-row-actions">
                                     <?php if ($show_quick): ?>
                                     <div class="dropdown">
                                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" title="<?php echo __('quick_status'); ?>">
