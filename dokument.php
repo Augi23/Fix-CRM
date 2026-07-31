@@ -254,6 +254,27 @@ $pageTitle = __($cfg['title_key'], $lang);
             }).catch(function (e) { toast('⚠️ ' + e.message, false); photoInput.value = ''; });
         };
     }
+    // Doklad totožnosti: dvě samostatná pole (přední/zadní strana). Nový soubor
+    // nahradí předchozí stranu, aby se nehromadily kopie občanek.
+    document.querySelectorAll('.idscan-input').forEach(function (inp) {
+        inp.onchange = function () {
+            if (!inp.files || !inp.files.length) { return; }
+            save().then(function () {
+                var fd = new FormData();
+                fd.append('action', 'upload');
+                fd.append('document_id', docId);
+                fd.append('kind', inp.dataset.kind);
+                fd.append('csrf_token', CSRF);
+                fd.append('files[]', inp.files[0]);
+                return fetch('api/document_media.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); });
+            }).then(function (j) {
+                if (!j.ok) { throw new Error(j.error || 'Nahrání selhalo'); }
+                window.location.reload();
+            }).catch(function (e) { toast('⚠️ ' + e.message, false); inp.value = ''; });
+        };
+    });
+
     document.querySelectorAll('.photo-del').forEach(function (btn) {
         btn.onclick = function () {
             var fd = new FormData();
@@ -264,7 +285,8 @@ $pageTitle = __($cfg['title_key'], $lang);
                 .then(function (r) { return r.json(); })
                 .then(function (j) {
                     if (!j.ok) { throw new Error(j.error || 'Smazání selhalo'); }
-                    var item = btn.closest('.photo-item'); if (item) { item.remove(); }
+                    var item = btn.closest('.photo-item') || btn.closest('.idscan');
+                    if (item) { window.location.reload(); }
                 }).catch(function (e) { toast('⚠️ ' + e.message, false); });
         };
     });

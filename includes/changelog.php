@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '3.28.0',
+        'date' => '2026-07-30',
+        'time' => '21:30',
+        'title' => 'Výkup: sken dokladu totožnosti (jen pro vedení) a poučení o osobních údajích',
+        'items' => [
+            '<b>Dvě nová nepovinná pole ve výkupním listu:</b> <b>přední</b> a <b>zadní strana</b> dokladu totožnosti prodávajícího, každá zvlášť. Nová strana nahradí předchozí, ať se nehromadí kopie občanek. Slouží k ověření totožnosti podle zákona o obchodu s použitým zbožím (č. 253/2008 Sb.).',
+            '<b>Skeny se ukládají MIMO veřejnou část systému</b> — ne do složky s fotkami, kterou by šlo otevřít přímým odkazem. Ven je pouští jen hlídaný přístup po ověření, že jde o vedení, a <b>každé zobrazení i smazání se zapisuje do historie změn</b>.',
+            '<b>Nikdy se netisknou ani neposílají klientovi</b> — do výkupního listu ani do e-mailu se nedostanou, ani omylem (mají vlastní druh přílohy, oddělený od fotodokumentace zařízení).',
+            '<b>Nová sekce „Doklady totožnosti"</b> (Dokumenty → tlačítko, vidí ho jen admin a Boss): přehled všech skenů s prodávajícím, číslem dokladu, zařízením a datem nahrání, s hledáním a s upozorněním, jak s nimi zacházet.',
+            '<b>Poučení o zpracování osobních údajů</b> přibylo dole na výkupním listu (česky, anglicky i rusky) — kdo je správcem, proč se údaje zpracovávají, jak dlouho se uchovávají, komu se předávají a jaká má prodávající práva.',
+        ],
+    ],
+    [
         'version' => '3.27.0',
         'date' => '2026-07-30',
         'time' => '19:20',

@@ -69,7 +69,7 @@ function crmDocTypes(): array {
                     ['n' => 'sign_payment',     'l' => 'cdoc_f_payment'],
                 ]],
             ],
-            'legal'      => ['buyout_agreement_text', 'cdoc_vykup_legal2', 'cdoc_vykup_legal3'],
+            'legal'      => ['buyout_agreement_text', 'cdoc_vykup_legal2', 'cdoc_vykup_legal3', 'cdoc_vykup_gdpr'],
             'sign_left'  => 'cdoc_sign_seller',
             'sign_right' => 'cdoc_sign_buyer',
             'subject_fields' => ['item_model', 'item_description'],
@@ -198,19 +198,28 @@ function ensureDocumentMediaTable(): void {
             file_name VARCHAR(255) NULL,
             uploaded_by VARCHAR(100) NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_dm_document (document_id)
+            kind VARCHAR(16) NOT NULL DEFAULT 'photo',
+            INDEX idx_dm_document (document_id),
+            INDEX idx_dm_kind (document_id, kind)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // dorovnání starší tabulky (migrace 039) — kód se nasazuje dřív než migrace
+        try { $pdo->exec("ALTER TABLE document_media ADD COLUMN kind VARCHAR(16) NOT NULL DEFAULT 'photo'"); }
+        catch (Throwable $e) { /* sloupec už existuje */ }
     } catch (Throwable $e) { /* best-effort */ }
 }
 
-/** Fotky dokumentu jako [['id'=>, 'src'=>relativní cesta], …]. */
-function crmGetDocumentMedia(int $documentId): array {
+/** Přílohy dokumentu jako [['id'=>, 'src'=>relativní cesta], …].
+ *  VÝCHOZÍ druh je 'photo' = fotodokumentace zařízení. Skeny dokladu totožnosti
+ *  ('id_front'/'id_back') se tak do tisku ani e-mailu NIKDY nedostanou — musí se
+ *  o ně říct výslovně (crmGetDocumentIdScans). */
+function crmGetDocumentMedia(int $documentId, string $kind = 'photo'): array {
     global $pdo;
     if ($documentId <= 0) return [];
     try {
         ensureDocumentMediaTable();
-        $st = $pdo->prepare("SELECT id, file_path, file_type FROM document_media WHERE document_id = ? ORDER BY id ASC");
-        $st->execute([$documentId]);
+        $st = $pdo->prepare("SELECT id, file_path, file_type FROM document_media
+            WHERE document_id = ? AND COALESCE(kind, 'photo') = ? ORDER BY id ASC");
+        $st->execute([$documentId, $kind]);
         $out = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             if (str_starts_with((string)($r['file_type'] ?? ''), 'image/')) {
@@ -219,6 +228,37 @@ function crmGetDocumentMedia(int $documentId): array {
         }
         return $out;
     } catch (Throwable $e) { return []; }
+}
+
+/**
+ * Úložiště skenů dokladu totožnosti — SCHVÁLNĚ MIMO WEB.
+ *
+ * `uploads/` leží pod webovým kořenem a server běží na Caddy, kde soubor .htaccess
+ * nic neblokuje — kdokoli s odkazem by si občanku stáhl. Skeny proto ukládáme o úroveň
+ * výš (mimo dosah webu) a ven je pouští jen api/document_id_scan.php po ověření, že jde
+ * o vedení. Cestu lze přebít nastavením `id_scan_dir` (např. na šifrovaný disk).
+ */
+function crmIdScanRoot(): string {
+    $dir = trim((string)get_setting('id_scan_dir', ''));
+    if ($dir === '') { $dir = dirname(__DIR__, 2) . '/crm-private/id_scans'; }
+    $dir = rtrim($dir, '/');
+    if (!is_dir($dir)) { @mkdir($dir, 0700, true); }
+    return $dir;
+}
+
+/** Skeny dokladu totožnosti u výkupu — ['id_front' => […]|null, 'id_back' => […]|null].
+ *  Používá se JEN v interním formuláři; do tištěného ani e-mailového dokladu nepatří. */
+function crmGetDocumentIdScans(int $documentId): array {
+    $out = ['id_front' => null, 'id_back' => null];
+    foreach (['id_front', 'id_back'] as $kind) {
+        $rows = crmGetDocumentMedia($documentId, $kind);
+        if ($rows) {
+            $last = end($rows);
+            // obrázek se nesmí servírovat přímo — jen přes hlídaný endpoint
+            $out[$kind] = ['id' => (int)$last['id'], 'src' => 'api/document_id_scan.php?id=' . (int)$last['id']];
+        }
+    }
+    return $out;
 }
 
 /**
@@ -337,6 +377,33 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
         $h .= '</div></div>';
     }
 
+    // Doklad totožnosti prodávajícího — JEN u výkupu a JEN ve formuláři.
+    // Zákon o opatřeních proti legalizaci výnosů z trestné činnosti (253/2008 Sb.)
+    // ukládá u obchodu s použitým zbožím identifikovat prodávajícího. Sken je citlivý
+    // údaj: neukazuje se na tištěném dokladu ani v e-mailu klientovi (a nesmí se tam
+    // dostat ani omylem — proto vlastní druh přílohy, ne fotodokumentace).
+    if ($type === 'vykup' && $mode === 'form') {
+        $scans = $docId > 0 ? crmGetDocumentIdScans($docId) : ['id_front' => null, 'id_back' => null];
+        $slot = function (string $kind, string $label) use ($scans) {
+            $cur = $scans[$kind] ?? null;
+            $h = '<div class="idscan" data-kind="' . e($kind) . '">';
+            $h .= '<div class="idscan-label">' . e($label) . '</div>';
+            if ($cur) {
+                $h .= '<span class="idscan-thumb"><img src="' . e((string)$cur['src']) . '" alt="' . e($label) . '">'
+                    . '<button type="button" class="photo-del" data-media-id="' . (int)$cur['id'] . '" title="Smazat">&times;</button></span>';
+            } else {
+                $h .= '<label class="idscan-add"><input type="file" class="idscan-input" data-kind="' . e($kind) . '"'
+                    . ' accept="image/*" capture="environment" style="display:none;"><span>+</span></label>';
+            }
+            return $h . '</div>';
+        };
+        $h .= '<div class="block block--internal"><h3>' . e($L('cdoc_idscan_title'))
+            . ' <span class="internal-tag">' . e($L('cdoc_internal_only')) . '</span></h3>';
+        $h .= '<div class="idscans">' . $slot('id_front', $L('cdoc_idscan_front')) . $slot('id_back', $L('cdoc_idscan_back')) . '</div>';
+        $h .= '<div class="idscan-note">' . e($L('cdoc_idscan_note')) . '</div>';
+        $h .= '</div>';
+    }
+
     // Fotodokumentace (stav zařízení): uložené fotky + ve formuláři tlačítko
     // „Přidat fotky / vyfotit" (na telefonu otevře rovnou foťák).
     $photos = $overridePhotos !== null ? $overridePhotos : ($docId > 0 ? crmGetDocumentMedia($docId) : []);
@@ -428,6 +495,19 @@ function crmDocumentSheetCss(): string {
                      align-items: center; justify-content: center; cursor: pointer; color: #949aa4; font-size: 34px;
                      font-weight: 300; transition: border-color .15s, color .15s; }
         .photo-add:hover { border-color: var(--accent); color: var(--accent); }
+        /* doklad totožnosti — interní blok, na tisku se nikdy neobjeví */
+        .block--internal { border: 1px dashed #f0a500; border-radius: 12px; padding: 10px 12px; background: #fffdf6; }
+        .internal-tag { font-size: 10.5px; font-weight: 700; color: #a86a00; background: #ffefc2;
+                        border-radius: 6px; padding: 2px 7px; margin-left: 6px; vertical-align: middle; }
+        .idscans { display: flex; gap: 14px; flex-wrap: wrap; }
+        .idscan-label { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+        .idscan-thumb { position: relative; display: inline-block; }
+        .idscan-thumb img { width: 150px; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
+        .idscan-add { width: 150px; height: 100px; border: 2px dashed #c9cfd8; border-radius: 8px; display: flex;
+                      align-items: center; justify-content: center; font-size: 24px; color: #9aa3ae; cursor: pointer; }
+        .idscan-add:hover { border-color: var(--accent); color: var(--accent); }
+        .idscan-note { font-size: 10.5px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+        @media print { .block--internal { display: none !important; } }
         @media print { .photo-add, .photo-del { display: none !important; } }
         .fineprint { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--line);
                      font-size: 10px; color: #495059; line-height: 1.55; font-weight: 300; text-align: justify; }

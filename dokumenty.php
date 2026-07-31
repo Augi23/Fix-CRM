@@ -58,6 +58,11 @@ $newLabels = ['vykup' => 'Nový výkupní list', 'zastava' => 'Nový zástavní 
         .afx-glassbtn i { font-size: 14px; opacity: .9; }
     </style>
     <div class="d-flex gap-2 flex-wrap">
+        <?php if (function_exists('crmCanManageInvoices') && crmCanManageInvoices()): ?>
+        <a class="afx-glassbtn" href="doklady-totoznosti.php" title="Skeny dokladů totožnosti z výkupu — jen pro vedení">
+            <i class="fas fa-id-card me-2"></i>Doklady totožnosti
+        </a>
+        <?php endif; ?>
         <a class="afx-glassbtn" href="dokument.php?type=vykup">
             <i class="fas fa-plus"></i>Nový výkupní list
         </a>
