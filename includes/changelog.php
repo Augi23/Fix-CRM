@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.31.2',
+        'date' => '2026-07-31',
+        'time' => '16:40',
+        'title' => 'Jednotný kompaktní vzhled řádků i v zakázkách, dashboardu a dalších seznamech',
+        'items' => [
+            'Kompaktní <b>datum + čas vedle sebe</b> (a jméno pod) je teď i v <b>Zakázkách</b> a na <b>Nástěnce</b> — méně místa, přehlednější.',
+            '<b>Menší akční ikony</b> v řádcích přes jednotnou třídu — nasazeno v Zakázkách, Produktech, Servisu (díly), Klientech a Nákupech. Snadno rozšířitelné na další seznamy.',
+        ],
+    ],
+    [
         'version' => '3.31.1',
         'date' => '2026-07-31',
         'time' => '16:20',

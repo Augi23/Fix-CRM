@@ -270,8 +270,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                     <?php if (($__legacyCode = trim((string)($r['legacy_code'] ?? ''))) !== ''): ?>
                                         <div class="order-code-prev">(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
                                     <?php endif; ?>
-                                    <div class="small text-white-75"><?php echo date('d.m.Y', strtotime($r['created_at'])); ?></div>
-                                    <div class="small text-white-75"><i class="far fa-clock me-1" style="font-size:.7rem;"></i><?php echo date('H:i:s', strtotime($r['created_at'])); ?></div>
+                                    <div class="text-white-75" style="font-size:12px;line-height:1.4;"><?php echo crmDateTime($r['created_at'], true); ?></div>
                                     <?php if (trim((string)($r['created_by_name'] ?? '')) !== ''): ?>
                                         <div class="text-white-50" style="font-size:.72rem;" title="Zakázku vytvořil(a)"><i class="fas fa-user-pen me-1" style="font-size:.65rem;"></i><?php echo e($r['created_by_name']); ?></div>
                                     <?php endif; ?>

@@ -119,10 +119,6 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
 </div>
 
 <?php require 'includes/inventory_tabs.php'; ?>
-<style>
-/* Menší akční ikony v tabulce produktů (přání 31.7.2026) */
-.afx-prod-actions .btn{width:36px;height:36px;min-width:36px;padding:0 !important;font-size:13.5px;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
-</style>
 
 <?php
 // Historie naskladnění — posledních 20 produktů (obdoba panelu „Naposledy přidané"
@@ -333,7 +329,7 @@ try {
                                     </td>
                                     <?php if ($canManageBranch): ?>
                                     <td class="text-end pe-4">
-                                        <div class="btn-group btn-group-sm afx-prod-actions">
+                                        <div class="btn-group btn-group-sm afx-row-actions">
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-810W)"><i class="fas fa-tag"></i></button>
                                             <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vrátit do skladu' : 'Zapůjčeno / komisní prodej'; ?>"><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i></button>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>

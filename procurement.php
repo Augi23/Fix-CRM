@@ -524,7 +524,7 @@ if (isset($_GET['catalog_imported'])):
                             <td class="small text-white-75"><?php echo nl2br(e((string)($request['notes'] ?? ''))); ?></td>
                             <td class="text-end">
                                 <?php if ($can_manage_procurement || $can_add_procurement): ?>
-                                <div class="btn-group btn-group-sm">
+                                <div class="btn-group btn-group-sm afx-row-actions">
                                     <?php if ($can_add_procurement && (int)($request['inventory_id'] ?? 0) > 0 && $status !== 'cancelled'): ?>
                                         <button
                                             class="btn btn-outline-info assign-procurement-btn"

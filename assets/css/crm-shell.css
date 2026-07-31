@@ -426,6 +426,12 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
 html[data-lg-theme="light"], html[data-lg-theme="light"] body { background: #eef1f0 !important; background-image: none !important; }
 html[data-lg-theme="light"] canvas.crm-bgfx { display: none !important; }
 html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
+
+/* ── Kompaktní akční tlačítka v řádcích seznamů (jednotně napříč CRM) ──────────
+   Zmenšení přes padding+font (ne fixní rozměr) → funguje i na dropdown/tlačítka s textem.
+   Použití: přidat třídu .afx-row-actions na .btn-group u akčního sloupce. */
+.afx-row-actions .btn { padding: .26rem .5rem !important; font-size: .82rem !important; }
+.afx-row-actions .btn i { font-size: .92em; }
 html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); background: #fff; } /* světlý motiv: lišta neprůhledně bílá (černá by pohřbila tmavý text) */
 html[data-lg-theme="light"] .afx-brand { color: #10151d; }
 html[data-lg-theme="light"] .afx-brand img { filter: none; } /* světlý motiv → černé logo */

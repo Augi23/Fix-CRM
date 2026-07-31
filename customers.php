@@ -177,7 +177,7 @@ function customersOrdersStyleDisplayName(array $customer): string
                                 </button>
                             </td>
                             <td>
-                                <div class="btn-group btn-group-sm">
+                                <div class="btn-group btn-group-sm afx-row-actions">
                                     <a href="edit_customer.php?id=<?php echo $customer['id']; ?>" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
                                 </div>
                             </td>

@@ -278,7 +278,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-end pe-4">
-                                        <div class="btn-group btn-group-sm">
+                                        <div class="btn-group btn-group-sm afx-row-actions">
                                             <?php if ($canModifyStock): ?>
                                             <button type="button" class="btn btn-white border text-success restock-btn" data-id="<?php echo $item['id']; ?>" data-name="<?php echo htmlspecialchars($item['part_name']); ?>" title="Naskladnit (příjem kusů)"><i class="fas fa-truck-loading"></i></button>
                                             <?php endif; ?>
