@@ -538,9 +538,9 @@ $lang_overrides = [
         'cdoc_f_email' => 'E-mail',
         'cdoc_f_address' => 'Adresa',
         // Identifikace osoby podle § 5 odst. 1 písm. a) zákona č. 253/2008 Sb.
-        // Datum narození a pohlaví se vyplňují teprve tehdy, když rodné číslo přiděleno nebylo —
-        // proto to stojí rovnou v popisku, obsluha to musí poznat bez školení.
-        'cdoc_f_pid' => 'Rodné číslo (jinak datum narození a pohlaví)',
+        // Datum narození a pohlaví se vyplňují teprve tehdy, když rodné číslo přiděleno nebylo
+        // (typicky cizinci) — obě pole stojí hned vedle rodného čísla, ať je to na dokladu vidět.
+        'cdoc_f_pid' => 'Rodné číslo',
         'cdoc_f_birth' => 'Datum narození',
         'cdoc_f_gender' => 'Pohlaví',
         'cdoc_f_birthplace' => 'Místo narození',
@@ -1240,7 +1240,7 @@ $lang_overrides = [
         'cdoc_f_email' => 'E-mail',
         'cdoc_f_address' => 'Адрес',
         // Идентификация лица по § 5 абз. 1 п. a) закона № 253/2008 Sb.
-        'cdoc_f_pid' => 'Личный номер (иначе дата рождения и пол)',
+        'cdoc_f_pid' => 'Личный номер',
         'cdoc_f_birth' => 'Дата рождения',
         'cdoc_f_gender' => 'Пол',
         'cdoc_f_birthplace' => 'Место рождения',
@@ -2399,7 +2399,7 @@ $lang_overrides = [
         'cdoc_f_email' => 'E-mail',
         'cdoc_f_address' => 'Address',
         // Identification under Sec. 5(1)(a) of Act No. 253/2008 Coll.
-        'cdoc_f_pid' => 'Personal ID no. (otherwise date of birth and sex)',
+        'cdoc_f_pid' => 'Personal ID no.',
         'cdoc_f_birth' => 'Date of birth',
         'cdoc_f_gender' => 'Sex',
         'cdoc_f_birthplace' => 'Place of birth',

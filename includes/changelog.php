@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.31.3',
+        'date' => '2026-07-31',
+        'time' => '16:45',
+        'title' => 'Výkupní list a zástavní formulář se vejdou na jednu stranu A4',
+        'items' => [
+            'Doklad má nově <b>dvanáctisloupcovou mřížku</b> — každé pole je široké přesně tak, jak potřebuje. <b>Telefon, rodné číslo, pohlaví, datum a místo narození, státní občanství, číslo a platnost dokladu</b> jsou úzké, jméno a adresa poloviční, popisy přes celou šířku.',
+            'Sekce prodávajícího/zástavce má kvůli zákonnému rozsahu identifikace 16 polí — po zúžení se vejde do <b>5 řádků místo 8</b> a doklad už na tisku <b>nepřetéká na druhou stranu</b> (ověřeno tiskem do PDF: výkupní list i zástavní formulář = 1 strana A4).',
+            'Popisek <b>„Rodné číslo"</b> zkrácen (datum narození a pohlaví mají vlastní pole hned vedle), svislé mezery mírně staženy.',
+            'Na <b>telefonu</b> se mřížka rozpadá tak, že krátké údaje zůstávají po dvou vedle sebe a zbytek přes celou šířku.',
+        ],
+    ],
+    [
         'version' => '3.31.2',
         'date' => '2026-07-31',
         'time' => '16:40',

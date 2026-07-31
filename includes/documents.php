@@ -371,11 +371,26 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
     $logoFs = __DIR__ . '/../assets/img/logo-black.png';
     $logoData = is_file($logoFs) ? 'data:image/png;base64,' . base64_encode((string)file_get_contents($logoFs)) : '';
 
-    $fieldHtml = function (array $f) use ($values, $mode, $L) {
+    // Šířka pole ve dvanáctisloupcové mřížce. Krátké údaje (telefon, rodné číslo,
+    // pohlaví, datum a místo narození, občanství, číslo a platnost dokladu, částky)
+    // si berou čtvrtinu řádku, delší texty polovinu. Co tu není, dostane třetinu.
+    $sirkaPole = [
+        'customer_name' => 5, 'customer_phone' => 3, 'customer_email' => 4, 'customer_address' => 6,
+        'customer_pid' => 3, 'customer_birth' => 3, 'customer_gender' => 3, 'customer_birthplace' => 3,
+        'customer_citizenship' => 3, 'customer_id_type' => 3, 'customer_id_doc' => 3,
+        'customer_id_issuer' => 4, 'customer_id_valid' => 3,
+        'customer_biz_name' => 4, 'customer_biz_address' => 5, 'customer_biz_ico' => 3,
+        'item_description' => 6, 'item_model' => 3, 'item_serial' => 3,
+        'item_price' => 3, 'item_estimate' => 3,
+        'loan_amount' => 3, 'due_date' => 3, 'fee_rate' => 3,
+        'sign_place_date' => 6, 'sign_payment' => 6,
+    ];
+    $fieldHtml = function (array $f) use ($values, $mode, $L, $sirkaPole) {
         $name = $f['n'];
         $isArea = ($f['t'] ?? '') === 'textarea';
         $val = (string)($values[$name] ?? '');
-        $h = '<div class="dfield' . ($isArea ? ' dfield--wide' : '') . '">';
+        $sirka = $isArea ? ' dfield--wide' : ' dfield--c' . ($sirkaPole[$name] ?? 4);
+        $h = '<div class="dfield' . $sirka . '">';
         $h .= '<label>' . e($L($f['l'])) . '</label>';
         if ($mode === 'form') {
             $h .= $isArea
@@ -506,18 +521,34 @@ function crmDocumentSheetCss(): string {
         .doc-code { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 3px 0 0; font-family: ui-monospace, Menlo, monospace; }
         .doc-date { font-size: 11px; color: var(--muted); margin-top: 5px; font-weight: 300; }
         .head-sep { margin: 16px 34px 0; border-bottom: 1px solid var(--line); }
-        .body { padding: 18px 34px 30px; }
-        .doc-title { font-size: 27px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 16px; }
-        .block { margin: 14px 0; border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px 12px; }
-        .block h3 { font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink); margin: 0 0 10px; font-weight: 800; }
-        .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 22px; }
+        .body { padding: 16px 34px 16px; }
+        .doc-title { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 12px; }
+        .block { margin: 9px 0; border: 1px solid var(--line); border-radius: 14px; padding: 12px 18px 10px; }
+        .block h3 { font-size: 13.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink); margin: 0 0 7px; font-weight: 800; }
+        /* Dvanáctisloupcová mřížka: sekce prodávajícího má kvůli zákonnému rozsahu
+           identifikace 16 polí a ve dvou sloupcích doklad přetékal na druhou stranu A4.
+           Každé pole si bere jen tolik místa, kolik potřebuje — krátké údaje (telefon,
+           rodné číslo, pohlaví, datum a místo narození, občanství, platnost dokladu)
+           čtvrtinu řádku, jméno a adresa polovinu, textová pole celý řádek. */
+        .fgrid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 7px 18px; }
         .dfield--wide { grid-column: 1 / -1; }
+        .dfield--c3 { grid-column: span 3; }
+        .dfield--c4 { grid-column: span 4; }
+        .dfield--c5 { grid-column: span 5; }
+        .dfield--c6 { grid-column: span 6; }
+        /* Na telefonu se mřížka smrskne: krátké údaje zůstanou po dvou vedle sebe,
+           všechno ostatní přes celou šířku (jinak by span 3 vyrobil implicitní sloupce). */
+        @media screen and (max-width: 760px) {
+            .fgrid { grid-template-columns: repeat(4, 1fr); }
+            .fgrid > .dfield { grid-column: span 4; }
+            .fgrid > .dfield--c3 { grid-column: span 2; }
+        }
         .dfield label { display: block; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 1px; }
         .dinput { width: 100%; border: none; border-bottom: 1px dashed #c9cfd8; background: transparent; padding: 2px 0 4px;
                   font: inherit; font-weight: 700; color: var(--ink); outline: none; resize: vertical; }
         .dinput:focus { border-bottom-color: var(--accent); }
         .dinput--date { text-align: right; font-weight: 300; font-size: 11px; color: var(--muted); border-bottom: 1px dashed #d8dde4; width: 130px; }
-        .dvalue { min-height: 21px; border-bottom: 1px solid var(--line); padding: 2px 0 4px; font-weight: 700; }
+        .dvalue { min-height: 19px; border-bottom: 1px solid var(--line); padding: 1px 0 3px; font-weight: 700; }
         .photos { display: flex; flex-wrap: wrap; gap: 8px; }
         .photo-item { position: relative; display: inline-block; }
         .photos img { width: 110px; height: 110px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); display: block; }
@@ -542,17 +573,17 @@ function crmDocumentSheetCss(): string {
         .idscan-note { font-size: 10.5px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
         @media print { .block--internal { display: none !important; } }
         @media print { .photo-add, .photo-del { display: none !important; } }
-        .fineprint { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--line);
+        .fineprint { margin-top: 14px; padding-top: 12px; border-top: 2px solid var(--line);
                      font-size: 10px; color: #495059; line-height: 1.55; font-weight: 300; text-align: justify; }
         .fineprint ol { margin: 0; padding-left: 16px; }
-        .fineprint li { margin-bottom: 4px; }
-        .sign { display: flex; gap: 40px; margin-top: 44px; }
+        .fineprint li { margin-bottom: 3px; }
+        .sign { display: flex; gap: 40px; margin-top: 20px; }
         .sign .slot { flex: 1; border-top: 1.4px solid var(--ink); padding-top: 7px; font-size: 10.5px; color: var(--muted); text-align: center; }
         .sign .slot.signed { border-top: none; padding-top: 0; }
         .sign .slot.signed .sig-img { display: block; max-height: 54px; margin: 0 auto 2px; }
         .sign .slot.signed .sigline { border-top: 1.4px solid var(--ink); padding-top: 7px; }
         .sign .slot.signed .sig-at { margin-top: 3px; font-size: 9px; color: #8a929c; }
-        .foot { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--line); text-align: center; padding-bottom: 26px; }
+        .foot { margin-top: 14px; padding-top: 9px; border-top: 1px solid var(--line); text-align: center; padding-bottom: 4px; }
         .foot .foot-name { font-size: 12px; font-weight: 800; letter-spacing: 0.02em; color: var(--ink); }
         .foot .foot-line { font-size: 10px; color: var(--muted); font-weight: 300; margin-top: 4px; letter-spacing: 0.02em; }
         @page { size: A4 portrait; margin: 0; }

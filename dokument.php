@@ -61,7 +61,6 @@ $pageTitle = __($cfg['title_key'], $lang);
         @media (max-width: 760px) {
             body { padding-top: 116px; }
             .doc-toolbar { flex-wrap: wrap; }
-            .fgrid { grid-template-columns: 1fr; }
         }
         @media print { .doc-toolbar, #docToast { display: none !important; } body { padding: 0; } }
     </style>
