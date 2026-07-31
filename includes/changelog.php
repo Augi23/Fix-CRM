@@ -11,7 +11,7 @@ return [
         'time' => '15:20',
         'title' => 'Rozcestník skladu: sklo a adresy dotažené',
         'items' => [
-            'Karty pobočky na rozcestníku teď mají <b>plný Liquid Glass vzhled</b> (lesklé sklo na prosvětleném pozadí) i na tmavém CRM. Doplněna reálná <b>adresa ulice</b> (Karlín: Křižíkova 177/29, Černá Růže: Na Příkopě 853) místo duplicitního názvu a opraveno české skloňování počtů („3 díly", „0 dílů").',
+            'Karty pobočky na rozcestníku teď mají <b>plný Liquid Glass vzhled</b> — sklo si nesou samy (světlý gradient + vnitřní lesk), takže září i na tmavém pozadí CRM. Doplněna reálná <b>adresa ulice</b> (Karlín: Křižíkova 177/29, Černá Růže: Na Příkopě 853) místo duplicitního názvu a opraveno české skloňování počtů („3 díly", „0 dílů").',
         ],
     ],
     [
