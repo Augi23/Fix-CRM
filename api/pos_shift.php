@@ -38,10 +38,21 @@ if (!is_array($in) || !validateCsrfToken((string)($in['csrf_token'] ?? ''))) {
 $action = (string)($in['action'] ?? '');
 try {
     if ($action === 'open') {
+        // PŘEVZETÍ = převzetí odpovědnosti za hotovost v zásuvce. Musí mu předcházet
+        // potvrzení heslem (api/pos_unlock.php), ať pod cizím jménem kasu nepřevezme
+        // někdo, kdo si jen sedl k rozdělané relaci. Platnost 10 minut = čas na
+        // spočítání hotovosti mezi zadáním hesla a potvrzením.
+        $verifiedAt = (int)($_SESSION['pos_shift_pwd_at'] ?? 0);
+        $verifiedBranch = (int)($_SESSION['pos_shift_pwd_branch'] ?? 0);
+        if ($verifiedAt <= 0 || time() - $verifiedAt > 600 || $verifiedBranch !== $branchId) {
+            echo json_encode(['ok' => false, 'need_password' => true,
+                'error' => 'Potvrď prosím heslem, že pokladnu přebíráš ty.'], JSON_UNESCAPED_UNICODE); exit;
+        }
         $match = (int)($in['match'] ?? 0) === 1;
         $counted = isset($in['counted']) && $in['counted'] !== '' && $in['counted'] !== null
             ? (float)str_replace(',', '.', (string)$in['counted']) : null;
         $res = afxPosShiftOpen($branchId, $match, $counted);
+        if (!empty($res['ok'])) { unset($_SESSION['pos_shift_pwd_at'], $_SESSION['pos_shift_pwd_branch']); }
         echo json_encode($res); exit;
     }
 

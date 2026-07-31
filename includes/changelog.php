@@ -6,6 +6,20 @@
  */
 return [
     [
+        'version' => '3.40.0',
+        'date' => '2026-07-31',
+        'time' => '22:30',
+        'title' => 'Převzetí pokladny s potvrzením heslem · každá pobočka tiskne na SVOU tiskárnu',
+        'items' => [
+            '<b>Převzetí pokladny je teď vědomý úkon ve třech krocích:</b> (1) potvrdíš <b>svým heslem</b>, že kasu přebíráš opravdu ty — od té chvíle za hotovost odpovídáš, (2) potvrdíš převzetí a systém ti připomene, ať <b>hotovost nejdřív spočítáš</b> (a nabídne „Ne, teď ne"), (3) teprve pak uvidíš, kolik má v kase být, a potvrdíš, jestli to sedí. Heslo hlídá i server, takže se krok nedá přeskočit; platí 10 minut, ať je čas hotovost v klidu spočítat.',
+            '<b>Zamčené účetní období</b> se u převzetí pozná hned na začátku — ne až po spočítání hotovosti.',
+            '<b>Konec štítků vyjíždějících na cizí pobočce:</b> tiskárna se nastavuje <b>per pobočka</b> a dokud ji pobočka spárovanou nemá, štítek se nevytiskne nikde a systém to rovnou řekne. Dřív se tiše použila tiskárna v Karlíně, takže štítky z Na Příkopě vyjížděly tam.',
+            '<b>Tlačítko „Spárovat tiskárnu"</b> v Nastavení → Tisk štítků: <b>spáruje si ji každá pobočka sama</b> (smí to i technik — ale jen na své pobočce). Tiskárnu se pokusí najít automaticky na počítači u pultu; když ji nenajde, stačí opsat IP z QL-810W (podržet tlačítko → vyjede lístek se síťovým nastavením). K tomu zkušební štítek a odpárování.',
+            '<b>Záložní tisk přes počítač u pultu:</b> když server na tiskárnu pobočky nedosáhne (jiná síť), štítek zakázky i reklamace se vytiskne přes štítkový můstek na tom počítači — a jen u zakázek vlastní pobočky, ať nikomu nevyjede cizí štítek.',
+            'Bezpečnostní drobnosti: čtečka čárových kódů už nesahá do polí s heslem, adresa tiskárny musí být z místní sítě a data pro štítky (jméno klienta, závada) se nevydají mimo vlastní pobočku.',
+        ],
+    ],
+    [
         'version' => '3.39.1',
         'date' => '2026-07-31',
         'time' => '22:58',

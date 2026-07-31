@@ -629,7 +629,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div class="lk-err" id="tkPassErr"></div>
                     <button type="submit" class="lk-btn"><i class="fas fa-arrow-right me-2"></i>Pokračovat</button>
                 </form>
-                <a href="index.php" class="lk-other">Odejít bez převzetí pokladny →</a>
+                <div class="mt-2">
+                    <a href="index.php" class="lk-other me-3">Odejít bez převzetí pokladny</a>
+                    <a href="logout.php" class="lk-other">Přihlásit jiného zaměstnance →</a>
+                </div>
             </div>
 
             <!-- KROK 2/3 — vědomé rozhodnutí + výzva SPOČÍTAT hotovost teď, dokud
@@ -639,8 +642,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 <h4>Chceš teď převzít pokladnu?</h4>
                 <div class="alert alert-warning bg-transparent border-warning text-start small py-2 px-3 mb-3">
                     <i class="fas fa-calculator me-1"></i><strong>Nejdřív spočítej hotovost v zásuvce.</strong>
-                    V dalším kroku uvidíš, kolik v kase podle systému <em>má</em> být, a už jen potvrdíš,
-                    jestli to sedí — <strong>odejít bez převzetí tam už nejde</strong>.
+                    V dalším kroku uvidíš, kolik v kase podle systému <em>má</em> být, a <strong>už jen potvrdíš,
+                    jestli to sedí</strong> — na přepočítávání tam nebude čas ani prostor.
                 </div>
                 <div class="d-flex gap-2 justify-content-center">
                     <button type="button" class="btn btn-success px-4" id="tkYes"><i class="fas fa-check me-1"></i>ANO, mám spočítáno</button>
@@ -673,7 +676,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <div class="lk-err" id="shiftErr"></div>
-            <a href="index.php" class="lk-other">Načíst znovu / odejít →</a>
+            <div class="mt-2">
+                <a href="#" class="lk-other me-3" onclick="location.reload();return false;">Načíst znovu</a>
+                <a href="index.php" class="lk-other">Odejít bez převzetí →</a>
+            </div>
             </div>
         <?php endif; ?>
         <hr class="border-secondary">
@@ -1048,7 +1054,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 // stav se mezitím změnil (kolega předběhl, nebo je to moje druhá
                 // záložka) → obrazovka se sama přepne na skutečnost, ať uživatel
                 // nezůstane viset pod overlayem bez cesty ven
-                if (/převzatou|už má|už je otevřen/i.test(msg)) {
+                if (/převzatou|už má|už je otevřen|právě přebírá/i.test(msg)) {
                     setTimeout(function () { location.reload(); }, 1800);
                 }
                 return;

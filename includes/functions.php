@@ -3759,31 +3759,89 @@ function ensureBranchPrinterColumn(): void {
         $bc = $pdo->query("SHOW COLUMNS FROM branches")->fetchAll(PDO::FETCH_COLUMN);
         if ($bc && !in_array('label_printer_ip', $bc, true)) {
             $pdo->exec("ALTER TABLE `branches` ADD COLUMN `label_printer_ip` VARCHAR(64) NULL DEFAULT NULL");
-            // Karlín zdědí dosavadní globální IP, ať dosavadní tisk beze změny běží dál
+        }
+        // JEDNORÁZOVÝ seed Karlína: 192.168.1.220 je karlínský Brother, který byl do
+        // v3.39.0 natvrdo v kódu jako výchozí hodnota — bez něj by Karlín po zrušení
+        // náhrady za cizí pobočku (branchPrinterIp) přestal tisknout.
+        // Hlídané příznakem: kdyby se pouštěl při každém požadavku, nešlo by Karlínu
+        // tiskárnu odpárovat (hned by se vrátila) ani ho trvale přepnout na jinou.
+        if (get_setting('label_printer_seeded', '') === '') {
             $global = trim((string)get_setting('label_printer_ip', ''));
+            if ($global === '') {
+                // Nastavení bylo prázdné → IP byla natvrdo v kódu. Dosadit ji smíme
+                // jen na BĚŽÍCÍ instalaci (má zakázky); na čisté/testovací DB by
+                // pobočka vypadala spárovaně a tiskla do prázdna.
+                $used = 0;
+                try { $used = (int)$pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn(); } catch (Throwable $e) {}
+                if ($used > 0) { $global = '192.168.1.220'; }
+            }
+            // Příznak se zapisuje PŘED UPDATE: kdyby set_setting selhalo až po něm,
+            // seed by běžel při každém požadavku a odpárování Karlína by nešlo.
+            set_setting('label_printer_seeded', '1');
             if ($global !== '') {
-                $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ? WHERE code = 'karlin' AND (label_printer_ip IS NULL OR label_printer_ip = '')");
+                $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ?
+                                     WHERE code = 'karlin' AND (label_printer_ip IS NULL OR label_printer_ip = '')");
                 $st->execute([$global]);
             }
         }
-    } catch (Throwable $e) { /* starší DB / bez oprávnění — tisk spadne na globální IP */ }
+    } catch (Throwable $e) { /* starší DB / bez oprávnění — pobočka pak tiskárnu „nemá" */ }
 }
 
-/** Vrátí IP tiskárny štítků pro danou pobočku: branches.label_printer_ip, a když je prázdné
- *  (nebo je pobočka neznámá), spadne na globální nastavení label_printer_ip (default Karlín). */
+/** Vrátí IP tiskárny štítků SPÁROVANÉ S DANOU POBOČKOU (branches.label_printer_ip),
+ *  nebo prázdný řetězec, když pobočka tiskárnu spárovanou nemá.
+ *
+ *  ZÁMĚRNĚ BEZ NÁHRADY ZA JINOU POBOČKU: dřív se spadlo na globální label_printer_ip,
+ *  což je tiskárna v Karlíně — štítky z Na Příkopě proto vyjížděly v Karlíně a nikdo
+ *  o tom nevěděl. Radši ať tisk řekne „pobočka nemá spárovanou tiskárnu" (obsluha ji
+ *  spáruje v Nastavení → Tisk štítků), než aby papír vyjel o město dál.
+ *  Globální nastavení slouží už jen jako dědictví pro pobočku, která si ho zdědila
+ *  při zavedení sloupce (Karlín) — viz ensureBranchPrinterColumn(). */
 function branchPrinterIp(?int $branchId): string {
     global $pdo;
-    $fallback = trim((string)get_setting('label_printer_ip', '192.168.1.220'));
-    if ($branchId) {
-        try {
-            ensureBranchPrinterColumn();
-            $st = $pdo->prepare("SELECT label_printer_ip FROM branches WHERE id = ? LIMIT 1");
-            $st->execute([(int)$branchId]);
-            $ip = trim((string)$st->fetchColumn());
-            if ($ip !== '') { return $ip; }
-        } catch (Throwable $e) { /* fallback níže */ }
+    if (!$branchId) { return ''; }
+    try {
+        ensureBranchPrinterColumn();
+        $st = $pdo->prepare("SELECT label_printer_ip FROM branches WHERE id = ? LIMIT 1");
+        $st->execute([(int)$branchId]);
+        return trim((string)$st->fetchColumn());
+    } catch (Throwable $e) {
+        return '';
     }
-    return $fallback;
+}
+
+/** Smí uživatel spárovat tiskárnu dané pobočky? Admin kteroukoli, ostatní zaměstnanci
+ *  JEN tu svou — aby si kluci na druhé pobočce nastavili tiskárnu sami a zároveň
+ *  nikdo omylem nepřepsal tiskárnu kolegům. */
+/** SKUTEČNÁ pobočka přihlášeného pracovníka z DB, nebo 0 když žádnou nemá.
+ *  Rozdíl proti getCurrentStaffBranchId(): ta u člověka bez přiřazené pobočky
+ *  propadne na výchozí (Karlín) — pro rozhodování „je tohle MOJE pobočka?"
+ *  je takový odhad nebezpečný (cizí tiskárna, cizí štítek). */
+function crmStaffBranchIdStrict(): int {
+    global $pdo;
+    static $cache = null;
+    if ($cache !== null) { return $cache; }
+    $cache = 0;
+    try {
+        if (!empty($_SESSION['tech_id'])) {
+            $st = $pdo->prepare("SELECT branch_id FROM technicians WHERE id = ? AND is_active = 1");
+            $st->execute([(int)$_SESSION['tech_id']]);
+            $cache = (int)$st->fetchColumn();
+        } elseif (!empty($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) {
+            $st = $pdo->prepare("SELECT branch_id FROM users WHERE id = ?");
+            $st->execute([(int)$_SESSION['user_id']]);
+            $cache = (int)$st->fetchColumn();
+        }
+    } catch (Throwable $e) { $cache = 0; }
+    return $cache;
+}
+
+function crmCanPairBranchPrinter(?int $branchId): bool {
+    if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) { return false; }
+    if (function_exists('crmIsAccountant') && crmIsAccountant()) { return false; }
+    if (hasPermission('admin_access')) { return true; }
+    if ($branchId === null || (int)$branchId <= 0) { return false; }
+    $own = crmStaffBranchIdStrict();
+    return $own > 0 && $own === (int)$branchId;
 }
 
 /** Jazyk komunikace zákazníka: customers.preferred_language (cs/en/ru, default cs).
@@ -4951,6 +5009,7 @@ function crmAuditLog(string $action, array $opts = []): void {
 function crmAuditActionLabel(string $action): string {
     static $map = [
         'auth.login' => 'Přihlášení', 'auth.logout' => 'Odhlášení', 'auth.reauth' => 'Obnovení přihlášení',
+        'settings.printer' => 'Spárování tiskárny štítků',
         'order.create' => 'Vytvoření zakázky', 'order.update' => 'Úprava zakázky',
         'order.status_change' => 'Změna stavu zakázky', 'order.delete' => 'Smazání zakázky',
         'customer.create' => 'Vytvoření klienta', 'customer.update' => 'Úprava klienta',

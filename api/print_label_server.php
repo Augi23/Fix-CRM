@@ -26,6 +26,17 @@ $VENV_DIR = realpath(__DIR__ . '/../print-bridge') . '/.venv';
 $PY = $VENV_DIR . '/bin/python3';
 $CLI = realpath(__DIR__ . '/../print-bridge') . '/stitek_print_cli.py';
 
+/** Smí se štítek téhle pobočky vytisknout přes MŮSTEK NA POČÍTAČI obsluhy?
+ *  Jen když jde o VLASTNÍ pobočku přihlášeného. Bez toho by vedení (vidí zakázky
+ *  obou poboček) tisklo štítky Na Příkopě na karlínské tiskárně u sebe na stole —
+ *  tedy přesně ta chyba, kterou pobočkové tiskárny odstraňují. */
+function afxLabelBridgeAllowed(int $branchId): bool {
+    // pobočka Z DB (crmStaffBranchIdStrict), ne odhad z getCurrentStaffBranchId —
+    // ten u člověka bez přiřazené pobočky propadne na Karlín
+    $own = function_exists('crmStaffBranchIdStrict') ? crmStaffBranchIdStrict() : 0;
+    return $branchId > 0 && $own > 0 && $branchId === $own;
+}
+
 function afxPrinterReachable(string $ip): bool {
     $fp = @fsockopen($ip, 9100, $errno, $errstr, 2);
     if ($fp) { fclose($fp); return true; }
@@ -51,34 +62,63 @@ function afxEnsureLabelEnv(string $venvDir, string $py): array {
 }
 
 if ($action === 'save_ip') {
-    if (!hasPermission('admin_access') || !validateCsrfToken($_POST['csrf_token'] ?? '')) {
-        echo json_encode(['ok' => false, 'error' => 'Bez oprávnění']); exit;
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
+        echo json_encode(['ok' => false, 'error' => 'Neplatný token']); exit;
     }
     $ip = trim((string)($_POST['ip'] ?? ''));
     $bid = (int)($_POST['branch_id'] ?? 0);
-    if ($ip !== '' && !filter_var($ip, FILTER_VALIDATE_IP)) {
-        echo json_encode(['ok' => false, 'error' => 'Neplatná IP adresa']); exit;
+    // Párovat smí admin kteroukoli pobočku, ostatní zaměstnanci JEN tu svou —
+    // druhá pobočka si tak tiskárnu nastaví sama a nikomu ji nepřepíše.
+    if (!crmCanPairBranchPrinter($bid > 0 ? $bid : null)) {
+        echo json_encode(['ok' => false, 'error' => 'Tiskárnu smíš párovat jen na své pobočce.']); exit;
+    }
+    if ($ip !== '') {
+        // JEN privátní adresa: veřejné/loopback by z odpovědi „reachable" udělaly
+        // skener otevřených portů 9100 v okolí serveru (a tisk by stejně nefungoval).
+        $isIp = filter_var($ip, FILTER_VALIDATE_IP);
+        // NO_PRIV_RANGE|NO_RES_RANGE odmítne veřejné adresy, ale loopback ani
+        // link-local NE (127.0.0.1 se tváří stejně jako 192.168.x.x) — proto navíc
+        // výslovný seznam: přes uložení + test by šlo šťourat po portu 9100.
+        $isPublic = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+        $isLocalish = in_array($ip, ['127.0.0.1', '0.0.0.0', '::1'], true)
+            || str_starts_with($ip, '127.') || str_starts_with($ip, '169.254.') || str_starts_with($ip, 'fe80:');
+        if (!$isIp || $isPublic !== false || $isLocalish) {
+            echo json_encode(['ok' => false,
+                'error' => 'Zadej adresu tiskárny z místní sítě (např. 192.168.x.x).'], JSON_UNESCAPED_UNICODE); exit;
+        }
     }
     if ($bid > 0) {
-        // per pobočku: prázdná IP = smazat (pobočka pak použije globální fallback)
+        // prázdná IP = rozpárovat (pobočka pak nemá tiskárnu a tisk to řekne)
         $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ? WHERE id = ?");
         $st->execute([$ip !== '' ? $ip : null, $bid]);
+        $__bn = $pdo->prepare("SELECT name FROM branches WHERE id = ?");
+        $__bn->execute([$bid]);
+        crmAuditLog('settings.printer', [
+            'entity_type' => 'branch', 'entity_id' => $bid, 'entity_label' => (string)$__bn->fetchColumn(),
+            'branch_id' => $bid,
+            'summary' => $ip !== '' ? 'Spárována tiskárna štítků ' . $ip : 'Tiskárna štítků odpárována',
+        ]);
+        // ZÁMĚRNĚ BEZ sondy dosažitelnosti: kdyby uložení rovnou hlásilo „odpovídá",
+        // dalo by se opakovaným ukládáním proskenovat port 9100 po celé síti serveru.
+        // Stav si klient vyžádá zvlášť přes action=status (a jen pro svou pobočku).
         echo json_encode(['ok' => true, 'ip' => $ip, 'branch_id' => $bid]); exit;
     }
-    // bez pobočky = globální fallback (zpětná kompatibilita)
-    if ($ip === '') { echo json_encode(['ok' => false, 'error' => 'Neplatná IP adresa']); exit; }
-    set_setting('label_printer_ip', $ip);
-    echo json_encode(['ok' => true, 'ip' => $ip]); exit;
+    // Globální tiskárna už neexistuje — od v3.40.0 se tiskne výhradně podle pobočky
+    // (branchPrinterIp), takže uložení „bez pobočky" by nemělo na tisk žádný vliv.
+    echo json_encode(['ok' => false, 'error' => 'Vyber pobočku, ke které tiskárna patří.'], JSON_UNESCAPED_UNICODE); exit;
 }
 
 if ($action === 'status') {
     $bid = (int)($_REQUEST['branch_id'] ?? 0);
     $printerIp = branchPrinterIp($bid ?: null);
+    $canPair = crmCanPairBranchPrinter($bid ?: null);
     echo json_encode([
         'ok' => true,
         'branch_id' => $bid,
-        'printer_ip' => $printerIp,
-        'printer_reachable' => afxPrinterReachable($printerIp),
+        'printer_ip' => $canPair ? $printerIp : '',   // adresu vidí jen ten, kdo pobočku spravuje
+        'paired' => $printerIp !== '',
+        'can_pair' => $canPair,
+        'printer_reachable' => $printerIp !== '' && afxPrinterReachable($printerIp),
         'env_ready' => is_file($PY),
     ]); exit;
 }
@@ -97,12 +137,21 @@ if ($action === 'print_complaint') {
     // štítek reklamace: RK kód + zařízení + důvod; tiskne se na pobočce zaměstnance
     $cmplId = (int)($_POST['id'] ?? 0);
     $st = $pdo->prepare('SELECT k.id, k.complaint_code, k.device, k.complaint_reason, k.created_at,
-        TRIM(CONCAT(COALESCE(c.first_name, ""), " ", COALESCE(c.last_name, ""))) AS client_name
-        FROM complaints k LEFT JOIN customers c ON c.id = k.customer_id WHERE k.id = ?');
+        TRIM(CONCAT(COALESCE(c.first_name, ""), " ", COALESCE(c.last_name, ""))) AS client_name,
+        o.branch_id, o.technician_id
+        FROM complaints k
+        LEFT JOIN customers c ON c.id = k.customer_id
+        LEFT JOIN orders o ON o.id = k.order_id
+        WHERE k.id = ?');
     $st->execute([$cmplId]);
     $cmpl = $st->fetch();
     if (!$cmpl) { echo json_encode(['ok' => false, 'error' => 'Reklamace nenalezena']); exit; }
-    $branchId = getCurrentStaffBranchId();
+    if (!empty($cmpl['branch_id']) && !canAccessOrderBranch($cmpl)) {
+        echo json_encode(['ok' => false, 'error' => 'Bez oprávnění']); exit;
+    }
+    // Pobočka REKLAMOVANÉ ZAKÁZKY, ne pracovníka: jinak by u vedení (vidí obě pobočky)
+    // vycházel bridge_ok vždy true a štítek cizí pobočky by vyjel na tomhle počítači.
+    $branchId = (int)($cmpl['branch_id'] ?? 0) ?: (int)getCurrentStaffBranchId();
 } elseif ($action !== 'test' && $action !== 'print_product') {
     $orderId = (int)($_POST['id'] ?? 0);
     $st = $pdo->prepare('SELECT o.id, o.order_code, o.problem_description, o.created_at, o.branch_id, o.technician_id,
@@ -119,8 +168,21 @@ if ($action === 'print_complaint') {
 }
 $printerIp = branchPrinterIp($branchId);
 
+if ($printerIp === '') {
+    // Dřív se tady spadlo na tiskárnu v Karlíně — štítek z druhé pobočky vyjel
+    // o město dál a nikdo o tom nevěděl. Teď se to rovnou řekne.
+    $__bn = $pdo->prepare("SELECT name FROM branches WHERE id = ?");
+    $__bn->execute([(int)$branchId]);
+    $__bname = (string)$__bn->fetchColumn();
+    echo json_encode(['ok' => false, 'not_paired' => true, 'branch_id' => (int)$branchId,
+        'bridge_ok' => afxLabelBridgeAllowed((int)$branchId),
+        'error' => 'Pobočka ' . ($__bname !== '' ? $__bname : '#' . (int)$branchId)
+            . ' nemá spárovanou tiskárnu štítků — spáruj ji v Nastavení → Tisk štítků.'], JSON_UNESCAPED_UNICODE); exit;
+}
 if (!afxPrinterReachable($printerIp)) {
-    echo json_encode(['ok' => false, 'error' => 'Tiskárna ' . $printerIp . ' neodpovídá (port 9100). Je zapnutá a na síti pobočky?']); exit;
+    echo json_encode(['ok' => false, 'unreachable' => true, 'printer_ip' => $printerIp,
+        'branch_id' => (int)$branchId, 'bridge_ok' => afxLabelBridgeAllowed((int)$branchId),
+        'error' => 'Tiskárna ' . $printerIp . ' neodpovídá (port 9100). Je zapnutá a na síti pobočky?'], JSON_UNESCAPED_UNICODE); exit;
 }
 [$envOk, $envErr] = afxEnsureLabelEnv($VENV_DIR, $PY);
 if (!$envOk) {

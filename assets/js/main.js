@@ -1308,10 +1308,50 @@ window.afxLabelToast = function (msg, ok) {
     setTimeout(function () { el.remove(); }, ok ? 3500 : 6000);
 };
 
+/* Záložní tisk štítku PŘES TENTO POČÍTAČ (lokální můstek 127.0.0.1:9110).
+   Potřebuje ho pobočka, která je v jiné síti než server — server na její tiskárnu
+   nedosáhne, ale počítač u pultu ano. Vrací Promise: true = vytištěno. */
+window.afxLabelViaBridge = function (orderId, isComplaint) {
+    // Na iPadu/Safari se http://127.0.0.1 z HTTPS stránky nikdy nepovolí — výsledek
+    // testu si proto zapamatujeme na relaci, ať se do konzole nesype chyba při
+    // každém tisku.
+    if (sessionStorage.getItem('afxNoLabelBridge') === '1') { return Promise.resolve(false); }
+    var q = isComplaint ? ('complaint_id=' + encodeURIComponent(orderId)) : ('id=' + encodeURIComponent(orderId));
+    return fetch('api/order_label_data.php?' + q, { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d || d.ok === false) { return false; }
+            var ctl = new AbortController();
+            // 15 s: render štítku + přenos rastru na QL-810W běžně trvá déle než pár
+            // vteřin, u pomalejšího Macu klidně 10 s
+            var t = setTimeout(function () { ctl.aborted = true; ctl.abort(); }, 15000);
+            return fetch('http://127.0.0.1:9110/print', {
+                method: 'POST', signal: ctl.signal,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: d.code || '', defect: d.defect || '', date: d.date || '', client: d.client || '' })
+            })
+                .then(function (r2) { clearTimeout(t); return r2.json(); })
+                .then(function (j) { return !!(j && j.ok); })
+                .catch(function (err) {
+                    clearTimeout(t);
+                    // „můstek tu není" si pamatujeme JEN při skutečně nenavázaném
+                    // spojení. Timeout znamená, že můstek běží a jen tiskne pomalu —
+                    // vypnout kvůli němu záložní tisk na celou relaci by bylo horší
+                    // než ta pomalost.
+                    var aborted = ctl.aborted || (err && err.name === 'AbortError');
+                    if (!aborted) { sessionStorage.setItem('afxNoLabelBridge', '1'); }
+                    return false;
+                });
+        })
+        .catch(function () { return false; });
+};
+
 window.printOrderLabel = function (orderId, opts) {
     opts = opts || {};
     // Tisk jde PŘES SERVER (server → tiskárna na pobočce) — funguje z jakéhokoliv
-    // zařízení i prohlížeče, bez štítkového můstku na počítači.
+    // zařízení i prohlížeče, bez štítkového můstku na počítači. Když server na
+    // tiskárnu pobočky nedosáhne (jiná síť) nebo pobočka tiskárnu spárovanou nemá,
+    // zkusí se ještě můstek na tomhle počítači — jinak by druhá pobočka netiskla vůbec.
     var fd = new FormData();
     fd.append('action', 'print');
     fd.append('id', orderId);
@@ -1319,7 +1359,20 @@ window.printOrderLabel = function (orderId, opts) {
     fetch('api/print_label_server.php', { method: 'POST', body: fd, credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-            if (!res.ok) { throw new Error(res.error || 'tisk selhal'); }
+            if (!res.ok) {
+                // bridge_ok určuje SERVER: můstek smí nastoupit jen u zakázky VLASTNÍ
+                // pobočky, jinak by vedení tisklo štítky druhé pobočky u sebe
+                if (res.bridge_ok && (res.not_paired || res.unreachable)) {
+                    return window.afxLabelViaBridge(orderId).then(function (printed) {
+                        if (printed) {
+                            window.afxLabelToast('🏷️ Štítek vytištěn přes tenhle počítač', true);
+                            return;
+                        }
+                        throw new Error(res.error || 'tisk selhal');
+                    });
+                }
+                throw new Error(res.error || 'tisk selhal');
+            }
             window.afxLabelToast('🏷️ Štítek ' + (res.code || '') + ' odeslán na tiskárnu', true);
         })
         .catch(function (e) {
@@ -1420,7 +1473,17 @@ window.printComplaintLabel = function (complaintId, opts) {
     fetch('api/print_label_server.php', { method: 'POST', body: fd, credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-            if (!res.ok) { throw new Error(res.error || 'tisk selhal'); }
+            if (!res.ok) {
+                // stejná záložní cesta jako u zakázek: můstek na počítači obsluhy,
+                // a jen u vlastní pobočky (rozhoduje server přes bridge_ok)
+                if (res.bridge_ok && (res.not_paired || res.unreachable)) {
+                    return window.afxLabelViaBridge(complaintId, true).then(function (printed) {
+                        if (printed) { window.afxLabelToast('🏷️ Štítek reklamace vytištěn přes tenhle počítač', true); return; }
+                        throw new Error(res.error || 'tisk selhal');
+                    });
+                }
+                throw new Error(res.error || 'tisk selhal');
+            }
             window.afxLabelToast('🏷️ Štítek reklamace ' + (res.code || '') + ' odeslán na tiskárnu', true);
         })
         .catch(function (e) {

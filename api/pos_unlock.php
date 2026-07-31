@@ -20,6 +20,11 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     echo json_encode(['ok' => false, 'message' => __('csrf_token_invalid')]); exit;
 }
 
+$forShift = (string)($_POST['purpose'] ?? '') === 'shift_open';
+$blockTail = $forShift
+    ? ' Blokace platí i pro přihlášení do CRM — ať pokladnu zatím převezme kolega.'
+    : ' Blokace platí i pro přihlášení do CRM — mezitím se může přihlásit jiný zaměstnanec.';
+
 $accountKey = !empty($_SESSION['tech_id']) ? 't' . (int)$_SESSION['tech_id']
     : (is_numeric($_SESSION['user_id'] ?? null) ? 'u' . (int)$_SESSION['user_id'] : '');
 if ($accountKey === '') {
@@ -30,7 +35,7 @@ if ($accountKey === '') {
 $remain = crmPosUnlockBlockRemaining($accountKey);
 if ($remain > 0) {
     echo json_encode(['ok' => false, 'blocked' => true,
-        'message' => 'Účet je zablokovaný ještě ' . (int)ceil($remain / 60) . ' min. Mezitím se může přihlásit jiný zaměstnanec.']);
+        'message' => 'Účet je zablokovaný ještě ' . (int)ceil($remain / 60) . ' min.' . $blockTail]);
     exit;
 }
 
@@ -60,6 +65,14 @@ if (!$hash) {   // účet mezitím zmizel/deaktivován → plné přihlášení
 
 if (password_verify($password, (string)$hash)) {
     crmPosUnlockClearFails($accountKey);
+    // Značka „člověk právě potvrdil heslem, že je to on" — vyžaduje ji převzetí
+    // pokladny (api/pos_shift.php action=open), aby heslo nebylo jen ozdoba.
+    // ÚČELOVĚ ODDĚLENÁ od běžného odemčení po nečinnosti: kdo si jen odemkl kasu,
+    // tím ještě nepotvrdil, že přebírá odpovědnost za hotovost.
+    if ((string)($_POST['purpose'] ?? '') === 'shift_open') {
+        $_SESSION['pos_shift_pwd_at'] = time();
+        $_SESSION['pos_shift_pwd_branch'] = (int)getCurrentStaffBranchId();
+    }
     echo json_encode(['ok' => true]); exit;
 }
 
@@ -70,7 +83,7 @@ if ($blockSeconds > 0) {
     crmAuditLog('auth.logout', ['entity_type' => 'auth',
         'summary' => 'Kasa: 10× špatné heslo — účet „' . ($_SESSION['full_name'] ?? $_SESSION['username'] ?? '') . '" na 15 minut zablokován']);
     echo json_encode(['ok' => false, 'blocked' => true,
-        'message' => 'Účet je po 10 špatných pokusech na 15 minut zablokovaný. Mezitím se může přihlásit jiný zaměstnanec.']);
+        'message' => 'Účet je po 10 špatných pokusech na 15 minut zablokovaný.' . $blockTail]);
     exit;
 }
 echo json_encode(['ok' => false, 'message' => 'Špatné heslo (' . $fails . '/10).']);
