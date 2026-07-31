@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '3.30.0',
+        'date' => '2026-07-31',
+        'time' => '14:47',
+        'title' => 'Sklad rozdělen na pobočky (Karlín / Černá Růže) — 1. část',
+        'items' => [
+            '<b>Výběr pobočky:</b> po kliknutí na <b>Sklad</b> se teď nejdřív zobrazí dvě velké karty (Liquid Glass) — <b>Praha 8 - Karlín</b> a <b>Praha 1 - Černá Růže</b>. Teprve po rozkliknutí se otevře sklad té pobočky. Každá pobočka má <b>vlastní oddělené zásoby</b> (Servis, Produkty i Příslušenství).',
+            '<b>Data zůstala Karlínu:</b> celý dosavadní sklad patří Karlínu. <b>Černá Růže začíná prázdná</b> a naskladní si svoje.',
+            '<b>Práva:</b> do obou skladů smí <b>nahlížet každý</b>, ale <b>přidávat a upravovat</b> smí jen zaměstnanec dané pobočky (admin a Boss obojí). U cizí pobočky se ukáže odznak „jen prohlížení" a tlačítka zmizí.',
+            '<b>Fotky modelů</b> (správa e-shopu) zůstávají jen pobočce Karlín.',
+            'Pozn.: pobočkové rozlišení u <b>Nákupů, Umístění</b> a na <b>e-shopu</b> (které zboží je na kterém skladu) dorazí v další části.',
+        ],
+    ],
+    [
         'version' => '3.29.0',
         'date' => '2026-07-31',
         'time' => '13:51',

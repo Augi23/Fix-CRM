@@ -170,6 +170,72 @@ function isBranchGlobalViewer(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POBOČKOVÉ SKLADY (v3.28.0, 31.7.2026) — sekce Sklad rozdělena na 2 pobočky.
+// Vidí obě všichni; PŘIDÁVAT / VYSKLADŇOVAT smí jen zaměstnanec dané pobočky
+// (admin + Boss globálně). Vše stávající patří Karlínu (branch_id DEFAULT).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Runtime doplnění branch_id do skladových tabulek (migrace se na serveru nespouští).
+ *  Idempotentní; vše bez pobočky → výchozí pobočka (Karlín). */
+function ensureSkladBranchSchema(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    $karlin = getDefaultBranchId() ?: 1;
+    foreach (['inventory', 'products', 'stock_locations'] as $tbl) {
+        try {
+            $has = $pdo->query("SHOW COLUMNS FROM `$tbl` LIKE 'branch_id'")->fetch();
+            if ($has) continue;
+            $pdo->exec("ALTER TABLE `$tbl` ADD COLUMN `branch_id` INT NOT NULL DEFAULT " . (int)$karlin);
+            $pdo->exec("ALTER TABLE `$tbl` ADD INDEX `idx_{$tbl}_branch` (`branch_id`)");
+            $pdo->exec("UPDATE `$tbl` SET branch_id = " . (int)$karlin . " WHERE branch_id IS NULL OR branch_id = 0");
+        } catch (Throwable $e) { error_log('ensureSkladBranchSchema ' . $tbl . ': ' . $e->getMessage()); }
+    }
+}
+
+/** Kód pobočky podle id (''=neznámá). */
+function skladBranchCode(int $branchId): string {
+    foreach (getBranches(false) as $b) if ((int)$b['id'] === $branchId) return (string)$b['code'];
+    return '';
+}
+
+/** Popisek pobočky VE SKLADU — pobočka „Na Příkopě" se tu píše jako „Praha 1 - Černá Růže"
+ *  (přání 31.7.2026); jinde v CRM zůstává původní název pobočky. */
+function skladBranchLabel(int $branchId): string {
+    if (skladBranchCode($branchId) === 'prikope') return 'Praha 1 - Černá Růže';
+    return getBranchLabel($branchId) ?: ('Pobočka ' . $branchId);
+}
+
+/** Vybraná pobočka Skladu z ?branch=N; 0 = nevybráno / neplatné (→ rozcestník). */
+function skladSelectedBranchId(): int {
+    $b = (int)($_GET['branch'] ?? 0);
+    if ($b <= 0) return 0;
+    foreach (getBranches(false) as $br) if ((int)$br['id'] === $b) return $b;
+    return 0;
+}
+
+/** Pobočka Skladu pro sub-stránky: vybraná, jinak vlastní pobočka přihlášeného. */
+function skladBranchOrOwn(): int {
+    $b = skladSelectedBranchId();
+    return $b > 0 ? $b : getCurrentStaffBranchId();
+}
+
+/** Smí přihlášený MĚNIT sklad dané pobočky (přidat díl, vyskladnit, upravit, smazat)?
+ *  Prohlížet smí všichni; měnit jen zaměstnanec té pobočky + admin/Boss (globálně). */
+function crmCanModifyBranchStock(int $branchId): bool {
+    if (isBranchGlobalViewer()) return true;
+    return getCurrentStaffBranchId() === (int)$branchId;
+}
+
+/** Pobočka (id) pro „prodejnu" produktu (stock_key): vaclavak = Černá Růže = prikope; jinak Karlín. */
+function skladBranchIdForStockKey(string $stockKey): int {
+    $code = (strtolower(trim($stockKey)) === 'vaclavak') ? 'prikope' : 'karlin';
+    foreach (getBranches(false) as $b) if (($b['code'] ?? '') === $code) return (int)$b['id'];
+    return getDefaultBranchId();
+}
+
 /** Faktury a účetnictví smí administrátor a Boss (rozšířeno 16.7.2026 na žádost
  *  admina — dřív jen admin). Mazání zakázek a nastavení systému zůstává adminovi. */
 function crmCanManageInvoices(): bool {

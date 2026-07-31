@@ -4,6 +4,16 @@ require_once 'includes/functions.php';
 require_once 'includes/header.php';
 ensureInventoryStockedSchema();
 ensureStockLocationsSchema();
+ensureSkladBranchSchema();
+
+// ── Pobočka skladu ── bez ?branch = rozcestník (výběr pobočky), teprve pak sklad
+$skladBranch = skladSelectedBranchId();
+if ($skladBranch === 0) {
+    require 'includes/sklad_branch_picker.php';
+    require_once 'includes/footer.php';
+    return;
+}
+$canModifyStock = crmCanModifyBranchStock($skladBranch);
 
 // Pagination and Filters
 $limit = 50;
@@ -20,6 +30,10 @@ $f_location = (string)($_GET['location'] ?? '');   // id umístění | 'none' = 
 // Real-stock base condition: only stocked items (manually added, received, or with quantity).
 $where_clauses = [inventoryStockedWhereSql()];
 $params = [];
+
+// Pobočková izolace — vždy jen zásoby vybrané pobočky.
+$where_clauses[] = "inventory.branch_id = ?";
+$params[] = $skladBranch;
 
 if (!empty($search)) {
     $where_clauses[] = "(part_name LIKE ? OR sku LIKE ?)";
@@ -62,14 +76,14 @@ $stmt = $pdo->prepare("SELECT inventory.*, sl.code AS loc_code, sl.name AS loc_n
 $stmt->execute($params);
 $inventory = $stmt->fetchAll();
 
-$inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity <= min_stock THEN 1 ELSE 0 END) as low_stock FROM inventory WHERE " . inventoryStockedWhereSql())->fetch();
+$inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity <= min_stock THEN 1 ELSE 0 END) as low_stock FROM inventory WHERE branch_id = " . (int)$skladBranch . " AND " . inventoryStockedWhereSql())->fetch();
 
-// nabídky pro filtry / hromadné akce / modal nového dílu
+// nabídky pro filtry / hromadné akce / modal nového dílu (jen vybraná pobočka)
 $modelOptions = [];
-try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
+try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE branch_id = " . (int)$skladBranch . " AND device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
 $allLocations = stockLocationsAll($pdo);
 $unplacedCount = 0;
-try { $unplacedCount = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE location_id IS NULL AND " . inventoryStockedWhereSql())->fetchColumn(); } catch (Throwable $e) {}
+try { $unplacedCount = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE location_id IS NULL AND branch_id = " . (int)$skladBranch . " AND " . inventoryStockedWhereSql())->fetchColumn(); } catch (Throwable $e) {}
 
 /** <option> seznam umístění seskupený podle typu (vybraná hodnota = id) */
 function invLocationOptionsHtml(array $allLocations, string $selected): string {
@@ -95,18 +109,23 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
         <small class="text-muted"><?php echo __('total_items'); ?>: <?php echo $total_count; ?></small>
     </div>
     <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
+        <?php if (!$canModifyStock): ?>
+            <span class="badge bg-secondary me-2" title="Do skladu jiné pobočky můžeš jen nahlížet"><i class="fas fa-eye me-1"></i>jen prohlížení</span>
+        <?php endif; ?>
         <?php if($inventory_stats['low_stock'] > 0): ?>
             <span class="badge bg-warning text-dark me-2"><?php echo __('low_stock_alert'); ?>: <?php echo $inventory_stats['low_stock']; ?></span>
         <?php endif; ?>
-        <a href="inventory_qr_label.php?all=1" target="_blank" class="btn btn-outline-info" title="Vytiskne arch QR štítků všech naskladněných dílů — nalep na regály">
+        <a href="inventory_qr_label.php?all=1&branch=<?php echo (int)$skladBranch; ?>" target="_blank" class="btn btn-outline-info" title="Vytiskne arch QR štítků všech naskladněných dílů — nalep na regály">
             <i class="fas fa-qrcode me-2"></i> QR štítky
         </a>
         <button class="btn btn-outline-info" data-bs-toggle="collapse" data-bs-target="#filterPanel">
             <i class="fas fa-filter me-2"></i> <?php echo __('filters'); ?>
         </button>
+        <?php if ($canModifyStock): ?>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newPartModal">
             <i class="fas fa-plus me-2"></i> <?php echo __('stock_new_part'); ?>
         </button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -115,6 +134,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
 <div class="collapse mb-4 <?php echo (!empty($search) || !empty($min_price) || !empty($max_price) || $f_model !== '' || $f_location !== '') ? 'show' : ''; ?>" id="filterPanel">
     <div class="card card-body shadow-sm">
         <form action="inventory.php" method="GET" class="row g-3">
+            <input type="hidden" name="branch" value="<?php echo (int)$skladBranch; ?>">
             <div class="col-md-4">
                 <label class="form-label small"><?php echo __('search_sku_placeholder'); ?></label>
                 <input type="text" name="search" class="form-control form-control-sm" value="<?php echo htmlspecialchars($search); ?>" placeholder="<?php echo __('name_or_sku'); ?>">
@@ -146,7 +166,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
             </div>
             <div class="col-md-2 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-sm btn-primary flex-grow-1"><?php echo __('apply_btn'); ?></button>
-                <a href="inventory.php" class="btn btn-sm btn-outline-secondary"><?php echo __('reset_btn'); ?></a>
+                <a href="inventory.php?branch=<?php echo (int)$skladBranch; ?>" class="btn btn-sm btn-outline-secondary"><?php echo __('reset_btn'); ?></a>
             </div>
         </form>
     </div>
@@ -206,7 +226,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                                     <td><code><?php echo htmlspecialchars($item['sku']); ?></code></td>
                                     <td>
                                         <?php if (!empty($item['loc_code'])): ?>
-                                            <a href="inventory.php?location=<?php echo (int)$item['location_id']; ?>" class="text-decoration-none" title="<?php echo htmlspecialchars((string)($item['loc_name'] ?? '')); ?>">
+                                            <a href="inventory.php?branch=<?php echo (int)$skladBranch; ?>&location=<?php echo (int)$item['location_id']; ?>" class="text-decoration-none" title="<?php echo htmlspecialchars((string)($item['loc_name'] ?? '')); ?>">
                                                 <span class="badge bg-info text-dark"><?php echo htmlspecialchars($item['loc_code']); ?></span>
                                             </a>
                                         <?php else: ?>
@@ -259,11 +279,15 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                                     </td>
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm">
+                                            <?php if ($canModifyStock): ?>
                                             <button type="button" class="btn btn-white border text-success restock-btn" data-id="<?php echo $item['id']; ?>" data-name="<?php echo htmlspecialchars($item['part_name']); ?>" title="Naskladnit (příjem kusů)"><i class="fas fa-truck-loading"></i></button>
+                                            <?php endif; ?>
                                             <a href="inventory_qr_label.php?id=<?php echo $item['id']; ?>" target="_blank" class="btn btn-white border text-info" title="QR štítek na regál"><i class="fas fa-qrcode"></i></a>
+                                            <?php if ($canModifyStock): ?>
                                             <a href="edit_inventory.php?id=<?php echo $item['id']; ?>" class="btn btn-white border" title="<?php echo __('edit'); ?>"><i class="fas fa-edit text-warning"></i></a>
                                             <button type="button" class="btn btn-white border text-success assign-order-btn" data-id="<?php echo $item['id']; ?>" data-name="<?php echo htmlspecialchars($item['part_name']); ?>" title="<?php echo __('use_in_repair'); ?>"><i class="fas fa-link"></i></button>
                                             <button type="button" class="btn btn-white border text-danger" onclick="deletePart(<?php echo $item['id']; ?>)" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
@@ -279,7 +303,8 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
             <?php foreach ($modelOptions as $m): ?><option value="<?php echo htmlspecialchars($m); ?>"></option><?php endforeach; ?>
         </datalist>
 
-        <!-- Hromadné akce nad zaškrtnutými díly (třídění skladu do krabiček) -->
+        <!-- Hromadné akce nad zaškrtnutými díly (třídění skladu do krabiček) — jen zaměstnanec pobočky -->
+        <?php if ($canModifyStock): ?>
         <div id="bulkBar" class="card shadow-lg border-secondary position-fixed start-50 translate-middle-x p-2 px-3" style="display:none; bottom: 18px; z-index: 1040; max-width: 96vw;">
             <div class="d-flex flex-wrap gap-2 align-items-center">
                 <span class="fw-semibold text-nowrap"><span id="bulkCount">0</span> vybráno</span>
@@ -294,6 +319,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                 <button type="button" id="bulkClear" class="btn btn-sm btn-outline-secondary">Zrušit</button>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Pagination -->
         <?php if ($total_pages > 1): ?>
@@ -356,6 +382,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
         <div class="modal-content">
             <form action="api/add_inventory.php" method="POST">
                 <?php echo csrfField(); ?>
+                <input type="hidden" name="branch_id" value="<?php echo (int)$skladBranch; ?>">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-truck-loading me-2 text-success"></i><?php echo __('stock_new_part'); ?></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

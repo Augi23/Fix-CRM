@@ -33,9 +33,17 @@ $offset = ($page - 1) * $limit;
 $search = trim((string)($_GET['search'] ?? ''));
 $avail = (string)($_GET['avail'] ?? '');   // '' = vše, 'in' = skladem, 'out' = vyprodáno, 'loan' = zapůjčené
 ensureProductsLoanColumns();
+ensureSkladBranchSchema();
+// Pobočka skladu (vybraná ?branch, jinak vlastní). Vidí se obě; MĚNIT jen zaměstnanec pobočky.
+$skladBranch = skladBranchOrOwn();
+$canModifyStock = crmCanModifyBranchStock($skladBranch);
+$canManageBranch = $canManage && $canModifyStock;
+// Prodejna (stock_key) i nová položka jdou do PRÁVĚ zobrazené pobočky (ne dle přihlášeného).
+$skladBranchCode = skladBranchCode($skladBranch);
+$defaultStockKey = $skladBranchCode === 'prikope' ? 'vaclavak' : 'karlin';
 
-$where_clauses = ['1=1'];
-$params = [];
+$where_clauses = ['branch_id = ?'];
+$params = [$skladBranch];
 if ($search !== '') {
     $where_clauses[] = "(title LIKE ? OR product_code LIKE ? OR model LIKE ?)";
     $params[] = "%$search%"; $params[] = "%$search%"; $params[] = "%$search%";
@@ -72,8 +80,8 @@ $statStmt = $pdo->prepare("SELECT COUNT(*) AS total,
         SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN 1 ELSE 0 END) AS in_stock,
         SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN price ELSE 0 END) AS stock_value,
         SUM(CASE WHEN loan_at IS NOT NULL THEN 1 ELSE 0 END) AS loaned
-    FROM products" . ($catWhere ? " WHERE $catWhere" : ""));
-$statStmt->execute($catParams);
+    FROM products WHERE branch_id = ?" . ($catWhere ? " AND $catWhere" : ""));
+$statStmt->execute(array_merge([$skladBranch], $catParams));
 $stats = $statStmt->fetch();
 
 // poslední import — řádky, které v něm nebyly, dostanou upozornění (nemažou se samy)
@@ -95,7 +103,10 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
         <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#stockHistoryModal" title="Posledních 20 naskladněných produktů — kdo je naskladnil a kdy">
             <i class="fas fa-clock-rotate-left me-2"></i> Historie naskladnění
         </button>
-        <?php if ($canManage): ?>
+        <?php if (!$canModifyStock): ?>
+        <span class="badge bg-secondary align-self-center" title="Do skladu jiné pobočky můžeš jen nahlížet"><i class="fas fa-eye me-1"></i>jen prohlížení</span>
+        <?php endif; ?>
+        <?php if ($canManageBranch): ?>
         <button class="btn btn-success" id="productCreateOpen" data-bs-toggle="modal" data-bs-target="#productCreateModal">
             <i class="fas fa-box-open me-2"></i> Naskladnit produkt
         </button>
@@ -199,6 +210,7 @@ try {
 <div class="collapse mb-4 <?php echo ($search !== '' || $avail !== '') ? 'show' : ''; ?>" id="filterPanel">
     <div class="card card-body shadow-sm">
         <form action="products.php" method="GET" class="row g-3">
+            <input type="hidden" name="branch" value="<?php echo (int)$skladBranch; ?>">
             <?php if ($cat !== ''): ?><input type="hidden" name="cat" value="<?php echo e($cat); ?>"><?php endif; ?>
             <div class="col-md-6">
                 <label class="form-label small">Hledat (název, kód, model)</label>
@@ -215,7 +227,7 @@ try {
             </div>
             <div class="col-md-3 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-sm btn-primary flex-grow-1"><?php echo __('apply_btn'); ?></button>
-                <a href="products.php<?php echo $cat !== '' ? '?cat=' . e($cat) : ''; ?>" class="btn btn-sm btn-outline-secondary"><?php echo __('reset_btn'); ?></a>
+                <a href="products.php?branch=<?php echo (int)$skladBranch; ?><?php echo $cat !== '' ? '&cat=' . e($cat) : ''; ?>" class="btn btn-sm btn-outline-secondary"><?php echo __('reset_btn'); ?></a>
             </div>
         </form>
     </div>
@@ -317,7 +329,7 @@ try {
                                             <div class="small text-white-50"><i class="fas fa-user me-1"></i><?php echo e($p['created_by']); ?></div>
                                         <?php endif; ?>
                                     </td>
-                                    <?php if ($canManage): ?>
+                                    <?php if ($canManageBranch): ?>
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm">
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-810W)"><i class="fas fa-tag"></i></button>

@@ -12,6 +12,7 @@ require_once 'includes/header.php';
 
 ensureStockLocationsSchema();
 ensureInventoryStockedSchema();
+ensureSkladBranchSchema();
 
 $locs = stockLocationsAll($pdo, false);   // včetně deaktivovaných
 

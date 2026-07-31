@@ -26,6 +26,7 @@ $action = (string)($_REQUEST['action'] ?? 'create');
 ensureProductsTable();
 ensureProductsPosColumn();
 ensureProductsCrmColumns();
+ensureSkladBranchSchema();
 
 // ── get: data pro editační režim modalu ──
 if ($action === 'get') {
@@ -107,6 +108,12 @@ $serial = trim((string)($_POST['serial'] ?? ''));
 $force = !empty($_POST['force']);
 $editId = (int)($_POST['id'] ?? 0);
 
+// Pobočka produktu = dle zvolené prodejny (stock_key). Naskladnit smí jen zaměstnanec té pobočky.
+$prodBranch = skladBranchIdForStockKey($in['stock_key']);
+if (!crmCanModifyBranchStock($prodBranch)) {
+    echo json_encode(['success' => false, 'message' => 'Na tuto prodejnu (pobočku) smí naskladňovat jen její zaměstnanci.'], JSON_UNESCAPED_UNICODE); exit;
+}
+
 if ($in['model'] === '') {
     echo json_encode(['success' => false, 'message' => 'Vyplň model.']); exit;
 }
@@ -144,6 +151,9 @@ try {
         $st->execute([$editId]);
         $existing = $st->fetch(PDO::FETCH_ASSOC);
         if (!$existing) { echo json_encode(['success' => false, 'message' => 'Produkt nenalezen.']); exit; }
+        if (isset($existing['branch_id']) && (int)$existing['branch_id'] > 0 && !crmCanModifyBranchStock((int)$existing['branch_id'])) {
+            echo json_encode(['success' => false, 'message' => 'Tento produkt patří jiné pobočce — upravit ho smí jen její zaměstnanci.'], JSON_UNESCAPED_UNICODE); exit;
+        }
     }
 
     // ── product_code ── (u editace: bez SN zachovat původní kód, i AFX-)
@@ -198,7 +208,7 @@ try {
 
     if ($action === 'update') {
         $pdo->prepare("UPDATE products SET product_code = ?, title = ?, manufacturer = ?, category_code = ?,
-                model = ?, capacity = ?, color = ?, grade = ?, battery = ?, price = ?, stock_qty = ?,
+                model = ?, capacity = ?, color = ?, grade = ?, battery = ?, price = ?, stock_qty = ?, branch_id = ?,
                 stock_key = ?, image_url = ?, studio_image_url = ?, gallery_images = ?, video_360_url = ?, has_360 = ?,
                 show_studio = ?, show_gallery = ?, show_360 = ?,
                 pcr_result = ?, pcr_status = ?, pcr_checked_at = COALESCE(?, pcr_checked_at),
@@ -206,7 +216,7 @@ try {
             WHERE id = ?")
             ->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
                 $asm['display_model'], $in['cap'] ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
-                $asm['battery_csv'] ?: null, $priceNum, $stockQty,
+                $asm['battery_csv'] ?: null, $priceNum, $stockQty, $prodBranch,
                 $in['stock_key'], $in['image_url'] ?: null,
                 $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
                 $in['show_studio'], $in['show_gallery'], $in['show_360'],
@@ -221,16 +231,16 @@ try {
     } else {
         $ins = $pdo->prepare("INSERT INTO products
                 (product_code, title, manufacturer, category_code, model, capacity, color, grade, battery,
-                 price, stock_qty, stock_key, image_url, studio_image_url, gallery_images, video_360_url, has_360,
+                 price, stock_qty, branch_id, stock_key, image_url, studio_image_url, gallery_images, video_360_url, has_360,
                  show_studio, show_gallery, show_360,
                  pcr_result, pcr_status, pcr_checked_at,
                  added_at, raw_csv, source, created_by, first_seen_at, last_seen_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
         for ($try = 0; $try < 3; $try++) {
             try {
                 $ins->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
                     $asm['display_model'], $in['cap'] ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
-                    $asm['battery_csv'] ?: null, $priceNum, $stockQty,
+                    $asm['battery_csv'] ?: null, $priceNum, $stockQty, $prodBranch,
                     $in['stock_key'], $in['image_url'] ?: null,
                     $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
                     $in['show_studio'], $in['show_gallery'], $in['show_360'],

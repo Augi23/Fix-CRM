@@ -12,6 +12,8 @@ require_once 'includes/header.php';
 ensureProductsTable();
 ensureProductsCrmColumns();
 ensureModelPhotosTable();
+ensureSkladBranchSchema();
+$_GET['branch'] = (string)getDefaultBranchId();  // Fotky modelů = nástroj Karlína (e-shop) → pobočkový pruh vždy Karlín
 
 if (!crmCanManageProducts()) {
     echo '<div class="container my-5"><div class="alert alert-danger">Nedostatečná oprávnění.</div></div>';

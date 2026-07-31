@@ -5,6 +5,7 @@ require_once 'includes/header.php';
 
 ensureProcurementSchema();
 ensureInventoryStockedSchema();
+ensureSkladBranchSchema();
 
 $suppliers = getSupplierCatalogs();
 $selectedOrderId = max(0, (int)($_GET['order_id'] ?? 0));
