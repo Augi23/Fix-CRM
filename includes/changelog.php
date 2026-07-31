@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.38.1',
+        'date' => '2026-07-31',
+        'time' => '20:15',
+        'title' => 'Návody: nová záložka Účetnictví',
+        'items' => [
+            'Návody mají novou záložku <b>Účetnictví</b> se třemi průvodci: <b>Uzávěrka měsíce</b> (co přesně zámek blokuje, proč se banka nikdy nezasekne, kdo zamyká a kdo jediný odemyká), <b>Pokladní kniha</b> (doklady PPD/VPD, storna protidokladem, limit 270 000 Kč, inventurní rozdíly) a <b>Účet pro účetní</b> (jak ho založit, co účetní vidí a smí, kde má sestavy s PDF tiskem).',
+            'V návodu kasy doplněno, že storno hotovostního prodeje vrací peníze výdajovým pokladním dokladem ke dni storna.',
+        ],
+    ],
+    [
         'version' => '3.38.0',
         'date' => '2026-07-31',
         'time' => '19:45',

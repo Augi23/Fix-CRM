@@ -8,7 +8,7 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
-$tab = in_array($_GET['tab'] ?? 'crm', ['crm', 'banka', 'opravy'], true) ? (string)($_GET['tab'] ?? 'crm') : 'crm';
+$tab = in_array($_GET['tab'] ?? 'crm', ['crm', 'banka', 'ucetnictvi', 'opravy'], true) ? (string)($_GET['tab'] ?? 'crm') : 'crm';
 
 // Přečtené návody TOHOTO pracovníka — nepřečtené mají svítící (glow) ikonku.
 // První rozbalení návodu zapíše api/guide_viewed.php a glow zhasne (v2.8.0).
@@ -61,7 +61,7 @@ $guides['crm'] = [
             ['typ' => 'info', 'text' => '<b>Termotiskárna účtenek</b> (Xprinter, role 57 mm) je zapojená do Macu u pokladny a sdílená po síti — CRM na ni tiskne samo, z libovolného zařízení včetně iPadu. Zkušební tisk: tlačítko <b>„Test účtenky"</b> nahoře v Pokladně. Účtenka sama hlídá náležitosti: typ dokladu podle plátcovství DPH a částky (do 10 000 Kč zjednodušený daňový doklad), označení použitého zboží, režim § 90 a záruční věty podle položek (nové 24 měs. / použité 12 měs. / oprava běžně 6 měs.).'],
             ['typ' => 'info', 'text' => '<b>Historie → Kasa prodejna:</b> všechny doklady, souhrn Hotově/Kartou/Fakturou za zvolené období (denní uzávěrka) a dotisk účtenek.'],
             ['typ' => 'info', 'text' => '<b>DPH u použitého zboží (§ 90):</b> na účtence i faktuře se u bazarového zboží DPH nevyčísluje — doklad má správný režim automaticky, nic neřešíš.'],
-            ['typ' => 'role', 'text' => '<b>Prodávat smí každý</b> přihlášený zaměstnanec na obou pobočkách. <b>Storno</b> (vrátí zboží na sklad a zruší případnou fakturu) smí jen vedení — admin a Boss, v Historii → Kasa prodejna.'],
+            ['typ' => 'role', 'text' => '<b>Prodávat smí každý</b> přihlášený zaměstnanec na obou pobočkách. <b>Storno</b> smí jen vedení — admin a Boss, v Historii → Kasa prodejna: vrátí zboží na sklad, zruší případnou fakturu a u hotovostního prodeje <b>vrátí peníze výdajovým pokladním dokladem ke dni storna</b> (historie ani zamčené měsíce se nepřepisují).'],
             ['typ' => 'info', 'text' => '<b>Zámek kasy:</b> když se kasa 15 minut nepoužívá, obrazovka se zamkne. Stačí zadat <b>svoje heslo</b> (jméno je předvyplněné) a pracuješ dál — nic se neztratí, rozdělaný košík zůstává. Odkaz „Přihlásit jiného zaměstnance" použij při střídání směny.'],
             ['typ' => 'info', 'text' => '<b>10× špatné heslo</b> = dotyčný účet se na 15 minut zablokuje (odemčení i přihlášení). Blokace platí jen pro toho jednoho člověka — kdokoli jiný se mezitím přihlásí a kasa jede dál.'],
         ],
@@ -579,6 +579,61 @@ $guides['banka'] = [
     ],
 ];
 
+/* ── Návody Účetnictví (uzávěrka, pokladní kniha, role účetní — k v3.38.0) ── */
+$guides['ucetnictvi'] = [
+    [
+        'id' => 'uzaverka-mesice', 'icon' => 'fa-lock', 'color' => '#FF9F0A',
+        'title' => 'Uzávěrka měsíce — zamknutí odevzdaného období',
+        'intro' => 'Když je měsíc předaný účetní (přiznání DPH, podklady), zamkne se — a od té chvíle ho NIC v CRM nezmění. Čísla v systému tak vždy sedí s tím, co je odevzdané na úřadě.',
+        'steps' => [
+            'Otevři <b>Nastavení → Uzávěrka období</b> (účetní tam z menu spadne rovnou).',
+            'Vyber rok a měsíc, volitelně napiš poznámku (např. „DPH podáno 25. 8.") a klikni <b>Uzavřít měsíc</b>.',
+            'Hotovo — všechno s datem v zamčeném měsíci je od té chvíle jen ke čtení. Kdo se pokusí něco změnit, dostane srozumitelnou hlášku „Účetní období … je uzavřené".',
+            'Historie zamykání a odemykání (kdo, kdy, proč) se ukládá a je vidět přímo na stránce uzávěrky.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => '<b>Co přesně zámek blokuje:</b> uložení, smazání i změnu stavu faktury, dobropis, platby k fakturám, pokladní doklady (PPD/VPD), vklady a výběry hotovosti, storna prodejů z kasy, opravy výkupních listů s výplatou hotovosti a antedatované doklady (hlídá se datum vystavení i DUZP, u editace nové i původní).'],
+            ['typ' => 'info', 'text' => '<b>Banka se zámkem nikdy nezasekne:</b> když synchronizace narazí na platbu nebo storno spadající do zamčeného měsíce, nezpracuje je „potichu" ani nespadne — pohyb označí <b>K prověření</b> s vysvětlením a jede dál. Rozhodne účetní (typicky po odemčení období, nebo zápisem k dnešku).'],
+            ['typ' => 'pozor', 'text' => '<b>Zamčený aktuální měsíc</b> zastaví i běžný provoz s hotovostí: kasa nemarkuje, pokladnu nejde převzít, výdej zakázky s platbou hotově se odmítne. Aktuální měsíc proto zamykej, jen když je to opravdu záměr (konec činnosti, inventura).'],
+            ['typ' => 'role', 'text' => '<b>Zamknout</b> smí vedení i účetní (uzávěrku dělá typicky právě ona). <b>Odemknout smí JEN administrátor</b> — ani Boss, ani účetní: odemčení je zásah do už odevzdaného účetnictví a musí zůstat výjimečné, s uvedeným důvodem.'],
+        ],
+    ],
+    [
+        'id' => 'pokladni-kniha', 'icon' => 'fa-book-open', 'color' => '#30D158',
+        'title' => 'Pokladní kniha — doklady PPD/VPD, storna a limit hotovosti',
+        'intro' => 'Pokladní kniha (dole na stránce Pokladna) je úřední evidence hotovosti: počáteční zůstatek → každý pohyb s dokladem → konečný zůstatek. Vede se automaticky — tady je, co se v ní děje a co dělat, když se něco pokazí.',
+        'steps' => [
+            '<b>Počáteční zůstatek</b> nastaví vedení jednorázově (tlačítko „Nastavit počáteční zůstatek" na Pokladně) — napočítej fyzicky hotovost v šuplíku a zapiš částku s datem. Od tohoto bodu se počítá celý stav pokladny.',
+            '<b>Doklady vznikají samy:</b> vklad/výběr hotovosti vystaví příjmový (P2026-0001…) nebo výdajový (V2026-0001…) pokladní doklad, výkup placený hotově zapíše výdej automaticky, hotovostní prodej na kase je v knize z prodejů. Číselná řada je souvislá — na papírový doklad piš číslo, které ti systém ohlásí.',
+            '<b>Chybný doklad se NIKDY nemaže — stornuje se</b> (tlačítko u řádku v knize, jen vedení): systém vystaví protidoklad a opačný pohyb, takže peníze v knize skutečně sedí a řada zůstává souvislá. I stornovaný prodej z kasy vrátí hotovost výdajovým dokladem ke dni storna — historie se zpětně nepřepisuje.',
+            '<b>Kniha za období:</b> filtr od–do (výchozí aktuální měsíc), počáteční zůstatek, příjmy, výdaje, konečný zůstatek. Admin, Boss a účetní přepínají pobočky; tisková verze pro účetní je v <b>Účetní sestavy</b>.',
+        ],
+        'conditions' => [
+            ['typ' => 'pozor', 'text' => '<b>Zákonný limit hotovosti 270 000 Kč</b> (zák. 254/2004 Sb.) platí na JEDNU platbu mezi týmiž stranami za den — příjem i výdej (výkup!). Kniha překročení sama červeně ohlásí; taková platba musí proběhnout převodem.'],
+            ['typ' => 'info', 'text' => '<b>Rozdíl při inventuře</b> (fyzicky jiná hotovost než v knize): nikdy neupravuj staré pohyby — zapiš vyrovnávací vklad/výběr s poznámkou „inventarizační rozdíl" a informuj vedení. Kniha musí odpovídat skutečnosti, ne naopak.'],
+            ['typ' => 'info', 'text' => '<b>Zamčený měsíc:</b> do uzavřeného období nejde zapsat pohyb ani vystavit či stornovat doklad — viz návod „Uzávěrka měsíce". Storno se vždy děje k dnešku, takže starý měsíc nemění.'],
+            ['typ' => 'role', 'text' => '<b>Vklad/výběr</b> smí každý, kdo smí markovat. <b>Počáteční zůstatek a storna dokladů jen vedení</b> (admin, Boss). <b>Účetní</b> knihu čte za obě pobočky, ale hotovostí nehýbe.'],
+        ],
+    ],
+    [
+        'id' => 'ucet-ucetni', 'icon' => 'fa-user-tie', 'color' => '#BF5AF2',
+        'title' => 'Účet pro účetní — co vidí, co smí a jak jí ho založit',
+        'intro' => 'Účetní má vlastní přihlášení s přesně ohraničeným přístupem: všechno účetní za celou firmu, nic provozního. Nemusíš řešit, na co smí kliknout — systém ji pouští jen tam, kam má.',
+        'steps' => [
+            'Účet založí administrátor v <b>Nastavení → Zaměstnanci</b> — sekce <b>Účet pro účetní</b> (jméno, přihlašovací jméno, heslo, e-mail) a přihlašovací údaje jí předá.',
+            'Účetní se přihlašuje normálně jako zaměstnanec. Po přihlášení vidí <b>Účetnictví</b> (faktury a dobropisy), <b>Banku</b> (pohyby + párování plateb), <b>Účetní sestavy</b>, <b>Pokladnu</b> (kniha jen ke čtení, za obě pobočky), <b>Návody</b> a <b>uzávěrku</b> v Nastavení.',
+            '<b>Smí:</b> upravovat účetní údaje faktur, měnit stav (zaplaceno…), vystavit dobropis, párovat bankovní platby s fakturami (i částečné), spustit synchronizaci banky, zamknout měsíc a tisknout sestavy do PDF (kniha faktur, DPH podklady, pokladní kniha, přijaté peníze…).',
+            '<b>Nesmí:</b> mazat jakékoli doklady (doklad se storňuje, nemaže), měnit fakturační údaje firmy (číslo účtu na fakturách mění jen vedení), odemykat zamčené období — a nikam do provozu: zakázky, klienti, sklad, prodej na kase i výkupy jsou pro ni zavřené včetně tiskových stránek a API.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => '<b>Sestavy pro účetní</b> jsou v <b>Účetní sestavy</b> (menu Účetnictví): za zvolené období kniha vydaných faktur, podklady DPH, pokladní kniha, přehled úhrad a přijatých peněz (faktury + kasa + pokladna, zálohy zvlášť) — všechno s tiskem do PDF přes Cmd/Ctrl+P.'],
+            ['typ' => 'info', 'text' => '<b>Bezpečnost je centrální:</b> každý požadavek účetní prochází jedinou stráží — mimo účetní funkce dostane odmítnutí, i kdyby znala přímou adresu. Přístup se nedá „rozbít" zapomenutou stránkou.'],
+            ['typ' => 'pozor', 'text' => '<b>Změna hesla účetní:</b> zatím ji provede administrátor v Nastavení → Zaměstnanci (účetní vlastní stránku profilu nemá — do Nastavení se dostane jen na záložku Uzávěrka).'],
+            ['typ' => 'role', 'text' => 'Založit i upravit účet účetní smí jen <b>administrátor</b>. Roli Účetní jde nastavit i existujícímu zaměstnanci (karta zaměstnance → role Účetní) — přístup se mu tím okamžitě zúží na účetní agendu.'],
+        ],
+    ],
+];
+
 /* ── Návody Opravy (plní se postupně) ─────────────────────────────────────── */
 $guides['opravy'] = [];
 ?>
@@ -595,6 +650,7 @@ $guides['opravy'] = [];
     <ul class="nav nav-pills mb-3 gap-2">
         <li class="nav-item"><a class="nav-link <?php echo $tab === 'crm' ? 'active' : ''; ?>" href="navody.php?tab=crm"><i class="fas fa-desktop me-1"></i> CRM</a></li>
         <li class="nav-item"><a class="nav-link <?php echo $tab === 'banka' ? 'active' : ''; ?>" href="navody.php?tab=banka"><i class="fas fa-building-columns me-1"></i> Banka</a></li>
+        <li class="nav-item"><a class="nav-link <?php echo $tab === 'ucetnictvi' ? 'active' : ''; ?>" href="navody.php?tab=ucetnictvi"><i class="fas fa-calculator me-1"></i> Účetnictví</a></li>
         <li class="nav-item"><a class="nav-link <?php echo $tab === 'opravy' ? 'active' : ''; ?>" href="navody.php?tab=opravy"><i class="fas fa-wrench me-1"></i> Opravy</a></li>
     </ul>
 
