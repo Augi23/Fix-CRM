@@ -255,8 +255,8 @@ function afxProductAccessoryCond(): array {
 function crmDateTime($ts, bool $seconds = false): string {
     $t = is_numeric($ts) ? (int)$ts : strtotime((string)$ts);
     if (!$t) return '<span class="text-white-75">—</span>';
-    return date('j.n.Y', $t)
-        . ' <span class="afx-datetime-t" style="opacity:.6;white-space:nowrap;font-weight:400;">'
+    return '<span style="font-size:1em;">' . date('j.n.Y', $t) . '</span>'
+        . ' <span class="afx-datetime-t" style="opacity:.6;white-space:nowrap;font-size:1em;font-weight:inherit;">'
         . '<i class="far fa-clock" style="font-size:.82em;margin-right:.18em;"></i>' . date($seconds ? 'H:i:s' : 'H:i', $t)
         . '</span>';
 }
