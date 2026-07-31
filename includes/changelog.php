@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.26.1',
+        'date' => '2026-07-30',
+        'time' => '17:40',
+        'title' => 'Návody → Banka: nový text „Test v sandboxu" s výsledky prvního testu',
+        'items' => [
+            '<b>Nový návod</b> popisuje, jak si celé napojení vyzkoušet nanečisto v testovacím prostředí banky — od autorizace přes stažení pohybů až po zaplacenou fakturu — a hlavně <b>co první ostrý test odhalil</b>: chybu u plateb v cizí měně (CRM by evidovalo 4,21 Kč místo 99,78 Kč), meze sandboxu (data z roku 2019, takže automatické párování se v něm ověřit nedá) a co je potřeba po testu uklidit.',
+        ],
+    ],
+    [
         'version' => '3.26.0',
         'date' => '2026-07-30',
         'time' => '17:05',

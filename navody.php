@@ -486,6 +486,28 @@ $guides['banka'] = [
         ],
     ],
     [
+        'id' => 'banka-test-sandbox', 'icon' => 'fa-flask', 'color' => '#BF5AF2',
+        'title' => 'Test v sandboxu — jak si napojení vyzkoušet nanečisto (a co ukázal)',
+        'intro' => 'Komerční banka má testovací prostředí s umělými daty. Dá se v něm projít celý koloběh — od autorizace po zaplacenou fakturu — bez certifikátu a bez rizika, že se sáhne na skutečné peníze. Tady je postup i to, co první ostrý test odhalil.',
+        'steps' => [
+            '<b>Nastavení → Banka</b>: prostředí nech na <b>Sandbox</b> a klikni na zelené <b>„Sandbox: nastavit testovací přístup a autorizovat"</b>. Na stránce banky napiš jméno testovacího klienta (např. <b>Klient 1</b>) a potvrď. CRM si samo uloží přístup i seznam testovacích účtů.',
+            '<b>Vyplň „Stahovat pohyby od"</b> na <b>1. 1. 2019</b> a ulož. Testovací data KB jsou totiž z roku 2019 — s výchozím oknem posledních 30 dní by se nenačetlo nic.',
+            '<b>Účetnictví → Banka → Synchronizovat.</b> Naskočí testovací pohyby přímo z banky (příchozí i odchozí, včetně poplatků a zahraniční platby).',
+            '<b>Vystav testovací fakturu</b> na částku některé <b>příchozí</b> platby a dej jí odpovídající variabilní symbol. Pak u platby klikni na <b>🔗</b> a spáruj ji — faktura se označí jako zaplacená, u platby se objeví zelený štítek s jejím číslem.',
+            '<b>Po testu ukliď:</b> smaž testovací fakturu i její platbu a vymaž <b>naučený účet klienta</b> (jinak by CRM u ostrých plateb navrhovalo klienta podle testovacího účtu). Přepnutím na <b>Produkce</b> se sandboxové pohyby přestanou zobrazovat a přihlašovací údaje k testovacímu prostředí se smažou.',
+            '<b>Kdykoli bez banky:</b> na serveru jde spustit <code>php scripts/kb_test_napojeni.php</code> (zkontroluje nastavení a že CRM umí rozšifrovat odpověď banky) a <code>php scripts/kb_test_parovani.php</code> (32 kontrol párování na modelových pohybech).',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => '<b>Výsledek prvního testu (30. 7. 2026):</b> prošlo stažení pohybů z banky, ruční spárování, označení faktury jako zaplacené, <b>datum platby podle banky</b> (ne podle dne, kdy se klikalo), evidence konkrétní platby s vazbou na bankovní pohyb, zapamatování účtu klienta i zápis do Historie změn. Obnova přístupu (bez ní by se po třech minutách přestaly stahovat pohyby) taky funguje a opakovaná synchronizace nic nezdvojila.'],
+            ['typ' => 'warn', 'text' => '<b>Nález, kvůli kterému se test vyplatil — platby v cizí měně.</b> Banka u pohybu posílá <b>dvě částky</b> a není pevně dané, ve které z nich je měna účtu: u jedné testovací platby přišlo <code>681,81 CZK / 27,28 EUR</code>, u druhé obráceně <code>4,21 USD / 99,78 CZK</code>. CRM bralo vždy tu první, takže by u zahraniční platby zapsalo <b>4,21 Kč místo 99,78 Kč</b> — a navíc by ji vyřadilo z párování jako cizoměnovou. Opraveno: bere se částka <b>v měně účtu</b>, původní se ukáže ve zprávě jako „(původně 4,21 USD)". V ostrém provozu by tohle dělalo tichý rozdíl v účetnictví u každé platby ze zahraničí.'],
+            ['typ' => 'warn', 'text' => '<b>Automatické párování v sandboxu ověřit nejde.</b> Všechna testovací data KB jsou z roku 2019 a automat zásadně nebere platby starší než <b>180 dní</b> (pojistka, aby starý symbol nesedl na novou fakturu). V testu se korektně zdržel — ověřit ho jde jen testem nanečisto (<code>kb_test_parovani.php</code>), který jede přes stejný kód.'],
+            ['typ' => 'info', 'text' => '<b>Co v sandboxu čekat:</b> pět testovacích účtů a jen pár pohybů na každém. <b>Variabilní symbol má jediná příchozí platba</b> z celého prostředí (99,78 Kč na účtu CZ4401…0227), takže na zkoušení párování je jen ona. Data jsou umělá a od ostrých se drží odděleně — sandboxová platba nemůže zaplatit skutečnou fakturu.'],
+            ['typ' => 'info', 'text' => '<b>Sandbox se nepřihlašuje do bankovnictví.</b> Registrace aplikace se v něm nedělá (vedla by na skutečné přihlášení do KB), přihlašovací údaje jsou testovací a autorizační kód vydá stránka, kde stačí napsat jméno klienta. Ostrý účet naproti tomu potřebuje kvalifikovaný certifikát a dvě potvrzení jednatelem.'],
+            ['typ' => 'info', 'text' => '<b>Další věci, které test odhalil a jsou opravené:</b> banka se vrací na obě naše adresy (ne jen na tu „registrační"), při návratu neposílá prohlížeč přihlašovací cookie (takže se výsledek dřív zahazoval) a identifikátor požadavku musí být ve tvaru UUID — jinak banka poslední krok odmítne. Každý návrat z banky se proto zapisuje do <b>Historie změn</b> i s tím, co přišlo za údaje.'],
+            ['typ' => 'role', 'text' => 'Test smí spustit <b>admin</b> (Nastavení → Banka). Uklizení testovacích faktur je důležité — jinak se objeví v účetnictví, statistikách i v přehledu tržeb.'],
+        ],
+    ],
+    [
         'id' => 'banka-situace-plateb', 'icon' => 'fa-circle-question', 'color' => '#FF9F0A',
         'title' => 'Když platba nesedí — situace a jejich řešení',
         'intro' => 'Přehled všeho, co u plateb reálně nastává: co s tím udělá systém sám a co po tobě chce. Podle tohohle se dá vyřídit celý sloupec „K prověření".',
