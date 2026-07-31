@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.26.2',
+        'date' => '2026-07-30',
+        'time' => '18:15',
+        'title' => 'Dvě pojistky kolem zaplacených faktur',
+        'items' => [
+            '<b>Synchronizace ze starého webu už nesmaže platbu:</b> dosud u navázaných faktur natvrdo nastavovala stav „vystaveno", takže jediné spuštění by shodilo i <b>zaplacené</b> faktury zpět mezi nezaplacené a smazalo datum platby. Nově se srovnává částka jen u faktur <b>bez evidované platby</b>; u ostatních jen upozorní, že se rozcházejí s částkou zakázky.',
+            '<b>Změna částky faktury přepočítá zaplacení:</b> po úpravě celkové částky se znovu vyhodnotí, jestli ji platby pokrývají — dřív mohla zůstat „zaplacená" faktura, na kterou už zaplacené peníze nestačí.',
+        ],
+    ],
+    [
         'version' => '3.26.1',
         'date' => '2026-07-30',
         'time' => '17:40',

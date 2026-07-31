@@ -71,9 +71,26 @@ function sync_orders($data) {
                 $sql = "UPDATE orders SET " . implode(', ', $upd_fields) . " WHERE id = ?";
                 $pdo->prepare($sql)->execute($params);
                 
-                // Also update related invoice if exists
-                $stmt_inv = $pdo->prepare("UPDATE invoices SET total_amount = ?, status = 'issued' WHERE order_id = ?");
+                // Také srovnat navázanou fakturu — ale JEN dokud na ní nevisí peníze.
+                // Dřív se tady natvrdo nastavovalo status='issued', takže jediné spuštění
+                // synchronizace shodilo i zaplacené faktury zpět mezi nezaplacené a smazalo
+                // datum platby. Faktury s evidovanou platbou (nebo označené jako zaplacené)
+                // se proto nechávají být a jen se zaloguje, že se rozcházejí částkou.
+                $stmt_inv = $pdo->prepare("UPDATE invoices SET total_amount = ?
+                    WHERE order_id = ? AND status IN ('draft','issued','overdue')
+                      AND COALESCE(paid_amount, 0) = 0
+                      AND NOT EXISTS (SELECT 1 FROM invoice_payments p WHERE p.invoice_id = invoices.id)");
                 $stmt_inv->execute([$amt, $id]);
+                if ($stmt_inv->rowCount() === 0) {
+                    $chk = $pdo->prepare("SELECT invoice_number, total_amount, status FROM invoices WHERE order_id = ?");
+                    $chk->execute([$id]);
+                    foreach ($chk->fetchAll(PDO::FETCH_ASSOC) as $__f) {
+                        if (abs((float)$__f['total_amount'] - (float)$amt) > 0.01) {
+                            echo "POZOR: faktura {$__f['invoice_number']} ({$__f['status']}) má jinou částku než zakázka "
+                               . "({$__f['total_amount']} vs $amt) — nechávám ji být, oprav ji ručně v Účetnictví.\n";
+                        }
+                    }
+                }
                 
                 $updated++;
                 echo "Updated Order #$id\n";

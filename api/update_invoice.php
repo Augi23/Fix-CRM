@@ -71,6 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $pdo->commit();
+        // změna celkové částky mění i to, jestli je faktura pokrytá platbami —
+        // přepočítat (allowUnpay jen když na faktuře nějaká platba evidovaná je,
+        // aby se „odzaplacené" nestaly hotovostní a starší doklady bez evidence)
+        if (function_exists('afxInvoiceRecalcPaid')) {
+            $pc = $pdo->prepare("SELECT COUNT(*) FROM invoice_payments WHERE invoice_id = ?");
+            $pc->execute([$invoice_id]);
+            afxInvoiceRecalcPaid((int)$invoice_id, (int)$pc->fetchColumn() > 0);
+        }
         crmAuditLog('invoice.update', [
             'entity_type' => 'invoice', 'entity_id' => (int)($_POST['invoice_id'] ?? $_POST['id'] ?? 0), 'entity_label' => (string)$invoice_number,
             'summary' => 'Upravena faktura ' . $invoice_number,
