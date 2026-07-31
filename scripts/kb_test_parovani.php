@@ -213,7 +213,7 @@ try {
     }
 
     // ── částečné platby (evidence plateb, ne párování) ────────────────────────
-    out('Částečné platby:');
+    out('Ruční evidence plateb (částečné platby jen když je zaeviduje člověk):');
     $insInv->execute(['TEST-CAST-01', 'TEST-CAST-01', $customerId, date('Y-m-d', strtotime('-10 days')),
         date('Y-m-d', strtotime('-10 days')), date('Y-m-d', strtotime('-10 days')), 8500.00, 'issued', 'invoice']);
     $partId = (int)$pdo->lastInsertId();
@@ -232,7 +232,7 @@ try {
     };
 
     afxInvoiceAddPayment($partId, 3000.00, 'bank', date('Y-m-d'), null, 'TEST 1. splátka');
-    $check('první splátka 3 000 z 8 500 → faktura zůstává nezaplacená', 3000.00, 'issued');
+    $check('ručně zapsaná splátka 3 000 z 8 500 → faktura zůstává nezaplacená', 3000.00, 'issued');
 
     afxInvoiceAddPayment($partId, 5000.00, 'bank', date('Y-m-d'), null, 'TEST 2. splátka');
     $check('druhá splátka 5 000 (celkem 8 000) → pořád nezaplacená', 8000.00, 'issued');

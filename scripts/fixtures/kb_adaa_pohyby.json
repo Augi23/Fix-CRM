@@ -773,9 +773,9 @@
    "faktura_stav": "paid"
   },
   {
-   "popis": "částečná platba 2 000 z 4 500 se zapíše AUTOMATICKY, faktura zůstává nezaplacená",
+   "popis": "částečná platba 2 000 z 4 500 se NEZAEVIDUJE — jde k prověření vedení",
    "entry_ref": "KB-2026-0000003",
-   "match_status": "auto",
+   "match_status": "review",
    "faktura": "2026002",
    "faktura_stav": "issued"
   },
@@ -787,17 +787,17 @@
    "faktura_stav": "issued"
   },
   {
-   "popis": "první splátka 1 500 z 3 000 se zapíše automaticky (stav faktury řeší až doplatek)",
+   "popis": "splátka 1 500 z 3 000 jde k prověření (částečné platby se netolerují)",
    "entry_ref": "KB-2026-0000005",
-   "match_status": "auto",
+   "match_status": "review",
    "faktura": "2026006"
   },
   {
-   "popis": "druhá splátka 1 500 fakturu 2026006 doplatí → ZAPLACENO",
+   "popis": "druhá splátka taky k prověření — faktura zůstává nezaplacená",
    "entry_ref": "KB-2026-0000006",
-   "match_status": "auto",
+   "match_status": "review",
    "faktura": "2026006",
-   "faktura_stav": "paid"
+   "faktura_stav": "issued"
   },
   {
    "popis": "číslo faktury jen ve zprávě → návrh k prověření, ne automatické zaplacení",
@@ -869,9 +869,9 @@
    "faktura": "2026012B"
   },
   {
-   "popis": "60 Kč z faktury na 60,50 se zapíše jako částečná platba",
+   "popis": "60 Kč z faktury na 60,50 = nedoplatek → k prověření",
    "entry_ref": "KB-2026-0000019",
-   "match_status": "auto",
+   "match_status": "review",
    "faktura": "2026013",
    "faktura_stav": "issued"
   },
