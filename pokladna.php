@@ -125,6 +125,32 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
 .pos-finish:disabled { opacity: .45; cursor: not-allowed; }
 .pos-empty { color: rgba(255,255,255,.4); text-align: center; padding: 34px 0; font-size: 15.5px; }
 /* Zámek kasy po nečinnosti — plné překrytí, pod ním nejde nic dělat ani číst */
+/* ── LCD displej platby hotově — font staré kalkulačky (DSEG7, sedmisegmentovky) ── */
+@font-face { font-family: 'DSEG7'; src: url('assets/fonts/DSEG7Classic-Bold.woff2') format('woff2'); font-display: block; }
+.lcd-overlay { position: fixed; inset: 0; z-index: 12500; display: none; align-items: center; justify-content: center;
+               background: rgba(4,7,11,.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.lcd-overlay.show { display: flex; }
+.lcd-card { width: min(460px, 94vw); background: rgba(15,19,26,.97); border: 1px solid rgba(255,255,255,.12);
+            border-radius: 18px; padding: 16px; box-shadow: 0 24px 80px rgba(0,0,0,.55); }
+.lcd-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+            color: #aeb6c2; font-weight: 600; }
+.lcd-x { background: none; border: 0; color: #aeb6c2; font-size: 24px; line-height: 1; cursor: pointer; }
+.lcd-x:hover { color: #fff; }
+.lcd-panel { background: #05070a; border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
+             padding: 10px 16px; box-shadow: inset 0 2px 16px rgba(0,0,0,.85); }
+.lcd-row { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; }
+.lcd-row + .lcd-row { border-top: 1px dashed rgba(255,255,255,.08); }
+.lcd-label { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #7d8794; white-space: nowrap; width: 74px; }
+.lcd-val { font-family: 'DSEG7', ui-monospace, Menlo, monospace; font-size: 32px; line-height: 1.15;
+           text-align: right; flex: 1; min-width: 0; }
+.lcd-unit { font-size: 13px; color: #7d8794; font-weight: 600; width: 24px; }
+.lcd-total { color: #ffffff; text-shadow: 0 0 12px rgba(255,255,255,.22); }
+.lcd-input { background: transparent; border: none; outline: none; padding: 0; caret-color: #e8ecf2; color: #5b6572; }
+.lcd-input.ok  { color: #30d158; text-shadow: 0 0 14px rgba(48,209,88,.4); }
+.lcd-input.low { color: #ff453a; text-shadow: 0 0 14px rgba(255,69,58,.4); }
+.lcd-change { color: #ff9f0a; text-shadow: 0 0 14px rgba(255,159,10,.4); }
+.lcd-actions { display: flex; gap: 10px; margin-top: 14px; }
+.lcd-actions .lcd-finish { flex: 1; }
 .pos-lock { position: fixed; inset: 0; z-index: 12000; display: none; align-items: center; justify-content: center;
   background: rgba(5,8,14,.72); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
 .pos-lock.show { display: flex; }
@@ -503,22 +529,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 <button type="button" class="pos-pay" data-pay="invoice"><i class="fas fa-file-invoice"></i>Na fakturu</button>
             </div>
 
-            <!-- Přijato/Vráceno — evidence hotovosti na dokladu (tiskne se na účtenku) -->
-            <div id="posCashWrap" class="mb-3" style="display:none;">
-                <label class="form-label small text-white-50 mb-1"><i class="fas fa-hand-holding-dollar me-1"></i>Přijato od zákazníka</label>
-                <div class="d-flex gap-2 flex-wrap align-items-center">
-                    <input type="text" id="posCashReceived" class="form-control" inputmode="decimal"
-                           placeholder="např. 1 000" style="max-width:140px;" autocomplete="off">
-                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="exact">Přesně</button>
-                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="500">500</button>
-                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="1000">1 000</button>
-                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="2000">2 000</button>
-                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="5000">5 000</button>
-                    <span class="ms-auto small">Vrátit: <strong id="posCashChange" class="text-info">—</strong></span>
-                </div>
-                <div class="small text-danger mt-1" id="posCashErr" style="display:none;">Přijatá částka je nižší než celkem.</div>
-            </div>
-
             <div id="posCustomerWrap" class="mb-3" style="display:none;">
                 <label class="form-label small text-white-50 mb-1">Zákazník (povinné u faktury)</label>
                 <select id="posCustomer" class="form-select" style="width:100%;"></select>
@@ -594,6 +604,37 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
 </div>
 <?php endif; ?>
+
+<!-- ── PLATBA HOTOVĚ — kalkulačkový displej (K úhradě / Přijato / Vrátit) ── -->
+<div class="lcd-overlay" id="lcdOverlay">
+    <div class="lcd-card">
+        <div class="lcd-head">
+            <span><i class="fas fa-money-bill-wave me-2"></i>Platba hotově</span>
+            <button type="button" class="lcd-x" id="lcdClose" title="Zavřít">&times;</button>
+        </div>
+        <div class="lcd-panel">
+            <div class="lcd-row">
+                <span class="lcd-label">K úhradě</span>
+                <span class="lcd-val lcd-total" id="lcdTotal">0</span>
+                <span class="lcd-unit">Kč</span>
+            </div>
+            <div class="lcd-row">
+                <span class="lcd-label">Přijato</span>
+                <input type="text" class="lcd-val lcd-input" id="posCashReceived" inputmode="numeric" autocomplete="off" maxlength="8">
+                <span class="lcd-unit">Kč</span>
+            </div>
+            <div class="lcd-row" id="lcdChangeRow" style="visibility:hidden;">
+                <span class="lcd-label">Vrátit</span>
+                <span class="lcd-val lcd-change" id="lcdChange">0</span>
+                <span class="lcd-unit">Kč</span>
+            </div>
+        </div>
+        <div class="lcd-actions">
+            <button type="button" class="btn btn-outline-light" id="lcdSkip" title="Dokončit bez evidence přijaté hotovosti">Bez evidence</button>
+            <button type="button" class="pos-finish lcd-finish mt-0" id="lcdFinish" disabled><i class="fas fa-check me-2"></i>Dokončit prodej</button>
+        </div>
+    </div>
+</div>
 
 <!-- ── UZÁVĚRKA POKLADNY — modal (z tlačítka i z pokusu o odhlášení) ── -->
 <div class="modal fade" id="shiftCloseModal" tabindex="-1">
@@ -721,53 +762,67 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ── platba ──
-    var $cashWrap = document.getElementById('posCashWrap');
-    var $cashReceived = document.getElementById('posCashReceived');
-    var $cashChange = document.getElementById('posCashChange');
-    var $cashErr = document.getElementById('posCashErr');
     document.querySelectorAll('.pos-pay').forEach(function (btn) {
         btn.addEventListener('click', function () {
             payment = btn.dataset.pay;
             document.querySelectorAll('.pos-pay').forEach(function (b) { b.className = 'pos-pay'; });
             btn.classList.add('sel-' + payment);
             $custWrap.style.display = payment === 'invoice' ? '' : 'none';
-            $cashWrap.style.display = payment === 'cash' ? '' : 'none';
-            updateCash();
             updateFinish();
+            // hotově → rovnou kalkulačkový displej (K úhradě / Přijato / Vrátit)
+            if (payment === 'cash' && cart.length) { lcdShow(); }
         });
     });
 
-    // ── přijatá hotovost → živý výpočet „Vrátit" (na doklad jde Placeno/Vráceno) ──
+    // ── LCD displej platby hotově ──
+    var $lcd = document.getElementById('lcdOverlay');
+    var $cashReceived = document.getElementById('posCashReceived');
+    var $lcdTotal = document.getElementById('lcdTotal');
+    var $lcdChange = document.getElementById('lcdChange');
+    var $lcdChangeRow = document.getElementById('lcdChangeRow');
+    var $lcdFinish = document.getElementById('lcdFinish');
+
     function cashVal() {
-        var raw = $cashReceived.value.replace(/\s/g, '').replace(',', '.');
-        if (raw === '') return null;
-        var v = parseFloat(raw);
-        return isNaN(v) ? NaN : v;
+        var raw = $cashReceived.value.replace(/\D/g, '');
+        return raw === '' ? null : parseInt(raw, 10);
     }
-    function updateCash() {
-        if (payment !== 'cash') { $cashErr.style.display = 'none'; return; }
-        var v = cashVal(), t = total();
-        if (v === null || isNaN(v)) {
-            $cashChange.textContent = '—';
-            $cashErr.style.display = (v !== null && isNaN(v)) ? '' : 'none';
+    function lcdUpdate() {
+        var t = Math.round(total());
+        $lcdTotal.textContent = String(t);
+        var v = cashVal();
+        $cashReceived.classList.remove('ok', 'low');
+        if (v === null) {
+            $lcdChangeRow.style.visibility = 'hidden';
+            $lcdFinish.disabled = true;
             return;
         }
-        var diff = v - t;
-        $cashChange.textContent = fmt(Math.max(0, diff));
-        $cashErr.style.display = diff < 0 ? '' : 'none';
+        // méně než k úhradě = červeně, dost = zeleně; oranžově kolik vrátit
+        $cashReceived.classList.add(v < t ? 'low' : 'ok');
+        var chg = v - t;
+        $lcdChangeRow.style.visibility = chg > 0 ? 'visible' : 'hidden';
+        $lcdChange.textContent = String(Math.max(0, chg));
+        $lcdFinish.disabled = v < t || cart.length === 0;
     }
-    $cashReceived.addEventListener('input', function () { updateCash(); updateFinish(); });
-    document.querySelectorAll('.pos-cash-quick').forEach(function (b) {
-        b.addEventListener('click', function () {
-            var t = total();
-            if (b.dataset.v === 'exact') { $cashReceived.value = String(Math.round(t)); }
-            else {
-                // bankovka: nejbližší násobek nominálu NAD celkovou částku (2 350 → 3×1 000)
-                var nom = parseInt(b.dataset.v, 10);
-                $cashReceived.value = String(Math.max(nom, Math.ceil(t / nom) * nom));
-            }
-            updateCash(); updateFinish();
-        });
+    function lcdShow() {
+        lcdUpdate();
+        $lcd.classList.add('show');
+        setTimeout(function () { $cashReceived.focus(); }, 60);
+    }
+    function lcdHide() { $lcd.classList.remove('show'); }
+    $cashReceived.addEventListener('input', function () {
+        var clean = this.value.replace(/\D/g, '');
+        if (clean !== this.value) { this.value = clean; }
+        lcdUpdate();
+    });
+    $cashReceived.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' && !$lcdFinish.disabled) { $lcdFinish.click(); }
+        if (ev.key === 'Escape') { lcdHide(); }
+    });
+    document.getElementById('lcdClose').addEventListener('click', lcdHide);
+    document.getElementById('lcdFinish').addEventListener('click', function () { lcdHide(); submitSale(); });
+    document.getElementById('lcdSkip').addEventListener('click', function () {
+        $cashReceived.value = '';   // bez evidence — doklad nebude mít Placeno/Vráceno
+        lcdHide(); submitSale();
     });
 
     // zákazník (select2 — stejný endpoint jako wizard Nová zakázka)
@@ -788,15 +843,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateFinish() {
         var ok = cart.length > 0 && payment !== '';
         if (payment === 'invoice' && !$('#posCustomer').val()) ok = false;
-        if (payment === 'cash') {
-            var v = cashVal();
-            if (v !== null && (isNaN(v) || v < total())) ok = false;   // méně než celkem nedává smysl
-        }
         $finish.disabled = !ok;
     }
 
     // ── dokončení ──
+    // Hotově jde přes LCD displej (Přijato/Vrátit); karta a faktura rovnou.
     $finish.addEventListener('click', function () {
+        if (payment === 'cash') { lcdShow(); return; }
+        submitSale();
+    });
+    function submitSale() {
         $finish.disabled = true;
         $finish.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Zpracovávám…';
         fetch('api/pos_checkout.php', {
@@ -826,7 +882,6 @@ document.addEventListener('DOMContentLoaded', function () {
             cart = []; payment = '';
             document.querySelectorAll('.pos-pay').forEach(function (b) { b.className = 'pos-pay'; });
             $custWrap.style.display = 'none';
-            $cashWrap.style.display = 'none';
             $cashReceived.value = '';
             $('#posCustomer').val(null).trigger('change');
             render();
@@ -838,7 +893,7 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('Síťová chyba — prodej se možná neuložil, zkontroluj dnešní prodeje.');
             updateFinish();
         });
-    });
+    }
 
     document.getElementById('posDoneReceipt').addEventListener('click', function () {
         if (lastSale) window.open('print_receipt.php?id=' + lastSale.sale_id + '&format=58&auto=1', '_blank');

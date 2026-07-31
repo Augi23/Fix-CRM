@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.36.1',
+        'date' => '2026-07-31',
+        'time' => '19:55',
+        'title' => 'Kasa: platba hotově přes kalkulačkový displej',
+        'items' => [
+            'Tlačítko <b>Hotově</b> otevře minimalistické okno ve stylu displeje staré kalkulačky (sedmisegmentový font DSEG7): <b>K úhradě</b> bíle, <b>Přijato</b> se píše rovnou do displeje — <span style="color:#ff453a">červeně</span> dokud je méně než k úhradě, <span style="color:#30d158">zeleně</span> jakmile to stačí — a pod tím <span style="color:#ff9f0a">oranžově</span> naskočí <b>Vrátit</b>.',
+            'Enter = dokončit prodej (jde jen při dostatečné částce), Esc/× = zavřít, „Bez evidence" = prodej bez zaznamenání přijaté hotovosti. Nahrazuje dřívější řádek s rychlými tlačítky.',
+        ],
+    ],
+    [
         'version' => '3.37.0',
         'date' => '2026-07-31',
         'time' => '15:30',
