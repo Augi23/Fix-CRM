@@ -303,15 +303,8 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
         <?php else: ?>
             <small class="text-white-75"><?php echo __('all_orders'); ?>: <?php echo $total_orders; ?></small>
         <?php endif; ?>
-        <?php if (isBranchGlobalViewer() && !empty($branches)): ?>
-            <div class="mt-2 d-flex flex-wrap gap-2">
-                <a class="badge rounded-pill text-decoration-none <?php echo $active_branch_filter === 0 ? 'bg-primary' : 'bg-secondary'; ?>" href="orders.php<?php echo $filter_status ? '?filter=' . urlencode($filter_status) : ''; ?>"><?php echo __('all_branches'); ?></a>
-                <?php foreach ($branches as $branch): ?>
-                    <?php $qs = http_build_query(array_filter(['filter' => $filter_status, 'branch_id' => (int)$branch['id']])); ?>
-                    <a class="badge rounded-pill text-decoration-none <?php echo $active_branch_filter === (int)$branch['id'] ? 'bg-primary' : 'bg-secondary'; ?>" href="orders.php?<?php echo e($qs); ?>"><?php echo e($branch['name']); ?></a>
-                <?php endforeach; ?>
-            </div>
-        <?php elseif (!isBranchGlobalViewer()): ?>
+        <?php /* Pobočkový filtr (admin/Boss) se přesunul do dropdownu „Pobočka" v řádku Filtrování. */ ?>
+        <?php if (!isBranchGlobalViewer()): ?>
             <div class="mt-1"><span class="badge bg-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel(getCurrentStaffBranchId())); ?></span></div>
         <?php endif; ?>
     </div>
@@ -331,6 +324,8 @@ $status_defs = getOrderStatusDefinitions();
 $branch_qs   = ($active_branch_filter > 0 && isBranchGlobalViewer()) ? '&branch_id=' . (int)$active_branch_filter : '';
 $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '';
 $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
+$status_qs   = $filter_status ? '&filter=' . urlencode($filter_status) : '';
+$__techs     = getActiveTechnicians(true);
 ?>
 <div class="orders-status-filter d-flex flex-wrap gap-2 mb-3 align-items-center">
     <span class="text-white-75 fw-semibold me-1" style="font-size:13.5px;"><i class="fas fa-filter me-2"></i>Filtrování</span>
@@ -354,19 +349,33 @@ $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
             <?php endforeach; ?>
         </ul>
     </div>
-    <?php /* Filtr zaměstnanců — zachovává ostatní filtry (stav/pobočka/hledání) */ ?>
-    <form method="GET" class="d-flex align-items-center gap-1">
-        <?php if ($filter_status): ?><input type="hidden" name="filter" value="<?php echo e($filter_status); ?>"><?php endif; ?>
-        <?php if ($active_branch_filter > 0): ?><input type="hidden" name="branch_id" value="<?php echo (int)$active_branch_filter; ?>"><?php endif; ?>
-        <?php if (!empty($_GET['search'])): ?><input type="hidden" name="search" value="<?php echo e((string)$_GET['search']); ?>"><?php endif; ?>
-        <i class="fas fa-user-gear text-white-75 me-1"></i>
-        <select name="tech" class="form-select form-select-sm" style="width:auto;min-width:170px;" onchange="this.form.submit()">
-            <option value="0">Zaměstnanci</option>
-            <?php foreach (getActiveTechnicians(true) as $__t): ?>
-                <option value="<?php echo (int)$__t['id']; ?>" <?php echo $tech_filter === (int)$__t['id'] ? 'selected' : ''; ?>><?php echo e((string)$__t['name']); ?></option>
+    <?php /* Filtr zaměstnanců — dropdown ve stylu „Stav" */ ?>
+    <?php $__curTech = null; foreach ($__techs as $__t) { if ($tech_filter === (int)$__t['id']) { $__curTech = $__t; break; } } ?>
+    <div class="dropdown">
+        <button class="btn btn-sm dropdown-toggle crm-filter-dd-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+            <i class="fas fa-user-gear"></i> <?php echo $__curTech ? e((string)$__curTech['name']) : 'Zaměstnanci'; ?>
+        </button>
+        <ul class="dropdown-menu crm-filter-dd-menu shadow">
+            <li><a class="dropdown-item crm-filter-dd-item<?php echo $tech_filter === 0 ? ' active' : ''; ?>" href="orders.php?<?php echo ltrim($status_qs . $branch_qs . $search_qs, '&'); ?>"><i class="fas fa-users"></i> Všichni zaměstnanci</a></li>
+            <?php foreach ($__techs as $__t): ?>
+            <li><a class="dropdown-item crm-filter-dd-item<?php echo $tech_filter === (int)$__t['id'] ? ' active' : ''; ?>" href="orders.php?tech=<?php echo (int)$__t['id'] . $status_qs . $branch_qs . $search_qs; ?>"><i class="fas fa-user"></i> <?php echo e((string)$__t['name']); ?></a></li>
             <?php endforeach; ?>
-        </select>
-    </form>
+        </ul>
+    </div>
+    <?php /* Filtr poboček — dropdown „Pobočka" (jen admin/Boss; dřív chipy v hlavičce) */ ?>
+    <?php if (isBranchGlobalViewer() && !empty($branches)): ?>
+    <div class="dropdown">
+        <button class="btn btn-sm dropdown-toggle crm-filter-dd-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+            <i class="fas fa-store"></i> <?php echo $active_branch_filter > 0 ? e(getBranchLabel($active_branch_filter)) : 'Pobočka'; ?>
+        </button>
+        <ul class="dropdown-menu crm-filter-dd-menu shadow">
+            <li><a class="dropdown-item crm-filter-dd-item<?php echo $active_branch_filter === 0 ? ' active' : ''; ?>" href="orders.php?<?php echo ltrim($status_qs . $search_qs . $tech_qs, '&'); ?>"><i class="fas fa-layer-group"></i> <?php echo __('all_branches'); ?></a></li>
+            <?php foreach ($branches as $branch): ?>
+            <li><a class="dropdown-item crm-filter-dd-item<?php echo $active_branch_filter === (int)$branch['id'] ? ' active' : ''; ?>" href="orders.php?branch_id=<?php echo (int)$branch['id'] . $status_qs . $search_qs . $tech_qs; ?>"><i class="fas fa-store"></i> <?php echo e($branch['name']); ?></a></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+    <?php endif; ?>
 </div>
 
 
