@@ -130,27 +130,37 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
 .lcd-overlay { position: fixed; inset: 0; z-index: 12500; display: none; align-items: center; justify-content: center;
                background: rgba(4,7,11,.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .lcd-overlay.show { display: flex; }
-.lcd-card { width: min(460px, 94vw); background: rgba(15,19,26,.97); border: 1px solid rgba(255,255,255,.12);
+.lcd-card { width: min(460px, 94vw); background: #1C1C1E; border: 1px solid rgba(255,255,255,.1);
             border-radius: 18px; padding: 16px; box-shadow: 0 24px 80px rgba(0,0,0,.55); }
 .lcd-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-            color: #aeb6c2; font-weight: 600; }
-.lcd-x { background: none; border: 0; color: #aeb6c2; font-size: 24px; line-height: 1; cursor: pointer; }
+            color: rgba(235,235,245,.6); font-weight: 600; }
+.lcd-x { background: none; border: 0; color: rgba(235,235,245,.6); font-size: 24px; line-height: 1; cursor: pointer; }
 .lcd-x:hover { color: #fff; }
-.lcd-panel { background: #05070a; border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
+.lcd-panel { background: #000000; border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
              padding: 10px 16px; box-shadow: inset 0 2px 16px rgba(0,0,0,.85); }
 .lcd-row { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; }
 .lcd-row + .lcd-row { border-top: 1px dashed rgba(255,255,255,.08); }
-.lcd-label { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #7d8794; white-space: nowrap; width: 74px; }
+.lcd-label { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: rgba(235,235,245,.6); white-space: nowrap; width: 74px; }
 .lcd-val { font-family: 'DSEG7', ui-monospace, Menlo, monospace; font-size: 32px; line-height: 1.15;
            text-align: right; flex: 1; min-width: 0; }
-.lcd-unit { font-size: 13px; color: #7d8794; font-weight: 600; width: 24px; }
+.lcd-unit { font-size: 13px; color: rgba(235,235,245,.6); font-weight: 600; width: 24px; }
 .lcd-total { color: #ffffff; text-shadow: 0 0 12px rgba(255,255,255,.22); }
-.lcd-input { background: transparent; border: none; outline: none; padding: 0; caret-color: #e8ecf2; color: #5b6572; }
-.lcd-input.ok  { color: #30d158; text-shadow: 0 0 14px rgba(48,209,88,.4); }
-.lcd-input.low { color: #ff453a; text-shadow: 0 0 14px rgba(255,69,58,.4); }
-.lcd-change { color: #ff9f0a; text-shadow: 0 0 14px rgba(255,159,10,.4); }
+.lcd-input { background: transparent; border: none; outline: none; padding: 0; caret-color: #EBEBF5; color: rgba(235,235,245,.3); }
+.lcd-input.ok  { color: #30D158; text-shadow: 0 0 14px rgba(48,209,88,.4); }
+.lcd-input.low { color: #FF453A; text-shadow: 0 0 14px rgba(255,69,58,.4); }
+.lcd-change { color: #FF9F0A; text-shadow: 0 0 14px rgba(255,159,10,.4); }
+/* Tlačítka dle Apple HIG (dark mode): SF Pro, systemGreen #30D158, sekundární
+   výplň systemGray5 #2C2C2E, rádius 12, disabled = 40 % (žádné vlastní odstíny). */
 .lcd-actions { display: flex; gap: 10px; margin-top: 14px; }
-.lcd-actions .lcd-finish { flex: 1; }
+.lcd-actions button { font-family: 'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+                      font-size: 17px; font-weight: 600; letter-spacing: -0.01em; border-radius: 12px;
+                      border: 0; padding: 13px 18px; cursor: pointer; transition: filter .15s, transform .12s; }
+.lcd-actions button:hover { filter: brightness(1.12); }
+.lcd-actions button:active { transform: scale(.985); }
+#lcdSkip { background: #2C2C2E; color: #FFFFFF; }
+.lcd-actions .lcd-finish { flex: 1; width: auto; background: #30D158; color: #FFFFFF;
+                           box-shadow: none; font-size: 17px; padding: 13px 18px; border-radius: 12px; }
+.lcd-actions .lcd-finish:disabled { opacity: .4; }
 .pos-lock { position: fixed; inset: 0; z-index: 12000; display: none; align-items: center; justify-content: center;
   background: rgba(5,8,14,.72); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
 .pos-lock.show { display: flex; }

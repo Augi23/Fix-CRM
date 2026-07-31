@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.36.2',
+        'date' => '2026-07-31',
+        'time' => '20:15',
+        'title' => 'Kasa: LCD okno v přesných Apple barvách + šířka účtenky 56 mm',
+        'items' => [
+            'Tlačítka LCD okna platby hotově: <b>SF Pro</b>, přesné systémové odstíny Apple (dark) — primární <b>systemGreen #30D158</b>, sekundární výplň <b>systemGray5 #2C2C2E</b>, rádius 12, disabled 40 %. Popisky displeje v secondaryLabel, karta systemGray6 #1C1C1E, displej čistě černý.',
+            'Šířka návrhu účtenky nastavena na <b>56 mm</b> (role 60 mm) přes nastavení receipt_width_mm — bez zásahu do kódu jde kdykoli doladit po zkušebním tisku.',
+        ],
+    ],
+    [
         'version' => '3.36.1',
         'date' => '2026-07-31',
         'time' => '19:55',
