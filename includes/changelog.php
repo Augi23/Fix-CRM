@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.35.1',
+        'date' => '2026-07-31',
+        'time' => '19:55',
+        'title' => 'Pobočka kusu: import a přesuny drží data konzistentní (nálezy revize)',
+        'items' => [
+            '<b>Import z appky nově zapisuje i pobočku</b> (branch_id) v kroku s prodejnou ze souboru — nový kus „vaclavak" už nespadne omylem pod Karlín. Prázdná prodejna v souboru (vyprodaný kus) uloženou prodejnu ani pobočku <b>nepřepíše</b>.',
+            '<b>Kus přesunutý mezi pobočkami</b> se označí jako spravovaný CRM — další import ze souboru appky ho už nepřepíše (nevrátí mu starou pobočku).',
+        ],
+    ],
+    [
         'version' => '3.35.0',
         'date' => '2026-07-31',
         'time' => '18:41',

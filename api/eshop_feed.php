@@ -118,8 +118,9 @@ try {
         if (!$showGallery) { $gallery = []; }
         if (!$show360)     { $video360 = ''; }
 
-        // Pobočka kusu: branch_id řádku, fallback ze stock_key (karlin/vaclavak) — feed nevolá
-        // ensureSkladBranchSchema(), takže sloupec branch_id nemusí ještě existovat.
+        // Pobočka kusu: autorita = branch_id řádku (import i přesuny ho drží v kroku se
+        // stock_key). Fallback přes stock_key platí JEN pro čerstvou DB, kde sloupec
+        // branch_id ještě neexistuje (feed nevolá ensureSkladBranchSchema()).
         $branchId = (int)($p['branch_id'] ?? 0) ?: skladBranchIdForStockKey((string)($p['stock_key'] ?? ''));
         $branchLabel = skladBranchLabel($branchId);
 

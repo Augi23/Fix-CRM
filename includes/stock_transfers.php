@@ -230,7 +230,9 @@ function afxTransferConfirm(int $transferId): array {
                 $s = $src->fetch(PDO::FETCH_ASSOC);
                 if (!$s || (int)$s['branch_id'] !== $from) { throw new Exception('Produkt „' . $it['name'] . '" už není na zdrojové pobočce.'); }
                 $toStockKey = (skladBranchCode($to) === 'prikope') ? 'vaclavak' : 'karlin';
-                $pdo->prepare("UPDATE products SET branch_id = ?, stock_key = ?, updated_at = NOW() WHERE id = ?")
+                // source='crm': přesunutý kus už NESMÍ přepisovat import souboru z appky —
+                // ten by mu vrátil původní prodejnu (stock_key) a pobočky by se rozjely.
+                $pdo->prepare("UPDATE products SET branch_id = ?, stock_key = ?, source = 'crm', updated_at = NOW() WHERE id = ?")
                     ->execute([$to, $toStockKey, (int)$s['id']]);
             }
         }

@@ -77,6 +77,7 @@ $parsePrice = static function (string $v): float {
 ensureProductsTable();   // DDL před transakcí (implicitní commit)
 ensureProductsPosColumn();
 ensureProductsCrmColumns();
+ensureSkladBranchSchema();   // sloupec branch_id — import ho drží v kroku se stock_key
 
 // čas začátku VŽDY z hodin databáze — last_seen_at plní NOW() z MySQL a kdyby
 // PHP a MySQL běžely v jiném pásmu, stale-detekce by označila i čerstvé řádky
@@ -119,6 +120,11 @@ if (isset($idx['[STOCK_STOCK "karlin"]']) || isset($idx['[STOCK_STOCK "vaclavak"
         if ($col($row, '[STOCK_STOCK "vaclavak"]') !== '') return 'vaclavak';
         return '';
     };
+    // branch_id VŽDY v kroku se stock_key — bez toho by nový kus „vaclavak" dostal
+    // sloupcový DEFAULT (Karlín) a feed/Sklad by ho ukazovaly na špatné pobočce.
+    // U EXISTUJÍCÍCH řádků s prázdným stock_key v souboru se pobočka NEMĚNÍ (viz upsert níže).
+    $__skFn = $fields['stock_key'];
+    $fields['branch_id'] = static fn(array $row) => skladBranchIdForStockKey($__skFn($row));
 }
 if (isset($idx['PRIDANO'])) {
     $fields['added_at'] = static function (array $row) use ($col): ?string {
@@ -146,6 +152,10 @@ foreach ($colNames as $c) {
     if ($c === 'product_code') continue;
     if ($c === 'added_at')   { $updateParts[] = "added_at = COALESCE(VALUES(added_at), added_at)"; continue; }
     if ($c === 'created_by') { $updateParts[] = "created_by = COALESCE(created_by, VALUES(created_by))"; continue; }
+    // prodejna/pobočka: prázdný stock_key v souboru (vyprodaný kus bez skladové kolonky)
+    // NESMÍ přepsat uloženou prodejnu ani pobočku — jinak by se stock_key×branch_id rozjely
+    if ($c === 'stock_key') { $updateParts[] = "stock_key = IF(VALUES(stock_key) = '' OR VALUES(stock_key) IS NULL, stock_key, VALUES(stock_key))"; continue; }
+    if ($c === 'branch_id') { $updateParts[] = "branch_id = IF(VALUES(stock_key) = '' OR VALUES(stock_key) IS NULL, branch_id, VALUES(branch_id))"; continue; }
     $updateParts[] = "$c = VALUES($c)";
 }
 $updateParts[] = "last_seen_at = NOW()";
