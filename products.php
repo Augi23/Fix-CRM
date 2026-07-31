@@ -43,6 +43,20 @@ if ($search !== '') {
 if ($avail === 'in')   { $where_clauses[] = "stock_qty > 0 AND loan_at IS NULL"; }
 if ($avail === 'out')  { $where_clauses[] = "stock_qty <= 0"; }
 if ($avail === 'loan') { $where_clauses[] = "loan_at IS NOT NULL"; }
+
+// Kategorie: '' = Produkty (vše) · 'prislusenstvi' = jen doplňky (kabely, kryty, boxy, adaptéry…).
+// Doplněk = má accessory-slovo v názvu, NEBO název/model neodpovídá žádnému zařízení/značce.
+// (Zrcadlí kategorii „Příslušenství" na e-shopu; „kryt na iPhone" tak spadne mezi doplňky, ne mezi telefony.)
+$cat = (string)($_GET['cat'] ?? '');
+$afxAccessoryRe = 'kryt|pouzdr|obal|kabel|adaptér|adapter|redukce|nabíj|charger|řemín|pásek|strap|sklo|fólie|folie|dock|stojan|držák|čtečk|reader|box|externí|case|cover|glass|pencil|stylus|klávesnic|keyboard|myš|mouse|sluchátk|airpods|beats|headphone|earphone|repro|speaker|powerbank|magsafe|airtag|gembird|axagon';
+$afxDeviceRe    = 'iphone|ipad|macbook|imac|mac ?mini|mac ?studio|mac ?pro|watch|[0-9]+ ?mm|playstation|nintendo|xbox|samsung|galaxy|xiaomi|redmi|poco|huawei|honor|asus|doogee|realme|oppo|oneplus|vivo|motorola|nokia|sony|lenovo|garmin|instinct|forerunner|fenix|venu|amazfit|fitbit|dji|pixel|tcl|zte|ulefone|cubot|umidigi';
+$catWhere = ''; $catParams = [];
+if ($cat === 'prislusenstvi') {
+    $catWhere = "(LOWER(CONCAT(title,' ',COALESCE(model,''))) REGEXP ? OR LOWER(CONCAT(title,' ',COALESCE(model,''))) NOT REGEXP ?)";
+    $where_clauses[] = $catWhere;
+    $params[] = $afxAccessoryRe; $params[] = $afxDeviceRe;
+    $catParams[] = $afxAccessoryRe; $catParams[] = $afxDeviceRe;
+}
 $where_sql = " WHERE " . implode(" AND ", $where_clauses);
 
 $total_stmt = $pdo->prepare("SELECT COUNT(*) FROM products" . $where_sql);
@@ -54,11 +68,13 @@ $stmt = $pdo->prepare("SELECT * FROM products" . $where_sql . " ORDER BY added_a
 $stmt->execute($params);
 $products = $stmt->fetchAll();
 
-$stats = $pdo->query("SELECT COUNT(*) AS total,
+$statStmt = $pdo->prepare("SELECT COUNT(*) AS total,
         SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN 1 ELSE 0 END) AS in_stock,
         SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN price ELSE 0 END) AS stock_value,
         SUM(CASE WHEN loan_at IS NOT NULL THEN 1 ELSE 0 END) AS loaned
-    FROM products")->fetch();
+    FROM products" . ($catWhere ? " WHERE $catWhere" : ""));
+$statStmt->execute($catParams);
+$stats = $statStmt->fetch();
 
 // poslední import — řádky, které v něm nebyly, dostanou upozornění (nemažou se samy)
 $lastImportAt = (string)get_setting('products_last_import_at', '');
@@ -67,7 +83,7 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="mb-0"><?php echo __('inventory'); ?></h2>
-        <small class="text-muted">Produkty pro e-shop: <?php echo (int)($stats['total'] ?? 0); ?> ·
+        <small class="text-muted"><?php echo $cat === 'prislusenstvi' ? 'Příslušenství' : 'Produkty pro e-shop'; ?>: <?php echo (int)($stats['total'] ?? 0); ?> ·
             skladem <?php echo (int)($stats['in_stock'] ?? 0); ?> ·
             hodnota <?php echo formatMoney((float)($stats['stock_value'] ?? 0)); ?><?php
             if ((int)($stats['loaned'] ?? 0) > 0): ?> · <a href="products.php?avail=loan" style="color:#A78BFA">zapůjčeno <?php echo (int)$stats['loaned']; ?></a><?php endif; ?></small>
@@ -183,6 +199,7 @@ try {
 <div class="collapse mb-4 <?php echo ($search !== '' || $avail !== '') ? 'show' : ''; ?>" id="filterPanel">
     <div class="card card-body shadow-sm">
         <form action="products.php" method="GET" class="row g-3">
+            <?php if ($cat !== ''): ?><input type="hidden" name="cat" value="<?php echo e($cat); ?>"><?php endif; ?>
             <div class="col-md-6">
                 <label class="form-label small">Hledat (název, kód, model)</label>
                 <input type="text" name="search" class="form-control form-control-sm" value="<?php echo e($search); ?>" placeholder="např. iPhone 13, F2LLD…">
@@ -198,7 +215,7 @@ try {
             </div>
             <div class="col-md-3 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-sm btn-primary flex-grow-1"><?php echo __('apply_btn'); ?></button>
-                <a href="products.php" class="btn btn-sm btn-outline-secondary"><?php echo __('reset_btn'); ?></a>
+                <a href="products.php<?php echo $cat !== '' ? '?cat=' . e($cat) : ''; ?>" class="btn btn-sm btn-outline-secondary"><?php echo __('reset_btn'); ?></a>
             </div>
         </form>
     </div>

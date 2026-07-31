@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.27.0',
+        'date' => '2026-07-31',
+        'time' => '12:30',
+        'title' => 'Sklad: přehlednější lišta + nová kategorie Příslušenství',
+        'items' => [
+            '<b>Rozdělená lišta Skladu:</b> vlevo zůstaly jen <b>kategorie</b> (Servis — náhradní díly · Produkty — e-shop · Příslušenství), nástroje <b>Fotky modelů · Umístění · Nákupy</b> se odsunuly doprava.',
+            '<b>Nová kategorie „Příslušenství":</b> filtrovaný pohled na produkty — kabely, kryty, adaptéry, boxy, sluchátka, MagSafe apod. Rozpozná se automaticky podle názvu, takže i „kryt na iPhone" spadne správně mezi doplňky, ne mezi telefony. Produkty zůstávají beze změny (ukazují vše).',
+        ],
+    ],
+    [
         'version' => '3.26.2',
         'date' => '2026-07-30',
         'time' => '18:15',
