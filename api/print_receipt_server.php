@@ -90,7 +90,7 @@ try {
 
     $bytes = '';
     if (!empty($in['drawer'])) { $bytes .= crmEscposDrawerPulse(); }   // šuplík ještě před tiskem
-    $bytes .= crmEscposFromImage(crmReceiptRaster($data));
+    $bytes .= crmEscposReceipt(crmReceiptRaster($data));
 
     $res = crmReceiptSendBytes($bytes);
     if (!$res['ok']) { error_log('print_receipt_server: ' . $res['error']); }

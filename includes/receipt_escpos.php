@@ -231,6 +231,47 @@ function crmEscposFromImage(\GdImage $im): string {
     return $out;
 }
 
+/**
+ * GD obraz → ESC/POS přes ESC * (bit image, 24bodové pásy, column format).
+ * Starší a NEJKOMPATIBILNĚJŠÍ rastrový režim — klony XP58 na GS v 0 často
+ * ztrácejí synchronizaci (po pár bajtech sypou data jako text), kdežto ESC *
+ * jede řádek po řádku s LF, takže se firmware nemá kde utrhnout.
+ */
+function crmEscposFromImageEscStar(\GdImage $im): string {
+    $W = imagesx($im); $H = imagesy($im);
+    $out = "\x1B\x40";            // init
+    $out .= "\x1B\x33\x18";      // řádkování 24 bodů (přesně výška pásu, žádné mezery)
+    $nL = chr($W & 0xFF); $nH = chr(($W >> 8) & 0xFF);
+    for ($y0 = 0; $y0 < $H; $y0 += 24) {
+        $out .= "\x1B\x2A\x21" . $nL . $nH;   // ESC * m=33 (24-dot double density)
+        for ($x = 0; $x < $W; $x++) {
+            for ($k = 0; $k < 3; $k++) {
+                $b = 0;
+                for ($bit = 0; $bit < 8; $bit++) {
+                    $yy = $y0 + $k * 8 + $bit;
+                    if ($yy >= $H) { continue; }
+                    $rgb = imagecolorat($im, $x, $yy);
+                    $g = ((($rgb >> 16) & 0xFF) + (($rgb >> 8) & 0xFF) + ($rgb & 0xFF)) / 3;
+                    if ($g < 160) { $b |= (0x80 >> $bit); }
+                }
+                $out .= chr($b);
+            }
+        }
+        $out .= "\x0A";            // posun o řádkování = další pás
+    }
+    $out .= "\x1B\x32";           // řádkování zpět na výchozí
+    $out .= "\x1B\x64\x04";      // feed na odtržení
+    $out .= "\x1D\x56\x42\x10"; // partial cut (bez řezačky se ignoruje)
+    return $out;
+}
+
+/** Zvolený rastrový režim (gsv0 | escstar) — po testech na konkrétním kusu. */
+function crmEscposReceipt(\GdImage $im): string {
+    return get_setting('receipt_raster_mode', 'escstar') === 'gsv0'
+        ? crmEscposFromImage($im)
+        : crmEscposFromImageEscStar($im);
+}
+
 /** Impulz do pokladní zásuvky (RJ11 na tiskárně): ESC p 0 60ms 120ms. */
 function crmEscposDrawerPulse(): string {
     return "\x1B\x70\x00\x3C\x78";
