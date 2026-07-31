@@ -118,6 +118,11 @@ try {
         if (!$showGallery) { $gallery = []; }
         if (!$show360)     { $video360 = ''; }
 
+        // Pobočka kusu: branch_id řádku, fallback ze stock_key (karlin/vaclavak) — feed nevolá
+        // ensureSkladBranchSchema(), takže sloupec branch_id nemusí ještě existovat.
+        $branchId = (int)($p['branch_id'] ?? 0) ?: skladBranchIdForStockKey((string)($p['stock_key'] ?? ''));
+        $branchLabel = skladBranchLabel($branchId);
+
         $products[] = [
             'code'                 => (string)$p['product_code'],
             'title'                => (string)$p['title'],
@@ -135,6 +140,8 @@ try {
             'in_stock'             => ((int)$p['stock_qty']) > 0,
             'stock_qty'            => (int)$p['stock_qty'],
             'stock_location'       => (string)($p['stock_key'] ?? ''),
+            'branch_id'            => $branchId,
+            'branch_label'         => $branchLabel,   // „Praha 8 - Karlín" / „Praha 1 - Černá Růže"
             'short_description'    => $shortDesc,
             'image'                => $img !== '' ? $img : null,
             'studio_image'         => $studio !== '' ? $studio : null,

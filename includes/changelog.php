@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.35.0',
+        'date' => '2026-07-31',
+        'time' => '18:41',
+        'title' => 'Pobočkové sklady 3/3: e-shop ukazuje, na které pobočce je zboží skladem',
+        'items' => [
+            'Feed pro e-shop nově posílá <b>pobočku každého kusu</b> (branch_label/branch_id — „Praha 8 - Karlín" / „Praha 1 - Černá Růže"), odvozenou z pobočky řádku, s fallbackem přes prodejnu (stock_key).',
+            'Na e-shopu je u produktu odznak <b>„Skladem — Praha 8 - Karlín"</b> (resp. Černá Růže) a osobní odběr uvádí konkrétní pobočku. Admin e-shopu ukazuje lidský název pobočky místo „karlin/vaclavak".',
+            'Odpis prodeje byl ověřen jako pobočkově správný už dřív (kód kusu je unikátní → prodej odečte přesně ten kus na jeho pobočce).',
+        ],
+    ],
+    [
         'version' => '3.33.2',
         'date' => '2026-07-31',
         'time' => '13:40',
