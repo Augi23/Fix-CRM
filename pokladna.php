@@ -632,6 +632,8 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
             <div class="lk-err" id="shiftErr"></div>
         <?php endif; ?>
+        <hr class="border-secondary">
+        <button type="button" class="btn btn-sm btn-outline-light" onclick="posTestReceipt(this)"><i class="fas fa-receipt me-1"></i>Test tiskárny účtenek</button>
     </div>
 </div>
 <?php endif; ?>
