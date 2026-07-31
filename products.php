@@ -459,6 +459,15 @@ try {
                                     <span class="input-group-text">Kč</span>
                                 </div>
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Nákupní cena <span class="text-white-50">(nepovinné)</span></label>
+                                <div class="input-group">
+                                    <input type="text" id="pcPurchasePrice" class="form-control" inputmode="numeric"
+                                           title="Za kolik jsme kus vykoupili/nakoupili. Potřeba pro daň z přirážky u použitého zboží (§ 90) — bez ní ji zpětně nespočítáme.">
+                                    <span class="input-group-text">Kč</span>
+                                </div>
+                                <div class="form-text small text-white-50">Potřeba pro daň z přirážky u použitého zboží (§ 90).</div>
+                            </div>
                             <div class="col-md-8">
                                 <label class="form-label small">SN / IMEI <span class="text-white-50">(naskenuj čtečkou nebo zapiš)</span></label>
                                 <input type="text" id="pcSerial" class="form-control" autocomplete="off">
@@ -641,7 +650,7 @@ $(document).on('click', '.product-label-btn', function () {
     var $typ = el('pcTyp'), $model = el('pcModel'), $modelC = el('pcModelCustom'),
         $cap = el('pcCap'), $color = el('pcColor'), $colorC = el('pcColorCustom'),
         $grade = el('pcGrade'), $stockKey = el('pcStockKey'), $bat = el('pcBattery'),
-        $price = el('pcPrice'), $serial = el('pcSerial'), $ram = el('pcRam'),
+        $price = el('pcPrice'), $purchase = el('pcPurchasePrice'), $serial = el('pcSerial'), $ram = el('pcRam'),
         $cpu = el('pcCpu'), $gpu = el('pcGpu'), $rocnik = el('pcRocnik'), $gen = el('pcGenerace'),
         $sold = el('pcSold'), $photo = el('pcPhoto'), $imageUrl = el('pcImageUrl'),
         $badge = el('pcPcrBadge'), $msg = el('pcMsg'), $hint = el('pcHint'), $editId = el('pcEditId');
@@ -974,6 +983,7 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('grade', $grade.value);
         fd.append('battery', $bat.value);
         fd.append('price', $price.value.trim());
+        fd.append('purchase_price', $purchase.value.trim());   // nepovinné; prázdné = neznámá nákupní cena
         fd.append('serial', $serial.value.trim());
         fd.append('ram', typeDef().ram ? $ram.value : '');
         fd.append('cpu', typeDef().ram ? $cpu.value : '');
@@ -1020,7 +1030,7 @@ $(document).on('click', '.product-label-btn', function () {
                 if ($editId.value) { printPromise.then(function () { location.reload(); }); return; }
                 // vyčistit vše KROMĚ Typ / Stav / Prodejna — sériové naskladňování jako v appce
                 formGen++;
-                [$modelC, $colorC, $bat, $price, $serial].forEach(function (n) { n.value = ''; });
+                [$modelC, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
                 $model.value = ''; $color.value = ''; $cap.value = '';
                 $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
                 $modelC.style.display = 'none'; $colorC.style.display = 'none';
@@ -1050,7 +1060,7 @@ $(document).on('click', '.product-label-btn', function () {
         el('pcSaveBtn').innerHTML = '<i class="fas fa-plus me-1"></i> Přidat';
         $typC.value = ''; $typC.style.display = 'none';
         if ($typ.value === CUSTOM) { $typ.value = CATALOG.types[0].id; onType(); }
-        [$modelC, $colorC, $bat, $price, $serial].forEach(function (n) { n.value = ''; });
+        [$modelC, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
         $model.value = ''; $color.value = ''; $cap.value = '';
         $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
         $modelC.style.display = 'none'; $colorC.style.display = 'none';
@@ -1097,6 +1107,7 @@ $(document).on('click', '.product-label-btn', function () {
                 $grade.value = gl.length ? gl[0] : 'Nový';
                 $bat.value = p.battery || '';
                 $price.value = p.price || '';
+                $purchase.value = p.purchase_price || '';   // '' = u kusu nikdy nezadaná (nepřepisovat nulou)
                 $serial.value = p.serial || '';
                 setSelectValue($ram, p.ram); setSelectValue($cpu, p.cpu); setSelectValue($gpu, p.gpu);
                 setSelectValue($rocnik, p.rocnik); setSelectValue($gen, p.generace);

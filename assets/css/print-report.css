@@ -1,0 +1,313 @@
+/* ============================================================================
+   PODKLADY PRO ÚČETNÍ — tiskový styl sestav (ucetni_sestavy.php)
+   ----------------------------------------------------------------------------
+   PDF se v tomhle CRM nedělá knihovnou, ale tiskem stránky do PDF (stejně jako
+   print_invoice.php / print_receipt.php). Proto musí sestava vypadat správně
+   ve DVOU režimech:
+     • na obrazovce  = náhled „list papíru" na šedém pozadí,
+     • v tisku       = čistý bílý list bez CRM ovládání.
+
+   Sestavy jsou dlouhé tabulky přes desítky stran, takže tenhle soubor řeší
+   hlavně věci, které se projeví AŽ na druhé straně tisku:
+     • opakování hlavičky tabulky (thead) na každé straně,
+     • zákaz rozříznutí řádku a součtového bloku mezi dvě strany,
+     • číslování stran přes margin boxy @page.
+
+   POZOR na číslování stran: margin boxy @page (counter(page)) umí Chromium
+   (Chrome/Edge, od v131) — Safari a Firefox je ignorují. Proto se na číslo
+   ve stylu NESPOLÉHÁME jako na jediné: identifikace sestavy (firma, období,
+   datum vytvoření) je natištěná i v samotném dokumentu, aby list vytištěný
+   ze Safari nebyl anonymní. V Safari čísla stran doplní tiskový dialog
+   (Záhlaví a zápatí).
+   ========================================================================== */
+
+/* ── Stránka A4 ─────────────────────────────────────────────────────────── */
+@page {
+    size: A4 portrait;
+    margin: 14mm 12mm 16mm;
+
+    @bottom-right {
+        content: "Strana " counter(page) " / " counter(pages);
+        font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 8.5pt;
+        color: #8a9099;
+    }
+}
+
+/* Široké sestavy (kniha faktur, bankovní pohyby) jedou na šířku. Pojmenovaná
+   stránka je jediný způsob, jak přepnout orientaci per dokument — @page se
+   nedá podmínit třídou na <body>. */
+@page landscape {
+    size: A4 landscape;
+    margin: 12mm 10mm 14mm;
+}
+body.report-landscape { page: landscape; }
+
+/* ── Základ ─────────────────────────────────────────────────────────────── */
+:root {
+    --rp-ink: #14171c;
+    --rp-sub: #4d5560;
+    --rp-muted: #8b929c;
+    --rp-line: #dfe3ea;
+    --rp-line-strong: #9ca4b0;
+    --rp-soft: #f4f6fa;
+    --rp-accent: #0a84ff;
+    --rp-danger: #c0392b;
+    --rp-ok: #1f8b4c;
+}
+
+body.report-body {
+    font-family: 'SF Pro Text', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--rp-ink);
+    background: #e9ecf1;
+    margin: 0;
+    padding: 22px 12px 40px;
+    -webkit-font-smoothing: antialiased;
+}
+
+.report-sheet {
+    background: #fff;
+    max-width: 200mm;
+    margin: 0 auto;
+    padding: 16mm 14mm;
+    border-radius: 10px;
+    box-shadow: 0 18px 48px rgba(20, 23, 28, .12);
+}
+body.report-landscape .report-sheet { max-width: 287mm; }
+
+/* ── Ovládací lišta (jen na obrazovce) ──────────────────────────────────── */
+.report-toolbar {
+    max-width: 200mm;
+    margin: 0 auto 14px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+body.report-landscape .report-toolbar { max-width: 287mm; }
+
+.report-toolbar .rp-hint {
+    margin-right: auto;
+    font-size: 11.5px;
+    color: #5b636e;
+}
+.report-btn {
+    font: inherit;
+    font-weight: 600;
+    font-size: 12.5px;
+    border: 0;
+    border-radius: 10px;
+    padding: 9px 18px;
+    background: var(--rp-accent);
+    color: #fff;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+.report-btn:hover { filter: brightness(1.06); }
+.report-btn--ghost {
+    background: #fff;
+    color: #333a44;
+    border: 1px solid #c9cfd8;
+}
+
+/* ── Hlavička sestavy ───────────────────────────────────────────────────── */
+.report-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--rp-ink);
+    margin-bottom: 14px;
+}
+.report-head .rp-co-name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.report-head .rp-co-line { font-size: 10.5px; color: var(--rp-sub); }
+.report-head .rp-doc { text-align: right; }
+.report-head .rp-doc-kicker {
+    font-size: 9px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--rp-muted);
+    font-weight: 600;
+}
+.report-head .rp-doc-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+.report-head .rp-doc-meta { font-size: 10.5px; color: var(--rp-sub); margin-top: 2px; }
+
+/* Pruh s parametry sestavy (období, pobočka, datum vytvoření) */
+.report-params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    background: var(--rp-soft);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    font-size: 10.5px;
+}
+.report-params span { color: var(--rp-sub); }
+.report-params b { font-weight: 600; color: var(--rp-ink); }
+
+/* ── Poznámky / varování pro účetní ─────────────────────────────────────── */
+.report-note {
+    border-left: 3px solid var(--rp-accent);
+    background: #f2f8ff;
+    padding: 7px 11px;
+    border-radius: 0 8px 8px 0;
+    font-size: 10.5px;
+    color: #2c3642;
+    margin-bottom: 10px;
+}
+.report-note--warn { border-left-color: #e0a800; background: #fff9e8; }
+.report-note b { font-weight: 600; }
+
+/* ── Tabulka ────────────────────────────────────────────────────────────── */
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+    margin-bottom: 12px;
+}
+.report-table th {
+    text-align: left;
+    font-size: 8.8px;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--rp-sub);
+    font-weight: 600;
+    padding: 6px 6px;
+    border-bottom: 1.5px solid var(--rp-line-strong);
+    background: var(--rp-soft);
+}
+.report-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid var(--rp-line);
+    vertical-align: top;
+}
+.report-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.report-table .nowrap { white-space: nowrap; }
+.report-table .sub { font-size: 9px; color: var(--rp-muted); }
+.report-table tbody tr:nth-child(even) td { background: #fbfcfe; }
+
+/* Součtový řádek — musí zůstat pohromadě s tabulkou i na konci strany */
+.report-table tfoot td {
+    font-weight: 700;
+    font-size: 10.5px;
+    border-top: 2px solid var(--rp-ink);
+    border-bottom: 0;
+    padding-top: 7px;
+    background: #fff;
+}
+.report-table tfoot tr { break-inside: avoid; page-break-inside: avoid; }
+
+.rp-pos { color: var(--rp-ok); }
+.rp-neg { color: var(--rp-danger); }
+.rp-mut { color: var(--rp-muted); }
+.rp-strike { text-decoration: line-through; color: var(--rp-muted); }
+
+/* Stavové štítky (zaplaceno / po splatnosti / storno …) */
+.rp-tag {
+    display: inline-block;
+    font-size: 8.5px;
+    font-weight: 600;
+    line-height: 1.5;
+    border-radius: 5px;
+    padding: 1px 6px;
+    white-space: nowrap;
+    background: #eceff4;
+    color: #4d5560;
+}
+.rp-tag--ok { background: #e4f6ec; color: #1f6b41; }
+.rp-tag--warn { background: #fff2d6; color: #8a6100; }
+.rp-tag--bad { background: #fdeaea; color: #a32b21; }
+.rp-tag--info { background: #e7f1ff; color: #14538f; }
+
+/* ── Souhrnné dlaždice (rekapitulace nad/pod tabulkou) ───────────────────── */
+.report-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.report-card {
+    flex: 1 1 130px;
+    border: 1px solid var(--rp-line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+.report-card .rp-k {
+    font-size: 8.8px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--rp-muted);
+    font-weight: 600;
+}
+.report-card .rp-v { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.report-card .rp-s { font-size: 9px; color: var(--rp-sub); }
+
+.report-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin: 16px 0 6px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--rp-line);
+}
+
+.report-empty {
+    padding: 26px 10px;
+    text-align: center;
+    color: var(--rp-muted);
+    font-size: 11px;
+    border: 1px dashed var(--rp-line-strong);
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+/* ── Patička dokumentu ──────────────────────────────────────────────────── */
+.report-foot {
+    margin-top: 18px;
+    padding-top: 8px;
+    border-top: 1px solid var(--rp-line);
+    font-size: 9px;
+    color: var(--rp-muted);
+    line-height: 1.6;
+}
+
+/* ── Tisk ───────────────────────────────────────────────────────────────── */
+@media print {
+    body.report-body {
+        background: #fff;
+        padding: 0;
+        font-size: 9.5pt;
+    }
+    .report-sheet {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+    .no-print { display: none !important; }
+
+    /* Bez tohohle by se hlavička tabulky objevila jen na první straně a další
+       strany by byly nečitelné sloupce čísel bez popisků. */
+    .report-table thead { display: table-header-group; }
+    .report-table tfoot { display: table-row-group; }
+    .report-table tr { break-inside: avoid; page-break-inside: avoid; }
+
+    .report-head, .report-params, .report-note, .report-cards { break-inside: avoid; page-break-inside: avoid; }
+    .report-section-title { break-after: avoid; page-break-after: avoid; }
+
+    /* Barevné podklady štítků a pruhů se v tisku běžně zahazují — u sestav
+       nesou informaci (storno / po splatnosti), takže je vynutíme. */
+    .report-params, .report-note, .rp-tag, .report-table th, .report-table tbody tr:nth-child(even) td {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}

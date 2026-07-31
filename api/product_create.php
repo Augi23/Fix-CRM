@@ -23,10 +23,37 @@ if (!crmCanManageProducts()) {
 
 $action = (string)($_REQUEST['action'] ?? 'create');
 
+/** Runtime pojistka ke sloupcům z migrace 040 (daňový režim + nákupní cena).
+ *  Deploy nasadí kód dřív, než doběhne run_migrations.php — bez ní by naskladnění
+ *  produktu po nasazení spadlo na neznámý sloupec purchase_price.
+ *  Stejná definice je i v api/pos_checkout.php (obě jsou samostatné vstupní body);
+ *  function_exists hlídá, aby se nedeklarovala dvakrát, kdyby se soubory potkaly. */
+if (!function_exists('afxEnsurePosGoodsTaxColumns')) {
+    function afxEnsurePosGoodsTaxColumns(): void {
+        global $pdo;
+        static $done = false;
+        if ($done || !isset($pdo)) return;
+        $done = true;
+        try {
+            $add = [
+                ['pos_sale_items', 'grade', "ALTER TABLE pos_sale_items ADD COLUMN grade VARCHAR(16) NULL DEFAULT NULL"],
+                ['pos_sale_items', 'purchase_price', "ALTER TABLE pos_sale_items ADD COLUMN purchase_price DECIMAL(12,2) NULL DEFAULT NULL"],
+                ['products', 'purchase_price', "ALTER TABLE products ADD COLUMN purchase_price DECIMAL(12,2) NULL DEFAULT NULL"],
+            ];
+            foreach ($add as [$table, $col, $ddl]) {
+                if (!$pdo->query("SHOW COLUMNS FROM `" . $table . "` LIKE '" . $col . "'")->fetch()) {
+                    $pdo->exec($ddl);
+                }
+            }
+        } catch (Throwable $e) { error_log('afxEnsurePosGoodsTaxColumns: ' . $e->getMessage()); }
+    }
+}
+
 ensureProductsTable();
 ensureProductsPosColumn();
 ensureProductsCrmColumns();
 ensureSkladBranchSchema();
+afxEnsurePosGoodsTaxColumns();
 
 // ── get: data pro editační režim modalu ──
 if ($action === 'get') {
@@ -50,6 +77,9 @@ if ($action === 'get') {
         'grade' => (string)($p['grade'] ?? ''),
         'battery' => trim(str_replace('%', '', (string)($p['battery'] ?? ''))),
         'price' => (float)$p['price'] == (int)(float)$p['price'] ? (string)(int)(float)$p['price'] : (string)(float)$p['price'],
+        // nákupní cena je nepovinná — nezadaná se vrací jako '' (ne 0), ať ji editace nevyrobí z ničeho
+        'purchase_price' => ($p['purchase_price'] ?? null) === null || (string)$p['purchase_price'] === ''
+            ? '' : rtrim(rtrim(number_format((float)$p['purchase_price'], 2, '.', ''), '0'), '.'),
         'sold' => (int)$p['stock_qty'] <= 0,
         'stock_key' => (string)($p['stock_key'] ?? ''),
         'image_url' => productImageDisplayUrl((string)($p['image_url'] ?? '')),   // jen naše úložiště — cizí URL z CSV nejde do <img>
@@ -87,6 +117,7 @@ $in = [
     'grade' => trim((string)($_POST['grade'] ?? '')),
     'battery' => ($__b = preg_replace('/\D+/', '', (string)($_POST['battery'] ?? ''))) !== '' ? (string)min(100, max(0, (int)$__b)) : '',
     'price' => trim((string)($_POST['price'] ?? '')),
+    'purchase_price' => trim((string)($_POST['purchase_price'] ?? '')),
     'ram' => trim((string)($_POST['ram'] ?? '')),
     'cpu' => trim((string)($_POST['cpu'] ?? '')),
     'gpu' => trim((string)($_POST['gpu'] ?? '')),
@@ -122,6 +153,16 @@ if ($in['price'] === '' || !is_finite($priceNum) || $priceNum <= 0 || $priceNum 
     echo json_encode(['success' => false, 'message' => 'Vyplň platnou cenu.']); exit;
 }
 $in['price'] = rtrim(rtrim(number_format($priceNum, 2, '.', ''), '0'), '.');   // "7990" / "7990.5"
+// Nákupní cena je NEPOVINNÁ (u starých kusů ji nikdo nezadal) → prázdné pole = NULL,
+// ne nula. Nula by u § 90 znamenala „koupeno zadarmo" a nafoukla by daň z přirážky.
+$purchaseNum = null;
+if ($in['purchase_price'] !== '') {
+    $purchaseNum = (float)str_replace(',', '.', str_replace(' ', '', $in['purchase_price']));
+    if (!is_finite($purchaseNum) || $purchaseNum < 0 || $purchaseNum > 10000000) {
+        echo json_encode(['success' => false, 'message' => 'Nákupní cena není platné číslo.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    $purchaseNum = round($purchaseNum, 2);
+}
 if (mb_strlen($in['image_url']) > 500 || ($in['image_url'] !== '' && productImageDisplayUrl($in['image_url']) === '')) {
     $in['image_url'] = '';   // jen fotky z našeho úložiště
 }
@@ -208,7 +249,7 @@ try {
 
     if ($action === 'update') {
         $pdo->prepare("UPDATE products SET product_code = ?, title = ?, manufacturer = ?, category_code = ?,
-                model = ?, capacity = ?, color = ?, grade = ?, battery = ?, price = ?, stock_qty = ?, branch_id = ?,
+                model = ?, capacity = ?, color = ?, grade = ?, battery = ?, price = ?, purchase_price = ?, stock_qty = ?, branch_id = ?,
                 stock_key = ?, image_url = ?, studio_image_url = ?, gallery_images = ?, video_360_url = ?, has_360 = ?,
                 show_studio = ?, show_gallery = ?, show_360 = ?,
                 pcr_result = ?, pcr_status = ?, pcr_checked_at = COALESCE(?, pcr_checked_at),
@@ -216,7 +257,7 @@ try {
             WHERE id = ?")
             ->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
                 $asm['display_model'], $in['cap'] ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
-                $asm['battery_csv'] ?: null, $priceNum, $stockQty, $prodBranch,
+                $asm['battery_csv'] ?: null, $priceNum, $purchaseNum, $stockQty, $prodBranch,
                 $in['stock_key'], $in['image_url'] ?: null,
                 $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
                 $in['show_studio'], $in['show_gallery'], $in['show_360'],
@@ -231,16 +272,16 @@ try {
     } else {
         $ins = $pdo->prepare("INSERT INTO products
                 (product_code, title, manufacturer, category_code, model, capacity, color, grade, battery,
-                 price, stock_qty, branch_id, stock_key, image_url, studio_image_url, gallery_images, video_360_url, has_360,
+                 price, purchase_price, stock_qty, branch_id, stock_key, image_url, studio_image_url, gallery_images, video_360_url, has_360,
                  show_studio, show_gallery, show_360,
                  pcr_result, pcr_status, pcr_checked_at,
                  added_at, raw_csv, source, created_by, first_seen_at, last_seen_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
         for ($try = 0; $try < 3; $try++) {
             try {
                 $ins->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
                     $asm['display_model'], $in['cap'] ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
-                    $asm['battery_csv'] ?: null, $priceNum, $stockQty, $prodBranch,
+                    $asm['battery_csv'] ?: null, $priceNum, $purchaseNum, $stockQty, $prodBranch,
                     $in['stock_key'], $in['image_url'] ?: null,
                     $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
                     $in['show_studio'], $in['show_gallery'], $in['show_360'],

@@ -3,6 +3,10 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
 ensureTechnicianTelegramSchema();
+// Role „účetní" + tabulka uzávěrek. Musí proběhnout PŘED zpracováním formulářů:
+// kdyby ENUM technicians.role hodnotu 'accountant' neznal, uložila by se prázdná
+// role a takový účet by se přihlásil jako obyčejný technik — tedy s právy na zakázky.
+afxEnsureAccountingSchema();
 
 if (!function_exists('settingsDebugLog')) {
     function settingsDebugLog(array $data): void {
@@ -449,6 +453,70 @@ if (isset($_POST['delete_admin']) && $is_admin_check) {
     exit;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ÚČETNÍ — založení účtu s rolí „účetní" (balík C)
+// Účet vzniká v `technicians` (ne `users`): login.php pro řádek z `users` natvrdo
+// nastaví role='admin', takže účetní založená tam by měla plná admin práva.
+// Jako technician dostane internal_role='accountant' a hasPermission() jí NIC
+// nepustí — přístup k účetnictví řídí crmCanAccountingRead()/Edit().
+// ─────────────────────────────────────────────────────────────────────────────
+if (isset($_POST['create_accountant']) && $is_admin_check) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    $acName  = trim((string)($_POST['accountant_name'] ?? ''));
+    $acLogin = trim((string)($_POST['accountant_username'] ?? ''));
+    $acPwd   = (string)($_POST['accountant_password'] ?? '');
+    $acEmail = trim((string)($_POST['accountant_email'] ?? ''));
+    $acBranch = (int)(filter_input(INPUT_POST, 'accountant_branch_id', FILTER_VALIDATE_INT) ?: 0);
+
+    if ($acName === '' || $acLogin === '') {
+        header("Location: settings.php?tab=admins&error=accountant_missing"); exit;
+    }
+    if (strlen($acPwd) < 8) {
+        header("Location: settings.php?tab=admins&error=short_password"); exit;
+    }
+    // Pobočka je u zaměstnance povinná (viz add_tech). Účetní ji fakticky nepotřebuje
+    // — do účetních dat vidí napříč pobočkami — ale sloupec musí být vyplněný.
+    $__acBranchOk = false;
+    foreach (getBranches() as $__b) { if ((int)$__b['id'] === $acBranch) { $__acBranchOk = true; break; } }
+    if (!$__acBranchOk) { header("Location: settings.php?tab=admins&error=branch_required"); exit; }
+
+    // Login musí být volný v OBOU tabulkách — jinak by se při přihlášení chytl
+    // dřív cizí účet (login.php zkouší nejdřív users, pak technicians).
+    $stmt = $pdo->prepare("SELECT id FROM technicians WHERE username = ? UNION SELECT id FROM users WHERE username = ?");
+    $stmt->execute([$acLogin, $acLogin]);
+    if ($stmt->fetch()) { header("Location: settings.php?tab=admins&error=username_taken"); exit; }
+
+    $pdo->prepare("INSERT INTO technicians (name, email, phone, specialization, role, branch_id, username, password, is_active)
+                   VALUES (?, ?, '', 'Účetnictví', 'accountant', ?, ?, ?, 1)")
+        ->execute([$acName, $acEmail, $acBranch, $acLogin, password_hash($acPwd, PASSWORD_DEFAULT)]);
+    crmAuditLog('staff.create', [
+        'entity_type' => 'technician', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => $acName,
+        'summary' => 'Vytvořen účet ÚČETNÍ ' . $acName . ' (login @' . $acLogin . ')',
+    ]);
+    header("Location: settings.php?tab=admins&accountant_added=1");
+    exit;
+}
+
+// ── Uzávěrka účetního období: uzamknout / odemknout ──────────────────────────
+// Oprávnění řeší samotné funkce (zamknout smí i účetní, odemknout jen admin),
+// proto tu ZÁMĚRNĚ není $is_admin_check — jinak by se účetní k uzávěrce nedostala.
+if (isset($_POST['accounting_lock_period']) || isset($_POST['accounting_unlock_period'])) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    $pYear  = (int)($_POST['period_year'] ?? 0);
+    $pMonth = (int)($_POST['period_month'] ?? 0);
+    if (isset($_POST['accounting_lock_period'])) {
+        $res = afxAccountingLockPeriod($pYear, $pMonth, (string)($_POST['period_note'] ?? ''));
+        $okText = 'Účetní období ' . $pMonth . '/' . $pYear . ' bylo uzavřeno.';
+    } else {
+        $res = afxAccountingUnlockPeriod($pYear, $pMonth, (string)($_POST['period_note'] ?? ''));
+        $okText = 'Účetní období ' . $pMonth . '/' . $pYear . ' bylo ODEMČENO (zapsáno do historie).';
+    }
+    // Výsledek přes session — hláška z funkce se nesmí protáhnout URL adresou.
+    $_SESSION['afx_period_flash'] = ['ok' => $res['ok'], 'text' => $res['ok'] ? $okText : $res['error']];
+    header("Location: settings.php?tab=uzaverka&rok=" . ($pYear ?: (int)date('Y')));
+    exit;
+}
+
 if (isset($_POST['clear_logs']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     try { $pdo->query("DELETE FROM system_errors"); } catch (Exception $e) {}
@@ -476,7 +544,9 @@ $is_admin_user = crmCanManageSettings();
 // Pobočkový manažer/technik vidí v této záložce jen svůj vlastní záznam (viz ř.~1104).
 $can_view_all_staff = isBranchGlobalViewer();
 
-$active_tab = $_GET['tab'] ?? ($is_admin_user ? 'company' : 'staff');
+// Účetní nemá v Nastavení co dělat kromě uzávěrky → ať na ni rovnou spadne
+// (výchozí 'staff' by jí ukázal prázdnou kartu jen s vlastním záznamem).
+$active_tab = $_GET['tab'] ?? ($is_admin_user ? 'company' : (crmIsAccountant() ? 'uzaverka' : 'staff'));
 
 // ── Sloučení do záložky „Systém": Integrace + Databáze + Aktualizace ──────────
 // Staré přímé odkazy i POST přesměrování (?tab=integrations|updates|backups)
@@ -563,7 +633,8 @@ require_once 'includes/header.php';
                     'unauthorized' => 'You do not have permission for this edit.',
                     'short_password' => 'Password is too short.',
                     'csrf' => 'Form expired, please refresh the page.',
-                    'branch_required' => 'Zaměstnanec musí mít vybranou pobočku — vyber ji a ulož znovu.'
+                    'branch_required' => 'Zaměstnanec musí mít vybranou pobočku — vyber ji a ulož znovu.',
+                    'accountant_missing' => 'Vyplň jméno účetní a přihlašovací jméno.'
                 ];
                 echo htmlspecialchars($settingsErrorMessages[$settingsError] ?? $settingsError, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             ?>
@@ -581,6 +652,12 @@ require_once 'includes/header.php';
         </li>
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'banka' ? 'active' : 'text-white-75'; ?>" href="?tab=banka"><i class="fas fa-building-columns me-2"></i>Banka</a>
+        </li>
+        <?php endif; ?>
+        <?php /* Uzávěrka období vidí i ÚČETNÍ — proto MIMO blok $is_admin_user. */ ?>
+        <?php if (crmCanAccountingRead()): ?>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active_tab == 'uzaverka' ? 'active' : 'text-white-75'; ?>" href="?tab=uzaverka"><i class="fas fa-lock me-2"></i>Uzávěrka období</a>
         </li>
         <?php endif; ?>
         <li class="nav-item">
@@ -1316,6 +1393,7 @@ require_once 'includes/header.php';
                                 elseif($r == 'boss') echo '<span class="badge bg-warning text-dark">Boss</span>';
                                 elseif($r == 'manager') echo '<span class="badge bg-primary">'.__('role_manager').'</span>';
                                 elseif($r == 'brigadnik') echo '<span class="badge bg-success bg-opacity-75"><i class="far fa-clock me-1"></i>Brigádník</span>';
+                                elseif($r == 'accountant') echo '<span class="badge bg-warning text-dark"><i class="fas fa-calculator me-1"></i>Účetní</span>';
                                 else echo '<span class="badge bg-info-glow">'.__('role_engineer').'</span>';
                                 ?>
                             </td>
@@ -1506,6 +1584,144 @@ require_once 'includes/header.php';
             </div>
         </div>
 
+        <!-- UZÁVĚRKA OBDOBÍ TAB (admin, Boss i účetní) -->
+        <div class="tab-pane fade <?php echo $active_tab == 'uzaverka' ? 'show active' : ''; ?>">
+            <?php if ($active_tab == 'uzaverka' && crmCanAccountingRead()):
+                $__pFlash = $_SESSION['afx_period_flash'] ?? null;
+                unset($_SESSION['afx_period_flash']);          // hláška se ukáže JEN jednou
+                $periodYear = (int)($_GET['rok'] ?? date('Y'));
+                if ($periodYear < 2000 || $periodYear > 2100) { $periodYear = (int)date('Y'); }
+                $lockedMap = afxAccountingLockedPeriods(true); // po zámku/odemčení musí být čerstvé
+                $canLock = afxAccountingCanLock();
+                $canUnlock = afxAccountingCanUnlock();
+                $mesice = [1=>'leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec'];
+            ?>
+            <h5 class="mb-3 text-white"><i class="fas fa-lock me-2 text-warning"></i>Uzávěrka účetního období</h5>
+
+            <?php if ($__pFlash): ?>
+                <div class="alert <?php echo $__pFlash['ok'] ? 'alert-success' : 'alert-danger'; ?> py-2">
+                    <i class="fas <?php echo $__pFlash['ok'] ? 'fa-check' : 'fa-triangle-exclamation'; ?> me-2"></i><?php echo e($__pFlash['text']); ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="glass-panel p-3 border-secondary mb-4 small text-white-75">
+                <i class="fas fa-circle-info me-2 text-info"></i>
+                Uzavřený měsíc znamená, že <strong>doklady s datem v tomto měsíci už nejde měnit</strong> —
+                faktury, platby, doklady kasy ani pohyby hotovosti. Zavírá se až po odevzdání přiznání,
+                aby se čísla v CRM nerozešla s tím, co je odevzdané na úřadě.
+                Uzavřít smí vedení i účetní, <strong>odemknout jen administrátor</strong> a každé odemčení jde do historie.
+            </div>
+
+            <!-- Volba roku -->
+            <form method="GET" class="d-flex align-items-end gap-2 mb-3">
+                <input type="hidden" name="tab" value="uzaverka">
+                <div>
+                    <label class="form-label small text-white-75 mb-1">Rok</label>
+                    <select name="rok" class="form-select" onchange="this.form.submit()">
+                        <?php for ($y = (int)date('Y') + 1; $y >= (int)date('Y') - 5; $y--): ?>
+                            <option value="<?php echo $y; ?>" <?php echo $y === $periodYear ? 'selected' : ''; ?>><?php echo $y; ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+            </form>
+
+            <div class="table-responsive mb-4">
+                <table class="table table-dark table-hover align-middle border-secondary">
+                    <thead class="table-dark"><tr>
+                        <th>Měsíc</th><th>Stav</th><th>Uzavřel / kdy</th><th>Poznámka</th><th class="text-end">Akce</th>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($mesice as $mNum => $mName):
+                        $key = sprintf('%04d-%02d', $periodYear, $mNum);
+                        $row = $lockedMap[$key] ?? null;
+                        // Budoucí měsíc zavřít nejde — viz afxAccountingLockPeriod().
+                        $isFuture = $key > date('Y-m');
+                    ?>
+                        <tr>
+                            <td><strong><?php echo $mNum . '/' . $periodYear; ?></strong> <span class="text-white-50 small"><?php echo $mName; ?></span></td>
+                            <td>
+                                <?php if ($row): ?>
+                                    <span class="badge bg-danger"><i class="fas fa-lock me-1"></i>uzavřeno</span>
+                                <?php elseif ($isFuture): ?>
+                                    <span class="badge bg-secondary">zatím neproběhl</span>
+                                <?php else: ?>
+                                    <span class="badge bg-success-glow"><i class="fas fa-lock-open me-1"></i>otevřeno</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="small text-white-75">
+                                <?php echo $row ? e($row['locked_by'] ?? '') . ' · ' . crmDateTime($row['locked_at'] ?? '') : '<span class="text-white-50">—</span>'; ?>
+                            </td>
+                            <td class="small text-white-75"><?php echo $row && !empty($row['note']) ? e($row['note']) : '<span class="text-white-50">—</span>'; ?></td>
+                            <td class="text-end">
+                                <?php if ($row && $canUnlock): ?>
+                                    <form method="POST" class="d-inline">
+                                        <?php echo csrfField(); ?>
+                                        <input type="hidden" name="period_year" value="<?php echo $periodYear; ?>">
+                                        <input type="hidden" name="period_month" value="<?php echo $mNum; ?>">
+                                        <input type="hidden" name="period_note" value="Odemčeno v Nastavení">
+                                        <button type="submit" name="accounting_unlock_period" value="1" class="btn btn-outline-warning btn-sm"
+                                                data-confirm="Opravdu odemknout uzavřené období <?php echo $mNum . '/' . $periodYear; ?>? Zapíše se to do auditní historie.">
+                                            <i class="fas fa-lock-open me-1"></i>Odemknout
+                                        </button>
+                                    </form>
+                                <?php elseif ($row): ?>
+                                    <span class="text-white-50 small">odemkne jen administrátor</span>
+                                <?php elseif (!$isFuture && $canLock): ?>
+                                    <form method="POST" class="d-inline d-flex gap-2 justify-content-end">
+                                        <?php echo csrfField(); ?>
+                                        <input type="hidden" name="period_year" value="<?php echo $periodYear; ?>">
+                                        <input type="hidden" name="period_month" value="<?php echo $mNum; ?>">
+                                        <input type="text" name="period_note" class="form-control form-control-sm" style="max-width:220px;" placeholder="poznámka (nepovinné)" maxlength="255">
+                                        <button type="submit" name="accounting_lock_period" value="1" class="btn btn-outline-danger btn-sm"
+                                                data-confirm="Uzavřít účetní období <?php echo $mNum . '/' . $periodYear; ?>? Doklady s datem v tomto měsíci pak už nepůjde měnit.">
+                                            <i class="fas fa-lock me-1"></i>Uzavřít
+                                        </button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="text-white-50 small">—</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Historie zamykání a odemykání (auditní stopa) -->
+            <h6 class="text-white mb-2"><i class="fas fa-clock-rotate-left me-2 text-info"></i>Historie uzávěrek</h6>
+            <?php $periodHistory = afxAccountingPeriodsHistory(50); ?>
+            <?php if (!$periodHistory): ?>
+                <div class="text-white-50 small">Zatím žádný záznam.</div>
+            <?php else: ?>
+            <div class="table-responsive">
+                <table class="table table-dark table-sm align-middle border-secondary">
+                    <thead class="table-dark"><tr><th>Kdy</th><th>Kdo</th><th>Období</th><th>Úkon</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($periodHistory as $h): ?>
+                        <tr>
+                            <td class="small"><?php echo crmDateTime($h['created_at'] ?? ''); ?></td>
+                            <td class="small"><?php echo e($h['actor_name'] ?? ''); ?></td>
+                            <td class="small"><?php echo e($h['entity_label'] ?? ''); ?></td>
+                            <td class="small">
+                                <?php if (($h['action'] ?? '') === 'accounting.period_unlock'): ?>
+                                    <span class="badge bg-warning text-dark">odemčeno</span>
+                                <?php else: ?>
+                                    <span class="badge bg-danger">uzavřeno</span>
+                                <?php endif; ?>
+                                <span class="text-white-75 ms-2"><?php echo e($h['summary'] ?? ''); ?></span>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+
+            <?php elseif ($active_tab == 'uzaverka'): ?>
+                <div class="alert alert-warning py-2"><i class="fas fa-lock me-2"></i>Na uzávěrku období nemáš oprávnění.</div>
+            <?php endif; ?>
+        </div>
+
         <!-- ADMINS TAB -->
         <?php if ($is_admin_user): ?>
         <div class="tab-pane fade <?php echo $active_tab == 'admins' ? 'show active' : ''; ?>">
@@ -1525,6 +1741,8 @@ require_once 'includes/header.php';
                 <div class="alert alert-danger py-2"><i class="fas fa-triangle-exclamation me-2"></i>Vlastní administrátorský účet si odstranit nemůžeš — požádej jiného administrátora.</div>
             <?php elseif (!empty($_GET['admin_deleted'])): ?>
                 <div class="alert alert-success py-2"><i class="fas fa-check me-2"></i>Administrátorský přístup byl odstraněn.</div>
+            <?php elseif (!empty($_GET['accountant_added'])): ?>
+                <div class="alert alert-success py-2"><i class="fas fa-check me-2"></i>Účetní byla přidána. Může se hned přihlásit — uvidí jen účetní data.</div>
             <?php endif; ?>
 
             <!-- Přidat administrátora z aktuálních zaměstnanců -->
@@ -1581,6 +1799,71 @@ require_once 'includes/header.php';
                 });
             })();
             </script>
+
+            <!-- ÚČETNÍ — samostatný účet s omezenými právy (balík C) -->
+            <?php $accountants = []; try {
+                $accountants = $pdo->query("SELECT id, name, username, email, is_active FROM technicians WHERE role = 'accountant' ORDER BY name")->fetchAll();
+            } catch (Throwable $e) {} ?>
+            <form method="POST" class="glass-panel p-3 border-secondary mb-4">
+                <?php echo csrfField(); ?>
+                <div class="small text-white-75 mb-2"><i class="fas fa-calculator me-2 text-warning"></i>Přidat účetní (omezený přístup jen k účetnictví)</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small text-white-75">Jméno a příjmení</label>
+                        <input type="text" name="accountant_name" class="form-control" required autocomplete="off">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-white-75">Přihlašovací jméno</label>
+                        <input type="text" name="accountant_username" class="form-control" required autocomplete="off">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-white-75">Heslo (min. 8 znaků)</label>
+                        <input type="password" name="accountant_password" class="form-control" minlength="8" required autocomplete="new-password">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-white-75">E-mail</label>
+                        <input type="email" name="accountant_email" class="form-control" autocomplete="off">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-white-75">Pobočka (jen evidenčně)</label>
+                        <select name="accountant_branch_id" class="form-select" required>
+                            <?php foreach (getBranches() as $__ab): ?>
+                                <option value="<?php echo (int)$__ab['id']; ?>" <?php echo ((int)$__ab['id'] === getDefaultBranchId()) ? 'selected' : ''; ?>><?php echo e($__ab['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" name="create_accountant" value="1" class="btn btn-warning w-100"><i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+                <div class="form-text small text-white-75 mt-2">
+                    Účetní vidí faktury, platby, pokladnu a bankovní pohyby za <strong>obě pobočky</strong>, smí párovat platby
+                    a doplňovat účetní údaje. <strong>Nesmí</strong> nic mazat, měnit zakázky, sklad ani nastavení
+                    a nevidí klientská data nad rámec fakturačních údajů.
+                </div>
+            </form>
+
+            <?php if ($accountants): ?>
+            <div class="table-responsive mb-4">
+                <table class="table table-dark table-hover align-middle border-secondary">
+                    <thead class="table-dark"><tr><th><?php echo __('login_col'); ?></th><th><?php echo __('name_col'); ?></th><th><?php echo __('role_col'); ?></th><th class="text-end"><?php echo __('actions_col'); ?></th></tr></thead>
+                    <tbody>
+                        <?php foreach ($accountants as $ac): ?>
+                        <tr>
+                            <td><strong>@<?php echo e($ac['username'] ?? '-'); ?></strong></td>
+                            <td><?php echo e($ac['name']); ?><?php echo ($ac['is_active'] ?? 1) ? '' : ' <span class="badge bg-secondary ms-1">neaktivní</span>'; ?></td>
+                            <td><span class="badge bg-warning text-dark">Účetní</span></td>
+                            <td class="text-end">
+                                <?php /* Heslo, deaktivace i smazání se dělají na kartě zaměstnance — ať je
+                                        jen JEDNO místo, kde se účty personálu spravují (jinak se to rozejde). */ ?>
+                                <a href="settings.php?tab=staff" class="btn btn-outline-secondary btn-sm"><i class="fas fa-user-edit me-1"></i>Karta zaměstnance</a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
 
             <div class="table-responsive">
                 <table class="table table-dark table-hover align-middle border-secondary">
@@ -2063,6 +2346,8 @@ require_once 'includes/header.php';
                         <option value="engineer"><?php echo __('role_engineer'); ?></option>
                         <option value="brigadnik">Brigádník</option>
                         <option value="manager"><?php echo __('role_manager'); ?></option>
+                        <?php /* Účetní = neprovozní role, do zakázek ani skladu se nedostane (viz accounting_role.php) */ ?>
+                        <option value="accountant">Účetní</option>
                         <option value="boss">Boss</option>
                         <option value="admin"><?php echo __('role_admin'); ?></option>
                     </select>
@@ -2117,11 +2402,12 @@ require_once 'includes/header.php';
                         <option value="engineer" <?php echo ($t['role'] ?? 'engineer') == 'engineer' ? 'selected' : ''; ?>><?php echo __('role_engineer'); ?></option>
                         <option value="brigadnik" <?php echo ($t['role'] ?? 'engineer') == 'brigadnik' ? 'selected' : ''; ?>>Brigádník</option>
                         <option value="manager" <?php echo ($t['role'] ?? 'engineer') == 'manager' ? 'selected' : ''; ?>><?php echo __('role_manager'); ?></option>
+                        <option value="accountant" <?php echo ($t['role'] ?? 'engineer') == 'accountant' ? 'selected' : ''; ?>>Účetní</option>
                         <option value="boss" <?php echo ($t['role'] ?? 'engineer') == 'boss' ? 'selected' : ''; ?>>Boss</option>
                         <option value="admin" <?php echo ($t['role'] ?? 'engineer') == 'admin' ? 'selected' : ''; ?>><?php echo __('role_admin'); ?></option>
                     </select>
                     <?php else: ?>
-                        <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo ($t['role'] ?? 'engineer') == 'admin' ? __('role_admin') : (($t['role'] ?? 'engineer') == 'boss' ? 'Boss' : (($t['role'] ?? 'engineer') == 'manager' ? __('role_manager') : (($t['role'] ?? 'engineer') == 'brigadnik' ? 'Brigádník' : __('role_engineer')))); ?></div>
+                        <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo ($t['role'] ?? 'engineer') == 'admin' ? __('role_admin') : (($t['role'] ?? 'engineer') == 'boss' ? 'Boss' : (($t['role'] ?? 'engineer') == 'accountant' ? 'Účetní' : (($t['role'] ?? 'engineer') == 'manager' ? __('role_manager') : (($t['role'] ?? 'engineer') == 'brigadnik' ? 'Brigádník' : __('role_engineer'))))); ?></div>
                         <input type="hidden" name="role" value="<?php echo htmlspecialchars($t['role'] ?? 'engineer'); ?>">
                     <?php endif; ?>
                 </div>

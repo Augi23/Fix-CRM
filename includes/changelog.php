@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '3.33.0',
+        'date' => '2026-07-31',
+        'time' => '12:30',
+        'title' => 'Účetnictví: pokladní kniha, podklady pro účetní, role účetní a zálohy v přehledech',
+        'items' => [
+            '<b>Pokladní kniha s počátečním zůstatkem:</b> kasa dosud počítala hotovost od nuly každý den, takže stav v zásuvce nikdy neseděl. Nově má každá pobočka pokladnu s počátečním zůstatkem (sem se zapíše skutečně napočítaná hotovost při inventuře) a stav se přenáší ze dne na den. Přibyly <b>pokladní doklady PPD/VPD</b> v souvislé číselné řadě — doklad se nemaže, chyba se opravuje <b>stornem</b>, jak vyžaduje zákon o účetnictví. Hlídá se i zákonný limit 270 000 Kč hotovosti za den.',
+            '<b>Podklady pro účetní:</b> nová stránka se sedmi tiskovými sestavami za zvolené období — kniha vydaných faktur, přehled úhrad, neuhrazené pohledávky podle stáří, dobropisy, tržby z pokladny po dnech, přijaté zálohy a bankovní pohyby. Vytisknou se do PDF a jsou stavěné tak, aby <b>nespadly</b>, i když některá evidence ještě neexistuje.',
+            '<b>Role „účetní“:</b> účetní dostane vlastní účet, vidí faktury, platby, pokladnu a banku napříč pobočkami, může párovat platby — ale <b>nemůže nic mazat</b> a nedostane se do zakázek, skladu ani nastavení. K tomu <b>uzávěrka měsíce</b>: po odevzdání přiznání se doklady daného období zamknou, odemknout smí jen administrátor a zapíše se to do historie.',
+            '<b>Zálohy v přehledech:</b> nástěnka i Přehledy ukazují vedle tržby i <b>přijaté peníze včetně záloh</b> (zvlášť označené). Účetně totiž záloha není výnos, ale majitel potřebuje vidět, kolik peněz reálně přišlo. Dřív navíc částečně zaplacená faktura z přehledu vypadla úplně.',
+            '<b>Použité zboží na účtence:</b> označení „použité zboží“ se tiskne <b>vždy</b> (dosud jen u plátce DPH) — vyžaduje to zákon o ochraně spotřebitele. U produktu jde nově zadat <b>nákupní cena</b>; bez ní by po přechodu na plátcovství DPH nešla u použitého zboží spočítat daň z přirážky.',
+        ],
+    ],
+    [
         'version' => '3.32.0',
         'date' => '2026-07-31',
         'time' => '18:30',

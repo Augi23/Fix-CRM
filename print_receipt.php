@@ -2,8 +2,10 @@
 /**
  * Prodejní doklad (účtenka) z kasy — samostatná tisková stránka.
  * print_receipt.php?id=<pos_sales.id>[&auto=1 → rovnou otevře tiskový dialog]
- * DPH: běžné zboží (díly) u plátce s rekapitulací; použité zboží jede ve zvláštním
+ * DPH: běžné zboží u plátce s rekapitulací; použité zboží jede ve zvláštním
  * režimu § 90 — DPH se u něj NEVYČÍSLUJE a doklad nese povinnou větu.
+ * Označení „použité zboží“ u položky se tiskne VŽDY (i u neplátce DPH) — vyžaduje
+ * ho § 16 zákona č. 634/1992 Sb. o ochraně spotřebitele, ne zákon o DPH.
  */
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
@@ -99,6 +101,8 @@ table.items td { padding:8px; border-bottom:1px solid var(--line); vertical-alig
 table.items .num { text-align:right; white-space:nowrap; }
 .code { color:var(--muted); font-size:11px; }
 .tag90 { display:inline-block; font-size:10px; font-weight:600; color:#8a6d00; background:#fff5d6; border-radius:6px; padding:1px 6px; margin-left:6px; vertical-align:1px; }
+/* povinné označení použitého zboží — tiskne se i u neplátce DPH, proto vlastní (neutrální) styl */
+.tagused { display:inline-block; font-size:10px; font-weight:600; color:#334; background:#e6ecf5; border-radius:6px; padding:1px 6px; margin-left:6px; vertical-align:1px; }
 .sum { display:flex; justify-content:flex-end; margin-top:10px; }
 .sum table td { padding:3px 8px; font-size:13px; }
 .sum .total td { font-size:18px; font-weight:700; border-top:2px solid var(--ink); padding-top:8px; }
@@ -113,7 +117,7 @@ table.items .num { text-align:right; white-space:nowrap; }
   body { background:#fff; padding:0; }
   .sheet { box-shadow:none; border-radius:0; max-width:none; }
   .no-print { display:none !important; }
-  .accent-bar, .meta, .tag90, .cancelstamp { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .accent-bar, .meta, .tag90, .tagused, .cancelstamp { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 }
 </style>
 </head>
@@ -154,7 +158,7 @@ table.items .num { text-align:right; white-space:nowrap; }
             <?php foreach ($items as $l): ?>
                 <tr>
                     <td>
-                        <?php echo e($l['item_name']); ?><?php if ($isVat && (int)$l['is_used_goods'] === 1): ?><span class="tag90">§ 90</span><?php endif; ?>
+                        <?php echo e($l['item_name']); ?><?php if ((int)$l['is_used_goods'] === 1): ?><span class="tagused"><?php echo _l('rcpt_used_goods'); ?></span><?php if ($isVat): ?><span class="tag90">§ 90</span><?php endif; ?><?php endif; ?>
                         <?php if (!empty($l['item_code'])): ?><div class="code"><?php echo e($l['item_code']); ?></div><?php endif; ?>
                     </td>
                     <td class="num"><?php echo (int)$l['quantity']; ?></td>
