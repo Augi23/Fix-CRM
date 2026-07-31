@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.31.0',
+        'date' => '2026-07-31',
+        'time' => '16:05',
+        'title' => 'Čas pod datem u „kdo/kdy" výpisů + výraznější pozadí',
+        'items' => [
+            'U výpisů s datem přidání/úprav/změn se nově zobrazuje i <b>čas</b> — hned pod datem, menším a tlumeným písmem. Nasazeno u naskladnění produktu (Sklad → Produkty, sloupec Naskladněno) a v nákupním seznamu. Zakázky a nástěnka čas u data měly už dřív. Sdílený helper <code>crmDateTime()</code> pro další místa.',
+            '<b>Pozadí CRM</b> (modré tečkované vlny) je nově <b>výraznější</b> — vlny i víry mají vyšší jas; střed obrazovky s obsahem zůstává tmavý a čitelný.',
+        ],
+    ],
+    [
         'version' => '3.30.1',
         'date' => '2026-07-31',
         'time' => '15:20',

@@ -75,6 +75,7 @@ function slRenderItem(array $r, bool $can_manage): void {
     $client    = trim((string)($r['first_name'] ?? '') . ' ' . (string)($r['last_name'] ?? ''));
     $reqBy     = trim((string)($r['requested_by_name'] ?? ''));
     $created   = !empty($r['created_at']) ? date('j.n.Y', strtotime((string)$r['created_at'])) : '';
+    $createdTm = !empty($r['created_at']) ? date('H:i', strtotime((string)$r['created_at'])) : '';
     ?>
     <div class="sl-item" id="sl-item-<?php echo $id; ?>">
         <div class="sl-item-main">
@@ -90,7 +91,7 @@ function slRenderItem(array $r, bool $can_manage): void {
                             <i class="fas fa-tools"></i> <?php echo e($orderCode !== '' ? $orderCode : (__('order_ref_prefix') . $orderId)); ?><?php if ($device !== ''): ?> · <?php echo e($device); ?><?php endif; ?>
                         </a>
                     <?php endif; ?>
-                    <?php if ($created !== ''): ?><span class="sl-chip sl-chip-soft"><i class="far fa-calendar"></i> <?php echo e($created); ?></span><?php endif; ?>
+                    <?php if ($created !== ''): ?><span class="sl-chip sl-chip-soft"><i class="far fa-calendar"></i> <?php echo e($created); ?><?php if ($createdTm !== ''): ?> <small style="opacity:.6;"><?php echo e($createdTm); ?></small><?php endif; ?></span><?php endif; ?>
                     <?php if ($reqBy !== ''): ?><span class="sl-chip sl-chip-soft"><i class="far fa-user"></i> <?php echo e($reqBy); ?></span><?php endif; ?>
                 </div>
                 <?php if ($notes !== ''): ?><div class="sl-item-notes"><i class="far fa-comment-dots me-1"></i><?php echo nl2br(e($notes)); ?></div><?php endif; ?>

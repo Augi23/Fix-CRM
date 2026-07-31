@@ -319,7 +319,7 @@ try {
                                     </td>
                                     <td>
                                         <?php if (!empty($p['added_at'])): ?>
-                                            <span class="small"><?php echo date('j.n.Y', strtotime($p['added_at'])); ?></span>
+                                            <span class="small"><?php echo crmDateTime($p['added_at']); ?></span>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>
                                         <?php endif; ?>
