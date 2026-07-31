@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.30.1',
+        'date' => '2026-07-31',
+        'time' => '15:20',
+        'title' => 'Rozcestník skladu: sklo a adresy dotažené',
+        'items' => [
+            'Karty pobočky na rozcestníku teď mají <b>plný Liquid Glass vzhled</b> (lesklé sklo na prosvětleném pozadí) i na tmavém CRM. Doplněna reálná <b>adresa ulice</b> (Karlín: Křižíkova 177/29, Černá Růže: Na Příkopě 853) místo duplicitního názvu a opraveno české skloňování počtů („3 díly", „0 dílů").',
+        ],
+    ],
+    [
         'version' => '3.30.0',
         'date' => '2026-07-31',
         'time' => '14:47',

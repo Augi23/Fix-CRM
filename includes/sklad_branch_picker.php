@@ -2,6 +2,8 @@
 /**
  * Rozcestník Skladu — výběr pobočky (dvě velké Liquid Glass karty).
  * Vkládá inventory.php, když není vybraná pobočka (?branch chybí/neplatné).
+ * Vzhled 1:1 dle schváleného náhledu: karty nesou sklo SAMY (světlý gradient + lesk),
+ * neřídí je glass-engine; sedí na prosvětleném „pódiu", ať frosted sklo září.
  * Vidí obě pobočky každý; kdo na pobočce nepracuje, má na kartě „jen prohlížení".
  */
 if (!function_exists('skladBranchLabel')) { return; }
@@ -15,47 +17,60 @@ foreach ($__branches as $__b) {
     catch (Throwable $e) { $prod = 0; }
     $__counts[$bid] = ['inv' => $inv, 'prod' => $prod];
 }
-$__icons = ['karlin' => 'fa-warehouse', 'prikope' => 'fa-store'];
+$__icons   = ['karlin' => 'fa-warehouse', 'prikope' => 'fa-store'];
+$__streets = ['karlin' => 'Křižíkova 177/29, Praha 8', 'prikope' => 'Na Příkopě 853, Praha 1'];
+$__pl = function (int $n, string $one, string $few, string $many): string {
+    if ($n === 1) return $one; if ($n >= 2 && $n <= 4) return $few; return $many;
+};
 ?>
-<div class="mb-2">
-    <h2 class="mb-0"><?php echo __('inventory'); ?></h2>
-    <small class="text-muted">Vyber pobočku skladu — každá má vlastní zásoby</small>
-</div>
-
-<div class="sklad-branch-picker">
-    <?php foreach ($__branches as $__b): $bid = (int)$__b['id']; $code = (string)$__b['code']; $c = $__counts[$bid]; ?>
-    <a href="inventory.php?branch=<?php echo $bid; ?>" class="sklad-branch-card" data-afx-glass="panel">
-        <span class="sklad-branch-ico"><i class="fas <?php echo $__icons[$code] ?? 'fa-boxes'; ?>"></i></span>
-        <span class="sklad-branch-name"><?php echo e(skladBranchLabel($bid)); ?></span>
-        <?php if (trim((string)($__b['address'] ?? '')) !== ''): ?>
-            <span class="sklad-branch-addr"><?php echo e((string)$__b['address']); ?></span>
-        <?php endif; ?>
-        <span class="sklad-branch-stats"><?php echo $c['inv']; ?> dílů · <?php echo $c['prod']; ?> produktů</span>
-        <?php if (!crmCanModifyBranchStock($bid)): ?>
-            <span class="sklad-branch-ro"><i class="fas fa-eye me-1"></i>jen prohlížení</span>
-        <?php endif; ?>
-    </a>
-    <?php endforeach; ?>
+<div class="sklad-stage">
+    <div class="sklad-stage-head">
+        <h2 class="mb-0"><?php echo __('inventory'); ?></h2>
+        <small>Vyber pobočku skladu — každá má vlastní zásoby</small>
+    </div>
+    <div class="sklad-branch-picker">
+        <?php foreach ($__branches as $__b): $bid = (int)$__b['id']; $code = (string)$__b['code']; $c = $__counts[$bid]; ?>
+        <a href="inventory.php?branch=<?php echo $bid; ?>" class="sklad-branch-card">
+            <span class="sklad-branch-ico"><i class="fas <?php echo $__icons[$code] ?? 'fa-boxes'; ?>"></i></span>
+            <span class="sklad-branch-name"><?php echo e(skladBranchLabel($bid)); ?></span>
+            <span class="sklad-branch-addr"><?php echo e($__streets[$code] ?? (string)$__b['address']); ?></span>
+            <span class="sklad-branch-stats"><?php echo $c['inv'] . ' ' . $__pl($c['inv'], 'díl', 'díly', 'dílů'); ?> · <?php echo $c['prod'] . ' ' . $__pl($c['prod'], 'produkt', 'produkty', 'produktů'); ?></span>
+            <?php if (!crmCanModifyBranchStock($bid)): ?>
+                <span class="sklad-branch-ro"><i class="fas fa-eye me-1"></i>jen prohlížení</span>
+            <?php endif; ?>
+        </a>
+        <?php endforeach; ?>
+    </div>
 </div>
 
 <style>
-.sklad-branch-picker{display:flex;gap:30px;justify-content:center;flex-wrap:wrap;padding:46px 12px 64px;}
+/* pódium = prosvětlené tmavé pozadí (jako ve schváleném náhledu), ať frosted sklo září */
+.sklad-stage{position:relative;overflow:hidden;border-radius:26px;margin-top:4px;padding:34px 20px 66px;
+    background:
+        radial-gradient(1100px 560px at 18% -12%, rgba(59,232,168,.14), transparent 58%),
+        radial-gradient(950px 520px at 88% 6%, rgba(85,212,255,.14), transparent 55%),
+        linear-gradient(160deg,#0c1512 0%,#0a0f15 55%,#0b1016 100%);}
+.sklad-stage::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px);background-size:22px 22px;}
+.sklad-stage-head{position:relative;z-index:1;padding:6px 14px 0;}
+.sklad-stage-head h2{font-size:30px;font-weight:700;letter-spacing:-.02em;color:#f2f7ff;}
+.sklad-stage-head small{color:#93a6bc;font-size:15px;}
+.sklad-branch-picker{position:relative;z-index:1;display:flex;gap:30px;justify-content:center;flex-wrap:wrap;padding:52px 12px 18px;}
 .sklad-branch-card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    text-align:center;gap:9px;width:344px;max-width:44vw;min-height:288px;padding:46px 30px;border-radius:28px;
+    text-align:center;gap:10px;width:346px;max-width:44vw;min-height:290px;padding:46px 30px;border-radius:28px;
     text-decoration:none;color:#eaf2ff;overflow:hidden;
-    background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.14);
-    backdrop-filter:blur(16px) saturate(1.35);-webkit-backdrop-filter:blur(16px) saturate(1.35);
-    box-shadow:0 26px 64px rgba(0,0,0,.42);
-    transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s ease;}
-.sklad-branch-card:hover{transform:translateY(-6px) scale(1.02);box-shadow:0 34px 80px rgba(0,0,0,.5);color:#fff;}
-.sklad-branch-ico{font-size:56px;line-height:1;margin-bottom:8px;color:#55d4ff;filter:drop-shadow(0 6px 22px rgba(85,212,255,.55));}
+    /* sklo NESE KARTA sama: světlý gradient shora dolů = lesk, i na tmavém pozadí */
+    background:linear-gradient(180deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,.045) 34%,rgba(255,255,255,.03) 100%);
+    border:1px solid rgba(255,255,255,.18);
+    backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
+    box-shadow:0 28px 66px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.38), inset 0 -34px 60px -44px rgba(0,0,0,.55);
+    transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s ease,border-color .18s ease;}
+.sklad-branch-card:hover{transform:translateY(-6px) scale(1.02);color:#fff;border-color:rgba(85,212,255,.45);
+    box-shadow:0 40px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.5), inset 0 -34px 60px -44px rgba(0,0,0,.5);}
+.sklad-branch-ico{font-size:56px;line-height:1;margin-bottom:8px;color:#5cd6ff;filter:drop-shadow(0 6px 26px rgba(85,212,255,.65));}
 .sklad-branch-name{font-size:23px;font-weight:700;letter-spacing:-.01em;}
 .sklad-branch-addr{font-size:14px;opacity:.72;font-weight:500;}
 .sklad-branch-stats{margin-top:6px;font-size:13.5px;font-weight:600;color:#3be8a8;}
-.sklad-branch-ro{position:absolute;top:14px;right:16px;font-size:12px;opacity:.72;font-weight:500;}
-html[data-lg-theme="light"] .sklad-branch-card{color:#0b1a2b;background:rgba(255,255,255,.62);border-color:rgba(0,0,0,.08);box-shadow:0 22px 54px rgba(0,40,90,.16);}
-html[data-lg-theme="light"] .sklad-branch-card:hover{color:#000;}
-html[data-lg-theme="light"] .sklad-branch-ico{color:#0a84ff;}
-html[data-lg-theme="light"] .sklad-branch-stats{color:#0a7d55;}
+.sklad-branch-ro{position:absolute;top:14px;right:16px;font-size:12px;opacity:.75;font-weight:500;}
 @media(max-width:560px){.sklad-branch-card{width:100%;max-width:92vw;min-height:210px;padding:34px 24px;}}
 </style>
