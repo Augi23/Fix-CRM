@@ -407,95 +407,12 @@ $afxFp = array_values(array_filter(explode(' ', $afxFn)));
 $afxInitials = mb_strtoupper(count($afxFp) >= 2 ? mb_substr($afxFp[0],0,1).mb_substr($afxFp[1],0,1) : mb_substr($afxFn,0,2));
 $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 ?>
-<!-- Pozadí: futuristické halftone vlny (tečkové víry, navy/cyan) — GENERUJE se
-     canvasem přesně na míru oknu a při každé změně velikosti/měřítka se překreslí,
-     takže se nikdy neořezává ani nedeformuje (dřívější SVG slice problém). -->
-<canvas class="crm-bgfx" id="crmBgWaves" aria-hidden="true"></canvas>
-<script>
-(function(){
-  var cv = document.getElementById('crmBgWaves');
-  if (!cv || !cv.getContext) return;
-  function lerp(a,b,t){ return a+(b-a)*t; }
-  function dotColor(bright){   // deep blue → azure → cyan
-    var r = Math.round(lerp(28, 90, bright*bright));
-    var g = Math.round(lerp(60, 205, bright));
-    var b = Math.round(lerp(150, 255, bright));
-    return [r,g,b];
-  }
-  function vortex(ctx, cx, cy, R, o){
-    for (var i=2;i<o.rings;i++){
-      var tR = i/(o.rings-1);
-      var r = R * Math.pow(tR, 1.25);
-      var n = Math.max(24, Math.round(r*0.85));
-      for (var j=0;j<n;j++){
-        var th = j/n*6.2832 + i*o.twist;
-        var rr = r*(1 + 0.14*Math.sin(3*th + i*0.33 + o.seed) + 0.06*Math.sin(7*th - i*0.21 + o.seed*2));
-        var x = cx + Math.cos(th+o.rot)*rr, y = cy + Math.sin(th+o.rot)*rr*o.squash;
-        var bright = Math.max(0, 0.5 + 0.5*Math.sin(th + i*0.30 + o.seed*3));
-        bright *= (0.35 + 0.65*Math.sin(3.1416*tR));
-        if (bright < 0.05) continue;
-        var rad = (0.6 + 2.35*bright) * (0.5 + 0.66*tR);
-        var c = dotColor(bright);
-        var a = o.alpha * (0.18 + 1.05*bright);
-        ctx.beginPath(); ctx.arc(x,y,rad,0,6.2832);
-        ctx.fillStyle = 'rgba('+c[0]+','+c[1]+','+c[2]+','+a.toFixed(3)+')';
-        ctx.fill();
-        if (bright > 0.82){
-          ctx.beginPath(); ctx.arc(x,y,rad*2.6,0,6.2832);
-          ctx.fillStyle = 'rgba('+c[0]+','+c[1]+','+c[2]+','+(a*0.16).toFixed(3)+')';
-          ctx.fill();
-        }
-      }
-    }
-  }
-  function waveBand(ctx, w, h, yBase, o){
-    for (var li=0; li<o.lines; li++){
-      var tL = li/(o.lines-1);
-      var yOff = (tL-0.5)*o.spread;
-      for (var x=-10; x<=w+10; x+=7){
-        var u = x/w;
-        var y = yBase - (u-0.5)*h*0.10 + yOff*(1+0.5*Math.sin(6.2832*u+o.seed))
-              + 26*Math.sin(6.2832*(1.35*u)+o.seed+tL*0.9) + 12*Math.sin(6.2832*(3.1*u)-o.seed*2+tL*1.7);
-        var bright = Math.max(0, 0.5+0.5*Math.sin(6.2832*u*2.2+tL*2.2+o.seed*4)) * (1-Math.abs(tL-0.5)*1.6);
-        if (bright < 0.06) continue;
-        var c = dotColor(bright*0.85);
-        ctx.beginPath(); ctx.arc(x,y,0.6+1.85*bright,0,6.2832);
-        ctx.fillStyle = 'rgba('+c[0]+','+c[1]+','+c[2]+','+(o.alpha*(0.14+0.72*bright)).toFixed(3)+')';
-        ctx.fill();
-      }
-    }
-  }
-  function sprinkle(ctx, w, h, count, seed){
-    var s = seed;
-    function rnd(){ s = (s*9301+49297)%233280; return s/233280; }
-    for (var i=0;i<count;i++){
-      var x = rnd()*w, y = rnd()*h, b = rnd();
-      var c = dotColor(b*0.6);
-      ctx.beginPath(); ctx.arc(x,y,0.5+b*0.9,0,6.2832);
-      ctx.fillStyle = 'rgba('+c[0]+','+c[1]+','+c[2]+','+(0.05+b*0.11).toFixed(3)+')';
-      ctx.fill();
-    }
-  }
-  function draw(){
-    var dpr = Math.min(window.devicePixelRatio||1,2), w=innerWidth, h=innerHeight;
-    cv.width=w*dpr; cv.height=h*dpr; cv.style.width=w+'px'; cv.style.height=h+'px';
-    var ctx = cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
-    var g = ctx.createLinearGradient(0,0,w,h);
-    g.addColorStop(0,'#04070d'); g.addColorStop(0.45,'#060d1d'); g.addColorStop(1,'#03060b');
-    ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
-    var halo = ctx.createRadialGradient(w*0.88,h*0.10,0,w*0.88,h*0.10,Math.max(w,h)*0.55);
-    halo.addColorStop(0,'rgba(45,130,225,0.17)'); halo.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=halo; ctx.fillRect(0,0,w,h);
-    var D = Math.max(w,h);
-    sprinkle(ctx, w, h, Math.round(w*h/9000), 77);
-    vortex(ctx, w*0.86, h*0.10, D*0.50, {rings:42, twist:0.15, seed:1.7, alpha:1.0, squash:0.93, rot:0.4});
-    vortex(ctx, w*0.05, h*0.96, D*0.38, {rings:32, twist:-0.13, seed:4.2, alpha:0.88, squash:0.95, rot:2.1});
-    waveBand(ctx, w, h, h*0.84, {lines:16, spread:h*0.15, alpha:0.82, seed:2.6});
-  }
-  var tm; window.addEventListener('resize', function(){ clearTimeout(tm); tm=setTimeout(draw,120); });
-  draw();
-})();
-</script>
+<!-- Pozadí: animovaná „zvlněná halftone síť" — web component <af-wave-bg>
+     (assets/js/af-wave-bg.js, bez závislostí). Responzivní: ResizeObserver + devicePixelRatio,
+     respektuje prefers-reduced-motion (statický snímek) a v neaktivní záložce se pozastaví.
+     Wrapper .crm-bgfx = fixní vrstva přes viewport s podkladem #0C0C0D; obsah leží nad ní. -->
+<div class="crm-bgfx" aria-hidden="true"><af-wave-bg></af-wave-bg></div>
+<script src="assets/js/af-wave-bg.js?v=<?php echo @filemtime(__DIR__ . '/../assets/js/af-wave-bg.js') ?: '1'; ?>"></script>
 
 <!-- Tenký servisní řádek -->
 <header class="afx-utility">

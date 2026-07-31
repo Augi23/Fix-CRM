@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.39.0',
+        'date' => '2026-07-31',
+        'time' => '21:05',
+        'title' => 'Nové animované pozadí CRM — zvlněná halftone síť',
+        'items' => [
+            'Staré tečkované víry nahradilo nové <b>animované pozadí „zvlněná halftone síť"</b> (dodaný web component) — síť teček se jemně vlní, houstne vlevo nahoře a slábne k pravému dolnímu rohu; barva se neznatelně protáčí spektrem (celý cyklus 10 minut).',
+            'Je <b>plně responzivní</b> (přizpůsobí se oknu i retina displeji), šetří baterii (v neaktivní záložce se samo pozastaví) a respektuje omezení pohybu v systému (vykreslí statický snímek). Ve světlém režimu se skrývá jako dřív.',
+        ],
+    ],
+    [
         'version' => '3.38.0',
         'date' => '2026-07-31',
         'time' => '23:30',

@@ -82,16 +82,18 @@ html[data-lg-theme="light"] .device-model-lg { color: rgba(30,34,44,.92) !import
 .table tbody tr .dropdown-menu.show { z-index: 1002 !important; }
 
 /* ============================================================
-   2) POZADÍ — futuristické halftone vlny (canvas #crmBgWaves)
-   Generuje se JS na míru oknu (header.php) a při resize/zoomu se
-   překreslí → nikdy se neořezává. Pod ním solid tmavá pro jistotu.
+   2) POZADÍ — animovaná „zvlněná halftone síť" (web component <af-wave-bg>,
+   assets/js/af-wave-bg.js; vkládá header.php do wrapperu .crm-bgfx).
+   Responzivní samo (ResizeObserver + DPR); pod ním solid tmavá #0C0C0D.
    ============================================================ */
 html, body {
   background: #04070d !important;
   background-color: #04070d !important;
 }
-canvas.crm-bgfx {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+/* Vrstva pozadí (wrapper <af-wave-bg> web componenty) — fixní přes viewport,
+   tmavý podklad #0C0C0D dle handoff; komponenta uvnitř se roztáhne absolute inset:0. */
+.crm-bgfx {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; background: #0C0C0D;
 }
 /* POZOR: #content NESMÍ mít z-index — vytvořil by stacking context a všechna
    popup okna definovaná uvnitř stránek by skončila POD .modal-backdrop (1050,
@@ -424,8 +426,8 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
    9) SVĚTLÝ REŽIM (lg-theme přepínač) — decentní úpravy shellu
    ============================================================ */
 html[data-lg-theme="light"], html[data-lg-theme="light"] body { background: #eef1f0 !important; background-image: none !important; }
-html[data-lg-theme="light"] canvas.crm-bgfx { display: none !important; }
-html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
+/* Světlý režim: tmavé pozadí schovat celé (wrapper i komponentu) */
+html[data-lg-theme="light"] .crm-bgfx { display: none !important; }
 
 /* ── Kompaktní akční tlačítka v řádcích seznamů (jednotně napříč CRM) ──────────
    Zmenšení přes padding+font (ne fixní rozměr) → funguje i na dropdown/tlačítka s textem.
@@ -441,14 +443,8 @@ th.col-priority, td.col-priority { width: 1%; white-space: nowrap; }
 .cell-status .afx-branch-tag { font-size: 9.5px; padding: .18em .5em; font-weight: 500; }
 .cell-status .afx-branch-tag i { font-size: .9em; }
 
-/* ── Compositor keep-alive ─────────────────────────────────────────────────────
-   Chromium občas přestane plánovat snímky pro paint-animace (pulzy řádků přes
-   box-shadow/filter) a ty „zamrznou" dokud uživatel nehne myší. Nekonečná,
-   sub-pixelová (neviditelná), compositor-only transform animace na malém fixním
-   prvku drží frame-loop naživu → pulzy řádků běží plynule i bez pohybu myší.
-   Nezávislé na tmavém/světlém režimu (vlastní neviditelný prvek). */
-@keyframes afxKeepAlive { 0%,100% { transform: translateZ(0); } 50% { transform: translate3d(0, .02px, 0); } }
-canvas.crm-bgfx { animation: afxKeepAlive 3s linear infinite; will-change: transform; }
+/* Compositor keep-alive už není potřeba: pozadí <af-wave-bg> kreslí každý snímek
+   přes requestAnimationFrame, takže frame-loop (a s ním pulzy řádků) běží pořád. */
 
 /* ── Filtr stavů zakázek jako DROPDOWN s obarvenými buňkami (místo roztažených chipů) ── */
 .crm-filter-dd-toggle { border: 1px solid var(--b1); background: rgba(255,255,255,.06); color: #e8eef6;
