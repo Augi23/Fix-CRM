@@ -441,6 +441,31 @@ html[data-lg-theme="light"] .crm-bgfx { opacity: .5; }
    Nezávislé na tmavém/světlém režimu (vlastní neviditelný prvek). */
 @keyframes afxKeepAlive { 0%,100% { transform: translateZ(0); } 50% { transform: translate3d(0, .02px, 0); } }
 canvas.crm-bgfx { animation: afxKeepAlive 3s linear infinite; will-change: transform; }
+
+/* ── Filtr stavů zakázek jako DROPDOWN s obarvenými buňkami (místo roztažených chipů) ── */
+.crm-filter-dd-toggle { border: 1px solid var(--b1); background: rgba(255,255,255,.06); color: #e8eef6;
+  font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; }
+.crm-filter-dd-toggle:hover { background: rgba(255,255,255,.10); color: #fff; }
+.crm-filter-dd-toggle .chip-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.crm-filter-dd-menu { min-width: 232px; padding: 6px; background: #141b25; border: 1px solid var(--b1); border-radius: 12px; }
+.crm-filter-dd-item { display: flex !important; align-items: center; gap: 9px; border-radius: 9px; margin: 2px 0;
+  padding: 8px 12px; color: #e8eef6; font-weight: 500; font-size: 13.5px; white-space: nowrap; }
+.crm-filter-dd-item .chip-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.crm-filter-dd-item:hover, .crm-filter-dd-item:focus { filter: brightness(1.16); color: #fff; }
+.crm-filter-dd-item.active { outline: 1.5px solid rgba(255,255,255,.4); outline-offset: -1.5px; font-weight: 600; }
+/* celá buňka barevná dle stavu (i toggle když je stav vybraný); !important ať barva přežije hover/active Bootstrapu */
+.crm-filter-dd-item.chip--new,        .crm-filter-dd-toggle.chip--new        { background: rgba(127,180,255,.20) !important; color: #a9caff !important; }
+.crm-filter-dd-item.chip--pending,    .crm-filter-dd-toggle.chip--pending    { background: rgba(255,192,122,.20) !important; color: #ffcf9a !important; }
+.crm-filter-dd-item.chip--progress,   .crm-filter-dd-toggle.chip--progress   { background: rgba(195,170,255,.20) !important; color: #d3c2ff !important; }
+.crm-filter-dd-item.chip--waiting,    .crm-filter-dd-toggle.chip--waiting    { background: rgba(255,154,154,.20) !important; color: #ffb3b3 !important; }
+.crm-filter-dd-item.chip--completed,  .crm-filter-dd-toggle.chip--completed  { background: rgba(247,198,107,.20) !important; color: #f7d28a !important; }
+.crm-filter-dd-item.chip--uncollected,.crm-filter-dd-toggle.chip--uncollected{ background: rgba(255,224,138,.20) !important; color: #ffe6a3 !important; }
+.crm-filter-dd-item.chip--collected,  .crm-filter-dd-toggle.chip--collected  { background: rgba(134,230,166,.20) !important; color: #a6eec0 !important; }
+.crm-filter-dd-item.chip--cancelled,  .crm-filter-dd-toggle.chip--cancelled  { background: rgba(185,192,204,.18) !important; color: #cfd5de !important; }
+.crm-filter-dd-menu .dropdown-item:hover, .crm-filter-dd-menu .dropdown-item:focus { filter: brightness(1.16); }
+html[data-lg-theme="light"] .crm-filter-dd-menu { background: #fff; }
+html[data-lg-theme="light"] .crm-filter-dd-toggle { background: rgba(0,0,0,.04); color: #1d2733; }
+html[data-lg-theme="light"] .crm-filter-dd-item { color: #1d2733; }
 html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); background: #fff; } /* světlý motiv: lišta neprůhledně bílá (černá by pohřbila tmavý text) */
 html[data-lg-theme="light"] .afx-brand { color: #10151d; }
 html[data-lg-theme="light"] .afx-brand img { filter: none; } /* světlý motiv → černé logo */

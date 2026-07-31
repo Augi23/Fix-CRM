@@ -333,16 +333,26 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
 $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
 ?>
 <div class="orders-status-filter d-flex flex-wrap gap-2 mb-3 align-items-center">
-    <a href="orders.php?<?php echo ltrim($branch_qs . $search_qs . $tech_qs, '&'); ?>"
-       class="crm-filter-chip<?php echo $filter_status ? '' : ' active'; ?>">
-        <i class="fas fa-layer-group"></i> <?php echo __('all_orders'); ?>
-    </a>
-    <?php foreach ($status_defs as $st => $meta): if (!empty($meta['legacy'])) continue; ?>
-        <a href="orders.php?filter=<?php echo urlencode($st) . $branch_qs . $search_qs . $tech_qs; ?>"
-           class="crm-filter-chip chip--<?php echo e($meta['badge']); ?><?php echo ($filter_status === $st) ? ' active' : ''; ?>">
-            <span class="chip-dot"></span><?php echo e(getOrderStatusLabel($st)); ?>
-        </a>
-    <?php endforeach; ?>
+    <?php $__curBadge = ($filter_status && isset($status_defs[$filter_status])) ? $status_defs[$filter_status]['badge'] : ''; ?>
+    <div class="dropdown">
+        <button class="btn btn-sm dropdown-toggle crm-filter-dd-toggle<?php echo $__curBadge ? ' chip--' . e($__curBadge) : ''; ?>" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+            <?php if ($filter_status): ?><span class="chip-dot"></span><?php echo e(getOrderStatusLabel($filter_status)); ?><?php else: ?><i class="fas fa-layer-group"></i> <?php echo __('all_orders'); ?><?php endif; ?>
+        </button>
+        <ul class="dropdown-menu crm-filter-dd-menu shadow">
+            <li>
+                <a class="dropdown-item crm-filter-dd-item<?php echo $filter_status ? '' : ' active'; ?>" href="orders.php?<?php echo ltrim($branch_qs . $search_qs . $tech_qs, '&'); ?>">
+                    <i class="fas fa-layer-group"></i> <?php echo __('all_orders'); ?>
+                </a>
+            </li>
+            <?php foreach ($status_defs as $st => $meta): if (!empty($meta['legacy'])) continue; ?>
+            <li>
+                <a class="dropdown-item crm-filter-dd-item chip--<?php echo e($meta['badge']); ?><?php echo ($filter_status === $st) ? ' active' : ''; ?>" href="orders.php?filter=<?php echo urlencode($st) . $branch_qs . $search_qs . $tech_qs; ?>">
+                    <span class="chip-dot"></span><?php echo e(getOrderStatusLabel($st)); ?>
+                </a>
+            </li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
     <?php /* Filtr podle technika — zachovává ostatní filtry (stav/pobočka/hledání) */ ?>
     <form method="GET" class="ms-auto d-flex align-items-center gap-1">
         <?php if ($filter_status): ?><input type="hidden" name="filter" value="<?php echo e($filter_status); ?>"><?php endif; ?>
