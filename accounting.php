@@ -15,6 +15,12 @@ if (isset($_POST['save_acc_settings'])) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
         die('<div class="alert alert-danger">' . __('security_token_invalid') . '</div>');
     }
+    // Fakturační údaje firmy (vč. ČÍSLA ÚČTU tištěného na faktury a do QR plateb)
+    // smí měnit JEN vedení — role účetní má na stránku čtecí přístup, a přepsání
+    // účtu je klasický podvodný vektor.
+    if (!crmCanManageInvoices()) {
+        die('<div class="alert alert-danger">Fakturační údaje firmy smí měnit jen vedení.</div>');
+    }
     set_setting('acc_company_name', $_POST['acc_company_name']);
     set_setting('acc_address', $_POST['acc_address']);
     set_setting('acc_ico', $_POST['acc_ico']);

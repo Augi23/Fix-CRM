@@ -8,6 +8,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
+if (function_exists('crmIsAccountant') && crmIsAccountant()) { die(__('unauthorized')); }
 if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) {
     die('Unauthorized');
 }

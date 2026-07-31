@@ -20,7 +20,23 @@ $order_id = $_POST['order_id'] ?? null;
 $invoice_id = $_POST['invoice_id'] ?? null;
 $invoice_number = $_POST['invoice_number'] ?? null;
 $item_name = $_POST['item_name'] ?? '';
-$date_issue = $_POST['date_issue'] ?? date('Y-m-d');
+$date_issue = trim((string)($_POST['date_issue'] ?? '')) ?: date('Y-m-d');
+// UZÁVĚRKA: expresní faktura je živá cesta z detailu zakázky — bez tohohle šla
+// editovat i zakládat faktura v uzamčeném měsíci (nález prověrky 31.7.2026)
+if (function_exists('afxAccountingAssertOpen')) {
+    try {
+        afxAccountingAssertOpen($date_issue, 'fakturu');
+        if (!empty($_POST['invoice_id'])) {
+            $pv = $pdo->prepare("SELECT date_issue, date_tax FROM invoices WHERE id = ?");
+            $pv->execute([(int)$_POST['invoice_id']]);
+            $pvRow = $pv->fetch(PDO::FETCH_ASSOC) ?: [];
+            afxAccountingAssertOpen((string)($pvRow['date_issue'] ?? '') ?: date('Y-m-d'), 'fakturu');
+            afxAccountingAssertOpen((string)($pvRow['date_tax'] ?? '') ?: date('Y-m-d'), 'fakturu (DUZP)');
+        }
+    } catch (AfxAccountingClosedException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE); exit;
+    }
+}
 $date_due = $_POST['date_due'] ?? date('Y-m-d', strtotime('+14 days'));
 $total_amount = floatval($_POST['total_amount'] ?? 0);
 

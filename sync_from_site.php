@@ -76,11 +76,21 @@ function sync_orders($data) {
                 // synchronizace shodilo i zaplacené faktury zpět mezi nezaplacené a smazalo
                 // datum platby. Faktury s evidovanou platbou (nebo označené jako zaplacené)
                 // se proto nechávají být a jen se zaloguje, že se rozcházejí částkou.
+                // …a JEN mimo uzamčené měsíce (uzávěrka platí i pro legacy synchronizaci)
+                $__lockedSql = '';
+                if (function_exists('afxAccountingLockedPeriods')) {
+                    $__locked = array_keys(afxAccountingLockedPeriods());
+                    if ($__locked) {
+                        $__lockedSql = " AND DATE_FORMAT(date_issue, '%Y-%m') NOT IN ("
+                            . implode(',', array_fill(0, count($__locked), '?')) . ")";
+                    }
+                }
                 $stmt_inv = $pdo->prepare("UPDATE invoices SET total_amount = ?
                     WHERE order_id = ? AND status IN ('draft','issued','overdue')
                       AND COALESCE(paid_amount, 0) = 0
-                      AND NOT EXISTS (SELECT 1 FROM invoice_payments p WHERE p.invoice_id = invoices.id)");
-                $stmt_inv->execute([$amt, $id]);
+                      AND NOT EXISTS (SELECT 1 FROM invoice_payments p WHERE p.invoice_id = invoices.id)"
+                    . $__lockedSql);
+                $stmt_inv->execute(array_merge([$amt, $id], $__lockedSql !== '' ? $__locked : []));
                 if ($stmt_inv->rowCount() === 0) {
                     $chk = $pdo->prepare("SELECT invoice_number, total_amount, status FROM invoices WHERE order_id = ?");
                     $chk->execute([$id]);

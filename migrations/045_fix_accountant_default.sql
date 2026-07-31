@@ -1,4 +1,4 @@
--- 043: pojistka proti neplatnému DEFAULTu technicians.role po migraci 042
+-- 045: pojistka proti neplatnému DEFAULTu technicians.role po migraci 042
 --
 -- PROČ: 042 skládá ALTER ENUMu dynamicky z information_schema.COLUMNS a počítá
 -- se dvěma podobami COLUMN_DEFAULT (s apostrofy / bez). MariaDB 10.2+ ale u

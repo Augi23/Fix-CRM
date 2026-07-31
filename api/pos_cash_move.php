@@ -27,7 +27,10 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) {
     pcm_fail('Role účetní hotovostí nehýbe — pokladní kniha je pro ni jen ke čtení.', 403);
 }
 
+// Neznámá/prázdná akce = 'move' — větev vklad/výběr níže je fall-through, takže
+// bez normalizace by `action=cokoliv` přeskočil kontrolu uzávěrky (nález prověrky)
 $action = (string)($_POST['action'] ?? 'move');
+if (!in_array($action, ['move', 'opening', 'storno'], true)) { $action = 'move'; }
 $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 
 // ── Počáteční zůstatek pokladny ─────────────────────────────────────────────
@@ -60,7 +63,12 @@ if ($action === 'opening') {
     if ($date === '') { $date = date('Y-m-d'); }
     $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 255);
 
-    $res = afxCashSetOpeningBalance($branch, $balance, $date, $by, $note);
+    try {
+        $res = afxCashSetOpeningBalance($branch, $balance, $date, $by, $note);
+    } catch (AfxAccountingClosedException $e) {
+        // uzávěrka = srozumitelná hláška, ne 500 (typicky historické datum inventury)
+        pcm_fail($e->getMessage(), 423);
+    }
     if (!$res['ok']) { pcm_fail((string)$res['error']); }
     echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     exit;
@@ -78,7 +86,11 @@ if ($action === 'storno') {
         pcm_fail('Doklad patří jiné pobočce', 403);
     }
     $reason = mb_substr(trim((string)($_POST['reason'] ?? '')), 0, 160);
-    $res = afxCashDocStorno($docId, $reason, $by);
+    try {
+        $res = afxCashDocStorno($docId, $reason, $by);
+    } catch (AfxAccountingClosedException $e) {
+        pcm_fail($e->getMessage(), 423);
+    }
     if (!$res['ok']) { pcm_fail((string)$res['error']); }
     echo json_encode(['ok' => true, 'number' => $res['number']], JSON_UNESCAPED_UNICODE);
     exit;

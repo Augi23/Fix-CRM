@@ -94,6 +94,13 @@ function afxPosShiftAssertMine(int $branchId): void {
  * Vrací ['ok'=>bool, 'error'=>?, 'shift_id'=>?].
  */
 function afxPosShiftOpen(int $branchId, bool $match, ?float $counted): array {
+    // UZÁVĚRKA: převzetí kasy zapisuje počáteční zůstatek k dnešku — při zamčeném
+    // aktuálním měsíci se musí odmítnout PŘED INSERTem směny, jinak směna zůstane
+    // viset otevřená a další převzetí hlásí „pokladnu už má převzatou…"
+    if (function_exists('afxAccountingClosedError')) {
+        $lockErr = afxAccountingClosedError(date('Y-m-d'), 'převzetí pokladny');
+        if ($lockErr !== null) { return ['ok' => false, 'error' => $lockErr]; }
+    }
     global $pdo;
     afxEnsurePosShiftTable();
     [$label, $uid, $tid] = afxPosShiftIdentity();

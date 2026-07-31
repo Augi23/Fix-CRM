@@ -133,7 +133,12 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
         if ($grade !== '' && function_exists('afxGoodsIsUsedByGrade')) {
             return afxGoodsIsUsedByGrade($grade, '58mm účtenka');
         }
-        if ($grade !== '') { return mb_strtolower($grade) !== 'nový'; }
+        if ($grade !== '') {
+            // stejná logika jako afxGoodsIsUsedByGrade: rozhoduje PRVNÍ slovo
+            // ('A – jako nové' nesmí projít jako použité jen kvůli pomlčce)
+            $first = mb_strtolower((string)preg_split('/[\s–-]+/u', $grade)[0]);
+            return !in_array($first, ['nový', 'nove', 'nové', 'novy', 'new'], true);
+        }
         if ((string)($l['item_type'] ?? '') === 'part') { return false; }
         return $saleAfterCut;
     };

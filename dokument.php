@@ -8,6 +8,9 @@ require_once 'includes/functions.php';
 require_once 'includes/documents.php';
 
 if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) { header('Location: login.php'); exit; }
+// Výkup i zástava jsou PROVOZNÍ doklady (vydávají hotovost z kasy) — role účetní
+// sem nesmí; jinak by obešla zákaz z api/pos_cash_move.php přes výkupní list.
+if (function_exists('crmIsAccountant') && crmIsAccountant()) { header('Location: accounting.php'); exit; }
 
 $type = (string)($_GET['type'] ?? 'vykup');
 if (!isset(crmDocTypes()[$type])) { $type = 'vykup'; }

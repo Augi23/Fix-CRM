@@ -2,8 +2,10 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-// Access Check
-if (!hasPermission('admin_access')) {
+// Access Check: vedení (admin_access) + role účetní (crmCanAccountingEdit) —
+// bez toho by účetní na accounting.php viděla faktury, ale každé tlačítko by
+// vrátilo Access denied. Mazání uvnitř hlídá crmCanAccountingDelete (účetní NE).
+if (!hasPermission('admin_access') && !(function_exists('crmCanAccountingEdit') && crmCanAccountingEdit())) {
     die(json_encode(['success' => false, 'error' => 'Access denied']));
 }
 
@@ -31,12 +33,18 @@ switch ($action) {
             // NOVÉ podoby dokladu i PŮVODNÍ datum u editace (přesun dokladu ven ze
             // zamčeného měsíce je taky změna zamčeného období).
             if (function_exists('afxAccountingAssertOpen')) {
-                afxAccountingAssertOpen((string)($_POST['date_issue'] ?? date('Y-m-d')), 'fakturu');
+                // `?:` a ne `??` — prázdný řetězec z formuláře by jinak assert obešel
+                // (InvoiceManager by pak stejně uložil dnešek). Hlídá se i DUZP:
+                // právě date_tax určuje zdaňovací období DPH.
+                afxAccountingAssertOpen(trim((string)($_POST['date_issue'] ?? '')) ?: date('Y-m-d'), 'fakturu');
+                afxAccountingAssertOpen(trim((string)($_POST['date_tax'] ?? '')) ?: date('Y-m-d'), 'fakturu (DUZP)');
                 if (!empty($_POST['id'])) {
-                    $pv = $pdo->prepare("SELECT date_issue FROM invoices WHERE id = ?");
+                    $pv = $pdo->prepare("SELECT date_issue, date_tax FROM invoices WHERE id = ?");
                     $pv->execute([(int)$_POST['id']]);
-                    $pvDate = (string)$pv->fetchColumn();
-                    if ($pvDate !== '') { afxAccountingAssertOpen($pvDate, 'fakturu'); }
+                    $pvRow = $pv->fetch(PDO::FETCH_ASSOC) ?: [];
+                    // doklad bez data (importy) konzervativně hlídat přes dnešek
+                    afxAccountingAssertOpen((string)($pvRow['date_issue'] ?? '') ?: date('Y-m-d'), 'fakturu');
+                    afxAccountingAssertOpen((string)($pvRow['date_tax'] ?? '') ?: date('Y-m-d'), 'fakturu (DUZP)');
                 }
             }
             
@@ -89,7 +97,8 @@ switch ($action) {
                 $dv = $pdo->prepare("SELECT date_issue FROM invoices WHERE id = ?");
                 $dv->execute([$id]);
                 $dvDate = (string)$dv->fetchColumn();
-                if ($dvDate !== '') { afxAccountingAssertOpen($dvDate, 'fakturu'); }
+                // faktura bez data (import) → konzervativně hlídat dnešek
+                afxAccountingAssertOpen($dvDate !== '' ? $dvDate : date('Y-m-d'), 'fakturu');
             }
             // číslo faktury pro historii zjistit PŘED smazáním
             $__invNo = '';
@@ -114,7 +123,7 @@ switch ($action) {
                 $sv = $pdo->prepare("SELECT date_issue FROM invoices WHERE id = ?");
                 $sv->execute([(int)$_POST['id']]);
                 $svDate = (string)$sv->fetchColumn();
-                if ($svDate !== '') { afxAccountingAssertOpen($svDate, 'fakturu'); }
+                afxAccountingAssertOpen($svDate !== '' ? $svDate : date('Y-m-d'), 'fakturu');
             } catch (Exception $e) {
                 echo json_encode(['success' => false, 'error' => $e->getMessage()]); break;
             }

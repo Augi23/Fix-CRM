@@ -164,6 +164,35 @@ function crmCanAccountingDelete(): bool {
 }
 
 /**
+ * Centrální stráž api/* pro roli účetní. Whitelist stránek v header.php chrání
+ * JEN stránky, které header includují — adresář api/ je mimo něj a řada endpointů
+ * kontroluje pouze přihlášení. Bez téhle stráže by si účetní přes search_customers/
+ * get_order_details přečetla celou klientskou databázi a přes add_order zapisovala
+ * do zakázek. Volá se z functions.php při každém požadavku; mimo api/ nedělá nic.
+ */
+function afxAccountantApiGate(): void {
+    if (PHP_SAPI === 'cli' || !crmIsAccountant()) { return; }
+    $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (strpos($script, '/api/') === false) { return; }   // stránky řeší header.php
+    $allowed = [
+        'kb_sync.php', 'kb_match.php',            // banka: synchronizace + párování
+        'reauth.php',                             // obnova přihlášení (globální poller)
+        'guide_viewed.php',                       // návody: značka přečtení
+        'get_invoice_data.php', 'get_invoice_details.php',   // detail faktury (čtení)
+        'tech_popups.php',                        // footer poller (vrátí prázdno; bez
+                                                  // něj by log šuměl 403 každých 20 s)
+    ];
+    if (!in_array(basename($script), $allowed, true)) {
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false,
+            'message' => 'Role účetní má přístup jen k účetním funkcím (faktury, banka, sestavy).'],
+            JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
+/**
  * Sloupce klienta, které smí účetní vidět — jen to, co patří na fakturu.
  * Účetní nemá co koukat na zařízení klienta, závady, poznámky techniků,
  * hesla ani doklady totožnosti. Určeno pro SELECT ve fakturačních výpisech.
@@ -217,6 +246,13 @@ function afxAccountingLockedPeriods(bool $refresh = false): array {
         return $cache;
     }
     $cache = [];
+    // VÝHRADNĚ pro testy nanečisto (scripts/kb_test_parovani.php): fixtures používají
+    // relativní data (@-N dní) a po první skutečné uzávěrce by část z nich padla do
+    // zamčeného měsíce — test by hlásil chyby, které nejsou chybami párování.
+    // Globál jde nastavit jen z PHP kódu, na chování webu nemá vliv.
+    if (!empty($GLOBALS['AFX_TEST_IGNORE_LOCKS'])) {
+        return $cache;
+    }
     if (!isset($pdo)) {
         return $cache;
     }
@@ -268,13 +304,21 @@ function afxAccountingLockMessage($date, string $what = 'doklad'): string {
  * Bez ní by šlo po odevzdání přiznání zpětně přepsat částku a čísla v CRM by se
  * rozešla s tím, co je odevzdané na úřadě.
  *
- * @throws RuntimeException když je měsíc uzamčený
+ * @throws AfxAccountingClosedException když je měsíc uzamčený
  */
 function afxAccountingAssertOpen($date, string $what = 'doklad'): void {
     if (afxAccountingPeriodLocked($date)) {
-        throw new RuntimeException(afxAccountingLockMessage($date, $what));
+        throw new AfxAccountingClosedException(afxAccountingLockMessage($date, $what));
     }
 }
+
+/**
+ * Výjimka „období je uzavřené". VLASTNÍ TŘÍDA je nutnost, ne okrasa: PDOException
+ * dědí z RuntimeException, takže `catch (RuntimeException)` u volajících by chytal
+ * i databázové chyby a maskoval je jako uzávěrku. Volající chytají VÝHRADNĚ tuhle
+ * třídu (dědí z RuntimeException, starší catch bloky tedy dál fungují).
+ */
+class AfxAccountingClosedException extends RuntimeException {}
 
 /**
  * Měkká varianta afxAccountingAssertOpen() pro místa, kde se výjimka nehodí

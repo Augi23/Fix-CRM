@@ -62,12 +62,22 @@ $cashToday = $todaySums['cash'] + $cashIn - $cashOut;
 // obrat a nikdy peníze, které v zásuvce reálně ležely z minulých dnů.
 afxEnsureCashBookTables();
 $cbBranch = (int)getCurrentStaffBranchId();
-// Napříč pobočkami smí pokladní knihu přepínat jen globální divák (admin/Boss);
-// ostatním se pobočka bere z DB a GET parametr se ignoruje (pobočková izolace).
-if (isBranchGlobalViewer() && isset($_GET['cb_branch'])) {
-    $cbBranch = max(0, (int)$_GET['cb_branch']);
+// Napříč pobočkami smí pokladní knihu přepínat globální divák (admin/Boss) a ÚČETNÍ
+// (účetnictví se vede za firmu, ne za provozovnu — čtení; zápis blokuje pos_cash_move).
+// Ostatním se pobočka bere z DB a GET parametr se ignoruje (pobočková izolace).
+$cbGlobalRead = isBranchGlobalViewer() || (function_exists('crmIsAccountant') && crmIsAccountant());
+if ($cbGlobalRead && isset($_GET['cb_branch'])) {
+    // jen skutečná pobočka — cizí číslo by nechalo auto-založit odpadní pokladnu
+    $cbReq = max(0, (int)$_GET['cb_branch']);
+    foreach (getBranches(false) as $__b) {
+        if ((int)$__b['id'] === $cbReq) { $cbBranch = $cbReq; break; }
+    }
 }
-$cbRegister = afxCashRegisterForBranch($cbBranch);
+// účetní bez přidělené pobočky → výchozí je první pobočka (ne falešná „pobočka 0")
+if ($cbBranch <= 0 && function_exists('crmIsAccountant') && crmIsAccountant()) {
+    foreach (getBranches(false) as $__b) { $cbBranch = (int)$__b['id']; break; }
+}
+$cbRegister = afxCashRegisterForBranch($cbBranch, $cbBranch > 0);
 $cbBranchName = (string)($cbRegister['name'] ?? 'Pokladna');
 
 /** Datum z GET, jen pokud je skutečně ve tvaru Y-m-d (jinak výchozí). */
@@ -206,8 +216,10 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
         <?php if (crmCanViewHistory()): ?>
         <a href="history.php?tab=kasa" class="btn btn-sm btn-info"><i class="fas fa-clock-rotate-left me-1"></i>Historie Pokladny</a>
         <?php endif; ?>
+        <?php if (crmCanUsePos()): ?>
         <button type="button" class="btn btn-sm btn-outline-success" onclick="posCashMove('in')"><i class="fas fa-arrow-down me-1"></i>Vklad</button>
         <button type="button" class="btn btn-sm btn-outline-warning" onclick="posCashMove('out')"><i class="fas fa-arrow-up me-1"></i>Výběr</button>
+        <?php endif; ?>
         <?php if ($cbCanEdit): ?>
         <button type="button" class="btn btn-sm btn-outline-info" onclick="posOpeningBalance()" title="Napočítanou hotovost zapíšeš jako počátek — od něj se počítá celý stav pokladny"><i class="fas fa-scale-balanced me-1"></i>Nastavit počáteční zůstatek</button>
         <?php endif; ?>
@@ -283,7 +295,7 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <strong><i class="fas fa-book-open me-2 text-info"></i>Pokladní kniha — <?php echo e($cbBranchName); ?></strong>
         <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
-            <?php if (isBranchGlobalViewer()): ?>
+            <?php if (!empty($cbGlobalRead)): ?>
             <select name="cb_branch" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
                 <?php foreach (getBranches(false) as $__b): ?>
                 <option value="<?php echo (int)$__b['id']; ?>"<?php echo (int)$__b['id'] === $cbBranch ? ' selected' : ''; ?>><?php echo e((string)$__b['name']); ?></option>
@@ -505,6 +517,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<?php if (crmCanUsePos()): ?>
 <div class="row g-4">
     <!-- ── vyhledávání ── -->
     <div class="col-lg-6">
@@ -568,7 +581,14 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
 </div>
 
-<?php if (!$shift || !$shiftMine): ?>
+<?php else: ?>
+<!-- Role účetní: jen pokladní kniha (výše) — prodej, směny a hotovost jsou provozní -->
+<div class="glass-panel p-3 border-secondary mb-3 small text-white-50">
+    <i class="fas fa-eye me-1"></i>Pokladna je pro tebe jen ke čtení — prodej a pohyby hotovosti dělá provoz.
+</div>
+<?php endif; ?>
+
+<?php if (crmCanUsePos() && (!$shift || !$shiftMine)): ?>
 <!-- ── PŘEVZETÍ POKLADNY — overlay přes celou kasu, dokud směnu někdo nedrží ── -->
 <div class="pos-lock" id="posShiftGate" style="display:flex;">
     <div class="pos-lock-card" style="width:min(480px,94vw);">
@@ -685,6 +705,7 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
 </div>
 
+<?php if (crmCanUsePos()): ?>
 <script>
 (function () {
     var cart = [];          // {type, id, name, code, price, qty, stock}
@@ -1184,5 +1205,6 @@ document.addEventListener('DOMContentLoaded', function () {
     render();
 })();
 </script>
+<?php endif; ?>
 
 <?php require_once 'includes/footer.php'; ?>

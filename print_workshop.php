@@ -2,6 +2,11 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
+// BEZPEČNOST: bez téhle kontroly si jméno a telefon klienta mohl stáhnout
+// kdokoli z internetu prostým iterováním ?id=1..N (nález prověrky 31.7.2026)
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) { die(__('unauthorized')); }
+if (function_exists('crmIsAccountant') && crmIsAccountant()) { die(__('unauthorized')); }
+
 if (!isset($_GET['id']) && !isset($_GET['order_id'])) die("Order ID is not specified");
 
 $id = $_GET['id'] ?? $_GET['order_id'];

@@ -57,6 +57,17 @@ try {
 
     $current_status = $order_data['status'];
     $current_tech_id = $order_data['technician_id'];
+
+    // UZÁVĚRKA — kontrola PŘED zápisem: výdej s platbou hotově zapisuje tržbu
+    // k dnešku. Při zamčeném aktuálním měsíci se odmítne CELÝ výdej (rollback),
+    // ne až zápis hotovosti po commitu — jinak by zakázka zůstala „vydaná" bez
+    // stopy v pokladním deníku a tržba by se už nikdy nedozapsala.
+    if ($payment_method === 'cash'
+        && isOrderStatusIn($new_status, 'collected') && !isOrderStatusIn($current_status, 'collected')
+        && function_exists('afxAccountingClosedError')) {
+        $lockErr = afxAccountingClosedError(date('Y-m-d'), 'příjem hotovosti za zakázku');
+        if ($lockErr !== null) { throw new Exception($lockErr); }
+    }
     $current_estimated = $order_data['estimated_cost'];
     $current_final = $order_data['final_cost'];
     // '0' = výslovně „bez technika" (odebrat přiřazení); prázdné = beze změny.
@@ -243,7 +254,13 @@ try {
                 'summary' => 'Zakázka ' . $__oc . ' — výdej, platba ' . ($payLabels[$payment_method] ?? $payment_method) . ($amount > 0 ? ' (' . formatMoney($amount) . ')' : ''),
             ]);
 
-            if ($payment_method === 'cash' && $amount > 0) {
+            if ($payment_method === 'cash' && $amount > 0
+                && function_exists('afxAccountingClosedError')
+                && afxAccountingClosedError(date('Y-m-d'), 'příjem hotovosti za zakázku') !== null) {
+                // pojistka pro souběh (zámek vznikl během požadavku): stav už je
+                // commitnutý, tak aspoň VIDITELNÁ stopa místo tichého nezapsání
+                $payment_note = 'POZOR: hotovost NEZAPSÁNA do pokladního deníku — období je uzavřené. Po odemčení doplň pohyb ručně.';
+            } elseif ($payment_method === 'cash' && $amount > 0) {
                 // hotovost prošla kasou → příjem do pokladního deníku (idempotentně)
                 ensurePosCashMovementsTable();
                 $ck = $pdo->prepare("SELECT id FROM pos_cash_movements WHERE ref_type = 'order' AND ref_id = ? LIMIT 1");

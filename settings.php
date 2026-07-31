@@ -547,6 +547,8 @@ $can_view_all_staff = isBranchGlobalViewer();
 // Účetní nemá v Nastavení co dělat kromě uzávěrky → ať na ni rovnou spadne
 // (výchozí 'staff' by jí ukázal prázdnou kartu jen s vlastním záznamem).
 $active_tab = $_GET['tab'] ?? ($is_admin_user ? 'company' : (crmIsAccountant() ? 'uzaverka' : 'staff'));
+// účetní se GET parametrem nesmí dostat na jinou záložku (staff = seznam zaměstnanců)
+if (crmIsAccountant()) { $active_tab = 'uzaverka'; }
 
 // ── Sloučení do záložky „Systém": Integrace + Databáze + Aktualizace ──────────
 // Staré přímé odkazy i POST přesměrování (?tab=integrations|updates|backups)

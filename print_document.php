@@ -7,6 +7,8 @@ require_once 'includes/functions.php';
 require_once 'includes/documents.php';
 
 if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) die(__('unauthorized'));
+// role účetní: klientská data mimo fakturační rozsah nevidí (hranice role)
+if (function_exists('crmIsAccountant') && crmIsAccountant()) { die(__('unauthorized')); }
 
 $doc = crmGetDocument((int)($_GET['id'] ?? 0));
 if (!$doc) die(__('print_not_found'));

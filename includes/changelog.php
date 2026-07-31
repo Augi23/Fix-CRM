@@ -6,6 +6,21 @@
  */
 return [
     [
+        'version' => '3.38.0',
+        'date' => '2026-07-31',
+        'time' => '19:45',
+        'title' => 'Bezpečnostní dotažení: uzávěrka bez zadních vrátek, role účetní bez děr',
+        'items' => [
+            '<b>Postup podle pravidla „prověrka před nasazením":</b> tato dávka prošla nezávislou prověrkou (3 pohledy), opravou nálezů a nezávislým ověřením oprav JEŠTĚ PŘED nasazením.',
+            '<b>Uzávěrka už nemá zadní vrátka:</b> kontrolu uzamčeného měsíce nově drží i expresní faktura ze zakázky, klasické vystavení/editace faktury, dobropis, DUZP (datum zdanitelného plnění), auto-faktura při výdeji, výdej zakázky s hotovostí (odmítne se celý, nic se neuloží napůl) i storno platby v bance. Prázdné datum kontrolu neobejde.',
+            '<b>Banka se nedá zablokovat:</b> storno platby spadající do zamčeného měsíce dřív shodilo celou synchronizaci — a každou další. Nově jde pohyb „k prověření" s vysvětlením a synchronizace běží dál. Databázové chyby se už nemaskují jako uzávěrka (vlastní typ výjimky).',
+            '<b>Role účetní utěsněna centrálně:</b> jediná stráž pro celé api/ — účetní projde jen na účetní funkce (banka, párování, detail faktury), všude jinde dostane srozumitelné odmítnutí. Ke klientským datům se nedostane ani přes tiskové stránky. Fakturační údaje firmy (číslo účtu na fakturách!) smí měnit jen vedení.',
+            '<b>Role účetní zároveň FUNGUJE:</b> otevřený backend faktur (uložit, stav, dobropis, exporty — mazat ne), uzávěrka v Nastavení, pokladní kniha za obě pobočky jen ke čtení (bez prodejního UI).',
+            '<b>Opravena veřejně přístupná stránka</b> tisku servisního štítku — jméno a telefon klienta si mohl zobrazit kdokoli bez přihlášení.',
+            '<b>Drobné:</b> výkup v zamčeném měsíci se ohlásí obsluze (dřív jen do logu), převzetí kasy nenechá viset směnu, test párování je nezávislý na skutečné uzávěrce, whitelist stránek nejde obejít přes PATH_INFO.',
+        ],
+    ],
+    [
         'version' => '3.37.2',
         'date' => '2026-07-31',
         'time' => '21:35',

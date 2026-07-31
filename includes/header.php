@@ -28,7 +28,10 @@ if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php
 }
 
 // Access Control based on permissions
-$page = basename($_SERVER['PHP_SELF']);
+// POZOR: basename(PHP_SELF) NE — PHP_SELF obsahuje i PATH_INFO, takže požadavek
+// /orders.php/accounting.php by se tvářil jako 'accounting.php' a prošel whitelistem.
+// SCRIPT_NAME je skutečně spuštěný skript.
+$page = basename((string)($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF']));
 
 // ── ÚČETNÍ = NEPROVOZNÍ ROLE: whitelist stránek ──────────────────────────────
 // hasPermission() účetní nikam nepustí (crmAccountantHasPermission vrací false),
@@ -41,12 +44,13 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) {
         'accounting.php',      // faktury a dobropisy
         'banka.php',           // bankovní pohyby a párování plateb
         'ucetni_sestavy.php',  // tiskové podklady za období
-        'pokladna.php',        // pokladní kniha (prodej jí blokuje crmCanUsePos)
-        'print_invoice.php',   // tisk dokladu, na který se dívá
-        'print_receipt.php',
+        'pokladna.php',        // pokladní kniha (prodejní UI se jí skryje, viz pokladna.php)
         'navody.php',          // návody (Jak fungují platby apod.)
-        'profile.php',         // vlastní profil a změna hesla
+        'settings.php',        // JEN kvůli záložce Uzávěrka — ostatní záložky i akce
+                               // hlídá crmCanManageSettings, účetní je neuvidí
     ];
+    // Pozn.: print_invoice.php / print_receipt.php header neincludují — jejich
+    // přístup pro účetní řeší jejich vlastní gaty, ne tento whitelist.
     if (!in_array($page, $__accountantPages, true)) {
         header('Location: accounting.php');
         exit;
@@ -74,7 +78,7 @@ if ($page == 'reports.php') {
     exit;
 }
 
-$current_page = basename($_SERVER['PHP_SELF']);
+$current_page = $page;
 $search_action = 'index.php';
 $search_placeholder = __('search_placeholder');
 $show_search = true;

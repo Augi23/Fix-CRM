@@ -310,11 +310,6 @@ function crmGetDocumentIdScans(int $documentId): array {
  * při běžném doladění listu před podpisem.
  */
 function crmSyncVykupCashMovement(int $docId): void {
-    // UZÁVĚRKA: oprava výkupu zapisuje rozdílový pohyb k DNEŠKU — když je aktuální
-    // měsíc zamčený, nesmí vzniknout (historické pohyby se nemění nikdy, viz níže)
-    if (function_exists('afxAccountingAssertOpen')) {
-        afxAccountingAssertOpen(date('Y-m-d'), 'pohyb hotovosti z výkupu');
-    }
     global $pdo;
     $doc = crmGetDocument($docId);
     if (!$doc || (string)$doc['doc_type'] !== 'vykup') return;
@@ -345,6 +340,12 @@ function crmSyncVykupCashMovement(int $docId): void {
         }
         $diff = round($target - $net, 2);
         if (abs($diff) < 0.005) { return; }   // deník už sedí — nic nezapisovat
+
+        // UZÁVĚRKA až TADY — hlídá se jen skutečný zápis (pohyb vzniká k dnešku;
+        // historické pohyby se nemění nikdy). No-op re-save projít smí.
+        if (function_exists('afxAccountingAssertOpen')) {
+            afxAccountingAssertOpen(date('Y-m-d'), 'pohyb hotovosti z výkupu');
+        }
 
         // První zápis hotovostní výplaty — založit výdaj jako dřív.
         if (!$moves && $target > 0) {
@@ -391,6 +392,9 @@ function crmSyncVykupCashMovement(int $docId): void {
             'summary' => ($dir === 'out' ? 'Doplatek z kasy ' : 'Vrácení do kasy ') . formatMoney(abs($diff))
                 . ' — oprava výkupu ' . $label . ' (historický pohyb se nemění, zapsán rozdíl k dnešku)',
         ]);
+    } catch (AfxAccountingClosedException $e) {
+        // uzávěrka NESMÍ skončit v error_logu — save_document ji hlásí obsluze
+        throw $e;
     } catch (Throwable $e) { error_log('crmSyncVykupCashMovement: ' . $e->getMessage()); }
 }
 

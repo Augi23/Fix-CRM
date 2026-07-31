@@ -22,7 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $order_id = $_POST['order_id'] ?? null;
         $invoice_number = $_POST['invoice_number'] ?? '';
         $variable_symbol = $_POST['variable_symbol'] ?? '';
-        $date_issue = $_POST['date_issue'] ?? date('Y-m-d');
+        $date_issue = trim((string)($_POST['date_issue'] ?? '')) ?: date('Y-m-d');
+        // UZÁVĚRKA: antedatovaná faktura do odevzdaného měsíce nesmí vzniknout
+        // (hlídá se i DUZP — právě to určuje zdaňovací období DPH)
+        if (function_exists('afxAccountingAssertOpen')) {
+            afxAccountingAssertOpen($date_issue, 'fakturu');
+            afxAccountingAssertOpen(trim((string)($_POST['date_tax'] ?? '')) ?: $date_issue, 'fakturu (DUZP)');
+        }
         $date_tax = $_POST['date_tax'] ?? date('Y-m-d');
         $date_due = $_POST['date_due'] ?? date('Y-m-d');
         $total_amount = (float)($_POST['total_amount'] ?? 0);

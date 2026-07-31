@@ -8,6 +8,8 @@ if (!defined('ORDER_DOC_EMBED')) {
     require_once 'includes/functions.php';
 
     if (!isset($_SESSION['user_id'])) die(__("unauthorized"));
+// role účetní: klientská data mimo fakturační rozsah nevidí (hranice role)
+if (function_exists('crmIsAccountant') && crmIsAccountant()) { die(__('unauthorized')); }
     if (!isset($_GET['id']) && !isset($_GET['order_id'])) die(__("ord_id_missing"));
 
     $id = $_GET['id'] ?? $_GET['order_id'];

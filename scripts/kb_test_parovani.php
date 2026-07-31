@@ -28,6 +28,11 @@ require_once $root . '/includes/config.php';
 require_once $root . '/includes/functions.php';
 require_once $root . '/includes/kb_api.php';
 
+// Test běží na relativních datech (@-N dní) — skutečná uzávěrka ho nesmí rozbíjet
+// (platba v zamčeném měsíci by skončila v review a kontroly 'auto' by lhaly).
+$GLOBALS['AFX_TEST_IGNORE_LOCKS'] = true;
+afxAccountingLockedPeriods(true);   // refresh statické cache, kdyby už byla naplněná
+
 const TEST_ENV = 'test';
 const TEST_ACCOUNT = 'TEST-ACCOUNT';
 

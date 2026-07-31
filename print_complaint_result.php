@@ -10,6 +10,8 @@ if (!defined('COMPLAINT_RESULT_EMBED')) {
     require_once 'includes/functions.php';
 
     if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) die(__("unauthorized"));
+// role účetní: klientská data mimo fakturační rozsah nevidí (hranice role)
+if (function_exists('crmIsAccountant') && crmIsAccountant()) { die(__('unauthorized')); }
     if (!isset($_GET['id'])) die("Complaint ID is not specified");
 
     ensureComplaintsClientColumns($pdo);

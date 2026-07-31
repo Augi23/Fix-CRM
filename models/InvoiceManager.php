@@ -64,7 +64,7 @@ private function getInvoiceStatusBadge($status) {
 }
 
     public function saveInvoice($data) {
-        if (!hasPermission('admin_access')) {
+        if (!hasPermission('admin_access') && !(function_exists('crmCanAccountingEdit') && crmCanAccountingEdit())) {
             return ['success' => false, 'error' => __('access_denied_simple')];
         }
         try {
@@ -89,6 +89,29 @@ private function getInvoiceStatusBadge($status) {
                     $pv = $this->pdo->prepare("SELECT payment_date FROM invoices WHERE id = ?");
                     $pv->execute([$id]);
                     $payment_date = (string)$pv->fetchColumn() ?: $payment_date;
+                }
+            }
+
+            // UZÁVĚRKA — kontrola v modelu, ne jen ve volajících: sem vedou i cesty
+            // bez pre-checku (auto-faktura při dokončení zakázky). Jsme uvnitř
+            // transakce — výjimka = rollback, žádný částečný zápis.
+            if (function_exists('afxAccountingAssertOpen')) {
+                afxAccountingAssertOpen($date_issue, 'fakturu');
+                afxAccountingAssertOpen($date_tax, 'fakturu (DUZP)');
+                if ($id) {
+                    $pv0 = $this->pdo->prepare("SELECT date_issue, date_tax FROM invoices WHERE id = ?");
+                    $pv0->execute([$id]);
+                    $pvR = $pv0->fetch(PDO::FETCH_ASSOC) ?: [];
+                    afxAccountingAssertOpen((string)($pvR['date_issue'] ?? '') ?: date('Y-m-d'), 'fakturu');
+                    afxAccountingAssertOpen((string)($pvR['date_tax'] ?? '') ?: date('Y-m-d'), 'fakturu (DUZP)');
+                }
+                if ($status == 'paid' && $payment_date !== null) {
+                    // sync po commitu zapíše platbu k tomuto datu — hlídat TEĎ, ne až
+                    // po commitu (jinak faktura uložená + chyba = riziko duplicity).
+                    // Doplatek při změně částky ale sync zapisuje k DNEŠKU, proto
+                    // se hlídá i ten (zamčený aktuální měsíc = vzácný, ale reálný).
+                    afxAccountingAssertOpen($payment_date, 'platbu');
+                    afxAccountingAssertOpen(date('Y-m-d'), 'platbu');
                 }
             }
 
@@ -195,6 +218,17 @@ private function getInvoiceStatusBadge($status) {
             ? ((string)($before['payment_date'] ?? '') ?: date('Y-m-d'))
             : null;
 
+        // UZÁVĚRKA před zápisem: sync plateb by jinak vyhodil výjimku až PO UPDATE
+        // a faktura by zůstala napůl přestavěná („zaplaceno 0 z …"). Hlídá se datum
+        // platby, které sync použije (u odznačení datum evidované platby).
+        if (function_exists('afxAccountingAssertOpen')) {
+            if ($status == 'paid' && $payment_date !== null) {
+                afxAccountingAssertOpen($payment_date, 'platbu');
+            } elseif ((string)($before['payment_date'] ?? '') !== '') {
+                afxAccountingAssertOpen((string)$before['payment_date'], 'platbu');
+            }
+        }
+
         $sql = "UPDATE invoices SET status = ?, payment_date = ?";
         $params = [$status, $payment_date];
 
@@ -206,11 +240,21 @@ private function getInvoiceStatusBadge($status) {
         $sql .= " WHERE id = ?";
         $params[] = $id;
 
-        $stmt = $this->pdo->prepare($sql);
-        $ok = $stmt->execute($params);
-        // evidence plateb musí odpovídat stavu (jinak by faktura hlásila „zaplaceno 0 z …")
-        if ($ok && function_exists('afxInvoiceSyncManualStatus')) {
-            afxInvoiceSyncManualStatus((int)$id, (string)$status, $payment_method);
+        // UPDATE + srovnání evidence plateb ATOMICKY — kdyby sync spadl, stav
+        // faktury se vrátí (žádné rozporné „zaplaceno, ale bez platby")
+        $ownTx = !$this->pdo->inTransaction();
+        if ($ownTx) { $this->pdo->beginTransaction(); }
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $ok = $stmt->execute($params);
+            // evidence plateb musí odpovídat stavu (jinak by faktura hlásila „zaplaceno 0 z …")
+            if ($ok && function_exists('afxInvoiceSyncManualStatus')) {
+                afxInvoiceSyncManualStatus((int)$id, (string)$status, $payment_method);
+            }
+            if ($ownTx) { $this->pdo->commit(); }
+        } catch (Throwable $e) {
+            if ($ownTx && $this->pdo->inTransaction()) { $this->pdo->rollBack(); }
+            throw $e;
         }
         return $ok;
     }
@@ -224,6 +268,12 @@ private function getInvoiceStatusBadge($status) {
 
         try {
             $this->pdo->beginTransaction();
+
+            // UZÁVĚRKA: dobropis vzniká s dnešním datem — v zamčeném aktuálním
+            // měsíci vzniknout nesmí (výjimka → rollback → chybová hláška)
+            if (function_exists('afxAccountingAssertOpen')) {
+                afxAccountingAssertOpen(date('Y-m-d'), 'dobropis');
+            }
 
             // Check if prefix exists in settings
             $prefix = get_setting('acc_credit_note_prefix', 'ODD' . date('Y'));

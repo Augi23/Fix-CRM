@@ -6,6 +6,8 @@
 // Role „účetní" + uzávěrka účetních období (balík C). Celá logika je záměrně
 // v samostatném souboru, aby se tenhle už tak velký soubor dál nenafukoval.
 require_once __DIR__ . '/accounting_role.php';
+// stráž api/* pro roli účetní — musí běžet hned po načtení rolí (viz funkce)
+afxAccountantApiGate();
 
 /**
  * Return the effective internal staff role for the current employee session.
@@ -3977,6 +3979,12 @@ function ensureOrderPaymentMethodColumn(): void {
 /** Vrátí id faktury k zakázce; když neexistuje, vystaví ji (1 položka Oprava …).
  *  Stejná konvence jako auto-faktura při dokončení (update_order_full). */
 function crmEnsureOrderInvoice(int $orderId, string $paymentMethod = 'bank_transfer'): int {
+    // UZÁVĚRKA: auto-faktura vzniká k dnešku — při zamčeném aktuálním měsíci
+    // nesmí vzniknout (0 = volající vypíše vlastní hlášku „faktura nevystavena")
+    if (function_exists('afxAccountingPeriodLocked') && afxAccountingPeriodLocked(date('Y-m-d'))) {
+        error_log('crmEnsureOrderInvoice: zamčené období — faktura nevystavena (zakázka ' . $orderId . ')');
+        return 0;
+    }
     global $pdo;
     try {
         $ck = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND invoice_type = 'invoice' AND status <> 'cancelled' ORDER BY id DESC LIMIT 1");

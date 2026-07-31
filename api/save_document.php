@@ -97,7 +97,15 @@ try {
     }
     // Výkup hotově = výdej z kasy (pokladní deník) — drží se v souladu s dokumentem.
     if ($type === 'vykup') {
-        try { crmSyncVykupCashMovement($id); } catch (Throwable $e) { /* kasa je bonus */ }
+        try { crmSyncVykupCashMovement($id); }
+        catch (AfxAccountingClosedException $e) {
+            // UZÁVĚRKA se nesmí tiše spolknout: klient by dostal peníze na ruku,
+            // ale kniha by o výdeji nevěděla (rozdíl by se našel až při inventuře).
+            // Dokument je v tuhle chvíli už uložený — proto se vrací CHYBA s jasnou
+            // hláškou, ať obsluha ví, že hotovost teď vyplatit nesmí.
+            sd_fail('Dokument je uložený, ale hotovost NEVYPLÁCEJ: ' . $e->getMessage(), 423);
+        }
+        catch (Throwable $e) { error_log('save_document kasa: ' . $e->getMessage()); /* kasa je bonus */ }
     }
 
     echo json_encode(['ok' => true, 'id' => $id, 'doc_number' => $docNumber], JSON_UNESCAPED_UNICODE);

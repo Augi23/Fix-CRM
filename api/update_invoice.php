@@ -26,7 +26,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $invoice_number = $_POST['invoice_number'] ?? '';
         $variable_symbol = $_POST['variable_symbol'] ?? '';
-        $date_issue = $_POST['date_issue'] ?? date('Y-m-d');
+        $date_issue = trim((string)($_POST['date_issue'] ?? '')) ?: date('Y-m-d');
+        // UZÁVĚRKA: editace nesmí sáhnout na doklad v zamčeném měsíci ani do něj
+        // doklad přesunout (kontroluje se nové I původní datum)
+        if (function_exists('afxAccountingAssertOpen')) {
+            afxAccountingAssertOpen($date_issue, 'fakturu');
+            afxAccountingAssertOpen(trim((string)($_POST['date_tax'] ?? '')) ?: $date_issue, 'fakturu (DUZP)');
+            $pv = $pdo->prepare("SELECT date_issue, date_tax FROM invoices WHERE id = ?");
+            $pv->execute([(int)($_POST['invoice_id'] ?? $_POST['id'] ?? 0)]);
+            $pvRow = $pv->fetch(PDO::FETCH_ASSOC) ?: [];
+            afxAccountingAssertOpen((string)($pvRow['date_issue'] ?? '') ?: date('Y-m-d'), 'fakturu');
+            afxAccountingAssertOpen((string)($pvRow['date_tax'] ?? '') ?: date('Y-m-d'), 'fakturu (DUZP)');
+        }
         $date_tax = $_POST['date_tax'] ?? date('Y-m-d');
         $date_due = $_POST['date_due'] ?? date('Y-m-d');
         $total_amount = (float)($_POST['total_amount'] ?? 0);

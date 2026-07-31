@@ -591,8 +591,19 @@ function kbApplyReversals(?string $env = null, ?string $accountId = null): int {
             $num = (string)$st->fetchColumn();
             // platba se vrátila → smazat její evidenci a přepočítat stav faktury
             // (allowUnpay: tady peníze prokazatelně na účtu nejsou)
-            afxInvoiceRemoveBankPayment((int)$tx['id']);
-            afxInvoiceRecalcPaid($invId, true);
+            // UZÁVĚRKA: platba s datem v zamčeném měsíci by tu vyhodila výjimku —
+            // NESMÍ shodit celý sync, a hlavně nesmí nechat reversal_done = 0
+            // (každý další sync by spadl na tomtéž místě a banka by byla trvale
+            // zablokovaná). Pohyb jde k prověření s hláškou zámku, účetní rozhodne.
+            try {
+                afxInvoiceRemoveBankPayment((int)$tx['id']);
+                afxInvoiceRecalcPaid($invId, true);
+            } catch (AfxAccountingClosedException $eLock) {
+                $pdo->prepare("UPDATE bank_transactions SET match_status = 'review',
+                    match_note = ? WHERE id = ?")
+                    ->execute([mb_substr('STORNO NEZPRACOVÁNO: ' . $eLock->getMessage(), 0, 255), (int)$tx['id']]);
+                return;
+            }
             crmAuditLog('banka.storno', [
                 'entity_type' => 'invoice', 'entity_id' => $invId, 'entity_label' => $num,
                 'summary' => 'Faktura ' . $num . ' vrácena mezi NEZAPLACENÉ — ' . $why . ' ('
@@ -796,7 +807,9 @@ function kbAutoMatchInvoices(?string $env = null, ?string $accountId = null): ar
             try {
                 $pridano = afxInvoiceAddPayment((int)$inv['id'], $amount, 'bank', $payDate, (int)$tx['id'],
                     'Automatické párování — VS ' . $vs);
-            } catch (Exception $eLock) {
+            } catch (AfxAccountingClosedException $eLock) {
+                // JEN uzávěrka — obecné Exception by chytalo i PDOException (dědí
+                // z RuntimeException) a maskovalo DB chybu jako „k prověření"
                 $mark->execute([(int)$inv['id'], 'review', mb_substr($eLock->getMessage(), 0, 255), (int)$tx['id']]);
                 if (!$wasReview) { $review++; }
                 continue;

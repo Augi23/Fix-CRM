@@ -13,7 +13,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-if (!crmCanUsePos()) { die(__('unauthorized')); }
+if (!crmCanUsePos() && !(function_exists('crmCanAccountingRead') && crmCanAccountingRead())) { die(__('unauthorized')); }
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) { die(__('missing_id')); }

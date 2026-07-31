@@ -238,12 +238,6 @@ function afxCashDocTypeLabel(string $docType): string {
  * díra (číslo je spotřebované). Proto se doklady vystavují až po commitu.
  */
 function afxCashDocIssue(array $p): array {
-    // UZÁVĚRKA OBDOBÍ: pokladní doklad s datem v uzamčeném měsíci by změnil
-    // pokladní knihu, která už je odevzdaná — proto se vydání odmítne dřív,
-    // než se čehokoli dotkne.
-    if (function_exists('afxAccountingAssertOpen')) {
-        afxAccountingAssertOpen((string)($p['date'] ?? date('Y-m-d')), 'pokladní doklad');
-    }
     global $pdo;
     afxEnsureCashBookTables();
 
@@ -258,6 +252,12 @@ function afxCashDocIssue(array $p): array {
     $date = (string)($p['date'] ?? '');
     $d = $date !== '' ? date_create_from_format('Y-m-d', $date) : false;
     if (!$d || $d->format('Y-m-d') !== $date) { $date = date('Y-m-d'); }
+
+    // UZÁVĚRKA OBDOBÍ — až PO normalizaci data: nečitelné/prázdné datum spadne na
+    // dnešek a assert by se jinak dal obejít prázdným řetězcem (nález prověrky).
+    if (function_exists('afxAccountingAssertOpen')) {
+        afxAccountingAssertOpen($date, 'pokladní doklad');
+    }
 
     $branchId = max(0, (int)($p['branch_id'] ?? 0));
     $reg = afxCashRegisterForBranch($branchId);

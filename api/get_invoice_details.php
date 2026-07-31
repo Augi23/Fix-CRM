@@ -6,7 +6,8 @@ require_once '../includes/functions.php';
 if (ob_get_length()) ob_clean();
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || !crmCanManageInvoices()) {
+if (!isset($_SESSION['user_id'])
+    || !(crmCanManageInvoices() || (function_exists('crmCanAccountingRead') && crmCanAccountingRead()))) {
     echo json_encode(['success' => false, 'message' => __('access_denied_msg')]);
     exit;
 }
