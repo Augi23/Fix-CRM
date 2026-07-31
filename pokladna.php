@@ -9,6 +9,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
+require_once 'includes/cash_book.php';
 
 ensurePosTables();
 ensureProductsTable();
@@ -38,7 +39,37 @@ try {
         if ($m['direction'] === 'in') { $cashIn += (float)$m['amount']; } else { $cashOut += (float)$m['amount']; }
     }
 } catch (Throwable $e) {}
-$cashState = $todaySums['cash'] + $cashIn - $cashOut;
+// Pohyb hotovosti POUZE za dnešek (to, co kasa ukazovala dřív jako „stav").
+$cashToday = $todaySums['cash'] + $cashIn - $cashOut;
+
+// ── POKLADNÍ KNIHA ──────────────────────────────────────────────────────────
+// Skutečný stav hotovosti = POČÁTEČNÍ ZŮSTATEK pokladny + všechny pohyby od
+// data počátku. Dřív se počítalo od nuly každý den, takže kasa hlásila jen dnešní
+// obrat a nikdy peníze, které v zásuvce reálně ležely z minulých dnů.
+afxEnsureCashBookTables();
+$cbBranch = (int)getCurrentStaffBranchId();
+// Napříč pobočkami smí pokladní knihu přepínat jen globální divák (admin/Boss);
+// ostatním se pobočka bere z DB a GET parametr se ignoruje (pobočková izolace).
+if (isBranchGlobalViewer() && isset($_GET['cb_branch'])) {
+    $cbBranch = max(0, (int)$_GET['cb_branch']);
+}
+$cbRegister = afxCashRegisterForBranch($cbBranch);
+$cbBranchName = (string)($cbRegister['name'] ?? 'Pokladna');
+
+/** Datum z GET, jen pokud je skutečně ve tvaru Y-m-d (jinak výchozí). */
+$cbDate = static function (string $key, string $default): string {
+    $v = trim((string)($_GET[$key] ?? ''));
+    $d = $v !== '' ? date_create_from_format('Y-m-d', $v) : false;
+    return ($d && $d->format('Y-m-d') === $v) ? $v : $default;
+};
+$cbFrom = $cbDate('cb_from', date('Y-m-01'));
+$cbTo   = $cbDate('cb_to', date('Y-m-d'));
+if ($cbTo < $cbFrom) { $cbTo = $cbFrom; }
+
+$cashBook  = afxCashBook($cbBranch, $cbFrom, $cbTo);
+$cashState = afxCashBalanceAt($cbBranch, date('Y-m-d'));
+$cbDayIn   = afxCashDayIncome($cbBranch, date('Y-m-d'));
+$cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen vedení
 ?>
 
 <style>
@@ -99,6 +130,11 @@ $cashState = $todaySums['cash'] + $cashIn - $cashOut;
 .pos-lock-card .lk-other:hover { color: #5fd2ff; }
 @keyframes lkshake { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
 .pos-lock-card.shake { animation: lkshake .4s; }
+/* Pokladní kniha — hustý účetní výpis, ať se do obrazovky vejde celý měsíc */
+.cash-book { max-height: 420px; overflow-y: auto; }
+.cash-book td, .cash-book th { padding: 5px 8px; white-space: nowrap; }
+.cash-book td:nth-child(3) { white-space: normal; }
+.cash-book code { color: #6fd0ff; }
 /* toast po skenu čtečkou */
 .pos-toast { position: fixed; top: 64px; right: 22px; z-index: 11500; display: none; align-items: center; gap: 10px;
   padding: 13px 18px; border-radius: 14px; font-size: 15.5px; font-weight: 600; color: #fff;
@@ -114,11 +150,17 @@ $cashState = $todaySums['cash'] + $cashIn - $cashOut;
         · fakturou <strong><?php echo formatMoney($todaySums['invoice']); ?></strong>
         <?php if ($cashIn > 0): ?> · vklady <strong class="text-success"><?php echo formatMoney($cashIn); ?></strong><?php endif; ?>
         <?php if ($cashOut > 0): ?> · výdaje <strong class="text-warning">−<?php echo formatMoney($cashOut); ?></strong><?php endif; ?>
-        · <span title="Prodeje hotově + vklady − výdaje (výkupy, výběry)">stav hotovosti <strong class="<?php echo $cashState < 0 ? 'text-danger' : 'text-success'; ?>"><?php echo formatMoney($cashState); ?></strong></span>
-        <?php if (crmCanViewHistory()): ?> · <a href="history.php?tab=kasa" class="text-info text-decoration-none">historie kasy →</a><?php endif; ?></span>
+        · <span title="Počáteční zůstatek pokladny (<?php echo e(formatMoney((float)$cbRegister['opening_balance'])); ?> k <?php echo e(date('j. n. Y', strtotime((string)$cbRegister['opening_date']))); ?>) + všechny příjmy − výdaje. Dnešní pohyb: <?php echo e(formatMoney($cashToday)); ?>">stav hotovosti <strong class="<?php echo $cashState < 0 ? 'text-danger' : 'text-success'; ?>"><?php echo formatMoney($cashState); ?></strong></span>
+        </span>
     <div class="d-flex gap-2">
+        <?php if (crmCanViewHistory()): ?>
+        <a href="history.php?tab=kasa" class="btn btn-sm btn-info"><i class="fas fa-clock-rotate-left me-1"></i>Historie Pokladny</a>
+        <?php endif; ?>
         <button type="button" class="btn btn-sm btn-outline-success" onclick="posCashMove('in')"><i class="fas fa-arrow-down me-1"></i>Vklad</button>
         <button type="button" class="btn btn-sm btn-outline-warning" onclick="posCashMove('out')"><i class="fas fa-arrow-up me-1"></i>Výběr</button>
+        <?php if ($cbCanEdit): ?>
+        <button type="button" class="btn btn-sm btn-outline-info" onclick="posOpeningBalance()" title="Napočítanou hotovost zapíšeš jako počátek — od něj se počítá celý stav pokladny"><i class="fas fa-scale-balanced me-1"></i>Nastavit počáteční zůstatek</button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -145,6 +187,167 @@ $cashState = $todaySums['cash'] + $cashIn - $cashOut;
 </div>
 <?php endif; ?>
 
+<?php
+// ── Upozornění na zákonný limit hotovosti (270 000 Kč, zák. 254/2004 Sb.) ──
+// Limit platí na JEDNU platbu mezi týmž plátcem a příjemcem za den, ne na denní
+// tržbu. Jednotlivá platba nad limit je proto tvrdé varování, denní součet jen
+// připomínka „zkontroluj, jestli to nebyla jedna platba od jednoho člověka".
+$cbLimit = AFX_CASH_LIMIT_CZK;
+$cbToday = date('Y-m-d');
+$cbOverSingle = $cashBook['limit_over'];
+$cbOverDay = $cashBook['days_over'];
+// Dnešek se přidává, JEN když ho zvolené období knihy nepokrývá — jinak by se
+// tytéž platby započítaly dvakrát a hláška by lhala o jejich počtu.
+if ($cbToday < $cbFrom || $cbToday > $cbTo) {
+    if ($cbDayIn['max_single'] > $cbLimit) {
+        $cbOverSingle[] = ['amount' => $cbDayIn['max_single'], 'date' => $cbToday, 'title' => 'dnešní platba'];
+    }
+    if ($cbDayIn['total'] > $cbLimit) { $cbOverDay[$cbToday] = $cbDayIn['total']; }
+}
+?>
+<?php if (!empty($cbOverSingle)): ?>
+<div class="alert alert-danger border-0 py-2 px-3 mb-3">
+    <i class="fas fa-triangle-exclamation me-1"></i>
+    <strong>Hotovostní platba nad zákonný limit <?php echo formatMoney($cbLimit); ?>.</strong>
+    Zákon č. 254/2004 Sb. zakazuje přijmout jednu hotovostní platbu nad tuto částku — takovou úhradu je nutné přijmout převodem.
+    <span class="text-white-50">(nalezeno <?php echo count($cbOverSingle); ?> ×, největší <?php echo formatMoney(max(array_map(static fn($r) => (float)$r['amount'], $cbOverSingle))); ?>)</span>
+</div>
+<?php elseif (!empty($cbOverDay)): ?>
+<div class="alert alert-warning border-0 py-2 px-3 mb-3">
+    <i class="fas fa-circle-exclamation me-1"></i>
+    <strong>Denní hotovostní příjem překročil <?php echo formatMoney($cbLimit); ?>.</strong>
+    Jednotlivé platby jsou v pořádku (limit platí na jednu platbu od jednoho plátce za den) — jen zkontroluj, že to nebyla jedna velká úhrada rozepsaná na víc dokladů.
+    <span class="text-white-50">
+        <?php foreach ($cbOverDay as $__d => $__s): ?><?php echo e(date('j. n. Y', strtotime((string)$__d))); ?>: <?php echo formatMoney((float)$__s); ?> · <?php endforeach; ?>
+    </span>
+</div>
+<?php endif; ?>
+
+<!-- ── Pokladní kniha (analytika 211): počáteční zůstatek → pohyby → konečný zůstatek ── -->
+<div class="glass-panel p-3 border-secondary mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <strong><i class="fas fa-book-open me-2 text-info"></i>Pokladní kniha — <?php echo e($cbBranchName); ?></strong>
+        <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
+            <?php if (isBranchGlobalViewer()): ?>
+            <select name="cb_branch" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                <?php foreach (getBranches(false) as $__b): ?>
+                <option value="<?php echo (int)$__b['id']; ?>"<?php echo (int)$__b['id'] === $cbBranch ? ' selected' : ''; ?>><?php echo e((string)$__b['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+            <input type="date" name="cb_from" class="form-control form-control-sm" style="width:auto;" value="<?php echo e($cbFrom); ?>">
+            <span class="text-white-50 small">–</span>
+            <input type="date" name="cb_to" class="form-control form-control-sm" style="width:auto;" value="<?php echo e($cbTo); ?>">
+            <button type="submit" class="btn btn-sm btn-outline-info"><i class="fas fa-filter me-1"></i>Zobrazit</button>
+        </form>
+    </div>
+
+    <div class="d-flex flex-wrap gap-3 small mb-2">
+        <span class="text-white-50">Počáteční zůstatek <strong class="text-white"><?php echo formatMoney((float)$cashBook['opening']); ?></strong></span>
+        <span class="text-white-50">Příjmy <strong class="text-success"><?php echo formatMoney((float)$cashBook['sum_in']); ?></strong></span>
+        <span class="text-white-50">Výdaje <strong class="text-warning">−<?php echo formatMoney((float)$cashBook['sum_out']); ?></strong></span>
+        <span class="text-white-50">Konečný zůstatek <strong class="<?php echo $cashBook['closing'] < 0 ? 'text-danger' : 'text-success'; ?>"><?php echo formatMoney((float)$cashBook['closing']); ?></strong></span>
+        <span class="text-white-50 ms-auto">Pokladna vedena od <?php echo e(date('j. n. Y', strtotime((string)$cbRegister['opening_date']))); ?>
+            (<?php echo formatMoney((float)$cbRegister['opening_balance']); ?>)</span>
+    </div>
+
+    <?php if (empty($cashBook['rows'])): ?>
+        <div class="text-white-50 small py-2">Za zvolené období nejsou žádné pohyby hotovosti.</div>
+    <?php else: ?>
+    <div class="table-responsive cash-book">
+        <table class="table table-dark table-sm align-middle mb-0">
+            <thead>
+                <tr class="text-white-50">
+                    <th style="width:96px;">Datum</th>
+                    <th style="width:98px;">Doklad</th>
+                    <th>Popis</th>
+                    <th class="text-end" style="width:110px;">Příjem</th>
+                    <th class="text-end" style="width:110px;">Výdej</th>
+                    <th class="text-end" style="width:120px;">Zůstatek</th>
+                    <th style="width:130px;">Vystavil</th>
+                    <?php if ($cbCanEdit): ?><th style="width:80px;"></th><?php endif; ?>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach (array_slice($cashBook['rows'], 0, 500) as $r): ?>
+                <tr<?php echo !empty($r['storno']) ? ' class="text-white-50" style="text-decoration:line-through;"' : ''; ?>>
+                    <td class="small"><?php echo e(date('j. n.', strtotime((string)$r['date']))); ?> <span class="text-white-50"><?php echo e((string)$r['time']); ?></span></td>
+                    <td class="small">
+                        <?php echo $r['doc_number'] !== '' ? '<code>' . e((string)$r['doc_number']) . '</code>' : '<span class="text-white-50">—</span>'; ?>
+                        <?php if (!empty($r['doc_storno'])): ?><span class="badge bg-danger ms-1" title="Papírový doklad byl stornován, peníze v pokladně zůstávají">storno</span><?php endif; ?>
+                    </td>
+                    <td class="small">
+                        <?php if (!empty($r['is_storno'])): ?><span class="badge bg-secondary me-1">STORNO</span><?php endif; ?>
+                        <?php echo e((string)$r['title']); ?>
+                        <?php if (trim((string)$r['detail']) !== ''): ?><span class="text-white-50"> · <?php echo e(mb_substr(trim((string)$r['detail']), 0, 90)); ?></span><?php endif; ?>
+                    </td>
+                    <td class="text-end small text-success"><?php echo $r['dir'] === 'in' ? formatMoney((float)$r['amount']) : ''; ?></td>
+                    <td class="text-end small text-warning"><?php echo $r['dir'] === 'out' ? '−' . formatMoney((float)$r['amount']) : ''; ?></td>
+                    <td class="text-end small"><strong><?php echo formatMoney((float)($r['balance'] ?? 0)); ?></strong></td>
+                    <td class="small text-white-50"><?php echo e(mb_substr((string)$r['by'], 0, 22)); ?></td>
+                    <?php if ($cbCanEdit): ?>
+                    <td class="text-end">
+                        <?php // Doklad se nikdy nemaže — jen stornuje protidokladem (§ 11 zák. 563/1991 Sb.) ?>
+                        <?php if ($r['source'] === 'document' && empty($r['storno']) && empty($r['is_storno'])): ?>
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Vystavit storno doklad"
+                                onclick="posCashDocStorno(<?php echo (int)$r['doc_id']; ?>, '<?php echo e((string)$r['doc_number']); ?>')">Storno</button>
+                        <?php endif; ?>
+                    </td>
+                    <?php endif; ?>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php if (count($cashBook['rows']) > 500): ?>
+        <div class="text-white-50 small mt-2">Zobrazeno prvních 500 z <?php echo count($cashBook['rows']); ?> pohybů — zvol kratší období.</div>
+    <?php endif; ?>
+    <?php endif; ?>
+</div>
+
+<!-- Počáteční zůstatek pokladny — inventarizace hotovosti (jen vedení) -->
+<?php if ($cbCanEdit): ?>
+<div class="modal fade" id="posOpeningModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="fas fa-scale-balanced me-2 text-info"></i>Počáteční zůstatek — <?php echo e($cbBranchName); ?></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zavřít"></button>
+            </div>
+            <form id="posOpeningForm">
+                <div class="modal-body">
+                    <p class="small text-white-50">
+                        Spočítej hotovost v zásuvce a zapiš ji sem. Od tohoto data a částky se počítá celý stav pokladny —
+                        starší pohyby se do zůstatku už nepřičítají (jinak by kasa hlásila peníze dvakrát).
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label small text-white-50 mb-1">Napočítaná hotovost (Kč)</label>
+                        <input type="text" class="form-control" name="balance" inputmode="decimal"
+                               value="<?php echo e(number_format((float)$cbRegister['opening_balance'], 0, ',', '')); ?>" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small text-white-50 mb-1">Ke dni</label>
+                        <input type="date" class="form-control" name="opening_date" max="<?php echo e(date('Y-m-d')); ?>"
+                               value="<?php echo e((string)$cbRegister['opening_date']); ?>" required>
+                    </div>
+                    <div>
+                        <label class="form-label small text-white-50 mb-1">Poznámka (nepovinné)</label>
+                        <input type="text" class="form-control" name="note" maxlength="255" placeholder="např. inventarizace pokladny">
+                    </div>
+                    <div class="alert alert-warning border-0 py-2 px-3 small mt-3 mb-0">
+                        <i class="fas fa-circle-info me-1"></i>Zápis se loguje do Historie — je vždy dohledatelné, kdo zůstatek změnil.
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Zrušit</button>
+                    <button type="submit" class="btn btn-info"><i class="fas fa-check me-1"></i>Uložit zůstatek</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 /* Vklad/výběr hotovosti — jednoduchý prompt flow (kasa je dotyková, ale tohle je výjimečná akce) */
 function posCashMove(direction) {
@@ -161,10 +364,57 @@ function posCashMove(direction) {
         .then(function (r) { return r.json(); })
         .then(function (j) {
             if (!j.ok) { alert(j.error || 'Pohyb se nepodařilo uložit'); return; }
+            // Číslo vystaveného PPD/VPD hlásíme hned — obsluha ho píše na papírový doklad.
+            if (j.doc_number) { alert('Uloženo. Pokladní doklad: ' + j.doc_number); }
             location.reload();
         })
         .catch(function () { alert('Chyba spojení'); });
 }
+
+/* Počáteční zůstatek pokladny (jen vedení) — modal, protože se zadává částka i datum. */
+function posOpeningBalance() {
+    var el = document.getElementById('posOpeningModal');
+    if (!el) { return; }
+    new bootstrap.Modal(el).show();
+}
+
+/* Storno pokladního dokladu — doklad se nikdy nemaže, vystaví se protidoklad. */
+function posCashDocStorno(docId, docNumber) {
+    var reason = prompt('Storno dokladu ' + docNumber + ' — důvod (zapíše se na storno doklad):');
+    if (reason === null) { return; }
+    var fd = new FormData();
+    fd.append('action', 'storno');
+    fd.append('doc_id', docId);
+    fd.append('reason', reason);
+    fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+    fetch('api/pos_cash_move.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+            if (!j.ok) { alert(j.error || 'Storno se nepodařilo'); return; }
+            alert('Vystaven storno doklad ' + (j.number || ''));
+            location.reload();
+        })
+        .catch(function () { alert('Chyba spojení'); });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    var f = document.getElementById('posOpeningForm');
+    if (!f) { return; }
+    f.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var fd = new FormData(f);
+        fd.append('action', 'opening');
+        fd.append('branch_id', '<?php echo (int)$cbBranch; ?>');
+        fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+        fetch('api/pos_cash_move.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j.ok) { alert(j.error || 'Zůstatek se nepodařilo uložit'); return; }
+                location.reload();
+            })
+            .catch(function () { alert('Chyba spojení'); });
+    });
+});
 </script>
 
 <div class="row g-4">
