@@ -108,20 +108,22 @@ $__actorBadge = function (array $r): string {
 require_once 'includes/header.php';
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <h2 class="mb-0"><i class="fas fa-clock-rotate-left me-2 text-info"></i>Historie</h2>
-    <span class="text-white-50 small"><?php echo number_format($activeTab === 'kasa' ? $kTotal : $total, 0, ',', ' '); ?> záznamů</span>
+    <h2 class="mb-0"><i class="fas fa-<?php echo $activeTab === 'kasa' ? 'cash-register' : 'clock-rotate-left'; ?> me-2 text-info"></i><?php echo $activeTab === 'kasa' ? 'Historie Pokladny' : 'Historie'; ?></h2>
+    <div class="d-flex align-items-center gap-2">
+        <?php if ($activeTab === 'kasa'): ?><a href="pokladna.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Zpět na Pokladnu</a><?php endif; ?>
+        <span class="text-white-50 small"><?php echo number_format($activeTab === 'kasa' ? $kTotal : $total, 0, ',', ' '); ?> záznamů</span>
+    </div>
 </div>
 
+<?php /* Kasa (Historie Pokladny) je přesunutá do Pokladny → v sekci Historie se už nezobrazuje. */ ?>
+<?php if ($activeTab !== 'kasa'): ?>
 <?php require 'includes/reports_tabs.php'; ?>
-
 <ul class="nav nav-pills mb-3 glass-panel p-2 border-secondary">
     <li class="nav-item">
-        <a class="nav-link <?php echo $activeTab === 'audit' ? 'active' : 'text-white-75'; ?>" href="history.php"><i class="fas fa-clock-rotate-left me-2"></i>Historie úprav</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link <?php echo $activeTab === 'kasa' ? 'active' : 'text-white-75'; ?>" href="history.php?tab=kasa"><i class="fas fa-cash-register me-2"></i>Kasa prodejna</a>
+        <a class="nav-link active" href="history.php"><i class="fas fa-clock-rotate-left me-2"></i>Historie úprav</a>
     </li>
 </ul>
+<?php endif; ?>
 
 <?php if ($activeTab === 'kasa'): ?>
 <p class="text-white-50 small mb-3">Všechny prodeje přes Pokladnu — doklady, položky, typ platby, prodejce. Storno smí jen vedení a vrací zboží na sklad.</p>
