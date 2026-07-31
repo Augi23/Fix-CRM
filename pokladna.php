@@ -887,20 +887,34 @@ document.addEventListener('DOMContentLoaded', function () {
         submitSale();
     });
 
-    // Účtenka jde nejdřív na termotiskárnu v serveru (bez dialogu, funguje i z iPadu);
-    // když tiskárna neodpoví, otevře se záložně tisk z prohlížeče.
-    function serverPrintReceipt(saleId, drawer) {
+    // TISK ÚČTENKY: tiskne VŽDY jen tento počítač — CRM vrátí hotové bajty
+    // a prohlížeč je pošle na lokální můstek (127.0.0.1:9101 → USB tiskárna).
+    // Na počítači bez tiskárny můstek neběží → u prodeje se nabídne tisk
+    // dialogem prohlížeče, u testu jen hláška. Server sám nikdy netiskne.
+    function localPrint(payload, onFail, onOk) {
         fetch('api/print_receipt_server.php', {
             method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>',
-                                   sale_id: saleId, drawer: drawer ? 1 : 0 })
+            body: JSON.stringify(Object.assign({ csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>', bytes: 1 }, payload))
         })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-            if (!d.ok) { window.open('print_receipt.php?id=' + saleId + '&format=58&auto=1', '_blank'); }
+            if (!d.ok || !d.b64) { onFail(d.error || 'Doklad se nepodařilo připravit.'); return; }
+            var bin = Uint8Array.from(atob(d.b64), function (c) { return c.charCodeAt(0); });
+            return fetch('http://127.0.0.1:9101/print', { method: 'POST', mode: 'cors', body: bin })
+                .then(function (r2) {
+                    if (!r2.ok) { onFail('Můstek tiskárny odpověděl chybou.'); }
+                    else if (onOk) { onOk(); }
+                })
+                .catch(function () { onFail('Tiskárna není na tomto počítači (můstek na 127.0.0.1:9101 neběží).'); });
         })
-        .catch(function () { window.open('print_receipt.php?id=' + saleId + '&format=58&auto=1', '_blank'); });
+        .catch(function () { onFail('Síťová chyba při přípravě dokladu.'); });
+    }
+    function serverPrintReceipt(saleId, drawer) {
+        localPrint({ sale_id: saleId, drawer: drawer ? 1 : 0 }, function () {
+            // fallback: tisk dialogem prohlížeče (obsluha si vybere tiskárnu sama)
+            window.open('print_receipt.php?id=' + saleId + '&format=58&auto=1', '_blank');
+        });
     }
 
     function submitSale() {
@@ -991,7 +1005,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         shiftApi({ action: 'open', match: match ? 1 : 0, counted: counted },
             document.getElementById('shiftErr'),
-            function () { location.reload(); });
+            function () {
+                // lístek „kolik má být v kase" — tiskne tento počítač; reload nečeká na tiskárnu
+                try { localPrint({ slip: 'shift_open' }, function () {}); } catch (e) {}
+                setTimeout(function () { location.reload(); }, 600);
+            });
     };
 
     // vedení: uzavření cizí zapomenuté směny
@@ -1005,7 +1023,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         shiftApi({ action: 'close', counted: v, force: 1, note: 'uzavřeno vedením' },
             document.getElementById('shiftForceErr'),
-            function () { location.reload(); });
+            function () {
+                try { localPrint({ slip: 'shift_close' }, function () {}); } catch (e) {}
+                setTimeout(function () { location.reload(); }, 600);
+            });
     };
 
     // uzávěrka vlastní směny — modal s živým rozdílem proti systému
@@ -1032,25 +1053,20 @@ document.addEventListener('DOMContentLoaded', function () {
         if (v === '' || isNaN(parseFloat(v))) { alert('Zapiš napočítanou hotovost.'); return; }
         shiftApi({ action: 'close', counted: v, note: document.getElementById('shiftCloseNote').value }, null,
             function () {
-                if (shiftAfterClose) { window.location.href = shiftAfterClose; }
-                else { location.reload(); }
+                try { localPrint({ slip: 'shift_close' }, function () {}); } catch (e) {}
+                setTimeout(function () {
+                    if (shiftAfterClose) { window.location.href = shiftAfterClose; }
+                    else { location.reload(); }
+                }, 600);
             });
     });
 
     // zkušební tisk na termotiskárnu (tlačítko v hlavičce kasy)
     window.posTestReceipt = function (btn) {
         btn.disabled = true;
-        fetch('api/print_receipt_server.php', {
-            method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ csrf_token: CSRF, test: 1 })
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-            btn.disabled = false;
-            alert(d.ok ? 'Zkušební účtenka odeslána na tiskárnu.' : ('Tisk se nepodařil: ' + (d.error || '')));
-        })
-        .catch(function () { btn.disabled = false; alert('Síťová chyba.'); });
+        localPrint({ test: 1 },
+            function (err) { btn.disabled = false; alert('Tisk se nepodařil: ' + err); },
+            function () { btn.disabled = false; alert('Zkušební účtenka odeslána na tiskárnu tohoto počítače.'); });
     };
 
     // odhlášení s převzatou pokladnou → nejdřív připomenout uzávěrku

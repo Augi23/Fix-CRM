@@ -272,6 +272,86 @@ function crmEscposReceipt(\GdImage $im): string {
         : crmEscposFromImageEscStar($im);
 }
 
+/**
+ * Lístek směny pokladny — tiskne se při PŘEVZETÍ a při UZÁVĚRCE kasy.
+ * Hlavní informace VELKÝM písmem: kolik má být v kase. U přepočtu/uzávěrky
+ * navíc napočítaná částka a rozdíl. $typ = 'open' | 'close'.
+ */
+function crmShiftSlipRaster(array $shift, string $typ, ?array $prev = null): \GdImage {
+    $W = CRM_RCPT_DOTS; $M = 6;
+    $fontR = crmRcptFont(false); $fontB = crmRcptFont(true);
+    $img = imagecreatetruecolor($W, 1200);
+    $bila = imagecolorallocate($img, 255, 255, 255);
+    $cerna = imagecolorallocate($img, 0, 0, 0);
+    imagefilledrectangle($img, 0, 0, $W, 1200, $bila);
+    $y = 14;
+    $sirka = function (float $size, string $t, bool $bold) use ($fontR, $fontB): int {
+        $b = imagettfbbox($size, 0, $bold ? $fontB : $fontR, $t);
+        return (int)abs($b[2] - $b[0]);
+    };
+    $text = function (float $size, string $t, bool $bold = false, float $lh = 1.4) use (&$img, &$y, $cerna, $fontR, $fontB, $sirka, $W) {
+        if ($t === '') { return; }
+        $x = (int)(($W - $sirka($size, $t, $bold)) / 2);
+        imagettftext($img, $size, 0, max(0, $x), (int)($y + $size * 1.05), $cerna, $bold ? $fontB : $fontR, $t);
+        $y += (int)ceil($size * $lh) + 4;
+    };
+    $cara = function (int $t = 3) use (&$img, &$y, $cerna, $W, $M) {
+        $y += 8; imagefilledrectangle($img, $M, $y, $W - $M, $y + $t - 1, $cerna); $y += $t + 8;
+    };
+    $kc = function ($v) { return number_format((float)$v, 0, ',', ' ') . ' Kč'; };
+
+    $open = $typ === 'open';
+    $expected = (float)($open ? $shift['opening_expected'] : ($shift['closing_expected'] ?? 0));
+    $counted  = $open ? ($shift['opening_match'] ? null : (float)$shift['opening_counted'])
+                      : (isset($shift['closing_counted']) ? (float)$shift['closing_counted'] : null);
+    $kdo  = (string)($open ? ($shift['opened_by'] ?? '') : ($shift['closed_by'] ?? $shift['opened_by'] ?? ''));
+    $kdy  = (string)($open ? ($shift['opened_at'] ?? '') : ($shift['closed_at'] ?? ''));
+
+    $text(20, $open ? 'PŘEVZETÍ POKLADNY' : 'UZÁVĚRKA POKLADNY', true);
+    $cara(4);
+    $y += 6;
+    $text(15, 'V KASE MÁ BÝT', false);
+    $text(42, $kc($expected), true, 1.15);   // hlavní částka — VELKÝM
+    $y += 6;
+    if ($counted !== null) {
+        $cara(2);
+        $text(16, 'Napočítáno: ' . $kc($counted), true);
+        $diff = round($counted - $expected, 2);
+        $text(16, 'Rozdíl: ' . ($diff > 0 ? '+' : '') . $kc($diff), true);
+        if ($open && abs($diff) >= 0.005) {
+            $text(12, 'Stav pokladny se dnes odvíjí od napočítané částky.', false, 1.25);
+        }
+    }
+    if (!$open && !empty($shift['closing_note'])) {
+        $text(12, 'Pozn.: ' . $shift['closing_note'], false, 1.25);
+    }
+    $cara(2);
+    $cas = function (?string $t) { return $t ? date('j. n. Y H:i', strtotime($t)) : ''; };
+    if ($open) {
+        $text(15, 'Převzal(a): ' . $kdo, true);
+        $text(13, $cas($kdy), false);
+        // kdo měl kasu předtím — poslední uzavřená směna
+        if ($prev) {
+            $y += 4;
+            $text(13, 'Předtím měl(a) kasu: ' . (string)($prev['opened_by'] ?? ''), false);
+            $line = 'uzavřeno ' . $cas($prev['closed_at'] ?? null);
+            if (isset($prev['closing_counted'])) { $line .= ' · napočítáno ' . $kc($prev['closing_counted']); }
+            $text(12, $line, false, 1.25);
+        }
+    } else {
+        $text(15, 'Uzavřel(a): ' . $kdo, true);
+        $text(13, $cas($kdy), false);
+        $y += 4;
+        $text(13, 'Směnu otevřel(a): ' . (string)($shift['opened_by'] ?? ''), false);
+        $text(12, 'převzato ' . $cas($shift['opened_at'] ?? null), false, 1.25);
+    }
+    $y += 20;
+
+    $fin = imagecreatetruecolor($W, $y);
+    imagecopy($fin, $img, 0, 0, 0, 0, $W, $y);
+    return $fin;
+}
+
 /** Impulz do pokladní zásuvky (RJ11 na tiskárně): ESC p 0 60ms 120ms. */
 function crmEscposDrawerPulse(): string {
     return "\x1B\x70\x00\x3C\x78";

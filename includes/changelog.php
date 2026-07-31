@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '3.38.0',
+        'date' => '2026-07-31',
+        'time' => '23:30',
+        'title' => 'Tisk účtenek jen z počítače pokladny + lístky převzetí a uzávěrky kasy',
+        'items' => [
+            '<b>Tiskne vždy jen počítač, který má tiskárnu v USB:</b> CRM doklad vykreslí a vrátí prohlížeči, ten ho pošle na lokální můstek (127.0.0.1:9101) do tiskárny. Server ani jiné počítače na tiskárnu nesahají; sdílení fronty je vypnuté.',
+            'Rastr účtenky přepnut na <b>řádkový režim ESC*</b> — firmware XP58 na moderním GS v 0 ztrácel synchronizaci a chrlil znaky; ESC* jede po 24bodových pásech a klony ho zvládají spolehlivě. Chybná úloha se nově zahazuje (žádné nekonečné opakování tisku).',
+            '<b>Lístek při převzetí kasy:</b> velkým písmem KOLIK MÁ BÝT V KASE, případný přepočet s rozdílem, jméno přebírajícího s datem a časem a kdo měl kasu předtím (kdy uzavřel a s kolika penězi).',
+            '<b>Lístek při uzávěrce:</b> velkým písmem kolik má v kase být, napočítaná částka a rozdíl, kdo směnu otevřel i uzavřel, s daty a časy. Tiskne se i při uzavření směny vedením.',
+            'Setup skript pro Mac u pokladny (v3): scripts/mac_xprinter_setup.sh — postaví lokální HTTP můstek, zruší starý síťový kanál i sdílení.',
+        ],
+    ],
+    [
         'version' => '3.38.1',
         'date' => '2026-07-31',
         'time' => '20:15',

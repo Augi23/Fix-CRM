@@ -12,6 +12,7 @@ require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/receipt58.php';
 require_once '../includes/receipt_escpos.php';
+require_once '../includes/pos_shift.php';
 ob_clean();
 
 if (!crmCanUsePos()) {
@@ -85,12 +86,31 @@ if (!is_array($in) || !validateCsrfToken((string)($in['csrf_token'] ?? ''))) {
 }
 
 try {
+    // lístek směny (převzetí/uzávěrka) — velkým písmem kolik má být v kase
+    $slip = (string)($in['slip'] ?? '');
+    if ($slip === 'shift_open' || $slip === 'shift_close') {
+        $branch = (int)getCurrentStaffBranchId();
+        $shift = $slip === 'shift_open' ? afxPosShiftCurrent($branch) : afxPosShiftLastClosed($branch);
+        if (!$shift) { echo json_encode(['ok' => false, 'error' => 'Směna nenalezena.']); exit; }
+        // u převzetí patří na lístek i předchozí držitel kasy (poslední uzavřená směna)
+        $prev = $slip === 'shift_open' ? afxPosShiftLastClosed($branch) : null;
+        $bytes = crmEscposReceipt(crmShiftSlipRaster($shift, $slip === 'shift_open' ? 'open' : 'close', $prev));
+        echo json_encode(['ok' => true, 'b64' => base64_encode($bytes)]); exit;
+    }
+
     $data = !empty($in['test']) ? afxReceiptTestData() : afxReceiptDataForSale((int)($in['sale_id'] ?? 0));
     if (!$data) { echo json_encode(['ok' => false, 'error' => 'Doklad nenalezen.']); exit; }
 
     $bytes = '';
     if (!empty($in['drawer'])) { $bytes .= crmEscposDrawerPulse(); }   // šuplík ještě před tiskem
     $bytes .= crmEscposReceipt(crmReceiptRaster($data));
+
+    // VÝCHOZÍ REŽIM: server NIC netiskne — vrátí hotové bajty a odešle je až
+    // prohlížeč POKLADNÍHO počítače na svůj lokální můstek (127.0.0.1:9101).
+    // Tiskne tedy vždy jen ten počítač, který má tiskárnu v USB (přání majitele).
+    if (!empty($in['bytes'])) {
+        echo json_encode(['ok' => true, 'b64' => base64_encode($bytes)]); exit;
+    }
 
     $res = crmReceiptSendBytes($bytes);
     if (!$res['ok']) { error_log('print_receipt_server: ' . $res['error']); }

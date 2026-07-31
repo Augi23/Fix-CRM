@@ -1,25 +1,18 @@
 #!/bin/zsh
-# Nastavení termotiskárny Xprinter XP58-IIN na Macu u pokladny — verze 2 (přímý kanál).
+# Nastavení termotiskárny Xprinter XP58-IIN na Macu u pokladny — verze 3.
 #
-# Proč verze 2: tisk přes SDÍLENOU CUPS frontu (Linux server → Mac) data cestou
-# překódovává — tiskárna pak místo účtenky chrlí rozsypané znaky a fronta s politikou
-# retry-current-job úlohu donekonečna opakovala (nešlo to zastavit). Lokální tisk
-# na Macu přitom funguje správně.
+# Architektura (přání majitele): tiskne VŽDY jen počítač, který má tiskárnu v USB.
+# CRM v prohlížeči tohoto Macu si od serveru vezme hotové bajty účtenky a pošle je
+# na lokální můstek http://127.0.0.1:9101/print → lp -o raw → USB. Nic nechodí
+# přes síť z jiných počítačů, sdílení tiskárny je vypnuté.
 #
-# Tahle verze proto:
-#   1. SMAŽE všechny čekající úlohy (ať po zapnutí tiskárny nezačne znovu chrlit),
-#   2. přepne frontu na abort-job (chybná úloha se zahodí, nikdy neopakuje),
-#   3. VYPNE sdílení fronty (už se přes ni tisknout nebude),
-#   4. postaví přímý kanál: launchd poslouchá na portu 9100 a příchozí bajty
-#      pouští do lokálního `lp -o raw` (ten je ověřeně v pořádku),
-#   5. vytiskne lokální test přes nový kanál.
-# Server CRM pak tiskne na tcp:IP:9100 — bajty jdou beze změny.
+# Skript je idempotentní — klidně ho spusť opakovaně.
 set -e
 
 echo "── Mažu čekající úlohy fronty xprinter…"
 sudo cancel -a xprinter 2>/dev/null || true
 
-echo "── Fronta: chybnou úlohu zahodit (žádné nekonečné opakování), sdílení vypnout…"
+echo "── Fronta xprinter (RAW, chybnou úlohu zahodit, sdílení vypnout)…"
 if ! lpstat -p xprinter >/dev/null 2>&1; then
     URI=$(lpinfo -v 2>/dev/null | awk '/usb:\/\// {print $2}' | head -1)
     [ -z "$URI" ] && { echo "❌ USB tiskárna nenalezena — je zapojená a zapnutá?"; exit 1; }
@@ -29,43 +22,70 @@ sudo lpadmin -p xprinter -o printer-error-policy=abort-job -o printer-is-shared=
 sudo cupsenable xprinter 2>/dev/null || true
 sudo cupsaccept xprinter 2>/dev/null || true
 
-echo "── Stavím přímý kanál (port 9100 → lokální tisk)…"
+echo "── Můstek: HTTP 127.0.0.1:9101 → lokální tisk…"
 sudo mkdir -p /usr/local/lib
-sudo tee /usr/local/lib/xprinter9100.sh >/dev/null << 'EOS'
+sudo tee /usr/local/lib/xprinter9101.sh >/dev/null << 'EOS'
 #!/bin/zsh
-# launchd (inetd režim) sem pustí TCP spojení jako stdin — bajty jdou beze změny
-# do lokální RAW fronty. Lokální lp je ověřený, tiskne správně.
-exec /usr/bin/lp -d xprinter -o raw -s - >/dev/null 2>&1
+# launchd (inetd režim): stdin/stdout = TCP spojení. Minimalistické HTTP:
+# OPTIONS = CORS preflight (Chrome vyžaduje i Allow-Private-Network),
+# POST /print = tělo požadavku beze změny do lokální RAW fronty.
+IFS= read -r reqline
+method=${reqline%% *}
+clen=0
+while IFS= read -r line; do
+    line=${line%$'\r'}
+    [ -z "$line" ] && break
+    lower=${(L)line}
+    case $lower in
+        content-length:*) clen=${line#*: } ;;
+    esac
+done
+cors=$'Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, OPTIONS\r\nAccess-Control-Allow-Headers: content-type\r\nAccess-Control-Allow-Private-Network: true\r\n'
+if [ "$method" = "OPTIONS" ]; then
+    printf 'HTTP/1.1 204 No Content\r\n%sConnection: close\r\n\r\n' "$cors"
+    exit 0
+fi
+if [ "$method" != "POST" ] || [ "$clen" -le 0 ] 2>/dev/null; then
+    printf 'HTTP/1.1 400 Bad Request\r\n%sConnection: close\r\n\r\n' "$cors"
+    exit 0
+fi
+head -c "$clen" | /usr/bin/lp -d xprinter -o raw -s - >/dev/null 2>&1
+printf 'HTTP/1.1 200 OK\r\n%sContent-Type: application/json\r\nConnection: close\r\n\r\n{"ok":true}' "$cors"
 EOS
-sudo chmod 755 /usr/local/lib/xprinter9100.sh
+sudo chmod 755 /usr/local/lib/xprinter9101.sh
 
-sudo tee /Library/LaunchDaemons/cz.applefix.xprinter9100.plist >/dev/null << 'EOP'
+sudo tee /Library/LaunchDaemons/cz.applefix.xprinter9101.plist >/dev/null << 'EOP'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>Label</key><string>cz.applefix.xprinter9100</string>
-    <key>ProgramArguments</key><array><string>/usr/local/lib/xprinter9100.sh</string></array>
+    <key>Label</key><string>cz.applefix.xprinter9101</string>
+    <key>ProgramArguments</key><array><string>/usr/local/lib/xprinter9101.sh</string></array>
     <key>inetdCompatibility</key><dict><key>Wait</key><false/></dict>
     <key>Sockets</key>
     <dict>
         <key>Listeners</key>
         <dict>
-            <key>SockServiceName</key><string>9100</string>
+            <key>SockNodeName</key><string>127.0.0.1</string>
+            <key>SockServiceName</key><string>9101</string>
             <key>SockType</key><string>stream</string>
         </dict>
     </dict>
 </dict>
 </plist>
 EOP
+sudo launchctl bootout system/cz.applefix.xprinter9101 2>/dev/null || true
+sudo launchctl bootstrap system /Library/LaunchDaemons/cz.applefix.xprinter9101.plist
+
+# starý kanál 9100 (verze 2) už není potřeba — tiskne jen tento počítač
 sudo launchctl bootout system/cz.applefix.xprinter9100 2>/dev/null || true
-sudo launchctl bootstrap system /Library/LaunchDaemons/cz.applefix.xprinter9100.plist
+sudo rm -f /Library/LaunchDaemons/cz.applefix.xprinter9100.plist /usr/local/lib/xprinter9100.sh
+
 sleep 1
-
-echo "── Test přes nový kanál…"
-printf '\x1b\x40MUSTEK 9100 OK - tisk pres primy kanal\n\n\n\n\x1d\x56\x42\x10' | nc -w 3 127.0.0.1 9100 || true
-
-IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1)
-echo ""
-echo "✅ Hotovo. Pokud vyjel lísteček „MUSTEK 9100 OK", nahlas do CRM:"
-echo "   receipt_printer_target = tcp:${IP}:9100"
+echo "── Ověření můstku (nic se netiskne):"
+RESP=$(curl -s -X OPTIONS http://127.0.0.1:9101/print -o /dev/null -w "%{http_code}")
+if [ "$RESP" = "204" ]; then
+    echo "✅ Můstek 9101 běží. V CRM na TOMTO počítači otevři Pokladnu a klikni „Test účtenky"."
+else
+    echo "❌ Můstek neodpovídá (HTTP $RESP) — napiš to Claudovi."
+fi
