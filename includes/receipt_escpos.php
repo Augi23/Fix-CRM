@@ -9,9 +9,11 @@
  * funguje vždy.
  *
  * Cíl tisku (get_setting 'receipt_printer_target'):
- *   usb:/dev/usb/lp0     — tiskárna v USB serveru (výchozí; XP58-IIN je USB-only)
- *   tcp:192.168.1.x:9100 — kdyby někdy byla síťová varianta
- *   lp:nazev_fronty      — přes CUPS (lp -d fronta -o raw)
+ *   cups:192.168.1.x:631:fronta — tiskárna sdílená z Macu u pokladny (CUPS/IPP);
+ *                                 server na ni tiskne přes lp -h, RAW průchod
+ *   usb:/dev/usb/lp0     — tiskárna v USB serveru
+ *   tcp:192.168.1.x:9100 — síťová varianta (JetDirect)
+ *   lp:nazev_fronty      — lokální CUPS fronta serveru
  *
  * Vstupem kreslení je STEJNÉ pole $d jako u crmRenderReceipt58() — jeden zdroj
  * pravdy o obsahu dokladu (crmBuildPosReceipt58).
@@ -262,6 +264,24 @@ function crmReceiptSendBytes(string $bytes, ?string $target = null): array {
             if (!$fp) { return ['ok' => false, 'error' => 'Tiskárna ' . $host . ':' . $port . ' neodpovídá.']; }
             fwrite($fp, $bytes); fclose($fp);
             return ['ok' => true, 'error' => null];
+        }
+        if (str_starts_with($target, 'cups:')) {
+            // cups:host[:port]:fronta — vzdálený CUPS (typicky Mac u pokladny se sdílenou tiskárnou)
+            $c = explode(':', substr($target, 5));
+            if (count($c) === 2) { [$host, $fronta] = $c; $port = '631'; }
+            elseif (count($c) === 3) { [$host, $port, $fronta] = $c; }
+            else { return ['ok' => false, 'error' => 'Cíl cups: má být cups:host[:port]:fronta.']; }
+            $tmp = tempnam(sys_get_temp_dir(), 'rcpt');
+            file_put_contents($tmp, $bytes);
+            $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+            $proc = proc_open(['lp', '-h', $host . ':' . $port, '-d', $fronta, '-o', 'raw', '-s', $tmp], $desc, $pipes);
+            if (!is_resource($proc)) { @unlink($tmp); return ['ok' => false, 'error' => 'Nelze spustit lp.']; }
+            fclose($pipes[0]);
+            $err = stream_get_contents($pipes[2]); fclose($pipes[1]); fclose($pipes[2]);
+            $rc = proc_close($proc);
+            @unlink($tmp);
+            return $rc === 0 ? ['ok' => true, 'error' => null]
+                : ['ok' => false, 'error' => 'Mac u pokladny neodpovídá (' . $host . '): ' . trim($err)];
         }
         if (str_starts_with($target, 'lp:')) {
             $fronta = substr($target, 3);

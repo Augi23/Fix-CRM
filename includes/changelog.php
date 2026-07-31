@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.37.2',
+        'date' => '2026-07-31',
+        'time' => '21:35',
+        'title' => 'Návody: pokladna a směny; tiskárna přes Mac u pokladny; datum prodeje jen u vyprodaných',
+        'items' => [
+            'Návod <b>Pokladna (kasa)</b> přepsán podle nového průběhu: kalkulačkový displej u hotovosti (K úhradě / Přijato / Vrátit), automatický tisk účtenky na termotiskárně + otevření zásuvky, náležitosti dokladu, synchronizace skladu s e-shopem (1–2 min).',
+            'Nový návod <b>„Převzetí a uzávěrka pokladny (směny)"</b>: kontrola hotovosti ANO/NE při převzetí, jeden držitel, uzávěrka s rozdílem, upozornění při odhlášení, force-uzavření vedením.',
+            'Tisk účtenek počítá s tiskárnou <b>zapojenou do Macu u pokladny</b>: nový cíl cups:host:631:fronta (server tiskne na sdílenou frontu Macu), jednorázový setup skript <b>scripts/mac_xprinter_setup.sh</b>.',
+            'Sklad → Produkty: datum „prodáno" se ukazuje <b>jen u vyprodaných kusů</b>.',
+        ],
+    ],
+    [
         'version' => '3.37.1',
         'date' => '2026-07-31',
         'time' => '21:05',
