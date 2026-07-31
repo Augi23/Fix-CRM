@@ -333,10 +333,11 @@ $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search'])
 $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
 ?>
 <div class="orders-status-filter d-flex flex-wrap gap-2 mb-3 align-items-center">
+    <span class="text-white-75 fw-semibold me-1" style="font-size:13.5px;"><i class="fas fa-filter me-2"></i>Filtrování</span>
     <?php $__curBadge = ($filter_status && isset($status_defs[$filter_status])) ? $status_defs[$filter_status]['badge'] : ''; ?>
     <div class="dropdown">
         <button class="btn btn-sm dropdown-toggle crm-filter-dd-toggle<?php echo $__curBadge ? ' chip--' . e($__curBadge) : ''; ?>" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
-            <?php if ($filter_status): ?><span class="chip-dot"></span><?php echo e(getOrderStatusLabel($filter_status)); ?><?php else: ?><i class="fas fa-layer-group"></i> <?php echo __('all_orders'); ?><?php endif; ?>
+            <?php if ($filter_status): ?><span class="chip-dot"></span><?php echo e(getOrderStatusLabel($filter_status)); ?><?php else: ?><i class="fas fa-layer-group"></i> Stav<?php endif; ?>
         </button>
         <ul class="dropdown-menu crm-filter-dd-menu shadow">
             <li>
@@ -353,14 +354,14 @@ $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
             <?php endforeach; ?>
         </ul>
     </div>
-    <?php /* Filtr podle technika — zachovává ostatní filtry (stav/pobočka/hledání) */ ?>
-    <form method="GET" class="ms-auto d-flex align-items-center gap-1">
+    <?php /* Filtr zaměstnanců — zachovává ostatní filtry (stav/pobočka/hledání) */ ?>
+    <form method="GET" class="d-flex align-items-center gap-1">
         <?php if ($filter_status): ?><input type="hidden" name="filter" value="<?php echo e($filter_status); ?>"><?php endif; ?>
         <?php if ($active_branch_filter > 0): ?><input type="hidden" name="branch_id" value="<?php echo (int)$active_branch_filter; ?>"><?php endif; ?>
         <?php if (!empty($_GET['search'])): ?><input type="hidden" name="search" value="<?php echo e((string)$_GET['search']); ?>"><?php endif; ?>
         <i class="fas fa-user-gear text-white-75 me-1"></i>
         <select name="tech" class="form-select form-select-sm" style="width:auto;min-width:170px;" onchange="this.form.submit()">
-            <option value="0"><?php echo __('all_technicians') !== 'all_technicians' ? __('all_technicians') : 'Všichni technici'; ?></option>
+            <option value="0">Zaměstnanci</option>
             <?php foreach (getActiveTechnicians(true) as $__t): ?>
                 <option value="<?php echo (int)$__t['id']; ?>" <?php echo $tech_filter === (int)$__t['id'] ? 'selected' : ''; ?>><?php echo e((string)$__t['name']); ?></option>
             <?php endforeach; ?>
