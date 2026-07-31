@@ -157,11 +157,18 @@ $in['price'] = rtrim(rtrim(number_format($priceNum, 2, '.', ''), '0'), '.');   /
 // ne nula. Nula by u § 90 znamenala „koupeno zadarmo" a nafoukla by daň z přirážky.
 $purchaseNum = null;
 if ($in['purchase_price'] !== '') {
-    $purchaseNum = (float)str_replace(',', '.', str_replace(' ', '', $in['purchase_price']));
-    if (!is_finite($purchaseNum) || $purchaseNum < 0 || $purchaseNum > 10000000) {
-        echo json_encode(['success' => false, 'message' => 'Nákupní cena není platné číslo.'], JSON_UNESCAPED_UNICODE); exit;
+    // Tvar validovat PŘED přetypováním — (float)'nevím' je 0.0, prošla by i mez
+    // „< 0“ a tiše by se uložila nákupní cena 0 Kč. Nula tu znamená „koupeno
+    // zadarmo“ a u § 90 by nafoukla daň z přirážky, proto se nečíselný vstup
+    // (i explicitní nula) odmítá chybou místo tichého uložení.
+    $ppNorm = str_replace([' ', "\xc2\xa0"], '', $in['purchase_price']);   // mezery vč. nezlomitelné („4 500“)
+    if (!preg_match('/^\d+([.,]\d{1,2})?$/', $ppNorm)) {
+        echo json_encode(['success' => false, 'message' => 'Nákupní cena musí být kladné číslo (např. 4500 nebo 4500,50), nebo pole nech prázdné.'], JSON_UNESCAPED_UNICODE); exit;
     }
-    $purchaseNum = round($purchaseNum, 2);
+    $purchaseNum = round((float)str_replace(',', '.', $ppNorm), 2);
+    if ($purchaseNum <= 0 || $purchaseNum > 10000000) {
+        echo json_encode(['success' => false, 'message' => 'Nákupní cena musí být kladné číslo do 10 000 000 Kč, nebo pole nech prázdné.'], JSON_UNESCAPED_UNICODE); exit;
+    }
 }
 if (mb_strlen($in['image_url']) > 500 || ($in['image_url'] !== '' && productImageDisplayUrl($in['image_url']) === '')) {
     $in['image_url'] = '';   // jen fotky z našeho úložiště
@@ -246,6 +253,71 @@ try {
     $who = mb_substr(trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? '')), 0, 64);
     $stockQty = $in['sold'] ? 0 : 1;
     $pcrCheckedAt = ($pcr['status'] !== '' && $pcr['status'] !== 'notimei') ? date('Y-m-d H:i:s') : null;
+
+    /* ── Ochrana napojení na CSV import z appky ─────────────────────────────
+       Plný UPDATE níže překlápí kus na source='crm' a import appky ho pak už
+       NIKDY neaktualizuje (api/import_products.php ho přeskakuje). To je správně
+       u skutečné úpravy karty, ale doplnění nákupní ceny (kvůli § 90) nebo médií
+       galerie NESMÍ kus od importu odpojit — import tyhle sloupce vůbec nespravuje
+       (nejsou v jeho $fields), takže mu jejich úprava nijak nekonkuruje.
+       Když se tedy nezměnilo NIC z toho, co import řídí (kód, model, cena, stav,
+       sklad…), uloží se jen import-neutrální sloupce a source ani pos_sold_at
+       (pojistka „prodáno na kase“, kterou import potřebuje vidět) se nesahá.
+       Srovnává se se surovými hodnotami z DB, které modal přes action=get dostal —
+       nezměněný formulář je tedy pošle zpátky beze změny. Jakákoli nejistota
+       (jiný formát, změněné pole) spadne do plné větve = dosavadní chování. */
+    if ($action === 'update' && (string)($existing['source'] ?? 'app') !== 'crm') {
+        $normBat = static fn($v) => preg_replace('/\D+/', '', (string)$v);   // „89“ vs „89 %“
+        $exRaw = json_decode((string)($existing['raw_csv'] ?? ''), true) ?: [];
+        $importGovernedUnchanged =
+            !$codeChanged
+            && abs($priceNum - (float)$existing['price']) < 0.005
+            // „prodáno“ se porovnává jako příznak — plný UPDATE by vícekusové
+            // příslušenství stáhl na 1 ks, mikroúprava stock_qty nesahá vůbec
+            && (($stockQty > 0) === ((int)$existing['stock_qty'] > 0))
+            && $in['stock_key'] === (string)($existing['stock_key'] ?? '')
+            && $in['model'] === (string)($existing['model'] ?? '')
+            && $in['cap'] === (string)($existing['capacity'] ?? '')
+            && $in['color'] === (string)($existing['color'] ?? '')
+            && $in['grade'] === (string)($existing['grade'] ?? '')
+            && $normBat($in['battery']) === $normBat($existing['battery'] ?? '')
+            && (string)($asm['k'] ?: '') === (string)($existing['category_code'] ?? '')
+            // prázdné image_url NENÍ změna: cizí (CSV) fotku modal neumí zobrazit
+            // ani poslat zpět, vrací se prázdno — plná větev by ji tady smazala
+            && ($in['image_url'] === '' || $in['image_url'] === (string)($existing['image_url'] ?? ''))
+            // Mac/iPad parametry žijí jen v raw_csv — jejich změna vyžaduje přeskládání řádku
+            && $in['ram'] === trim((string)($exRaw['[PARAMETER "RAM"]'] ?? ''))
+            && $in['cpu'] === trim((string)($exRaw['CPU_JADRA'] ?? ''))
+            && $in['gpu'] === trim((string)($exRaw['GPU_JADRA'] ?? ''))
+            && $in['rocnik'] === trim((string)($exRaw['[PARAMETER "Ročník"]'] ?? ''))
+            && $in['generace'] === trim((string)($exRaw['[PARAMETER "Generace"]'] ?? ''));
+
+        if ($importGovernedUnchanged) {
+            // import-neutrální mikroúprava: nákupní cena + média galerie; title,
+            // raw_csv a spol. zůstávají z appky (zdroj pravdy se nemění)
+            $pdo->prepare("UPDATE products SET purchase_price = ?, studio_image_url = ?, gallery_images = ?,
+                    video_360_url = ?, has_360 = ?, show_studio = ?, show_gallery = ?, show_360 = ?
+                WHERE id = ?")
+                ->execute([$purchaseNum, $in['studio_image_url'] ?: null, $in['gallery_images'],
+                    $in['video_360_url'] ?: null, $in['has_360'],
+                    $in['show_studio'], $in['show_gallery'], $in['show_360'], $editId]);
+            crmAuditLog('products.update', [
+                'entity_type' => 'products', 'entity_id' => $editId, 'entity_label' => (string)$existing['title'],
+                'summary' => 'Doplněna nákupní cena/média u „' . $existing['title'] . '“ (' . $code . ') — kus zůstává napojený na import z appky',
+            ]);
+            echo json_encode([
+                'success' => true,
+                'id' => $editId,
+                'code' => $code,
+                'title' => (string)$existing['title'],
+                'pcr_status' => $pcr['status'],
+                'pcr_text' => $pcr['text'],
+                'hint' => '',
+                'today_count' => (int)$pdo->query("SELECT COUNT(*) FROM products WHERE DATE(added_at) = CURDATE()")->fetchColumn(),
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
 
     if ($action === 'update') {
         $pdo->prepare("UPDATE products SET product_code = ?, title = ?, manufacturer = ?, category_code = ?,

@@ -52,6 +52,10 @@ SET @afx_role_null := (
 SET @afx_role_def := (
     SELECT CASE
         WHEN COLUMN_DEFAULT IS NULL THEN ''
+        -- MariaDB vrací u sloupce s výchozí hodnotou NULL řetězec 'NULL' (ne SQL NULL);
+        -- bez téhle větve by vznikl doslovný DEFAULT 'NULL' a ALTER by na strict
+        -- serveru spadl s chybou 1067 — a zastavil celý běh migrací.
+        WHEN COLUMN_DEFAULT = 'NULL' THEN ' DEFAULT NULL'
         -- POZOR: MariaDB 10.2+ vrací výchozí hodnotu VČETNĚ apostrofů ('engineer'),
         -- MySQL bez nich (engineer). Bez tohohle rozlišení by se na MariaDB nastavil
         -- výchozí role doslovný řetězec i s apostrofy a nový zaměstnanec by dostal

@@ -9,7 +9,8 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/kb_api.php';
 
-if ((empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) || !crmCanManageInvoices()) {
+if ((empty($_SESSION['user_id']) && empty($_SESSION['tech_id']))
+    || !(crmCanManageInvoices() || (function_exists('crmCanAccountingRead') && crmCanAccountingRead()))) {
     header('Location: index.php');
     exit;
 }

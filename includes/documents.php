@@ -299,12 +299,22 @@ function crmGetDocumentIdScans(int $documentId): array {
 }
 
 /**
- * Výkup placený HOTOVĚ = výdej z kasy. Drží pokladní deník v souladu s dokumentem:
- * po každém uložení výkupního listu založí/aktualizuje výdajový pohyb (vazba
- * ref_type='document'), a když výplata přestane být hotově, pohyb zase odebere.
- * Kasa tak sedí na korunu a u pohybu je dohledatelné číslo výkupního listu.
+ * Výkup placený HOTOVĚ = výdej z kasy. Drží pokladní deník v souladu s dokumentem
+ * (vazba ref_type='document'), ale HISTORII NIKDY nepřepisuje: pohyb ze staršího
+ * dne je součástí už uzavřeného dne pokladní knihy (konečný zůstatek dne navazuje
+ * na počáteční zůstatek dne dalšího) a jeho UPDATE/DELETE by knihu měnil zpětně —
+ * fakticky by šlo doklad smazat, což § 11 zák. 563/1991 Sb. zakazuje. Oprava
+ * částky nebo zrušení hotovostní výplaty se proto zapisuje jako NOVÝ rozdílový
+ * (resp. opačný) pohyb s dnešním datem. Jen DNEŠNÍ osamocený pohyb se smí
+ * upravit na místě — dnešek ještě uzavřený není a deník zůstane bez balastu
+ * při běžném doladění listu před podpisem.
  */
 function crmSyncVykupCashMovement(int $docId): void {
+    // UZÁVĚRKA: oprava výkupu zapisuje rozdílový pohyb k DNEŠKU — když je aktuální
+    // měsíc zamčený, nesmí vzniknout (historické pohyby se nemění nikdy, viz níže)
+    if (function_exists('afxAccountingAssertOpen')) {
+        afxAccountingAssertOpen(date('Y-m-d'), 'pohyb hotovosti z výkupu');
+    }
     global $pdo;
     $doc = crmGetDocument($docId);
     if (!$doc || (string)$doc['doc_type'] !== 'vykup') return;
@@ -315,39 +325,72 @@ function crmSyncVykupCashMovement(int $docId): void {
     $amount = crmParseAmountCzk((string)($doc['price'] ?? ''));
     $label = (string)$doc['doc_number'];
     $note = trim((string)($doc['customer_name'] ?? '') . ' · ' . (string)($doc['subject'] ?? ''), ' ·');
+    $branch = (int)($doc['branch_id'] ?? 0) ?: null;
+    $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+
+    // Cílový čistý výdej z kasy podle aktuální podoby dokumentu.
+    $target = ($isCash && $amount > 0) ? $amount : 0.0;
 
     try {
-        $st = $pdo->prepare("SELECT id, amount FROM pos_cash_movements WHERE ref_type = 'document' AND ref_id = ? LIMIT 1");
+        // Pohybů může být k dokumentu víc (původní + rozdílové opravy) —
+        // porovnává se proto ČISTÝ výdej (out − in), ne jeden řádek.
+        $st = $pdo->prepare("SELECT id, direction, amount, (DATE(created_at) = CURDATE()) AS is_today
+                             FROM pos_cash_movements WHERE ref_type = 'document' AND ref_id = ? ORDER BY id");
         $st->execute([$docId]);
-        $existing = $st->fetch(PDO::FETCH_ASSOC);
+        $moves = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        if ($isCash && $amount > 0) {
-            if ($existing) {
-                $pdo->prepare("UPDATE pos_cash_movements SET amount = ?, branch_id = ?, ref_label = ?, note = ? WHERE id = ?")
-                    ->execute([$amount, (int)($doc['branch_id'] ?? 0) ?: null, $label, mb_substr($note, 0, 255), (int)$existing['id']]);
-                if (abs((float)$existing['amount'] - $amount) >= 0.005) {
-                    crmAuditLog('kasa.cash_move', [
-                        'entity_type' => 'document', 'entity_id' => $docId, 'entity_label' => $label,
-                        'summary' => 'Výdej z kasy na výkup ' . $label . ' upraven na ' . formatMoney($amount),
-                    ]);
-                }
-            } else {
-                $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
-                $pdo->prepare("INSERT INTO pos_cash_movements (branch_id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by)
-                               VALUES (?, 'out', ?, 'vykup', 'document', ?, ?, ?, ?)")
-                    ->execute([(int)($doc['branch_id'] ?? 0) ?: null, $amount, $docId, $label, mb_substr($note, 0, 255), $by !== '' ? mb_substr($by, 0, 100) : null]);
-                crmAuditLog('kasa.cash_move', [
-                    'entity_type' => 'document', 'entity_id' => $docId, 'entity_label' => $label,
-                    'summary' => 'Výdej z kasy ' . formatMoney($amount) . ' — výkup ' . $label . ($note !== '' ? ' (' . $note . ')' : ''),
-                ]);
-            }
-        } elseif ($existing) {
-            $pdo->prepare("DELETE FROM pos_cash_movements WHERE id = ?")->execute([(int)$existing['id']]);
+        $net = 0.0;
+        foreach ($moves as $m) {
+            $net += ((string)$m['direction'] === 'out' ? 1 : -1) * (float)$m['amount'];
+        }
+        $diff = round($target - $net, 2);
+        if (abs($diff) < 0.005) { return; }   // deník už sedí — nic nezapisovat
+
+        // První zápis hotovostní výplaty — založit výdaj jako dřív.
+        if (!$moves && $target > 0) {
+            $pdo->prepare("INSERT INTO pos_cash_movements (branch_id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by)
+                           VALUES (?, 'out', ?, 'vykup', 'document', ?, ?, ?, ?)")
+                ->execute([$branch, $target, $docId, $label, mb_substr($note, 0, 255), $by !== '' ? mb_substr($by, 0, 100) : null]);
             crmAuditLog('kasa.cash_move', [
                 'entity_type' => 'document', 'entity_id' => $docId, 'entity_label' => $label,
-                'summary' => 'Výdej z kasy na výkup ' . $label . ' zrušen (výplata už není hotově)',
+                'summary' => 'Výdej z kasy ' . formatMoney($target) . ' — výkup ' . $label . ($note !== '' ? ' (' . $note . ')' : ''),
             ]);
+            return;
         }
+
+        // Jediný pohyb z DNEŠKA: úprava na místě je bezpečná (den není uzavřený).
+        if (count($moves) === 1 && !empty($moves[0]['is_today'])) {
+            if ($target > 0) {
+                $pdo->prepare("UPDATE pos_cash_movements SET amount = ?, branch_id = ?, ref_label = ?, note = ? WHERE id = ?")
+                    ->execute([$target, $branch, $label, mb_substr($note, 0, 255), (int)$moves[0]['id']]);
+                crmAuditLog('kasa.cash_move', [
+                    'entity_type' => 'document', 'entity_id' => $docId, 'entity_label' => $label,
+                    'summary' => 'Výdej z kasy na výkup ' . $label . ' upraven na ' . formatMoney($target) . ' (dnešní pohyb)',
+                ]);
+            } else {
+                $pdo->prepare("DELETE FROM pos_cash_movements WHERE id = ?")->execute([(int)$moves[0]['id']]);
+                crmAuditLog('kasa.cash_move', [
+                    'entity_type' => 'document', 'entity_id' => $docId, 'entity_label' => $label,
+                    'summary' => 'Výdej z kasy na výkup ' . $label . ' zrušen (výplata už není hotově, dnešní pohyb)',
+                ]);
+            }
+            return;
+        }
+
+        // Historický pohyb → ROZDÍLOVÝ pohyb s dnešním datem: kladný rozdíl =
+        // doplatit z kasy (out), záporný = vrácení do kasy (in) — snížení ceny
+        // nebo přepnutí výplaty na převod.
+        $dir = $diff > 0 ? 'out' : 'in';
+        $pdo->prepare("INSERT INTO pos_cash_movements (branch_id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by)
+                       VALUES (?, ?, ?, 'vykup', 'document', ?, ?, ?, ?)")
+            ->execute([$branch, $dir, abs($diff), $docId, $label,
+                       mb_substr('Oprava výkupu ' . $label . ($target <= 0 ? ' — výplata už není hotově' : ' — nová cena ' . formatMoney($target)), 0, 255),
+                       $by !== '' ? mb_substr($by, 0, 100) : null]);
+        crmAuditLog('kasa.cash_move', [
+            'entity_type' => 'document', 'entity_id' => $docId, 'entity_label' => $label,
+            'summary' => ($dir === 'out' ? 'Doplatek z kasy ' : 'Vrácení do kasy ') . formatMoney(abs($diff))
+                . ' — oprava výkupu ' . $label . ' (historický pohyb se nemění, zapsán rozdíl k dnešku)',
+        ]);
     } catch (Throwable $e) { error_log('crmSyncVykupCashMovement: ' . $e->getMessage()); }
 }
 

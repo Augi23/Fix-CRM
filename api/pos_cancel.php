@@ -2,10 +2,17 @@
 /**
  * Storno prodeje na kase — JEN vedení (admin/Boss). Plná vratka celého dokladu:
  * vrátí zboží na sklad, označí doklad jako stornovaný, případnou fakturu zruší.
+ *
+ * POKLADNÍ KNIHA: u hotovostního prodeje se NEsmí historie přepsat zpětně —
+ * peníze v den prodeje v zásuvce byly (uzavřený den knihy musí dál sedět)
+ * a fyzicky odcházejí až teď, při vrácení zákazníkovi. Proto se v den storna
+ * založí VÝDAJOVÝ pohyb (purpose 'storno', vazba na prodej) + VPD; kniha pak
+ * prodej dál počítá jako příjem v den prodeje a výdej ukáže v den storna.
  */
 ob_start();
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/cash_book.php';
 ob_clean();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -28,7 +35,25 @@ if ($id <= 0) {
 ensurePosTables();
 ensureInventoryMovesTable();
 ensureProductsPosColumn();
+// DDL pojistky PŘED transakcí — uvnitř by CREATE/ALTER udělal implicitní COMMIT.
+ensurePosCashMovementsTable();
+afxEnsureCashBookTables();
 
+// UZÁVĚRKA: storno mění tržby dne PRODEJE (sestava Tržby z pokladny čte stav
+// dokladu) a zakládá kompenzační pohyb k DNEŠKU — oba měsíce musí být otevřené.
+if (function_exists('afxAccountingAssertOpen')) {
+    try {
+        $dv = $pdo->prepare("SELECT DATE(created_at) FROM pos_sales WHERE id = ?");
+        $dv->execute([$id]);
+        $dvDate = (string)$dv->fetchColumn();
+        if ($dvDate !== '') { afxAccountingAssertOpen($dvDate, 'prodej z pokladny'); }
+        afxAccountingAssertOpen(date('Y-m-d'), 'storno prodeje');
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE); exit;
+    }
+}
+
+$stornoMoveId = 0;
 try {
     $pdo->beginTransaction();
 
@@ -77,12 +102,50 @@ try {
         $pdo->prepare("UPDATE invoices SET status = 'cancelled' WHERE id = ?")->execute([(int)$sale['invoice_id']]);
     }
 
+    // Hotovostní prodej: výdej peněz zapsat do pokladního deníku ke DNI STORNA
+    // (v jedné transakci se stornem — buď se povede obojí, nebo nic). Kniha
+    // stornovaný prodej ponechává v příjmech dne prodeje PRÁVĚ podle existence
+    // tohoto pohybu (afxCashSums), takže se historie zpětně nemění.
+    if ((string)$sale['payment_method'] === 'cash') {
+        $pdo->prepare("INSERT INTO pos_cash_movements
+                (branch_id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by)
+            VALUES (?, 'out', ?, 'storno', 'pos_sale', ?, ?, ?, ?)")
+            ->execute([
+                ((int)($sale['branch_id'] ?? 0) > 0 ? (int)$sale['branch_id'] : null),
+                (float)$sale['total'], $id,
+                mb_substr((string)$sale['sale_number'], 0, 40),
+                mb_substr('Vratka hotovosti — storno prodeje ' . (string)$sale['sale_number'], 0, 255),
+                $who !== '' ? mb_substr($who, 0, 100) : null,
+            ]);
+        $stornoMoveId = (int)$pdo->lastInsertId();
+    }
+
     $pdo->commit();
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) { $pdo->rollBack(); }
     error_log('pos_cancel: ' . $e->getMessage());
     $msg = ($e instanceof PDOException) ? 'Databázová chyba — storno neproběhlo, zkus to znovu.' : $e->getMessage();
     echo json_encode(['success' => false, 'message' => $msg]); exit;
+}
+
+// VPD ke kompenzačnímu pohybu — vystavuje se až PO commitu (rollback by v řadě
+// nechal díru, viz afxCashDocIssue). Vazba ref_type='cash_movement' = jen papír
+// k pohybu, který v knize už je; selhání dokladu nesmí shodit hotové storno.
+$stornoDocNumber = '';
+if ($stornoMoveId > 0) {
+    $doc = afxCashDocIssue([
+        'branch_id' => (int)($sale['branch_id'] ?? 0),
+        'type' => 'expense',
+        'amount' => (float)$sale['total'],
+        'date' => date('Y-m-d'),
+        'purpose' => 'Vratka hotovosti — storno prodeje ' . (string)$sale['sale_number'],
+        'issued_by' => $who,
+        'ref_type' => 'cash_movement',
+        'ref_id' => $stornoMoveId,
+        'note' => 'Storno prodeje ' . (string)$sale['sale_number'],
+    ]);
+    if ($doc['ok']) { $stornoDocNumber = (string)$doc['number']; }
+    else { error_log('pos_cancel: VPD ke stornu se nepodařilo vystavit — ' . (string)$doc['error']); }
 }
 
 foreach ($items as $line) {
@@ -94,8 +157,9 @@ crmAuditLog('kasa.cancel', [
     'entity_type' => 'pos_sale', 'entity_id' => $id, 'entity_label' => (string)$sale['sale_number'],
     'summary' => 'Storno prodeje ' . $sale['sale_number'] . ' za ' . formatMoney((float)$sale['total'])
         . (!empty($sale['invoice_id']) ? ' (zrušena i faktura)' : '')
+        . ($stornoMoveId > 0 ? ' — výdej hotovosti zapsán do pokladního deníku' . ($stornoDocNumber !== '' ? ' (' . $stornoDocNumber . ')' : '') : '')
         . ($missingParts ? ' — díl „' . implode('“, „', $missingParts) . '“ už není ve skladu, kusy se nevrátily' : ''),
     'branch_id' => (int)getCurrentStaffBranchId(),
 ]);
 
-echo json_encode(['success' => true]);
+echo json_encode(['success' => true, 'storno_doc' => $stornoDocNumber]);

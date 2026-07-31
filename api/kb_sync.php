@@ -15,8 +15,8 @@ header('Content-Type: application/json; charset=utf-8');
 if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
     echo json_encode(['success' => false, 'message' => __('unauthorized')]); exit;
 }
-if (!crmCanManageInvoices()) {
-    echo json_encode(['success' => false, 'message' => 'Banka je jen pro vedení (admin, Boss).']); exit;
+if (!(crmCanManageInvoices() || (function_exists('crmCanAccountingEdit') && crmCanAccountingEdit()))) {
+    echo json_encode(['success' => false, 'message' => 'Banka je jen pro vedení a účetní.']); exit;
 }
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     http_response_code(403);

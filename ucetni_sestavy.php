@@ -22,7 +22,24 @@ require_once __DIR__ . '/includes/ucetni_reports.php';
 $defs = afxUcetniReportDefs();
 $sestava = trim((string)($_GET['sestava'] ?? ''));
 $period = afxUcetniResolvePeriod($_GET);
-$branchId = afxUcetniResolveBranch($_GET['pobocka'] ?? 0);
+
+// ÚČETNÍ VIDÍ OBĚ PROVOZOVNY: účetnictví se vede za firmu, ne za pobočku.
+// afxUcetniResolveBranch() by ji ale přes afxUcetniForcedBranchId() zamkla na
+// branch_id z karty zaměstnance (sloupec je povinný, pro účetní jen formální)
+// a sestavy by TIŠE vynechaly druhou pobočku — Kniha faktur bez poloviny faktur
+// je horší než žádná. Proto tady pro roli účetní pobočku řešíme sami: výchozí
+// je „všechny provozovny" a výběr z URL se jen validuje proti seznamu poboček.
+if (crmIsAccountant()) {
+    $branchId = 0;
+    $__rawBranch = (int)($_GET['pobocka'] ?? 0);
+    if ($__rawBranch > 0) {
+        foreach (afxUcetniBranchList() as $__b) {
+            if ((int)$__b['id'] === $__rawBranch) { $branchId = $__rawBranch; break; }
+        }
+    }
+} else {
+    $branchId = afxUcetniResolveBranch($_GET['pobocka'] ?? 0);
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // A) TISKOVÁ SESTAVA
@@ -481,7 +498,8 @@ if (!afxUcetniCanRead()) {
 }
 
 $branches = afxUcetniBranchList();
-$forcedBranch = afxUcetniForcedBranchId();
+// Účetní vynucenou pobočku nemá (viz resolve nahoře) — selektor jí zůstává aktivní.
+$forcedBranch = crmIsAccountant() ? 0 : afxUcetniForcedBranchId();
 $rok = (int)date('Y');
 $roky = range($rok + 1, $rok - 5);
 
@@ -502,13 +520,13 @@ $sestavaUrl = static function (string $key) use ($period, $branchId): string {
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h2 class="mb-0"><i class="fas fa-file-lines me-2"></i>Podklady pro účetní</h2>
-    <div class="d-flex gap-2">
-        <a href="accounting.php" class="btn btn-outline-light btn-sm"><i class="fas fa-file-invoice-dollar me-1"></i>Faktury</a>
-        <?php if (function_exists('crmCanManageInvoices') && crmCanManageInvoices()): ?>
-            <a href="banka.php" class="btn btn-outline-light btn-sm"><i class="fas fa-building-columns me-1"></i>Banka</a>
-        <?php endif; ?>
-    </div>
 </div>
+<?php
+// Stejná lišta záložek jako na Fakturách a Bance (Faktury | Banka | Podklady) —
+// jednak konzistence, jednak jediná navigace, přes kterou se na tuhle stránku
+// dá doklikat (dřív nebyla odkázaná odnikud a účetní musela psát URL ručně).
+require __DIR__ . '/includes/accounting_tabs.php';
+?>
 
 <div class="glass-panel p-3 border-secondary mb-4">
     <form method="get" action="ucetni_sestavy.php" class="row g-3 align-items-end" id="ucetniObdobiForm">

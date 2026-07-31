@@ -25,6 +25,20 @@ switch ($action) {
         try {
             require_once 'models/InvoiceManager.php';
             $manager = new InvoiceManager($pdo);
+
+            // UZÁVĚRKA: doklad v uzamčeném měsíci se nesmí měnit — čísla v CRM by se
+            // rozešla s tím, co je odevzdané na úřadě. Kontroluje se datum vystavení
+            // NOVÉ podoby dokladu i PŮVODNÍ datum u editace (přesun dokladu ven ze
+            // zamčeného měsíce je taky změna zamčeného období).
+            if (function_exists('afxAccountingAssertOpen')) {
+                afxAccountingAssertOpen((string)($_POST['date_issue'] ?? date('Y-m-d')), 'fakturu');
+                if (!empty($_POST['id'])) {
+                    $pv = $pdo->prepare("SELECT date_issue FROM invoices WHERE id = ?");
+                    $pv->execute([(int)$_POST['id']]);
+                    $pvDate = (string)$pv->fetchColumn();
+                    if ($pvDate !== '') { afxAccountingAssertOpen($pvDate, 'fakturu'); }
+                }
+            }
             
             // Allow JS to send order_id via the from_order_id field
             if (empty($_POST['order_id']) && !empty($_POST['from_order_id'])) {
@@ -66,6 +80,17 @@ switch ($action) {
     case 'delete_invoice':
         try {
             $id = (int)$_POST['id'];
+            // účetní doklady nikdy nemaže (crmCanAccountingDelete) a zamčený měsíc
+            // nesmaže nikdo — smazání je nejtvrdší možná změna období
+            if (function_exists('crmCanAccountingDelete') && !crmCanAccountingDelete()) {
+                echo json_encode(['success' => false, 'error' => 'Mazání dokladů je jen pro vedení — účetní doklad stornuje, nemaže.']); break;
+            }
+            if (function_exists('afxAccountingAssertOpen')) {
+                $dv = $pdo->prepare("SELECT date_issue FROM invoices WHERE id = ?");
+                $dv->execute([$id]);
+                $dvDate = (string)$dv->fetchColumn();
+                if ($dvDate !== '') { afxAccountingAssertOpen($dvDate, 'fakturu'); }
+            }
             // číslo faktury pro historii zjistit PŘED smazáním
             $__invNo = '';
             try { $ns = $pdo->prepare("SELECT invoice_number FROM invoices WHERE id = ?"); $ns->execute([$id]); $__invNo = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
@@ -82,6 +107,18 @@ switch ($action) {
         break;
 
     case 'update_status':
+        // změna stavu (zaplaceno/…) zapisuje payment_date k dnešku a sahá na doklad —
+        // u dokladu z uzamčeného měsíce ji pustit nesmíme
+        if (function_exists('afxAccountingAssertOpen') && !empty($_POST['id'])) {
+            try {
+                $sv = $pdo->prepare("SELECT date_issue FROM invoices WHERE id = ?");
+                $sv->execute([(int)$_POST['id']]);
+                $svDate = (string)$sv->fetchColumn();
+                if ($svDate !== '') { afxAccountingAssertOpen($svDate, 'fakturu'); }
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]); break;
+            }
+        }
         try {
             require_once 'models/InvoiceManager.php';
             $manager = new InvoiceManager($pdo);

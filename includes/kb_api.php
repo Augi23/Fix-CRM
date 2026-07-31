@@ -790,8 +790,18 @@ function kbAutoMatchInvoices(?string $env = null, ?string $accountId = null): ar
                     $reason = 'platba bez bankovní reference by fakturu ' . $inv['invoice_number']
                         . ' uzavřela — potvrď ručně';
                 } else {
-                    if (afxInvoiceAddPayment((int)$inv['id'], $amount, 'bank', $payDate, (int)$tx['id'],
-                            'Automatické párování — VS ' . $vs)) {
+                    // Platba s datem v UZAMČENÉM měsíci: afxInvoiceAddPayment vyhodí výjimku
+            // (uzávěrka). Nesmí shodit celý sync — pohyb jde k prověření s vysvětlením
+            // a účetní rozhodne (typicky zapíše platbu k dnešku po odemčení období).
+            try {
+                $pridano = afxInvoiceAddPayment((int)$inv['id'], $amount, 'bank', $payDate, (int)$tx['id'],
+                    'Automatické párování — VS ' . $vs);
+            } catch (Exception $eLock) {
+                $mark->execute([(int)$inv['id'], 'review', mb_substr($eLock->getMessage(), 0, 255), (int)$tx['id']]);
+                if (!$wasReview) { $review++; }
+                continue;
+            }
+            if ($pridano) {
                         // pojistka proti souběhu: kdyby mezitím fakturu (do)platil někdo
                         // jiný, platba by ji přeplatila → radši ji zrušit a nechat člověku
                         $after = afxInvoiceRecalcPaid((int)$inv['id']);

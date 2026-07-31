@@ -51,9 +51,24 @@ function rptInvoicesHavePaidAmount(): bool {
  *   invoiced_amount  … vše vyfakturované (i nezaplacené) — jen pro informaci
  *   paid_amount      … kolik na fakturách reálně sedí (i částečné platby = zálohy)
  * Dobropisy a stornované faktury se nepočítají, aby nesnižovaly/nezvyšovaly tržbu dvakrát.
+ * KONCEPTY (draft) se nepočítají taky: rozpracovaný koncept doúčtování by u plně
+ * zaplacené zakázky rozsvítil odznak „záloha" (paid < invoiced) a majitel by z něj
+ * četl neexistující pohledávku.
+ *
+ * $orderStatuses: nepovinné zúžení na zakázky v daných stavech. Odvozená tabulka se
+ * jinak agreguje nad VŠEMI fakturami (per-order součty musí být „za celou historii
+ * zakázky", takže datem filtrovat nejde) — volající, který stejně bere jen dokončené
+ * zakázky, ale může agregaci zúžit na ně a ušetřit většinu práce. Stavy jdou z
+ * getOrderStatusList() (interní hodnoty), přesto se quotují přes PDO.
  */
-function rptPaidInvoiceJoinSql(string $alias = 'inv'): string {
+function rptPaidInvoiceJoinSql(string $alias = 'inv', array $orderStatuses = []): string {
+    global $pdo;
     $paidExpr = rptInvoicesHavePaidAmount() ? 'SUM(COALESCE(iv.paid_amount, 0))' : '0';
+    $statusJoin = '';
+    if ($orderStatuses) {
+        $quoted = array_map(static function ($s) use ($pdo) { return $pdo->quote((string)$s); }, $orderStatuses);
+        $statusJoin = "JOIN orders og ON og.id = iv.order_id AND og.status IN (" . implode(', ', $quoted) . ")\n                ";
+    }
     return "LEFT JOIN (
                 SELECT iv.order_id,
                        MAX(CASE WHEN iv.status = 'paid' THEN iv.payment_date END) AS payment_date,
@@ -61,16 +76,25 @@ function rptPaidInvoiceJoinSql(string $alias = 'inv'): string {
                        SUM(iv.total_amount) AS invoiced_amount,
                        $paidExpr AS paid_amount
                 FROM invoices iv
-                WHERE iv.order_id IS NOT NULL
-                  AND iv.status <> 'cancelled'
+                $statusJoin WHERE iv.order_id IS NOT NULL
+                  AND iv.status NOT IN ('cancelled', 'draft')
                   AND COALESCE(iv.invoice_type, 'invoice') <> 'credit_note'
                 GROUP BY iv.order_id
             ) $alias ON $alias.order_id = o.id";
 }
 
 /**
- * PŘIJATÉ PENÍZE (cash-flow) za období — součet skutečně došlých plateb z invoice_payments
- * podle DATA PLATBY, tedy VČETNĚ částečných úhrad a záloh.
+ * PŘIJATÉ PENÍZE (cash-flow) za období — kolik peněz v období SKUTEČNĚ přišlo,
+ * složené ze TŘÍ zdrojů (rozpad se ukazuje v UI, aby čísla šla dohledat):
+ *   1. úhrady faktur (invoice_payments) — včetně částečných úhrad a záloh,
+ *   2. tržby kasy (pos_sales, hotovost + karta) — prodej na kase žádný záznam
+ *      v invoice_payments nezakládá, takže bez něj by dlaždici chyběla celá
+ *      pultová tržba a číslo by nesedělo ani na sestavu „Tržby z pokladny",
+ *   3. ostatní příjmy pokladny (pos_cash_movements, direction='in') — hotovost
+ *      při výdeji zakázky, vklady do kasy… (vklady se vyčíslují zvlášť, protože
+ *      to nejsou peníze od zákazníků).
+ * Prodej na kase „na fakturu" se schválně NEpočítá — peníze přijdou až úhradou
+ * faktury (zdroj 1) a počítaly by se dvakrát.
  *
  * Pozor na účetní rozdíl: přijatá záloha NENÍ výnos (je to závazek do doby, než je plnění
  * uskutečněno), proto se toto číslo v UI ukazuje VEDLE tržby a nikdy se s ní nesčítá.
@@ -80,58 +104,153 @@ function rptPaidInvoiceJoinSql(string $alias = 'inv'): string {
  */
 function getCashFlowStats(PDO $pdo, string $start, string $end): array {
     $out = [
-        'received' => 0.0,        // vše, co v období přišlo
-        'advances' => 0.0,        // z toho na dosud neuhrazené faktury = zálohy / části
-        'settled'  => 0.0,        // z toho na faktury uhrazené celé
+        'received' => 0.0,        // vše, co v období přišlo (faktury + kasa + pokladna)
+        'invoices' => 0.0,        // z toho úhrady faktur (invoice_payments)
+        'advances' => 0.0,        // z úhrad faktur: na dosud neuhrazené faktury = zálohy / části
+        'settled'  => 0.0,        // z úhrad faktur: na faktury uhrazené celé
         'count' => 0, 'advance_count' => 0,
         'by_kind' => ['bank' => 0.0, 'cash' => 0.0, 'card' => 0.0, 'other' => 0.0],
-        'rows' => [],
+        'pos' => ['cash' => 0.0, 'card' => 0.0, 'total' => 0.0, 'count' => 0],       // kasa
+        'moves' => ['total' => 0.0, 'count' => 0, 'vklady' => 0.0],                  // pokladní příjmy mimo prodej
+        'no_paid_on' => ['count' => 0, 'sum' => 0.0],                                // platby s dopočteným datem
+        'rows' => [], 'rows_total' => 0, 'rows_limit' => 200,
     ];
+
+    // Platba bez vyplněného paid_on by s BETWEEN nespadla do ŽÁDNÉHO období a report
+    // by nikdy neseděl na invoices.paid_amount — datuje se proto dnem zápisu do CRM
+    // a v tabulce se označí, že jde o dopočtené datum.
+    $dateExpr = "COALESCE(p.paid_on, DATE(p.created_at))";
+
+    // Pobočková izolace: platba patří pod pobočku ZAKÁZKY. Faktura BEZ zakázky
+    // (samostatný prodej, faktura z kasy) ale žádnou pobočku nemá — kdyby zůstala
+    // podmínka jen „o.branch_id = X", LEFT JOIN by pro ni vrátil NULL a WHERE by ji
+    // zahodil i s platbou. Manažer pobočky by pak viděl „Přijaté peníze 0 Kč",
+    // přestože platby přišly. Proto se NULL zakázka výslovně pouští dál.
+    $scope = orderBranchScopeSql('o.branch_id');
+    $scopeCond = $scope !== '' ? ' AND (o.id IS NULL OR ' . substr($scope, 5) . ')' : '';
+
     try {
-        // Pobočková izolace: platba patří pod pobočku ZAKÁZKY. Faktura bez zakázky
-        // (samostatný prodej) proto řadovému zaměstnanci pobočky nesvítí — vidí ji vedení.
+        // Je faktura pokrytá celá? Stejné pravidlo jako afxPayTolerance u párování
+        // plateb (tolerance 1 Kč nad 100 Kč); když paid_amount nikdo nenaplnil
+        // (ručně uzavřené staré faktury), rozhoduje stav faktury.
+        $covered = rptInvoicesHavePaidAmount()
+            ? "IF(i.paid_amount > 0,
+                  i.paid_amount >= i.total_amount - IF(i.total_amount >= 100, 1.0, 0.0),
+                  i.status = 'paid')"
+            : "i.status = 'paid'";
+        // Dobropisy se vylučují stejně jako v sestavě „Přehled úhrad faktur" —
+        // jinak by dlaždice a sestava účetní dávaly různá čísla za totéž období.
+        $base = "FROM invoice_payments p
+                 JOIN invoices i ON i.id = p.invoice_id
+                 LEFT JOIN orders o ON o.id = i.order_id
+                 LEFT JOIN customers c ON c.id = i.customer_id
+                 WHERE $dateExpr BETWEEN ? AND ?
+                   AND i.status <> 'cancelled'
+                   AND COALESCE(i.invoice_type, 'invoice') <> 'credit_note'" . $scopeCond;
+
+        // Součty se počítají v SQL nad VŠEMI platbami období — výpis řádků níž je
+        // oříznutý LIMITem, takže z něj sčítat nejde (zobrazí se jen část).
+        $agg = $pdo->prepare(
+            "SELECT COUNT(*) c, COALESCE(SUM(p.amount), 0) s,
+                    COALESCE(SUM(CASE WHEN $covered THEN p.amount END), 0) settled,
+                    COALESCE(SUM(CASE WHEN NOT ($covered) THEN p.amount END), 0) advances,
+                    COALESCE(SUM(CASE WHEN NOT ($covered) THEN 1 ELSE 0 END), 0) advance_count,
+                    COALESCE(SUM(CASE WHEN p.kind = 'bank' THEN p.amount END), 0) k_bank,
+                    COALESCE(SUM(CASE WHEN p.kind = 'cash' THEN p.amount END), 0) k_cash,
+                    COALESCE(SUM(CASE WHEN p.kind = 'card' THEN p.amount END), 0) k_card,
+                    COALESCE(SUM(CASE WHEN p.kind IS NULL OR p.kind NOT IN ('bank','cash','card') THEN p.amount END), 0) k_other,
+                    COALESCE(SUM(p.paid_on IS NULL), 0) np_c,
+                    COALESCE(SUM(CASE WHEN p.paid_on IS NULL THEN p.amount END), 0) np_s
+             " . $base);
+        $agg->execute([$start, $end]);
+        $a = $agg->fetch(PDO::FETCH_ASSOC) ?: [];
+        $out['invoices']      = (float)($a['s'] ?? 0);
+        $out['count']         = (int)($a['c'] ?? 0);
+        $out['settled']       = (float)($a['settled'] ?? 0);
+        $out['advances']      = (float)($a['advances'] ?? 0);
+        $out['advance_count'] = (int)($a['advance_count'] ?? 0);
+        $out['by_kind']       = ['bank' => (float)($a['k_bank'] ?? 0), 'cash' => (float)($a['k_cash'] ?? 0),
+                                 'card' => (float)($a['k_card'] ?? 0), 'other' => (float)($a['k_other'] ?? 0)];
+        $out['no_paid_on']    = ['count' => (int)($a['np_c'] ?? 0), 'sum' => (float)($a['np_s'] ?? 0)];
+        $out['rows_total']    = (int)($a['c'] ?? 0);
+
+        // Výpis jednotlivých plateb se stropem — výchozí rozsah reportů je celý rok
+        // a bez LIMITu by se do stránky renderovaly tisíce řádků.
         $paidCol = rptInvoicesHavePaidAmount() ? 'i.paid_amount' : '0';
-        $sql = "SELECT p.amount, p.paid_on, p.kind, p.note,
+        $sql = "SELECT p.amount, $dateExpr AS paid_on, (p.paid_on IS NULL) AS paid_on_missing,
+                       p.kind, p.note,
                        i.invoice_number, i.total_amount, $paidCol AS paid_amount, i.status AS inv_status, i.order_id,
                        o.id AS oid, o.order_code,
                        c.first_name, c.last_name, c.company
-                FROM invoice_payments p
-                JOIN invoices i ON i.id = p.invoice_id
-                LEFT JOIN orders o ON o.id = i.order_id
-                LEFT JOIN customers c ON c.id = i.customer_id
-                WHERE p.paid_on BETWEEN ? AND ?
-                  AND i.status <> 'cancelled'" . orderBranchScopeSql('o.branch_id') . "
-                ORDER BY p.paid_on DESC, p.id DESC";
+                " . $base . "
+                ORDER BY paid_on DESC, p.id DESC
+                LIMIT " . (int)$out['rows_limit'];
         $st = $pdo->prepare($sql);
         $st->execute([$start, $end]);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $amount = (float)$r['amount'];
-            $total  = (float)$r['total_amount'];
-            $paid   = (float)$r['paid_amount'];
-            // Je faktura pokrytá celá? Primárně podle částky (tolerance stejná jako u párování
-            // plateb), a jen když paid_amount nikdo nikdy nenaplnil (ručně uzavřené staré faktury),
-            // se sáhne na stav faktury.
+            $total = (float)$r['total_amount'];
+            $paid  = (float)$r['paid_amount'];
             $tol = function_exists('afxPayTolerance') ? afxPayTolerance($total) : ($total >= 100 ? 1.0 : 0.0);
-            $covered = $paid > 0 ? ($paid >= $total - $tol) : ($r['inv_status'] === 'paid');
-
-            $out['received'] += $amount;
-            $out['count']++;
-            $kind = isset($out['by_kind'][$r['kind']]) ? $r['kind'] : 'other';
-            $out['by_kind'][$kind] += $amount;
-            if ($covered) {
-                $out['settled'] += $amount;
-            } else {
-                $out['advances'] += $amount;
-                $out['advance_count']++;
-            }
-            $r['is_advance'] = !$covered;
+            $rowCovered = $paid > 0 ? ($paid >= $total - $tol) : ($r['inv_status'] === 'paid');
+            $r['is_advance'] = !$rowCovered;
             $r['remaining']  = max(0.0, round($total - $paid, 2));
             $out['rows'][] = $r;
         }
     } catch (Throwable $e) {
-        // invoice_payments ještě není → cash-flow se tváří jako prázdný, zbytek reportů běží dál
+        // invoice_payments ještě není → úhrady faktur se tváří jako prázdné, zbytek běží dál
         error_log('getCashFlowStats: ' . $e->getMessage());
     }
+
+    // 2. KASA — dokončené prodeje za hotové a kartou. Prodej „na fakturu" sem
+    // nepatří (přijde úhradou faktury). Rozsah dat je psaný bez DATE(), aby mohl
+    // použít index na created_at.
+    try {
+        $posScope = orderBranchScopeSql('s.branch_id');
+        $q = $pdo->prepare(
+            "SELECT COUNT(*) c,
+                    COALESCE(SUM(CASE WHEN s.payment_method = 'cash' THEN s.total END), 0) cash_sum,
+                    COALESCE(SUM(CASE WHEN s.payment_method = 'card' THEN s.total END), 0) card_sum
+             FROM pos_sales s
+             WHERE s.status = 'completed' AND s.payment_method IN ('cash', 'card')
+               AND s.created_at >= ? AND s.created_at < DATE_ADD(?, INTERVAL 1 DAY)" . $posScope);
+        $q->execute([$start, $end]);
+        $p = $q->fetch(PDO::FETCH_ASSOC) ?: [];
+        $out['pos'] = [
+            'cash' => (float)($p['cash_sum'] ?? 0), 'card' => (float)($p['card_sum'] ?? 0),
+            'total' => (float)($p['cash_sum'] ?? 0) + (float)($p['card_sum'] ?? 0),
+            'count' => (int)($p['c'] ?? 0),
+        ];
+    } catch (Throwable $e) {
+        // pos_sales ještě není (kasa nenasazená) → složka zůstane nulová
+    }
+
+    // 3. OSTATNÍ PŘÍJMY POKLADNY — hotovost mimo prodejní doklad kasy: platba
+    // hotově při výdeji zakázky (ref_type='order') a vklady do kasy. Vklady se
+    // vyčíslují zvlášť — jsou to peníze vlastníka, ne tržba od zákazníků, ale do
+    // celkového cash-flow patří, aby číslo sedělo na pokladní knihu.
+    try {
+        $mvScope = orderBranchScopeSql('m.branch_id');
+        $q = $pdo->prepare(
+            "SELECT COUNT(*) c, COALESCE(SUM(m.amount), 0) s,
+                    COALESCE(SUM(CASE WHEN m.purpose = 'vklad' THEN m.amount END), 0) vklady
+             FROM pos_cash_movements m
+             WHERE m.direction = 'in'
+               AND m.created_at >= ? AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY)
+               -- pojistka proti dvojímu započtení: když někdo hotovost z výdeje
+               -- zakázky zaevidoval i jako platbu u faktury, počítá se jen platba
+               AND NOT (m.ref_type = 'order' AND EXISTS (
+                        SELECT 1 FROM invoice_payments p3
+                        JOIN invoices i3 ON i3.id = p3.invoice_id
+                        WHERE i3.order_id = m.ref_id AND p3.kind = 'cash'))" . $mvScope);
+        $q->execute([$start, $end]);
+        $m = $q->fetch(PDO::FETCH_ASSOC) ?: [];
+        $out['moves'] = ['total' => (float)($m['s'] ?? 0), 'count' => (int)($m['c'] ?? 0),
+                         'vklady' => (float)($m['vklady'] ?? 0)];
+    } catch (Throwable $e) {
+        // pos_cash_movements ještě není → složka zůstane nulová
+    }
+
+    $out['received'] = $out['invoices'] + $out['pos']['total'] + $out['moves']['total'];
     return $out;
 }
 
@@ -204,7 +323,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
              WHERE oi2.order_id = o.id) AS inventory_cost,
             o.work_duration_seconds
         FROM orders o
-        " . rptPaidInvoiceJoinSql() . "
+        " . rptPaidInvoiceJoinSql('inv', $doneStatuses) . "
         WHERE o.status IN (" . sqlPlaceholders($doneStatuses) . ")
           AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
     " . $fin_tech_cond;
@@ -605,7 +724,13 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     <div class="card border-0 bg-primary bg-opacity-10 p-3 text-center h-100">
                         <h6 class="text-uppercase small text-muted mb-2">Přijaté peníze (cash-flow)</h6>
                         <h2 class="mb-1 text-primary"><?php echo formatMoney($cf['received']); ?></h2>
-                        <div class="small text-white-75"><?php echo (int)$cf['count']; ?> plateb v období</div>
+                        <!-- Rozpad složení přímo v dlaždici — bez něj by číslo nešlo srovnat
+                             ani s Knihou faktur, ani s Tržbami z pokladny. -->
+                        <div class="small text-white-75">
+                            faktury <?php echo formatMoney($cf['invoices']); ?> (<?php echo (int)$cf['count']; ?> plateb)
+                            · kasa <?php echo formatMoney($cf['pos']['total']); ?> (<?php echo (int)$cf['pos']['count']; ?> dokladů)
+                            · ostatní <?php echo formatMoney($cf['moves']['total']); ?>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -625,10 +750,21 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
             </div>
             <div class="small text-white-75 mb-4">
                 <i class="fas fa-circle-info me-1"></i>
-                <strong>Přijaté peníze (cash-flow)</strong> = kolik peněz v období skutečně přišlo podle evidovaných plateb
-                k fakturám (banka <?php echo formatMoney($cf['by_kind']['bank']); ?> · hotovost <?php echo formatMoney($cf['by_kind']['cash']); ?>
+                <strong>Přijaté peníze (cash-flow)</strong> = kolik peněz v období skutečně přišlo, ze tří zdrojů:
+                <strong>úhrady faktur</strong> <?php echo formatMoney($cf['invoices']); ?>
+                (banka <?php echo formatMoney($cf['by_kind']['bank']); ?> · hotovost <?php echo formatMoney($cf['by_kind']['cash']); ?>
                 · karta <?php echo formatMoney($cf['by_kind']['card']); ?> · jiné <?php echo formatMoney($cf['by_kind']['other']); ?>),
+                <strong>tržby kasy</strong> <?php echo formatMoney($cf['pos']['total']); ?>
+                (hotovost <?php echo formatMoney($cf['pos']['cash']); ?> · karta <?php echo formatMoney($cf['pos']['card']); ?>;
+                prodej na fakturu se počítá až úhradou faktury)
+                a <strong>ostatní příjmy pokladny</strong> <?php echo formatMoney($cf['moves']['total']); ?><?php
+                    if ($cf['moves']['vklady'] > 0): ?> (z toho vklady do kasy <?php echo formatMoney($cf['moves']['vklady']); ?> — peníze vlastníka, ne tržba)<?php endif; ?>,
                 a to <strong>včetně záloh a částečných úhrad</strong>.
+                Složky odpovídají sestavám účetní: úhrady faktur = „Přehled úhrad faktur", tržby kasy = „Tržby z pokladny po dnech".
+                <?php if ($cf['no_paid_on']['count'] > 0): ?>
+                    U <?php echo (int)$cf['no_paid_on']['count']; ?> plateb (<?php echo formatMoney($cf['no_paid_on']['sum']); ?>) chybí datum úhrady —
+                    počítají se dnem zápisu do CRM a v tabulce jsou označené.
+                <?php endif; ?>
                 <strong>Tržba (výnos)</strong> = hodnota dokončených zakázek — přijatá záloha se do tržby počítá až tehdy,
                 když je práce hotová a plnění uskutečněné; do té doby je to závazek vůči klientovi, ne výnos.
                 Obě čísla se proto <strong>nesčítají</strong> a nemusí si odpovídat.
@@ -655,7 +791,12 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             $__cust = trim((string)($pmt['company'] ?: (($pmt['first_name'] ?? '') . ' ' . ($pmt['last_name'] ?? ''))));
                         ?>
                         <tr>
-                            <td><?php echo $pmt['paid_on'] ? date('d.m.Y', strtotime($pmt['paid_on'])) : '—'; ?></td>
+                            <td>
+                                <?php echo $pmt['paid_on'] ? date('d.m.Y', strtotime($pmt['paid_on'])) : '—'; ?>
+                                <?php if (!empty($pmt['paid_on_missing'])): ?>
+                                    <span class="badge bg-secondary ms-1" title="U platby chybí datum úhrady — počítá se dnem zápisu do CRM">dopočteno</span>
+                                <?php endif; ?>
+                            </td>
                             <td class="fw-bold"><?php echo e((string)$pmt['invoice_number']); ?></td>
                             <td><?php echo e($__cust !== '' ? $__cust : '—'); ?></td>
                             <td>
@@ -677,6 +818,14 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                <?php if ($cf['rows_total'] > count($cf['rows'])): ?>
+                    <!-- Výpis je oříznutý LIMITem — součty nahoře jsou ale spočítané v SQL
+                         nad VŠEMI platbami období, takže sedí i při oříznutém výpisu. -->
+                    <div class="small text-white-75 p-2">
+                        Zobrazeno prvních <?php echo count($cf['rows']); ?> z <?php echo (int)$cf['rows_total']; ?> plateb —
+                        pro kompletní výpis zvol kratší období. Součty nahoře zahrnují všechny platby.
+                    </div>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
 
@@ -990,7 +1139,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                     (SELECT COALESCE(SUM((wl.duration_minutes / 60.0) * COALESCE(wl.rate_snapshot, ?)), 0) FROM order_work_log wl WHERE wl.order_id = o.id AND wl.technician_id = ? AND wl.ended_at BETWEEN ? AND ?) AS tech_earn
                                 FROM orders o
                                 JOIN customers c ON o.customer_id = c.id
-                                " . rptPaidInvoiceJoinSql() . "
+                                " . rptPaidInvoiceJoinSql('inv', $doneStatuses) . "
                                 WHERE o.technician_id = ? AND o.status IN (" . sqlPlaceholders($doneStatuses) . ")" . orderBranchScopeSql('o.branch_id', 'o.technician_id') . "
                                   AND COALESCE(DATE(o.work_finished_at), inv.payment_date, DATE(o.shipping_date), DATE(o.updated_at)) BETWEEN ? AND ?
                                 ORDER BY finance_date DESC

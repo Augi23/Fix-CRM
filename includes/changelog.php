@@ -6,6 +6,21 @@
  */
 return [
     [
+        'version' => '3.37.0',
+        'date' => '2026-07-31',
+        'time' => '15:30',
+        'title' => 'Účetnictví po nezávislé prověrce: storna vracejí peníze a uzávěrka opravdu zamyká',
+        'items' => [
+            '<b>Nezávislá prověrka</b> účetní dávky našla 4 kritické a 11 vážných chyb — všechny podstatné jsou opravené a každá oprava byla ověřená proti původnímu nálezu.',
+            '<b>Storno teď skutečně vrací peníze:</b> storno pokladního dokladu dřív jen vystavilo papír, ale hotovost v knize nezměnilo — a šlo provést dvakrát. Nově založí protipohyb (atomicky, dvojité storno nemůže nastat), stornovaný hotovostní prodej z kasy vytvoří výdajový doklad ke dni storna a oprava výkupního listu už nikdy nepřepisuje historické pohyby — rozdíl se zapíše novým pohybem.',
+            '<b>Uzávěrka měsíce opravdu zamyká:</b> dřív byla jen vizuální. Nově blokuje editaci, mazání i změnu stavu faktur, platby k fakturám, pokladní doklady, pohyby hotovosti, storna prodejů i opravy výkupů s datem v uzamčeném měsíci. Bankovní synchronizace platbu do zamčeného měsíce nespadne — pošle ji k prověření s vysvětlením.',
+            '<b>Role účetní dotažena:</b> účetní se dostane právě tam, kam má — faktury, banka, párování plateb, podklady, pokladní kniha (jen ke čtení) — a nikam jinam: zakázky, klienti, sklad i kasa ji přesměrují pryč. Mazat nesmí nic.',
+            '<b>Přehledy „Přijaté peníze" konečně vidí kasu:</b> dřív ukazovaly jen platby k fakturám, takže celá pultová tržba chyběla. Nově sčítají faktury + kasu + ostatní příjmy pokladny s rozpisem složení. Přehled úhrad vynechává stornované faktury a dobropisy, pohledávky odečítají dobropisy a kniha faktur počítá „uhrazeno/zbývá" k poslednímu dni období.',
+            '<b>Dotisk starých účtenek</b> (A4 i nová 58mm) už neoznačuje nové zboží jako použité — příznak se posuzuje podle stavu zboží uloženého na dokladu.',
+            '<b>Drobné pojistky:</b> souvislá řada PPD/VPD i při souběhu, limit 270 000 Kč hlídán u příjmů i výdajů, nečitelný počáteční zůstatek se odmítne, výkonové úpravy dotazů (indexy, stropy výpisů).',
+        ],
+    ],
+    [
         'version' => '3.36.0',
         'date' => '2026-07-31',
         'time' => '19:30',

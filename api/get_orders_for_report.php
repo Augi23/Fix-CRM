@@ -61,12 +61,20 @@ switch ($type) {
         //    takže u zakázky nebylo vidět, že na ni už přišla záloha,
         //  - a při dvou uhrazených fakturách JOIN zakázku zdvojil.
         // total_amount zůstává jen z CELÝCH úhrad → tržba se nemění.
+        // KONCEPTY (draft) se do invoiced_amount nepočítají: rozpracovaný koncept
+        // doúčtování by u plně zaplacené zakázky rozsvítil odznak „záloha"
+        // (paid < invoiced) a majitel by z přehledu četl neexistující pohledávku.
         // Sloupec paid_amount přidává migrace 037 / afxEnsureInvoicePayments(); kdyby přesto
         // chyběl, nesmí kvůli němu selhat celý výpis zakázek — dosadí se nula.
         $hasPaidCol = false;
         try { $hasPaidCol = (bool)$pdo->query("SHOW COLUMNS FROM invoices LIKE 'paid_amount'")->fetch(); }
         catch (Throwable $e) { $hasPaidCol = false; }
         $paidExpr = $hasPaidCol ? 'SUM(COALESCE(iv.paid_amount, 0))' : '0';
+        // Agregace se zužuje JOINem jen na zakázky ve stavech „hotovo" (stejné, jaké
+        // filtruje vnější WHERE) — bez toho by se materializovala nad celou tabulkou
+        // faktur při každém otevření modalu. Stavy jsou interní hodnoty
+        // z getOrderStatusList(), přesto se quotují přes PDO.
+        $stQuoted = implode(', ', array_map(static function ($s) use ($pdo) { return $pdo->quote((string)$s); }, $statuses));
         $joins .= " LEFT JOIN (
                         SELECT iv.order_id,
                                MAX(CASE WHEN iv.status = 'paid' THEN iv.payment_date END) AS payment_date,
@@ -74,8 +82,9 @@ switch ($type) {
                                SUM(iv.total_amount) AS invoiced_amount,
                                $paidExpr AS paid_amount
                         FROM invoices iv
+                        JOIN orders og ON og.id = iv.order_id AND og.status IN ($stQuoted)
                         WHERE iv.order_id IS NOT NULL
-                          AND iv.status <> 'cancelled'
+                          AND iv.status NOT IN ('cancelled', 'draft')
                           AND COALESCE(iv.invoice_type, 'invoice') <> 'credit_note'
                         GROUP BY iv.order_id
                     ) inv ON inv.order_id = o.id";

@@ -439,35 +439,39 @@ try {
                                 <label class="form-label small">Stav</label>
                                 <select id="pcGrade" class="form-select"></select>
                             </div>
-                            <div class="col-md-4">
+                            <!-- Prodejna + Baterie + ceny jedou 3+3+3+3, aby nové pole Nákupní cena
+                                 neposunulo zaběhaný rytmus naskladňování: SN/IMEI zůstává na svém
+                                 řádku vedle PČR dlaždice (8+4) a u Maců drží RAM/CPU/GPU/Ročník
+                                 pohromadě (3+3+3+3) — obsluha čte formulář shora dolů čtečkou. -->
+                            <div class="col-md-3">
                                 <label class="form-label small">Prodejna</label>
                                 <select id="pcStockKey" class="form-select">
                                     <option value="karlin">Karlín</option>
                                     <option value="vaclavak">Černá Růže</option>
                                 </select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label small">Baterie</label>
                                 <div class="input-group">
                                     <input type="number" id="pcBattery" class="form-control" min="0" max="100">
                                     <span class="input-group-text">%</span>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label small">Prodejní cena <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <input type="text" id="pcPrice" class="form-control" inputmode="numeric">
                                     <span class="input-group-text">Kč</span>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Nákupní cena <span class="text-white-50">(nepovinné)</span></label>
+                            <div class="col-md-3">
+                                <label class="form-label small">Nákupní cena</label>
                                 <div class="input-group">
                                     <input type="text" id="pcPurchasePrice" class="form-control" inputmode="numeric"
                                            title="Za kolik jsme kus vykoupili/nakoupili. Potřeba pro daň z přirážky u použitého zboží (§ 90) — bez ní ji zpětně nespočítáme.">
                                     <span class="input-group-text">Kč</span>
                                 </div>
-                                <div class="form-text small text-white-50">Potřeba pro daň z přirážky u použitého zboží (§ 90).</div>
+                                <div class="form-text small text-white-50">Nepovinné — pro daň z přirážky u použitého zboží (§ 90).</div>
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label small">SN / IMEI <span class="text-white-50">(naskenuj čtečkou nebo zapiš)</span></label>

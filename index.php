@@ -45,19 +45,29 @@ $waiting_count = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN (
 $active_count = (int)$new_count + (int)$pending_count + (int)$progress_count + $waiting_count;
 $urgent_waiting = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($waitingStatuses) AND priority = 'High'" . $noLegacy . $tech_cond)->fetchColumn();
 try {
-    $completed_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE()" . $noLegacy . $tech_cond)->fetchColumn();
-    $planned_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()" . $noLegacy . $tech_cond)->fetchColumn();
-    $new_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($newStatuses) AND DATE(created_at) = CURDATE()" . $noLegacy . $tech_cond)->fetchColumn();
-    $revenue_today = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE()" . $noLegacy . $tech_cond)->fetchColumn();
-    $revenue_yesterday = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND DATE(updated_at) = CURDATE() - INTERVAL 1 DAY" . $noLegacy . $tech_cond)->fetchColumn();
+    // Rozsahy dat schválně BEZ funkce nad sloupcem (DATE()/MONTH() by znemožnily
+    // použití indexu a nástěnka by při každém načtení skenovala celé orders).
+    // „dnešek" = updated_at >= CURDATE() AND < CURDATE()+1 den, stejně měsíce.
+    $__day  = " AND updated_at >= CURDATE() AND updated_at < CURDATE() + INTERVAL 1 DAY";
+    $__dayC = " AND created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY";
+    $completed_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($doneStatuses)" . $__day . $noLegacy . $tech_cond)->fetchColumn();
+    $planned_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE 1=1" . $__dayC . $noLegacy . $tech_cond)->fetchColumn();
+    $new_today = (int)$pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ($newStatuses)" . $__dayC . $noLegacy . $tech_cond)->fetchColumn();
+    $revenue_today = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses)" . $__day . $noLegacy . $tech_cond)->fetchColumn();
+    $revenue_yesterday = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND updated_at >= CURDATE() - INTERVAL 1 DAY AND updated_at < CURDATE()" . $noLegacy . $tech_cond)->fetchColumn();
     $revenue_today_trend = $revenue_yesterday > 0 ? round((($revenue_today - $revenue_yesterday) / $revenue_yesterday) * 100) : 0;
 
-    $revenue_month = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND MONTH(updated_at) = MONTH(CURDATE()) AND YEAR(updated_at) = YEAR(CURDATE())" . $noLegacy . $tech_cond)->fetchColumn();
-    $revenue_prev = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND MONTH(updated_at) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(updated_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)" . $noLegacy . $tech_cond)->fetchColumn();
+    $revenue_month = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND updated_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND updated_at < DATE_FORMAT(CURDATE() + INTERVAL 1 MONTH, '%Y-%m-01')" . $noLegacy . $tech_cond)->fetchColumn();
+    $revenue_prev = (float)$pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND updated_at >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m-01') AND updated_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')" . $noLegacy . $tech_cond)->fetchColumn();
     $revenue_trend = $revenue_prev > 0 ? round((($revenue_month - $revenue_prev) / $revenue_prev) * 100) : 0;
     $revenue_12m = [];
     for ($i = 11; $i >= 0; $i--) {
-        $m = $pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses) AND YEAR(updated_at)*12+MONTH(updated_at) = YEAR(CURDATE())*12+MONTH(CURDATE()) - $i" . $noLegacy . $tech_cond)->fetchColumn();
+        // měsíc „před $i měsíci" jako polouzavřený interval <začátek; začátek dalšího)
+        // — INTERVAL -1 MONTH pro $i=0 dá korektně začátek příštího měsíce
+        $prev = $i - 1;
+        $m = $pdo->query("SELECT COALESCE(SUM(final_cost),0) FROM orders WHERE status IN ($doneStatuses)
+            AND updated_at >= DATE_FORMAT(CURDATE() - INTERVAL $i MONTH, '%Y-%m-01')
+            AND updated_at < DATE_FORMAT(CURDATE() - INTERVAL $prev MONTH, '%Y-%m-01')" . $noLegacy . $tech_cond)->fetchColumn();
         $revenue_12m[] = (float)$m;
     }
 } catch (Throwable $e) {
@@ -87,13 +97,24 @@ try {
                    i.paid_amount < i.total_amount - IF(i.total_amount >= 100, 1.0, 0.0),
                    i.status <> 'paid')"
         : " AND i.status <> 'paid'";
-    // Pobočka se bere ze ZAKÁZKY; faktura bez zakázky se řadovému zaměstnanci pobočky nepočítá.
+    // Pobočka se bere ze ZAKÁZKY. Faktura BEZ zakázky žádnou pobočku nemá — LEFT JOIN
+    // pro ni vrátí NULL a holá podmínka „o.branch_id = X" by ji zahodila i s platbou.
+    // Proto se NULL zakázka výslovně pouští dál (stejné pravidlo jako getCashFlowStats
+    // v Přehledech, jinak by nástěnka a Přehledy ukazovaly různá čísla za týž měsíc).
+    // Dobropisy se vylučují ze stejného důvodu — sestavy účetní je nepočítají.
+    $__scope = orderBranchScopeSql('o.branch_id');
+    $__scopeCond = $__scope !== '' ? ' AND (o.id IS NULL OR ' . substr($__scope, 5) . ')' : '';
     $__payBase = "FROM invoice_payments p
                   JOIN invoices i ON i.id = p.invoice_id
                   LEFT JOIN orders o ON o.id = i.order_id
-                  WHERE i.status <> 'cancelled'" . orderBranchScopeSql('o.branch_id');
-    $__payToday = " AND p.paid_on = CURDATE()";
-    $__payMonth = " AND MONTH(p.paid_on) = MONTH(CURDATE()) AND YEAR(p.paid_on) = YEAR(CURDATE())";
+                  WHERE i.status <> 'cancelled'
+                    AND COALESCE(i.invoice_type, 'invoice') <> 'credit_note'" . $__scopeCond;
+    // Platba bez vyplněného paid_on se datuje dnem zápisu — s holým paid_on by
+    // nespadla do žádného dne ani měsíce a číslo by nesedělo na paid_amount faktur.
+    $__payDate = "COALESCE(p.paid_on, DATE(p.created_at))";
+    $__payToday = " AND $__payDate = CURDATE()";
+    $__payMonth = " AND $__payDate >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+                    AND $__payDate < DATE_FORMAT(CURDATE() + INTERVAL 1 MONTH, '%Y-%m-01')";
     $received_today = (float)$pdo->query("SELECT COALESCE(SUM(p.amount),0) " . $__payBase . $__payToday)->fetchColumn();
     $advance_today  = (float)$pdo->query("SELECT COALESCE(SUM(p.amount),0) " . $__payBase . $__payToday . $__advCond)->fetchColumn();
     $received_month = (float)$pdo->query("SELECT COALESCE(SUM(p.amount),0) " . $__payBase . $__payMonth)->fetchColumn();

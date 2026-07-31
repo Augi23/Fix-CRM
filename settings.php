@@ -1610,6 +1610,7 @@ require_once 'includes/header.php';
                 faktury, platby, doklady kasy ani pohyby hotovosti. Zavírá se až po odevzdání přiznání,
                 aby se čísla v CRM nerozešla s tím, co je odevzdané na úřadě.
                 Uzavřít smí vedení i účetní, <strong>odemknout jen administrátor</strong> a každé odemčení jde do historie.
+                <span class="ms-2"><a href="ucetni_sestavy.php" class="link-info"><i class="fas fa-file-lines me-1"></i>Podklady pro účetní (sestavy za období)</a></span>
             </div>
 
             <!-- Volba roku -->
@@ -1654,11 +1655,13 @@ require_once 'includes/header.php';
                             <td class="small text-white-75"><?php echo $row && !empty($row['note']) ? e($row['note']) : '<span class="text-white-50">—</span>'; ?></td>
                             <td class="text-end">
                                 <?php if ($row && $canUnlock): ?>
-                                    <form method="POST" class="d-inline">
+                                    <form method="POST" class="d-inline d-flex gap-2 justify-content-end">
                                         <?php echo csrfField(); ?>
                                         <input type="hidden" name="period_year" value="<?php echo $periodYear; ?>">
                                         <input type="hidden" name="period_month" value="<?php echo $mNum; ?>">
-                                        <input type="hidden" name="period_note" value="Odemčeno v Nastavení">
+                                        <!-- Důvod jde do auditní historie; poznámka k UZAVŘENÍ zůstává nedotčená
+                                             (afxAccountingUnlockPeriod ji nepřepisuje). -->
+                                        <input type="text" name="period_note" class="form-control form-control-sm" style="max-width:220px;" placeholder="důvod odemčení" maxlength="255">
                                         <button type="submit" name="accounting_unlock_period" value="1" class="btn btn-outline-warning btn-sm"
                                                 data-confirm="Opravdu odemknout uzavřené období <?php echo $mNum . '/' . $periodYear; ?>? Zapíše se to do auditní historie.">
                                             <i class="fas fa-lock-open me-1"></i>Odemknout

@@ -21,6 +21,18 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     exit;
 }
 
+// Editace zakázky je PROVOZNÍ právo — samotné přihlášení nestačí. Bez téhle
+// kontroly mohl zakázku přepsat kdokoli se session (stav, cenu, technika,
+// pobočku), včetně role „účetní", která do zakázek nesmí vůbec (její
+// hasPermission() vrací vždy false — viz crmAccountantHasPermission()).
+// Zaměstnancům dává edit_orders implicitně hasPermission(), takže provoz
+// tahle pojistka nijak neomezí.
+if (!hasPermission('edit_orders')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => $t('access_denied_msg')]);
+    exit;
+}
+
 $order_id = $_POST['order_id'] ?? null;
 if (!$order_id) {
     echo json_encode(['success' => false, 'message' => $t('missing_id')]);

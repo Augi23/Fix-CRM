@@ -21,12 +21,24 @@ if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) { pcm_fail('Nep�
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { pcm_fail('Chybná metoda', 405); }
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { pcm_fail('Neplatný token', 419); }
 
+// ÚČETNÍ do pokladny NESMÍ zapisovat (jen číst knihu): vklad/výběr i doklady
+// jsou provozní operace s fyzickou hotovostí, kterou účetní v ruce nemá.
+if (function_exists('crmIsAccountant') && crmIsAccountant()) {
+    pcm_fail('Role účetní hotovostí nehýbe — pokladní kniha je pro ni jen ke čtení.', 403);
+}
+
 $action = (string)($_POST['action'] ?? 'move');
 $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 
 // ── Počáteční zůstatek pokladny ─────────────────────────────────────────────
 // Zásah do účetního základu (od téhle částky se počítá celý stav hotovosti) →
 // jen vedení, stejná citlivost jako faktury.
+// pohyb hotovosti se zapisuje k dnešku — v uzamčeném měsíci nesmí vzniknout
+if ($action === 'move' && function_exists('afxAccountingClosedError')) {
+    $err = afxAccountingClosedError(date('Y-m-d'), 'pohyb hotovosti');
+    if ($err !== null) { pcm_fail($err, 423); }
+}
+
 if ($action === 'opening') {
     if (!crmCanManageInvoices()) { pcm_fail('Počáteční zůstatek smí nastavit jen vedení', 403); }
     $branch = (int)($_POST['branch_id'] ?? 0);
@@ -34,7 +46,16 @@ if ($action === 'opening') {
     // si zaměstnanec jedné pobočky mohl přepsat stav hotovosti té druhé.
     if (!isBranchGlobalViewer() || $branch <= 0) { $branch = (int)getCurrentStaffBranchId(); }
 
-    $balance = crmParseAmountCzk((string)($_POST['balance'] ?? ''));
+    // crmParseAmountCzk je shovívavý: pro „nevím" vrátí 0,00 a z „cca 15 tis."
+    // vytáhne 15 — obojí by se TIŠE stalo základem celé pokladní knihy. Vstup
+    // proto musí být čitelné číslo (mezery/nbsp a „Kč"/„,-" jsou tolerované).
+    $balRaw = trim((string)($_POST['balance'] ?? ''));
+    $balNorm = str_ireplace([' ', "\u{00A0}", 'Kč'], '', $balRaw);
+    if (substr($balNorm, -2) === ',-') { $balNorm = substr($balNorm, 0, -2); }
+    if (!preg_match('/^\d+([.,]\d{1,2})?$/', $balNorm)) {
+        pcm_fail('Zadej zůstatek číslem, např. 15000 nebo 15 000,50');
+    }
+    $balance = crmParseAmountCzk($balRaw);
     $date = trim((string)($_POST['opening_date'] ?? ''));
     if ($date === '') { $date = date('Y-m-d'); }
     $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 255);
@@ -71,6 +92,15 @@ $amount = crmParseAmountCzk((string)($_POST['amount'] ?? ''));
 if ($amount <= 0) { pcm_fail('Zadej platnou částku'); }
 if ($amount > 500000) { pcm_fail('Částka je podezřele vysoká'); }
 
+// Zákonný limit hotovosti (zák. 254/2004 Sb.) platí pro přijatou i POSKYTNUTOU
+// platbu. Vklad/výběr nad limit nezakazujeme (může jít o svoz vlastní tržby do
+// banky, což limitu nepodléhá), ale obsluha musí varování dostat hned.
+$limitWarning = '';
+if ($amount > AFX_CASH_LIMIT_CZK) {
+    $limitWarning = 'Pozor: částka přesahuje zákonný limit hotovostní platby '
+        . formatMoney(AFX_CASH_LIMIT_CZK) . ' (zák. 254/2004 Sb.). Pokud jde o platbu jedné protistraně, musí proběhnout převodem.';
+}
+
 $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 255);
 
 ensurePosCashMovementsTable();
@@ -106,6 +136,7 @@ try {
     echo json_encode([
         'ok' => true, 'id' => $id,
         'doc_number' => $doc['ok'] ? $doc['number'] : '',
+        'warning' => $limitWarning,
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     error_log('pos_cash_move: ' . $e->getMessage());

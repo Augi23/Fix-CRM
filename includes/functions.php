@@ -1834,6 +1834,11 @@ function afxInvoiceAddPayment(int $invoiceId, float $amount, string $kind = 'oth
     global $pdo;
     afxEnsureInvoicePayments();
     if ($invoiceId <= 0 || $amount <= 0) { return false; }
+    // UZÁVĚRKA: platba se účtuje ke dni úhrady — do uzavřeného měsíce už zapsat
+    // nejde, jinak by se sestavy (Přehled úhrad, Pohledávky k datu) po odevzdání
+    // přiznání tiše rozešly s úřadem. RuntimeException se srozumitelnou hláškou
+    // chytají vstupní body (api/kb_match.php, accounting_actions…) v catch(Throwable).
+    afxAccountingAssertOpen($paidOn ?: date('Y-m-d'), 'platbu k faktuře');
     $who = trim((string)($_SESSION['user_name'] ?? $_SESSION['tech_name'] ?? 'systém'));
     try {
         $ins = $pdo->prepare("INSERT INTO invoice_payments
@@ -1856,10 +1861,17 @@ function afxInvoiceRemoveBankPayment(int $bankTxId): int {
     global $pdo;
     afxEnsureInvoicePayments();
     if ($bankTxId <= 0) { return 0; }
-    $q = $pdo->prepare("SELECT DISTINCT invoice_id FROM invoice_payments WHERE bank_transaction_id = ?");
+    $q = $pdo->prepare("SELECT DISTINCT invoice_id, paid_on FROM invoice_payments WHERE bank_transaction_id = ?");
     $q->execute([$bankTxId]);
-    $ids = array_map('intval', $q->fetchAll(PDO::FETCH_COLUMN));
-    if (!$ids) { return 0; }
+    $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+    if (!$rows) { return 0; }
+    // UZÁVĚRKA: odpárování MAŽE evidenci platby k jejímu dni úhrady — v uzavřeném
+    // měsíci by to zpětně změnilo už odevzdané podklady. Kontrola PŘED mazáním,
+    // aby po výjimce nezůstala platba napůl smazaná.
+    foreach ($rows as $r) {
+        afxAccountingAssertOpen($r['paid_on'] ?: date('Y-m-d'), 'platbu k faktuře');
+    }
+    $ids = array_values(array_unique(array_map(static fn(array $r) => (int)$r['invoice_id'], $rows)));
     $pdo->prepare("DELETE FROM invoice_payments WHERE bank_transaction_id = ?")->execute([$bankTxId]);
     foreach ($ids as $id) { afxInvoiceRecalcPaid($id, true); }
     return count($ids);
@@ -1894,6 +1906,15 @@ function afxInvoiceSyncManualStatus(int $invoiceId, string $status, ?string $pay
         return;
     }
     if (in_array($status, ['issued', 'overdue', 'draft', 'cancelled'], true)) {
+        // UZÁVĚRKA: ruční „odzaplacení" maže evidované platby k jejich dni úhrady.
+        // Když některá spadá do uzavřeného měsíce, nesmí se smazat NIC (kontrola
+        // před DELETE) — jinak by zpětně klesly úhrady v už odevzdaném období.
+        $chk = $pdo->prepare("SELECT DISTINCT paid_on FROM invoice_payments
+            WHERE invoice_id = ? AND bank_transaction_id IS NULL");
+        $chk->execute([$invoiceId]);
+        foreach ($chk->fetchAll(PDO::FETCH_COLUMN) as $paidOn) {
+            afxAccountingAssertOpen($paidOn ?: date('Y-m-d'), 'platbu k faktuře');
+        }
         $pdo->prepare("DELETE FROM invoice_payments WHERE invoice_id = ? AND bank_transaction_id IS NULL")
             ->execute([$invoiceId]);
         afxInvoiceRecalcPaid($invoiceId, true);
@@ -1939,9 +1960,15 @@ function ensureEshopOrdersTable(): void {
     } catch (Throwable $e) { error_log('ensureEshopOrdersTable: ' . $e->getMessage()); }
 }
 
-/** Prodávat na kase smí KAŽDÝ přihlášený zaměstnanec (pultová operace, obě pobočky).
- *  Guard akceptuje obě session varianty dual-loginu (users i technicians). */
+/** Prodávat na kase smí každý přihlášený zaměstnanec (pultová operace, obě pobočky)
+ *  KROMĚ ÚČETNÍ — ta je neprovozní role: nesmí prodávat, odepisovat sklad ani
+ *  vystavovat doklady kasy (viz includes/accounting_role.php). Bez téhle výjimky
+ *  by prošla přes api/pos_checkout.php i pos_cancel.php, protože obě session
+ *  varianty dual-loginu (users i technicians) tu jinak stačí. */
 function crmCanUsePos(): bool {
+    if (function_exists('crmIsAccountant') && crmIsAccountant()) {
+        return false;
+    }
     return !empty($_SESSION['user_id']) || !empty($_SESSION['tech_id']);
 }
 

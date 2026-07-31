@@ -44,7 +44,6 @@ function afxEnsureCashBookTables(): void {
     // volajícího (např. checkout kasy). Raději nic a zkusit to při dalším volání
     // mimo transakci; $done proto zůstává false.
     if ($pdo->inTransaction()) return;
-    $done = true;
     try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS cash_registers (
             id INT NOT NULL AUTO_INCREMENT,
@@ -88,6 +87,10 @@ function afxEnsureCashBookTables(): void {
             KEY idx_cash_doc_date (doc_date),
             KEY idx_cash_doc_ref (ref_type, ref_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // $done až PO úspěchu: přechodná chyba (metadata lock, výpadek spojení)
+        // by jinak pojistku vypnula do konce requestu a kniha by se ukázala
+        // prázdná s nulovým zůstatkem — nerozeznatelné od pravdy.
+        $done = true;
     } catch (Throwable $e) { error_log('afxEnsureCashBookTables: ' . $e->getMessage()); }
 }
 
@@ -134,7 +137,15 @@ function afxCashRegisterForBranch(int $branchId, bool $autoCreate = true): array
         // peněz, než v ní je. Skutečný stav zapíše vedení tlačítkem v kase.
         $ins = $pdo->prepare("INSERT INTO cash_registers (branch_id, name, currency, opening_balance, opening_date)
                               VALUES (?, ?, 'CZK', 0, CURDATE())");
-        $ins->execute([$branchId, mb_substr($name, 0, 80)]);
+        try {
+            $ins->execute([$branchId, mb_substr($name, 0, 80)]);
+        } catch (PDOException $e) {
+            // Souběh: dvě kasy zakládají pokladnu téže pobočky ve stejnou chvíli —
+            // druhý INSERT narazí na UNIQUE(branch_id). To není chyba, řádek už
+            // existuje; bez tohohle odchycení by druhá kasa dostala $fallback
+            // s nulovým zůstatkem a ukázala prázdnou knihu.
+            if ((int)($e->errorInfo[1] ?? 0) !== 1062) { throw $e; }
+        }
         $st->execute([$branchId]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
         return $row ?: $fallback;
@@ -146,6 +157,11 @@ function afxCashRegisterForBranch(int $branchId, bool $autoCreate = true): array
 
 /** Zápis počátečního zůstatku (inventarizace hotovosti). Vrací ['ok'=>bool,'error'=>string]. */
 function afxCashSetOpeningBalance(int $branchId, float $balance, string $openingDate, string $by = '', string $note = ''): array {
+    // počáteční zůstatek datovaný do uzamčeného měsíce by přepsal základ knihy
+    // za odevzdané období
+    if (function_exists('afxAccountingAssertOpen')) {
+        afxAccountingAssertOpen($openingDate, 'počáteční zůstatek pokladny');
+    }
     global $pdo;
     $d = date_create_from_format('Y-m-d', $openingDate);
     if (!$d || $d->format('Y-m-d') !== $openingDate) {
@@ -156,6 +172,22 @@ function afxCashSetOpeningBalance(int $branchId, float $balance, string $opening
     if ($openingDate > date('Y-m-d')) { return ['ok' => false, 'error' => 'Datum nesmí být v budoucnosti'] ; }
 
     $reg = afxCashRegisterForBranch($branchId);
+
+    // Posun počátku DO MINULOSTI za existující pohyby by knihu nafoukl: napočítaná
+    // hotovost v zásuvce ty pohyby už OBSAHUJE a součty knihy by je přičetly
+    // podruhé (např. zůstatek k dnešku zapsaný s datem 1. 1. = leden–dnešek 2×).
+    // Datum před dosavadní počátek se proto povolí, jen když je mezidobí prázdné.
+    $curOpen = (string)($reg['opening_date'] ?? '');
+    if ((int)($reg['id'] ?? 0) > 0 && $curOpen !== '' && $openingDate < $curOpen) {
+        $s = afxCashSums($branchId, $openingDate, date('Y-m-d', strtotime($curOpen . ' -1 day')));
+        if ($s['in'] > 0 || $s['out'] > 0) {
+            return ['ok' => false, 'error' => 'Mezi ' . date('j. n. Y', strtotime($openingDate))
+                . ' a dosavadním počátkem pokladny (' . date('j. n. Y', strtotime($curOpen)) . ') už existují pohyby'
+                . ' (příjmy ' . formatMoney($s['in']) . ', výdaje ' . formatMoney($s['out']) . ') — započítaly by se dvakrát.'
+                . ' Zvol pozdější datum, ideálně den skutečné inventarizace.'];
+        }
+    }
+
     try {
         if ((int)($reg['id'] ?? 0) > 0) {
             $pdo->prepare("UPDATE cash_registers SET opening_balance = ?, opening_date = ?, note = ?, updated_by = ?, updated_at = NOW() WHERE id = ?")
@@ -206,6 +238,12 @@ function afxCashDocTypeLabel(string $docType): string {
  * díra (číslo je spotřebované). Proto se doklady vystavují až po commitu.
  */
 function afxCashDocIssue(array $p): array {
+    // UZÁVĚRKA OBDOBÍ: pokladní doklad s datem v uzamčeném měsíci by změnil
+    // pokladní knihu, která už je odevzdaná — proto se vydání odmítne dřív,
+    // než se čehokoli dotkne.
+    if (function_exists('afxAccountingAssertOpen')) {
+        afxAccountingAssertOpen((string)($p['date'] ?? date('Y-m-d')), 'pokladní doklad');
+    }
     global $pdo;
     afxEnsureCashBookTables();
 
@@ -223,6 +261,20 @@ function afxCashDocIssue(array $p): array {
 
     $branchId = max(0, (int)($p['branch_id'] ?? 0));
     $reg = afxCashRegisterForBranch($branchId);
+
+    // Datum mimo vedení knihy se odmítá: doklad datovaný PŘED počátek pokladny
+    // by se v knize nikdy neobjevil (rozsah se ořezává na opening_date) — číslo
+    // v řadě by se spotřebovalo, ale peníze by ve výpisu ani v zůstatku nebyly.
+    // Budoucí datum by zas rozešlo hlavičku kasy (stav k dnešku) s výpisem.
+    if ($date > date('Y-m-d')) {
+        return ['ok' => false, 'id' => 0, 'number' => '', 'error' => 'Doklad nelze datovat do budoucnosti'];
+    }
+    $regOpen = (string)($reg['opening_date'] ?? '');
+    if ((int)($reg['id'] ?? 0) > 0 && $regOpen !== '' && $date < $regOpen) {
+        return ['ok' => false, 'id' => 0, 'number' => '',
+                'error' => 'Pokladna je vedena až od ' . date('j. n. Y', strtotime($regOpen))
+                    . ' — doklad se starším datem by se v knize nikdy neobjevil. Nejdřív uprav počáteční zůstatek.'];
+    }
     $year = (int)date('Y', strtotime($date));
 
     $purpose = mb_substr(trim((string)($p['purpose'] ?? '')), 0, 255);
@@ -243,8 +295,11 @@ function afxCashDocIssue(array $p): array {
 
     $ins = null;
     try {
+        // FOR UPDATE = zamykající čtení: vidí čerstvě commitnutá data i pod
+        // REPEATABLE READ (afxCashDocStorno volá vystavení uvnitř transakce)
+        // a zamkne konec indexu řady, takže se číslo přiděluje atomicky.
         $seqStmt = $pdo->prepare("SELECT COALESCE(MAX(doc_seq), 0) FROM cash_documents
-                                  WHERE branch_id = ? AND doc_type = ? AND doc_year = ?");
+                                  WHERE branch_id = ? AND doc_type = ? AND doc_year = ? FOR UPDATE");
         $ins = $pdo->prepare("INSERT INTO cash_documents
                 (register_id, branch_id, doc_type, doc_number, doc_year, doc_seq, doc_date, amount,
                  purpose, counterparty, issued_by, ref_type, ref_id, ref_label, storno_of, note)
@@ -252,9 +307,11 @@ function afxCashDocIssue(array $p): array {
 
         for ($try = 0; $try < 8; $try++) {
             $seqStmt->execute([$branchId, $type, $year]);
-            // $try se přičítá schválně: pod REPEATABLE READ vrací opakovaný SELECT
-            // tentýž snapshot, takže bez posunu bychom donekonečna zkoušeli totéž číslo.
-            $seq = (int)$seqStmt->fetchColumn() + 1 + $try;
+            // Žádný posun o $try: FOR UPDATE výše čte vždy aktuální MAX, takže po
+            // kolizi 1062 stačí číst znovu. Dřívější „+ $try" dělal v souvislé
+            // řadě díry (P…-0006 a P…-0008 bez P…-0007), což je při kontrole
+            // účetní nedoložitelné jako „doklad nebyl vytržen".
+            $seq = (int)$seqStmt->fetchColumn() + 1;
             $number = afxCashDocNumber($type, $year, $seq);
             try {
                 $ins->execute([
@@ -303,40 +360,131 @@ function afxCashDocGet(int $docId): ?array {
  * Původní doklad zůstává v řadě i v knize a nový ho vyruší, takže zůstatek sedí
  * a je vidět, co se stalo (na rozdíl od tichého smazání).
  *
- * Storno dědí vazbu (ref_type) původního dokladu schválně: doklad k prodeji se
- * do součtu knihy nepočítá, a kdyby se jeho storno počítalo, sebralo by z kasy
- * peníze, které v ní pořád jsou (prodej se ruší stornem prodeje, ne dokladu).
+ * Doklad NAVÁZANÝ na pohyb v deníku (ref_type 'cash_movement') se do součtů
+ * knihy nepočítá — samotný protidoklad by tedy nevrátil ani korunu. Proto se
+ * u něj NEJDŘÍV založí OPAČNÝ pohyb v pos_cash_movements (purpose 'storno',
+ * ref na původní pohyb) a protidoklad se vystaví jako papír k němu. Když pohyb
+ * založit nejde, storno se ODMÍTNE — dřív se tiše vrátilo ok a zůstatek knihy
+ * zůstal špatně, bez jakékoli cesty k opravě.
+ *
+ * Doklad k prodeji na kase (ref_type 'pos_sale') se stornuje stornem PRODEJE
+ * (api/pos_cancel.php — vrací i zboží na sklad), ne stornem papíru.
+ *
+ * Celé v jedné transakci: SELECT … FOR UPDATE na originál + UPDATE s podmínkou
+ * storned_by IS NULL (kontrola rowCount) — dva současné kliky na Storno jinak
+ * oba prošly kontrolou a vystavily dva protidoklady (dvojitý výdaj z kasy).
  */
 function afxCashDocStorno(int $docId, string $reason = '', string $by = ''): array {
+    // storno vzniká VŽDY s dnešním datem (kompenzační pohyb i protidoklad) — hlídá
+    // se tedy dnešek; původní měsíc zůstává číselně nezměněn
+    if (function_exists('afxAccountingAssertOpen')) {
+        afxAccountingAssertOpen(date('Y-m-d'), 'storno pokladního dokladu');
+    }
     global $pdo;
-    $doc = afxCashDocGet($docId);
-    if (!$doc) { return ['ok' => false, 'error' => 'Doklad nenalezen']; }
-    if (!empty($doc['storned_by'])) { return ['ok' => false, 'error' => 'Doklad už je stornovaný']; }
-    if (!empty($doc['storno_of'])) { return ['ok' => false, 'error' => 'Storno doklad nelze stornovat']; }
+    // DDL pojistky PŘED transakcí — uvnitř by ALTER/CREATE udělal implicitní COMMIT.
+    afxEnsureCashBookTables();
+    ensurePosCashMovementsTable();
+    if ($pdo->inTransaction()) {
+        return ['ok' => false, 'error' => 'Storno nelze spustit uvnitř jiné transakce'];
+    }
 
-    $opposite = ((string)$doc['doc_type'] === 'income') ? 'expense' : 'income';
     $reason = mb_substr(trim($reason), 0, 160);
-    $res = afxCashDocIssue([
-        'branch_id' => (int)$doc['branch_id'],
-        'type' => $opposite,
-        'amount' => (float)$doc['amount'],
-        'date' => date('Y-m-d'),
-        'purpose' => 'STORNO dokladu ' . (string)$doc['doc_number'] . ($reason !== '' ? ' — ' . $reason : ''),
-        'counterparty' => (string)($doc['counterparty'] ?? ''),
-        'issued_by' => $by,
-        'ref_type' => (string)($doc['ref_type'] ?? ''),
-        'ref_id' => (int)($doc['ref_id'] ?? 0),
-        'ref_label' => (string)($doc['ref_label'] ?? ''),
-        'storno_of' => $docId,
-        'note' => 'Storno k ' . (string)$doc['doc_number'],
-    ]);
-    if (!$res['ok']) { return ['ok' => false, 'error' => $res['error']]; }
-
     try {
-        $pdo->prepare("UPDATE cash_documents SET storned_by = ?, storned_at = NOW() WHERE id = ?")
-            ->execute([(int)$res['id'], $docId]);
+        $pdo->beginTransaction();
+
+        // Zámek originálu drží kontrolu storned_by a vystavení protidokladu pohromadě.
+        $st = $pdo->prepare("SELECT * FROM cash_documents WHERE id = ? LIMIT 1 FOR UPDATE");
+        $st->execute([$docId]);
+        $doc = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$doc) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Doklad nenalezen']; }
+        if (!empty($doc['storned_by'])) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Doklad už je stornovaný']; }
+        if (!empty($doc['storno_of'])) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Storno doklad nelze stornovat']; }
+
+        $refType = (string)($doc['ref_type'] ?? '');
+        if ($refType === 'pos_sale') {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => 'Doklad patří k prodeji na kase — použij storno prodeje, to vrátí i zboží na sklad.'];
+        }
+
+        // U dokladu navázaného na pohyb vrací peníze OPAČNÝ pohyb v deníku.
+        $moveId = 0;
+        if (in_array($refType, afxCashLinkedRefTypes(), true)) {
+            $orig = null;
+            if ((int)($doc['ref_id'] ?? 0) > 0) {
+                // Zámky vždy v pořadí cash_documents → pos_cash_movements (prevence deadlocku).
+                $ms = $pdo->prepare("SELECT direction, amount FROM pos_cash_movements WHERE id = ? LIMIT 1 FOR UPDATE");
+                $ms->execute([(int)$doc['ref_id']]);
+                $orig = $ms->fetch(PDO::FETCH_ASSOC);
+            }
+            // Směr podle původního pohybu (spolehlivější než typ dokladu); když
+            // pohyb už nedohledáme, odvodí se z typu: PPD (income) → výdej.
+            $moveDir = ((string)$doc['doc_type'] === 'income') ? 'out' : 'in';
+            if ($orig && in_array((string)$orig['direction'], ['in', 'out'], true)) {
+                $moveDir = ((string)$orig['direction'] === 'in') ? 'out' : 'in';
+            }
+            $mi = $pdo->prepare("INSERT INTO pos_cash_movements
+                    (branch_id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by)
+                VALUES (?, ?, ?, 'storno', 'cash_movement', ?, ?, ?, ?)");
+            $mi->execute([
+                ((int)$doc['branch_id'] > 0 ? (int)$doc['branch_id'] : null),
+                $moveDir, (float)$doc['amount'],
+                ((int)($doc['ref_id'] ?? 0) > 0 ? (int)$doc['ref_id'] : null),
+                mb_substr('Storno ' . (string)$doc['doc_number'], 0, 40),
+                mb_substr('Opačný pohyb ke stornu dokladu ' . (string)$doc['doc_number']
+                    . ($reason !== '' ? ' — ' . $reason : ''), 0, 255),
+                ($by !== '' ? mb_substr($by, 0, 100) : null),
+            ]);
+            $moveId = (int)$pdo->lastInsertId();
+            if ($moveId <= 0) {
+                $pdo->rollBack();
+                return ['ok' => false, 'error' => 'Nepodařilo se založit opačný pohyb v deníku — storno neprovedeno'];
+            }
+        }
+
+        $opposite = ((string)$doc['doc_type'] === 'income') ? 'expense' : 'income';
+        $res = afxCashDocIssue([
+            'branch_id' => (int)$doc['branch_id'],
+            'type' => $opposite,
+            'amount' => (float)$doc['amount'],
+            'date' => date('Y-m-d'),
+            'purpose' => 'STORNO dokladu ' . (string)$doc['doc_number'] . ($reason !== '' ? ' — ' . $reason : ''),
+            'counterparty' => (string)($doc['counterparty'] ?? ''),
+            'issued_by' => $by,
+            // Papír ke KOMPENZAČNÍMU pohybu (ať se v knize přilepí k němu a
+            // nesčítá se dvakrát); u samostatného dokladu se vazba dědí.
+            'ref_type' => $moveId > 0 ? 'cash_movement' : $refType,
+            'ref_id' => $moveId > 0 ? $moveId : (int)($doc['ref_id'] ?? 0),
+            'ref_label' => $moveId > 0 ? '' : (string)($doc['ref_label'] ?? ''),
+            'storno_of' => $docId,
+            'note' => 'Storno k ' . (string)$doc['doc_number'],
+        ]);
+        if (!$res['ok']) { $pdo->rollBack(); return ['ok' => false, 'error' => $res['error']]; }
+
+        // storned_by IS NULL + rowCount: kdyby zámek z jakéhokoli důvodu selhal,
+        // druhé storno se tady zastaví místo vystavení dalšího protidokladu.
+        $upd = $pdo->prepare("UPDATE cash_documents SET storned_by = ?, storned_at = NOW()
+                              WHERE id = ? AND storned_by IS NULL");
+        $upd->execute([(int)$res['id'], $docId]);
+        if ($upd->rowCount() !== 1) {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => 'Doklad už byl mezitím stornován'];
+        }
+
+        $pdo->commit();
     } catch (Throwable $e) {
-        error_log('afxCashDocStorno (označení originálu): ' . $e->getMessage());
+        if ($pdo->inTransaction()) { try { $pdo->rollBack(); } catch (Throwable $e2) {} }
+        error_log('afxCashDocStorno: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'Storno se nepodařilo provést'];
+    }
+
+    // Audit až po commitu — rollback by jinak nechal v historii zápis o stornu,
+    // které neproběhlo.
+    if ($moveId > 0) {
+        crmAuditLog('kasa.cash_move', [
+            'entity_type' => 'pos_cash_movement', 'entity_id' => $moveId,
+            'summary' => 'Opačný pohyb ' . formatMoney((float)$doc['amount']) . ' ke stornu dokladu ' . (string)$doc['doc_number'],
+            'branch_id' => (int)$doc['branch_id'],
+        ]);
     }
     crmAuditLog('kasa.cash_doc_storno', [
         'entity_type' => 'cash_document', 'entity_id' => $docId, 'entity_label' => (string)$doc['doc_number'],
@@ -354,19 +502,34 @@ function afxCashDocStorno(int $docId, string $reason = '', string $by = ''): arr
 function afxCashSums(int $branchId, string $from, string $to): array {
     global $pdo;
     afxEnsureCashBookTables();
+    // EXISTS na pos_cash_movements je nově i v dotazu na prodeje — bez tabulky
+    // by spadl celý součet, ne jen deník.
+    ensurePosCashMovementsTable();
     $in = 0.0; $out = 0.0;
     $linked = "'" . implode("','", afxCashLinkedRefTypes()) . "'";
     try {
-        // 1) prodej na kase za hotové (stornované prodeje mají status 'cancelled' → nepočítají se)
-        $st = $pdo->prepare("SELECT COALESCE(SUM(total), 0) FROM pos_sales
-            WHERE payment_method = 'cash' AND status = 'completed'
-              AND DATE(created_at) BETWEEN ? AND ?" . afxCashBranchSql('branch_id', $branchId));
+        // 1) prodej na kase za hotové. Prodej stornovaný AŽ PO uzavření dne v knize
+        //    ZŮSTÁVÁ, pokud k němu existuje kompenzační pohyb (purpose 'storno'):
+        //    peníze v den prodeje v zásuvce fyzicky byly a odešly až v den storna
+        //    — jinak by se historie knihy zpětně přepsala a konečný zůstatek dne
+        //    prodeje by přestal sedět na počáteční zůstatek dne dalšího.
+        //    Starší storna BEZ kompenzačního pohybu se nepočítají (jako dřív),
+        //    aby se kniha zpětně nenafoukla o výdaje, které v ní nikdy nebyly.
+        //    Rozsah přes created_at bez funkce → použije se index (idx_pos_created).
+        $st = $pdo->prepare("SELECT COALESCE(SUM(total), 0) FROM pos_sales s
+            WHERE s.payment_method = 'cash'
+              AND (s.status = 'completed' OR (s.status = 'cancelled' AND EXISTS (
+                    SELECT 1 FROM pos_cash_movements m
+                    WHERE m.ref_type = 'pos_sale' AND m.ref_id = s.id AND m.purpose = 'storno')))
+              AND s.created_at >= ? AND s.created_at < DATE_ADD(?, INTERVAL 1 DAY)"
+            . afxCashBranchSql('s.branch_id', $branchId));
         $st->execute([$from, $to]);
         $in += (float)$st->fetchColumn();
 
-        // 2) pokladní deník (vklady/výběry/výkupy/hotovost ze zakázek) — jen ČTEME
+        // 2) pokladní deník (vklady/výběry/výkupy/storna/hotovost ze zakázek) — jen ČTEME
         $st = $pdo->prepare("SELECT direction, COALESCE(SUM(amount), 0) s FROM pos_cash_movements
-            WHERE DATE(created_at) BETWEEN ? AND ?" . afxCashBranchSql('branch_id', $branchId) . " GROUP BY direction");
+            WHERE created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)"
+            . afxCashBranchSql('branch_id', $branchId) . " GROUP BY direction");
         $st->execute([$from, $to]);
         foreach ($st as $r) {
             if ((string)$r['direction'] === 'in') { $in += (float)$r['s']; } else { $out += (float)$r['s']; }
@@ -409,30 +572,43 @@ function afxCashBalanceAt(int $branchId, string $date): float {
 function afxCashBookRows(int $branchId, string $from, string $to): array {
     global $pdo;
     afxEnsureCashBookTables();
+    ensurePosCashMovementsTable();   // EXISTS v dotazu na prodeje ji potřebuje vždy
     $rows = [];
     $linked = "'" . implode("','", afxCashLinkedRefTypes()) . "'";
     try {
-        $st = $pdo->prepare("SELECT id, sale_number, total, seller_name, created_at FROM pos_sales
-            WHERE payment_method = 'cash' AND status = 'completed'
-              AND DATE(created_at) BETWEEN ? AND ?" . afxCashBranchSql('branch_id', $branchId));
+        // Stejná pravidla jako v afxCashSums: stornovaný prodej s kompenzačním
+        // pohybem v knize zůstává (příjem v den prodeje, výdej v den storna);
+        // rozsah přes created_at bez funkce kvůli indexům.
+        $st = $pdo->prepare("SELECT s.id, s.sale_number, s.total, s.seller_name, s.created_at, s.status FROM pos_sales s
+            WHERE s.payment_method = 'cash'
+              AND (s.status = 'completed' OR (s.status = 'cancelled' AND EXISTS (
+                    SELECT 1 FROM pos_cash_movements m
+                    WHERE m.ref_type = 'pos_sale' AND m.ref_id = s.id AND m.purpose = 'storno')))
+              AND s.created_at >= ? AND s.created_at < DATE_ADD(?, INTERVAL 1 DAY)"
+            . afxCashBranchSql('s.branch_id', $branchId));
         $st->execute([$from, $to]);
         foreach ($st as $r) {
+            $cancelled = (string)$r['status'] === 'cancelled';
             $rows[] = [
                 'sort' => (string)$r['created_at'], 'date' => date('Y-m-d', strtotime((string)$r['created_at'])),
                 'time' => date('H:i', strtotime((string)$r['created_at'])),
                 'dir' => 'in', 'amount' => (float)$r['total'],
-                'title' => 'Prodej na kase', 'detail' => (string)$r['sale_number'],
+                'title' => 'Prodej na kase',
+                'detail' => (string)$r['sale_number'] . ($cancelled ? ' · stornováno (výdej v den storna)' : ''),
                 'source' => 'pos_sale', 'ref_id' => (int)$r['id'],
                 'by' => (string)$r['seller_name'], 'doc_number' => '', 'doc_id' => 0,
-                'storno' => false, 'is_storno' => false, 'doc_storno' => false, 'counts' => true,
+                'storno' => false, 'is_storno' => false, 'doc_storno' => false,
+                'doc_is_storno' => false, 'counts' => true,
             ];
         }
 
         $st = $pdo->prepare("SELECT id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by, created_at
-            FROM pos_cash_movements WHERE DATE(created_at) BETWEEN ? AND ?" . afxCashBranchSql('branch_id', $branchId));
+            FROM pos_cash_movements
+            WHERE created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)" . afxCashBranchSql('branch_id', $branchId));
         $st->execute([$from, $to]);
         $purposeLabels = ['vykup' => 'Výkup zařízení', 'vklad' => 'Vklad do pokladny',
-                          'vyber' => 'Výběr z pokladny', 'zakazka' => 'Úhrada zakázky'];
+                          'vyber' => 'Výběr z pokladny', 'zakazka' => 'Úhrada zakázky',
+                          'storno' => 'Storno / vratka hotovosti'];
         foreach ($st as $r) {
             $detail = trim((string)($r['ref_label'] ?? '') . ' ' . (string)($r['note'] ?? ''));
             $rows[] = [
@@ -442,7 +618,8 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
                 'title' => $purposeLabels[(string)$r['purpose']] ?? ucfirst((string)$r['purpose']),
                 'detail' => $detail, 'source' => 'movement', 'ref_id' => (int)$r['id'],
                 'by' => (string)($r['created_by'] ?? ''), 'doc_number' => '', 'doc_id' => 0,
-                'storno' => false, 'is_storno' => false, 'doc_storno' => false, 'counts' => true,
+                'storno' => false, 'is_storno' => false, 'doc_storno' => false,
+                'doc_is_storno' => false, 'counts' => true,
             ];
         }
 
@@ -456,9 +633,15 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
         foreach ($st as $r) {
             $standalone = !in_array((string)($r['ref_type'] ?? ''), afxCashLinkedRefTypes(), true);
             if (!$standalone) {
-                // klíč = zdroj + id pohybu, ať se číslo dokladu přilepí ke správnému řádku
+                // klíč = zdroj + id pohybu, ať se číslo dokladu přilepí ke správnému řádku.
+                // K řádku patří PŮVODNÍ doklad (storno_of prázdné): starší storno
+                // doklady sdílely klíč s originálem a přepisovaly mu číslo — řádek
+                // vkladu pak ukazoval výdajové číslo a odznak „storno" zmizel.
                 $key = (string)$r['ref_type'] . ':' . (int)$r['ref_id'];
-                if (!isset($linkedDocs[$key]) || empty($r['storned_by'])) { $linkedDocs[$key] = $r; }
+                if (!isset($linkedDocs[$key])
+                    || (!empty($linkedDocs[$key]['storno_of']) && empty($r['storno_of']))) {
+                    $linkedDocs[$key] = $r;
+                }
                 continue;
             }
             $rows[] = [
@@ -473,7 +656,7 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
                 // storno = doklad byl zrušen protidokladem → přeškrtnout
                 // is_storno = tenhle řádek JE ten protidoklad (peníze skutečně vrací)
                 'storno' => !empty($r['storned_by']), 'is_storno' => !empty($r['storno_of']),
-                'doc_storno' => false, 'counts' => true,
+                'doc_storno' => false, 'doc_is_storno' => false, 'counts' => true,
             ];
         }
         foreach ($rows as &$row) {
@@ -483,7 +666,11 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
                 $row['doc_id'] = (int)$linkedDocs[$key]['id'];
                 // Zrušený PAPÍR k prodeji/pohybu peníze z kasy nebere (ty tam pořád
                 // jsou) — proto se řádek NEpřeškrtává, jen se označí doklad.
+                // Peníze vrací kompenzační pohyb, který storno založilo zvlášť.
                 $row['doc_storno'] = !empty($linkedDocs[$key]['storned_by']);
+                // Doklad řádku je sám STORNO dokladem (papír ke kompenzačnímu
+                // pohybu) → nenabízet na něm další storno.
+                $row['doc_is_storno'] = !empty($linkedDocs[$key]['storno_of']);
             }
         }
         unset($row);
@@ -501,11 +688,31 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
  * Vrací ['register','from','to','opening','rows','sum_in','sum_out','closing','limit_over'].
  */
 function afxCashBook(int $branchId, string $from, string $to): array {
+    global $pdo;
     $reg = afxCashRegisterForBranch($branchId);
     $openDate = (string)($reg['opening_date'] ?? date('Y-m-d'));
-    // Kniha nemůže začínat dřív než pokladna sama.
+    // Kniha nemůže začínat dřív než pokladna sama — ale ořez se hlásí volajícímu
+    // (range_clipped), aby uživatel věděl, že vidí kratší období, než si zvolil.
+    $rangeClipped = $from < $openDate;
     if ($from < $openDate) { $from = $openDate; }
     if ($to < $from) { $to = $from; }
+
+    // Samostatné doklady datované PŘED počátek pokladny by z výpisu tiše zmizely
+    // (každé zvolené období začíná nejdřív na opening_date) — číslo v řadě mají,
+    // ale peníze by nikde nebyly vidět. Nezahazovat, spočítat a ohlásit.
+    $orphans = ['count' => 0, 'in' => 0.0, 'out' => 0.0];
+    try {
+        $linked = "'" . implode("','", afxCashLinkedRefTypes()) . "'";
+        $st = $pdo->prepare("SELECT doc_type, COUNT(*) c, COALESCE(SUM(amount), 0) s FROM cash_documents
+            WHERE doc_date < ? AND (ref_type IS NULL OR ref_type NOT IN ($linked))"
+            . afxCashBranchSql('branch_id', $branchId) . " GROUP BY doc_type");
+        $st->execute([$openDate]);
+        foreach ($st as $r) {
+            $orphans['count'] += (int)$r['c'];
+            if ((string)$r['doc_type'] === 'income') { $orphans['in'] += (float)$r['s']; }
+            else { $orphans['out'] += (float)$r['s']; }
+        }
+    } catch (Throwable $e) { error_log('afxCashBook (doklady mimo rozsah): ' . $e->getMessage()); }
 
     // Počáteční zůstatek období = stav ke konci předchozího dne.
     $opening = afxCashBalanceAt($branchId, date('Y-m-d', strtotime($from . ' -1 day')));
@@ -521,10 +728,12 @@ function afxCashBook(int $branchId, string $from, string $to): array {
             else { $bal -= $r['amount']; $sumOut += $r['amount']; }
         }
         $rows[$i]['balance'] = round($bal, 2);
+        // JEDNA hotovostní platba nad limit = porušení zák. 254/2004 Sb.
+        // Limit platí pro OBĚ strany — poskytnutá platba (výkup za 310 000 Kč
+        // hotově) je stejné porušení jako přijatá, proto se hlídají oba směry.
+        if (!empty($r['counts']) && $r['amount'] > AFX_CASH_LIMIT_CZK) { $limitOver[] = $rows[$i]; }
         if ($r['dir'] === 'in' && !empty($r['counts'])) {
             $dayIn[$r['date']] = ($dayIn[$r['date']] ?? 0.0) + $r['amount'];
-            // JEDNA hotovostní platba nad limit = skutečné porušení zák. 254/2004 Sb.
-            if ($r['amount'] > AFX_CASH_LIMIT_CZK) { $limitOver[] = $rows[$i]; }
         }
     }
     $daysOver = [];
@@ -537,8 +746,10 @@ function afxCashBook(int $branchId, string $from, string $to): array {
         'opening' => round($opening, 2), 'rows' => $rows,
         'sum_in' => round($sumIn, 2), 'sum_out' => round($sumOut, 2),
         'closing' => round($bal, 2),
-        'limit_over' => $limitOver,     // jednotlivé platby nad 270 000 Kč
+        'limit_over' => $limitOver,     // jednotlivé platby nad 270 000 Kč (příjmy i výdeje)
         'days_over' => $daysOver,       // dny, kdy hotovostní příjem v součtu překročil limit
+        'range_clipped' => $rangeClipped,   // zvolený rozsah začínal před počátkem pokladny
+        'orphan_docs' => $orphans,      // doklady datované před počátek — v knize nejsou
     ];
 }
 

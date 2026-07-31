@@ -276,17 +276,42 @@ function afxAccountingAssertOpen($date, string $what = 'doklad'): void {
     }
 }
 
+/**
+ * Měkká varianta afxAccountingAssertOpen() pro místa, kde se výjimka nehodí
+ * (vlastní chybové odpovědi, kód uprostřed rozdělané transakce): vrátí hotovou
+ * hlášku pro uživatele, když je měsíc daného data uzavřený, jinak null.
+ * Určeno hlavně pro pokladní knihu a storna (cash_book.php, pos_cancel.php,
+ * pos_cash_move.php — řeší je souběžný balík):
+ *   if (($err = afxAccountingClosedError($datum, 'pokladní doklad')) !== null) {
+ *       pcm_fail($err, 409);
+ *   }
+ */
+function afxAccountingClosedError($date, string $what = 'doklad'): ?string {
+    return afxAccountingPeriodLocked($date) ? afxAccountingLockMessage($date, $what) : null;
+}
+
 /** Kdo smí měsíc UZAVŘÍT — vedení i účetní (uzávěrku dělá typicky právě účetní). */
 function afxAccountingCanLock(): bool {
     return crmCanAccountingEdit();
 }
 
 /**
- * Kdo smí měsíc ODEMKNOUT — jen administrátor. Odemčení je zásah do už odevzdaného
- * účetnictví, takže ho účetní sama udělat nesmí (a Boss projde přes hasPermission,
- * který mu jako majiteli vrací true na cokoliv — to je záměr, ne opomenutí).
+ * Kdo smí měsíc ODEMKNOUT — JEN administrátor. Odemčení je zásah do už odevzdaného
+ * účetnictví; UI i dokumentace slibují „odemkne jen administrátor", takže to tak
+ * musí opravdu být. POZOR: nestačí hasPermission('admin_access') — ta vrací Bossovi
+ * (majiteli) true na cokoliv, a Boss by tak tlačítko Odemknout dostal v rozporu
+ * s textem vedle něj. Proto se nejdřív testuje ROLE, teprve pak oprávnění.
  */
 function afxAccountingCanUnlock(): bool {
+    if (($_SESSION['role'] ?? '') === 'admin') {
+        return true;                                  // účet z tabulky users = administrátor
+    }
+    // Boss a účetní výslovně NE — Boss by prošel přes všemocné hasPermission(),
+    // účetní je z admin práv vyloučená v crmAccountantHasPermission().
+    if (getCurrentStaffRole() === 'boss' || crmIsAccountant()) {
+        return false;
+    }
+    // Technik s VÝSLOVNĚ přiděleným admin_access je fakticky administrátor.
     return function_exists('hasPermission') && hasPermission('admin_access');
 }
 
@@ -370,10 +395,14 @@ function afxAccountingUnlockPeriod($year, $month, string $reason = ''): array {
         afxEnsureAccountingSchema();
         [, , $aName] = crmAuditResolveActor([]);
         $reason = mb_substr(trim($reason), 0, 255);
+        // POZNÁMKU K UZAVŘENÍ NEPŘEPISOVAT: sloupec note nese důvod uzavření
+        // (např. „odevzdáno DPFO 2026") a musí přežít i odemčení — jinak by po
+        // odemčení a novém zamčení nešlo dohledat, proč byl měsíc původně zavřený.
+        // Důvod odemčení žije v audit_log (Historie uzávěrek v Nastavení).
         $pdo->prepare("UPDATE accounting_periods
-            SET locked_at = NULL, unlocked_at = NOW(), unlocked_by = ?, note = ?
+            SET locked_at = NULL, unlocked_at = NOW(), unlocked_by = ?
             WHERE period_year = ? AND period_month = ?")
-            ->execute([$aName, ($reason !== '' ? $reason : null), $y, $m]);
+            ->execute([$aName, $y, $m]);
         afxAccountingLockedPeriods(true);
         crmAuditLog('accounting.period_unlock', [
             'entity_type' => 'accounting_period',

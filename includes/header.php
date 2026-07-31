@@ -30,6 +30,29 @@ if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php
 // Access Control based on permissions
 $page = basename($_SERVER['PHP_SELF']);
 
+// ── ÚČETNÍ = NEPROVOZNÍ ROLE: whitelist stránek ──────────────────────────────
+// hasPermission() účetní nikam nepustí (crmAccountantHasPermission vrací false),
+// ale spousta stránek CRM žádné oprávnění nekontroluje (zakázky, klienti, kasa…).
+// Bez tohoto whitelistu by účetní viděla celou klientskou databázi a mohla
+// prodávat na kase. Proto: účetní smí JEN na účetní stránky, vše ostatní ji
+// přesměruje rovnou do Účetnictví.
+if (function_exists('crmIsAccountant') && crmIsAccountant()) {
+    $__accountantPages = [
+        'accounting.php',      // faktury a dobropisy
+        'banka.php',           // bankovní pohyby a párování plateb
+        'ucetni_sestavy.php',  // tiskové podklady za období
+        'pokladna.php',        // pokladní kniha (prodej jí blokuje crmCanUsePos)
+        'print_invoice.php',   // tisk dokladu, na který se dívá
+        'print_receipt.php',
+        'navody.php',          // návody (Jak fungují platby apod.)
+        'profile.php',         // vlastní profil a změna hesla
+    ];
+    if (!in_array($page, $__accountantPages, true)) {
+        header('Location: accounting.php');
+        exit;
+    }
+}
+
 // Pages that require specific permissions
 $permission_pages = [
     'customers.php' => 'edit_customers',

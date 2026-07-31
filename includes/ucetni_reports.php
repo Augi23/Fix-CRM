@@ -344,13 +344,32 @@ function afxUcetniDataKniha(string $from, string $to, int $branchId): array {
     }
 
     [$bSql, $bPar] = afxUcetniInvoiceBranchSql($branchId);
-    $paid = afxUcetniPaidExpr('i');
     $name = afxUcetniCustNameExpr();
+
+    // „Uhrazeno" se počítá K POSLEDNÍMU DNI OBDOBÍ, ne k dnešku. invoices.paid_amount
+    // je stav „teď" — kniha za červenec vytištěná v srpnu by u faktury zaplacené 5. 8.
+    // ukázala „zbývá 0", zatímco Pohledávky k 31. 7. ji správně vykazují jako
+    // neuhrazenou. Dvě sestavy nad týmž obdobím si musí odpovídat, proto se
+    // zaplacenost bere z invoice_payments se stejným pravidlem jako v pohledávkách.
+    // Platba bez vyplněného paid_on se datuje dnem zápisu (jinak by nespadla nikam).
+    $hasPay = afxUcetniTableExists('invoice_payments');
+    $paid = $hasPay
+        ? "(SELECT COALESCE(SUM(p.amount), 0) FROM invoice_payments p
+            WHERE p.invoice_id = i.id AND COALESCE(p.paid_on, DATE(p.created_at)) <= ?)"
+        : afxUcetniPaidExpr('i');
+    $payRows = $hasPay
+        ? "(SELECT COUNT(*) FROM invoice_payments p2 WHERE p2.invoice_id = i.id)"
+        : '0';
+
+    // Poddotazy s datem jsou v SELECTu, tedy jejich parametry jdou PŘED WHERE.
+    $params = $hasPay ? [$to] : [];
+    $params = array_merge($params, [$from, $to], $bPar);
 
     $rows = afxUcetniQuery(
         "SELECT i.id, i.invoice_number, i.date_issue, i.date_tax, i.date_due, i.status,
-                i.total_amount, i.currency, i.order_id, o.branch_id,
+                i.total_amount, i.currency, i.order_id, i.payment_date, o.branch_id,
                 $paid AS paid_amount,
+                $payRows AS pay_rows,
                 $name AS cust_name,
                 COALESCE(NULLIF(i.cust_ico_override, ''), c.ico, '') AS cust_ico
          FROM invoices i
@@ -359,16 +378,23 @@ function afxUcetniDataKniha(string $from, string $to, int $branchId): array {
          WHERE COALESCE(i.invoice_type, 'invoice') = 'invoice'
            AND i.date_issue BETWEEN ? AND ?" . $bSql . "
          ORDER BY i.date_issue ASC, i.invoice_number ASC",
-        array_merge([$from, $to], $bPar)
+        $params
     );
 
     $today = date('Y-m-d');
+    $toTs = strtotime($to);
     foreach ($rows as $r) {
         $total = (float)$r['total_amount'];
         $paidV = (float)$r['paid_amount'];
         // Starší faktura označená ručně jako zaplacená nemá evidovanou platbu —
         // bez tohohle dorovnání by v knize svítilo „zbývá = celá částka".
-        if ($r['status'] === 'paid' && $paidV <= 0) { $paidV = $total; }
+        // Dorovnává se ale jen tehdy, když úhrada (payment_date) spadá do konce
+        // období — faktura zaplacená až po něm musí v knize zůstat neuhrazená,
+        // stejně jako v sestavě pohledávek.
+        if ((int)$r['pay_rows'] === 0 && $r['status'] === 'paid' && $paidV <= 0) {
+            $pd = (string)($r['payment_date'] ?? '');
+            if ($pd === '' || !strtotime($pd) || strtotime($pd) <= $toTs) { $paidV = $total; }
+        }
         $rem = round($total - $paidV, 2);
 
         $r['paid_calc'] = $paidV;
@@ -386,6 +412,14 @@ function afxUcetniDataKniha(string $from, string $to, int $branchId): array {
         $out['soucty']['celkem'] += $total;
         $out['soucty']['uhrazeno'] += min($paidV, $total);
         $out['soucty']['zbyva'] += max(0.0, $rem);
+    }
+
+    // Účetní musí vědět, k jakému datu jsou sloupce počítané — sestava vytištěná
+    // dvakrát s odstupem týdnů musí dát stejná čísla (podklad k přiznání).
+    if ($hasPay) {
+        $out['pozn'][] = 'Sloupce „Uhrazeno" a „Zbývá" jsou počítány <b>k poslednímu dni období ('
+            . afxUcetniDate($to) . ')</b>, ne k dnešku — kniha tak sedí na sestavu „Neuhrazené pohledávky k datu". '
+            . 'Platba došlá po tomto datu se tu neprojeví, i když už je faktura dnes zaplacená.';
     }
 
     // Faktury bez zakázky nejde přiřadit pobočce — účetní musí vědět, že jí
@@ -425,8 +459,17 @@ function afxUcetniDataUhrady(string $from, string $to, int $branchId): array {
     $bankCols = $hasBank ? 'bt.counterparty_name AS bank_name, bt.counterparty_account AS bank_acc, bt.vs AS bank_vs,'
                          : "NULL AS bank_name, NULL AS bank_acc, NULL AS bank_vs,";
 
+    // Platby ke STORNOVANÝM fakturám a k dobropisům do součtů NEPATŘÍ — Kniha
+    // vydaných faktur i panel cash-flow v Přehledech je vylučují a účetní by
+    // jinak měla dvě sestavy, které na sebe nesedí a nedají se srovnat.
+    // Nezmizí ale beze stopy: vyčíslí se zvlášť v poznámce pod tabulkou (viz níž),
+    // protože platba ke stornu = peníze, které je nutné vrátit nebo dobropisovat.
+    // Platba bez vyplněného data úhrady se datuje dnem zápisu (COALESCE) — jinak
+    // by nespadla do ŽÁDNÉHO období a součty by nikdy neseděly na paid_amount.
     $out['rows'] = afxUcetniQuery(
-        "SELECT p.id, p.paid_on, p.amount, p.kind, p.note, p.created_by,
+        "SELECT p.id, COALESCE(p.paid_on, DATE(p.created_at)) AS paid_on,
+                (p.paid_on IS NULL) AS datum_dopocten,
+                p.amount, p.kind, p.note, p.created_by,
                 $bankCols
                 i.invoice_number, i.variable_symbol, i.currency, i.status AS inv_status,
                 $name AS cust_name
@@ -435,16 +478,48 @@ function afxUcetniDataUhrady(string $from, string $to, int $branchId): array {
          LEFT JOIN customers c ON c.id = i.customer_id
          LEFT JOIN orders o ON o.id = i.order_id
          $bankJoin
-         WHERE p.paid_on BETWEEN ? AND ?" . $bSql . "
-         ORDER BY p.paid_on ASC, p.id ASC",
+         WHERE COALESCE(p.paid_on, DATE(p.created_at)) BETWEEN ? AND ?
+           AND i.status <> 'cancelled'
+           AND COALESCE(i.invoice_type, 'invoice') <> 'credit_note'" . $bSql . "
+         ORDER BY paid_on ASC, p.id ASC",
         array_merge([$from, $to], $bPar)
     );
 
+    $dopocteno = 0;
     foreach ($out['rows'] as $r) {
         $out['soucty']['celkem'] += (float)$r['amount'];
         $out['soucty']['pocet']++;
         $k = (string)$r['kind'];
         $out['soucty']['dle_zpusobu'][$k] = ($out['soucty']['dle_zpusobu'][$k] ?? 0) + (float)$r['amount'];
+        if (!empty($r['datum_dopocten'])) { $dopocteno++; }
+    }
+
+    // Vyloučené platby se vyčíslí pod čarou — jinak by účetní neměla jak zjistit,
+    // proč jí sestava nesedí na výpis z banky (peníze fyzicky přišly).
+    $excl = afxUcetniQuery(
+        "SELECT SUM(CASE WHEN i.status = 'cancelled' THEN 1 ELSE 0 END) storno_pocet,
+                COALESCE(SUM(CASE WHEN i.status = 'cancelled' THEN p.amount END), 0) storno_castka,
+                SUM(CASE WHEN i.status <> 'cancelled' AND COALESCE(i.invoice_type, 'invoice') = 'credit_note' THEN 1 ELSE 0 END) dobropis_pocet,
+                COALESCE(SUM(CASE WHEN i.status <> 'cancelled' AND COALESCE(i.invoice_type, 'invoice') = 'credit_note' THEN p.amount END), 0) dobropis_castka
+         FROM invoice_payments p
+         JOIN invoices i ON i.id = p.invoice_id
+         LEFT JOIN orders o ON o.id = i.order_id
+         WHERE COALESCE(p.paid_on, DATE(p.created_at)) BETWEEN ? AND ?
+           AND (i.status = 'cancelled' OR COALESCE(i.invoice_type, 'invoice') = 'credit_note')" . $bSql,
+        array_merge([$from, $to], $bPar)
+    );
+    $ex = $excl[0] ?? [];
+    if ((int)($ex['storno_pocet'] ?? 0) > 0) {
+        $out['pozn'][] = '<b>Mimo součet:</b> ' . (int)$ex['storno_pocet'] . ' plateb za '
+            . afxUcetniMoney($ex['storno_castka'] ?? 0) . ' Kč patří k fakturám, které byly NÁSLEDNĚ STORNOVÁNY. '
+            . 'Do součtů nevstupují (aby sestava seděla na Knihu vydaných faktur) — peníze je nutné vrátit nebo dobropisovat.';
+    }
+    if ((int)($ex['dobropis_pocet'] ?? 0) > 0) {
+        $out['pozn'][] = '<b>Mimo součet:</b> ' . (int)$ex['dobropis_pocet'] . ' plateb za '
+            . afxUcetniMoney($ex['dobropis_castka'] ?? 0) . ' Kč je evidováno u dobropisů — najdete je v sestavě „Dobropisy za období".';
+    }
+    if ($dopocteno > 0) {
+        $out['pozn'][] = 'U ' . $dopocteno . ' plateb chybí datum úhrady — v sestavě jsou datované dnem zápisu do CRM.';
     }
     $out['pozn'][] = 'Sestava obsahuje jen platby EVIDOVANÉ u faktury. Hotovostní tržby z kasy bez faktury najdete v sestavě „Tržby z pokladny po dnech".';
     return $out;
@@ -472,22 +547,35 @@ function afxUcetniDataPohledavky(string $toDate, int $branchId): array {
     [$bSql, $bPar] = afxUcetniInvoiceBranchSql($branchId);
     $name = afxUcetniCustNameExpr();
     $hasPay = afxUcetniTableExists('invoice_payments');
+    // Platba bez data úhrady se datuje dnem zápisu — stejné pravidlo jako v Knize
+    // faktur a Přehledu úhrad, jinak by tatáž platba v jedné sestavě byla a v druhé ne.
     $paidTo = $hasPay
-        ? "(SELECT COALESCE(SUM(p.amount), 0) FROM invoice_payments p WHERE p.invoice_id = i.id AND p.paid_on <= ?)"
+        ? "(SELECT COALESCE(SUM(p.amount), 0) FROM invoice_payments p
+            WHERE p.invoice_id = i.id AND COALESCE(p.paid_on, DATE(p.created_at)) <= ?)"
         : afxUcetniPaidExpr('i');
     $payRows = $hasPay
         ? "(SELECT COUNT(*) FROM invoice_payments p2 WHERE p2.invoice_id = i.id)"
         : '0';
+    // Dobropis vystavený k faktuře pohledávku SNIŽUJE — faktura plně pokrytá
+    // dobropisem už není pohledávka, i když na ni nikdy nepřišla koruna.
+    // Bez odečtu by účetní zaúčtovala pohledávku, kterou už jednou snížila,
+    // a v rozvaze by jí zůstal přebytek. Počítá se jen dobropis vystavený
+    // do konce období (date_issue <= k datu) — sestava je stavová „k datu".
+    $creditTo = "(SELECT COALESCE(SUM(cn.total_amount), 0) FROM invoices cn
+                  WHERE cn.parent_id = i.id AND cn.invoice_type = 'credit_note'
+                    AND cn.status <> 'cancelled' AND cn.date_issue <= ?)";
 
-    // Pořadí parametrů: poddotaz s datem je v SELECTu, tedy PŘED WHERE.
+    // Pořadí parametrů: poddotazy s datem jsou v SELECTu, tedy PŘED WHERE.
     $params = $hasPay ? [$toDate] : [];
-    $params[] = $toDate;
+    $params[] = $toDate;   // dobropisy do konce období
+    $params[] = $toDate;   // WHERE date_issue <= ?
     $params = array_merge($params, $bPar);
 
     $rows = afxUcetniQuery(
         "SELECT i.id, i.invoice_number, i.date_issue, i.date_due, i.date_tax, i.status,
                 i.total_amount, i.currency, i.payment_date,
                 $paidTo AS paid_to_date,
+                $creditTo AS dobropisovano,
                 $payRows AS pay_rows,
                 $name AS cust_name,
                 COALESCE(NULLIF(i.cust_ico_override, ''), c.ico, '') AS cust_ico
@@ -502,9 +590,12 @@ function afxUcetniDataPohledavky(string $toDate, int $branchId): array {
     );
 
     $toTs = strtotime($toDate);
+    $dobropisPocet = 0;
+    $dobropisCastka = 0.0;
     foreach ($rows as $r) {
         $total = round((float)$r['total_amount'], 2);
         $paid = round((float)$r['paid_to_date'], 2);
+        $credited = round((float)$r['dobropisovano'], 2);
 
         // Faktura zaplacená ještě před zavedením evidence plateb nemá žádný řádek
         // v invoice_payments — pak rozhoduje payment_date. Bez toho by se všechny
@@ -514,7 +605,9 @@ function afxUcetniDataPohledavky(string $toDate, int $branchId): array {
             if ($pd === '' || strtotime($pd) <= $toTs) { $paid = $total; }
         }
 
-        $rem = round($total - $paid, 2);
+        // Dobropis snižuje zbývající pohledávku (viz komentář u $creditTo).
+        $rem = round($total - $paid - $credited, 2);
+        if ($credited > 0.005) { $dobropisPocet++; $dobropisCastka += $credited; }
         if ($rem <= 0.005) { continue; }
 
         $due = (string)($r['date_due'] ?? '');
@@ -535,6 +628,12 @@ function afxUcetniDataPohledavky(string $toDate, int $branchId): array {
         $out['soucty']['pocet']++;
         $out['soucty']['kose'][$key] += $rem;
         $out['soucty']['kose_pocet'][$key]++;
+    }
+
+    if ($dobropisPocet > 0) {
+        $out['pozn'][] = 'U ' . $dobropisPocet . ' faktur je od zbývající částky odečten dobropis vystavený do '
+            . afxUcetniDate($toDate) . ' (celkem ' . afxUcetniMoney($dobropisCastka) . ' Kč). '
+            . 'Faktura plně pokrytá dobropisem v pohledávkách není — pohledávka zanikla dobropisem, ne úhradou.';
     }
     return $out;
 }
@@ -622,6 +721,29 @@ function afxUcetniDataKasa(string $from, string $to, int $branchId): array {
     $out['soucty']['storno_pocet'] = (int)($st[0]['c'] ?? 0);
     $out['soucty']['storno_castka'] = (float)($st[0]['s'] ?? 0);
 
+    // Prodeje BEZ přiřazené provozovny (branch_id NULL/0 — prodej pod účtem bez
+    // pobočky, starší doklady) by při zvolené pobočce tiše vypadly a součet
+    // poboček by nedal celek — stejná past jako u faktur bez zakázky výš.
+    // JEDNOTNÉ PRAVIDLO sestav: doklady bez pobočky se vykazují ZVLÁŠŤ (vlastní
+    // řádka v poznámce), nepřiřazují se tiše žádné pobočce. POZOR: pokladní
+    // kniha (includes/cash_book.php) je naopak připočítává výchozí provozovně,
+    // aby seděl fyzický zůstatek zásuvky — proto se to tady říká nahlas.
+    if ($branchId > 0) {
+        $orphan = afxUcetniQuery(
+            "SELECT COUNT(*) c, COALESCE(SUM(s.total), 0) s FROM pos_sales s
+             WHERE s.status = 'completed' AND s.created_at BETWEEN ? AND ?
+               AND (s.branch_id IS NULL OR s.branch_id = 0)",
+            [$from . ' 00:00:00', $to . ' 23:59:59']
+        );
+        $cnt = (int)($orphan[0]['c'] ?? 0);
+        if ($cnt > 0) {
+            $out['pozn'][] = '<b>Bez provozovny:</b> v období je dále ' . $cnt . ' dokladů kasy za '
+                . afxUcetniMoney($orphan[0]['s'] ?? 0) . ' Kč bez přiřazené provozovny — do výběru konkrétní '
+                . 'pobočky nespadají, najdete je ve výběru „všechny provozovny". Pokladní kniha je '
+                . 'připočítává výchozí provozovně (fyzicky prošly její zásuvkou).';
+        }
+    }
+
     $out['pozn'][] = 'Prodej „na fakturu" není hotovostní tržba — peníze přijdou až úhradou faktury (viz sestava „Přehled úhrad faktur"), aby se stejná částka nezaúčtovala dvakrát.';
     return $out;
 }
@@ -659,6 +781,7 @@ function afxUcetniDataZalohy(string $from, string $to, int $branchId): array {
              LEFT JOIN customers c ON c.id = i.customer_id
              LEFT JOIN orders o ON o.id = i.order_id
              WHERE COALESCE(i.invoice_type, 'invoice') = 'invoice'
+               AND i.status <> 'cancelled'
                AND p.paid_on BETWEEN ? AND ?
                AND i.date_tax IS NOT NULL AND i.date_tax > p.paid_on" . $bSql . "
              ORDER BY p.paid_on ASC, p.id ASC",
@@ -717,6 +840,48 @@ function afxUcetniDataZalohy(string $from, string $to, int $branchId): array {
         $out['soucty']['pocet']++;
         if ($r['zuctovano']) { $out['soucty']['zuctovano'] += $r['castka']; }
         else { $out['soucty']['zavazek'] += $r['castka']; }
+    }
+
+    // ZÁVAZEK KE KONCI OBDOBÍ musí být KUMULATIVNÍ. Řádky výš jsou jen zálohy
+    // PŘIJATÉ v období — ale záloha složená v červnu, jejíž DUZP vyjde na září,
+    // je závazkem i v sestavě za červenec a srpen. Kdyby se karta „Závazek k datu"
+    // plnila jen z plateb období, účetní by podle srpnové sestavy odúčtovala
+    // závazek na účtu 324, který nikdy nezanikl. Proto se závazek počítá zvlášť:
+    // všechny platby do konce období na faktury, jejichž DUZP je po konci období
+    // (nebo chybí), plus hotovostní zálohy z pokladního deníku bez vazby na fakturu.
+    $zavazek = null;
+    if (afxUcetniTableExists('invoice_payments') && afxUcetniTableExists('invoices')) {
+        $rows = afxUcetniQuery(
+            "SELECT COALESCE(SUM(p.amount), 0) s FROM invoice_payments p
+             JOIN invoices i ON i.id = p.invoice_id
+             LEFT JOIN orders o ON o.id = i.order_id
+             WHERE COALESCE(i.invoice_type, 'invoice') = 'invoice'
+               AND i.status <> 'cancelled'
+               AND COALESCE(p.paid_on, DATE(p.created_at)) <= ?
+               AND (i.date_tax IS NULL OR i.date_tax > ?)" . $bSql,
+            array_merge([$to, $to], $bPar)
+        );
+        if (isset($rows[0]['s'])) { $zavazek = (float)$rows[0]['s']; }
+    }
+    if (afxUcetniTableExists('pos_cash_movements')) {
+        $cSql = $branchId > 0 ? ' AND branch_id = ?' : '';
+        $cPar = $branchId > 0 ? [$branchId] : [];
+        $rows = afxUcetniQuery(
+            "SELECT COALESCE(SUM(amount), 0) s FROM pos_cash_movements
+             WHERE direction = 'in' AND created_at <= ?
+               AND (purpose LIKE '%áloh%' OR note LIKE '%áloh%')" . $cSql,
+            array_merge([$to . ' 23:59:59'], $cPar)
+        );
+        if (isset($rows[0]['s'])) { $zavazek = ($zavazek ?? 0.0) + (float)$rows[0]['s']; }
+    }
+    // Když se kumulativní dotaz nepovede (chybějící tabulky, chyba DB), zůstane
+    // aspoň konzervativní číslo z plateb období — horší, ale ne prázdné.
+    if ($zavazek !== null) {
+        $out['soucty']['zavazek'] = $zavazek;
+        $out['pozn'][] = 'Karta „Závazek k datu" je <b>kumulativní</b> — zahrnuje i zálohy přijaté v dřívějších '
+            . 'obdobích, které ke konci období nebyly zúčtované (DUZP faktury je pozdější nebo chybí). '
+            . 'Proto se nemusí rovnat rozdílu „Přijaté zálohy − Zúčtováno" za samotné období; '
+            . 'tabulka níže ukazuje jen zálohy přijaté v období.';
     }
 
     // (c) faktury s položkou „záloha" — jen kontrolní seznam

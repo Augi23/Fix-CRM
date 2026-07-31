@@ -120,10 +120,28 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
     $isVat   = (int)($sale['is_vat_payer'] ?? 0) === 1;
     $vatRate = (float)($sale['vat_rate'] ?? 0);
 
+    // Věrohodnost příznaku „použité zboží" — STEJNÉ pravidlo jako na A4 účtence
+    // (print_receipt.php): před v3.33.0 kasa označovala použité VŠECHNO, takže
+    // u starých řádků (grade NULL, prodej před hranicí) se surové is_used_goods
+    // nesmí věřit — dotisk historie by označil nové zboží jako použité.
+    $usedSince = trim((string)get_setting('pos_used_goods_grade_since', ''));
+    $saleAfterCut = $usedSince !== ''
+        && strtotime((string)($sale['created_at'] ?? '')) >= strtotime($usedSince);
+    $lineIsUsed = static function (array $l) use ($saleAfterCut): bool {
+        if ((int)($l['is_used_goods'] ?? 0) !== 1) { return false; }
+        $grade = trim((string)($l['grade'] ?? ''));
+        if ($grade !== '' && function_exists('afxGoodsIsUsedByGrade')) {
+            return afxGoodsIsUsedByGrade($grade, '58mm účtenka');
+        }
+        if ($grade !== '') { return mb_strtolower($grade) !== 'nový'; }
+        if ((string)($l['item_type'] ?? '') === 'part') { return false; }
+        return $saleAfterCut;
+    };
+
     $rows = []; $stdTotal = 0.0; $usedTotal = 0.0; $warrantyItems = [];
     foreach ($items as $l) {
         $line = (float)$l['unit_price'] * (int)$l['quantity'];
-        $used = (int)($l['is_used_goods'] ?? 0) === 1;
+        $used = $lineIsUsed($l);
         if ($used) { $usedTotal += $line; } else { $stdTotal += $line; }
         $rows[] = [
             'name' => (string)$l['item_name'],
