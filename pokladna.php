@@ -223,8 +223,8 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
         <?php if ($cbCanEdit): ?>
         <button type="button" class="btn btn-sm btn-outline-info" onclick="posOpeningBalance()" title="Napočítanou hotovost zapíšeš jako počátek — od něj se počítá celý stav pokladny"><i class="fas fa-scale-balanced me-1"></i>Nastavit počáteční zůstatek</button>
         <?php endif; ?>
+        <button type="button" class="btn btn-sm btn-outline-light" onclick="posTestReceipt(this)" title="Vytiskne zkušební účtenku na termotiskárně u pokladny"><i class="fas fa-receipt me-1"></i>Test účtenky</button>
         <?php if ($shift && $shiftMine): ?>
-        <button type="button" class="btn btn-sm btn-outline-light" onclick="posTestReceipt(this)" title="Vytiskne zkušební účtenku na termotiskárně (Xprinter v serveru)"><i class="fas fa-receipt me-1"></i>Test účtenky</button>
         <button type="button" class="btn btn-sm btn-warning" onclick="shiftCloseOpenModal()" title="Spočítej hotovost, zapiš stav a předej pokladnu"><i class="fas fa-lock me-1"></i>Uzavřít / předat pokladnu</button>
         <span class="small text-white-50 align-self-center">převzato <?php echo e(date('H:i', strtotime((string)$shift['opened_at']))); ?></span>
         <?php endif; ?>
