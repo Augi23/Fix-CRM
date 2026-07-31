@@ -56,14 +56,12 @@ if ($avail === 'loan') { $where_clauses[] = "loan_at IS NOT NULL"; }
 // Doplněk = má accessory-slovo v názvu, NEBO název/model neodpovídá žádnému zařízení/značce.
 // (Zrcadlí kategorii „Příslušenství" na e-shopu; „kryt na iPhone" tak spadne mezi doplňky, ne mezi telefony.)
 $cat = (string)($_GET['cat'] ?? '');
-$afxAccessoryRe = 'kryt|pouzdr|obal|kabel|adaptér|adapter|redukce|nabíj|charger|řemín|pásek|strap|sklo|fólie|folie|dock|stojan|držák|čtečk|reader|box|externí|case|cover|glass|pencil|stylus|klávesnic|keyboard|myš|mouse|sluchátk|airpods|beats|headphone|earphone|repro|speaker|powerbank|magsafe|airtag|gembird|axagon';
-$afxDeviceRe    = 'iphone|ipad|macbook|imac|mac ?mini|mac ?studio|mac ?pro|watch|[0-9]+ ?mm|playstation|nintendo|xbox|samsung|galaxy|xiaomi|redmi|poco|huawei|honor|asus|doogee|realme|oppo|oneplus|vivo|motorola|nokia|sony|lenovo|garmin|instinct|forerunner|fenix|venu|amazfit|fitbit|dji|pixel|tcl|zte|ulefone|cubot|umidigi';
 $catWhere = ''; $catParams = [];
 if ($cat === 'prislusenstvi') {
-    $catWhere = "(LOWER(CONCAT(title,' ',COALESCE(model,''))) REGEXP ? OR LOWER(CONCAT(title,' ',COALESCE(model,''))) NOT REGEXP ?)";
+    $__ac = afxProductAccessoryCond();   // jediný zdroj pravdy (functions.php)
+    $catWhere = $__ac['sql'];
     $where_clauses[] = $catWhere;
-    $params[] = $afxAccessoryRe; $params[] = $afxDeviceRe;
-    $catParams[] = $afxAccessoryRe; $catParams[] = $afxDeviceRe;
+    foreach ($__ac['params'] as $__p) { $params[] = $__p; $catParams[] = $__p; }
 }
 $where_sql = " WHERE " . implode(" AND ", $where_clauses);
 

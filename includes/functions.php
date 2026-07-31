@@ -236,6 +236,19 @@ function skladBranchIdForStockKey(string $stockKey): int {
     return getDefaultBranchId();
 }
 
+/** SQL podmínka „produkt je Příslušenství" (kabely, kryty, adaptéry, boxy, sluchátka…) — zrcadlí
+ *  kategorii „Příslušenství" na e-shopu: má accessory-slovo v názvu, NEBO název/model neodpovídá
+ *  žádnému zařízení/značce (i „kryt na iPhone" = doplněk). Vrací ['sql' => '(…)', 'params' => [acc,dev]].
+ *  JEDINÝ zdroj pravdy — používá products.php (filtr) i rozcestník skladu (počty). */
+function afxProductAccessoryCond(): array {
+    $acc = 'kryt|pouzdr|obal|kabel|adaptér|adapter|redukce|nabíj|charger|řemín|pásek|strap|sklo|fólie|folie|dock|stojan|držák|čtečk|reader|box|externí|case|cover|glass|pencil|stylus|klávesnic|keyboard|myš|mouse|sluchátk|airpods|beats|headphone|earphone|repro|speaker|powerbank|magsafe|airtag|gembird|axagon';
+    $dev = 'iphone|ipad|macbook|imac|mac ?mini|mac ?studio|mac ?pro|watch|[0-9]+ ?mm|playstation|nintendo|xbox|samsung|galaxy|xiaomi|redmi|poco|huawei|honor|asus|doogee|realme|oppo|oneplus|vivo|motorola|nokia|sony|lenovo|garmin|instinct|forerunner|fenix|venu|amazfit|fitbit|dji|pixel|tcl|zte|ulefone|cubot|umidigi';
+    return [
+        'sql' => "(LOWER(CONCAT(title,' ',COALESCE(model,''))) REGEXP ? OR LOWER(CONCAT(title,' ',COALESCE(model,''))) NOT REGEXP ?)",
+        'params' => [$acc, $dev],
+    ];
+}
+
 /** Faktury a účetnictví smí administrátor a Boss (rozšířeno 16.7.2026 na žádost
  *  admina — dřív jen admin). Mazání zakázek a nastavení systému zůstává adminovi. */
 function crmCanManageInvoices(): bool {

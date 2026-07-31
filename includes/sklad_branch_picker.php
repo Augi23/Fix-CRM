@@ -14,7 +14,13 @@ foreach ($__branches as $__b) {
     catch (Throwable $e) { $inv = 0; }
     try { $prod = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE branch_id = $bid")->fetchColumn(); }
     catch (Throwable $e) { $prod = 0; }
-    $__counts[$bid] = ['inv' => $inv, 'prod' => $prod];
+    try {
+        $__ac = afxProductAccessoryCond();
+        $st = $pdo->prepare("SELECT COUNT(*) FROM products WHERE branch_id = ? AND " . $__ac['sql']);
+        $st->execute(array_merge([$bid], $__ac['params']));
+        $acc = (int)$st->fetchColumn();
+    } catch (Throwable $e) { $acc = 0; }
+    $__counts[$bid] = ['inv' => $inv, 'prod' => $prod, 'acc' => $acc];
 }
 // Ikony 1:1 z návrhu (vlastní SVG obrys, ne FontAwesome) — sklad (Karlín) / obchod (Černá Růže).
 $__svg = [
@@ -37,7 +43,7 @@ $__pl = function (int $n, string $one, string $few, string $many): string {
         <span class="sklad-branch-ico"><?php echo $__svg[$code] ?? $__svg['karlin']; ?></span>
         <span class="sklad-branch-name"><?php echo e(skladBranchLabel($bid)); ?></span>
         <span class="sklad-branch-addr"><?php echo e($__streets[$code] ?? (string)$__b['address']); ?></span>
-        <span class="sklad-branch-stats"><?php echo $c['inv'] . ' ' . $__pl($c['inv'], 'díl', 'díly', 'dílů'); ?> · <?php echo $c['prod'] . ' ' . $__pl($c['prod'], 'produkt', 'produkty', 'produktů'); ?></span>
+        <span class="sklad-branch-stats"><?php echo $c['inv'] . ' ' . $__pl($c['inv'], 'díl', 'díly', 'dílů'); ?> · <?php echo $c['prod'] . ' ' . $__pl($c['prod'], 'produkt', 'produkty', 'produktů'); ?> · <?php echo $c['acc']; ?> příslušenství</span>
         <?php if (!crmCanModifyBranchStock($bid)): ?>
             <span class="sklad-branch-ro"><i class="fas fa-eye me-1"></i>jen prohlížení</span>
         <?php endif; ?>
