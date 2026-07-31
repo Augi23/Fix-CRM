@@ -212,6 +212,7 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
         <button type="button" class="btn btn-sm btn-outline-info" onclick="posOpeningBalance()" title="Napočítanou hotovost zapíšeš jako počátek — od něj se počítá celý stav pokladny"><i class="fas fa-scale-balanced me-1"></i>Nastavit počáteční zůstatek</button>
         <?php endif; ?>
         <?php if ($shift && $shiftMine): ?>
+        <button type="button" class="btn btn-sm btn-outline-light" onclick="posTestReceipt(this)" title="Vytiskne zkušební účtenku na termotiskárně (Xprinter v serveru)"><i class="fas fa-receipt me-1"></i>Test účtenky</button>
         <button type="button" class="btn btn-sm btn-warning" onclick="shiftCloseOpenModal()" title="Spočítej hotovost, zapiš stav a předej pokladnu"><i class="fas fa-lock me-1"></i>Uzavřít / předat pokladnu</button>
         <span class="small text-white-50 align-self-center">převzato <?php echo e(date('H:i', strtotime((string)$shift['opened_at']))); ?></span>
         <?php endif; ?>
@@ -862,7 +863,25 @@ document.addEventListener('DOMContentLoaded', function () {
         if (payment === 'cash') { lcdShow(); return; }
         submitSale();
     });
+
+    // Účtenka jde nejdřív na termotiskárnu v serveru (bez dialogu, funguje i z iPadu);
+    // když tiskárna neodpoví, otevře se záložně tisk z prohlížeče.
+    function serverPrintReceipt(saleId, drawer) {
+        fetch('api/print_receipt_server.php', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>',
+                                   sale_id: saleId, drawer: drawer ? 1 : 0 })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d.ok) { window.open('print_receipt.php?id=' + saleId + '&format=58&auto=1', '_blank'); }
+        })
+        .catch(function () { window.open('print_receipt.php?id=' + saleId + '&format=58&auto=1', '_blank'); });
+    }
+
     function submitSale() {
+        var wasCash = payment === 'cash';   // payment se po úspěchu nuluje — šuplík potřebuje hodnotu z doby prodeje
         $finish.disabled = true;
         $finish.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Zpracovávám…';
         fetch('api/pos_checkout.php', {
@@ -895,8 +914,8 @@ document.addEventListener('DOMContentLoaded', function () {
             $cashReceived.value = '';
             $('#posCustomer').val(null).trigger('change');
             render();
-            // účtenka pro 58mm termotiskárnu (Xprinter) — A4 verze zůstává v Historii
-            window.open('print_receipt.php?id=' + d.sale_id + '&format=58&auto=1', '_blank');
+            // účtenka na termotiskárnu (hotově s otevřením šuplíku), fallback = prohlížeč
+            serverPrintReceipt(d.sale_id, wasCash);
         })
         .catch(function () {
             $finish.innerHTML = '<i class="fas fa-check me-2"></i>Dokončit prodej';
@@ -906,7 +925,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('posDoneReceipt').addEventListener('click', function () {
-        if (lastSale) window.open('print_receipt.php?id=' + lastSale.sale_id + '&format=58&auto=1', '_blank');
+        if (lastSale) serverPrintReceipt(lastSale.sale_id, false);   // dotisk bez šuplíku
     });
     document.getElementById('posDoneInvoice').addEventListener('click', function () {
         if (lastSale && lastSale.invoice_id) window.open('print_invoice.php?id=' + lastSale.invoice_id, '_blank');
@@ -994,6 +1013,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 else { location.reload(); }
             });
     });
+
+    // zkušební tisk na termotiskárnu (tlačítko v hlavičce kasy)
+    window.posTestReceipt = function (btn) {
+        btn.disabled = true;
+        fetch('api/print_receipt_server.php', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csrf_token: CSRF, test: 1 })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            btn.disabled = false;
+            alert(d.ok ? 'Zkušební účtenka odeslána na tiskárnu.' : ('Tisk se nepodařil: ' + (d.error || '')));
+        })
+        .catch(function () { btn.disabled = false; alert('Síťová chyba.'); });
+    };
 
     // odhlášení s převzatou pokladnou → nejdřív připomenout uzávěrku
     if (shiftMine) {

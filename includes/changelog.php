@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.37.0',
+        'date' => '2026-07-31',
+        'time' => '20:50',
+        'title' => 'Účtenka se tiskne přímo ze serveru na Xprinter (bez dialogu, i z iPadu)',
+        'items' => [
+            'Nový serverový tisk účtenek: CRM vykreslí doklad do rastru <b>384 bodů</b> (přesně tisková hlava, SF Pro, plná čeština bez kódových stránek) a pošle ho po USB do tiskárny v serveru — <b>žádný tiskový dialog</b>, funguje ze Safari i iPadu. Když tiskárna neodpoví, kasa automaticky otevře záložní tisk z prohlížeče.',
+            'U platby <b>hotově</b> tiskárna zároveň <b>otevře pokladní zásuvku</b> (RJ11 impulz).',
+            'V hlavičce Pokladny je tlačítko <b>„Test účtenky"</b> — vytiskne zkušební doklad s diakritikou; náhled rastru je na api/print_receipt_server.php?preview=1.',
+            'Cíl tisku řídí nastavení receipt_printer_target (výchozí usb:/dev/usb/lp0, umí i tcp:host:port a lp:fronta přes CUPS).',
+        ],
+    ],
+    [
         'version' => '3.36.2',
         'date' => '2026-07-31',
         'time' => '20:15',
