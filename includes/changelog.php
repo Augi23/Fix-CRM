@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.33.2',
+        'date' => '2026-07-31',
+        'time' => '13:40',
+        'title' => 'Návody → Banka: postup ostrého napojení na KB',
+        'items' => [
+            '<b>Nový návod „Ostré napojení na KB"</b> — sedm kroků od kvalifikovaného certifikátu po první synchronizaci, včetně upozornění, co si ověřit u api@kb.cz před objednáním certifikátu, jaké tři termíny si hlídat v kalendáři (certifikát, software statement, souhlas jednatele) a čím se produkce liší od sandboxu.',
+        ],
+    ],
+    [
         'version' => '3.33.1',
         'date' => '2026-07-31',
         'time' => '13:10',
