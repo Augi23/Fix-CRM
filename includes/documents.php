@@ -66,6 +66,10 @@ function crmDocTypes(): array {
                     ['n' => 'customer_id_doc',      'l' => 'cdoc_f_iddoc'],
                     ['n' => 'customer_id_issuer',   'l' => 'cdoc_f_idissuer'],
                     ['n' => 'customer_id_valid',    'l' => 'cdoc_f_idvalid'],
+                    // § 8 odst. 2 písm. a) zák. 253/2008 Sb. žádá, aby povinná osoba u identifikace
+                    // OVĚŘILA SHODU PODOBY s vyobrazením v dokladu. Bez zaznamenání, kdo ověření
+                    // provedl, je identifikace neprůkazná — proto sem patří jméno pracovníka.
+                    ['n' => 'customer_id_verified', 'l' => 'cdoc_f_id_verified'],
                     // Jen pro podnikající fyzickou osobu — u běžného klienta zůstane prázdné.
                     ['n' => 'customer_biz_name',    'l' => 'cdoc_f_biz_name'],
                     ['n' => 'customer_biz_address', 'l' => 'cdoc_f_biz_address'],
@@ -84,7 +88,7 @@ function crmDocTypes(): array {
                     ['n' => 'sign_payment',     'l' => 'cdoc_f_payment'],
                 ]],
             ],
-            'legal'      => ['buyout_agreement_text', 'cdoc_vykup_legal2', 'cdoc_vykup_legal3', 'cdoc_vykup_gdpr'],
+            'legal'      => ['buyout_agreement_text', 'cdoc_vykup_legal2', 'cdoc_vykup_legal3', 'cdoc_vykup_aml', 'cdoc_vykup_gdpr'],
             'sign_left'  => 'cdoc_sign_seller',
             'sign_right' => 'cdoc_sign_buyer',
             'subject_fields' => ['item_model', 'item_description'],

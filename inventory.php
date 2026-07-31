@@ -286,6 +286,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                                             <?php if ($canModifyStock): ?>
                                             <a href="edit_inventory.php?id=<?php echo $item['id']; ?>" class="btn btn-white border" title="<?php echo __('edit'); ?>"><i class="fas fa-edit text-warning"></i></a>
                                             <button type="button" class="btn btn-white border text-success assign-order-btn" data-id="<?php echo $item['id']; ?>" data-name="<?php echo htmlspecialchars($item['part_name']); ?>" title="<?php echo __('use_in_repair'); ?>"><i class="fas fa-link"></i></button>
+                                            <button type="button" class="btn btn-white border tr-add-btn" data-type="inventory" data-id="<?php echo (int)$item['id']; ?>" data-name="<?php echo htmlspecialchars($item['part_name']); ?>" data-max="<?php echo (int)$item['quantity']; ?>" title="Přesun na druhou pobočku"><i class="fas fa-right-left text-info"></i></button>
                                             <button type="button" class="btn btn-white border text-danger" onclick="deletePart(<?php echo $item['id']; ?>)" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>
                                             <?php endif; ?>
                                         </div>
@@ -589,6 +590,24 @@ $(document).on('click', '.restock-btn', function () {
             if (d.success) { location.reload(); }
             else { alert(d.message || 'Chyba'); }
         })
+        .catch(function () { alert('Síťová chyba.'); });
+});
+
+// Přesun dílu na druhou pobočku — přidat do seznamu přesunu (schválí zdrojová pobočka)
+$(document).on('click', '.tr-add-btn', function () {
+    var t = this.dataset.type, id = this.dataset.id, name = this.dataset.name || '', max = parseInt(this.dataset.max || '1', 10), qty = 1;
+    if (t === 'inventory') {
+        var v = prompt('Kolik ks „' + name + '" přidat do přesunu na druhou pobočku? (skladem ' + max + ')', '1');
+        if (v === null) return;
+        qty = parseInt(v, 10);
+        if (!qty || qty < 1 || qty > max) { alert('Zadej 1–' + max + ' ks.'); return; }
+    }
+    var fd = new FormData();
+    fd.append('from_branch', '<?php echo (int)$skladBranch; ?>'); fd.append('type', t); fd.append('source_id', id); fd.append('qty', qty);
+    fd.append('csrf_token', '<?php echo $_SESSION['csrf_token'] ?? ''; ?>');
+    fetch('api/transfer_add.php', {method: 'POST', body: fd, credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (window.showAlert) showAlert(d.message); else alert(d.message); })
         .catch(function () { alert('Síťová chyba.'); });
 });
 </script>

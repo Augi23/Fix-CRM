@@ -11,7 +11,8 @@ $__invTab = basename($_SERVER['PHP_SELF']);
 $__invTab = $__invTab === 'products.php' ? 'products'
     : ($__invTab === 'procurement.php' ? 'procurement'
     : ($__invTab === 'model_photos.php' ? 'modelphotos'
-    : ($__invTab === 'sklad_umisteni.php' ? 'locations' : 'service')));
+    : ($__invTab === 'sklad_presuny.php' ? 'presuny'
+    : ($__invTab === 'sklad_umisteni.php' ? 'locations' : 'service'))));
 $__invCat = (string)($_GET['cat'] ?? '');
 $__isAccessory = ($__invTab === 'products' && $__invCat === 'prislusenstvi');
 $__isProducts  = ($__invTab === 'products' && !$__isAccessory);
@@ -19,6 +20,8 @@ $__skladBranch = function_exists('skladBranchOrOwn') ? skladBranchOrOwn() : (int
 $__bq = '?branch=' . (int)$__skladBranch;
 $__karlinId = function_exists('getDefaultBranchId') ? getDefaultBranchId() : 1;
 $__isKarlin = ((int)$__skladBranch === (int)$__karlinId);
+$__trDraft = 0;
+try { $__trDraft = (int)$pdo->query("SELECT COUNT(*) FROM stock_transfer_items ti JOIN stock_transfers t ON t.id = ti.transfer_id WHERE t.from_branch_id = " . (int)$__skladBranch . " AND t.status = 'draft'")->fetchColumn(); } catch (Throwable $e) {}
 ?>
 <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
     <span class="badge rounded-pill" style="background:rgba(85,212,255,.16);color:#7fe3ff;border:1px solid rgba(85,212,255,.35);font-size:13px;padding:.5em .95em;">
@@ -49,6 +52,9 @@ $__isKarlin = ((int)$__skladBranch === (int)$__karlinId);
         <a class="nav-link <?php echo $__invTab === 'locations' ? 'active' : 'text-white-75'; ?>" href="sklad_umisteni.php<?php echo $__bq; ?>"><i class="fas fa-map-location-dot me-2"></i>Umístění</a>
     </li>
     <?php endif; ?>
+    <li class="nav-item">
+        <a class="nav-link <?php echo $__invTab === 'presuny' ? 'active' : 'text-white-75'; ?>" href="sklad_presuny.php<?php echo $__bq; ?>"><i class="fas fa-right-left me-2"></i>Přesuny<?php if (!empty($__trDraft)): ?> <span class="badge bg-warning text-dark ms-1"><?php echo (int)$__trDraft; ?></span><?php endif; ?></a>
+    </li>
     <?php endif; ?>
     <li class="nav-item <?php echo hasPermission('manage_inventory') ? '' : 'ms-auto'; ?>">
         <a class="nav-link <?php echo $__invTab === 'procurement' ? 'active' : 'text-white-75'; ?>" href="procurement.php<?php echo $__bq; ?>"><i class="fas fa-truck-loading me-2"></i><?php echo __('procurement'); ?><?php if (!empty($procurementBadgeCount)): ?> <span class="badge bg-warning text-dark ms-1"><?php echo (int)$procurementBadgeCount; ?></span><?php endif; ?></a>

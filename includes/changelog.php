@@ -6,6 +6,27 @@
  */
 return [
     [
+        'version' => '3.33.1',
+        'date' => '2026-07-31',
+        'time' => '13:10',
+        'title' => 'Výkupní list: potvrzení, že se ověřila totožnost prodávajícího',
+        'items' => [
+            '<b>Nové pole „Totožnost ověřil"</b> — kdo z obsluhy porovnal podobu prodávajícího s fotkou v dokladu. Zákon proti praní špinavých peněz to u výkupu použitého zboží vyžaduje (§ 8 odst. 2), a bez záznamu, kdo ověření provedl, je celá identifikace neprůkazná.',
+            '<b>Na výkupním listu přibyla věta</b>, že kupující provedl identifikaci podle zákona č. 253/2008 Sb., ověřil shodu podoby s dokladem a k čemu se údaje uchovávají — česky, anglicky i rusky.',
+        ],
+    ],
+    [
+        'version' => '3.34.0',
+        'date' => '2026-07-31',
+        'time' => '19:15',
+        'title' => 'Přesuny zboží mezi pobočkami (se schválením a historií)',
+        'items' => [
+            'Ve Skladu (Servis, Produkty i Příslušenství) je u zboží nová ikona <b>⇄ přesun</b> na druhou pobočku — přidá zboží do <b>rozpracovaného seznamu přesunu</b> (u dílů se zeptá na počet, produkt se přesouvá celý).',
+            'Seznam musí <b>potvrdit zaměstnanec zdrojové pobočky</b> (od které se přesouvá). Teprve pak se zásoba fyzicky přesune — <b>se stejným obrázkem</b>, aby druhá pobočka viděla u sebe totéž (u dílů se sloučí stejný díl nebo vytvoří kopie; produkt se přepne i s fotkou).',
+            'Nová záložka <b>Přesuny</b> ve Skladu: rozpracovaný seznam + potvrzení + <b>historie všech přesunů</b> (datum, čas, kdo potvrdil, soupis položek).',
+        ],
+    ],
+    [
         'version' => '3.33.0',
         'date' => '2026-07-31',
         'time' => '12:30',

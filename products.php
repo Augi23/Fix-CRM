@@ -333,6 +333,7 @@ try {
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-810W)"><i class="fas fa-tag"></i></button>
                                             <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vrátit do skladu' : 'Zapůjčeno / komisní prodej'; ?>"><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i></button>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>
+                                            <button type="button" class="btn btn-white border tr-add-btn" data-type="product" data-id="<?php echo (int)$p['id']; ?>" data-name="<?php echo e($p['title']); ?>" title="Přesun na druhou pobočku"><i class="fas fa-right-left text-info"></i></button>
                                             <button type="button" class="btn btn-white border text-danger product-delete-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>
                                         </div>
                                     </td>
@@ -1206,6 +1207,21 @@ $(document).on('click', '#loanSaveBtn', function () {
     }).fail(function () { btn.disabled = false; showAlert('Uložení selhalo — obnov stránku a zkus to znovu.'); });
 });
 <?php endif; ?>
+</script>
+
+<script>
+// Přesun produktu na druhou pobočku — přidat do seznamu přesunu (produkt se přesouvá celý)
+$(document).on('click', '.tr-add-btn', function () {
+    var t = this.dataset.type, id = this.dataset.id, name = this.dataset.name || '';
+    if (t === 'product' && !confirm('Přidat „' + name + '" do přesunu na druhou pobočku? Produkt se přesune celý (po potvrzení zdrojovou pobočkou).')) return;
+    var fd = new FormData();
+    fd.append('from_branch', '<?php echo (int)$skladBranch; ?>'); fd.append('type', t); fd.append('source_id', id); fd.append('qty', 1);
+    fd.append('csrf_token', '<?php echo $_SESSION['csrf_token'] ?? ''; ?>');
+    fetch('api/transfer_add.php', {method: 'POST', body: fd, credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (window.showAlert) showAlert(d.message); else alert(d.message); })
+        .catch(function () { alert('Síťová chyba.'); });
+});
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
