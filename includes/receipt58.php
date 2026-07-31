@@ -21,10 +21,12 @@
  *   logo    => data: URI (černobílé logo) nebo ''
  */
 
-/** Šířka tiskové plochy v mm (384 bodů / 8 bodů na mm při 203 dpi). */
+/** Návrhová šířka v mm. Hlava tiskne 48 mm (384 bodů, 203 dpi), ale papír má
+ * v mechanice toleranci ±0,5 mm — na plné šířce se okraje ořezávají. 46 mm je
+ * bezpečné maximum ověřené rešerší (manuál XP58-IIN + praxe prodejců). */
 function crmReceiptWidthMm(): float {
-    $w = (float)get_setting('receipt_width_mm', '48');
-    return ($w >= 30 && $w <= 80) ? $w : 48.0;
+    $w = (float)get_setting('receipt_width_mm', '46');
+    return ($w >= 30 && $w <= 80) ? $w : 46.0;
 }
 
 function crmReceipt58Css(float $w): string {
@@ -69,7 +71,7 @@ function crmReceipt58Css(float $w): string {
     .legal p { margin-top: 1mm; }
     .thanks { margin-top: 2.4mm; text-align: center; font-weight: 700; letter-spacing: 0.04em; }
     .qr { display: block; width: 18mm; margin: 2mm auto 0; }
-    .cut { margin-top: 4mm; }
+    .cut { height: 10mm; }
     /* Náhled na obrazovce: papír na podkladu, ať je vidět skutečná šířka role. */
     @media screen {
         html { background: #e2e5ea; }
@@ -78,10 +80,151 @@ function crmReceipt58Css(float $w): string {
     @page { size: {$wStr}mm auto; margin: 0; }
     @media print {
         html { background: #fff; }
-        body { box-shadow: none; width: auto; }
+        body { box-shadow: none; }
         .no-print { display: none !important; }
     }
 CSS;
+}
+
+/**
+ * Sloupce pos_sales.cash_received / cash_change — pojistka pro instalace, kde
+ * ještě neproběhla migrace 043 (deploy je pouští hned po pullu, tohle kryje zbytek).
+ */
+function afxEnsurePosCashColumns(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'cash_received'")->fetch()) {
+            $pdo->exec("ALTER TABLE pos_sales ADD COLUMN cash_received DECIMAL(10,2) NULL DEFAULT NULL");
+            $pdo->exec("ALTER TABLE pos_sales ADD COLUMN cash_change DECIMAL(10,2) NULL DEFAULT NULL");
+        }
+    } catch (Throwable $e) { error_log('afxEnsurePosCashColumns: ' . $e->getMessage()); }
+}
+
+/**
+ * Složí vstupní pole pro crmRenderReceipt58() z řádků kasy (pos_sales + pos_sale_items).
+ *
+ * Drží VŠECHNA pravidla obsahu dokladu na jednom místě:
+ *  - typ dokladu: neplátce „Doklad o prodeji"; plátce do 10 000 Kč vč. DPH
+ *    „Zjednodušený daňový doklad" (§ 30 ZDPH), nad to „Daňový doklad",
+ *  - DIČ jen u plátce (uvedení daně neplátcem = povinnost ji odvést, § 108 ZDPH),
+ *  - rekapitulace DPH ze snapshotu na dokladu (vat_rate/is_vat_payer), § 90 mimo ni,
+ *  - záruční věty podle druhů položek (crmReceiptWarrantyLines),
+ *  - Placeno/Vráceno jen u hotovosti, je-li evidováno.
+ *
+ * $co = ['name','address','ico','dic','phone','web'], $labels = přepisy (payment aj.).
+ */
+function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo = '', array $labels = []): array {
+    $isVat   = (int)($sale['is_vat_payer'] ?? 0) === 1;
+    $vatRate = (float)($sale['vat_rate'] ?? 0);
+
+    $rows = []; $stdTotal = 0.0; $usedTotal = 0.0; $warrantyItems = [];
+    foreach ($items as $l) {
+        $line = (float)$l['unit_price'] * (int)$l['quantity'];
+        $used = (int)($l['is_used_goods'] ?? 0) === 1;
+        if ($used) { $usedTotal += $line; } else { $stdTotal += $line; }
+        $rows[] = [
+            'name' => (string)$l['item_name'],
+            'code' => (string)($l['item_code'] ?? ''),
+            'qty' => (int)$l['quantity'],
+            'unit_price' => (float)$l['unit_price'],
+            'total' => $line,
+            'used' => $used,
+            'par90' => $used && $isVat,
+        ];
+        // kasa dnes prodává jen zboží (díly + produkty); servisní položka by sem
+        // přišla s příznakem service — záruční věta o opravě se pak přidá sama
+        $warrantyItems[] = ['used' => $used, 'service' => !empty($l['is_service'])];
+    }
+    $total = (float)($sale['total'] ?? 0);
+
+    // rekapitulace v celých Kč tak, aby základ + DPH vždy dalo přesně součet (vzor A4 dokladu)
+    $stdKc  = (int)round($stdTotal);
+    $baseKc = ($isVat && $vatRate > 0) ? (int)round($stdTotal * 100 / (100 + $vatRate)) : $stdKc;
+    $hasUsed = $usedTotal > 0 && $isVat;
+
+    if (!$isVat) {
+        $title = 'Doklad o prodeji';
+        unset($co['dic']);
+    } elseif ($total <= 10000) {
+        $title = 'Zjednodušený daňový doklad';
+    } else {
+        $title = 'Daňový doklad';
+    }
+
+    $legal = [];
+    if ($hasUsed) {
+        $legal[] = 'Zvláštní režim – použité zboží podle § 90 zákona č. 235/2004 Sb. U položek označených „§ 90" se daň nevyčísluje.';
+    }
+    if (!$isVat) { $legal[] = 'Nejsme plátci DPH.'; }
+    foreach (crmReceiptWarrantyLines($warrantyItems) as $w) { $legal[] = $w; }
+    $legal[] = 'Reklamace uplatníte na adrese provozovny výše. Doklad uschovejte.';
+
+    $payment = (string)($sale['payment_method'] ?? '');
+    $payLabel = $labels[$payment] ?? ['cash' => 'Hotově', 'card' => 'Kartou', 'invoice' => 'Na fakturu'][$payment] ?? $payment;
+
+    $received = isset($sale['cash_received']) && $sale['cash_received'] !== null ? (float)$sale['cash_received'] : null;
+    $change   = isset($sale['cash_change'])   && $sale['cash_change']   !== null ? (float)$sale['cash_change']   : null;
+
+    return [
+        'lang' => 'cs',
+        'logo' => $logo,
+        'company' => $co,
+        'doc' => [
+            'title' => $title,
+            'number' => (string)($sale['sale_number'] ?? ''),
+            'datetime' => !empty($sale['created_at']) ? date('j. n. Y H:i', strtotime((string)$sale['created_at'])) : '',
+            'seller' => (string)($sale['seller_name'] ?? ''),
+            'payment' => $payLabel,
+            'customer' => (string)($sale['customer_label'] ?? ''),
+            'customer_ico' => (string)($sale['customer_ico'] ?? ''),
+            'invoice' => (string)($sale['invoice_number'] ?? ''),
+            'cancelled_at' => !empty($sale['cancelled_at']) ? date('j. n. Y H:i', strtotime((string)$sale['cancelled_at'])) : '',
+        ],
+        'items' => $rows,
+        'vat' => [
+            'is_payer' => $isVat,
+            'rate' => $vatRate,
+            'base' => $baseKc,
+            'tax' => $stdKc - $baseKc,
+            'used_total' => $hasUsed ? $usedTotal : 0,
+        ],
+        'totals' => [
+            'total' => $total,
+            'paid' => $payment === 'cash' ? $received : null,
+            'change' => $payment === 'cash' ? $change : null,
+        ],
+        'legal' => $legal,
+        'money' => static function ($v) {
+            // celé Kč bez desetinných; haléře (netypické) se ukážou, ať doklad sedí na korunu
+            $v = (float)$v;
+            return (abs($v - round($v)) < 0.005)
+                ? number_format($v, 0, ',', ' ') . ' Kč'
+                : number_format($v, 2, ',', ' ') . ' Kč';
+        },
+        'thanks' => 'Děkujeme za nákup',
+    ];
+}
+
+/**
+ * Záruční věty do patičky — skládají se podle toho, co na dokladu opravdu je:
+ * nové zboží → 24 měsíců, použité → 12 měsíců, servis/oprava → 6 měsíců.
+ * Věta se tiskne jen tehdy, když na dokladu příslušný druh položky existuje.
+ */
+function crmReceiptWarrantyLines(array $items): array {
+    $maNove = $maPouzite = $maServis = false;
+    foreach ($items as $l) {
+        if (!empty($l['service']))   { $maServis = true; }
+        elseif (!empty($l['used']))  { $maPouzite = true; }
+        else                         { $maNove = true; }
+    }
+    $out = [];
+    if ($maNove)    { $out[] = 'Záruka na nové zboží je 24 měsíců.'; }
+    if ($maPouzite) { $out[] = 'Záruka na použité zboží je 12 měsíců.'; }
+    if ($maServis)  { $out[] = 'Záruka na opravu je běžně 6 měsíců, pokud není určeno jinak.'; }
+    return $out;
 }
 
 /** Vyrenderuje kompletní HTML účtenky (samostatný dokument, vhodný i pro náhled). */
@@ -104,7 +247,10 @@ function crmRenderReceipt58(array $d): string {
         $h .= '<img class="logo" src="' . e((string)$d['logo']) . '" alt="' . e((string)($co['name'] ?? '')) . '">';
     }
     $h .= '<div class="c co-name">' . e((string)($co['name'] ?? '')) . '</div>';
-    $h .= '<div class="c sm">' . e((string)($co['address'] ?? '')) . '</div>';
+    // adresa smí mít víc řádků (ulice / město) — dlouhá adresa se jinak láme nešikovně
+    foreach (preg_split('/\n/', (string)($co['address'] ?? '')) as $ar) {
+        if (trim($ar) !== '') { $h .= '<div class="c sm">' . e(trim($ar)) . '</div>'; }
+    }
     $ids = [];
     if (!empty($co['ico'])) { $ids[] = 'IČO ' . $co['ico']; }
     if (!empty($co['dic'])) { $ids[] = 'DIČ ' . $co['dic']; }

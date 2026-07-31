@@ -13,6 +13,8 @@
 ob_start();
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/receipt58.php';   // afxEnsurePosCashColumns (Placeno/Vráceno)
+require_once '../includes/pos_shift.php';   // převzetí pokladny — markovat smí jen držitel směny
 ob_clean();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -81,6 +83,17 @@ if (!in_array($payment, ['cash', 'card', 'invoice'], true)) {
 $customerId = (int)($in['customer_id'] ?? 0);
 $note = mb_substr(trim((string)($in['note'] ?? '')), 0, 255);
 
+// Přijatá hotovost (nepovinná evidence): obsluha ji zadává u platby hotově,
+// účtenka z ní tiskne Placeno/Vráceno. Prázdná hodnota = nezaznamenáno (NULL).
+$cashReceived = null;
+if ($payment === 'cash' && isset($in['cash_received']) && $in['cash_received'] !== '' && $in['cash_received'] !== null) {
+    $cashReceived = (float)str_replace(',', '.', (string)$in['cash_received']);
+    if (!is_finite($cashReceived) || $cashReceived < 0 || $cashReceived > 10000000) {
+        echo json_encode(['success' => false, 'message' => 'Přijatá částka je mimo rozsah.']); exit;
+    }
+    $cashReceived = round($cashReceived, 2);
+}
+
 $items = $in['items'] ?? [];
 if (!is_array($items) || count($items) === 0) {
     echo json_encode(['success' => false, 'message' => 'Košík je prázdný.']); exit;
@@ -131,6 +144,8 @@ ensureProductsTable();
 ensureProductsPosColumn();
 afxEnsurePosGoodsTaxColumns();
 ensureSkladBranchSchema();
+afxEnsurePosCashColumns();
+afxEnsurePosShiftTable();
 
 // názvy/kódy položek VŽDY čerstvě z DB — klientovi nevěříme nic než id/qty/cenu
 try {
@@ -181,6 +196,26 @@ try {
         echo json_encode(['success' => false, 'message' => 'Částka je mimo rozsah.']); exit;
     }
 
+    // přijatá hotovost nesmí být nižší než celkem — jinak by „Vráceno" vyšlo záporně
+    $cashChange = null;
+    if ($cashReceived !== null) {
+        if ($cashReceived + 0.005 < $total) {
+            echo json_encode(['success' => false, 'message' => 'Přijatá částka (' . number_format($cashReceived, 0, ',', ' ') . ' Kč) je nižší než celkem k úhradě.']); exit;
+        }
+        $cashChange = round($cashReceived - $total, 2);
+    }
+
+    // POKLADNU SMÍ OBSLUHOVAT JEN TEN, KDO JI MÁ PŘEVZATOU (pos_shifts) —
+    // v jednu chvíli jediný pracovník na pobočku. Kontrola PŘED transakcí.
+    afxPosShiftAssertMine((int)getCurrentStaffBranchId());
+
+    // UZÁVĚRKA OBDOBÍ: doklad kasy vzniká k dnešnímu dni — když je aktuální měsíc
+    // účetně uzavřený (typicky konec roku uzavřený se zpožděním), prodej nesmí
+    // projít, jinak by se tržby rozešly s odevzdaným přiznáním. Kontrola PŘED
+    // transakcí (žádný odpis skladu nazmar); RuntimeException doputuje do catch
+    // níže a uživatel u kasy dostane srozumitelnou hlášku, ne „databázovou chybu".
+    afxAccountingAssertOpen(date('Y-m-d'), 'prodej na kase');
+
     $pdo->beginTransaction();
 
     // ── odpis skladu (atomicky, guard proti souběhu/zápornému stavu) ──
@@ -210,15 +245,17 @@ try {
     $isVat = get_setting('acc_is_vat_payer', '0') == '1';
     $vatRate = (float)get_setting('acc_vat_rate', '21');
     $insSale = $pdo->prepare("INSERT INTO pos_sales
-            (sale_number, branch_id, seller_name, customer_id, payment_method, total, vat_rate, is_vat_payer, note)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            (sale_number, branch_id, seller_name, customer_id, payment_method, total, vat_rate, is_vat_payer, note,
+             cash_received, cash_change)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $saleId = 0; $saleNumber = '';
     for ($try = 0; $try < 6; $try++) {
         $saleNumber = generatePosSaleNumber($pdo, $try);
         try {
             $insSale->execute([$saleNumber, $branchId ?: null, $seller,
                 $customerId > 0 ? $customerId : null, $payment, $total,
-                $isVat ? $vatRate : 0, $isVat ? 1 : 0, $note !== '' ? $note : null]);
+                $isVat ? $vatRate : 0, $isVat ? 1 : 0, $note !== '' ? $note : null,
+                $cashReceived, $cashChange]);
             $saleId = (int)$pdo->lastInsertId();
             break;
         } catch (PDOException $e) {
@@ -284,5 +321,6 @@ echo json_encode([
     'sale_number' => $saleNumber,
     'invoice_id' => $invoiceId,
     'total' => round($total, 2),
+    'cash_change' => $cashChange,   // kolik vrátit zákazníkovi (jen hotově s evidencí)
     'has_product' => $hasProduct,   // UI připomene vyřadit kus v naskladňovací appce
 ]);

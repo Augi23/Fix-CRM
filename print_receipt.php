@@ -4,8 +4,11 @@
  * print_receipt.php?id=<pos_sales.id>[&auto=1 → rovnou otevře tiskový dialog]
  * DPH: běžné zboží u plátce s rekapitulací; použité zboží jede ve zvláštním
  * režimu § 90 — DPH se u něj NEVYČÍSLUJE a doklad nese povinnou větu.
- * Označení „použité zboží“ u položky se tiskne VŽDY (i u neplátce DPH) — vyžaduje
+ * Označení „použité zboží“ u položky se tiskne i u neplátce DPH — vyžaduje
  * ho § 16 zákona č. 634/1992 Sb. o ochraně spotřebitele, ne zákon o DPH.
+ * POZOR na dotisk historie: staré řádky (před v3.33.0) mají is_used_goods = 1
+ * paušálně i u nového zboží, proto se příznak tiskne jen tam, kde je věrohodný
+ * (viz $lineIsUsed níže).
  */
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
@@ -17,7 +20,7 @@ if ($id <= 0) { die(__('missing_id')); }
 
 ensurePosTables();
 
-$st = $pdo->prepare("SELECT s.*, c.first_name, c.last_name, c.company, c.preferred_language, i.invoice_number
+$st = $pdo->prepare("SELECT s.*, c.first_name, c.last_name, c.company, c.ico AS cust_ico, c.preferred_language, i.invoice_number
     FROM pos_sales s
     LEFT JOIN customers c ON s.customer_id = c.id
     LEFT JOIN invoices i ON s.invoice_id = i.id
@@ -42,6 +45,53 @@ $it = $pdo->prepare("SELECT * FROM pos_sale_items WHERE sale_id = ? ORDER BY id"
 $it->execute([$id]);
 $items = $it->fetchAll();
 
+/** Je zboží s tímhle stavem (grade) POUŽITÉ? — STEJNÁ definice jako v api/pos_checkout.php
+ *  (samostatné vstupní body; function_exists hlídá dvojí deklaraci, kdyby se soubory potkaly).
+ *  Účtenka jím při dotisku ZNOVU odvodí režim ze snapshotu stavu na řádku dokladu —
+ *  je to tentýž výpočet, kterým checkout příznak původně nastavil. */
+if (!function_exists('afxGoodsIsUsedByGrade')) {
+    function afxGoodsIsUsedByGrade(?string $grade, string $ctx = ''): bool {
+        // v DB je uložený jen token stavu („A“), ale snese i celý label („A – jako nové“)
+        $g = mb_strtolower(trim(explode(' ', trim((string)$grade))[0]));
+        if ($g === '') { return false; }
+        if (in_array($g, ['nový', 'novy', 'nové', 'nove', 'new'], true)) { return false; }
+        if (in_array($g, ['zánovní', 'zanovni', 'a', 'b', 'c', 'd'], true)) { return true; }
+        error_log('print_receipt: neznámý stav zboží „' . $g . '“ (' . $ctx . ') → běžný režim');
+        return false;
+    }
+}
+
+/* ---- Věrohodnost příznaku „použité zboží“ na řádcích (dotisk historie) ----
+   Do v3.32.0 kasa ukládala is_used_goods = 1 KAŽDÉMU prodanému produktu (i novému
+   telefonu) a účtenka příznak nikdy netiskla (podmínka byla svázaná s plátcovstvím
+   DPH, které je vypnuté). Od v3.33.0 se režim odvozuje ze stavu (grade, snapshot
+   z migrace 040) a označení se tiskne vždy — dotisk STARÉHO dokladu by ale nový
+   iPhone falešně označil „Použité zboží“. Proto:
+   – řádek s vyplněným grade → rozhodne grade (tj. stejný výpočet jako při prodeji);
+   – díl (item_type 'part') bez grade → nikdy (díly se jako použité neprodávají,
+     stará paušální jednička je jen šum);
+   – produkt bez grade → jen když prodej vznikl až PO nasazení v3.33.0. Hranici si
+     při prvním tisku uložíme do system_settings (přesné datum migrace zpětně
+     nezjistíme, první tisk po nasazení je nejbližší bezpečná aproximace): každý
+     „použitý“ řádek vzniklý po nasazení má grade vyplněný (checkout režim odvozuje
+     právě z něj), takže pozdější prodej s prázdným grade je korektně běžné zboží
+     a starší paušální jedničky se ignorují. Směr případné chyby je konzervativní —
+     označení se spíš NEvytiskne, než aby se nové zboží označilo za použité. */
+$__usedSince = trim((string)get_setting('pos_used_goods_grade_since', ''));
+if ($__usedSince === '') {
+    $__usedSince = date('Y-m-d H:i:s');
+    // tisk dokladu nesmí spadnout na zápisu nastavení (např. read-only replika)
+    try { set_setting('pos_used_goods_grade_since', $__usedSince); } catch (Throwable $e) { error_log('print_receipt: set_setting pos_used_goods_grade_since: ' . $e->getMessage()); }
+}
+$__saleAfterCut = strtotime((string)$sale['created_at']) >= strtotime($__usedSince);
+$lineIsUsed = static function (array $l) use ($__saleAfterCut): bool {
+    if ((int)($l['is_used_goods'] ?? 0) !== 1) { return false; }
+    $grade = trim((string)($l['grade'] ?? ''));
+    if ($grade !== '') { return afxGoodsIsUsedByGrade($grade, 'účtenka, řádek #' . (int)($l['id'] ?? 0)); }
+    if ((string)($l['item_type'] ?? '') === 'part') { return false; }
+    return $__saleAfterCut;
+};
+
 /* ---- firma / pobočka ---- */
 $__logo_fs = __DIR__ . '/assets/img/logo-black.png';
 $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((string)file_get_contents($__logo_fs)) : '';
@@ -61,7 +111,9 @@ $vatRate = (float)($sale['vat_rate'] ?? 0);
 $stdTotal = 0.0; $usedTotal = 0.0;
 foreach ($items as $l) {
     $line = (float)$l['unit_price'] * (int)$l['quantity'];
-    if ((int)$l['is_used_goods'] === 1) { $usedTotal += $line; } else { $stdTotal += $line; }
+    // stejné pravidlo věrohodnosti jako u štítku na řádku — rekapitulace § 90
+    // musí sedět s tím, co je na dokladu vyznačené
+    if ($lineIsUsed($l)) { $usedTotal += $line; } else { $stdTotal += $line; }
 }
 // rekapitulace v celých Kč tak, aby základ + DPH VŽDY dalo přesně řádek s celkem
 $stdKc  = (int)round($stdTotal);
@@ -72,6 +124,31 @@ $hasUsed = $usedTotal > 0 && $isVat;   // §90 má smysl jen u plátce DPH
 $payLabel = ['cash' => _l('rcpt_pay_cash'), 'card' => _l('rcpt_pay_card'), 'invoice' => _l('rcpt_pay_invoice')][(string)$sale['payment_method']] ?? (string)$sale['payment_method'];
 $custName = trim((string)($sale['company'] ?? '')) ?: trim((string)($sale['first_name'] ?? '') . ' ' . (string)($sale['last_name'] ?? ''));
 $cancelled = (string)$sale['status'] === 'cancelled';
+
+/* ---- ?format=58 → účtenka pro pokladní termotiskárnu (Xprinter XP58-IIN) ----
+   Vlastní šablona v includes/receipt58.php: 46 mm tisková šířka, čistá čerň,
+   typ dokladu podle plátcovství a částky, Placeno/Vráceno u hotovosti. Doklad
+   je záměrně česky (daňový doklad); vícejazyčná zůstává A4 verze bez formátu. */
+if (($_GET['format'] ?? '') === '58') {
+    require_once 'includes/receipt58.php';
+    $sale58 = $sale;
+    $sale58['customer_label'] = $custName;
+    $sale58['customer_ico'] = $custName !== '' ? trim((string)($sale['cust_ico'] ?? '')) : '';
+    $sale58['cancelled_at'] = $cancelled ? ($sale['cancelled_at'] ?: date('Y-m-d H:i:s')) : null;
+    $html58 = crmRenderReceipt58(crmBuildPosReceipt58($sale58, $items, [
+        'name' => $co_name,
+        'address' => trim((string)$__bc['address']),
+        'ico' => $co_ico,
+        'dic' => $co_dic,
+        'phone' => $co_phone,
+        'web' => $co_web,
+    ], $__logo_data));
+    if (!empty($_GET['auto'])) {
+        $html58 = str_replace('</body>', '<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},250);});</script></body>', $html58);
+    }
+    echo $html58;
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo e($target_lang); ?>">
@@ -158,7 +235,7 @@ table.items .num { text-align:right; white-space:nowrap; }
             <?php foreach ($items as $l): ?>
                 <tr>
                     <td>
-                        <?php echo e($l['item_name']); ?><?php if ((int)$l['is_used_goods'] === 1): ?><span class="tagused"><?php echo _l('rcpt_used_goods'); ?></span><?php if ($isVat): ?><span class="tag90">§ 90</span><?php endif; ?><?php endif; ?>
+                        <?php echo e($l['item_name']); ?><?php if ($lineIsUsed($l)): ?><span class="tagused"><?php echo _l('rcpt_used_goods'); ?></span><?php if ($isVat): ?><span class="tag90">§ 90</span><?php endif; ?><?php endif; ?>
                         <?php if (!empty($l['item_code'])): ?><div class="code"><?php echo e($l['item_code']); ?></div><?php endif; ?>
                     </td>
                     <td class="num"><?php echo (int)$l['quantity']; ?></td>

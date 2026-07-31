@@ -6,6 +6,20 @@
  */
 return [
     [
+        'version' => '3.36.0',
+        'date' => '2026-07-31',
+        'time' => '19:30',
+        'title' => 'Pokladna: účtenka pro termotiskárnu, Přijato/Vráceno a předávání pokladny (směny)',
+        'items' => [
+            '<b>Účtenka na termotiskárnu Xprinter XP58-IIN</b> (role 57 mm): nová šablona na 46 mm tiskové šířky, čistá čerň bez šedých tónů. Kasa ji po prodeji otevírá automaticky (print_receipt.php?format=58); A4 verze zůstává v Historii.',
+            'Účtenka hlídá náležitosti: typ dokladu podle plátcovství a částky (<b>Zjednodušený daňový doklad</b> do 10 000 Kč, § 30 ZDPH), DIČ jen u plátce, povinná věta a vyloučení DPH u <b>§ 90</b>, označení použitého zboží, <b>záruční věty podle položek</b> (nové 24 měs. / použité 12 měs. / oprava běžně 6 měs.).',
+            '<b>Přijato/Vráceno u hotovosti:</b> kasa má pole „Přijato od zákazníka" s rychlými tlačítky (Přesně/500/1000/2000/5000), živě počítá vrácení, ukládá je na doklad (pos_sales.cash_received/cash_change, migrace 043) a tiskne na účtenku. Po prodeji velké upozornění <b>„Vrátit zákazníkovi"</b>.',
+            '<b>Předávání pokladny (směny):</b> před prací s kasou pracovník směnu převezme — systém ukáže stav hotovosti a ptá se <b>ANO/NE</b>. Při NE se zapíše skutečně napočítaná částka a od ní se ten den odvíjí stav pokladny (počáteční zůstatek).',
+            'V jednu chvíli drží pokladnu <b>jen jeden pracovník</b> — ostatním kasa ukáže, kdo ji má převzatou; markování hlídá i server. Vedení může zapomenutou směnu uzavřít za kolegu.',
+            'Při odhlášení s převzatou pokladnou kasa <b>připomene spočítání hotovosti a uzávěrku</b>; uzávěrka zapisuje napočítanou částku, rozdíl proti systému a jde do audit logu (tabulka pos_shifts, migrace 044).',
+        ],
+    ],
+    [
         'version' => '3.35.1',
         'date' => '2026-07-31',
         'time' => '19:55',

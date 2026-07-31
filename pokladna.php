@@ -10,10 +10,20 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 require_once 'includes/cash_book.php';
+require_once 'includes/pos_shift.php';
 
 ensurePosTables();
 ensureProductsTable();
 ensureProductsPosColumn();
+
+// ── PŘEVZETÍ POKLADNY (směna) ───────────────────────────────────────────────
+// Bez převzaté směny nejde markovat (server to vynucuje v api/pos_checkout.php).
+// Tady se rozhoduje, co pracovník uvidí: převzetí / cizí směnu / vlastní kasu.
+afxEnsurePosShiftTable();
+$shift = afxPosShiftCurrent((int)getCurrentStaffBranchId());
+$shiftMine = afxPosShiftIsMine($shift);
+$shiftLast = $shift ? null : afxPosShiftLastClosed((int)getCurrentStaffBranchId());
+$shiftCanForce = function_exists('crmCanDeleteOrders') && crmCanDeleteOrders();
 
 // denní součty do hlavičky (uzávěrka na první pohled); historie prodejů
 // je záměrně JEN v Historie → Kasa prodejna, kasa je čistě prodejní plocha
@@ -21,8 +31,10 @@ $todaySums = ['cash' => 0.0, 'card' => 0.0, 'invoice' => 0.0];
 try {
     // Denní uzávěrka jen za SVOU pobočku (admin/Boss vidí celofiremní součet).
     $__posBranch = orderBranchScopeSql('branch_id');
+    // rozsah přes created_at místo DATE(...) — funkce nad sloupcem by vyřadila index
     foreach ($pdo->query("SELECT payment_method, SUM(total) s FROM pos_sales
-        WHERE DATE(created_at) = CURDATE() AND status = 'completed'" . $__posBranch . " GROUP BY payment_method") as $r) {
+        WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY
+          AND status = 'completed'" . $__posBranch . " GROUP BY payment_method") as $r) {
         $todaySums[(string)$r['payment_method']] = (float)$r['s'];
     }
 } catch (Throwable $e) {}
@@ -33,7 +45,9 @@ ensurePosCashMovementsTable();
 $cashIn = 0.0; $cashOut = 0.0; $todayMoves = [];
 try {
     $st = $pdo->query("SELECT id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by, created_at
-        FROM pos_cash_movements WHERE DATE(created_at) = CURDATE()" . orderBranchScopeSql('branch_id') . " ORDER BY id DESC LIMIT 30");
+        FROM pos_cash_movements
+        WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY"
+        . orderBranchScopeSql('branch_id') . " ORDER BY id DESC LIMIT 30");
     foreach ($st as $m) {
         $todayMoves[] = $m;
         if ($m['direction'] === 'in') { $cashIn += (float)$m['amount']; } else { $cashOut += (float)$m['amount']; }
@@ -161,6 +175,10 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
         <?php if ($cbCanEdit): ?>
         <button type="button" class="btn btn-sm btn-outline-info" onclick="posOpeningBalance()" title="Napočítanou hotovost zapíšeš jako počátek — od něj se počítá celý stav pokladny"><i class="fas fa-scale-balanced me-1"></i>Nastavit počáteční zůstatek</button>
         <?php endif; ?>
+        <?php if ($shift && $shiftMine): ?>
+        <button type="button" class="btn btn-sm btn-warning" onclick="shiftCloseOpenModal()" title="Spočítej hotovost, zapiš stav a předej pokladnu"><i class="fas fa-lock me-1"></i>Uzavřít / předat pokladnu</button>
+        <span class="small text-white-50 align-self-center">převzato <?php echo e(date('H:i', strtotime((string)$shift['opened_at']))); ?></span>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -209,7 +227,7 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
 <div class="alert alert-danger border-0 py-2 px-3 mb-3">
     <i class="fas fa-triangle-exclamation me-1"></i>
     <strong>Hotovostní platba nad zákonný limit <?php echo formatMoney($cbLimit); ?>.</strong>
-    Zákon č. 254/2004 Sb. zakazuje přijmout jednu hotovostní platbu nad tuto částku — takovou úhradu je nutné přijmout převodem.
+    Zákon č. 254/2004 Sb. zakazuje přijmout i poskytnout jednu hotovostní platbu nad tuto částku — týká se tržeb stejně jako výdejů (např. výkup) a taková platba musí proběhnout převodem.
     <span class="text-white-50">(nalezeno <?php echo count($cbOverSingle); ?> ×, největší <?php echo formatMoney(max(array_map(static fn($r) => (float)$r['amount'], $cbOverSingle))); ?>)</span>
 </div>
 <?php elseif (!empty($cbOverDay)): ?>
@@ -251,6 +269,24 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
             (<?php echo formatMoney((float)$cbRegister['opening_balance']); ?>)</span>
     </div>
 
+    <?php if (!empty($cashBook['range_clipped'])): ?>
+    <div class="text-white-50 small mb-2"><i class="fas fa-circle-info me-1"></i>
+        Zvolené období začínalo před počátkem pokladny — výpis je zkrácen a začíná
+        <?php echo e(date('j. n. Y', strtotime((string)$cashBook['from']))); ?>.</div>
+    <?php endif; ?>
+    <?php /* Doklady datované před počátek pokladny mají číslo v řadě, ale v žádném
+             období knihy se neobjeví — mlčky je nezahazovat, účetní by při kontrole
+             souvislé řady našla „vytržené" doklady. */ ?>
+    <?php if (!empty($cashBook['orphan_docs']['count'])): ?>
+    <div class="alert alert-warning border-0 py-2 px-3 small mb-2">
+        <i class="fas fa-triangle-exclamation me-1"></i>
+        <strong><?php echo (int)$cashBook['orphan_docs']['count']; ?> doklad(y) datované před počátek pokladny</strong>
+        (příjmy <?php echo formatMoney((float)$cashBook['orphan_docs']['in']); ?>,
+        výdaje <?php echo formatMoney((float)$cashBook['orphan_docs']['out']); ?>) —
+        v knize ani v zůstatku nejsou. Uprav počáteční zůstatek pokladny, nebo je stornuj.
+    </div>
+    <?php endif; ?>
+
     <?php if (empty($cashBook['rows'])): ?>
         <div class="text-white-50 small py-2">Za zvolené období nejsou žádné pohyby hotovosti.</div>
     <?php else: ?>
@@ -287,9 +323,21 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
                     <td class="small text-white-50"><?php echo e(mb_substr((string)$r['by'], 0, 22)); ?></td>
                     <?php if ($cbCanEdit): ?>
                     <td class="text-end">
-                        <?php // Doklad se nikdy nemaže — jen stornuje protidokladem (§ 11 zák. 563/1991 Sb.) ?>
-                        <?php if ($r['source'] === 'document' && empty($r['storno']) && empty($r['is_storno'])): ?>
-                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Vystavit storno doklad"
+                        <?php
+                        // Doklad se nikdy nemaže — jen stornuje protidokladem (§ 11 zák. 563/1991 Sb.).
+                        // Nabízí se i u dokladu NAVÁZANÉHO na pohyb (vklad/výběr/výkup):
+                        // storno tam vedle protidokladu založí i opačný pohyb v deníku,
+                        // takže se peníze skutečně vrátí (afxCashDocStorno). Prodej na
+                        // kase se stornuje stornem prodeje (vrací i zboží), ne tady.
+                        $rowStornoable = false;
+                        if ($r['source'] === 'document') {
+                            $rowStornoable = empty($r['storno']) && empty($r['is_storno']);
+                        } elseif ($r['source'] === 'movement' && (int)$r['doc_id'] > 0) {
+                            $rowStornoable = empty($r['doc_storno']) && empty($r['doc_is_storno']);
+                        }
+                        ?>
+                        <?php if ($rowStornoable): ?>
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Vystavit storno doklad<?php echo $r['source'] === 'movement' ? ' — založí i opačný pohyb v deníku, peníze se vrátí' : ''; ?>"
                                 onclick="posCashDocStorno(<?php echo (int)$r['doc_id']; ?>, '<?php echo e((string)$r['doc_number']); ?>')">Storno</button>
                         <?php endif; ?>
                     </td>
@@ -364,8 +412,11 @@ function posCashMove(direction) {
         .then(function (r) { return r.json(); })
         .then(function (j) {
             if (!j.ok) { alert(j.error || 'Pohyb se nepodařilo uložit'); return; }
-            // Číslo vystaveného PPD/VPD hlásíme hned — obsluha ho píše na papírový doklad.
-            if (j.doc_number) { alert('Uloženo. Pokladní doklad: ' + j.doc_number); }
+            // Číslo vystaveného PPD/VPD hlásíme hned — obsluha ho píše na papírový
+            // doklad. Varování (např. částka nad zákonný limit hotovosti) taky.
+            var msg = j.doc_number ? 'Uloženo. Pokladní doklad: ' + j.doc_number : '';
+            if (j.warning) { msg += (msg ? '\n\n' : '') + j.warning; }
+            if (msg) { alert(msg); }
             location.reload();
         })
         .catch(function () { alert('Chyba spojení'); });
@@ -452,6 +503,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 <button type="button" class="pos-pay" data-pay="invoice"><i class="fas fa-file-invoice"></i>Na fakturu</button>
             </div>
 
+            <!-- Přijato/Vráceno — evidence hotovosti na dokladu (tiskne se na účtenku) -->
+            <div id="posCashWrap" class="mb-3" style="display:none;">
+                <label class="form-label small text-white-50 mb-1"><i class="fas fa-hand-holding-dollar me-1"></i>Přijato od zákazníka</label>
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                    <input type="text" id="posCashReceived" class="form-control" inputmode="decimal"
+                           placeholder="např. 1 000" style="max-width:140px;" autocomplete="off">
+                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="exact">Přesně</button>
+                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="500">500</button>
+                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="1000">1 000</button>
+                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="2000">2 000</button>
+                    <button type="button" class="btn btn-sm btn-outline-light pos-cash-quick" data-v="5000">5 000</button>
+                    <span class="ms-auto small">Vrátit: <strong id="posCashChange" class="text-info">—</strong></span>
+                </div>
+                <div class="small text-danger mt-1" id="posCashErr" style="display:none;">Přijatá částka je nižší než celkem.</div>
+            </div>
+
             <div id="posCustomerWrap" class="mb-3" style="display:none;">
                 <label class="form-label small text-white-50 mb-1">Zákazník (povinné u faktury)</label>
                 <select id="posCustomer" class="form-select" style="width:100%;"></select>
@@ -465,6 +532,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 <i class="fas fa-check-circle text-success fs-4"></i>
                 <strong>Prodáno — doklad <code id="posDoneNumber"></code></strong>
             </div>
+            <div id="posDoneChange" class="alert alert-warning border-0 py-2" style="display:none;font-size:1.15rem;">
+                <i class="fas fa-coins me-1"></i> Vrátit zákazníkovi: <strong id="posDoneChangeVal"></strong>
+            </div>
             <div id="posDoneProductNote" class="alert alert-info border-0 py-2 small" style="display:none;">
                 <i class="fas fa-check me-1"></i> Sklad CRM odečten automaticky — produkt zůstane vyprodaný i po dalším nahrání souboru z naskladňovací appky.
             </div>
@@ -472,6 +542,77 @@ document.addEventListener('DOMContentLoaded', function () {
                 <button type="button" class="btn btn-info" id="posDoneReceipt"><i class="fas fa-print me-1"></i> Účtenka</button>
                 <button type="button" class="btn btn-warning" id="posDoneInvoice" style="display:none;"><i class="fas fa-file-invoice me-1"></i> Faktura</button>
                 <button type="button" class="btn btn-outline-light ms-auto" id="posDoneNew"><i class="fas fa-plus me-1"></i> Nový prodej</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php if (!$shift || !$shiftMine): ?>
+<!-- ── PŘEVZETÍ POKLADNY — overlay přes celou kasu, dokud směnu někdo nedrží ── -->
+<div class="pos-lock" id="posShiftGate" style="display:flex;">
+    <div class="pos-lock-card" style="width:min(480px,94vw);">
+        <?php if ($shift && !$shiftMine): ?>
+            <div class="lk-icon"><i class="fas fa-user-lock"></i></div>
+            <h4>Pokladnu má převzatou <?php echo e($shift['opened_by']); ?></h4>
+            <div class="lk-who">od <?php echo e(date('j. n. Y H:i', strtotime((string)$shift['opened_at']))); ?> · v jednu chvíli obsluhuje pokladnu jen jeden pracovník</div>
+            <?php if ($shiftCanForce): ?>
+                <hr class="border-secondary">
+                <div class="small text-white-50 mb-2">Vedení může směnu uzavřít za kolegu (např. zapomněl):</div>
+                <div class="d-flex gap-2 justify-content-center">
+                    <input type="text" class="form-control" id="shiftForceCounted" inputmode="decimal" placeholder="Napočítaná hotovost (Kč)" style="max-width:220px;">
+                    <button type="button" class="btn btn-warning" onclick="shiftForceClose()"><i class="fas fa-lock-open me-1"></i>Uzavřít směnu</button>
+                </div>
+                <div class="lk-err" id="shiftForceErr"></div>
+            <?php else: ?>
+                <div class="small text-white-50 mt-2">Požádej kolegu o uzávěrku, nebo vedení o uzavření směny.</div>
+            <?php endif; ?>
+        <?php else: ?>
+            <div class="lk-icon"><i class="fas fa-cash-register"></i></div>
+            <h4>Převzetí pokladny</h4>
+            <div class="mb-2">Stav pokladny podle systému:
+                <div class="fs-3 fw-bold text-info my-1"><?php echo formatMoney($cashState); ?></div>
+                <?php if ($shiftLast): ?>
+                    <div class="small text-white-50">Poslední uzávěrka: <?php echo e($shiftLast['closed_by'] ?? $shiftLast['opened_by']); ?>,
+                        <?php echo e(date('j. n. H:i', strtotime((string)$shiftLast['closed_at']))); ?>,
+                        napočítáno <?php echo formatMoney((float)$shiftLast['closing_counted']); ?></div>
+                <?php endif; ?>
+            </div>
+            <div class="mb-3"><strong>Souhlasí hotovost v zásuvce?</strong></div>
+            <div class="d-flex gap-2 justify-content-center mb-2">
+                <button type="button" class="btn btn-success px-4" onclick="shiftOpen(1)"><i class="fas fa-check me-1"></i>ANO, souhlasí</button>
+                <button type="button" class="btn btn-outline-warning px-4" onclick="document.getElementById('shiftRecount').style.display='';this.style.display='none';"><i class="fas fa-calculator me-1"></i>NE, přepočítám</button>
+            </div>
+            <div id="shiftRecount" style="display:none;">
+                <div class="small text-white-50 mb-1">Zapiš, kolik v pokladně reálně je — od této částky se dnes odvíjí stav pokladny:</div>
+                <div class="d-flex gap-2 justify-content-center">
+                    <input type="text" class="form-control" id="shiftCounted" inputmode="decimal" placeholder="Skutečná hotovost (Kč)" style="max-width:220px;">
+                    <button type="button" class="btn btn-warning" onclick="shiftOpen(0)"><i class="fas fa-pen me-1"></i>Zapsat a převzít</button>
+                </div>
+            </div>
+            <div class="lk-err" id="shiftErr"></div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- ── UZÁVĚRKA POKLADNY — modal (z tlačítka i z pokusu o odhlášení) ── -->
+<div class="modal fade" id="shiftCloseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="fas fa-lock me-2 text-warning"></i>Uzávěrka pokladny</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">Stav podle systému: <strong class="text-info"><?php echo formatMoney($cashState); ?></strong></div>
+                <label class="form-label small text-white-50">Spočítej hotovost v zásuvce a zapiš ji:</label>
+                <input type="text" class="form-control mb-2" id="shiftCloseCounted" inputmode="decimal" placeholder="Napočítaná hotovost (Kč)" autocomplete="off">
+                <div class="small mb-2" id="shiftCloseDiff"></div>
+                <input type="text" class="form-control" id="shiftCloseNote" placeholder="Poznámka (nepovinné)" maxlength="255">
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Zpět</button>
+                <button type="button" class="btn btn-warning" id="shiftCloseBtn"><i class="fas fa-lock me-1"></i>Uzavřít pokladnu</button>
             </div>
         </div>
     </div>
@@ -580,13 +721,52 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ── platba ──
+    var $cashWrap = document.getElementById('posCashWrap');
+    var $cashReceived = document.getElementById('posCashReceived');
+    var $cashChange = document.getElementById('posCashChange');
+    var $cashErr = document.getElementById('posCashErr');
     document.querySelectorAll('.pos-pay').forEach(function (btn) {
         btn.addEventListener('click', function () {
             payment = btn.dataset.pay;
             document.querySelectorAll('.pos-pay').forEach(function (b) { b.className = 'pos-pay'; });
             btn.classList.add('sel-' + payment);
             $custWrap.style.display = payment === 'invoice' ? '' : 'none';
+            $cashWrap.style.display = payment === 'cash' ? '' : 'none';
+            updateCash();
             updateFinish();
+        });
+    });
+
+    // ── přijatá hotovost → živý výpočet „Vrátit" (na doklad jde Placeno/Vráceno) ──
+    function cashVal() {
+        var raw = $cashReceived.value.replace(/\s/g, '').replace(',', '.');
+        if (raw === '') return null;
+        var v = parseFloat(raw);
+        return isNaN(v) ? NaN : v;
+    }
+    function updateCash() {
+        if (payment !== 'cash') { $cashErr.style.display = 'none'; return; }
+        var v = cashVal(), t = total();
+        if (v === null || isNaN(v)) {
+            $cashChange.textContent = '—';
+            $cashErr.style.display = (v !== null && isNaN(v)) ? '' : 'none';
+            return;
+        }
+        var diff = v - t;
+        $cashChange.textContent = fmt(Math.max(0, diff));
+        $cashErr.style.display = diff < 0 ? '' : 'none';
+    }
+    $cashReceived.addEventListener('input', function () { updateCash(); updateFinish(); });
+    document.querySelectorAll('.pos-cash-quick').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var t = total();
+            if (b.dataset.v === 'exact') { $cashReceived.value = String(Math.round(t)); }
+            else {
+                // bankovka: nejbližší násobek nominálu NAD celkovou částku (2 350 → 3×1 000)
+                var nom = parseInt(b.dataset.v, 10);
+                $cashReceived.value = String(Math.max(nom, Math.ceil(t / nom) * nom));
+            }
+            updateCash(); updateFinish();
         });
     });
 
@@ -608,6 +788,10 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateFinish() {
         var ok = cart.length > 0 && payment !== '';
         if (payment === 'invoice' && !$('#posCustomer').val()) ok = false;
+        if (payment === 'cash') {
+            var v = cashVal();
+            if (v !== null && (isNaN(v) || v < total())) ok = false;   // méně než celkem nedává smysl
+        }
         $finish.disabled = !ok;
     }
 
@@ -622,6 +806,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>',
                 payment: payment,
                 customer_id: parseInt($('#posCustomer').val() || 0, 10),
+                cash_received: payment === 'cash' ? (cashVal() === null ? null : cashVal()) : null,
                 items: cart.map(function (c) { return { type: c.type, id: c.id, qty: c.qty, price: c.price }; })
             })
         })
@@ -633,13 +818,20 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('posDoneNumber').textContent = d.sale_number;
             document.getElementById('posDoneProductNote').style.display = d.has_product ? '' : 'none';
             document.getElementById('posDoneInvoice').style.display = d.invoice_id ? '' : 'none';
+            // velké „Vrátit zákazníkovi" — obsluha to potřebuje vidět hned, ne až na účtence
+            var chg = (d.cash_change !== null && d.cash_change !== undefined && d.cash_change > 0);
+            document.getElementById('posDoneChange').style.display = chg ? '' : 'none';
+            if (chg) document.getElementById('posDoneChangeVal').textContent = fmt(d.cash_change);
             document.getElementById('posDone').style.display = '';
             cart = []; payment = '';
             document.querySelectorAll('.pos-pay').forEach(function (b) { b.className = 'pos-pay'; });
             $custWrap.style.display = 'none';
+            $cashWrap.style.display = 'none';
+            $cashReceived.value = '';
             $('#posCustomer').val(null).trigger('change');
             render();
-            window.open('print_receipt.php?id=' + d.sale_id + '&auto=1', '_blank');
+            // účtenka pro 58mm termotiskárnu (Xprinter) — A4 verze zůstává v Historii
+            window.open('print_receipt.php?id=' + d.sale_id + '&format=58&auto=1', '_blank');
         })
         .catch(function () {
             $finish.innerHTML = '<i class="fas fa-check me-2"></i>Dokončit prodej';
@@ -649,7 +841,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('posDoneReceipt').addEventListener('click', function () {
-        if (lastSale) window.open('print_receipt.php?id=' + lastSale.sale_id + '&auto=1', '_blank');
+        if (lastSale) window.open('print_receipt.php?id=' + lastSale.sale_id + '&format=58&auto=1', '_blank');
     });
     document.getElementById('posDoneInvoice').addEventListener('click', function () {
         if (lastSale && lastSale.invoice_id) window.open('print_invoice.php?id=' + lastSale.invoice_id, '_blank');
@@ -658,6 +850,97 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('posDone').style.display = 'none';
         location.reload();
     });
+
+    // ── SMĚNY POKLADNY (převzetí / uzávěrka / odhlášení) ──
+    var CSRF = '<?php echo $_SESSION['csrf_token'] ?? ''; ?>';
+    var shiftMine = <?php echo ($shift && $shiftMine) ? 'true' : 'false'; ?>;
+    var shiftExpected = <?php echo json_encode(round((float)$cashState, 2)); ?>;
+
+    function shiftApi(payload, errEl, onOk) {
+        fetch('api/pos_shift.php', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.assign({ csrf_token: CSRF }, payload))
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d.ok) { if (errEl) { errEl.textContent = d.error || 'Nepodařilo se.'; errEl.style.display = ''; } return; }
+            onOk(d);
+        })
+        .catch(function () { if (errEl) { errEl.textContent = 'Síťová chyba.'; errEl.style.display = ''; } });
+    }
+
+    // převzetí: ANO (match=1) / NE + napočítaná částka (match=0)
+    window.shiftOpen = function (match) {
+        var counted = null;
+        if (!match) {
+            var el = document.getElementById('shiftCounted');
+            counted = el.value.replace(/\s/g, '').replace(',', '.');
+            if (counted === '' || isNaN(parseFloat(counted))) {
+                var e1 = document.getElementById('shiftErr');
+                e1.textContent = 'Zapiš napočítanou hotovost.'; e1.style.display = '';
+                return;
+            }
+        }
+        shiftApi({ action: 'open', match: match ? 1 : 0, counted: counted },
+            document.getElementById('shiftErr'),
+            function () { location.reload(); });
+    };
+
+    // vedení: uzavření cizí zapomenuté směny
+    window.shiftForceClose = function () {
+        var el = document.getElementById('shiftForceCounted');
+        var v = el.value.replace(/\s/g, '').replace(',', '.');
+        if (v === '' || isNaN(parseFloat(v))) {
+            var e2 = document.getElementById('shiftForceErr');
+            e2.textContent = 'Zapiš napočítanou hotovost.'; e2.style.display = '';
+            return;
+        }
+        shiftApi({ action: 'close', counted: v, force: 1, note: 'uzavřeno vedením' },
+            document.getElementById('shiftForceErr'),
+            function () { location.reload(); });
+    };
+
+    // uzávěrka vlastní směny — modal s živým rozdílem proti systému
+    var shiftCloseModal = null;
+    var shiftAfterClose = null;   // po uzávěrce z odhlášení → pokračovat na logout
+    window.shiftCloseOpenModal = function (afterUrl) {
+        shiftAfterClose = afterUrl || null;
+        if (!shiftCloseModal) shiftCloseModal = new bootstrap.Modal(document.getElementById('shiftCloseModal'));
+        shiftCloseModal.show();
+        setTimeout(function () { document.getElementById('shiftCloseCounted').focus(); }, 300);
+    };
+    document.getElementById('shiftCloseCounted').addEventListener('input', function () {
+        var v = parseFloat(this.value.replace(/\s/g, '').replace(',', '.'));
+        var out = document.getElementById('shiftCloseDiff');
+        if (isNaN(v)) { out.textContent = ''; return; }
+        var diff = Math.round((v - shiftExpected) * 100) / 100;
+        out.innerHTML = diff === 0
+            ? '<span class="text-success"><i class="fas fa-check me-1"></i>Souhlasí se systémem.</span>'
+            : '<span class="' + (diff < 0 ? 'text-danger' : 'text-warning') + '">Rozdíl proti systému: <strong>'
+                + (diff > 0 ? '+' : '') + fmt(diff) + '</strong></span>';
+    });
+    document.getElementById('shiftCloseBtn').addEventListener('click', function () {
+        var v = document.getElementById('shiftCloseCounted').value.replace(/\s/g, '').replace(',', '.');
+        if (v === '' || isNaN(parseFloat(v))) { alert('Zapiš napočítanou hotovost.'); return; }
+        shiftApi({ action: 'close', counted: v, note: document.getElementById('shiftCloseNote').value }, null,
+            function () {
+                if (shiftAfterClose) { window.location.href = shiftAfterClose; }
+                else { location.reload(); }
+            });
+    });
+
+    // odhlášení s převzatou pokladnou → nejdřív připomenout uzávěrku
+    if (shiftMine) {
+        document.querySelectorAll('a[href$="logout.php"]').forEach(function (a) {
+            a.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                if (confirm('Máš převzatou pokladnu.\n\nPřed odhlášením spočítej hotovost, zapiš stav a uzavři pokladnu.\n\nOK = uzavřít pokladnu teď · Zrušit = zůstat')) {
+                    shiftCloseOpenModal(a.href);
+                }
+            });
+        });
+    }
 
     // ── USB čtečka čárových kódů — funguje KDEKOLI na stránce ──
     // Čtečka je klávesnice, která „napíše" kód strojovým tempem (10–40 ms/znak)
