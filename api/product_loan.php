@@ -24,6 +24,7 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 ensureProductsLoanColumns();
+ensureSkladBranchSchema();
 
 $id     = (int)($_POST['id'] ?? 0);
 $action = (string)($_POST['action'] ?? '');
@@ -36,6 +37,10 @@ $st = $pdo->prepare("SELECT id, title FROM products WHERE id = ?");
 $st->execute([$id]);
 $prod = $st->fetch();
 if (!$prod) { echo json_encode(['success' => false, 'message' => 'Produkt nenalezen.']); exit; }
+// Pobočková pojistka: se zapůjčkou produktu smí hýbat jen zaměstnanec JEHO pobočky (admin/Boss vždy).
+if (!crmCanModifyBranchStock(crmProductBranchId($id))) {
+    echo json_encode(['success' => false, 'message' => 'Tento produkt patří jiné pobočce — zapůjčku smí řešit jen její zaměstnanci.']); exit;
+}
 
 if ($action === 'lend') {
     if ($to === '') { echo json_encode(['success' => false, 'message' => 'Vyplň, komu je kus zapůjčen.']); exit; }

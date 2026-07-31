@@ -28,7 +28,7 @@ if ($order_id <= 0) {
 }
 
 try {
-    $st = $pdo->prepare("SELECT order_code, device_brand, device_model, serial_number, final_cost, estimated_cost, technician_notes FROM orders WHERE id = ?");
+    $st = $pdo->prepare("SELECT order_code, device_brand, device_model, serial_number, final_cost, estimated_cost, technician_notes, branch_id FROM orders WHERE id = ?");
     $st->execute([$order_id]);
     $order = $st->fetch(PDO::FETCH_ASSOC);
     if (!$order) {
@@ -63,9 +63,12 @@ try {
     }
 
     ensureInventoryStockedSchema();
+    ensureSkladBranchSchema();
+    // Nový díl patří pobočce zakázky (kde zařízení fyzicky je).
+    $partBranch = (int)($order['branch_id'] ?? 0) ?: getDefaultBranchId();
     // min_stock 0 (jednorázový použitý díl → nehlásit „dochází"), viditelný ve Skladu.
-    $ins = $pdo->prepare("INSERT INTO inventory (part_name, sku, quantity, cost_price, sale_price, min_stock, is_stocked) VALUES (?, ?, ?, ?, NULL, 0, 1)");
-    $ins->execute([$partName, $sku, $qty, $cost]);
+    $ins = $pdo->prepare("INSERT INTO inventory (part_name, sku, quantity, cost_price, sale_price, min_stock, is_stocked, branch_id) VALUES (?, ?, ?, ?, NULL, 0, 1, ?)");
+    $ins->execute([$partName, $sku, $qty, $cost, $partBranch]);
     $invId = (int)$pdo->lastInsertId();
 
     // Naskladnění zapíšeme i do pohybů skladu (s poznámkou/rozpisem z okna).

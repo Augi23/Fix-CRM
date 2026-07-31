@@ -142,6 +142,11 @@ try {
         $inventoryId = (int)($request['inventory_id'] ?? 0);
         $quantity = max(1, (int)($request['quantity'] ?? 1));
 
+        // Pobočková pojistka: příjem/zrušení příjmu (naskladnění dílu) smí jen zaměstnanec JEHO pobočky.
+        if ($inventoryId > 0 && $wasReceived !== $isNowReceived && !crmCanModifyBranchStock(crmInventoryBranchId($inventoryId))) {
+            throw new Exception('Tento díl je skladem na jiné pobočce — příjem na sklad smí potvrdit jen její zaměstnanci.');
+        }
+
         if (!$wasReceived && $isNowReceived && $inventoryId > 0) {
             changeInventoryQuantity($inventoryId, $quantity);
             // Received parts become real warehouse stock → show in Sklad even after they run out.

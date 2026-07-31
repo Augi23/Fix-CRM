@@ -26,6 +26,7 @@ if ($id <= 0) {
 }
 
 ensureProductsTable();
+ensureSkladBranchSchema();
 
 try {
     $st = $pdo->prepare("SELECT id, product_code, title FROM products WHERE id = ?");
@@ -33,6 +34,10 @@ try {
     $p = $st->fetch();
     if (!$p) {
         echo json_encode(['success' => false, 'message' => 'Produkt nenalezen.']); exit;
+    }
+    // Pobočková pojistka: produkt smí smazat jen zaměstnanec JEHO pobočky (admin/Boss vždy).
+    if (!crmCanModifyBranchStock(crmProductBranchId($id))) {
+        echo json_encode(['success' => false, 'message' => 'Tento produkt patří jiné pobočce — smazat ho smí jen její zaměstnanci.']); exit;
     }
     $pdo->prepare("DELETE FROM products WHERE id = ?")->execute([$id]);
     crmAuditLog('products.delete', [

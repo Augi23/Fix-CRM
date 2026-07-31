@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => '3.32.0',
+        'date' => '2026-07-31',
+        'time' => '18:30',
+        'title' => 'Pobočkové sklady 2/2: backendové pojistky na vyskladnění',
+        'items' => [
+            'Backend teď u <b>každého skladového pohybu</b> hlídá pobočku: <b>výdej dílu na zakázku</b>, <b>kasa</b> (díly, produkty i příslušenství), <b>příjem z Nákupů</b>, naskladnění/korekce/přesun dílu, <b>úprava a mazání dílu</b>, zapůjčka a mazání produktu, hromadné umístění/model. Provést je smí jen <b>zaměstnanec dané pobočky</b> (admin a Boss vždy) — jinak se akce odmítne.',
+            '<b>Naskladnění zařízení ze zakázky</b> jako dílu jde na sklad té pobočky, pod kterou zakázka spadá.',
+            'Pozn.: prohlížet obojí smí dál každý; omezuje se jen změna zásoby. Zbývá ještě rozlišení skladů na <b>e-shopu</b> („Skladem — Karlín vs Praha 1 Černá Růže").',
+        ],
+    ],
+    [
         'version' => '3.31.3',
         'date' => '2026-07-31',
         'time' => '16:45',

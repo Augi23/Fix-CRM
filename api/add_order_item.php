@@ -54,6 +54,10 @@ try {
     if (!$inventory) {
         throw new Exception('Inventory item not found');
     }
+    // Pobočková pojistka: díl smí na zakázku vydat (vyskladnit) jen zaměstnanec JEHO pobočky (admin/Boss vždy).
+    if (!crmCanModifyBranchStock(crmInventoryBranchId((int)$inventory_id))) {
+        throw new Exception('Tento díl je skladem na jiné pobočce — vyskladnit ho smí jen její zaměstnanci.');
+    }
     $price = $inventory['sale_price'];
 
     if (in_array(getCurrentStaffRole(), ['engineer', 'brigadnik'], true) && (int)($inventory['quantity'] ?? 0) <= 0) {

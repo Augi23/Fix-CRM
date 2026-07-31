@@ -5,6 +5,7 @@ require_once 'includes/header.php';
 
 ensureStockLocationsSchema();
 ensureInventoryMovesTable();
+ensureSkladBranchSchema();
 
 $id = $_GET['id'] ?? null;
 if (!$id) die(__("inventory_id_missing"));
@@ -15,10 +16,17 @@ $item = $stmt->fetch();
 
 if (!$item) die(__("part_not_found"));
 
+// Pobočková pojistka: díl smí upravit jen zaměstnanec JEHO pobočky (admin/Boss vždy).
+$canEditBranch = crmCanModifyBranchStock((int)($item['branch_id'] ?? 0) ?: getDefaultBranchId());
+
 $success = false;
 $error = false;
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$canEditBranch) {
+    $error = 'Tento díl patří jiné pobočce (' . e(skladBranchLabel((int)($item['branch_id'] ?? 0) ?: getDefaultBranchId())) . ') — upravit ho smí jen její zaměstnanci.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canEditBranch) {
     $part_name = $_POST['part_name'];
     $sku = $_POST['sku'];
     $quantity = $_POST['quantity'];

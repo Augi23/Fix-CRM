@@ -3,6 +3,10 @@
  * Helper Functions for CRM
  */
 
+// Role „účetní" + uzávěrka účetních období (balík C). Celá logika je záměrně
+// v samostatném souboru, aby se tenhle už tak velký soubor dál nenafukoval.
+require_once __DIR__ . '/accounting_role.php';
+
 /**
  * Return the effective internal staff role for the current employee session.
  */
@@ -41,6 +45,14 @@ function hasPermission($permission) {
 
     // Technicians/Staff – use session-level cache
     if (($_SESSION['role'] ?? '') === 'technician' && isset($_SESSION['tech_id'])) {
+        // ── ÚČETNÍ (role 'accountant') je NEPROVOZNÍ role ──
+        // Musí být PŘED načtením práv i před implicitními právy níže: bez toho by
+        // účetní tiše dostala edit_orders + edit_customers (dává je KAŽDÉMU
+        // zaměstnanci) a mohla přepisovat zakázky a klienty. Její přístup řídí
+        // VÝHRADNĚ crmCanAccountingRead()/Edit() z includes/accounting_role.php.
+        if (getCurrentStaffRole() === 'accountant') {
+            return crmAccountantHasPermission($permission);
+        }
         if (!isset($_SESSION['_perms'])) {
             $stmt = $pdo->prepare('SELECT permission FROM tech_permissions WHERE technician_id = ?');
             $stmt->execute([$_SESSION['tech_id']]);
@@ -227,6 +239,28 @@ function skladBranchOrOwn(): int {
 function crmCanModifyBranchStock(int $branchId): bool {
     if (isBranchGlobalViewer()) return true;
     return getCurrentStaffBranchId() === (int)$branchId;
+}
+
+/** Pobočka skladového DÍLU (inventory) podle id; 0 = díl neexistuje. Prázdný branch → výchozí (Karlín). */
+function crmInventoryBranchId(int $inventoryId): int {
+    global $pdo;
+    try {
+        $st = $pdo->prepare("SELECT branch_id FROM inventory WHERE id = ?");
+        $st->execute([$inventoryId]);
+        $b = $st->fetchColumn();
+        return $b === false ? 0 : ((int)$b ?: getDefaultBranchId());
+    } catch (Throwable $e) { return 0; }
+}
+
+/** Pobočka PRODUKTU podle id; 0 = produkt neexistuje. Prázdný branch → výchozí (Karlín). */
+function crmProductBranchId(int $productId): int {
+    global $pdo;
+    try {
+        $st = $pdo->prepare("SELECT branch_id FROM products WHERE id = ?");
+        $st->execute([$productId]);
+        $b = $st->fetchColumn();
+        return $b === false ? 0 : ((int)$b ?: getDefaultBranchId());
+    } catch (Throwable $e) { return 0; }
 }
 
 /** Pobočka (id) pro „prodejnu" produktu (stock_key): vaclavak = Černá Růže = prikope; jinak Karlín. */

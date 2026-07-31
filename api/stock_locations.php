@@ -23,6 +23,9 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 ensureStockLocationsSchema();
+ensureSkladBranchSchema();
+// Hromadné skladové akce smí zaměstnanec provést jen u dílů SVÉ pobočky (admin/Boss všude).
+$__invBranchScope = isBranchGlobalViewer() ? '' : ' AND branch_id = ' . (int)getCurrentStaffBranchId();
 
 $op = (string)($_POST['op'] ?? '');
 
@@ -140,7 +143,7 @@ try {
             if (!$loc) { throw new Exception('Cílové umístění nenalezeno (nebo je deaktivované).'); }
         }
         $ph = implode(',', array_fill(0, count($ids), '?'));
-        $pdo->prepare("UPDATE inventory SET location_id = ? WHERE id IN ($ph)")
+        $pdo->prepare("UPDATE inventory SET location_id = ? WHERE id IN ($ph)" . $__invBranchScope)
             ->execute(array_merge([$locId > 0 ? $locId : null], $ids));
         $label = $loc ? $loc['code'] . (trim((string)$loc['name']) !== '' ? ' · ' . $loc['name'] : '') : null;
         crmAuditLog('inventory.assign_location', [
@@ -159,7 +162,7 @@ try {
         if (!$ids) { throw new Exception('Nejsou vybrané žádné díly.'); }
         $model = mb_substr(trim((string)($_POST['device_model'] ?? '')), 0, 64);
         $ph = implode(',', array_fill(0, count($ids), '?'));
-        $pdo->prepare("UPDATE inventory SET device_model = ? WHERE id IN ($ph)")
+        $pdo->prepare("UPDATE inventory SET device_model = ? WHERE id IN ($ph)" . $__invBranchScope)
             ->execute(array_merge([$model !== '' ? $model : null], $ids));
         crmAuditLog('inventory.set_model', [
             'entity_type' => 'inventory', 'entity_id' => $ids[0], 'entity_label' => $model !== '' ? $model : '—',

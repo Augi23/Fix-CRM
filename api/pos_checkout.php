@@ -7,12 +7,59 @@
  * i zápornému skladu) + doklad pos_sales/pos_sale_items + případná faktura.
  * Selže-li COKOLI, vrátí se celý košík — nesmí projít půlka prodeje.
  * Ceny přijímáme z košíku (možnost slevy na místě), názvy/kódy VŽDY z DB.
+ * Daňový režim položky se odvozuje ze STAVU zboží (grade), ne z typu položky —
+ * viz afxGoodsIsUsedByGrade().
  */
 ob_start();
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 ob_clean();
 header('Content-Type: application/json; charset=utf-8');
+
+/** Runtime pojistka ke sloupcům z migrace 040 (daňový režim + nákupní cena).
+ *  Deploy nasadí kód dřív, než doběhne run_migrations.php — bez ní by první prodej
+ *  po nasazení spadl na neznámý sloupec a zákazník by u kasy zůstal bez dokladu.
+ *  POZOR: DDL nesmí běžet uvnitř transakce (v MySQL dělá implicitní COMMIT). */
+if (!function_exists('afxEnsurePosGoodsTaxColumns')) {
+    function afxEnsurePosGoodsTaxColumns(): void {
+        global $pdo;
+        static $done = false;
+        if ($done || !isset($pdo)) return;
+        $done = true;
+        try {
+            $add = [
+                ['pos_sale_items', 'grade', "ALTER TABLE pos_sale_items ADD COLUMN grade VARCHAR(16) NULL DEFAULT NULL"],
+                ['pos_sale_items', 'purchase_price', "ALTER TABLE pos_sale_items ADD COLUMN purchase_price DECIMAL(12,2) NULL DEFAULT NULL"],
+                ['products', 'purchase_price', "ALTER TABLE products ADD COLUMN purchase_price DECIMAL(12,2) NULL DEFAULT NULL"],
+            ];
+            foreach ($add as [$table, $col, $ddl]) {
+                if (!$pdo->query("SHOW COLUMNS FROM `" . $table . "` LIKE '" . $col . "'")->fetch()) {
+                    $pdo->exec($ddl);
+                }
+            }
+        } catch (Throwable $e) { error_log('afxEnsurePosGoodsTaxColumns: ' . $e->getMessage()); }
+    }
+}
+
+/** Je zboží s tímhle stavem (grade) POUŽITÉ? Rozhoduje o daňovém režimu položky:
+ *  „Nový“ = běžný režim, ostatní stavy (Zánovní / A / B / C / D) = použité zboží.
+ *  Prázdný nebo neznámý stav → BĚŽNÝ režim: kdybychom hádali „použité“, prodalo by
+ *  se u plátce DPH nové zboží ve zvláštním režimu § 90 bez DPH = krácení daně.
+ *  Opačná chyba (použitý kus v běžném režimu) stát nepoškodí, jen nás. */
+if (!function_exists('afxGoodsIsUsedByGrade')) {
+    function afxGoodsIsUsedByGrade(?string $grade, string $ctx = ''): bool {
+        // v DB je uložený jen token stavu („A“), ale snese i celý label („A – jako nové“)
+        $g = mb_strtolower(trim(explode(' ', trim((string)$grade))[0]));
+        if ($g === '') {
+            error_log('pos_checkout: prázdný stav zboží (' . $ctx . ') → běžný daňový režim');
+            return false;
+        }
+        if (in_array($g, ['nový', 'novy', 'nové', 'nove', 'new'], true)) { return false; }
+        if (in_array($g, ['zánovní', 'zanovni', 'a', 'b', 'c', 'd'], true)) { return true; }
+        error_log('pos_checkout: neznámý stav zboží „' . $g . '" (' . $ctx . ') → běžný daňový režim');
+        return false;
+    }
+}
 
 if (!crmCanUsePos()) {
     echo json_encode(['success' => false, 'message' => __('unauthorized')]); exit;
@@ -82,6 +129,8 @@ ensurePosTables();
 ensureInventoryMovesTable();
 ensureProductsTable();
 ensureProductsPosColumn();
+afxEnsurePosGoodsTaxColumns();
+ensureSkladBranchSchema();
 
 // názvy/kódy položek VŽDY čerstvě z DB — klientovi nevěříme nic než id/qty/cenu
 try {
@@ -91,21 +140,37 @@ try {
             $st->execute([$line['id']]);
             $row = $st->fetch();
             if (!$row) { echo json_encode(['success' => false, 'message' => 'Díl už neexistuje.']); exit; }
+            if (!crmCanModifyBranchStock(crmInventoryBranchId((int)$line['id']))) {
+                echo json_encode(['success' => false, 'message' => 'Díl „' . $row['part_name'] . '" je skladem na jiné pobočce — prodat ho smí jen její zaměstnanci.']); exit;
+            }
             // předběžná česká kontrola; skutečný souběh chytí atomický guard v transakci
             if ((int)$row['quantity'] < $line['qty']) {
                 echo json_encode(['success' => false, 'message' => 'Dílu „' . $row['part_name'] . '" je skladem jen ' . (int)$row['quantity'] . ' ks.']); exit;
             }
             $cart[$i]['name'] = (string)$row['part_name'];
             $cart[$i]['code'] = (string)($row['sku'] ?? '');
+            // díly (náhradní součástky) jdou vždy v běžném režimu — neprodávají se jako použité zboží
             $cart[$i]['used'] = false;
+            $cart[$i]['grade'] = null;
+            $cart[$i]['purchase_price'] = null;
         } else {
-            $st = $pdo->prepare("SELECT title, product_code, grade FROM products WHERE id = ?");
+            $st = $pdo->prepare("SELECT title, product_code, grade, purchase_price FROM products WHERE id = ?");
             $st->execute([$line['id']]);
             $row = $st->fetch();
             if (!$row) { echo json_encode(['success' => false, 'message' => 'Produkt už neexistuje.']); exit; }
-            $cart[$i]['name'] = (string)$row['title'] . (!empty($row['grade']) ? ' (stav ' . $row['grade'] . ')' : '');
+            if (!crmCanModifyBranchStock(crmProductBranchId((int)$line['id']))) {
+                echo json_encode(['success' => false, 'message' => 'Produkt „' . $row['title'] . '" je skladem na jiné pobočce — prodat ho smí jen její zaměstnanci.']); exit;
+            }
+            $grade = trim((string)($row['grade'] ?? ''));
+            $cart[$i]['name'] = (string)$row['title'] . ($grade !== '' ? ' (stav ' . $grade . ')' : '');
             $cart[$i]['code'] = (string)$row['product_code'];
-            $cart[$i]['used'] = true;   // §90 — použité zboží
+            // režim dle stavu zboží: „Nový“ = běžný, ostatní stavy = použité zboží (§ 90 u plátce)
+            $cart[$i]['grade'] = $grade !== '' ? mb_substr($grade, 0, 16) : null;
+            $cart[$i]['used'] = afxGoodsIsUsedByGrade($grade, 'produkt #' . $line['id'] . ' ' . $row['product_code']);
+            // nákupní cena se ukládá NA DOKLAD — u § 90 se z ní počítá daň z přirážky
+            // a v products se může kdykoli přepsat (nebo kus po prodeji zmizet)
+            $cart[$i]['purchase_price'] = ($row['purchase_price'] === null || $row['purchase_price'] === '')
+                ? null : round((float)$row['purchase_price'], 2);
         }
     }
 
@@ -163,11 +228,13 @@ try {
     if ($saleId <= 0) { throw new Exception('Nepodařilo se přidělit číslo dokladu — zkus to znovu.'); }
 
     $insItem = $pdo->prepare("INSERT INTO pos_sale_items
-            (sale_id, item_type, item_id, item_name, item_code, quantity, unit_price, is_used_goods)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            (sale_id, item_type, item_id, item_name, item_code, quantity, unit_price, is_used_goods,
+             grade, purchase_price)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     foreach ($cart as $line) {
         $insItem->execute([$saleId, $line['type'], $line['id'], mb_substr($line['name'], 0, 255),
-            mb_substr($line['code'], 0, 64) ?: null, $line['qty'], round($line['price'], 2), $line['used'] ? 1 : 0]);
+            mb_substr($line['code'], 0, 64) ?: null, $line['qty'], round($line['price'], 2), $line['used'] ? 1 : 0,
+            $line['grade'], $line['purchase_price']]);
     }
 
     // ── platba na fakturu → rovnou vystavit fakturu (stejná transakce) ──

@@ -23,6 +23,12 @@ if (!$id) {
     exit;
 }
 
+// Pobočková pojistka: díl smí smazat jen zaměstnanec JEHO pobočky (admin/Boss vždy).
+if (!crmCanModifyBranchStock(crmInventoryBranchId((int)$id))) {
+    echo json_encode(['success' => false, 'message' => 'Tento díl patří jiné pobočce — smazat ho smí jen její zaměstnanci.']);
+    exit;
+}
+
 try {
     // Check if item is used in orders
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM order_items WHERE inventory_id = ?");

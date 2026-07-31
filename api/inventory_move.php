@@ -35,6 +35,10 @@ try {
     $item->execute([$inventory_id]);
     $inv = $item->fetch();
     if (!$inv) { throw new Exception('Díl nenalezen.'); }
+    // Pobočková pojistka: naskladnit/vyskladnit/korigovat díl smí jen zaměstnanec JEHO pobočky (admin/Boss vždy).
+    if (!crmCanModifyBranchStock(crmInventoryBranchId($inventory_id))) {
+        throw new Exception('Tento díl patří jiné pobočce — skladový pohyb smí provést jen její zaměstnanci.');
+    }
 
     if ($op === 'restock') {
         if ($qty < 1 || $qty > 10000) { throw new Exception('Zadej počet naskladněných kusů (1–10000).'); }
