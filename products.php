@@ -119,6 +119,10 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
 </div>
 
 <?php require 'includes/inventory_tabs.php'; ?>
+<style>
+/* Menší akční ikony v tabulce produktů (přání 31.7.2026) */
+.afx-prod-actions .btn{width:36px;height:36px;min-width:36px;padding:0 !important;font-size:13.5px;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
+</style>
 
 <?php
 // Historie naskladnění — posledních 20 produktů (obdoba panelu „Naposledy přidané"
@@ -317,19 +321,19 @@ try {
                                             <div class="small text-white-75 mt-1"><?php echo $p['stock_key'] === 'karlin' ? 'Karlín' : 'Václavák'; ?></div>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td style="white-space:nowrap;">
                                         <?php if (!empty($p['added_at'])): ?>
-                                            <span class="small"><?php echo crmDateTime($p['added_at']); ?></span>
+                                            <div style="font-size:12px;line-height:1.4;"><?php echo crmDateTime($p['added_at']); ?></div>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>
                                         <?php endif; ?>
                                         <?php if (trim((string)($p['created_by'] ?? '')) !== ''): ?>
-                                            <div class="small text-white-50"><i class="fas fa-user me-1"></i><?php echo e($p['created_by']); ?></div>
+                                            <div style="font-size:11px;opacity:.62;line-height:1.35;"><i class="fas fa-user" style="font-size:.85em;margin-right:.25em;"></i><?php echo e($p['created_by']); ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <?php if ($canManageBranch): ?>
                                     <td class="text-end pe-4">
-                                        <div class="btn-group btn-group-sm">
+                                        <div class="btn-group btn-group-sm afx-prod-actions">
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-810W)"><i class="fas fa-tag"></i></button>
                                             <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vrátit do skladu' : 'Zapůjčeno / komisní prodej'; ?>"><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i></button>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>

@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.31.1',
+        'date' => '2026-07-31',
+        'time' => '16:20',
+        'title' => 'Sklad → Produkty: kompaktní „Naskladněno" a menší akční ikony',
+        'items' => [
+            'Sloupec <b>Naskladněno</b> je kompaktnější: <b>datum a čas vedle sebe</b> na jednom řádku (čas menší a tlumený), pod tím <b>jméno a příjmení</b> — vše menším písmem, ať to zabírá míň místa.',
+            '<b>Akční ikony</b> vpravo (štítek, zápůjčka, úprava, smazání) jsou o něco menší.',
+        ],
+    ],
+    [
         'version' => '3.31.0',
         'date' => '2026-07-31',
         'time' => '16:05',

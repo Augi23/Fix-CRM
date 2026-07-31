@@ -249,15 +249,16 @@ function afxProductAccessoryCond(): array {
     ];
 }
 
-/** Datum a POD NÍM menší, tlumený ČAS (přání 31.7.2026) — pro „kdo/kdy" výpisy: naskladnění,
- *  úpravy, změny apod. $ts = UNIX timestamp nebo datetime string. Prázdné/nevalidní → „—". */
+/** Datum + ČAS pro „kdo/kdy" výpisy (naskladnění, úpravy, změny…). Kompaktně na jednom řádku:
+ *  datum a za ním menší tlumený čas (přání 31.7.2026). $ts = UNIX timestamp nebo datetime string.
+ *  Prázdné/nevalidní → „—". */
 function crmDateTime($ts, bool $seconds = false): string {
     $t = is_numeric($ts) ? (int)$ts : strtotime((string)$ts);
     if (!$t) return '<span class="text-white-75">—</span>';
-    return '<span class="afx-datetime">' . date('j.n.Y', $t)
-        . '<span class="afx-datetime-t" style="display:block;font-size:.8em;line-height:1.15;opacity:.6;font-weight:400;">'
-        . '<i class="far fa-clock" style="font-size:.85em;margin-right:.3em;"></i>' . date($seconds ? 'H:i:s' : 'H:i', $t)
-        . '</span></span>';
+    return date('j.n.Y', $t)
+        . ' <span class="afx-datetime-t" style="opacity:.6;white-space:nowrap;font-weight:400;">'
+        . '<i class="far fa-clock" style="font-size:.82em;margin-right:.18em;"></i>' . date($seconds ? 'H:i:s' : 'H:i', $t)
+        . '</span>';
 }
 
 /** Faktury a účetnictví smí administrátor a Boss (rozšířeno 16.7.2026 na žádost
