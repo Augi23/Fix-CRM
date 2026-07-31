@@ -382,7 +382,7 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
         'customer_name' => 5, 'customer_phone' => 3, 'customer_email' => 4, 'customer_address' => 6,
         'customer_pid' => 3, 'customer_birth' => 3, 'customer_gender' => 3, 'customer_birthplace' => 3,
         'customer_citizenship' => 3, 'customer_id_type' => 3, 'customer_id_doc' => 3,
-        'customer_id_issuer' => 4, 'customer_id_valid' => 3,
+        'customer_id_issuer' => 4, 'customer_id_valid' => 2, 'customer_id_verified' => 3,
         'customer_biz_name' => 4, 'customer_biz_address' => 5, 'customer_biz_ico' => 3,
         'item_description' => 6, 'item_model' => 3, 'item_serial' => 3,
         'item_price' => 3, 'item_estimate' => 3,
@@ -536,6 +536,7 @@ function crmDocumentSheetCss(): string {
            čtvrtinu řádku, jméno a adresa polovinu, textová pole celý řádek. */
         .fgrid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 7px 18px; }
         .dfield--wide { grid-column: 1 / -1; }
+        .dfield--c2 { grid-column: span 2; }
         .dfield--c3 { grid-column: span 3; }
         .dfield--c4 { grid-column: span 4; }
         .dfield--c5 { grid-column: span 5; }
@@ -545,6 +546,7 @@ function crmDocumentSheetCss(): string {
         @media screen and (max-width: 760px) {
             .fgrid { grid-template-columns: repeat(4, 1fr); }
             .fgrid > .dfield { grid-column: span 4; }
+            .fgrid > .dfield--c2,
             .fgrid > .dfield--c3 { grid-column: span 2; }
         }
         .dfield label { display: block; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 1px; }
