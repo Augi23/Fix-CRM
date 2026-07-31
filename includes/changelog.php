@@ -7,6 +7,18 @@
 return [
     [
         'version' => '3.27.0',
+        'date' => '2026-07-30',
+        'time' => '19:20',
+        'title' => 'Částečné platby se netolerují — vedení dostane upozornění',
+        'items' => [
+            '<b>Změna pravidla (rozhodnutí vedení):</b> firma nepřijímá částečné platby, takže je systém <b>už nezaúčtuje sám</b>. Když přijde míň, než je na faktuře, platba jde <b>k prověření</b> a faktura zůstane nezaplacená — automat ji nikdy neoznačí jako uhrazenou z části.',
+            '<b>Upozornění pro vedení:</b> každá taková platba se objeví v <b>oznámeních (zvoneček)</b> u admina a Bosse — s částkou, variabilním symbolem, protistranou a důvodem, proč nesedí. Klikem se otevře rovnou seznam plateb k prověření.',
+            '<b>Ručně to jde vyřešit dál:</b> vedení může platbu k faktuře přiřadit ručně (třeba po domluvě s klientem) — pak se eviduje jako doložená částka a je vidět, kolik zbývá.',
+            '<b>Klientský portál:</b> nezaplacená faktura <b>po splatnosti</b> se klientovi nově zobrazuje (dřív mu z portálu zmizela) a je <b>červeně zvýrazněná</b> s popiskem „po splatnosti, neuhrazeno" — česky, anglicky i rusky.',
+        ],
+    ],
+    [
+        'version' => '3.27.0',
         'date' => '2026-07-31',
         'time' => '12:30',
         'title' => 'Sklad: přehlednější lišta + nová kategorie Příslušenství',

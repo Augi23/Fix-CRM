@@ -201,12 +201,24 @@ if ($selectedOrder && isset($pdo)) {
     // Zakázkový list — vždy
     $clientDocs[] = ['type' => 'order_sheet', 'label' => __('client_doc_order_sheet'), 'icon' => 'fa-file-lines'];
 
-    // Faktura — jen pokud byla vystavena
+    // Faktura — jen pokud byla vystavena.
+    // Nezaplacená faktura PO SPLATNOSTI se klientovi ukazuje taky (dřív mu zmizela,
+    // protože stav 'overdue' nebyl ve výčtu) a zvýrazní se — ať ví, že má zaplatit.
     try {
-        $q = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND customer_id = ? AND status IN ('issued','paid') AND invoice_type = 'invoice' ORDER BY created_at DESC LIMIT 1");
+        $q = $pdo->prepare("SELECT id, status, date_due FROM invoices
+            WHERE order_id = ? AND customer_id = ? AND status IN ('issued','paid','overdue')
+              AND invoice_type = 'invoice' ORDER BY created_at DESC LIMIT 1");
         $q->execute([$oid, $customerId]);
-        if ($q->fetchColumn()) {
-            $clientDocs[] = ['type' => 'invoice', 'label' => __('client_doc_invoice'), 'icon' => 'fa-file-invoice-dollar'];
+        $inv = $q->fetch(PDO::FETCH_ASSOC);
+        if ($inv) {
+            $poSplatnosti = (string)$inv['status'] !== 'paid'
+                && !empty($inv['date_due']) && strtotime((string)$inv['date_due']) < strtotime(date('Y-m-d'));
+            $clientDocs[] = [
+                'type' => 'invoice',
+                'label' => __('client_doc_invoice') . ($poSplatnosti ? ' — ' . __('client_invoice_overdue') : ''),
+                'icon' => 'fa-file-invoice-dollar',
+                'alert' => $poSplatnosti,
+            ];
         }
     } catch (Throwable $e) { /* faktura nedostupná */ }
 
@@ -833,11 +845,17 @@ if ($selectedOrder && isset($pdo)) {
                                     <p><?php echo __('client_documents_desc'); ?></p>
                                 </div>
                             </div>
+                            <style>
+                            /* nezaplacená faktura po splatnosti — ať ji klient nepřehlédne */
+                            .doc-link-alert { border-color: rgba(255,69,58,.55) !important; background: rgba(255,69,58,.10) !important; }
+                            .doc-link-alert .doc-link-label { color: #ff9f96; font-weight: 600; }
+                            .doc-link-alert .doc-link-ico { color: #ff453a; }
+                            </style>
                             <div class="doc-links">
                                 <?php foreach ($clientDocs as $d): ?>
                                     <?php $href = 'document.php?type=' . rawurlencode($d['type']) . '&order=' . (int)$selectedOrder['id']
                                         . (isset($d['complaint']) ? '&complaint=' . (int)$d['complaint'] : ''); ?>
-                                    <a class="doc-link" href="<?php echo e($href); ?>" target="_blank" rel="noopener noreferrer">
+                                    <a class="doc-link<?php echo !empty($d['alert']) ? ' doc-link-alert' : ''; ?>" href="<?php echo e($href); ?>" target="_blank" rel="noopener noreferrer">
                                         <span class="doc-link-ico"><i class="fas <?php echo e($d['icon']); ?>"></i></span>
                                         <span class="doc-link-label"><?php echo e($d['label']); ?></span>
                                         <i class="fas fa-arrow-up-right-from-square doc-link-ext"></i>

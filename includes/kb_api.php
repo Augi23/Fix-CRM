@@ -645,9 +645,12 @@ function kbApplyReversals(?string $env = null, ?string $accountId = null): int {
  *
  * Rozhoduje podle jednoho pravidla: AUTOMATICKY se zapíše jen platba, u které není
  * pochyb, komu patří — variabilní symbol musí sednout PRÁVĚ JEDNÉ otevřené faktuře,
- * platba nesmí být starší než faktura a nesmí přijít víc, než kolik na faktuře zbývá.
- * Částečná platba se zapíše a faktuře zůstane zbytek k úhradě; zaplacená je teprve
- * tehdy, když ji platby pokryjí celou.
+ * platba nesmí být starší než faktura a musí fakturu uhradit CELOU.
+ *
+ * ČÁSTEČNÉ PLATBY SE NEEVIDUJÍ AUTOMATICKY (rozhodnutí vedení 30. 7. 2026): firma je
+ * nepřijímá, takže menší platba je vždy anomálie — jde „k prověření" a vedení (admin
+ * a Boss) na ni dostane upozornění (viz getCrmNotifications). Zaevidovat ji může jen
+ * člověk ručně, když se s klientem domluví.
  *
  * Všechno ostatní jde „k prověření" — ale s konkrétním návrhem a důvodem:
  *   • přeplatek (nejčastěji jde o platbu za dvě faktury nebo zálohu),
@@ -774,9 +777,16 @@ function kbAutoMatchInvoices(?string $env = null, ?string $accountId = null): ar
             if ($amount > $rem + $tol) {
                 $reason = 'přišlo víc, než na faktuře ' . $inv['invoice_number'] . ' zbývá ('
                     . formatMoney($amount) . ' proti ' . formatMoney($rem) . ') — může jít o platbu za víc faktur';
+            } elseif ($amount < $rem - $tol) {
+                // ČÁSTEČNÉ PLATBY SE NEEVIDUJÍ AUTOMATICKY (rozhodnutí vedení 30. 7. 2026):
+                // firma je nepřijímá, takže menší platba než celá faktura je vždycky
+                // anomálie — nemá se tiše zaúčtovat, ale dostat před oči vedení.
+                $reason = 'přišlo méně, než je na faktuře ' . $inv['invoice_number'] . ' ('
+                    . formatMoney($amount) . ' z ' . formatMoney($rem)
+                    . ') — částečné platby se neevidují automaticky, zkontroluj platbu';
             } else {
-                $closes = $amount >= $rem - $tol;
-                if ($closes && !$hasRealRef) {
+                $closes = true;
+                if (!$hasRealRef) {
                     $reason = 'platba bez bankovní reference by fakturu ' . $inv['invoice_number']
                         . ' uzavřela — potvrď ručně';
                 } else {
@@ -789,17 +799,14 @@ function kbAutoMatchInvoices(?string $env = null, ?string $accountId = null): ar
                             afxInvoiceRemoveBankPayment((int)$tx['id']);
                             $reason = 'faktura ' . $inv['invoice_number'] . ' byla mezitím uhrazena jinou platbou';
                         } else {
-                            $note = $closes
-                                ? 'Doplatek — faktura ' . $inv['invoice_number'] . ' uhrazena'
-                                : 'Částečná platba — na faktuře ' . $inv['invoice_number'] . ' zbývá '
-                                  . formatMoney($after['remaining']);
+                            $note = 'Faktura ' . $inv['invoice_number'] . ' uhrazena v plné výši';
                             $mark->execute([(int)$inv['id'], 'auto', mb_substr($note, 0, 255), (int)$tx['id']]);
                             crmAuditLog('banka.match', [
                                 'entity_type' => 'invoice', 'entity_id' => (int)$inv['id'],
                                 'entity_label' => (string)$inv['invoice_number'],
                                 'summary' => 'Faktura ' . $inv['invoice_number'] . ' — automaticky navázána platba '
-                                    . formatMoney($amount) . ' (VS ' . $vs . ', ' . ($tx['counterparty_name'] ?: 'bez názvu') . '); '
-                                    . ($closes ? 'označena ZAPLACENO' : 'zbývá ' . formatMoney($after['remaining'])),
+                                    . formatMoney($amount) . ' (VS ' . $vs . ', ' . ($tx['counterparty_name'] ?: 'bez názvu')
+                                    . ') a označena ZAPLACENO',
                             ]);
                             $matched++;
                             continue;

@@ -5753,6 +5753,36 @@ function getCrmNotifications(int $limit = 15): array
         }
     } catch (Throwable $e) { /* tabulka nemusí existovat */ }
 
+    try {
+        // 5) PLATBY K PROVĚŘENÍ — jen pro vedení (admin, Boss).
+        //    Firma nepřijímá částečné platby: když přijde jiná částka, než je na faktuře,
+        //    systém ji sám nezaúčtuje a vedení se to musí dozvědět, ne to hledat v modulu.
+        if (function_exists('crmCanManageInvoices') && crmCanManageInvoices()) {
+            $st = $pdo->prepare(
+                "SELECT t.id, t.booking_date, t.amount, t.vs, t.counterparty_name, t.match_note,
+                        t.created_at, i.invoice_number
+                 FROM bank_transactions t
+                 LEFT JOIN invoices i ON i.id = t.matched_invoice_id
+                 WHERE t.match_status = 'review' AND t.direction = 'in'
+                   AND t.env = ? AND t.account_id = ?
+                 ORDER BY t.id DESC LIMIT 10");
+            // stejná logika jako kbApiEnv(), ale bez závislosti na kb_api.php (v patičce se nenačítá)
+            $st->execute([get_setting('kb_env', 'sandbox') === 'prod' ? 'prod' : 'sandbox',
+                          (string)get_setting('kb_account_id', '')]);
+            foreach ($st as $r) {
+                $items[] = [
+                    'type' => 'warning', 'icon' => 'fa-money-bill-transfer',
+                    'title' => 'Platba k prověření: ' . formatMoney((float)$r['amount'])
+                        . ($r['vs'] ? ' (VS ' . $r['vs'] . ')' : ''),
+                    'sub' => trim(($r['counterparty_name'] ?: 'bez názvu') . ' · '
+                        . mb_substr((string)($r['match_note'] ?? ''), 0, 90)),
+                    'ts' => strtotime((string)($r['created_at'] ?: $r['booking_date'])),
+                    'url' => 'banka.php?match=review',
+                ];
+            }
+        }
+    } catch (Throwable $e) { /* modul banky nemusí být nastavený */ }
+
     // seřadit: nejnovější nahoře, deduplikovat podle title+ts, oříznout
     usort($items, fn($a, $b) => ($b['ts'] ?? 0) <=> ($a['ts'] ?? 0));
     $seen = []; $out = [];
