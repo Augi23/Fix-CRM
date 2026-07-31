@@ -76,8 +76,17 @@ if ($isDocument) {
         file_put_contents($dir . '/' . $name, $bin);
 
         $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
-        $pdo->prepare("INSERT INTO document_signatures (document_id, file_path, requested_by) VALUES (?, ?, ?)")
-            ->execute([$documentId, 'uploads/signatures/' . $name, $by !== '' ? mb_substr($by, 0, 100) : null]);
+        // uložit i větu, kterou klient nad podpisem viděl (v jazyce dokumentu) — bez ní
+        // by později nešlo doložit, s čím přesně souhlasil
+        $__docLang = 'cs';
+        try {
+            $lq = $pdo->prepare("SELECT lang FROM crm_documents WHERE id = ?");
+            $lq->execute([$documentId]);
+            $__docLang = crmDocLangOrDefault((string)$lq->fetchColumn());
+        } catch (Throwable $e) { /* zůstane čeština */ }
+        $__terms = __('cdoc_sign_terms', $__docLang);
+        $pdo->prepare("INSERT INTO document_signatures (document_id, file_path, requested_by, terms_text) VALUES (?, ?, ?, ?)")
+            ->execute([$documentId, 'uploads/signatures/' . $name, $by !== '' ? mb_substr($by, 0, 100) : null, $__terms]);
 
         $reqId = (int)($_POST['request_id'] ?? 0);
         if ($reqId > 0) {

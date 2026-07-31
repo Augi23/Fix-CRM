@@ -47,14 +47,29 @@ function crmDocTypes(): array {
             'title_key'  => 'buyout_title',            // „Výkupní list / Kupní smlouva"
             'kicker_key' => 'cdoc_vykup_kicker',
             'sections' => [
+                // Rozsah údajů drží § 5 odst. 1 písm. a) zákona č. 253/2008 Sb. — u výkupu
+                // (obchod s použitým zbožím) musíme prodávajícího identifikovat celý, ne jen
+                // podle jména a čísla dokladu. Pořadí: kontakt → totožnost → doklad → podnikatel.
                 ['h' => 'cdoc_sec_seller', 'fields' => [
-                    ['n' => 'customer_name',    'l' => 'cdoc_f_name'],
-                    ['n' => 'customer_phone',   'l' => 'cdoc_f_phone'],
-                    ['n' => 'customer_email',   'l' => 'cdoc_f_email'],
-                    ['n' => 'customer_address', 'l' => 'cdoc_f_address'],
-                    ['n' => 'customer_birth',   'l' => 'cdoc_f_birth'],
-                    ['n' => 'customer_id_doc',  'l' => 'cdoc_f_iddoc'],
-                    ['n' => 'customer_id_valid','l' => 'cdoc_f_idvalid'],
+                    ['n' => 'customer_name',        'l' => 'cdoc_f_name'],
+                    ['n' => 'customer_phone',       'l' => 'cdoc_f_phone'],
+                    ['n' => 'customer_email',       'l' => 'cdoc_f_email'],
+                    ['n' => 'customer_address',     'l' => 'cdoc_f_address'],
+                    // Rodné číslo je primární údaj; datum narození a pohlaví jsou náhrada,
+                    // pokud rodné číslo přiděleno nebylo (typicky cizinci).
+                    ['n' => 'customer_pid',         'l' => 'cdoc_f_pid'],
+                    ['n' => 'customer_birth',       'l' => 'cdoc_f_birth'],
+                    ['n' => 'customer_gender',      'l' => 'cdoc_f_gender'],
+                    ['n' => 'customer_birthplace',  'l' => 'cdoc_f_birthplace'],
+                    ['n' => 'customer_citizenship', 'l' => 'cdoc_f_citizenship'],
+                    ['n' => 'customer_id_type',     'l' => 'cdoc_f_idtype'],
+                    ['n' => 'customer_id_doc',      'l' => 'cdoc_f_iddoc'],
+                    ['n' => 'customer_id_issuer',   'l' => 'cdoc_f_idissuer'],
+                    ['n' => 'customer_id_valid',    'l' => 'cdoc_f_idvalid'],
+                    // Jen pro podnikající fyzickou osobu — u běžného klienta zůstane prázdné.
+                    ['n' => 'customer_biz_name',    'l' => 'cdoc_f_biz_name'],
+                    ['n' => 'customer_biz_address', 'l' => 'cdoc_f_biz_address'],
+                    ['n' => 'customer_biz_ico',     'l' => 'cdoc_f_biz_ico'],
                 ]],
                 ['h' => 'cdoc_sec_item_vykup', 'fields' => [
                     ['n' => 'item_description', 'l' => 'cdoc_f_item_desc'],
@@ -80,12 +95,26 @@ function crmDocTypes(): array {
             'title_key'  => 'cdoc_zastava_title',
             'kicker_key' => 'cdoc_zastava_kicker',
             'sections' => [
+                // Přijímání věcí do zástavy je podle § 2 odst. 1 písm. j) zákona č. 253/2008 Sb.
+                // stejná povinná osoba jako výkup — zástavce se proto identifikuje ve stejném
+                // rozsahu podle § 5 odst. 1 písm. a) jako prodávající u výkupního listu.
                 ['h' => 'cdoc_sec_pledger', 'fields' => [
-                    ['n' => 'customer_name',    'l' => 'cdoc_f_name'],
-                    ['n' => 'customer_phone',   'l' => 'cdoc_f_phone'],
-                    ['n' => 'customer_email',   'l' => 'cdoc_f_email'],
-                    ['n' => 'customer_address', 'l' => 'cdoc_f_address'],
-                    ['n' => 'customer_id_doc',  'l' => 'cdoc_f_iddoc'],
+                    ['n' => 'customer_name',        'l' => 'cdoc_f_name'],
+                    ['n' => 'customer_phone',       'l' => 'cdoc_f_phone'],
+                    ['n' => 'customer_email',       'l' => 'cdoc_f_email'],
+                    ['n' => 'customer_address',     'l' => 'cdoc_f_address'],
+                    ['n' => 'customer_pid',         'l' => 'cdoc_f_pid'],
+                    ['n' => 'customer_birth',       'l' => 'cdoc_f_birth'],
+                    ['n' => 'customer_gender',      'l' => 'cdoc_f_gender'],
+                    ['n' => 'customer_birthplace',  'l' => 'cdoc_f_birthplace'],
+                    ['n' => 'customer_citizenship', 'l' => 'cdoc_f_citizenship'],
+                    ['n' => 'customer_id_type',     'l' => 'cdoc_f_idtype'],
+                    ['n' => 'customer_id_doc',      'l' => 'cdoc_f_iddoc'],
+                    ['n' => 'customer_id_issuer',   'l' => 'cdoc_f_idissuer'],
+                    ['n' => 'customer_id_valid',    'l' => 'cdoc_f_idvalid'],
+                    ['n' => 'customer_biz_name',    'l' => 'cdoc_f_biz_name'],
+                    ['n' => 'customer_biz_address', 'l' => 'cdoc_f_biz_address'],
+                    ['n' => 'customer_biz_ico',     'l' => 'cdoc_f_biz_ico'],
                 ]],
                 ['h' => 'cdoc_sec_item_zastava', 'fields' => [
                     ['n' => 'item_description', 'l' => 'cdoc_f_item_desc'],
@@ -162,8 +191,12 @@ function ensureDocumentSignatureSupport(): void {
             file_path VARCHAR(255) NOT NULL,
             signed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             requested_by VARCHAR(100) NULL,
+            terms_text TEXT NULL,
             INDEX idx_ds_document (document_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // doplnění starší tabulky — u podpisu chceme mít i ZNĚNÍ, které klient viděl
+        try { $pdo->exec("ALTER TABLE document_signatures ADD COLUMN terms_text TEXT NULL"); }
+        catch (Throwable $e) { /* sloupec už existuje */ }
     } catch (Throwable $e) { /* best-effort */ }
 }
 

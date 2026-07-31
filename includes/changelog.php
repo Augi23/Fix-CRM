@@ -6,6 +6,23 @@
  */
 return [
     [
+        'version' => '3.29.0',
+        'date' => '2026-07-31',
+        'time' => '13:51',
+        'title' => 'Výkup a zástava: údaje o klientovi v rozsahu, který ukládá zákon',
+        'items' => [
+            '<b>Poučení o osobních údajích je teď krátké a odkazuje na plné znění.</b> Podle pokynů evropského sboru pro ochranu údajů stačí na dokladu tzv. první vrstva — kdo je správce, proč údaje zpracováváme, jaká máte práva a to, co může překvapit (uchování 5 let a předání úřadům na vyžádání) — se odkazem na <b>applefix.cz/zasady-ochrany-osobnich-udaju</b>. Doklad je tím čitelnější a poučení zůstává úplné.',
+            '<b>Klient poučení vidí i na podpisovém tabletu:</b> nad podpisem je nově věta, že podpisem potvrzuje i převzetí informace o zpracování osobních údajů, a k podpisu se <b>ukládá přesné znění, které klient viděl</b> — jde tak doložit, s čím souhlasil.',
+            '<b>Souhlas se skenem dokladu tam záměrně NENÍ.</b> Kopii průkazu totožnosti u výkupu umožňuje přímo zákon (§ 8 odst. 11 zákona č. 253/2008 Sb.) a metodika Finančního analytického úřadu z 1. 1. 2025 výslovně říká, že v takovém případě je žádat souhlas nepřípustné — klient by ho nemohl svobodně odmítnout. Místo souhlasu je proto na dokladu poučení.',
+            '<b>Výkupní list i zástavní formulář se teď ptají na všechny údaje, které vyžaduje zákon č. 253/2008 Sb.</b> (§ 5) pro identifikaci klienta — dosud tam část chyběla a doklad by při kontrole neobstál.',
+            '<b>Nová pole:</b> rodné číslo, datum narození, pohlaví, místo narození, státní občanství, druh dokladu, kdo doklad vydal (stát / orgán) a do kdy platí.',
+            '<b>Rodné číslo je hlavní údaj</b> — datum narození a pohlaví se vyplňují teprve tehdy, když rodné číslo přiděleno nebylo (typicky u cizinců). Stojí to rovnou v popisku pole, ať se to nemusí pamatovat.',
+            '<b>Pro živnostníky</b> přibyla tři nepovinná pole: obchodní firma, sídlo a IČO. U běžného klienta se nechají prázdná.',
+            '<b>Zástavní formulář dostal stejná pole jako výkup</b> — přijímání věcí do zástavy má podle zákona úplně stejnou povinnost jako výkup, dosud se u něj vyplňovalo jen jméno, adresa a číslo dokladu.',
+            'Popisky jsou upřesněné, aby se nepletly: „Datum narození" (dřív „Rodné číslo / datum narození"), „Číslo dokladu" (dřív „Číslo OP / pasu") a „Platnost do" (dřív „Vydal / platnost do", protože „kdo vydal" má teď vlastní pole). Vše česky, anglicky i rusky.',
+        ],
+    ],
+    [
         'version' => '3.28.0',
         'date' => '2026-07-30',
         'time' => '21:30',
