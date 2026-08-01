@@ -457,15 +457,16 @@ try {
                                     <span class="input-group-text">%</span>
                                 </div>
                             </div>
-                            <div class="col-md-3 pc-mac" style="display:none;">
+                            <?php /* RAM/jádra mají i telefony, tablety, konzole → viditelné pro VŠECHNY typy (nepovinné) */ ?>
+                            <div class="col-md-3">
                                 <label class="form-label small">RAM</label>
                                 <select id="pcRam" class="form-select"></select>
                             </div>
-                            <div class="col-md-3 pc-mac" style="display:none;">
+                            <div class="col-md-3">
                                 <label class="form-label small">Jader CPU</label>
                                 <select id="pcCpu" class="form-select"></select>
                             </div>
-                            <div class="col-md-3 pc-mac" style="display:none;">
+                            <div class="col-md-3">
                                 <label class="form-label small">Jader GPU</label>
                                 <select id="pcGpu" class="form-select"></select>
                             </div>
@@ -713,8 +714,11 @@ $(document).on('click', '.product-label-btn', function () {
         var dm = model;
         if (model && t.id && model.toLowerCase().indexOf(t.id.toLowerCase()) !== 0) dm = t.id + ' ' + model;
         var cap = t.cap ? $cap.value : '';
-        var ram = t.ram ? $ram.value : '', cpu = t.ram ? $cpu.value : '', gpu = t.ram ? $gpu.value : '';
-        var mem = (ram && cap) ? ram + '/' + cap + ' SSD' : (ram ? ram + ' RAM' : cap);
+        // RAM/jádra bere každý typ; t.ram = jen „macový" formát názvu (X/Y SSD)
+        var ram = $ram.value, cpu = $cpu.value, gpu = $gpu.value;
+        var mem = t.ram
+            ? ((ram && cap) ? ram + '/' + cap + ' SSD' : (ram ? ram + ' RAM' : cap))
+            : [ram ? ram + ' RAM' : '', cap].filter(Boolean).join(' ');
         var cores = [cpu ? cpu + ' CPU' : '', gpu ? gpu + ' GPU' : ''].filter(Boolean).join(' ');
         var spec = (cores && mem) ? cores + ', ' + mem : (cores || mem);
         var gr = ($grade.value || '').split(' ')[0] || 'A';
@@ -726,9 +730,9 @@ $(document).on('click', '.product-label-btn', function () {
         var gr = ($grade.value || '').split(' ')[0] || 'A';
         if (gr) out.push('Stav: ' + gr);
         if ($bat.value) out.push('Kondice baterie: ' + $bat.value + ' %');
-        if (t.ram && $cpu.value) out.push('Jader CPU: ' + $cpu.value);
-        if (t.ram && $gpu.value) out.push('Jader GPU: ' + $gpu.value);
-        if (t.ram && $ram.value) out.push('RAM: ' + $ram.value);
+        if ($cpu.value) out.push('Jader CPU: ' + $cpu.value);
+        if ($gpu.value) out.push('Jader GPU: ' + $gpu.value);
+        if ($ram.value) out.push('RAM: ' + $ram.value);
         if (t.cap && $cap.value) out.push('Úložiště: ' + $cap.value);
         if (colorVal()) out.push('Barva: ' + colorVal());
         if ($rocnik.value) out.push('Ročník: ' + $rocnik.value);
@@ -746,7 +750,6 @@ $(document).on('click', '.product-label-btn', function () {
         fillSelect($model, t.models, true, true);
         fillSelect($color, t.colors, true, true);
         $modelC.style.display = 'none'; $colorC.style.display = 'none';
-        document.querySelectorAll('.pc-mac').forEach(function (n) { n.style.display = t.ram ? '' : 'none'; });
         document.querySelectorAll('.pc-ipad').forEach(function (n) { n.style.display = t.gen ? '' : 'none'; });
         refreshPreview();
     }
@@ -1021,9 +1024,9 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('price', $price.value.trim());
         fd.append('purchase_price', $purchase.value.trim());   // nepovinné; prázdné = neznámá nákupní cena
         fd.append('serial', $serial.value.trim());
-        fd.append('ram', typeDef().ram ? $ram.value : '');
-        fd.append('cpu', typeDef().ram ? $cpu.value : '');
-        fd.append('gpu', typeDef().ram ? $gpu.value : '');
+        fd.append('ram', $ram.value);
+        fd.append('cpu', $cpu.value);
+        fd.append('gpu', $gpu.value);
         fd.append('rocnik', $rocnik.value);
         fd.append('generace', typeDef().gen ? $gen.value : '');
         if ($sold.checked) fd.append('sold', '1');

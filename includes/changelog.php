@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.40.1',
+        'date' => '2026-08-01',
+        'time' => '13:36',
+        'title' => 'RAM a jádra CPU/GPU jde zadat u všech typů zařízení',
+        'items' => [
+            'Pole <b>RAM, Jader CPU a Jader GPU</b> v naskladnění už nejsou jen pro MacBooky — mají je i telefony, tablety, konzole a vlastní typy (nepovinná). Doplněny menší hodnoty (2–6 GB RAM, 2–6 jader).',
+            'Název produktu: <b>Mac zůstává beze změny</b> („32 GB/512 GB SSD" — parita s appkou), ostatní typy skládají „8 GB RAM 256 GB" bez SSD. Ověřeno testem na Macu, iPadu, telefonu i konzoli.',
+        ],
+    ],
+    [
         'version' => '3.39.3',
         'date' => '2026-08-01',
         'time' => '13:45',

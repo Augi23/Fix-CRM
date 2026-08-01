@@ -11,9 +11,10 @@
 const AFX_APPLE_COLORS = ['Black', 'White', 'Space Black', 'Space Gray', 'Silver', 'Gold', 'Graphite', 'Sierra Blue', 'Pacific Blue', 'Blue', 'Green', 'Alpine Green', 'Pink', 'Purple', 'Deep Purple', 'Red', 'Midnight', 'Starlight', 'Yellow', 'Coral', 'Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium', 'Desert Titanium', 'Ultramarine', 'Teal', 'Cosmic Orange', 'Mist Blue'];
 const AFX_ANDROID_COLORS = ['Black', 'White', 'Blue', 'Green', 'Grey', 'Silver', 'Gold', 'Purple', 'Red'];
 const AFX_CAPS = ['16 GB', '32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB', '2 TB'];
-const AFX_RAMS = ['8 GB', '16 GB', '18 GB', '24 GB', '32 GB', '36 GB', '48 GB', '64 GB', '96 GB', '128 GB'];
-const AFX_CPU_CORES = ['8', '10', '11', '12', '14', '16', '20', '24', '28', '32'];
-const AFX_GPU_CORES = ['8', '10', '14', '16', '18', '19', '20', '30', '32', '38', '40', '60', '76', '80'];
+// RAM/jádra mají i telefony, tablety, konzole… — menší hodnoty pro ne-Macy (31.7. rozšířeno)
+const AFX_RAMS = ['2 GB', '3 GB', '4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '18 GB', '24 GB', '32 GB', '36 GB', '48 GB', '64 GB', '96 GB', '128 GB'];
+const AFX_CPU_CORES = ['2', '4', '6', '8', '10', '11', '12', '14', '16', '20', '24', '28', '32'];
+const AFX_GPU_CORES = ['3', '4', '5', '6', '8', '10', '14', '16', '18', '19', '20', '30', '32', '38', '40', '60', '76', '80'];
 const AFX_GRADE_LABELS = ['Nový', 'Zánovní', 'A – jako nové', 'B – mírné stopy', 'C – viditelné opotřebení', 'D – silné opotřebení'];
 const AFX_PRODEJNY = [['Karlín', 'karlin'], ['Černá Růže', 'vaclavak']];
 
@@ -35,7 +36,9 @@ const AFX_MACBOOKS_PRO = [
     'MacBook Pro 14″ M5 (2025)',
 ];
 
-/** Typy zařízení: id → [výrobce, K-kód kategorie, cap?, ram?, gen?, barvy, modely] */
+/** Typy zařízení: id → [výrobce, K-kód kategorie, cap?, ram?, gen?, barvy, modely]
+ *  POZOR: 'ram' už NEznamená „má RAM pole" (RAM/jádra bere každý typ) — znamená
+ *  „macový formát názvu" (32 GB/512 GB SSD). Ne-Macy skládají „8 GB RAM 256 GB". */
 function afxProductTypes(): array {
     static $types = null;
     if ($types === null) {
@@ -77,9 +80,11 @@ function afxProductAssemble(array $in): array {
     $model = trim((string)($in['model'] ?? ''));
     $cap = $t['cap'] ? trim((string)($in['cap'] ?? '')) : '';
     $color = trim((string)($in['color'] ?? ''));
-    $ram = $t['ram'] ? trim((string)($in['ram'] ?? '')) : '';
-    $cpu = $t['ram'] ? trim((string)($in['cpu'] ?? '')) : '';
-    $gpu = $t['ram'] ? trim((string)($in['gpu'] ?? '')) : '';
+    // RAM/jádra bere KAŽDÝ typ (mají je i telefony/tablety/konzole — přání 31.7.);
+    // příznak $t['ram'] už neřídí VSTUP, jen „macový" formát názvu (X/Y SSD) níže.
+    $ram = trim((string)($in['ram'] ?? ''));
+    $cpu = trim((string)($in['cpu'] ?? ''));
+    $gpu = trim((string)($in['gpu'] ?? ''));
     $bat = trim((string)($in['battery'] ?? ''));
     $bat = rtrim(str_replace('%', '', $bat));   // ukládá se bez %, do CSV s " %"
     $bat = trim($bat);
@@ -100,9 +105,18 @@ function afxProductAssemble(array $in): array {
     }
 
     // build_title()
-    if ($ram !== '' && $cap !== '') { $mem = $ram . '/' . $cap . ' SSD'; }
-    elseif ($ram !== '') { $mem = $ram . ' RAM'; }
-    else { $mem = $cap; }
+    if ($t['ram']) {
+        // Mac: PŘESNÁ parita s appkou — „32 GB/512 GB SSD"
+        if ($ram !== '' && $cap !== '') { $mem = $ram . '/' . $cap . ' SSD'; }
+        elseif ($ram !== '') { $mem = $ram . ' RAM'; }
+        else { $mem = $cap; }
+    } else {
+        // ostatní typy: RAM bez „SSD" žargonu — „8 GB RAM 256 GB"
+        $memParts = [];
+        if ($ram !== '') { $memParts[] = $ram . ' RAM'; }
+        if ($cap !== '') { $memParts[] = $cap; }
+        $mem = implode(' ', $memParts);
+    }
     $coresParts = [];
     if ($cpu !== '') $coresParts[] = $cpu . ' CPU';
     if ($gpu !== '') $coresParts[] = $gpu . ' GPU';
