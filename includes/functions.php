@@ -3327,15 +3327,40 @@ function nextStockLocationCode(PDO $pdo, string $type, int $parentId = 0): strin
 }
 
 /** Všechna umístění (+ kód/název rodiče) pro selecty, stromy a štítky. */
-function stockLocationsAll(PDO $pdo, bool $activeOnly = true): array {
+/** Umístění skladu. $branchId = jen regály/police/krabičky DANÉ POBOČKY
+ *  (null = všechny; každá provozovna má vlastní regály, sklad se nesdílí). */
+function stockLocationsAll(PDO $pdo, bool $activeOnly = true, ?int $branchId = null): array {
     ensureStockLocationsSchema();
+    ensureSkladBranchSchema();
     try {
+        $where = [];
+        $params = [];
+        if ($activeOnly) { $where[] = 'l.is_active = 1'; }
+        if ($branchId !== null && $branchId > 0) { $where[] = 'l.branch_id = ?'; $params[] = $branchId; }
         $sql = "SELECT l.*, p.code AS parent_code, p.name AS parent_name
                 FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id"
-             . ($activeOnly ? " WHERE l.is_active = 1" : "")
+             . ($where ? ' WHERE ' . implode(' AND ', $where) : '')
              . " ORDER BY FIELD(l.type,'regal','police','krabicka'), l.code ASC";
-        return $pdo->query($sql)->fetchAll();
-    } catch (Throwable $e) { return []; }
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        return $st->fetchAll();
+    } catch (Throwable $e) {
+        // prázdný sklad a rozbitý dotaz vypadají v UI stejně — ať to je aspoň v logu
+        error_log('stockLocationsAll: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/** Pobočka umístění (regálu/police/krabičky); 0 = neexistuje. */
+function stockLocationBranchId(int $locationId): int {
+    global $pdo;
+    if ($locationId <= 0) { return 0; }
+    try {
+        $st = $pdo->prepare("SELECT branch_id FROM stock_locations WHERE id = ?");
+        $st->execute([$locationId]);
+        $b = $st->fetchColumn();
+        return $b === false ? 0 : ((int)$b ?: getDefaultBranchId());
+    } catch (Throwable $e) { return 0; }
 }
 
 /** „K012 · iPhone 12 – drobné (R1-P2)" — plný popisek umístění. */

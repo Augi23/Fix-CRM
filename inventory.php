@@ -81,7 +81,8 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
 // nabídky pro filtry / hromadné akce / modal nového dílu (jen vybraná pobočka)
 $modelOptions = [];
 try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE branch_id = " . (int)$skladBranch . " AND device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
-$allLocations = stockLocationsAll($pdo);
+// jen umístění TÉTO pobočky — díl z Karlína nesmí jít do krabičky Na Příkopě
+$allLocations = stockLocationsAll($pdo, true, (int)$skladBranch);
 $unplacedCount = 0;
 try { $unplacedCount = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE location_id IS NULL AND branch_id = " . (int)$skladBranch . " AND " . inventoryStockedWhereSql())->fetchColumn(); } catch (Throwable $e) {}
 

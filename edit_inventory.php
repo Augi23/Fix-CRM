@@ -35,8 +35,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canEditBranch) {
     $min_stock = $_POST['min_stock'];
     $device_model = mb_substr(trim((string)($_POST['device_model'] ?? '')), 0, 64);
     $location_id = (int)($_POST['location_id'] ?? 0);
+    // umístění musí patřit stejné pobočce jako díl (jinak by díl „ležel" jinde);
+    // uložení se v takovém případě ZASTAVÍ — tiché vynulování by obsluhu nechalo
+    // v přesvědčení, že díl někde je
+    if ($location_id > 0) {
+        $__itemBranch = (int)($item['branch_id'] ?? 0) ?: getDefaultBranchId();
+        if (stockLocationBranchId($location_id) !== $__itemBranch) {
+            $error = 'Vybrané umístění patří jiné pobočce — díl uložen nebyl. Vyber umístění ze skladu ' . e(skladBranchLabel($__itemBranch)) . '.';
+            $location_id = -1;   // -1 = neukládat
+        }
+    }
 
-    try {
+    // chybné umístění (cizí pobočka) → neukládat nic; hláška je nastavená výše.
+    // Rozepsané hodnoty se vrátí do formuláře, ať obsluha nepřijde o práci.
+    if ($location_id < 0) {
+        $item = array_merge($item, [
+            'part_name' => $part_name, 'sku' => $sku, 'quantity' => $quantity,
+            'cost_price' => $cost_price, 'sale_price' => $sale_price, 'min_stock' => $min_stock,
+            'device_model' => $device_model,
+        ]);
+    }
+    if ($location_id >= 0) {
+      try {
         $update = $pdo->prepare("UPDATE inventory SET
             part_name = ?,
             sku = ?,
@@ -61,12 +81,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canEditBranch) {
         // Refresh
         $stmt->execute([$id]);
         $item = $stmt->fetch();
-    } catch (Exception $e) {
+      } catch (Exception $e) {
         $error = __("error_prefix") . $e->getMessage();
+      }
     }
 }
 
-$allLocations = stockLocationsAll($pdo);
+// umístění pobočky, které díl patří (sklad se mezi provozovnami nemíchá)
+$allLocations = stockLocationsAll($pdo, true, (int)($item['branch_id'] ?? 0) ?: getDefaultBranchId());
 $modelOptions = [];
 try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
 ?>
@@ -75,6 +97,10 @@ try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory W
     <h2><?php echo __('edit_product_title'); ?> <?php echo htmlspecialchars($item['part_name']); ?></h2>
     <a href="inventory.php" class="btn btn-outline-secondary"><?php echo __('back_to_inventory'); ?></a>
 </div>
+
+<?php if ($error): ?>
+    <div class="alert alert-danger"><i class="fas fa-triangle-exclamation me-2"></i><?php echo $error; ?></div>
+<?php endif; ?>
 
 <?php if ($success): ?>
     <div class="alert alert-success"><?php echo $success; ?></div>
@@ -135,10 +161,23 @@ try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory W
                     </datalist>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Umístění (regál / police / krabička)</label>
+                    <label class="form-label">Umístění — pozice ve skladu</label>
                     <select name="location_id" class="form-select">
                         <option value="">— bez umístění —</option>
-                        <?php $curLoc = (string)(int)($item['location_id'] ?? 0); ?>
+                        <?php $curLoc = (string)(int)($item['location_id'] ?? 0);
+                        // stávající umístění musí být v nabídce vždy — i když je
+                        // deaktivované nebo z jiné pobočky, jinak by se při uložení
+                        // tiše ztratilo a nikdo by nevěděl, kde díl leží
+                        $curInList = false;
+                        foreach ($allLocations as $__l) { if ((int)$__l['id'] === (int)$curLoc) { $curInList = true; break; } }
+                        ?>
+                        <?php if (!$curInList && (int)$curLoc > 0):
+                            $__cl = null;
+                            try { $__q = $pdo->prepare("SELECT l.*, p.code parent_code FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id WHERE l.id = ?"); $__q->execute([(int)$curLoc]); $__cl = $__q->fetch(); } catch (Throwable $e) {}
+                            if ($__cl): ?>
+                            <?php $__sameBranch = (int)($__cl['branch_id'] ?? 0) === ((int)($item['branch_id'] ?? 0) ?: getDefaultBranchId()); ?>
+                            <option value="<?php echo (int)$curLoc; ?>" selected><?php echo htmlspecialchars(stockLocationFullLabel($__cl)); ?> — <?php echo $__sameBranch ? 'deaktivované' : 'jiná pobočka'; ?></option>
+                        <?php endif; endif; ?>
                         <?php foreach (['krabicka' => 'Krabičky', 'police' => 'Police', 'regal' => 'Regály'] as $t => $glabel): ?>
                             <?php $grp = array_filter($allLocations, fn($l) => $l['type'] === $t); if (!$grp) continue; ?>
                             <optgroup label="<?php echo $glabel; ?>">
@@ -148,6 +187,7 @@ try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory W
                             </optgroup>
                         <?php endforeach; ?>
                     </select>
+                    <div class="form-text">Vyber <b>krabičku</b>, když je díl v ní — nebo rovnou <b>polici</b> či <b>regál</b>, když leží volně. Umístění se zakládají v <a href="sklad_umisteni.php" class="text-info">Sklad → Umístění</a>.</div>
                 </div>
                 <div class="col-12 mt-4">
                     <button type="submit" class="btn btn-primary px-5"><?php echo __('save'); ?></button>

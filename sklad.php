@@ -152,7 +152,7 @@ if ($inv) {
 
     <div class="d-flex gap-2 mb-3">
         <a href="location_labels.php?id=<?php echo (int)$loc['id']; ?>" target="_blank" class="btn btn-outline-secondary flex-grow-1"><i class="fas fa-qrcode me-1"></i> Štítek</a>
-        <a href="inventory.php?location=<?php echo (int)$loc['id']; ?>" class="btn btn-outline-secondary flex-grow-1"><i class="fas fa-boxes me-1"></i> Ve skladu</a>
+        <a href="inventory.php?branch=<?php echo (int)($loc['branch_id'] ?? 0) ?: getDefaultBranchId(); ?>&amp;location=<?php echo (int)$loc['id']; ?>" class="btn btn-outline-secondary flex-grow-1"><i class="fas fa-boxes me-1"></i> Ve skladu</a>
     </div>
 
 <script>

@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => '3.38.3',
+        'date' => '2026-08-01',
+        'time' => '02:30',
+        'title' => 'Sklad: rozvržení regálů si nastaví každá pobočka sama',
+        'items' => [
+            '<b>Rychlé nastavení skladu</b> (Sklad → Umístění): řekneš, <b>kolik máš regálů</b>, <b>kolik polic je v každém</b> a případně <b>kolik krabiček na polici</b> — CRM celou kostru založí naráz, očísluje (R1, R1-P1, K001…) a připraví QR štítky. Police jde stejně tak doplnit do už existujících regálů. Náhled průběžně ukazuje, kolik umístění vznikne.',
+            '<b>Umístění patří pobočce.</b> Karlín a Na Příkopě mají každý svůj sklad — regály, police i krabičky. Cizí sklad si prohlédneš, ale měnit ho smí jen jeho lidé (a vedení); díl se nedá uložit do krabičky druhé pobočky a arch štítků tiskne jen umístění té pobočky, na kterou se díváš.',
+            '<b>Pozice u dílu:</b> v kartě dílu vybíráš <b>krabičku</b>, když je díl v ní — nebo rovnou <b>polici</b> či <b>regál</b>, když leží volně. Nabídka obsahuje jen umístění pobočky, které díl patří; když díl leží někde, co už v nabídce není (deaktivované), zůstane to vidět a neztratí se to.',
+            'Umístění nastavují <b>všichni zaměstnanci</b> — technici, manažeři i Boss (navazuje na včerejší otevření skladu všem).',
+            'Technicky: číselná řada je společná pro celou firmu (každý QR kód je jedinečný) a přiděluje se pod zámkem, takže dva lidé zakládající naráz nedostanou stejné číslo; zakládání běží v transakci (celá dávka, nebo nic).',
+        ],
+    ],
+    [
         'version' => '3.38.2',
         'date' => '2026-08-01',
         'time' => '10:05',

@@ -12,10 +12,15 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
 if (!isset($_SESSION['user_id'])) { header('Location: login.php'); exit; }
+// rozvržení skladu (kde co leží) je provozní informace — stejné právo jako sklad
+if (!hasPermission('manage_inventory')) { header('Location: index.php'); exit; }
 ensureStockLocationsSchema();
 
 $one = (int)($_GET['id'] ?? 0);
 $type = (string)($_GET['type'] ?? '');
+// arch štítků je POBOČKOVÝ — jinak by z Karlína vyjely i štítky regálů Na Příkopě
+ensureSkladBranchSchema();
+$labelBranch = (int)skladBranchOrOwn();
 $items = [];
 try {
     $sqlBase = "SELECT l.*, p.code AS parent_code FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id";
@@ -24,11 +29,13 @@ try {
         $stmt->execute([$one]);
         $items = $stmt->fetchAll();
     } elseif (in_array($type, ['regal', 'police', 'krabicka'], true)) {
-        $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.type = ? ORDER BY l.code ASC");
-        $stmt->execute([$type]);
+        $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.type = ? AND l.branch_id = ? ORDER BY l.code ASC");
+        $stmt->execute([$type, $labelBranch]);
         $items = $stmt->fetchAll();
     } elseif (!empty($_GET['all'])) {
-        $items = $pdo->query($sqlBase . " WHERE l.is_active = 1 ORDER BY FIELD(l.type,'regal','police','krabicka'), l.code ASC")->fetchAll();
+        $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.branch_id = ? ORDER BY FIELD(l.type,'regal','police','krabicka'), l.code ASC");
+        $stmt->execute([$labelBranch]);
+        $items = $stmt->fetchAll();
     }
 } catch (Throwable $e) { $items = []; }
 
@@ -61,10 +68,10 @@ $base = rtrim(str_replace('\\', '/', $base), '/');
 <div class="toolbar">
     <button onclick="window.print()">🖨 Tisknout</button>
     <a href="sklad_umisteni.php">← Zpět na umístění</a>
-    <a href="location_labels.php?type=krabicka">Jen krabičky</a>
-    <a href="location_labels.php?type=police">Jen police</a>
-    <a href="location_labels.php?type=regal">Jen regály</a>
-    <a href="location_labels.php?all=1">Vše</a>
+    <a href="location_labels.php?type=krabicka&amp;branch=<?php echo (int)$labelBranch; ?>">Jen krabičky</a>
+    <a href="location_labels.php?type=police&amp;branch=<?php echo (int)$labelBranch; ?>">Jen police</a>
+    <a href="location_labels.php?type=regal&amp;branch=<?php echo (int)$labelBranch; ?>">Jen regály</a>
+    <a href="location_labels.php?all=1&amp;branch=<?php echo (int)$labelBranch; ?>">Vše</a>
 </div>
 <?php if (!$items): ?>
     <p>Žádná umístění k tisku. <a href="sklad_umisteni.php">Zpět na umístění</a></p>

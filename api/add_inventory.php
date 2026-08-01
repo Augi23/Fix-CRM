@@ -46,8 +46,10 @@ try {
     ensureStockLocationsSchema();
     ensureSkladBranchSchema();
     if ($location_id > 0) {
-        $lchk = $pdo->prepare("SELECT id FROM stock_locations WHERE id = ? AND is_active = 1");
-        $lchk->execute([$location_id]);
+        // umístění musí patřit STEJNÉ pobočce jako díl — jinak by díl Karlína
+        // „ležel" v krabičce Na Příkopě (poslední neošetřená cesta zápisu)
+        $lchk = $pdo->prepare("SELECT id FROM stock_locations WHERE id = ? AND is_active = 1 AND branch_id = ?");
+        $lchk->execute([$location_id, $branch_id]);
         if (!$lchk->fetch()) { $location_id = 0; }
     }
     // Manually added parts are real warehouse stock → always visible in Sklad.
