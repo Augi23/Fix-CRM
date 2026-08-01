@@ -31,7 +31,14 @@ if (isset($_POST['kb_env'])) {
 }
 if ($envSwitch) {
     foreach (['kb_client_id', 'kb_client_secret', 'kb_refresh_token', 'kb_software_statement',
-              'kb_software_statement_at', 'kb_account_id', 'kb_last_sync_at'] as $k) {
+              'kb_software_statement_at', 'kb_account_id', 'kb_last_sync_at',
+              // „Stahovat pohyby od" se maže taky: v sandboxu se nastavuje na 2019
+              // (testovací data KB jsou z toho roku) a po přepnutí do produkce by
+              // první synchronizace stáhla roky skutečné historie — a KB účtuje
+              // podle počtu volání. Bez hodnoty se vezme posledních 30 dní.
+              'kb_sync_from',
+              // měna a stav účtu patří k tomu druhému prostředí
+              'kb_account_currency'] as $k) {
         set_setting($k, '');
     }
 }

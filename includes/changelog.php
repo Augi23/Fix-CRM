@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.38.5',
+        'date' => '2026-08-01',
+        'time' => '05:00',
+        'title' => 'Banka: přepnutí na produkci nezdědí testovací okno stahování',
+        'items' => [
+            'Při přepnutí prostředí (sandbox ↔ produkce) se nově maže i <b>„Stahovat pohyby od"</b> a měna účtu. V sandboxu se to datum nastavuje na rok 2019 (tam jsou testovací data KB) — po přepnutí do ostrého provozu by první synchronizace stáhla roky skutečné historie a KB účtuje podle počtu volání. Bez vyplněného data se bere posledních 30 dní.',
+        ],
+    ],
+    [
         'version' => '3.39.1',
         'date' => '2026-08-01',
         'time' => '11:14',
