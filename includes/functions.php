@@ -2406,7 +2406,16 @@ function crmVersionFromChangelogSource(string $src): string {
 function crmAppVersion(): string {
     static $v = null;
     if ($v !== null) return $v;
-    $v = crmVersionFromChangelogSource((string)@file_get_contents(__DIR__ . '/changelog.php'));
+    // Verzi bereme z NEJNOVĚJŠÍHO záznamu SEŘAZENÉHO seznamu — stejný zdroj, jaký
+    // vidí uživatel v Historii úprav. Čtení regexem ze zdrojáku (níž jako záloha)
+    // bralo první výskyt v SOUBORU, takže po zavedení řazení podle času se dlaždice
+    // s verzí rozešla s prvním řádkem seznamu.
+    $cl = @include __DIR__ . '/changelog.php';
+    if (is_array($cl) && !empty($cl[0]['version'])) {
+        $v = (string)$cl[0]['version'];
+    } else {
+        $v = crmVersionFromChangelogSource((string)@file_get_contents(__DIR__ . '/changelog.php'));
+    }
     if ($v === '') {
         $v = trim((string)@file_get_contents(dirname(__DIR__) . '/VERSION'));
     }

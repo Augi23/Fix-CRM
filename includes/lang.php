@@ -573,6 +573,7 @@ $lang_data = [
 
         // Phase 1 + 2 (Errors & API)
         'csrf_invalid' => 'Недействительный токен безопасности. Обновите страницу.',
+        'login_session_expired' => 'Страница входа была открыта слишком долго — попробуйте ещё раз.',
         'login_rate_limit' => 'Слишком много попыток входа. Попробуйте через {seconds} сек.',
         'unauthorized' => 'Не авторизовано',
         'access_denied_msg' => 'Доступ запрещён',
@@ -1241,6 +1242,7 @@ $lang_data = [
 
         // Phase 1 + 2 (Errors & API)
         'csrf_invalid' => 'Neplatný bezpečnostní token. Obnovte stránku.',
+        'login_session_expired' => 'Přihlašovací stránka byla dlouho otevřená — zkus to prosím ještě jednou.',
         'login_rate_limit' => 'Příliš mnoho pokusů o přihlášení. Zkuste to za {seconds} s.',
         'unauthorized' => 'Neautorizováno',
         'access_denied_msg' => 'Přístup odepřen',

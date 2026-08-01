@@ -1657,6 +1657,7 @@ $lang_overrides = [
         'created_at' => 'Date created',
         'crm_role_label' => 'CRM role',
         'csrf_invalid' => 'Invalid security token. Please refresh the page.',
+        'login_session_expired' => 'The sign-in page was open too long — please try again.',
         'csrf_token_invalid' => 'Invalid security token',
         'currency' => 'Currency',
         'current_version' => 'Current version',

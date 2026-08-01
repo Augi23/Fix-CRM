@@ -99,7 +99,12 @@ $loginQuip = $loginQuips[array_rand($loginQuips)];
 
 if (isset($_POST['login'])) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
-        $error = __('csrf_invalid');
+        // Stránka byla otevřená déle, než žije relace (4 h nečinnosti) — pro obsluhu
+        // to není „chyba tokenu", ale prostě vypršelé okno. Prohlížeč dostane
+        // v odpovědi čerstvý token a odešle formulář znovu, takže tuhle hlášku
+        // uvidí jen ten, komu nefunguje JS.
+        $__csrfStale = true;
+        $error = __('login_session_expired');
     } elseif (!checkLoginAttempts($pdo ?? null)) {
         $error = __('login_rate_limit');
     } else {
@@ -136,6 +141,7 @@ if (isset($_POST['login'])) {
 
             if ($user && password_verify($password, $user['password'])) {
                 session_regenerate_id(true);
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));   // nový token k nové relaci
                 clearClientSession();
                 $_SESSION['user_id']   = $user['id'];
                 $_SESSION['username']  = $user['username'];
@@ -176,6 +182,7 @@ if (isset($_POST['login'])) {
 
             if ($tech && password_verify($password, $tech['password'])) {
                 session_regenerate_id(true);
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));   // nový token k nové relaci
                 clearClientSession();
                 $_SESSION['user_id']   = 't' . $tech['id'];
                 $_SESSION['username']  = $tech['username'];
@@ -216,6 +223,7 @@ if (isset($_POST['login'])) {
 
             if ($customer && $matchedOrder) {
                 session_regenerate_id(true);
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));   // nový token k nové relaci
                 clearStaffSession();
                 $_SESSION['client_authenticated'] = true;
                 $_SESSION['client_customer_id'] = (int)$customer['id'];
@@ -258,7 +266,15 @@ if (isset($_SESSION['user_id'])) {
 <?php
 if (!empty($_POST['ajax'])) {
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['ok' => false, 'error' => (string)($error ?: __('login_invalid_credentials'))], JSON_UNESCAPED_UNICODE);
+    // 'csrf' = token TÉTO (už platné) relace. Prohlížeč si po neúspěchu kvůli
+    // vypršené stránce opraví pole sám a zkusí to znovu — funguje to i tehdy,
+    // když endpoint api/csrf_token.php není dostupný (staré nasazení, 403).
+    echo json_encode([
+        'ok' => false,
+        'error' => (string)($error ?: __('login_invalid_credentials')),
+        'csrf' => generateCsrfToken(),
+        'stale' => !empty($__csrfStale),
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 ?>
@@ -508,6 +524,22 @@ var afxGreetWave = (function () {
 (function () {
     var form = document.querySelector('.login-form');
     if (!form || !window.fetch) { return; }
+    // Čerstvý token těsně před odesláním. Stránka mohla být otevřená hodiny (pult,
+    // iPad, prohlížeč přes noc) a její relace mezitím vypršela — vypečený token by
+    // pak přihlášení shodil hláškou „Neplatný bezpečnostní token". Nová relace se
+    // navíc založí právě tímhle dotazem, takže odeslání už jede v platné relaci.
+    function withFreshCsrf(cb) {
+        var f = form.querySelector('input[name="csrf_token"]');
+        if (!f) { cb(); return; }
+        var done = false;
+        var go = function () { if (!done) { done = true; cb(); } };
+        setTimeout(go, 5000);                       // pomalá síť nesmí zablokovat přihlášení (iPad na LTE)
+        fetch('api/csrf_token.php', { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d && d.token) { f.value = d.token; } go(); })
+            .catch(go);                             // nepovedlo se → zkusí se stávající token
+    }
+
     form.addEventListener('submit', function (e) {
         e.preventDefault();
         var btn = form.querySelector('button[type="submit"]');
@@ -517,12 +549,24 @@ var afxGreetWave = (function () {
         var ov = document.getElementById('greetOverlay');
         ov.style.display = 'block';
         if (window.afxGreetWave) { afxGreetWave.start(); }
+        var retried = false;
+        function send() {
         var fd = new FormData(form);
         fd.append('ajax', '1');
         fetch('login.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (!d.ok) {
+                    // Vypršelá stránka: server poslal čerstvý token — zkusit ještě
+                    // jednou, aby obsluha vůbec nepoznala, že něco vypršelo.
+                    // Jen JEDNOU (retried), ať z toho nevznikne smyčka.
+                    if (d.stale && d.csrf && !retried) {
+                        retried = true;
+                        var fld = form.querySelector('input[name="csrf_token"]');
+                        if (fld) { fld.value = d.csrf; }
+                        send();
+                        return;
+                    }
                     if (window.afxGreetWave) { afxGreetWave.stop(); }
                     ov.style.display = 'none';
                     btn.disabled = false;
@@ -553,7 +597,9 @@ var afxGreetWave = (function () {
                     go();   // bez hlášky rovnou dál — vlny běží až do načtení dashboardu
                 }
             })
-            .catch(function () { form.removeEventListener('submit', arguments.callee); form.submit(); });
+            .catch(function () { form.submit(); });   // síť selhala → klasické odeslání
+        }
+        withFreshCsrf(send);
     });
 })();
 </script>

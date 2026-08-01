@@ -1,10 +1,26 @@
 <?php
 /**
  * Historie úprav CRM — ručně vedený, lidsky čitelný přehled dokončených
- * vylepšení. Zobrazuje se v Nastavení → Aktualizace pod git changelogem.
- * Nové záznamy přidávat NAHORU (nejnovější první).
+ * vylepšení. Zobrazuje se v Nastavení → Aktualizace.
+ *
+ * Nové záznamy piš NAHORU. Na pořadí v souboru ale nezáleží: výpis se řadí
+ * podle DATA A ČASU (viz konec souboru). Bez toho se pořadí rozsypalo, kdykoli
+ * na CRM pracovaly dvě relace naráz — každá si připsala svůj záznam nahoru a
+ * seznam pak skákal (3.38.5 → 3.39.1 → 3.38.4).
  */
-return [
+return (static function (): array {
+$entries = [
+    [
+        'version' => '3.39.2',
+        'date' => '2026-08-01',
+        'time' => '13:20',
+        'title' => 'Konec hlášky „Neplatný token" při přihlašování',
+        'items' => [
+            '<b>Přihlášení projde napoprvé i po dlouho otevřené stránce.</b> Když někdo nechal kartu s přihlašovací obrazovkou otevřenou přes noc (pult, iPad), přihlášení skončilo hláškou o neplatném tokenu — relace mezitím vypršela (4 h nečinnosti) a stránka nesla starý bezpečnostní klíč. Nově si stránka vyžádá čerstvý klíč těsně před odesláním, a kdyby to nestihla, systém odeslání sám jednou zopakuje. Obsluha nic nepozná.',
+            'Kdo přesto na hlášku narazí (vypnutý JavaScript), uvidí srozumitelné <b>„Přihlašovací stránka byla dlouho otevřená — zkus to prosím ještě jednou"</b> místo technické chyby, a to i anglicky a rusky.',
+            '<b>Historie úprav se řadí podle data a času</b>, ne podle pořadí v souboru. Když na CRM pracovaly dvě věci naráz, seznam skákal (3.38.5 → 3.39.1 → 3.38.4) a nešlo poznat, co je nejnovější. Verze v dlaždici nahoře teď vždy odpovídá prvnímu záznamu v seznamu.',
+        ],
+    ],
     [
         'version' => '3.38.5',
         'date' => '2026-08-01',
@@ -3649,3 +3665,21 @@ return [
         ],
     ],
 ];
+
+// Seřadit sestupně podle data a času. PHP 8 řadí stabilně, takže záznamy se
+// shodným časem si zachovají pořadí ze souboru (novější zapsaný výš zůstane výš).
+$stamp = static function (array $x): int {
+    $d = trim((string)($x['date'] ?? ''));
+    if ($d === '') { $d = '1970-01-01'; }
+    // Bez času → 23:59, ať záznam zapsaný jen s datem zůstane NAHOŘE ve svém dni
+    // (jinak by nový zápis skončil pod staršími, které čas mají).
+    $t = trim((string)($x['time'] ?? ''));
+    if ($t === '') { $t = '23:59'; }
+    return (int)(strtotime($d . ' ' . $t) ?: 0);
+};
+usort($entries, static function (array $a, array $b) use ($stamp): int {
+    return $stamp($b) <=> $stamp($a);
+});
+
+return $entries;
+})();
