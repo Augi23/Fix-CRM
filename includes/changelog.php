@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => '3.39.1',
+        'date' => '2026-08-01',
+        'time' => '11:14',
+        'title' => 'Sklad: vysvětlivky k akčním ikonám na konci řádků',
+        'items' => [
+            'V pruhu nad záložkami Skladu (vpravo, vedle „Přepnout pobočku") jsou nové <b>vysvětlivky ikon</b> z konce řádků — v Produktech/Příslušenství: cenový štítek · zapůjčení · upravit · přesun na pobočku · smazat; v Servisu: naskladnit · QR štítek · upravit · na zakázku · přesun · smazat. Na malých displejích se schovávají, ať nepřekáží.',
+        ],
+    ],
+    [
         'version' => '3.38.4',
         'date' => '2026-08-01',
         'time' => '04:15',

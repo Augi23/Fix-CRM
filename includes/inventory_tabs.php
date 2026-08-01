@@ -28,6 +28,25 @@ try { $__trDraft = (int)$pdo->query("SELECT COUNT(*) FROM stock_transfer_items t
         <i class="fas <?php echo $__isKarlin ? 'fa-warehouse' : 'fa-store'; ?> me-1"></i><?php echo e(skladBranchLabel((int)$__skladBranch)); ?>
     </span>
     <a href="inventory.php" class="btn btn-sm btn-outline-secondary" title="Zpět na výběr pobočky skladu"><i class="fas fa-right-left me-1"></i>Přepnout pobočku</a>
+    <?php /* Vysvětlivky k akčním ikonám na konci řádků — dle záložky (produkty vs. díly) */ ?>
+    <?php if ($__invTab === 'products' || $__invTab === 'service'): ?>
+    <span class="ms-auto afx-row-legend d-none d-lg-inline-flex align-items-center flex-wrap">
+        <?php if ($__invTab === 'products'): ?>
+            <span><i class="fas fa-tag text-info"></i>Cenový štítek</span>
+            <span><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i>Zapůjčení</span>
+            <span><i class="fas fa-edit text-warning"></i>Upravit</span>
+            <span><i class="fas fa-right-left text-info"></i>Přesun na pobočku</span>
+            <span><i class="fas fa-trash text-danger"></i>Smazat</span>
+        <?php else: ?>
+            <span><i class="fas fa-truck-loading text-success"></i>Naskladnit</span>
+            <span><i class="fas fa-qrcode text-info"></i>QR štítek</span>
+            <span><i class="fas fa-edit text-warning"></i>Upravit</span>
+            <span><i class="fas fa-link text-success"></i>Na zakázku</span>
+            <span><i class="fas fa-right-left text-info"></i>Přesun na pobočku</span>
+            <span><i class="fas fa-trash text-danger"></i>Smazat</span>
+        <?php endif; ?>
+    </span>
+    <?php endif; ?>
 </div>
 <ul class="nav nav-pills mb-4 glass-panel p-2 border-secondary">
     <?php if (hasPermission('manage_inventory')): ?>

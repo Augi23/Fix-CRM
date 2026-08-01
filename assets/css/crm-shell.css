@@ -435,6 +435,12 @@ html[data-lg-theme="light"] .crm-bgfx { display: none !important; }
 .afx-row-actions .btn { padding: .26rem .5rem !important; font-size: .82rem !important; }
 .afx-row-actions .btn i { font-size: .92em; }
 
+/* Vysvětlivky k akčním ikonám v řádcích skladu (pruh nad záložkami, vpravo) */
+.afx-row-legend { gap: 14px; font-size: 12px; font-weight: 500; color: rgba(255,255,255,.55); }
+.afx-row-legend > span { white-space: nowrap; }
+.afx-row-legend i { margin-right: 5px; font-size: 11.5px; }
+html[data-lg-theme="light"] .afx-row-legend { color: rgba(0,0,0,.5); }
+
 /* Užší sloupec Priorita — zabírá jen tolik, kolik potřebuje jeho odznak */
 th.col-priority, td.col-priority { width: 1%; white-space: nowrap; }
 
