@@ -53,6 +53,7 @@ ensureProductsTable();
 ensureProductsPosColumn();
 ensureProductsCrmColumns();
 ensureSkladBranchSchema();
+ensureProductsHideEshopColumn();
 afxEnsurePosGoodsTaxColumns();
 
 // ── get: data pro editační režim modalu ──
@@ -82,6 +83,7 @@ if ($action === 'get') {
             ? '' : rtrim(rtrim(number_format((float)$p['purchase_price'], 2, '.', ''), '0'), '.'),
         'sold' => (int)$p['stock_qty'] <= 0,
         'stock_key' => (string)($p['stock_key'] ?? ''),
+        'hide_eshop' => (int)($p['hide_eshop'] ?? 0),
         'image_url' => productImageDisplayUrl((string)($p['image_url'] ?? '')),   // jen naše úložiště — cizí URL z CSV nejde do <img>
         'studio_image_url' => productImageDisplayUrl((string)($p['studio_image_url'] ?? '')),
         'gallery_images'   => (string)($p['gallery_images'] ?? ''),   // JSON, UI si rozparsuje
@@ -125,6 +127,7 @@ $in = [
     'generace' => trim((string)($_POST['generace'] ?? '')),
     'sold' => !empty($_POST['sold']),
     'stock_key' => in_array((string)($_POST['stock_key'] ?? ''), ['karlin', 'vaclavak'], true) ? (string)$_POST['stock_key'] : 'karlin',
+    'hide_eshop' => ((string)($_POST['hide_eshop'] ?? '0') === '1') ? 1 : 0,
     'image_url' => trim((string)($_POST['image_url'] ?? '')),
     // Galerie média (sekce v modalu): studiová fotka, klasické fotky (JSON pole URL), 360° video
     'studio_image_url' => trim((string)($_POST['studio_url'] ?? '')),
@@ -296,11 +299,11 @@ try {
             // import-neutrální mikroúprava: nákupní cena + média galerie; title,
             // raw_csv a spol. zůstávají z appky (zdroj pravdy se nemění)
             $pdo->prepare("UPDATE products SET purchase_price = ?, studio_image_url = ?, gallery_images = ?,
-                    video_360_url = ?, has_360 = ?, show_studio = ?, show_gallery = ?, show_360 = ?
+                    video_360_url = ?, has_360 = ?, show_studio = ?, show_gallery = ?, show_360 = ?, hide_eshop = ?
                 WHERE id = ?")
                 ->execute([$purchaseNum, $in['studio_image_url'] ?: null, $in['gallery_images'],
                     $in['video_360_url'] ?: null, $in['has_360'],
-                    $in['show_studio'], $in['show_gallery'], $in['show_360'], $editId]);
+                    $in['show_studio'], $in['show_gallery'], $in['show_360'], $in['hide_eshop'], $editId]);
             crmAuditLog('products.update', [
                 'entity_type' => 'products', 'entity_id' => $editId, 'entity_label' => (string)$existing['title'],
                 'summary' => 'Doplněna nákupní cena/média u „' . $existing['title'] . '“ (' . $code . ') — kus zůstává napojený na import z appky',
@@ -323,7 +326,7 @@ try {
         $pdo->prepare("UPDATE products SET product_code = ?, title = ?, manufacturer = ?, category_code = ?,
                 model = ?, capacity = ?, color = ?, grade = ?, battery = ?, price = ?, purchase_price = ?, stock_qty = ?, branch_id = ?,
                 stock_key = ?, image_url = ?, studio_image_url = ?, gallery_images = ?, video_360_url = ?, has_360 = ?,
-                show_studio = ?, show_gallery = ?, show_360 = ?,
+                show_studio = ?, show_gallery = ?, show_360 = ?, hide_eshop = ?,
                 pcr_result = ?, pcr_status = ?, pcr_checked_at = COALESCE(?, pcr_checked_at),
                 raw_csv = ?, source = 'crm', created_by = COALESCE(created_by, ?), pos_sold_at = NULL, last_seen_at = NOW()
             WHERE id = ?")
@@ -332,7 +335,7 @@ try {
                 $asm['battery_csv'] ?: null, $priceNum, $purchaseNum, $stockQty, $prodBranch,
                 $in['stock_key'], $in['image_url'] ?: null,
                 $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
-                $in['show_studio'], $in['show_gallery'], $in['show_360'],
+                $in['show_studio'], $in['show_gallery'], $in['show_360'], $in['hide_eshop'],
                 $pcr['text'] ?: null,
                 $pcr['status'] ?: null, $codeChanged ? $pcrCheckedAt : null,
                 json_encode($asm['assoc'], JSON_UNESCAPED_UNICODE), $who ?: null, $editId]);
@@ -345,10 +348,10 @@ try {
         $ins = $pdo->prepare("INSERT INTO products
                 (product_code, title, manufacturer, category_code, model, capacity, color, grade, battery,
                  price, purchase_price, stock_qty, branch_id, stock_key, image_url, studio_image_url, gallery_images, video_360_url, has_360,
-                 show_studio, show_gallery, show_360,
+                 show_studio, show_gallery, show_360, hide_eshop,
                  pcr_result, pcr_status, pcr_checked_at,
                  added_at, raw_csv, source, created_by, first_seen_at, last_seen_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'crm', ?, NOW(), NOW())");
         for ($try = 0; $try < 3; $try++) {
             try {
                 $ins->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
@@ -356,7 +359,7 @@ try {
                     $asm['battery_csv'] ?: null, $priceNum, $purchaseNum, $stockQty, $prodBranch,
                     $in['stock_key'], $in['image_url'] ?: null,
                     $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
-                    $in['show_studio'], $in['show_gallery'], $in['show_360'],
+                    $in['show_studio'], $in['show_gallery'], $in['show_360'], $in['hide_eshop'],
                     $pcr['text'] ?: null,
                     $pcr['status'] ?: null, $pcrCheckedAt,
                     json_encode($asm['assoc'], JSON_UNESCAPED_UNICODE), $who ?: null]);

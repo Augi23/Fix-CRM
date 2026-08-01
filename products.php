@@ -34,6 +34,7 @@ $search = trim((string)($_GET['search'] ?? ''));
 $avail = (string)($_GET['avail'] ?? '');   // '' = vše, 'in' = skladem, 'out' = vyprodáno, 'loan' = zapůjčené
 ensureProductsLoanColumns();
 ensureSkladBranchSchema();
+ensureProductsHideEshopColumn();
 // Pobočka skladu (vybraná ?branch, jinak vlastní). Vidí se obě; MĚNIT jen zaměstnanec pobočky.
 $skladBranch = skladBranchOrOwn();
 $canModifyStock = crmCanModifyBranchStock($skladBranch);
@@ -319,6 +320,9 @@ try {
                                         <?php if (!empty($p['stock_key'])): ?>
                                             <div class="small text-white-75 mt-1"><?php echo $p['stock_key'] === 'karlin' ? 'Karlín' : 'Václavák'; ?></div>
                                         <?php endif; ?>
+                                        <?php if (!empty($p['hide_eshop'])): ?>
+                                            <div class="mt-1"><span class="badge bg-secondary" title="Kus je v CRM, ale feed ho na e-shop neposílá"><i class="fas fa-eye-slash me-1"></i>skrytý na e-shopu</span></div>
+                                        <?php endif; ?>
                                     </td>
                                     <td style="white-space:nowrap;">
                                         <?php if (!empty($p['added_at'])): ?>
@@ -415,6 +419,14 @@ try {
                         <input type="hidden" id="pcGalleryUrls" value="">
                         <input type="hidden" id="pcVideo360Url" value="">
                         <div class="row g-3">
+                            <!-- ── 1) ZAŘÍZENÍ — co naskladňuješ ─────────────────────────
+                                 „Vlastní…" pole se VŽDY otevírá POD svým výběrem (jednotné). -->
+                            <div class="col-12">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <i class="fas fa-mobile-alt text-info"></i>
+                                    <span class="fw-semibold">Zařízení</span>
+                                </div>
+                            </div>
                             <div class="col-md-4">
                                 <label class="form-label small">Typ zařízení</label>
                                 <select id="pcTyp" class="form-select"></select>
@@ -422,36 +434,21 @@ try {
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label small">Model <span class="text-danger">*</span></label>
-                                <div class="d-flex gap-2">
-                                    <select id="pcModel" class="form-select"></select>
-                                    <input type="text" id="pcModelCustom" class="form-control" placeholder="vlastní model…" style="display:none;">
-                                </div>
+                                <select id="pcModel" class="form-select"></select>
+                                <input type="text" id="pcModelCustom" class="form-control mt-1" placeholder="vlastní model…" style="display:none;">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label small">Úložiště</label>
                                 <select id="pcCap" class="form-select"></select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label small">Barva</label>
-                                <div class="d-flex gap-2">
-                                    <select id="pcColor" class="form-select"></select>
-                                    <input type="text" id="pcColorCustom" class="form-control" placeholder="vlastní…" style="display:none;">
-                                </div>
+                                <select id="pcColor" class="form-select"></select>
+                                <input type="text" id="pcColorCustom" class="form-control mt-1" placeholder="vlastní barva…" style="display:none;">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label small">Stav</label>
                                 <select id="pcGrade" class="form-select"></select>
-                            </div>
-                            <!-- Prodejna + Baterie + ceny jedou 3+3+3+3, aby nové pole Nákupní cena
-                                 neposunulo zaběhaný rytmus naskladňování: SN/IMEI zůstává na svém
-                                 řádku vedle PČR dlaždice (8+4) a u Maců drží RAM/CPU/GPU/Ročník
-                                 pohromadě (3+3+3+3) — obsluha čte formulář shora dolů čtečkou. -->
-                            <div class="col-md-3">
-                                <label class="form-label small">Prodejna</label>
-                                <select id="pcStockKey" class="form-select">
-                                    <option value="karlin">Karlín</option>
-                                    <option value="vaclavak">Černá Růže</option>
-                                </select>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small">Baterie</label>
@@ -459,29 +456,6 @@ try {
                                     <input type="number" id="pcBattery" class="form-control" min="0" max="100">
                                     <span class="input-group-text">%</span>
                                 </div>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small">Prodejní cena <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <input type="text" id="pcPrice" class="form-control" inputmode="numeric">
-                                    <span class="input-group-text">Kč</span>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small">Nákupní cena</label>
-                                <div class="input-group">
-                                    <input type="text" id="pcPurchasePrice" class="form-control" inputmode="numeric"
-                                           title="Za kolik jsme kus vykoupili/nakoupili. Potřeba pro daň z přirážky u použitého zboží (§ 90) — bez ní ji zpětně nespočítáme.">
-                                    <span class="input-group-text">Kč</span>
-                                </div>
-                                <div class="form-text small text-white-50">Nepovinné — pro daň z přirážky u použitého zboží (§ 90).</div>
-                            </div>
-                            <div class="col-md-8">
-                                <label class="form-label small">SN / IMEI <span class="text-white-50">(naskenuj čtečkou nebo zapiš)</span></label>
-                                <input type="text" id="pcSerial" class="form-control" autocomplete="off">
-                            </div>
-                            <div class="col-md-4 d-flex align-items-end">
-                                <div id="pcPcrBadge" class="w-100 text-center small fw-bold rounded py-2" style="background:rgba(255,255,255,.06);color:#9aa3b2;">PČR: nekontrolováno</div>
                             </div>
                             <div class="col-md-3 pc-mac" style="display:none;">
                                 <label class="form-label small">RAM</label>
@@ -503,24 +477,78 @@ try {
                                 <label class="form-label small">Generace</label>
                                 <select id="pcGenerace" class="form-select"></select>
                             </div>
-                            <div class="col-md-5">
-                                <label class="form-label small">Foto produktu</label>
-                                <input type="file" id="pcPhoto" class="form-control" accept=".jpg,.jpeg,.png,.webp,image/*">
+
+                            <!-- ── 2) IDENTIFIKACE KUSU ── -->
+                            <div class="col-12">
+                                <hr class="border-secondary opacity-25 my-1">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <i class="fas fa-barcode text-info"></i>
+                                    <span class="fw-semibold">Identifikace kusu</span>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small">SN / IMEI <span class="text-white-50">(naskenuj čtečkou nebo zapiš)</span></label>
+                                <input type="text" id="pcSerial" class="form-control" autocomplete="off">
                             </div>
                             <div class="col-md-4 d-flex align-items-end">
+                                <div id="pcPcrBadge" class="w-100 text-center small fw-bold rounded py-2" style="background:rgba(255,255,255,.06);color:#9aa3b2;">PČR: nekontrolováno</div>
+                            </div>
+
+                            <!-- ── 3) CENA A PRODEJ ── -->
+                            <div class="col-12">
+                                <hr class="border-secondary opacity-25 my-1">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <i class="fas fa-coins text-warning"></i>
+                                    <span class="fw-semibold">Cena a prodej</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Prodejní cena <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" id="pcPrice" class="form-control" inputmode="numeric">
+                                    <span class="input-group-text">Kč</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Nákupní cena</label>
+                                <div class="input-group">
+                                    <input type="text" id="pcPurchasePrice" class="form-control" inputmode="numeric"
+                                           title="Za kolik jsme kus vykoupili/nakoupili. Potřeba pro daň z přirážky u použitého zboží (§ 90) — bez ní ji zpětně nespočítáme.">
+                                    <span class="input-group-text">Kč</span>
+                                </div>
+                                <div class="form-text small text-white-50">Nepovinné — § 90 (daň z přirážky).</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Prodejna</label>
+                                <select id="pcStockKey" class="form-select">
+                                    <option value="karlin">Karlín</option>
+                                    <option value="vaclavak">Černá Růže</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 d-flex flex-column justify-content-end gap-1 pb-1">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="pcSold">
-                                    <label class="form-check-label small" for="pcSold">Prodáno (uloží se jako Vyprodáno)</label>
+                                    <label class="form-check-label small" for="pcSold">Prodáno <span class="text-white-50">(Vyprodáno)</span></label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="pcHideEshop">
+                                    <label class="form-check-label small" for="pcHideEshop">Nezobrazovat na e-shopu</label>
                                 </div>
                             </div>
 
-                            <!-- ── Galerie média ── -->
+                            <!-- ── 4) FOTKY A MÉDIA ── -->
                             <div class="col-12">
                                 <hr class="border-secondary opacity-25 my-1">
                                 <div class="d-flex align-items-center gap-2 mb-2">
                                     <i class="fas fa-images text-primary"></i>
-                                    <span class="fw-semibold">Galerie média</span>
+                                    <span class="fw-semibold">Fotky a média</span>
                                     <span class="text-white-50 small">— studiová fotka · klasické fotky (Sbazar/Bazos) · 360° video</span>
+                                </div>
+                                <div class="row g-3 mb-1">
+                                    <div class="col-md-5">
+                                        <label class="form-label small">Foto produktu <span class="text-white-50">(rychlá fotka — náhled v CRM)</span></label>
+                                        <input type="file" id="pcPhoto" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.webp,image/*">
+                                    </div>
                                 </div>
                                 <div class="row g-3">
                                     <div class="col-md-4">
@@ -1008,6 +1036,7 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('show_studio', el('pcShowStudio').checked ? '1' : '0');
         fd.append('show_gallery', el('pcShowGallery').checked ? '1' : '0');
         fd.append('show_360', el('pcShow360').checked ? '1' : '0');
+        fd.append('hide_eshop', el('pcHideEshop').checked ? '1' : '0');
         if (force) fd.append('force', '1');
         fetch('api/product_create.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
@@ -1073,6 +1102,7 @@ $(document).on('click', '.product-label-btn', function () {
         $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
         $modelC.style.display = 'none'; $colorC.style.display = 'none';
         $sold.checked = false;
+        el('pcHideEshop').checked = false;
         $photo.value = ''; $imageUrl.value = '';
         resetGalleryAll([], '', '');
         el('pcPreviewImgWrap').style.display = 'none';
@@ -1120,6 +1150,7 @@ $(document).on('click', '.product-label-btn', function () {
                 setSelectValue($ram, p.ram); setSelectValue($cpu, p.cpu); setSelectValue($gpu, p.gpu);
                 setSelectValue($rocnik, p.rocnik); setSelectValue($gen, p.generace);
                 $sold.checked = !!p.sold;
+                el('pcHideEshop').checked = !!parseInt(p.hide_eshop || 0, 10);
                 $stockKey.value = p.stock_key || DEFAULT_STOCK;
                 $imageUrl.value = p.image_url || '';
                 if (p.image_url) { el('pcPreviewImg').src = p.image_url; el('pcPreviewImgWrap').style.display = ''; }

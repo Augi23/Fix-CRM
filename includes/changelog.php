@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.40.0',
+        'date' => '2026-08-01',
+        'time' => '13:28',
+        'title' => 'Naskladnění produktu: přehledný formulář ve 4 sekcích + „Nezobrazovat na e-shopu"',
+        'items' => [
+            'Formulář naskladnění je přerovnaný do <b>4 logických sekcí</b>: <b>Zařízení</b> (typ, model, úložiště, barva, stav, baterie + Mac/iPad pole) → <b>Identifikace kusu</b> (SN/IMEI + PČR) → <b>Cena a prodej</b> (ceny, prodejna, zaškrtávátka) → <b>Fotky a média</b> (foto, studiovka, galerie, 360°).',
+            'Pole <b>„vlastní…"</b> se nově otevírá VŽDY stejně — pod svým výběrem (dřív jednou vedle, jednou pod = chaos).',
+            'Nový checkbox <b>„Nezobrazovat na e-shopu"</b>: kus zůstává v CRM (prodáš ho na kase), ale feed ho na e-shop vůbec nepošle. V seznamu produktů má badge „skrytý na e-shopu".',
+        ],
+    ],
+    [
         'version' => '3.39.2',
         'date' => '2026-08-01',
         'time' => '13:20',

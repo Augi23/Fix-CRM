@@ -287,6 +287,20 @@ function crmProductBranchId(int $productId): int {
     } catch (Throwable $e) { return 0; }
 }
 
+/** Runtime sloupec products.hide_eshop (checkbox „Nezobrazovat na e-shopu" v naskladnění):
+ *  1 = kus zůstává v CRM, ale feed pro e-shop ho vůbec neposílá. */
+function ensureProductsHideEshopColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM products LIKE 'hide_eshop'")->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN hide_eshop TINYINT(1) NOT NULL DEFAULT 0");
+        }
+    } catch (Throwable $e) { error_log('ensureProductsHideEshopColumn: ' . $e->getMessage()); }
+}
+
 /** Pobočka (id) pro „prodejnu" produktu (stock_key): vaclavak = Černá Růže = prikope; jinak Karlín. */
 function skladBranchIdForStockKey(string $stockKey): int {
     $code = (strtolower(trim($stockKey)) === 'vaclavak') ? 'prikope' : 'karlin';

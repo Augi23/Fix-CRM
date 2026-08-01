@@ -34,6 +34,7 @@ if (function_exists('ensureProductsCrmColumns')) { try { ensureProductsCrmColumn
 // Knihovna studiových fotek modelů — produkt bez vlastní studiovky ji zdědí (viz níže).
 $modelPhotos = function_exists('crmModelPhotoMap') ? crmModelPhotoMap() : [];
 if (function_exists('ensureProductsLoanColumns')) { ensureProductsLoanColumns(); }
+if (function_exists('ensureProductsHideEshopColumn')) { ensureProductsHideEshopColumn(); }
 
 // ── auth ─────────────────────────────────────────────────────────────────────
 $remote   = (string)($_SERVER['REMOTE_ADDR'] ?? '');
@@ -58,6 +59,7 @@ $offset       = max(0, (int)($_GET['offset'] ?? 0));
 $where = []; $params = [];
 if ($code !== '')       { $where[] = 'product_code = ?'; $params[] = $code; }
 $where[] = 'loan_at IS NULL';   // zapůjčené / v komisi nejsou naše k prodeji
+$where[] = 'hide_eshop = 0';    // checkbox „Nezobrazovat na e-shopu" v naskladnění
 if ($inStockOnly)       { $where[] = 'stock_qty > 0'; }
 if ($updatedSince !== '') {
     $tsN = strtotime($updatedSince);
