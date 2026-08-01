@@ -322,7 +322,7 @@ try {
                                     </td>
                                     <td style="white-space:nowrap;">
                                         <?php if (!empty($p['added_at'])): ?>
-                                            <div style="font-size:12px;line-height:1.4;"><?php echo crmDateTime($p['added_at']); ?></div>
+                                            <div style="font-size:10.5px;line-height:1.4;"><?php echo crmDateTime($p['added_at']); ?></div>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>
                                         <?php endif; ?>
