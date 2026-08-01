@@ -6,7 +6,7 @@
  *   ?location=N  — štítky všech dílů jednoho umístění (dotisk po přerovnání)
  *   ?all=1       — arch se štítky všech naskladněných dílů (tisk na A4 / řezané štítky)
  * QR kód vede na sklad.php?qr=<id> (naskladnění / výdej mobilem).
- * Na štítku je i kód umístění (K012…) a model zařízení, když jsou vyplněné.
+ * Na štítku je i kód umístění (KrK001…) a model zařízení, když jsou vyplněné.
  */
 require_once 'includes/config.php';
 require_once 'includes/functions.php';

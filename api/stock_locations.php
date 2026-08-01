@@ -46,12 +46,13 @@ function _locRequireBranch(int $branchId): void {
 }
 
 /** Založí jedno umístění a vrátí ['id'=>…, 'code'=>…].
- *  Kód se odvozuje z nejvyššího už použitého (R1, R1-P2, K001…), takže dva lidé
+ *  Kód se odvozuje z nejvyššího už použitého v TÉ pobočce (RegK1, RegK1-P2,
+ *  KrK001…), takže dva lidé
  *  zakládající naráz by dostali tentýž — proto se celé zakládání dělá pod zámkem
  *  _locLock() (opakování po chybě duplicity by uvnitř transakce nepomohlo: čtení
  *  vidí kvůli REPEATABLE READ pořád stejný snímek dat). */
 function _locInsert(PDO $pdo, string $type, string $name, int $parentId, int $branchId): array {
-    $code = nextStockLocationCode($pdo, $type, $parentId);
+    $code = nextStockLocationCode($pdo, $type, $parentId, $branchId);
     $pdo->prepare("INSERT INTO stock_locations (code, name, type, parent_id, branch_id) VALUES (?, ?, ?, ?, ?)")
         ->execute([$code, $name, $type, $parentId > 0 ? $parentId : null, $branchId]);
     return ['id' => (int)$pdo->lastInsertId(), 'code' => $code];
@@ -83,6 +84,8 @@ try {
         $parentId = (int)($_POST['parent_id'] ?? 0);
         $count = max(1, min(50, (int)($_POST['count'] ?? 1)));
         if ($type === 'regal') { $parentId = 0; }
+        // police se zakládá VÝHRADNĚ na regál — jinak by neměla z čeho odvodit kód
+        if ($type === 'police' && $parentId <= 0) { throw new Exception('Vyber regál, na který police patří.'); }
         if ($parentId > 0) {
             $p = $pdo->prepare("SELECT id, type, branch_id, is_active FROM stock_locations WHERE id = ?");
             $p->execute([$parentId]);
@@ -207,11 +210,16 @@ try {
             $parentId = (int)$_POST['parent_id'];
             if ($parentId === $id) { throw new Exception('Umístění nemůže být samo sobě rodičem.'); }
             if ($loc['type'] === 'regal') { $parentId = 0; }
+            // police musí zůstat na regálu — jinak by její kód (RegK1-P2) lhal
+            if ((string)$loc['type'] === 'police' && $parentId <= 0) {
+                throw new Exception('Police musí zůstat na regálu — vyber regál.');
+            }
             if ($parentId > 0) {
-                $p = $pdo->prepare("SELECT id, type, branch_id FROM stock_locations WHERE id = ?");
+                $p = $pdo->prepare("SELECT id, type, branch_id, is_active FROM stock_locations WHERE id = ?");
                 $p->execute([$parentId]);
                 $parent = $p->fetch();
                 if (!$parent) { throw new Exception('Nadřazené umístění nenalezeno.'); }
+                if (empty($parent['is_active'])) { throw new Exception('Cílové umístění je deaktivované.'); }
                 if ((int)($parent['branch_id'] ?? 0) !== (int)($loc['branch_id'] ?? 0)) {
                     throw new Exception('Přesunout jde jen v rámci skladu jedné pobočky.');
                 }
@@ -220,14 +228,52 @@ try {
             }
             $set[] = 'parent_id = ?'; $vals[] = $parentId > 0 ? $parentId : null;
         }
-        if (!$set) { throw new Exception('Není co měnit.'); }
-        $vals[] = $id;
-        $pdo->prepare("UPDATE stock_locations SET " . implode(', ', $set) . " WHERE id = ?")->execute($vals);
+        // POLICE PŘESTĚHOVANÁ NA JINÝ REGÁL musí dostat nový kód: kód police obsahuje
+        // kód regálu (RegK1-P2), takže po přesunu na RegK3 by štítek lhal o tom, kde
+        // police je. U krabičky je naopak trvalý kód záměr (štítek se netiskne znovu).
+        $newCode = null;
+        $needCode = false;
+        if (isset($_POST['parent_id']) && (string)$loc['type'] === 'police') {
+            $newParent = (int)$_POST['parent_id'];
+            if ($newParent > 0 && $newParent !== (int)($loc['parent_id'] ?? 0)) {
+                // Kód police už může cílovému regálu odpovídat (police se jen vrací
+                // tam, odkud byla) — pak se nepřečísluje a číslo se zbytečně nespálí.
+                $pc = $pdo->prepare("SELECT code FROM stock_locations WHERE id = ?");
+                $pc->execute([$newParent]);
+                $parentCode = (string)$pc->fetchColumn();
+                if ($parentCode !== '' && strpos((string)$loc['code'], $parentCode . '-P') !== 0) {
+                    $needCode = true;
+                }
+            }
+        }
+        if (!$set && !$needCode) { throw new Exception('Není co měnit.'); }
+
+        // Přidělení kódu i ZÁPIS pod jedním zámkem — kdyby se zámek pustil hned po
+        // výpočtu, dva souběžné přesuny na týž regál by dostaly stejný kód a druhý
+        // by spadl na UNIQUE se syrovou SQL hláškou.
+        if ($needCode) { _locLock($pdo); }
+        try {
+            if ($needCode) {
+                $newCode = nextStockLocationCode($pdo, 'police', (int)$_POST['parent_id'], (int)($loc['branch_id'] ?? 0) ?: getDefaultBranchId());
+                $set[] = 'code = ?'; $vals[] = $newCode;
+            }
+            $vals[] = $id;
+            $pdo->prepare("UPDATE stock_locations SET " . implode(', ', $set) . " WHERE id = ?")->execute($vals);
+        } finally {
+            if ($needCode) { _locUnlock($pdo); }
+        }
         crmAuditLog('location.update', [
-            'entity_type' => 'stock_location', 'entity_id' => $id, 'entity_label' => (string)$loc['code'],
-            'summary' => 'Upraveno umístění ' . $loc['code'] . (isset($_POST['parent_id']) ? ' (přesun/nadřazení)' : '') . (isset($_POST['is_active']) ? ((int)$_POST['is_active'] ? ' (aktivováno)' : ' (deaktivováno)') : ''),
+            'entity_type' => 'stock_location', 'entity_id' => $id,
+            'entity_label' => $newCode ?? (string)$loc['code'],
+            'summary' => 'Upraveno umístění ' . $loc['code']
+                . ($newCode !== null ? ' → nový kód ' . $newCode : '')
+                . (isset($_POST['parent_id']) ? ' (přesun/nadřazení)' : '')
+                . (isset($_POST['is_active']) ? ((int)$_POST['is_active'] ? ' (aktivováno)' : ' (deaktivováno)') : ''),
         ]);
-        echo json_encode(['success' => true, 'message' => 'Umístění ' . $loc['code'] . ' uloženo.'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success' => true,
+            'message' => $newCode !== null
+                ? 'Police přesunuta a má nový kód ' . $newCode . ' — VYTISKNI JÍ NOVÝ ŠTÍTEK (starý už neplatí).'
+                : 'Umístění ' . $loc['code'] . ' uloženo.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

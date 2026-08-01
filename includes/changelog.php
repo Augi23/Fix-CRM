@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => '3.38.4',
+        'date' => '2026-08-01',
+        'time' => '04:15',
+        'title' => 'Kódy umístění nesou zkratku pobočky — RegK1 v Karlíně, RegCR1 na Černé Růži',
+        'items' => [
+            '<b>Ze štítku je hned poznat, do kterého skladu patří.</b> Karlín: <b>RegK1</b> → <b>RegK1-P2</b> → <b>KrK001</b>. Černá Růže: <b>RegCR1</b> → <b>RegCR1-P2</b> → <b>KrCR001</b>. Každá pobočka má vlastní řadu od jedničky.',
+            'Sken QR i ruční zapsání kódu do hledání funguje na nové i staré kódy.',
+            '<b>Police vždy patří na regál</b> — její kód se z něj odvozuje. Když polici přesuneš na jiný regál, systém jí <b>přidělí nový kód</b> a připomene, ať jí vytiskneš nový štítek. Krabička si naopak kód nechává napořád (štítek se nepřetiskuje).',
+            'Příklady kódů v aplikaci se skládají podle pobočky, na kterou se právě díváš; návod ve Skladu je přepsaný na nový formát.',
+        ],
+    ],
+    [
         'version' => '3.38.3',
         'date' => '2026-08-01',
         'time' => '02:30',
@@ -15,7 +27,7 @@ return [
             '<b>Umístění patří pobočce.</b> Karlín a Na Příkopě mají každý svůj sklad — regály, police i krabičky. Cizí sklad si prohlédneš, ale měnit ho smí jen jeho lidé (a vedení); díl se nedá uložit do krabičky druhé pobočky a arch štítků tiskne jen umístění té pobočky, na kterou se díváš.',
             '<b>Pozice u dílu:</b> v kartě dílu vybíráš <b>krabičku</b>, když je díl v ní — nebo rovnou <b>polici</b> či <b>regál</b>, když leží volně. Nabídka obsahuje jen umístění pobočky, které díl patří; když díl leží někde, co už v nabídce není (deaktivované), zůstane to vidět a neztratí se to.',
             'Umístění nastavují <b>všichni zaměstnanci</b> — technici, manažeři i Boss (navazuje na včerejší otevření skladu všem).',
-            'Technicky: číselná řada je společná pro celou firmu (každý QR kód je jedinečný) a přiděluje se pod zámkem, takže dva lidé zakládající naráz nedostanou stejné číslo; zakládání běží v transakci (celá dávka, nebo nic).',
+            'Technicky: kód se přiděluje pod zámkem, takže dva lidé zakládající naráz nedostanou stejné číslo; zakládání běží v transakci (celá dávka, nebo nic).',
         ],
     ],
     [

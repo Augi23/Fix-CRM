@@ -224,6 +224,26 @@ function skladBranchLabel(int $branchId): string {
     return getBranchLabel($branchId) ?: ('Pobočka ' . $branchId);
 }
 
+/** ZKRATKA POBOČKY do kódů umístění: Karlín = K, Černá Růže (Na Příkopě) = CR.
+ *  Kód regálu pak vypadá „RegK1" / „RegCR1", krabička „KrK001" / „KrCR001" —
+ *  na štítku je tedy na první pohled vidět, do kterého skladu patří.
+ *  Neznámá pobočka: první dvě písmena jejího kódu (aby kód vždycky vznikl). */
+function skladBranchShort(int $branchId): string {
+    $map = ['karlin' => 'K', 'prikope' => 'CR'];
+    $code = skladBranchCode($branchId);
+    if (isset($map[$code])) { return $map[$code]; }
+    // diakritiku přepsat (jinak by z „černá" zbylo „ERN" → nesmyslná zkratka)
+    $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT', $code) ?: $code;
+    $fallback = strtoupper(preg_replace('/[^A-Za-z]/', '', $ascii));
+    if ($fallback !== '') { return substr($fallback, 0, 2); }
+    // ZKRATKA NIKDY NEKONČÍ ČÍSLICÍ — jinak by splynula s pořadovým číslem
+    // („RegB31" = pobočka B3 regál 1, nebo B31?) a mohla by kolidovat.
+    $letters = '';
+    $n = max(1, $branchId);
+    while ($n > 0) { $letters = chr(65 + (($n - 1) % 26)) . $letters; $n = intdiv($n - 1, 26); }
+    return 'X' . $letters;
+}
+
 /** Vybraná pobočka Skladu z ?branch=N; 0 = nevybráno / neplatné (→ rozcestník). */
 function skladSelectedBranchId(): int {
     $b = (int)($_GET['branch'] ?? 0);
@@ -3252,7 +3272,7 @@ function crmLogInventoryMove(int $inventoryId, int $delta, string $reason, ?int 
 }
 
 /* ═══════════════ SKLAD: fyzická umístění (regál → police → krabička) ═══════════════
-   Organizace 29.7.2026: krabička má TRVALÝ kód (K001…) a štítek s QR
+   Organizace 29.7.2026: krabička má TRVALÝ kód (KrK001…) a štítek s QR
    (sklad.php?loc=<id>); na které polici leží, drží parent_id v CRM — přesun
    krabičky = změna v CRM, štítek se NEpřetiskuje. Dražší díly mají vlastní
    kartu + svůj QR (sklad.php?qr=), drobné levné díly sdílí krabičku: buď jako
@@ -3294,36 +3314,66 @@ function stockLocationTypeLabel(string $type): string {
     return ['regal' => 'Regál', 'police' => 'Police', 'krabicka' => 'Krabička'][$type] ?? $type;
 }
 
-/** Další volný kód: regál R1, R2…; police <regál>-P1…; krabička K001… (trvalý). */
-function nextStockLocationCode(PDO $pdo, string $type, int $parentId = 0): string {
+/** Další volný kód V RÁMCI POBOČKY: regál RegK1/RegCR1…; police <regál>-P1…;
+ *  krabička KrK001/KrCR001… (trvalý — nemění se ani po přestěhování). */
+function nextStockLocationCode(PDO $pdo, string $type, int $parentId = 0, int $branchId = 0): string {
+    if ($branchId <= 0) { $branchId = getDefaultBranchId(); }
+    $short = skladBranchShort($branchId);
     if ($type === 'regal') {
+        // Řada je PER POBOČKU: Karlín má RegK1, RegK2…, Černá Růže RegCR1, RegCR2…
+        // Každá provozovna tak začíná jedničkou a ze štítku je hned poznat, kam patří.
+        // Maximum se hledá podle PREFIXU KÓDU, ne podle branch_id: kdyby dvě pobočky
+        // někdy dostaly stejnou zkratku, řada jen naváže — nevzniknou dva stejné kódy
+        // (code má globální UNIQUE a zakládání by trvale padalo).
         $max = 0;
-        foreach ($pdo->query("SELECT code FROM stock_locations WHERE type = 'regal'")->fetchAll(PDO::FETCH_COLUMN) as $c) {
+        $st = $pdo->prepare("SELECT code FROM stock_locations WHERE type = 'regal' AND code LIKE ?");
+        $st->execute(['Reg' . $short . '%']);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $c) {
+            if (preg_match('/^Reg' . preg_quote($short, '/') . '(\d+)$/i', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
+        }
+        // historické kódy R1, R2… (před v3.38.4) — jen u výchozí pobočky
+        $lg = $pdo->prepare("SELECT code FROM stock_locations WHERE type = 'regal' AND code REGEXP '^R[0-9]+$' AND branch_id = ?");
+        $lg->execute([$branchId]);
+        foreach ($lg->fetchAll(PDO::FETCH_COLUMN) as $c) {
             if (preg_match('/^R(\d+)$/', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
         }
-        return 'R' . ($max + 1);
+        return 'Reg' . $short . ($max + 1);
     }
     if ($type === 'police') {
-        $parentCode = '';
-        if ($parentId > 0) {
-            $st = $pdo->prepare("SELECT code FROM stock_locations WHERE id = ?");
-            $st->execute([$parentId]);
-            $parentCode = (string)$st->fetchColumn();
-        }
-        $st = $pdo->prepare("SELECT code FROM stock_locations WHERE type = 'police' AND parent_id " . ($parentId > 0 ? '= ?' : 'IS NULL'));
-        $st->execute($parentId > 0 ? [$parentId] : []);
+        // police VŽDY patří na regál (bez něj by kód neměl z čeho vzniknout)
+        if ($parentId <= 0) { throw new RuntimeException('Police se zakládá na regál — vyber regál.'); }
+        $st = $pdo->prepare("SELECT code FROM stock_locations WHERE id = ?");
+        $st->execute([$parentId]);
+        $parentCode = (string)$st->fetchColumn();
+        if ($parentCode === '') { throw new RuntimeException('Regál nenalezen.'); }
+
+        // Police dědí kód regálu: RegK1-P1, RegK1-P2… Číslo se hledá podle PREFIXU
+        // KÓDU, ne podle parent_id — police přestěhovaná na jiný regál si totiž kód
+        // ponechá, a hledání mezi sourozenci by pak vyrobilo duplicitu (a zakládání
+        // polic v tom regálu by natrvalo padalo na UNIQUE).
+        $st = $pdo->prepare("SELECT code FROM stock_locations WHERE type = 'police' AND code LIKE ?");
+        $st->execute([$parentCode . '-P%']);
         $max = 0;
         foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $c) {
-            if (preg_match('/P(\d+)$/', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
+            if (preg_match('/-P(\d+)$/', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
         }
-        return ($parentCode !== '' ? $parentCode . '-' : '') . 'P' . ($max + 1);
+        return $parentCode . '-P' . ($max + 1);
     }
-    // krabička — globální řada K001, K002… (kód se nikdy nerecykluje ani nemění)
+    // krabička — řada per pobočka: KrK001, KrK002… / KrCR001…
+    // (kód se nemění ani po přestěhování krabičky na jinou polici)
     $max = 0;
-    foreach ($pdo->query("SELECT code FROM stock_locations WHERE type = 'krabicka'")->fetchAll(PDO::FETCH_COLUMN) as $c) {
+    $st = $pdo->prepare("SELECT code FROM stock_locations WHERE type = 'krabicka' AND code LIKE ?");
+    $st->execute(['Kr' . $short . '%']);
+    foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $c) {
+        if (preg_match('/^Kr' . preg_quote($short, '/') . '(\d+)$/i', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
+    }
+    // historické kódy K001… (před v3.38.4) — jen u výchozí pobočky
+    $lg = $pdo->prepare("SELECT code FROM stock_locations WHERE type = 'krabicka' AND code REGEXP '^K[0-9]+$' AND branch_id = ?");
+    $lg->execute([$branchId]);
+    foreach ($lg->fetchAll(PDO::FETCH_COLUMN) as $c) {
         if (preg_match('/^K(\d+)$/', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
     }
-    return 'K' . str_pad((string)($max + 1), 3, '0', STR_PAD_LEFT);
+    return 'Kr' . $short . str_pad((string)($max + 1), 3, '0', STR_PAD_LEFT);
 }
 
 /** Všechna umístění (+ kód/název rodiče) pro selecty, stromy a štítky. */
@@ -3363,7 +3413,7 @@ function stockLocationBranchId(int $locationId): int {
     } catch (Throwable $e) { return 0; }
 }
 
-/** „K012 · iPhone 12 – drobné (R1-P2)" — plný popisek umístění. */
+/** „KrK012 · iPhone 12 – drobné (RegK1-P2)" — plný popisek umístění. */
 function stockLocationFullLabel(array $loc): string {
     $s = (string)$loc['code'];
     if (trim((string)($loc['name'] ?? '')) !== '') { $s .= ' · ' . $loc['name']; }

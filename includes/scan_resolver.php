@@ -24,7 +24,8 @@ if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '' && function_exi
             exit;
         }
     }
-    // Kód umístění skladu (K012 / R1 / R1-P2) napsaný či naskenovaný do hledání
+    // Kód umístění skladu (RegK1 / RegK1-P2 / KrK001, historicky R1 / K001)
+    // napsaný či naskenovaný do hledání
     // → rovnou obsah krabičky/police. Přesná shoda v DB, jinak se nic neděje.
     if (!empty($_SESSION['user_id'])) {
         if (function_exists('ensureStockLocationsSchema')) { ensureStockLocationsSchema(); }
@@ -32,9 +33,12 @@ if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '' && function_exi
         if (function_exists('scanNormalizeCandidates')) { $_lcands = array_merge($_lcands, scanNormalizeCandidates($_scan)); }
         foreach ($_lcands as $_lc) {
             $_lc = strtoupper(trim((string)$_lc));
-            if ($_lc === '' || !preg_match('/^[KR]\d[\dA-Z\-]{0,12}$/', $_lc)) { continue; }
+            // kódy umístění: RegK1, RegCR1-P2, KrK001 (a historické R1 / R1-P2 / K001)
+            if ($_lc === '' || !preg_match('/^(?:(?:REG|KR)[A-Z]{1,4}\d{1,4}|[KR]\d{1,4})(?:-P\d{1,3})?$/', $_lc)) { continue; }
             try {
-                $_lq = $pdo->prepare("SELECT id FROM stock_locations WHERE code = ?");
+                // kódy jsou nově smíšené (RegK1), vstup ze skenu velkými písmeny —
+                // porovnat bez ohledu na velikost, ať to nestojí na collation tabulky
+                $_lq = $pdo->prepare("SELECT id FROM stock_locations WHERE UPPER(code) = ?");
                 $_lq->execute([$_lc]);
                 if (($_lid = (int)$_lq->fetchColumn()) > 0) {
                     header("Location: sklad.php?loc=" . $_lid);

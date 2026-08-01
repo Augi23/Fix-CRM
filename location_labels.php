@@ -6,7 +6,9 @@
  *   ?type=krabicka     — arch jen daného typu (regal | police | krabicka)
  * QR kód vede na sklad.php?loc=<id> — mobil ukáže obsah umístění
  * (u krabičky seznam dílů; ťuknutím na díl rovnou naskladnění/výdej).
- * Kód umístění je TRVALÝ — štítek platí, i když se krabička přestěhuje.
+ * Kód KRABIČKY je TRVALÝ — štítek platí, i když se krabička přestěhuje.
+ * Kód POLICE obsahuje regál (RegK1-P2), takže po přesunu police na jiný regál
+ * se přečísluje a štítek se tiskne znovu.
  */
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
@@ -29,11 +31,11 @@ try {
         $stmt->execute([$one]);
         $items = $stmt->fetchAll();
     } elseif (in_array($type, ['regal', 'police', 'krabicka'], true)) {
-        $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.type = ? AND l.branch_id = ? ORDER BY l.code ASC");
+        $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.type = ? AND l.branch_id = ? ORDER BY LENGTH(l.code) ASC, l.code ASC");
         $stmt->execute([$type, $labelBranch]);
         $items = $stmt->fetchAll();
     } elseif (!empty($_GET['all'])) {
-        $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.branch_id = ? ORDER BY FIELD(l.type,'regal','police','krabicka'), l.code ASC");
+        $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.branch_id = ? ORDER BY FIELD(l.type,'regal','police','krabicka'), LENGTH(l.code) ASC, l.code ASC");
         $stmt->execute([$labelBranch]);
         $items = $stmt->fetchAll();
     }
@@ -58,7 +60,7 @@ $base = rtrim(str_replace('\\', '/', $base), '/');
         break-inside: avoid; page-break-inside: avoid; min-height: 30mm;
     }
     .label img { width: 24mm; height: 24mm; flex: 0 0 auto; }
-    .label .cd { font-size: 19px; font-weight: 800; letter-spacing: .5px; line-height: 1.1; }
+    .label .cd { font-size: 19px; font-weight: 800; letter-spacing: .5px; line-height: 1.1;  word-break: break-word; overflow-wrap: anywhere; }
     .label .nm { font-size: 11.5px; font-weight: 700; line-height: 1.25; word-break: break-word; margin-top: 1mm; }
     .label .mt { font-size: 10px; color: #333; margin-top: 1mm; }
     @media print { .toolbar { display: none; } body { padding: 4mm; } .label { border-color: #bbb; } }
