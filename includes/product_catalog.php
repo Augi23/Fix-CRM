@@ -123,7 +123,9 @@ function afxProductAssemble(array $in): array {
     $cores = implode(' ', $coresParts);
     if ($cores !== '' && $mem !== '') { $spec = $cores . ', ' . $mem; }
     else { $spec = $cores !== '' ? $cores : $mem; }
-    $titleParts = array_filter([$displayModel, $spec, $color, $gradeToken], static fn($p) => $p !== '');
+    // Stav (grade) do NÁZVU nepatří (přání 1.8.2026) — zůstává jen v parametru
+    // [PARAMETER "Stav"], v popisu a v buňce Stav (CRM tabulka i e-shop).
+    $titleParts = array_filter([$displayModel, $spec, $color], static fn($p) => $p !== '');
     $title = trim(implode(' ', $titleParts));
 
     // SHORT_DESCRIPTION — pořadí přesně dle form_row()

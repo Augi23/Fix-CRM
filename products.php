@@ -83,8 +83,7 @@ $statStmt = $pdo->prepare("SELECT COUNT(*) AS total,
 $statStmt->execute(array_merge([$skladBranch], $catParams));
 $stats = $statStmt->fetch();
 
-// poslední import — řádky, které v něm nebyly, dostanou upozornění (nemažou se samy)
-$lastImportAt = (string)get_setting('products_last_import_at', '');
+// Import z appky ODSTRANĚN (1.8.2026) — produkty se naskladňují výhradně v CRM.
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -112,9 +111,6 @@ $lastImportAt = (string)get_setting('products_last_import_at', '');
         <a class="btn btn-outline-secondary" href="api/export_products_csv.php" title="Kompletní sklad ve formátu souboru appky — pro ruční import do Upgates">
             <i class="fas fa-file-csv me-2"></i> CSV pro Upgates
         </a>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importModal">
-            <i class="fas fa-file-upload me-2"></i> Nahrát soubor z appky
-        </button>
         <?php endif; ?>
     </div>
 </div>
@@ -256,14 +252,12 @@ try {
                                 <tr>
                                     <td colspan="9" class="text-center py-5 text-muted">
                                         <i class="fas fa-mobile-alt fa-3x mb-3 d-block opacity-25"></i>
-                                        Zatím žádné produkty.<?php echo $canManage ? ' Nahraj soubor z naskladňovací appky tlačítkem vpravo nahoře.' : ''; ?>
+                                        Zatím žádné produkty.<?php echo $canManage ? ' Naskladni první kus tlačítkem „Naskladnit produkt" vpravo nahoře.' : ''; ?>
                                     </td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($products as $p): ?>
                                 <?php $img = productImageDisplayUrl($p['image_url'] ?? ''); ?>
-                                <?php // kusy spravované v CRM v souboru appky nejsou ZÁMĚRNĚ — badge „není v souboru" se jich netýká
-                                $stale = ($lastImportAt !== '' && (string)$p['last_seen_at'] < $lastImportAt && (string)($p['source'] ?? 'app') !== 'crm'); ?>
                                 <tr>
                                     <td class="ps-4">
                                         <?php if ($img !== ''): ?>
@@ -283,9 +277,6 @@ try {
                                             <?php if (!empty($p['capacity'])): ?> · <?php echo e($p['capacity']); ?><?php endif; ?>
                                             <?php if (!empty($p['color'])): ?> · <?php echo e($p['color']); ?><?php endif; ?>
                                         </div>
-                                        <?php if ($stale): ?>
-                                            <span class="badge bg-warning text-dark mt-1" title="Tento produkt nebyl v naposledy nahraném souboru — buď byl v appce smazán, nebo byl nahrán jiný soubor. Nemaže se automaticky.">není v posledním souboru</span>
-                                        <?php endif; ?>
                                     </td>
                                     <td><code><?php echo e($p['product_code']); ?></code></td>
                                     <td>
@@ -618,33 +609,6 @@ try {
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="importModal" tabindex="-1" data-bs-focus="false">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form id="importForm">
-                <?php echo csrfField(); ?>
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-file-upload me-2 text-primary"></i>Nahrát produkty z appky</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="small text-white-75 mb-3">
-                        Vyber soubor <code>AppleFix-produkty.csv</code> — ten, do kterého ukládá
-                        naskladňovací aplikace (bývá na Ploše). Import produkty <strong>přidá nebo
-                        aktualizuje podle kódu</strong>; nic sám nemaže, takže opakované nahrání je bezpečné.
-                    </p>
-                    <input type="file" name="file" class="form-control" accept=".csv,text/csv" required>
-                    <div id="importResult" class="alert alert-info border-0 mt-3" style="display:none;"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
-                    <button type="submit" class="btn btn-primary" id="importSubmitBtn"><i class="fas fa-file-import me-2"></i>Importovat</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 <?php endif; ?>
 
 <script>
@@ -721,8 +685,8 @@ $(document).on('click', '.product-label-btn', function () {
             : [ram ? ram + ' RAM' : '', cap].filter(Boolean).join(' ');
         var cores = [cpu ? cpu + ' CPU' : '', gpu ? gpu + ' GPU' : ''].filter(Boolean).join(' ');
         var spec = (cores && mem) ? cores + ', ' + mem : (cores || mem);
-        var gr = ($grade.value || '').split(' ')[0] || 'A';
-        return [dm, spec, colorVal(), gr].filter(Boolean).join(' ').trim();
+        // stav (grade) do názvu nepatří — jen v buňce/parametru/popisu
+        return [dm, spec, colorVal()].filter(Boolean).join(' ').trim();
     }
     function buildDesc() {
         var t = typeDef();
@@ -1169,31 +1133,6 @@ $(document).on('click', '.product-label-btn', function () {
             .catch(function () { showAlert('Načtení produktu selhalo.'); });
     });
 })();
-
-document.getElementById('importForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var btn = document.getElementById('importSubmitBtn');
-    var box = document.getElementById('importResult');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importuji…';
-    var fd = new FormData(this);
-    fetch('api/import_products.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-            box.style.display = 'block';
-            box.className = 'alert border-0 mt-3 ' + (d.success ? 'alert-success' : 'alert-danger');
-            box.textContent = d.message || (d.success ? 'Hotovo.' : 'Chyba importu.');
-            if (d.success) { setTimeout(function () { location.reload(); }, 1600); }
-            else { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import me-2"></i>Importovat'; }
-        })
-        .catch(function () {
-            box.style.display = 'block';
-            box.className = 'alert alert-danger border-0 mt-3';
-            box.textContent = 'Síťová chyba — zkus to znovu.';
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-file-import me-2"></i>Importovat';
-        });
-});
 
 // dataset.title = surový text (HTML entity už dekódované) — showConfirm ale renderuje
 // přes innerHTML, takže se název MUSÍ escapovat tady, jinak <img onerror> z CSV = XSS

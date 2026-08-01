@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.41.0',
+        'date' => '2026-08-01',
+        'time' => '13:41',
+        'title' => 'Konec importu z appky + stav zboží už není v názvu produktu',
+        'items' => [
+            '<b>Import „Nahrát soubor z appky" je odstraněn</b> — tlačítko, okno i serverový endpoint. Produkty se naskladňují výhradně v CRM (Naskladnit produkt). Zmizel i badge „není v posledním souboru", který se vázal na importy.',
+            '<b>Stav (Nový/A/B/C…) se už nepřidává do názvu produktu</b> — zůstává jen v buňce Stav, v parametru a v popisu. Nové/upravené kusy dostanou čistý název („iPhone 15 Pro 256 GB Blue Titanium"); starší kusy se přejmenují při první úpravě.',
+        ],
+    ],
+    [
         'version' => '3.40.1',
         'date' => '2026-08-01',
         'time' => '13:36',
