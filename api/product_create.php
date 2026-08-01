@@ -82,6 +82,7 @@ if ($action === 'get') {
         'purchase_price' => ($p['purchase_price'] ?? null) === null || (string)$p['purchase_price'] === ''
             ? '' : rtrim(rtrim(number_format((float)$p['purchase_price'], 2, '.', ''), '0'), '.'),
         'sold' => (int)$p['stock_qty'] <= 0,
+        'stock_qty' => (int)$p['stock_qty'],
         'stock_key' => (string)($p['stock_key'] ?? ''),
         'hide_eshop' => (int)($p['hide_eshop'] ?? 0),
         'image_url' => productImageDisplayUrl((string)($p['image_url'] ?? '')),   // jen naše úložiště — cizí URL z CSV nejde do <img>
@@ -126,6 +127,8 @@ $in = [
     'rocnik' => trim((string)($_POST['rocnik'] ?? '')),
     'generace' => trim((string)($_POST['generace'] ?? '')),
     'sold' => !empty($_POST['sold']),
+    'stock_qty' => isset($_POST['stock_qty']) && $_POST['stock_qty'] !== '' ? max(0, min(9999, (int)$_POST['stock_qty'])) : null,
+    'stock_qty_raw' => isset($_POST['stock_qty']) ? trim((string)$_POST['stock_qty']) : null,
     'stock_key' => in_array((string)($_POST['stock_key'] ?? ''), ['karlin', 'vaclavak'], true) ? (string)$_POST['stock_key'] : 'karlin',
     'hide_eshop' => ((string)($_POST['hide_eshop'] ?? '0') === '1') ? 1 : 0,
     'image_url' => trim((string)($_POST['image_url'] ?? '')),
@@ -254,7 +257,35 @@ try {
         'pcr_status' => $pcr['status'], 'pcr_text' => $pcr['text']]);
 
     $who = mb_substr(trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? '')), 0, 64);
-    $stockQty = $in['sold'] ? 0 : 1;
+    // POČET KUSŮ z formuláře (dřív natvrdo 1 = jeden kus na řádek). Příslušenství se
+    // naskladňuje po víc kusech a prodej na kase i e-shop už s počtem umí pracovat
+    // (stock_qty se snižuje, pos_sold_at se nastaví až při nule).
+    // Počet kusů musí být číslo. Nečíselný vstup ('', 'abc') by přes (int) tiše spadl
+    // na 0 a produkt by se založil rovnou jako vyprodaný.
+    if ($in['stock_qty_raw'] !== null && $in['stock_qty_raw'] !== '' && !preg_match('/^\d+$/', $in['stock_qty_raw'])) {
+        echo json_encode(['success' => false, 'message' => 'Počet kusů zadej celým číslem (např. 8).'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    $stockQty = $in['stock_qty'] !== null ? (int)$in['stock_qty'] : 1;
+    if ($editId <= 0 && !$in['sold'] && $stockQty < 1) {
+        echo json_encode(['success' => false, 'message' => 'Zadej počet kusů (alespoň 1) — nebo zaškrtni „Prodáno", pokud kus naskladňuješ jako vyprodaný.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    // OPTIMISTICKÝ ZÁMEK na počet kusů: formulář načetl stav v okamžiku otevření modalu,
+    // ale kasa nebo e-shop mezitím mohly prodávat. Absolutní přepis by prodané kusy
+    // „oživil" (a pos_sold_at = NULL by zahladil stopu). Zapíšeme jen tehdy, když je
+    // v DB pořád ta hodnota, kterou obsluha viděla.
+    $qtyOrig = isset($_POST['stock_qty_orig']) && $_POST['stock_qty_orig'] !== ''
+        ? max(0, (int)$_POST['stock_qty_orig']) : null;
+    $qtyGuardSql = ($editId > 0 && $qtyOrig !== null) ? ' AND stock_qty = ?' : '';
+    // „Prodáno" = vyprodáno. Explicitní kladný počet ale vyhrává — obsluha, která
+    // u vyprodané položky přepíše počet na 5, chce naskladnit, ne vynulovat.
+    if ($in['sold'] && ($in['stock_qty'] === null || $stockQty === 0)) { $stockQty = 0; }
+    // Kus se sériovým číslem je vždy JEDEN (dva stejné SN by nešly rozlišit).
+    // POZOR: sériové číslo je v $serial, ne v $in — dřív tu byl $in['serial'], což je
+    // vždy prázdné, takže pojistka nikdy nezabrala.
+    if ($stockQty > 1 && $serial !== '') { $stockQty = 1; }
+    // „Prodáno" má poslední slovo: kdyby formulář poslal 1 ks u prodaného kusu se SN
+    // (viz zámek v UI), vrátil by se prodaný telefon na sklad.
+    if ($in['sold'] && $serial !== '') { $stockQty = 0; }
     $pcrCheckedAt = ($pcr['status'] !== '' && $pcr['status'] !== 'notimei') ? date('Y-m-d H:i:s') : null;
 
     /* ── Ochrana napojení na CSV import z appky ─────────────────────────────
@@ -277,7 +308,7 @@ try {
             && abs($priceNum - (float)$existing['price']) < 0.005
             // „prodáno“ se porovnává jako příznak — plný UPDATE by vícekusové
             // příslušenství stáhl na 1 ks, mikroúprava stock_qty nesahá vůbec
-            && (($stockQty > 0) === ((int)$existing['stock_qty'] > 0))
+            && $stockQty === (int)$existing['stock_qty']   // změna POČTU musí projít plnou větví, jinak se tiše zahodí
             && $in['stock_key'] === (string)($existing['stock_key'] ?? '')
             && $in['model'] === (string)($existing['model'] ?? '')
             && $in['cap'] === (string)($existing['capacity'] ?? '')
@@ -323,14 +354,14 @@ try {
     }
 
     if ($action === 'update') {
-        $pdo->prepare("UPDATE products SET product_code = ?, title = ?, manufacturer = ?, category_code = ?,
+        $upd = $pdo->prepare("UPDATE products SET product_code = ?, title = ?, manufacturer = ?, category_code = ?,
                 model = ?, capacity = ?, color = ?, grade = ?, battery = ?, price = ?, purchase_price = ?, stock_qty = ?, branch_id = ?,
                 stock_key = ?, image_url = ?, studio_image_url = ?, gallery_images = ?, video_360_url = ?, has_360 = ?,
                 show_studio = ?, show_gallery = ?, show_360 = ?, hide_eshop = ?,
                 pcr_result = ?, pcr_status = ?, pcr_checked_at = COALESCE(?, pcr_checked_at),
                 raw_csv = ?, source = 'crm', created_by = COALESCE(created_by, ?), pos_sold_at = NULL, last_seen_at = NOW()
-            WHERE id = ?")
-            ->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
+            WHERE id = ?" . $qtyGuardSql);
+        $updParams = [$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
                 $asm['display_model'], $in['cap'] ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
                 $asm['battery_csv'] ?: null, $priceNum, $purchaseNum, $stockQty, $prodBranch,
                 $in['stock_key'], $in['image_url'] ?: null,
@@ -338,7 +369,25 @@ try {
                 $in['show_studio'], $in['show_gallery'], $in['show_360'], $in['hide_eshop'],
                 $pcr['text'] ?: null,
                 $pcr['status'] ?: null, $codeChanged ? $pcrCheckedAt : null,
-                json_encode($asm['assoc'], JSON_UNESCAPED_UNICODE), $who ?: null, $editId]);
+                json_encode($asm['assoc'], JSON_UNESCAPED_UNICODE), $who ?: null, $editId];
+        // POZOR: parametry se PŘIPOJUJÍ, ne sjednocují. `[...] + [$x]` je u polí sjednocení
+        // podle klíčů — index 0 vlevo existuje, takže by se $qtyOrig zahodilo a dotaz by
+        // měl o parametr míň (PDOException „Invalid parameter number" u KAŽDÉ editace).
+        if ($qtyGuardSql !== '') { $updParams[] = $qtyOrig; }
+        $upd->execute($updParams);
+        if ($qtyGuardSql !== '' && $upd->rowCount() === 0) {
+            // rowCount()=0 znamená „nic se nezměnilo" NEBO „zámek nesedí" — rozlišit,
+            // ať uložení beze změny nehlásí falešný poplach.
+            $cur = $pdo->prepare("SELECT stock_qty FROM products WHERE id = ?");
+            $cur->execute([$editId]);
+            $curQty = $cur->fetchColumn();
+            if ($curQty !== false && (int)$curQty !== (int)$qtyOrig) {
+                echo json_encode(['success' => false,
+                    'message' => 'Počet kusů se mezitím změnil (' . (int)$qtyOrig . ' → ' . (int)$curQty
+                        . ' — nejspíš prodej na kase nebo e-shopu). Zavři a otevři produkt znovu, ať nepřepíšeš prodané kusy.'],
+                    JSON_UNESCAPED_UNICODE); exit;
+            }
+        }
         $productId = $editId;
         crmAuditLog('products.update', [
             'entity_type' => 'products', 'entity_id' => $productId, 'entity_label' => $asm['title'],
@@ -378,7 +427,8 @@ try {
         $productId = (int)$pdo->lastInsertId();
         crmAuditLog('products.create', [
             'entity_type' => 'products', 'entity_id' => $productId, 'entity_label' => $asm['title'],
-            'summary' => 'Naskladněn produkt „' . $asm['title'] . '" (' . $code . ', ' . formatMoney($priceNum) . ')'
+            'summary' => 'Naskladněn produkt „' . $asm['title'] . '" (' . $code . ', ' . formatMoney($priceNum)
+                . ($stockQty !== 1 ? ', ' . $stockQty . ' ks' : '') . ')'
                 . ($pcr['status'] === 'stolen' ? ' — POZOR: PČR hlásí ODCIZENÉ, přidáno po potvrzení' : ''),
         ]);
     }

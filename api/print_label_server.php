@@ -168,18 +168,32 @@ if ($action === 'print_complaint') {
 }
 $printerIp = branchPrinterIp($branchId);
 
+/** Zápis neúspěšného tisku do Historie — ať jde po hlášce „netiskne to" dohledat,
+ *  co se dělo. Voláno i u nespárované/nedostupné tiskárny: to jsou nejčastější důvody. */
+function afxLabelAuditFail(string $why, int $branchId, string $action, string $label = ''): void {
+    try {
+        crmAuditLog('label.print_failed', [
+            'entity_type' => 'print', 'entity_label' => $label !== '' ? $label : $action,
+            'branch_id' => $branchId,
+            'summary' => 'Tisk štítku SELHAL (' . $action . '): ' . mb_substr($why, 0, 180),
+        ]);
+    } catch (Throwable $e) { error_log('label.print_failed audit: ' . $e->getMessage()); }
+}
+
 if ($printerIp === '') {
     // Dřív se tady spadlo na tiskárnu v Karlíně — štítek z druhé pobočky vyjel
     // o město dál a nikdo o tom nevěděl. Teď se to rovnou řekne.
     $__bn = $pdo->prepare("SELECT name FROM branches WHERE id = ?");
     $__bn->execute([(int)$branchId]);
     $__bname = (string)$__bn->fetchColumn();
+    afxLabelAuditFail('pobočka nemá spárovanou tiskárnu', (int)$branchId, $action);
     echo json_encode(['ok' => false, 'not_paired' => true, 'branch_id' => (int)$branchId,
         'bridge_ok' => afxLabelBridgeAllowed((int)$branchId),
         'error' => 'Pobočka ' . ($__bname !== '' ? $__bname : '#' . (int)$branchId)
             . ' nemá spárovanou tiskárnu štítků — spáruj ji v Nastavení → Tisk štítků.'], JSON_UNESCAPED_UNICODE); exit;
 }
 if (!afxPrinterReachable($printerIp)) {
+    afxLabelAuditFail('tiskárna ' . $printerIp . ' neodpovídá (port 9100)', (int)$branchId, $action);
     echo json_encode(['ok' => false, 'unreachable' => true, 'printer_ip' => $printerIp,
         'branch_id' => (int)$branchId, 'bridge_ok' => afxLabelBridgeAllowed((int)$branchId),
         'error' => 'Tiskárna ' . $printerIp . ' neodpovídá (port 9100). Je zapnutá a na síti pobočky?'], JSON_UNESCAPED_UNICODE); exit;
@@ -273,29 +287,39 @@ if ($action === 'print_product') {
 
 $cmd = escapeshellarg($PY) . ' ' . escapeshellarg($CLI) . ' --ip ' . escapeshellarg($printerIp);
 foreach ($args as $k => $v) { $cmd .= ' ' . $k . ' ' . escapeshellarg((string)$v); }
+// POČET KOPIÍ: u produktu naskladněného po víc kusech chce obsluha štítek na každý
+// kus (jinak by 19 z 20 krytů leželo v regále bez ceny — přesně to, kvůli čemu se
+// rušilo tlačítko „Přidat" bez tisku). Strop 20, ať překlep nevytiskne roli.
+$copies = 1;
+if ($action === 'print_product') { $copies = max(1, min(20, (int)($_POST['copies'] ?? 1))); }
+
 $outLines = [];
 $rc = 0;
-set_time_limit(60);
-exec($cmd . ' 2>&1', $outLines, $rc);
-$last = trim((string)end($outLines));
-$res = json_decode($last, true);
+set_time_limit(60 + 10 * $copies);
+$res = null;
+$printed = 0;
+for ($i = 0; $i < $copies; $i++) {
+    $outLines = [];
+    exec($cmd . ' 2>&1', $outLines, $rc);
+    $last = trim((string)end($outLines));
+    $res = json_decode($last, true);
+    if (!is_array($res) || empty($res['ok'])) { break; }   // při chybě dál netiskneme
+    $printed++;
+    if ($i + 1 < $copies) { usleep(400000); }              // tiskárna potřebuje oddech mezi štítky
+}
 
 if (is_array($res) && !empty($res['ok'])) {
-    echo json_encode(['ok' => true, 'code' => $args['--code'] ?? 'produkt']);
+    echo json_encode(['ok' => true, 'code' => $args['--code'] ?? 'produkt', 'copies' => $printed]);
 } else {
     $err = is_array($res) ? (string)($res['error'] ?? '') : implode(' | ', array_slice($outLines, -3));
     // NEÚSPĚŠNÝ TISK PATŘÍ DO HISTORIE. Dokud se nikam nezapisoval, nešlo po
     // hlášce „netiskne to" vůbec zjistit, jestli se o tisk někdo pokusil, na které
     // tiskárně a co odpověděla — a hláška v rohu obrazovky zmizí dřív, než ji
     // někdo přečte. Úspěšné tisky se nelogují (bylo by jich denně sto).
-    try {
-        crmAuditLog('label.print_failed', [
-            'entity_type' => 'print',
-            'entity_label' => (string)($args['--code'] ?? ('produkt #' . (int)($_POST['id'] ?? 0))),
-            'branch_id' => (int)$branchId,
-            'summary' => 'Tisk štítku SELHAL (' . $action . ', tiskárna ' . $printerIp . '): '
-                . mb_substr($err !== '' ? $err : 'neznámá chyba', 0, 180),
-        ]);
-    } catch (Throwable $e) { error_log('label.print_failed audit: ' . $e->getMessage()); }
-    echo json_encode(['ok' => false, 'error' => 'Tisk selhal: ' . ($err !== '' ? $err : 'neznámá chyba')]);
+    afxLabelAuditFail('tiskárna ' . $printerIp . ': ' . ($err !== '' ? $err : 'neznámá chyba'),
+        (int)$branchId, $action, (string)($args['--code'] ?? ('produkt #' . (int)($_POST['id'] ?? 0))));
+    // částečná dávka: obsluha musí vědět, kolik štítků UŽ vyjelo, jinak dotiskne duplicity
+    $partial = ($copies > 1 && $printed > 0) ? (' Vytisklo se ' . $printed . ' z ' . $copies . ' — dotiskni zbylé.') : '';
+    echo json_encode(['ok' => false, 'printed' => $printed, 'copies' => $copies,
+        'error' => 'Tisk selhal: ' . ($err !== '' ? $err : 'neznámá chyba') . $partial], JSON_UNESCAPED_UNICODE);
 }

@@ -76,8 +76,8 @@ $stmt->execute($params);
 $products = $stmt->fetchAll();
 
 $statStmt = $pdo->prepare("SELECT COUNT(*) AS total,
-        SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN 1 ELSE 0 END) AS in_stock,
-        SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN price ELSE 0 END) AS stock_value,
+        SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN stock_qty ELSE 0 END) AS in_stock,
+        SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN price * stock_qty ELSE 0 END) AS stock_value,
         SUM(CASE WHEN loan_at IS NOT NULL THEN 1 ELSE 0 END) AS loaned
     FROM products WHERE branch_id = ?" . ($catWhere ? " AND $catWhere" : ""));
 $statStmt->execute(array_merge([$skladBranch], $catParams));
@@ -90,7 +90,7 @@ $stats = $statStmt->fetch();
     <div>
         <h2 class="mb-0"><?php echo __('inventory'); ?></h2>
         <small class="text-muted"><?php echo $cat === 'prislusenstvi' ? 'Příslušenství' : 'Produkty pro e-shop'; ?>: <?php echo (int)($stats['total'] ?? 0); ?> ·
-            skladem <?php echo (int)($stats['in_stock'] ?? 0); ?> ·
+            skladem <?php echo (int)($stats['in_stock'] ?? 0); ?> ks ·
             hodnota <?php echo formatMoney((float)($stats['stock_value'] ?? 0)); ?><?php
             if ((int)($stats['loaned'] ?? 0) > 0): ?> · <a href="products.php?avail=loan" style="color:#A78BFA">zapůjčeno <?php echo (int)$stats['loaned']; ?></a><?php endif; ?></small>
     </div>
@@ -298,6 +298,8 @@ try {
                                         <?php if (productIsLoaned($p)): ?>
                                             <span class="badge" style="background:#8B5CF6" title="<?php echo e(($p['loan_to'] ?? '') . (!empty($p['loan_at']) ? ' · od ' . date('j.n.Y', strtotime($p['loan_at'])) : '') . (!empty($p['loan_note']) ? ' · ' . $p['loan_note'] : '')); ?>">Zapůjčeno/Komisní prod.</span>
                                             <div class="small text-white-75 mt-1"><i class="fas fa-user-tag me-1"></i><?php echo e($p['loan_to'] ?? ''); ?></div>
+                                        <?php elseif ((int)$p['stock_qty'] > 1): ?>
+                                            <span class="badge bg-success">Skladem <?php echo (int)$p['stock_qty']; ?> ks</span>
                                         <?php elseif ((int)$p['stock_qty'] > 0): ?>
                                             <span class="badge bg-success">Skladem</span>
                                         <?php elseif (!empty($p['pos_sold_at'])): ?>
@@ -403,7 +405,9 @@ try {
             <div class="modal-body">
                 <div class="row g-4">
                     <!-- ── formulář ── -->
-                    <div class="col-lg-7">
+                    <?php /* Formulář dostává většinu šířky; pravý panel je jen kontrolní náhled
+                             (název, popis, foto) — při 5/12 lámal popisky polí do dvou řádků. */ ?>
+                    <div class="col-lg-8 col-xxl-9">
                         <input type="hidden" id="pcEditId" value="">
                         <input type="hidden" id="pcImageUrl" value="">
                         <input type="hidden" id="pcStudioUrl" value="">
@@ -494,6 +498,12 @@ try {
                                     <span class="fw-semibold">Cena a prodej</span>
                                 </div>
                             </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">Počet kusů</label>
+                                <input type="number" id="pcQty" class="form-control" value="1" min="0" step="1"
+                                       title="Kolik stejných kusů naskladňuješ. U zboží se sériovým číslem nechej 1 — SN má každý kus vlastní.">
+                                <div class="form-text small text-white-50">u SN vždy 1</div>
+                            </div>
                             <div class="col-md-3">
                                 <label class="form-label small">Prodejní cena <span class="text-danger">*</span></label>
                                 <div class="input-group">
@@ -510,14 +520,14 @@ try {
                                 </div>
                                 <div class="form-text small text-white-50">Nepovinné — § 90 (daň z přirážky).</div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="form-label small">Prodejna</label>
                                 <select id="pcStockKey" class="form-select">
                                     <option value="karlin">Karlín</option>
                                     <option value="vaclavak">Černá Růže</option>
                                 </select>
                             </div>
-                            <div class="col-md-3 d-flex flex-column justify-content-end gap-1 pb-1">
+                            <div class="col-md-2 d-flex flex-column justify-content-end gap-1 pb-1">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="pcSold">
                                     <label class="form-check-label small" for="pcSold">Prodáno <span class="text-white-50">(Vyprodáno)</span></label>
@@ -583,10 +593,10 @@ try {
                         </div>
                     </div>
                     <!-- ── živý náhled ── -->
-                    <div class="col-lg-5">
+                    <div class="col-lg-4 col-xxl-3">
                         <div class="glass-panel p-3 border-secondary h-100 d-flex flex-column">
                             <div class="small text-white-50 mb-1">Název produktu (generuje se sám)</div>
-                            <div id="pcPreviewTitle" class="fs-5 fw-bold mb-3">—</div>
+                            <div id="pcPreviewTitle" class="fs-6 fw-bold mb-3" style="overflow-wrap:anywhere;">—</div>
                             <div class="small text-white-50 mb-1">Popis</div>
                             <div id="pcPreviewDesc" class="small mb-3" style="color:rgba(255,255,255,.75);">—</div>
                             <div id="pcPreviewImgWrap" class="mb-3" style="display:none;">
@@ -603,7 +613,11 @@ try {
             <div class="modal-footer">
                 <span id="pcMsg" class="me-auto small"></span>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
-                <button type="button" class="btn btn-outline-success" id="pcSaveBtn"><i class="fas fa-plus me-1"></i> Přidat</button>
+                <?php /* Při NASKLADNĚNÍ je jediná možnost „Přidat a vytisknout štítek" (přání
+                         majitele 1.8.2026): dřív tu bylo i holé „Přidat" a zboží pak leželo
+                         v regále bez cenovky, protože si obsluha vybrala vedlejší tlačítko.
+                         Tenhle knoflík zůstává jen pro EDITACI jako „Uložit změny". */ ?>
+                <button type="button" class="btn btn-outline-success" id="pcSaveBtn" style="display:none;"><i class="fas fa-save me-1"></i> Uložit změny</button>
                 <button type="button" class="btn btn-success" id="pcSavePrintBtn" title="Ctrl/Cmd + Enter"><i class="fas fa-tag me-1"></i> Přidat a vytisknout štítek</button>
             </div>
         </div>
@@ -968,7 +982,25 @@ $(document).on('click', '.product-label-btn', function () {
     // ── uložení (create/update), stolen force flow, sériové naskladňování ──
     var saving = false;
     var savedSomething = false;   // řídí reload po zavření modalu (ne křehký text v $msg)
+    var qtyOriginal = '';                   // počet při otevření editace (optimistický zámek)
+    var qtyBeforeSold = '1';                // počet před zaškrtnutím „Prodáno" (pro vrácení)
+
     function save(printAfter, force) {
+        // Prázdné pole „Počet kusů" by se odeslalo jako 0 → kus by se naskladnil rovnou
+        // jako VYPRODANÝ: v regále leží, na kase ani e-shopu ho nikdo nenajde.
+        var qtyRaw = String((el('pcQty') || {}).value || '').trim();
+        var qty = parseInt(qtyRaw, 10);
+        if (qtyRaw === '' || isNaN(qty) || qty < 0) {
+            $msg.innerHTML = '<span class="text-danger">Vyplň počet kusů (alespoň 1).</span>';
+            if (el('pcQty')) { el('pcQty').focus(); }
+            return;
+        }
+        if (qty > 9999) { qty = 9999; }
+        if (!$sold.checked && qty < 1) {
+            $msg.innerHTML = '<span class="text-danger">Vyplň počet kusů (alespoň 1).</span>';
+            if (el('pcQty')) { el('pcQty').focus(); }
+            return;
+        }
         if (saving) return;
         if (pending > 0) { $msg.textContent = 'Počkej — média se ještě nahrávají…'; return; }
         if (!modelVal()) { $msg.textContent = 'Vyplň model.'; return; }
@@ -994,6 +1026,8 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('rocnik', $rocnik.value);
         fd.append('generace', typeDef().gen ? $gen.value : '');
         if ($sold.checked) fd.append('sold', '1');
+        fd.append('stock_qty', String(qty));
+        if (qtyOriginal !== '') { fd.append('stock_qty_orig', qtyOriginal); }
         fd.append('stock_key', $stockKey.value);
         fd.append('image_url', $imageUrl.value);
         fd.append('studio_url', $studioUrl.value);
@@ -1033,9 +1067,15 @@ $(document).on('click', '.product-label-btn', function () {
                 if (printAfter && d.id) {
                     var pf = new FormData();
                     pf.append('action', 'print_product'); pf.append('id', d.id); pf.append('csrf_token', CSRF);
+                    // dávka štítků jen při NASKLADNĚNÍ; editace by jinak vytiskla tolik
+                    // štítků, kolik je zrovna kusů skladem
+                    pf.append('copies', String($editId.value ? 1 : Math.min(20, Math.max(1, qty))));
                     printPromise = fetch('api/print_label_server.php', { method: 'POST', body: pf, credentials: 'same-origin' })
                         .then(function (r) { return r.json(); })
-                        .then(function (p) { if (!p.ok) { labelFail(p.error || ''); } })
+                        .then(function (p) {
+                            if (!p.ok) { labelFail(p.error || ''); return; }
+                            if (p.copies && p.copies > 1) { $msg.textContent += ' · vytištěno ' + p.copies + ' štítků'; }
+                        })
                         .catch(function () { labelFail('síť — server neodpověděl'); });
                 }
                 // reload při editaci až PO doběhnutí tisku — unload by in-flight tisk zrušil
@@ -1047,6 +1087,11 @@ $(document).on('click', '.product-label-btn', function () {
                 $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
                 $modelC.style.display = 'none'; $colorC.style.display = 'none';
                 $sold.checked = false;
+        // Počet patří ke KONKRÉTNÍ položce — bez vynulování by další kus (klidně telefon)
+        // dostal počet toho předchozího a e-shop i kasa by nabízely zboží, které není.
+        if (el('pcQty')) { el('pcQty').value = '1'; el('pcQty').disabled = false; }
+        qtyBeforeSold = '1';
+        syncQtyWithSerial();                    // SN je vyčištěné → pole zase odemknout
                 $photo.value = ''; $imageUrl.value = '';
                 resetGalleryAll([], '', '');
                 el('pcPreviewImgWrap').style.display = 'none';
@@ -1055,6 +1100,36 @@ $(document).on('click', '.product-label-btn', function () {
             })
             .catch(function () { saving = false; $msg.textContent = 'Síťová chyba — zkus to znovu.'; });
     }
+    // Sériové číslo = jeden konkrétní kus → počet se zamkne na 1 (dva kusy se
+    // stejným SN nedávají smysl a e-shop i kasa by je nerozlišily).
+    function syncQtyWithSerial() {
+        var q = el('pcQty'), sn = $serial.value.trim();
+        if (!q) { return; }
+        if (sn !== '') {
+            // POZOR: jen SRÁŽET dolů, nikdy nezvyšovat. Prodaný kus má 0 ks a natvrdo
+            // dosazená 1 by ho editací vrátila na sklad (a smazala stopu prodeje).
+            if ((parseInt(q.value, 10) || 0) > 1) { q.value = '1'; }
+            q.readOnly = true;
+            q.title = 'Kus se sériovým číslem je vždy jeden.';
+        } else {
+            q.readOnly = false;
+            q.title = 'Kolik stejných kusů naskladňuješ.';
+        }
+    }
+    $serial.addEventListener('input', syncQtyWithSerial);
+    syncQtyWithSerial();
+
+    // „Prodáno" = vyprodáno (0 ks). Bez provázání by šlo mít zaškrtnuto Prodáno a v poli
+    // 5 ks — server uloží 0 a pět kusů tiše zmizí ze skladu.
+    $sold.addEventListener('change', function () {
+        var q = el('pcQty'); if (!q) { return; }
+        if ($sold.checked) { qtyBeforeSold = q.value || '1'; q.value = '0'; q.disabled = true; }
+        else { q.disabled = false; q.value = (parseInt(qtyBeforeSold, 10) > 0) ? qtyBeforeSold : '1'; }
+    });
+    el('pcQty').addEventListener('input', function () {
+        if (parseInt(this.value, 10) > 0 && $sold.checked) { $sold.checked = false; }
+    });
+
     el('pcSaveBtn').addEventListener('click', function () { save(false, false); });
     el('pcSavePrintBtn').addEventListener('click', function () { save(true, false); });
     document.getElementById('productCreateModal').addEventListener('keydown', function (e) {
@@ -1069,7 +1144,10 @@ $(document).on('click', '.product-label-btn', function () {
         formGen++;
         $editId.value = '';
         el('pcTitleMode').textContent = 'Naskladnit produkt';
-        el('pcSaveBtn').innerHTML = '<i class="fas fa-plus me-1"></i> Přidat';
+        if (el('pcQty')) { el('pcQty').value = '1'; el('pcQty').readOnly = false; el('pcQty').disabled = false; }
+        qtyOriginal = ''; qtyBeforeSold = '1';
+        el('pcSaveBtn').style.display = 'none';          // při naskladnění se štítek tiskne vždy
+        el('pcSavePrintBtn').innerHTML = '<i class="fas fa-tag me-1"></i> Přidat a vytisknout štítek';
         $typC.value = ''; $typC.style.display = 'none';
         if ($typ.value === CUSTOM) { $typ.value = CATALOG.types[0].id; onType(); }
         [$modelC, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
@@ -1098,7 +1176,16 @@ $(document).on('click', '.product-label-btn', function () {
                 formGen++;
                 $editId.value = p.id;
                 el('pcTitleMode').textContent = 'Upravit produkt';
+                if (el('pcQty')) {
+                    el('pcQty').value = (p.stock_qty !== undefined && p.stock_qty !== null) ? p.stock_qty : (p.sold ? 0 : 1);
+                    el('pcQty').disabled = false;
+                }
+                // původní počet — server podle něj pozná, že mezitím někdo prodával
+                qtyOriginal = (p.stock_qty !== undefined && p.stock_qty !== null) ? String(p.stock_qty) : '';
+                qtyBeforeSold = (parseInt(qtyOriginal, 10) > 0) ? qtyOriginal : '1';
+                el('pcSaveBtn').style.display = '';   // u editace se štítek tisknout nemusí
                 el('pcSaveBtn').innerHTML = '<i class="fas fa-save me-1"></i> Uložit změny';
+                el('pcSavePrintBtn').innerHTML = '<i class="fas fa-tag me-1"></i> Uložit a vytisknout štítek';
                 // typ odvodit z kategorie (K-kód), fallback z názvu; NEZNÁMÝ typ (z appky
                 // „Vlastní…") NIKDY nespadne na iPhone — přešel by na cizí K-kód a výrobce
                 var typ = '';
@@ -1125,6 +1212,7 @@ $(document).on('click', '.product-label-btn', function () {
                 setSelectValue($ram, p.ram); setSelectValue($cpu, p.cpu); setSelectValue($gpu, p.gpu);
                 setSelectValue($rocnik, p.rocnik); setSelectValue($gen, p.generace);
                 $sold.checked = !!p.sold;
+                syncQtyWithSerial();   // AŽ TEĎ — funkce se řídí i stavem „Prodáno"
                 el('pcHideEshop').checked = !!parseInt(p.hide_eshop || 0, 10);
                 $stockKey.value = p.stock_key || DEFAULT_STOCK;
                 $imageUrl.value = p.image_url || '';

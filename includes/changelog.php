@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.40.0',
+        'date' => '2026-08-01',
+        'time' => '16:30',
+        'title' => 'Naskladnění: počet kusů, štítek na každý kus a jediné tlačítko',
+        'items' => [
+            '<b>Nové pole „Počet kusů"</b> u naskladnění produktů — příslušenství se konečně naskladní najednou (8 krytů = jeden řádek „Skladem 8 ks"). Prodej na kase i na e-shopu počet snižuje. U zboží se <b>sériovým číslem se pole zamkne na 1</b> — dva kusy se stejným SN by systém nerozlišil.',
+            '<b>Štítek se vytiskne na každý kus.</b> Naskladníš 8 kusů, vyjede 8 cenovek (strop 20 na jedno naskladnění). Když se dávka přeruší, systém napíše, kolik štítků už vyjelo, ať se nedotisknou duplicity.',
+            '<b>Zrušeno tlačítko „Přidat" bez tisku</b> — zůstává jediné <b>„Přidat a vytisknout štítek"</b>. Zboží tak nekončí v regále bez cenovky jen proto, že si obsluha vybrala vedlejší tlačítko. (Při úpravě už naskladněné položky se tiskne jen na vyžádání.)',
+            '<b>Formulář naskladnění je širší</b> — pravý náhled zabíral moc místa a popisky polí se lámaly do dvou řádků.',
+            'Pojistky: prázdný počet kusů se odmítne (dřív by se zboží naskladnilo rovnou jako vyprodané), „Prodáno" a počet jsou provázané, a když někdo mezitím kus prodá, editace to pozná a nepřepíše prodané kusy zpátky na sklad.',
+        ],
+    ],
+    [
         'version' => '3.39.5',
         'date' => '2026-08-01',
         'time' => '15:05',
