@@ -38,7 +38,7 @@ $guides['crm'] = [
             ['typ' => 'info', 'text' => '<b>Duplicity hlídá systém:</b> stejné SN/IMEI podruhé nepřidáš (ukáže se, kdy byl kus naskladněn). Odcizené zařízení z databáze PČR jde přidat jen po výslovném potvrzení — a zapíše se to do Historie.'],
             ['typ' => 'info', 'text' => '<b>Mac appka funguje dál souběžně.</b> Kus naskladněný v CRM si CRM chrání — import souboru z appky ho nepřepíše. Jeden fyzický kus ale naskladňuj jen v jednom systému.'],
             ['typ' => 'info', 'text' => '<b>Pro Upgates:</b> tlačítko „CSV pro Upgates" stáhne kompletní sklad ve formátu appky — nahraje se do Upgates stejně jako dřív soubor z appky (párování podle kódu, aktualizace stávajících).'],
-            ['typ' => 'role', 'text' => 'Naskladňovat a upravovat smí <b>vedení</b> (admin, Boss, manažer). Tisknout cenový štítek smí každý přihlášený.'],
+            ['typ' => 'role', 'text' => 'Sklad (díly i produkty) vidí a spravuje <b>každý zaměstnanec</b> na obou pobočkách — každá změna je dohledatelná v Historii. Tisknout cenový štítek smí každý přihlášený.'],
         ],
     ],
     [

@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.38.1',
+        'date' => '2026-08-01',
+        'time' => '09:20',
+        'title' => 'Sklad vidí všichni zaměstnanci (obě pobočky)',
+        'items' => [
+            'Oprávnění <b>manage_inventory</b> má nově implicitně KAŽDÝ aktivní zaměstnanec — Sklad dílů i Produkty tak vidí a spravují i technici na Růži (Roman, Stas) a Karlíně (Khalil, Zdeněk), kteří dosud padali na Nákupy. Změny ve skladu jsou dál dohledatelné v Historii.',
+            'Nákupy (objednávání dílů) zůstávají manažerské; mazání zakázek dál jen admin + Boss.',
+        ],
+    ],
+    [
         'version' => '3.40.0',
         'date' => '2026-07-31',
         'time' => '22:30',

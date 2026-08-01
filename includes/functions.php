@@ -73,9 +73,11 @@ function hasPermission($permission) {
         // zůstává jen adminovi a Bossovi — viz crmCanDeleteOrders().
         $implicitPermissions[] = 'edit_orders';
         $implicitPermissions[] = 'edit_customers';
-        // Sklad a Nákupy jsou CELOFIREMNÍ (ne pobočkové) → smí je spravovat manažer i Boss.
+        // SKLAD vidí a spravuje KAŽDÝ zaměstnanec (rozhodnutí majitele 1.8.2026 —
+        // „všem technikům": na Růži jsou engineeři bez skladu k ničemu a viník
+        // každé změny je dohledatelný v Historii). Nákupy zůstávají manažerské.
+        $implicitPermissions[] = 'manage_inventory';
         if (in_array(getCurrentStaffRole(), ['manager', 'boss'], true)) {
-            $implicitPermissions[] = 'manage_inventory';
             $implicitPermissions[] = 'procurement_manage';
         }
         // Přehledy NAPŘÍČ pobočkami (vidět vše, Reporty) jen pro globální diváky = admin + Boss.
