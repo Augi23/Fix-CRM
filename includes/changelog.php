@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => '3.38.2',
+        'date' => '2026-08-01',
+        'time' => '10:05',
+        'title' => 'Nákupy: ceník MobileSentrix správně v Kč (byl v EUR)',
+        'items' => [
+            'Import katalogu MobileSentrix ukládal ceny číselně tak, jak jsou na webu — jenže mobilesentrix.eu má ceník v <b>EUR</b>. Nově se ceny při importu <b>převádí na Kč denním kurzem ČNB</b> (cache 24 h; mobilesentrix.com by se bral jako USD, u jiných dodavatelů rozhodne symbol u ceny).',
+            'Stávajících <b>3 152 katalogových položek</b> MobileSentrix v Nákupech přepočteno kurzem 24,21 Kč/EUR (jen položky bez fyzického skladu; původní hodnoty zálohovány v tabulce inventory_ms_eur_backup_20260801).',
+        ],
+    ],
+    [
         'version' => '3.38.1',
         'date' => '2026-08-01',
         'time' => '09:20',
