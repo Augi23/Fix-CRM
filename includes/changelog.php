@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.39.5',
+        'date' => '2026-08-01',
+        'time' => '15:05',
+        'title' => 'Když se štítek nevytiskne, je to vidět (a zapíše se to do Historie)',
+        'items' => [
+            'Při naskladnění se neúspěšný tisk štítku dřív jen tiše připsal drobným písmem za hlášku „Naskladněno" — obsluha to přehlédla a zjistila až u regálu, že zboží nemá cenovku. Nově se ukáže <b>červené upozornění „Štítek se NEVYTISKL"</b> i s důvodem a s radou dotisknout ho ikonou u řádku.',
+            '<b>Neúspěšný tisk se zapisuje do Historie úprav</b> (kdo, kdy, která tiskárna, co odpověděla). Do teď se o tisku nikam nezapisovalo nic, takže po hlášce „netiskne to" nešlo zpětně zjistit vůbec nic. Úspěšné tisky se nelogují, aby historii nezahltily.',
+        ],
+    ],
+    [
         'version' => '3.39.4',
         'date' => '2026-08-01',
         'time' => '14:10',

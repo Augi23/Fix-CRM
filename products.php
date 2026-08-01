@@ -1021,14 +1021,22 @@ $(document).on('click', '.product-label-btn', function () {
                 $msg.textContent = ($editId.value ? 'Uloženo: ' : 'Naskladněno: ') + d.title;
                 if (d.hint) { $hint.textContent = d.hint; $hint.style.display = ''; }
                 else { $hint.style.display = 'none'; }
+                // Selhání tisku se dřív jen připsalo za hlášku „Naskladněno" drobným
+                // písmem — obsluha to přehlédla a zjistila až u regálu, že štítek není.
+                function labelFail(err) {
+                    $msg.innerHTML = '<span class="text-danger fw-bold">⚠️ Štítek se NEVYTISKL</span> ' +
+                        '<span class="text-white-50">(' + String(err).replace(/</g, '&lt;') + ')</span> · ' +
+                        'zboží je naskladněné, štítek dotiskni ikonou <i class="fas fa-tag"></i> u řádku';
+                    if (window.showAlert) { showAlert('Štítek se nevytiskl: ' + err); }
+                }
                 var printPromise = Promise.resolve();
                 if (printAfter && d.id) {
                     var pf = new FormData();
                     pf.append('action', 'print_product'); pf.append('id', d.id); pf.append('csrf_token', CSRF);
                     printPromise = fetch('api/print_label_server.php', { method: 'POST', body: pf, credentials: 'same-origin' })
                         .then(function (r) { return r.json(); })
-                        .then(function (p) { if (!p.ok) { $msg.textContent += ' · Tisk štítku selhal: ' + (p.error || ''); } })
-                        .catch(function () { $msg.textContent += ' · Tisk štítku selhal (síť).'; });
+                        .then(function (p) { if (!p.ok) { labelFail(p.error || ''); } })
+                        .catch(function () { labelFail('síť — server neodpověděl'); });
                 }
                 // reload při editaci až PO doběhnutí tisku — unload by in-flight tisk zrušil
                 if ($editId.value) { printPromise.then(function () { location.reload(); }); return; }

@@ -284,5 +284,18 @@ if (is_array($res) && !empty($res['ok'])) {
     echo json_encode(['ok' => true, 'code' => $args['--code'] ?? 'produkt']);
 } else {
     $err = is_array($res) ? (string)($res['error'] ?? '') : implode(' | ', array_slice($outLines, -3));
+    // NEÚSPĚŠNÝ TISK PATŘÍ DO HISTORIE. Dokud se nikam nezapisoval, nešlo po
+    // hlášce „netiskne to" vůbec zjistit, jestli se o tisk někdo pokusil, na které
+    // tiskárně a co odpověděla — a hláška v rohu obrazovky zmizí dřív, než ji
+    // někdo přečte. Úspěšné tisky se nelogují (bylo by jich denně sto).
+    try {
+        crmAuditLog('label.print_failed', [
+            'entity_type' => 'print',
+            'entity_label' => (string)($args['--code'] ?? ('produkt #' . (int)($_POST['id'] ?? 0))),
+            'branch_id' => (int)$branchId,
+            'summary' => 'Tisk štítku SELHAL (' . $action . ', tiskárna ' . $printerIp . '): '
+                . mb_substr($err !== '' ? $err : 'neznámá chyba', 0, 180),
+        ]);
+    } catch (Throwable $e) { error_log('label.print_failed audit: ' . $e->getMessage()); }
     echo json_encode(['ok' => false, 'error' => 'Tisk selhal: ' . ($err !== '' ? $err : 'neznámá chyba')]);
 }

@@ -5110,6 +5110,7 @@ function crmAuditActionLabel(string $action): string {
     static $map = [
         'auth.login' => 'Přihlášení', 'auth.logout' => 'Odhlášení', 'auth.reauth' => 'Obnovení přihlášení',
         'settings.printer' => 'Spárování tiskárny štítků',
+        'label.print_failed' => 'Tisk štítku selhal',
         'order.create' => 'Vytvoření zakázky', 'order.update' => 'Úprava zakázky',
         'order.status_change' => 'Změna stavu zakázky', 'order.delete' => 'Smazání zakázky',
         'customer.create' => 'Vytvoření klienta', 'customer.update' => 'Úprava klienta',
