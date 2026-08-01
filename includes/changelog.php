@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.39.4',
+        'date' => '2026-08-01',
+        'time' => '14:10',
+        'title' => 'Podpisová stanice: iPad se neuspí a nová žádost pípne',
+        'items' => [
+            '<b>Displej iPadu se během čekání na podpis neuspává.</b> Stanice si od systému vyžádá „nech obrazovku svítit" a po každém návratu do aplikace si to vyžádá znovu. Ve spodním řádku je vidět, že to drží.',
+            '<b>Nová žádost o podpis dá o sobě vědět zvukem</b> — dvojité pípnutí, ať si toho obsluha i zákazník všimnou. iPad povolí zvuk až po prvním doteku na stanici, takže po ránu stačí jednou ťuknout do obrazovky.',
+            '<b>Co web neumí:</b> probudit <em>zamčený</em> iPad. Když je tablet uspaný nebo zamčený, žádná stránka ho nerozsvítí — proto na něm nastav <b>Nastavení → Displej a jas → Automatické zamykání → Nikdy</b> a nech ho na nabíječce. Stanice to připomene sama, pokud běží na starším iOS, který držení displeje neumí.',
+        ],
+    ],
+    [
         'version' => '3.41.0',
         'date' => '2026-08-01',
         'time' => '13:41',

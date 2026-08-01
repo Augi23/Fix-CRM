@@ -87,7 +87,8 @@ foreach (['cs', 'en', 'ru'] as $__l) {
     <div class="sub"><?php echo e(_l('sign_station_idle')); ?></div>
     <div class="pulse"></div>
 </div>
-<div class="station-branch"><?php echo e($branchLabel); ?> · <?php echo e(_l('sign_logged_in_as')); ?>: <?php echo e($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''); ?></div>
+<div class="station-branch"><?php echo e($branchLabel); ?> · <?php echo e(_l('sign_logged_in_as')); ?>: <?php echo e($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''); ?><span id="wakeState"></span></div>
+
 
 <!-- Výběr z fronty (víc čekajících podpisů = klient si vybere SVOU zakázku) -->
 <div id="queueChooser" style="display:none; position:fixed; inset:0; z-index:3050; background:#070a09; flex-direction:column; align-items:center; justify-content:center; padding:24px;">
@@ -149,6 +150,7 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
                 var reqs = d.requests || (d.request ? [d.request] : []);
                 if (!reqs.length) return;
                 busy = true;
+                beep();                       // ať si toho obsluha i zákazník všimnou
                 if (reqs.length === 1) {
                     current = reqs[0];
                     showDocument(reqs[0]);
@@ -254,6 +256,74 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
             onCancel: function () { /* zpět na dokument, požadavek trvá */ }
         });
     };
+
+    /* ── DISPLEJ VZHŮRU ──────────────────────────────────────────────────────
+       iPad na pultu nesmí usnout, jinak si zákazník nemá kam podepsat.
+       1) Screen Wake Lock API (Safari od iOS 16.4) — drží displej, dokud je
+          stránka vidět. Po zhasnutí/přepnutí aplikace se zámek ztrácí, proto se
+          znovu bere při návratu na stránku.
+       2) Starší iOS (před 16.4) to neumí — stanice v takovém případě jen napíše,
+          že je potřeba vypnout automatické zamykání v Nastavení iPadu.
+       POZOR: web NEUMÍ probudit zamčený iPad — to zvládne jen upozornění z
+       aplikace na ploše. Proto je v Nastavení iPadu potřeba vypnout automatické
+       zamykání (Displej a jas → Automatické zamykání → Nikdy). */
+    var wakeLock = null;
+    var $wakeState = document.getElementById('wakeState');
+    function wakeNote(txt) { if ($wakeState) { $wakeState.textContent = txt ? ' · ' + txt : ''; } }
+
+    function keepAwake() {
+        if (!('wakeLock' in navigator)) { return noWakeSupport(); }
+        navigator.wakeLock.request('screen').then(function (l) {
+            wakeLock = l;
+            wakeNote('displej se neuspí');
+            l.addEventListener('release', function () { wakeLock = null; });
+        }).catch(function () { noWakeSupport(); });
+    }
+    function noWakeSupport() {
+        // Starší iOS (před 16.4) tohle neumí — nemá cenu předstírat, že drží
+        // displej vzhůru. Řekneme rovnou, co s tím: vypnout automatické zamykání.
+        wakeNote('displej se může uspat → Nastavení → Displej a jas → Automatické zamykání: Nikdy');
+    }
+    keepAwake();
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' && wakeLock === null) { keepAwake(); }
+    });
+
+    /* ── ZVUKOVÉ UPOZORNĚNÍ NA NOVOU ŽÁDOST ──────────────────────────────────
+       iOS pustí zvuk až po prvním doteku na stránce, proto se „odemkne" tichým
+       tónem při prvním dotyku a od té chvíle pípne u každé nové žádosti. */
+    var audioCtx = null;
+    function unlockAudio() {
+        if (audioCtx) { return; }
+        try {
+            var C = window.AudioContext || window.webkitAudioContext;
+            if (!C) { return; }
+            audioCtx = new C();
+            var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+            g.gain.value = 0;                     // tichý tón jen kvůli povolení zvuku
+            o.connect(g); g.connect(audioCtx.destination);
+            o.start(); o.stop(audioCtx.currentTime + 0.01);
+        } catch (e) { audioCtx = null; }
+    }
+    ['touchstart', 'mousedown', 'keydown'].forEach(function (ev) {
+        document.addEventListener(ev, unlockAudio, { once: true, passive: true });
+    });
+    function beep() {
+        if (!audioCtx) { return; }
+        try {
+            if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+            [880, 1320].forEach(function (hz, i) {          // dvojtón, ať to nezanikne v provozu
+                var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+                o.frequency.value = hz;
+                g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + 0.02 + i * 0.18);
+                g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.16 + i * 0.18);
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start(audioCtx.currentTime + i * 0.18);
+                o.stop(audioCtx.currentTime + 0.2 + i * 0.18);
+            });
+        } catch (e) {}
+    }
 
     setInterval(poll, 3000);
     poll();
