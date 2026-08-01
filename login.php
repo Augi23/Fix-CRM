@@ -99,7 +99,7 @@ $loginQuip = $loginQuips[array_rand($loginQuips)];
 
 if (isset($_POST['login'])) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
-        // Stránka byla otevřená déle, než žije relace (4 h nečinnosti) — pro obsluhu
+        // Stránka byla otevřená déle, než žije relace (8 h nečinnosti) — pro obsluhu
         // to není „chyba tokenu", ale prostě vypršelé okno. Prohlížeč dostane
         // v odpovědi čerstvý token a odešle formulář znovu, takže tuhle hlášku
         // uvidí jen ten, komu nefunguje JS.

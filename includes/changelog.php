@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.39.3',
+        'date' => '2026-08-01',
+        'time' => '13:45',
+        'title' => 'Přihlášení vydrží 8 hodin místo 4',
+        'items' => [
+            'Přihlášení nově vydrží <b>8 hodin nečinnosti</b> (dřív 4). U pultu se lidi střídají a přihlašovat se po každé delší pauze zdržovalo.',
+            'Na bezpečnost to nemá vliv tam, kde na ní záleží nejvíc: <b>kasa se dál sama zamkne po 15 minutách</b> nečinnosti a odemyká se heslem, takže sdílený počítač nebo iPad u pokladny nezůstane volně přístupný.',
+        ],
+    ],
+    [
         'version' => '3.40.0',
         'date' => '2026-08-01',
         'time' => '13:28',

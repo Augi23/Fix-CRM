@@ -3,7 +3,7 @@
  * Čerstvý bezpečnostní token pro PŘIHLAŠOVACÍ stránku.
  *
  * PROČ TO EXISTUJE: stránka otevřená v prohlížeči v sobě nese token z relace,
- * ve které se vykreslila. Relace se po 4 hodinách nečinnosti smaže
+ * ve které se vykreslila. Relace se po 8 hodinách nečinnosti smaže
  * (session.gc_maxlifetime), ale karta na pultu nebo iPadu zůstane otevřená
  * klidně přes noc — a odeslání formuláře pak skončilo hláškou „Neplatný
  * bezpečnostní token". Přihlašovací stránka si proto token vyžádá čerstvý

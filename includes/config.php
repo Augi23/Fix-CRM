@@ -26,7 +26,11 @@ if (is_dir($__sessDir) && is_writable($__sessDir)) {
     ini_set('session.gc_probability', 1);
     ini_set('session.gc_divisor', 50);
 }
-ini_set('session.gc_maxlifetime', 14400);   // 4 h nečinnosti (2× původní záměr 2 h)
+ini_set('session.gc_maxlifetime', 28800);   // 8 h nečinnosti (rozhodnutí majitele 1.8.2026):
+                                            // u pultu se lidi střídají a přihlašovat se
+                                            // po každé delší pauze zdržovalo. Kasa má vlastní
+                                            // zámek po 15 min nečinnosti (pokladna.php), takže
+                                            // sdílené zařízení nezůstane odemčené.
 ini_set('session.cookie_samesite', 'Strict');
 ini_set('session.use_only_cookies', 1);
 
