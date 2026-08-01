@@ -265,6 +265,45 @@ function createXPathFromHtml(string $html): ?DOMXPath {
     return new DOMXPath($doc);
 }
 
+/**
+ * Denní kurz cizí měny → CZK podle ČNB (kurzovní lístek, cache v settings na 24 h).
+ * Fallback při nedostupnosti ČNB: poslední známý kurz, jinak konzervativní konstanta.
+ */
+function afxCzkRate(string $currency): float {
+    $currency = strtoupper($currency);
+    if ($currency === 'CZK') { return 1.0; }
+    $fallback = ['EUR' => 25.0, 'USD' => 23.0][$currency] ?? 1.0;
+    $cacheKey = 'fx_' . strtolower($currency) . '_czk';
+    $cached = (string)get_setting($cacheKey, '');
+    if ($cached !== '') {
+        [$den, $kurz] = array_pad(explode('|', $cached, 2), 2, '');
+        if ($den === date('Y-m-d') && (float)$kurz > 0) { return (float)$kurz; }
+    }
+    try {
+        $txt = @file_get_contents('https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt',
+            false, stream_context_create(['http' => ['timeout' => 6]]));
+        if ($txt) {
+            foreach (explode("\n", $txt) as $line) {
+                $c = explode('|', trim($line));
+                // země|měna|množství|kód|kurz
+                if (count($c) === 5 && $c[3] === $currency && (float)$c[2] > 0) {
+                    $kurz = ((float)str_replace(',', '.', $c[4])) / (float)$c[2];
+                    if ($kurz > 0) {
+                        set_setting($cacheKey, date('Y-m-d') . '|' . $kurz);
+                        return $kurz;
+                    }
+                }
+            }
+        }
+    } catch (Throwable $e) { error_log('afxCzkRate: ' . $e->getMessage()); }
+    // ČNB nedostupná → poslední známý kurz (i starší), jinak fallback konstanta
+    if ($cached !== '') {
+        $kurz = (float)(explode('|', $cached, 2)[1] ?? 0);
+        if ($kurz > 0) { return $kurz; }
+    }
+    return $fallback;
+}
+
 function isMobileSentrixUrl(string $url): bool {
     $host = strtolower((string)parse_url($url, PHP_URL_HOST));
     return $host !== '' && (str_contains($host, 'mobilesentrix'));
@@ -672,6 +711,22 @@ try {
                 }
             }
             $price = parseMoneyValue($priceRaw);
+
+            // MĚNA: ceny se do skladu ukládají v Kč. mobilesentrix.eu má ceník v EUR
+            // (mobilesentrix.com v USD) — převádí se denním kurzem ČNB. U ostatních
+            // dodavatelů rozhodne symbol u ceny (€/EUR), jinak se bere Kč.
+            $mena = 'CZK';
+            if (isMobileSentrixUrl($pageUrl)) {
+                $mena = str_contains(strtolower((string)parse_url($pageUrl, PHP_URL_HOST)), 'mobilesentrix.com') ? 'USD' : 'EUR';
+            } else {
+                $menaText = trim((string)($product->textContent ?? ''));
+                if (preg_match('/€|\bEUR\b/iu', $menaText) && !preg_match('/Kč/u', $menaText)) {
+                    $mena = 'EUR';
+                }
+            }
+            if ($price > 0 && $mena !== 'CZK') {
+                $price = round($price * afxCzkRate($mena), 2);
+            }
 
             $imageUrl = queryFirstValue($pageXPath, $product, [
                 ".//img/@data-micro-image",
