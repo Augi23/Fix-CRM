@@ -125,6 +125,7 @@ try {
         // branch_id ještě neexistuje (feed nevolá ensureSkladBranchSchema()).
         $branchId = (int)($p['branch_id'] ?? 0) ?: skladBranchIdForStockKey((string)($p['stock_key'] ?? ''));
         $branchLabel = skladBranchLabel($branchId);
+        $productType = trim((string)($raw['[PARAMETER "Typ zařízení"]'] ?? $raw['PRODUKT_TYP'] ?? ''));
         $processorFamily = trim((string)($raw['[PARAMETER "Výrobce procesoru"]'] ?? $raw['PROCESOR_TYP'] ?? ''));
         $processor = trim((string)($raw['[PARAMETER "Procesor"]'] ?? ''));
 
@@ -133,6 +134,7 @@ try {
             'title'                => (string)$p['title'],
             'manufacturer'         => $p['manufacturer'] !== null ? (string)$p['manufacturer'] : null,
             'category_code'        => $p['category_code'] !== null ? (string)$p['category_code'] : null,
+            'product_type'         => $productType !== '' ? $productType : null,
             'model'                => $p['model'] !== null ? (string)$p['model'] : null,
             'capacity'             => $p['capacity'] !== null ? (string)$p['capacity'] : null,
             'color'                => $p['color'] !== null ? (string)$p['color'] : null,

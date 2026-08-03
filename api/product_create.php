@@ -69,6 +69,7 @@ if ($action === 'get') {
     if ($rawProcessorModel === '') {
         $rawProcessorModel = trim((string)($raw['[PARAMETER "Procesor"]'] ?? ''));
     }
+    $rawTyp = trim((string)($raw['[PARAMETER "Typ zařízení"]'] ?? $raw['PRODUKT_TYP'] ?? ''));
     $code = (string)$p['product_code'];
     echo json_encode(['success' => true, 'product' => [
         'id' => (int)$p['id'],
@@ -77,6 +78,7 @@ if ($action === 'get') {
         'title' => (string)$p['title'],
         'model' => (string)($p['model'] ?? ''),
         'manufacturer' => (string)($p['manufacturer'] ?? ''),
+        'typ' => $rawTyp,
         'category_code' => (string)($p['category_code'] ?? ''),
         'cap' => (string)($p['capacity'] ?? ''),
         'color' => (string)($p['color'] ?? ''),
@@ -120,6 +122,7 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
 }
 
 $in = [
+    'manufacturer' => trim((string)($_POST['manufacturer'] ?? '')),
     'typ' => trim((string)($_POST['typ'] ?? '')),
     'model' => trim((string)($_POST['model'] ?? '')),
     'cap' => trim((string)($_POST['cap'] ?? '')),
@@ -162,6 +165,12 @@ if (!crmCanModifyBranchStock($prodBranch)) {
 
 if ($in['model'] === '') {
     echo json_encode(['success' => false, 'message' => 'Vyplň model.']); exit;
+}
+if (mb_strlen($in['manufacturer']) > 64) {
+    echo json_encode(['success' => false, 'message' => 'Výrobce je moc dlouhý. Zkrať ho prosím na max. 64 znaků.'], JSON_UNESCAPED_UNICODE); exit;
+}
+if (mb_strlen($in['typ']) > 64) {
+    echo json_encode(['success' => false, 'message' => 'Typ zařízení je moc dlouhý. Zkrať ho prosím na max. 64 znaků.'], JSON_UNESCAPED_UNICODE); exit;
 }
 $processorFamilies = array_keys(afxProductProcessors());
 if (!afxProductHasProcessorFields($in['typ'], $in['model'])) {
@@ -329,6 +338,7 @@ try {
             // příslušenství stáhl na 1 ks, mikroúprava stock_qty nesahá vůbec
             && $stockQty === (int)$existing['stock_qty']   // změna POČTU musí projít plnou větví, jinak se tiše zahodí
             && $in['stock_key'] === (string)($existing['stock_key'] ?? '')
+            && (string)($asm['manuf'] ?: '') === (string)($existing['manufacturer'] ?? '')
             && $in['model'] === (string)($existing['model'] ?? '')
             && $in['cap'] === (string)($existing['capacity'] ?? '')
             && $in['color'] === (string)($existing['color'] ?? '')
@@ -339,6 +349,8 @@ try {
             // ani poslat zpět, vrací se prázdno — plná větev by ji tady smazala
             && ($in['image_url'] === '' || $in['image_url'] === (string)($existing['image_url'] ?? ''))
             // Mac/iPad parametry žijí jen v raw_csv — jejich změna vyžaduje přeskládání řádku
+            && (trim((string)($exRaw['[PARAMETER "Typ zařízení"]'] ?? $exRaw['PRODUKT_TYP'] ?? '')) === ''
+                || $in['typ'] === trim((string)($exRaw['[PARAMETER "Typ zařízení"]'] ?? $exRaw['PRODUKT_TYP'] ?? '')))
             && $in['ram'] === trim((string)($exRaw['[PARAMETER "RAM"]'] ?? ''))
             && $in['processor_family'] === trim((string)($exRaw['[PARAMETER "Výrobce procesoru"]'] ?? $exRaw['PROCESOR_TYP'] ?? ''))
             && $in['processor_model'] === trim((string)($exRaw['PROCESOR_MODEL'] ?? $exRaw['[PARAMETER "Procesor"]'] ?? ''))

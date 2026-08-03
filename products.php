@@ -423,11 +423,16 @@ try {
                                 </div>
                             </div>
                             <div class="col-md-4">
+                                <label class="form-label small">Výrobce</label>
+                                <select id="pcManufacturer" class="form-select"></select>
+                                <input type="text" id="pcManufacturerCustom" class="form-control mt-1" placeholder="vlastní výrobce…" style="display:none;">
+                            </div>
+                            <div class="col-md-4">
                                 <label class="form-label small">Typ zařízení</label>
                                 <select id="pcTyp" class="form-select"></select>
                                 <input type="text" id="pcTypCustom" class="form-control mt-1" placeholder="vlastní typ…" style="display:none;">
                             </div>
-                            <div class="col-md-8">
+                            <div class="col-md-4">
                                 <label class="form-label small">Model <span class="text-danger">*</span></label>
                                 <select id="pcModel" class="form-select"></select>
                                 <input type="text" id="pcModelCustom" class="form-control mt-1" placeholder="vlastní model…" style="display:none;">
@@ -659,6 +664,7 @@ $(document).on('click', '.product-label-btn', function () {
 // ═══ Naskladnit produkt — port Mac appky ═══
 (function () {
     var CATALOG = <?php echo json_encode([
+        'manufacturers' => afxProductManufacturers(),
         'types' => afxProductTypes(),
         'caps' => AFX_CAPS, 'rams' => AFX_RAMS, 'cpus' => AFX_CPU_CORES, 'gpus' => AFX_GPU_CORES,
         'processors' => afxProductProcessors(),
@@ -671,7 +677,7 @@ $(document).on('click', '.product-label-btn', function () {
     var CUSTOM = '✏️ Vlastní…';
 
     var el = function (id) { return document.getElementById(id); };
-    var $typC = el('pcTypCustom');
+    var $manuf = el('pcManufacturer'), $manufC = el('pcManufacturerCustom'), $typC = el('pcTypCustom');
     var $typ = el('pcTyp'), $model = el('pcModel'), $modelC = el('pcModelCustom'),
         $cap = el('pcCap'), $color = el('pcColor'), $colorC = el('pcColorCustom'),
         $grade = el('pcGrade'), $stockKey = el('pcStockKey'), $bat = el('pcBattery'),
@@ -687,11 +693,38 @@ $(document).on('click', '.product-label-btn', function () {
         values.forEach(function (v) { sel.appendChild(new Option(v, v)); });
         if (withCustom) sel.appendChild(new Option(CUSTOM, CUSTOM));
     }
+    function manufacturerVal() { return $manuf.value === CUSTOM ? $manufC.value.trim() : $manuf.value.trim(); }
     function typVal() { return $typ.value === CUSTOM ? $typC.value.trim() : $typ.value; }
+    function typeMatchesManufacturer(t, manuf) { return (t.manuf || '') === manuf; }
+    function typeMatchesCategory(t, categoryCode) {
+        return !!categoryCode && (t.k === categoryCode || ((t.kmatch || []).indexOf(categoryCode) >= 0));
+    }
+    function typeOptionsForManufacturer(manuf) {
+        var opts = CATALOG.types.filter(function (t) { return typeMatchesManufacturer(t, manuf); });
+        if (!opts.length || $manuf.value === CUSTOM) {
+            opts = CATALOG.types.filter(function (t) { return !(t.manuf || ''); });
+        }
+        var seen = {};
+        return opts.filter(function (t) {
+            if (seen[t.id]) return false;
+            seen[t.id] = true;
+            return true;
+        });
+    }
     function typeDef() {
         var tv = typVal();
-        for (var i = 0; i < CATALOG.types.length; i++) if (CATALOG.types[i].id === tv) return CATALOG.types[i];
-        return { id: tv, manuf: '', k: '', cap: true, ram: false, gen: false, colors: [], models: [] };
+        var mv = manufacturerVal();
+        for (var i = 0; i < CATALOG.types.length; i++) {
+            if (CATALOG.types[i].id === tv && typeMatchesManufacturer(CATALOG.types[i], mv)) return CATALOG.types[i];
+        }
+        for (var j = 0; j < CATALOG.types.length; j++) {
+            if (CATALOG.types[j].id === tv && !(CATALOG.types[j].manuf || '')) {
+                var g = Object.assign({}, CATALOG.types[j]);
+                g.manuf = mv;
+                return g;
+            }
+        }
+        return { id: tv, manuf: mv, k: '', cap: true, ram: false, gen: false, colors: [], models: [] };
     }
     function modelVal() { return $model.value === CUSTOM ? $modelC.value.trim() : $model.value.trim(); }
     function colorVal() { return $color.value === CUSTOM ? $colorC.value.trim() : $color.value.trim(); }
@@ -699,7 +732,7 @@ $(document).on('click', '.product-label-btn', function () {
     function processorModelVal() { return $processorModel.value === CUSTOM ? $processorModelC.value.trim() : $processorModel.value.trim(); }
     function typeHasProcessorFields() {
         var hay = (typVal() + ' ' + modelVal()).toLowerCase();
-        return ['macbook', 'notebook', 'laptop', 'počítač', 'pocitac', 'computer', 'desktop', 'pc', 'imac', 'mac mini', 'mac studio']
+        return ['macbook', 'notebook', 'laptop', 'počítač', 'pocitac', 'computer', 'desktop', 'pc', 'imac', 'mac mini', 'mac studio', 'mac pro']
             .some(function (needle) { return hay.indexOf(needle) >= 0; });
     }
     function processorDisplayVal() {
@@ -719,6 +752,8 @@ $(document).on('click', '.product-label-btn', function () {
     function titleHasProcessor(titleBase, processor) {
         var hay = normSpec(titleBase), needle = normSpec(processor);
         var noBrand = needle.replace(/^(apple|amd|intel)\s+/, '').trim();
+        var chip = needle.match(/\bm\d(?:\s+(?:pro|max|ultra))?\b/);
+        if (chip && hay.indexOf(chip[0]) >= 0) return true;
         return !!needle && (hay.indexOf(needle) >= 0 || (!!noBrand && hay.indexOf(noBrand) >= 0));
     }
     function processorTitlePart(titleBase, processor) {
@@ -728,6 +763,25 @@ $(document).on('click', '.product-label-btn', function () {
             part = part.replace(/^(Intel|AMD|Apple)\s+/, '');
         }
         return part.trim();
+    }
+    function displayModelVal(t, model) {
+        model = String(model || '').trim();
+        if (!model) return '';
+        var typeId = String((t && t.id) || '').trim();
+        var manuf = String((t && t.manuf) || manufacturerVal() || '').trim();
+        var low = model.toLowerCase();
+        if (typeId && low.indexOf(typeId.toLowerCase()) === 0) return model;
+        if (manuf && low.indexOf(manuf.toLowerCase()) === 0) return model;
+        if (manuf && manuf !== 'Apple') return model;
+        if (typeId) return typeId + ' ' + model;
+        return model;
+    }
+    function titleModelVal(t, displayModel) {
+        var manuf = String((t && t.manuf) || manufacturerVal() || '').trim();
+        if (manuf && manuf !== 'Apple' && displayModel.toLowerCase().indexOf(manuf.toLowerCase()) !== 0) {
+            return manuf + ' ' + displayModel;
+        }
+        return displayModel;
     }
     function clearProcessor() {
         $processorFamily.value = '';
@@ -768,8 +822,8 @@ $(document).on('click', '.product-label-btn', function () {
     function buildTitle() {
         var t = typeDef();
         var model = modelVal();
-        var dm = model;
-        if (model && t.id && model.toLowerCase().indexOf(t.id.toLowerCase()) !== 0) dm = t.id + ' ' + model;
+        var dm = displayModelVal(t, model);
+        var titleModel = titleModelVal(t, dm);
         var cap = t.cap ? $cap.value : '';
         // RAM/jádra bere každý typ; t.ram = jen „macový" formát názvu (X/Y SSD)
         var ram = $ram.value, cpu = $cpu.value, gpu = $gpu.value;
@@ -779,13 +833,13 @@ $(document).on('click', '.product-label-btn', function () {
         var cores = [cpu ? cpu + ' CPU' : '', gpu ? gpu + ' GPU' : ''].filter(Boolean).join(' ');
         var processor = processorDisplayVal();
         var specParts = [];
-        var processorTitle = processorTitlePart(dm, processor);
+        var processorTitle = processorTitlePart(titleModel, processor);
         if (processorTitle) specParts.push(processorTitle);
         if (cores && mem) specParts.push(cores + ', ' + mem);
         else if (cores || mem) specParts.push(cores || mem);
         var spec = specParts.join(', ');
         // stav (grade) do názvu nepatří — jen v buňce/parametru/popisu
-        return [dm, spec, colorVal()].filter(Boolean).join(' ').trim();
+        return [titleModel, spec, colorVal()].filter(Boolean).join(' ').trim();
     }
     function buildDesc() {
         var t = typeDef();
@@ -810,6 +864,13 @@ $(document).on('click', '.product-label-btn', function () {
         el('pcPreviewDesc').textContent = buildDesc();
     }
 
+    function onManufacturer() {
+        var opts = typeOptionsForManufacturer(manufacturerVal());
+        fillSelect($typ, opts.map(function (t) { return t.id; }), false, true);
+        $typC.style.display = 'none';
+        onType();
+    }
+
     function onType() {
         var t = typeDef();
         fillSelect($model, t.models, true, true);
@@ -829,9 +890,39 @@ $(document).on('click', '.product-label-btn', function () {
         }
         sel.value = val;
     }
+    function setManufacturerValue(val) {
+        val = val || '';
+        if (val && CATALOG.manufacturers.indexOf(val) >= 0) {
+            $manuf.value = val;
+            $manufC.value = '';
+            $manufC.style.display = 'none';
+        } else {
+            $manuf.value = CUSTOM;
+            $manufC.value = val;
+            $manufC.style.display = '';
+        }
+        onManufacturer();
+    }
+    function inferManufacturerFromProduct(p) {
+        var manuf = p.manufacturer || '';
+        if (manuf) return manuf;
+        CATALOG.types.forEach(function (t) { if (!manuf && typeMatchesCategory(t, p.category_code || '')) manuf = t.manuf || ''; });
+        CATALOG.manufacturers.forEach(function (m) {
+            if (!manuf && p.title && p.title.toLowerCase().indexOf(m.toLowerCase() + ' ') === 0) manuf = m;
+        });
+        return manuf;
+    }
+    function inferTypeFromProduct(p) {
+        var opts = typeOptionsForManufacturer(manufacturerVal());
+        var typ = p.typ || '';
+        if (typ && opts.some(function (t) { return t.id === typ; })) return typ;
+        opts.forEach(function (t) { if (!typ && typeMatchesCategory(t, p.category_code || '')) typ = t.id; });
+        opts.forEach(function (t) { if (!typ && p.title && p.title.indexOf(t.id) === 0) typ = t.id; });
+        return typ;
+    }
 
     // init
-    fillSelect($typ, CATALOG.types.map(function (t) { return t.id; }), false, true);
+    fillSelect($manuf, CATALOG.manufacturers, false, true);
     fillSelect($cap, CATALOG.caps, true, false);
     fillSelect($grade, CATALOG.grades, false, false);
     fillSelect($ram, CATALOG.rams, true, false);
@@ -843,8 +934,13 @@ $(document).on('click', '.product-label-btn', function () {
     fillSelect($gen, CATALOG.gens, true, false);
     $grade.value = 'Nový';
     $stockKey.value = DEFAULT_STOCK;
-    onType();
+    if (CATALOG.manufacturers.indexOf('Apple') >= 0) $manuf.value = 'Apple';
+    onManufacturer();
 
+    $manuf.addEventListener('change', function () {
+        $manufC.style.display = $manuf.value === CUSTOM ? '' : 'none';
+        onManufacturer();
+    });
     $typ.addEventListener('change', function () {
         $typC.style.display = $typ.value === CUSTOM ? '' : 'none';
         onType();
@@ -853,11 +949,11 @@ $(document).on('click', '.product-label-btn', function () {
     $color.addEventListener('change', function () { $colorC.style.display = $color.value === CUSTOM ? '' : 'none'; refreshPreview(); });
     $processorFamily.addEventListener('change', function () { onProcessorFamily(true); });
     $processorModel.addEventListener('change', function () { $processorModelC.style.display = $processorModel.value === CUSTOM ? '' : 'none'; refreshPreview(); });
-    [$typC, $modelC].forEach(function (n) {
+    [$manufC, $typC, $modelC].forEach(function (n) {
         n.addEventListener('input', function () { syncProcessorVisibility(); refreshPreview(); });
         n.addEventListener('change', function () { syncProcessorVisibility(); refreshPreview(); });
     });
-    [$typC, $modelC, $colorC, $cap, $grade, $bat, $ram, $processorModelC, $cpu, $gpu, $rocnik, $gen].forEach(function (n) {
+    [$manufC, $typC, $modelC, $colorC, $cap, $grade, $bat, $ram, $processorModelC, $cpu, $gpu, $rocnik, $gen].forEach(function (n) {
         n.addEventListener('input', refreshPreview);
         n.addEventListener('change', refreshPreview);
     });
@@ -1108,6 +1204,7 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('action', $editId.value ? 'update' : 'create');
         if ($editId.value) fd.append('id', $editId.value);
         fd.append('csrf_token', CSRF);
+        fd.append('manufacturer', manufacturerVal());
         fd.append('typ', typVal());
         fd.append('model', modelVal());
         fd.append('cap', typeDef().cap ? $cap.value : '');
@@ -1248,8 +1345,10 @@ $(document).on('click', '.product-label-btn', function () {
         qtyOriginal = ''; qtyBeforeSold = '1';
         el('pcSaveBtn').style.display = 'none';          // při naskladnění se štítek tiskne vždy
         el('pcSavePrintBtn').innerHTML = '<i class="fas fa-tag me-1"></i> Přidat a vytisknout štítek';
+        $manufC.value = ''; $manufC.style.display = 'none';
+        if ($manuf.value === CUSTOM) { $manuf.value = 'Apple'; onManufacturer(); }
         $typC.value = ''; $typC.style.display = 'none';
-        if ($typ.value === CUSTOM) { $typ.value = CATALOG.types[0].id; onType(); }
+        if ($typ.value === CUSTOM) { onManufacturer(); }
         [$modelC, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
         $model.value = ''; $color.value = ''; $cap.value = '';
         clearProcessor(); syncProcessorVisibility();
@@ -1287,17 +1386,20 @@ $(document).on('click', '.product-label-btn', function () {
                 el('pcSaveBtn').style.display = '';   // u editace se štítek tisknout nemusí
                 el('pcSaveBtn').innerHTML = '<i class="fas fa-save me-1"></i> Uložit změny';
                 el('pcSavePrintBtn').innerHTML = '<i class="fas fa-tag me-1"></i> Uložit a vytisknout štítek';
-                // typ odvodit z kategorie (K-kód), fallback z názvu; NEZNÁMÝ typ (z appky
-                // „Vlastní…") NIKDY nespadne na iPhone — přešel by na cizí K-kód a výrobce
-                var typ = '';
-                CATALOG.types.forEach(function (t) { if (t.k && t.k === p.category_code) typ = t.id; });
-                if (!typ) { CATALOG.types.forEach(function (t) { if (p.title.indexOf(t.id) === 0) typ = t.id; }); }
+                setManufacturerValue(inferManufacturerFromProduct(p));
+                // typ odvodit z raw_csv / kategorie / názvu; NEZNÁMÝ typ se drží jako Vlastní,
+                // aby editace starého nebo ručně založeného kusu nespadla na cizí kategorii.
+                var typ = inferTypeFromProduct(p);
                 if (typ) { $typ.value = typ; $typC.value = ''; $typC.style.display = 'none'; }
                 else { $typ.value = CUSTOM; $typC.value = ''; $typC.style.display = ''; }
                 onType();
                 var t = typeDef();
                 // model bez prefixu typu (display_model ho přidává zpět)
                 var m = p.model || '';
+                var mvNow = manufacturerVal();
+                if (mvNow && mvNow !== 'Apple' && m.toLowerCase().indexOf(mvNow.toLowerCase() + ' ') === 0) {
+                    m = m.substring(mvNow.length).trim();
+                }
                 if (t.models.indexOf(m) >= 0) { $model.value = m; }
                 else if (m) { $model.value = CUSTOM; $modelC.style.display = ''; $modelC.value = m; }
                 if (t.colors.indexOf(p.color) >= 0) { $color.value = p.color; }

@@ -62,6 +62,7 @@ foreach ($rows as $p) {
         '[AVAILABILITY]' => $stockQty > 0 ? 'Skladem' : 'Vyprodáno',
         '[STOCK]' => $stockVal,
         '[PRICE_ORIGINAL "Výchozí"]' => $priceStr,
+        '[PARAMETER "Výrobce"]' => (string)($p['manufacturer'] ?? ''),
         '[PARAMETER "Model"]' => (string)($p['model'] ?? ''),
         '[PARAMETER "Kapacita"]' => (string)($p['capacity'] ?? ''),
         '[PARAMETER "Barva"]' => (string)($p['color'] ?? ''),

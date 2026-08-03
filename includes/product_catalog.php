@@ -145,6 +145,52 @@ const AFX_MACBOOKS_PRO = [
     'MacBook Pro 14″ M4 (2024)', 'MacBook Pro 14″ M4 Pro (2024)', 'MacBook Pro 14″ M4 Max (2024)', 'MacBook Pro 16″ M4 Pro (2024)', 'MacBook Pro 16″ M4 Max (2024)',
     'MacBook Pro 14″ M5 (2025)',
 ];
+const AFX_IMACS = [
+    'iMac 21,5″ (2012) Intel', 'iMac 27″ (2012) Intel', 'iMac 21,5″ (2013) Intel', 'iMac 27″ (2013) Intel',
+    'iMac 21,5″ (2014) Intel', 'iMac 27″ Retina 5K (2014) Intel', 'iMac 21,5″ (2015) Intel', 'iMac 27″ Retina 5K (2015) Intel',
+    'iMac 21,5″ (2017) Intel', 'iMac 27″ Retina 5K (2017) Intel', 'iMac 21,5″ (2019) Intel', 'iMac 27″ Retina 5K (2019) Intel',
+    'iMac 27″ Retina 5K (2020) Intel', 'iMac 24″ M1 (2021)', 'iMac 24″ M3 (2023)', 'iMac 24″ M4 (2024)',
+];
+const AFX_MAC_MINI = [
+    'Mac mini (2010) Intel', 'Mac mini (2011) Intel', 'Mac mini (2012) Intel', 'Mac mini (2014) Intel',
+    'Mac mini (2018) Intel', 'Mac mini M1 (2020)', 'Mac mini M2 (2023)', 'Mac mini M2 Pro (2023)',
+    'Mac mini M4 (2024)', 'Mac mini M4 Pro (2024)',
+];
+const AFX_MAC_STUDIO = [
+    'Mac Studio M1 Max (2022)', 'Mac Studio M1 Ultra (2022)', 'Mac Studio M2 Max (2023)',
+    'Mac Studio M2 Ultra (2023)', 'Mac Studio M4 Max (2025)', 'Mac Studio M4 Ultra (2025)',
+];
+const AFX_MAC_PRO = [
+    'Mac Pro (2010) Intel', 'Mac Pro (2012) Intel', 'Mac Pro (2013) Intel',
+    'Mac Pro (2019) Intel', 'Mac Pro M2 Ultra (2023)',
+];
+const AFX_APPLE_WATCHES = [
+    'Apple Watch Series 3', 'Apple Watch Series 4', 'Apple Watch Series 5', 'Apple Watch Series 6',
+    'Apple Watch SE (1. gen)', 'Apple Watch Series 7', 'Apple Watch Series 8', 'Apple Watch Ultra',
+    'Apple Watch SE (2. gen)', 'Apple Watch Series 9', 'Apple Watch Ultra 2', 'Apple Watch Series 10',
+];
+const AFX_AIRPODS = [
+    'AirPods (2. generace)', 'AirPods (3. generace)', 'AirPods (4. generace)',
+    'AirPods Pro (1. generace)', 'AirPods Pro (2. generace)', 'AirPods Max',
+];
+const AFX_APPLE_TV = ['Apple TV HD', 'Apple TV 4K (1. generace)', 'Apple TV 4K (2. generace)', 'Apple TV 4K (3. generace)'];
+const AFX_HOMEPODS = ['HomePod (1. generace)', 'HomePod mini', 'HomePod (2. generace)'];
+
+function afxProductManufacturers(): array {
+    return ['Apple', 'Samsung', 'Xiaomi', 'Asus', 'Doogee', 'Honor', 'Huawei', 'Motorola', 'Nokia',
+        'Lenovo', 'Dell', 'HP', 'Acer', 'MSI', 'Sony', 'Nintendo', 'Microsoft'];
+}
+
+function afxBrandProductTypes(string $manufacturer, string $k, array $typeIds, array $colors = AFX_ANDROID_COLORS): array {
+    $out = [];
+    foreach ($typeIds as $id) {
+        $out[] = ['id' => $id, 'manuf' => $manufacturer, 'k' => $k, 'cap' => true,
+            'ram' => false, 'gen' => false,
+            'colors' => in_array($id, ['Notebook', 'Počítač'], true) ? AFX_COMPUTER_COLORS : $colors,
+            'models' => []];
+    }
+    return $out;
+}
 
 /** Typy zařízení: id → [výrobce, K-kód kategorie, cap?, ram?, gen?, barvy, modely]
  *  POZOR: 'ram' už NEznamená „má RAM pole" (RAM/jádra bere každý typ) — znamená
@@ -152,22 +198,44 @@ const AFX_MACBOOKS_PRO = [
 function afxProductTypes(): array {
     static $types = null;
     if ($types === null) {
-        $types = [
+        $types = array_merge([
             ['id' => 'iPhone', 'manuf' => 'Apple', 'k' => 'K00039', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_APPLE_COLORS, 'models' => AFX_IPHONES],
             ['id' => 'iPad', 'manuf' => 'Apple', 'k' => 'K00041', 'cap' => true, 'ram' => false, 'gen' => true, 'colors' => AFX_APPLE_COLORS, 'models' => AFX_IPADS],
-            ['id' => 'MacBook Pro', 'manuf' => 'Apple', 'k' => 'K00143', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Space Gray', 'Silver', 'Space Black'], 'models' => AFX_MACBOOKS_PRO],
-            ['id' => 'MacBook Air', 'manuf' => 'Apple', 'k' => 'K00144', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Space Gray', 'Silver', 'Starlight', 'Midnight', 'Sky Blue'], 'models' => AFX_MACBOOKS_AIR],
+            ['id' => 'MacBook', 'manuf' => 'Apple', 'k' => '', 'kmatch' => ['K00143', 'K00144'], 'cap' => true, 'ram' => true, 'gen' => false,
+                'colors' => ['Space Gray', 'Silver', 'Space Black', 'Starlight', 'Midnight', 'Sky Blue'], 'models' => array_merge(AFX_MACBOOKS_PRO, AFX_MACBOOKS_AIR)],
+            ['id' => 'iMac', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver', 'Blue', 'Green', 'Pink', 'Purple', 'Yellow', 'Orange'], 'models' => AFX_IMACS],
+            ['id' => 'Mac mini', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver', 'Space Gray'], 'models' => AFX_MAC_MINI],
+            ['id' => 'Mac Studio', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver'], 'models' => AFX_MAC_STUDIO],
+            ['id' => 'Mac Pro', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver', 'Black'], 'models' => AFX_MAC_PRO],
+            ['id' => 'Apple Watch', 'manuf' => 'Apple', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'colors' => AFX_APPLE_COLORS, 'models' => AFX_APPLE_WATCHES],
+            ['id' => 'AirPods', 'manuf' => 'Apple', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'colors' => ['White', 'Midnight', 'Blue', 'Purple', 'Orange'], 'models' => AFX_AIRPODS],
+            ['id' => 'Apple TV', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => ['Black'], 'models' => AFX_APPLE_TV],
+            ['id' => 'HomePod', 'manuf' => 'Apple', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'colors' => ['White', 'Midnight', 'Space Gray', 'Yellow', 'Orange', 'Blue'], 'models' => AFX_HOMEPODS],
+        ],
+        afxBrandProductTypes('Samsung', 'K00135', ['Telefon', 'Tablet', 'Notebook', 'Hodinky', 'Sluchátka']),
+        afxBrandProductTypes('Xiaomi', 'K00136', ['Telefon', 'Tablet', 'Hodinky']),
+        afxBrandProductTypes('Asus', 'K00137', ['Telefon', 'Tablet', 'Notebook', 'Počítač']),
+        afxBrandProductTypes('Doogee', 'K00138', ['Telefon']),
+        afxBrandProductTypes('Honor', 'K00139', ['Telefon', 'Tablet', 'Notebook']),
+        afxBrandProductTypes('Huawei', 'K00140', ['Telefon', 'Tablet', 'Notebook', 'Hodinky']),
+        afxBrandProductTypes('Motorola', 'K00141', ['Telefon', 'Tablet']),
+        afxBrandProductTypes('Nokia', 'K00142', ['Telefon', 'Tablet']),
+        afxBrandProductTypes('Lenovo', '', ['Telefon', 'Tablet', 'Notebook', 'Počítač']),
+        afxBrandProductTypes('Dell', '', ['Notebook', 'Počítač']),
+        afxBrandProductTypes('HP', '', ['Notebook', 'Počítač']),
+        afxBrandProductTypes('Acer', '', ['Notebook', 'Počítač']),
+        afxBrandProductTypes('MSI', '', ['Notebook', 'Počítač']),
+        afxBrandProductTypes('Sony', '', ['Telefon', 'Herní konzole', 'Sluchátka']),
+        afxBrandProductTypes('Nintendo', '', ['Herní konzole']),
+        afxBrandProductTypes('Microsoft', '', ['Herní konzole', 'Tablet', 'Notebook']),
+        [
+            ['id' => 'Telefon', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
+            ['id' => 'Tablet', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
             ['id' => 'Notebook', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_COMPUTER_COLORS, 'models' => []],
             ['id' => 'Počítač', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_COMPUTER_COLORS, 'models' => []],
-            ['id' => 'Samsung', 'manuf' => 'Samsung', 'k' => 'K00135', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
-            ['id' => 'Xiaomi', 'manuf' => 'Xiaomi', 'k' => 'K00136', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
-            ['id' => 'Asus', 'manuf' => 'Asus', 'k' => 'K00137', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
-            ['id' => 'Doogee', 'manuf' => 'Doogee', 'k' => 'K00138', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
-            ['id' => 'Honor', 'manuf' => 'Honor', 'k' => 'K00139', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
-            ['id' => 'Huawei', 'manuf' => 'Huawei', 'k' => 'K00140', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
-            ['id' => 'Motorola', 'manuf' => 'Motorola', 'k' => 'K00141', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
-            ['id' => 'Nokia', 'manuf' => 'Nokia', 'k' => 'K00142', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
-        ];
+            ['id' => 'Hodinky', 'manuf' => '', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
+            ['id' => 'Herní konzole', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_COMPUTER_COLORS, 'models' => []],
+        ]);
     }
     return $types;
 }
@@ -183,7 +251,7 @@ function afxProductProcessors(): array {
 function afxProductHasProcessorFields(string $typeId, string $model = ''): bool {
     $hay = mb_strtolower(trim($typeId . ' ' . $model));
     if ($hay === '') return false;
-    foreach (['macbook', 'notebook', 'laptop', 'počítač', 'pocitac', 'computer', 'desktop', 'pc', 'imac', 'mac mini', 'mac studio'] as $needle) {
+    foreach (['macbook', 'notebook', 'laptop', 'počítač', 'pocitac', 'computer', 'desktop', 'pc', 'imac', 'mac mini', 'mac studio', 'mac pro'] as $needle) {
         if (str_contains($hay, $needle)) return true;
     }
     return false;
@@ -216,6 +284,7 @@ function afxProductTitleHasProcessor(string $titleBase, string $processor): bool
     $needle = afxProductSpecText($processor);
     if ($hay === '' || $needle === '') return false;
     $needleNoBrand = trim(preg_replace('/^(apple|amd|intel)\s+/u', '', $needle) ?? $needle);
+    if (preg_match('/\bm\d(?:\s+(?:pro|max|ultra))?\b/u', $needle, $m) && str_contains($hay, $m[0])) return true;
     return str_contains($hay, $needle) || ($needleNoBrand !== '' && str_contains($hay, $needleNoBrand));
 }
 
@@ -231,12 +300,69 @@ function afxProductProcessorTitlePart(string $titleBase, string $processor): str
     return trim($part);
 }
 
-function afxProductTypeById(string $id): array {
+function afxProductTypeMatchesCategory(array $t, string $categoryCode): bool {
+    if ($categoryCode === '') return false;
+    if (($t['k'] ?? '') === $categoryCode) return true;
+    return in_array($categoryCode, $t['kmatch'] ?? [], true);
+}
+
+function afxProductTypeById(string $id, string $manufacturer = ''): array {
+    $id = trim($id);
+    $manufacturer = trim($manufacturer);
+    $legacyBrandTypes = array_diff(afxProductManufacturers(), ['Apple']);
+    if ($manufacturer === '' && in_array($id, $legacyBrandTypes, true)) {
+        $manufacturer = $id;
+        $id = 'Telefon';
+    } elseif ($manufacturer === '' && in_array($id, ['MacBook Pro', 'MacBook Air'], true)) {
+        $manufacturer = 'Apple';
+        $id = 'MacBook';
+    }
+    foreach (afxProductTypes() as $t) {
+        if ($t['id'] === $id && $manufacturer !== '' && $t['manuf'] === $manufacturer) return $t;
+    }
+    foreach (afxProductTypes() as $t) {
+        if ($t['id'] === $id && ($t['manuf'] ?? '') === '') {
+            $t['manuf'] = $manufacturer;
+            return $t;
+        }
+    }
     foreach (afxProductTypes() as $t) {
         if ($t['id'] === $id) return $t;
     }
     // vlastní (neznámý) typ — jako GENERIC_TYPE v appce
-    return ['id' => $id, 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => [], 'models' => []];
+    return ['id' => $id, 'manuf' => $manufacturer, 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => [], 'models' => []];
+}
+
+function afxProductCategoryCode(array $t, string $model): string {
+    $id = (string)($t['id'] ?? '');
+    if (($t['manuf'] ?? '') === 'Apple' && $id === 'MacBook') {
+        $low = mb_strtolower($model);
+        if (str_contains($low, 'macbook air')) return 'K00144';
+        if (str_contains($low, 'macbook pro')) return 'K00143';
+    }
+    return (string)($t['k'] ?? '');
+}
+
+function afxProductDisplayModel(array $t, string $model): string {
+    $typeId = trim((string)($t['id'] ?? ''));
+    $manufacturer = trim((string)($t['manuf'] ?? ''));
+    $displayModel = trim($model);
+    if ($displayModel === '') return '';
+    $lowModel = mb_strtolower($displayModel);
+    if ($typeId !== '' && str_starts_with($lowModel, mb_strtolower($typeId))) return $displayModel;
+    if ($manufacturer !== '' && str_starts_with($lowModel, mb_strtolower($manufacturer))) return $displayModel;
+    if ($manufacturer !== '' && $manufacturer !== 'Apple') return $displayModel;
+    if ($typeId !== '') return $typeId . ' ' . $displayModel;
+    return $displayModel;
+}
+
+function afxProductTitleModel(array $t, string $displayModel): string {
+    $manufacturer = trim((string)($t['manuf'] ?? ''));
+    if ($manufacturer !== '' && $manufacturer !== 'Apple'
+        && !str_starts_with(mb_strtolower($displayModel), mb_strtolower($manufacturer))) {
+        return $manufacturer . ' ' . $displayModel;
+    }
+    return $displayModel;
 }
 
 /**
@@ -247,7 +373,7 @@ function afxProductTypeById(string $id): array {
  * Vrací: ['title', 'short_desc', 'assoc' => klíče raw_csv, 'manuf', 'k', 'grade_token', 'display_model']
  */
 function afxProductAssemble(array $in): array {
-    $t = afxProductTypeById(trim((string)($in['typ'] ?? '')));
+    $t = afxProductTypeById(trim((string)($in['typ'] ?? '')), trim((string)($in['manufacturer'] ?? '')));
     $model = trim((string)($in['model'] ?? ''));
     $cap = $t['cap'] ? trim((string)($in['cap'] ?? '')) : '';
     $color = trim((string)($in['color'] ?? ''));
@@ -274,12 +400,9 @@ function afxProductAssemble(array $in): array {
     $gradeRaw = trim((string)($in['grade'] ?? ''));
     $gradeToken = $gradeRaw !== '' ? trim(explode(' ', $gradeRaw)[0]) : 'A';
 
-    // display_model(): model doplněný o typ, pokud ho už neobsahuje
-    $typeId = trim($t['id']);
-    $displayModel = $model;
-    if ($model !== '' && $typeId !== '' && !str_starts_with(mb_strtolower($model), mb_strtolower($typeId))) {
-        $displayModel = $typeId . ' ' . $model;
-    }
+    $displayModel = afxProductDisplayModel($t, $model);
+    $titleModel = afxProductTitleModel($t, $displayModel);
+    $categoryCode = afxProductCategoryCode($t, $displayModel);
 
     // build_title()
     if ($t['ram']) {
@@ -299,14 +422,14 @@ function afxProductAssemble(array $in): array {
     if ($gpu !== '') $coresParts[] = $gpu . ' GPU';
     $cores = implode(' ', $coresParts);
     $specParts = [];
-    $processorTitlePart = afxProductProcessorTitlePart($displayModel, $processorDisplay);
+    $processorTitlePart = afxProductProcessorTitlePart($titleModel, $processorDisplay);
     if ($processorTitlePart !== '') $specParts[] = $processorTitlePart;
     if ($cores !== '' && $mem !== '') { $specParts[] = $cores . ', ' . $mem; }
     elseif ($cores !== '' || $mem !== '') { $specParts[] = $cores !== '' ? $cores : $mem; }
     $spec = implode(', ', $specParts);
     // Stav (grade) do NÁZVU nepatří (přání 1.8.2026) — zůstává jen v parametru
     // [PARAMETER "Stav"], v popisu a v buňce Stav (CRM tabulka i e-shop).
-    $titleParts = array_filter([$displayModel, $spec, $color], static fn($p) => $p !== '');
+    $titleParts = array_filter([$titleModel, $spec, $color], static fn($p) => $p !== '');
     $title = trim(implode(' ', $titleParts));
 
     // SHORT_DESCRIPTION — pořadí přesně dle form_row()
@@ -336,13 +459,15 @@ function afxProductAssemble(array $in): array {
         '[ACTIVE_YN]' => '1',
         '[TITLE]' => $title,
         '[MANUFACTURER]' => $t['manuf'],
-        '[CATEGORIES]' => $t['k'],
+        '[CATEGORIES]' => $categoryCode,
         '[AVAILABILITY]' => $sold ? 'Vyprodáno' : 'Skladem',
         '[STOCK]' => $stockVal,
         '[PRICE_ORIGINAL "Výchozí"]' => $priceStr,
         '[IS_PRICES_WITH_VAT_YN]' => '1',
         '[VAT]' => '0',
         '[SHORT_DESCRIPTION]' => $shortDesc,
+        '[PARAMETER "Výrobce"]' => $t['manuf'],
+        '[PARAMETER "Typ zařízení"]' => (string)$t['id'],
         '[PARAMETER "Model"]' => $displayModel,
         '[PARAMETER "Kapacita"]' => $cap,
         '[PARAMETER "Barva"]' => $color,
@@ -354,6 +479,7 @@ function afxProductAssemble(array $in): array {
         '[PARAMETER "Výrobce procesoru"]' => $processorFamily,
         '[PARAMETER "Procesor"]' => $processorDisplay,
         'PRIDANO' => $added,
+        'PRODUKT_TYP' => (string)$t['id'],
         'CPU_JADRA' => $cpu,
         'GPU_JADRA' => $gpu,
         'PROCESOR_TYP' => $processorFamily,
@@ -370,7 +496,7 @@ function afxProductAssemble(array $in): array {
         'short_desc' => $shortDesc,
         'assoc' => $assoc,
         'manuf' => $t['manuf'],
-        'k' => $t['k'],
+        'k' => $categoryCode,
         'grade_token' => $gradeToken,
         'display_model' => $displayModel,
         'battery_csv' => $bat !== '' ? $bat . ' %' : '',
@@ -381,7 +507,7 @@ function afxProductAssemble(array $in): array {
 function afxProductCsvHeader(): array {
     return ['[PRODUCT_CODE]', '[ACTIVE_YN]', '[TITLE]', '[MANUFACTURER]', '[CATEGORIES]', '[AVAILABILITY]',
         '[STOCK]', '[PRICE_ORIGINAL "Výchozí"]', '[IS_PRICES_WITH_VAT_YN]', '[VAT]', '[SHORT_DESCRIPTION]',
-        '[PARAMETER "Model"]', '[PARAMETER "Kapacita"]', '[PARAMETER "Barva"]', '[PARAMETER "Stav"]',
+        '[PARAMETER "Výrobce"]', '[PARAMETER "Typ zařízení"]', '[PARAMETER "Model"]', '[PARAMETER "Kapacita"]', '[PARAMETER "Barva"]', '[PARAMETER "Stav"]',
         '[PARAMETER "Baterie"]', '[STOCK_STOCK "karlin"]', '[STOCK_STOCK "vaclavak"]', '[PARAMETER "RAM"]',
         '[PARAMETER "Výrobce procesoru"]', '[PARAMETER "Procesor"]',
         'PRIDANO', 'CPU_JADRA', 'GPU_JADRA', '[PARAMETER "Ročník"]', '[PARAMETER "Generace"]',

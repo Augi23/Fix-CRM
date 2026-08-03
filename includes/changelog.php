@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.3',
+        'date' => '2026-08-03',
+        'time' => '16:41',
+        'title' => 'Naskladnění: Výrobce → Typ zařízení → Model',
+        'items' => [
+            'Formulář <b>Naskladnit produkt</b> má nově samostatné pole <b>Výrobce</b> před polem Typ zařízení. Výrobce obsahuje Apple a další značky z katalogu, plus stejnou volbu <b>✏️ Vlastní…</b> jako ostatní výběry.',
+            'Pole <b>Typ zařízení</b> se filtruje podle výrobce: Apple nabídne iPhone, iPad, MacBook, iMac, Mac mini, Mac Studio, Mac Pro, Apple Watch, AirPods, Apple TV a HomePod; ostatní výrobci dostanou relevantní typy jako Telefon, Tablet, Notebook, Počítač, Hodinky nebo Herní konzole.',
+            'Pole <b>Model</b> se dál filtruje podle typu zařízení — například Apple → iPhone nabídne jen iPhony, Apple → MacBook jen MacBooky. Vlastní výrobce, vlastní typ i vlastní model zůstávají zachované.',
+            'Výrobce a typ zařízení se ukládají do raw dat, exportu i e-shop feedu a editace starších produktů se snaží původní výrobce/typ bezpečně odvodit z uložených dat, K-kódu nebo názvu.',
+        ],
+    ],
+    [
         'version' => '3.42.2',
         'date' => '2026-08-03',
         'time' => '16:28',
