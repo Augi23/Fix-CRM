@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.4',
+        'date' => '2026-08-03',
+        'time' => '17:01',
+        'title' => 'Naskladnění: procesor podle výrobce zařízení',
+        'items' => [
+            'Výběr procesoru v naskladnění se nově řídí výrobcem zařízení: u Apple počítačů se nabízí <b>Intel</b> a <b>M chip - ARM</b>, u ostatních notebooků/počítačů jen <b>AMD</b> a <b>Intel</b>.',
+            'Server má stejnou pojistku jako formulář, takže <b>M chip - ARM</b> nejde omylem uložit k ne-Apple notebooku ani při ručně poslaném požadavku.',
+        ],
+    ],
+    [
         'version' => '3.42.3',
         'date' => '2026-08-03',
         'time' => '16:41',

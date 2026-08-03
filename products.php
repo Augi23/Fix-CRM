@@ -728,12 +728,19 @@ $(document).on('click', '.product-label-btn', function () {
     }
     function modelVal() { return $model.value === CUSTOM ? $modelC.value.trim() : $model.value.trim(); }
     function colorVal() { return $color.value === CUSTOM ? $colorC.value.trim() : $color.value.trim(); }
-    function processorFamilyVal() { return $processorFamily.value.trim(); }
+    function processorFamilyVal() {
+        var fam = $processorFamily.value.trim();
+        return processorFamiliesForType().indexOf(fam) >= 0 ? fam : '';
+    }
     function processorModelVal() { return $processorModel.value === CUSTOM ? $processorModelC.value.trim() : $processorModel.value.trim(); }
     function typeHasProcessorFields() {
         var hay = (typVal() + ' ' + modelVal()).toLowerCase();
         return ['macbook', 'notebook', 'laptop', 'počítač', 'pocitac', 'computer', 'desktop', 'pc', 'imac', 'mac mini', 'mac studio', 'mac pro']
             .some(function (needle) { return hay.indexOf(needle) >= 0; });
+    }
+    function processorFamiliesForType() {
+        if (!typeHasProcessorFields()) return [];
+        return typeDef().manuf === 'Apple' ? ['Intel', 'M chip - ARM'] : ['AMD', 'Intel'];
     }
     function processorDisplayVal() {
         if (!typeHasProcessorFields()) return '';
@@ -784,6 +791,21 @@ $(document).on('click', '.product-label-btn', function () {
         return displayModel;
     }
     function clearProcessor() {
+        fillSelect($processorFamily, processorFamiliesForType(), true, false);
+        $processorFamily.value = '';
+        fillSelect($processorModel, [], true, false);
+        $processorModel.value = '';
+        $processorModelC.value = '';
+        $processorModelC.style.display = 'none';
+    }
+    function syncProcessorFamilyOptions() {
+        var families = processorFamiliesForType();
+        var current = $processorFamily.value.trim();
+        fillSelect($processorFamily, families, true, false);
+        if (current && families.indexOf(current) >= 0) {
+            $processorFamily.value = current;
+            return;
+        }
         $processorFamily.value = '';
         fillSelect($processorModel, [], true, false);
         $processorModel.value = '';
@@ -792,12 +814,14 @@ $(document).on('click', '.product-label-btn', function () {
     }
     function syncProcessorVisibility() {
         var show = typeHasProcessorFields();
+        if (show) syncProcessorFamilyOptions();
         document.querySelectorAll('.pc-processor').forEach(function (n) { n.style.display = show ? '' : 'none'; });
         if (!show) clearProcessor();
         document.querySelectorAll('.pc-processor-model').forEach(function (n) { n.style.display = (show && processorFamilyVal()) ? '' : 'none'; });
     }
     function onProcessorFamily(clearModel) {
         var fam = processorFamilyVal();
+        if (!fam) $processorFamily.value = '';
         fillSelect($processorModel, (fam && CATALOG.processors[fam]) ? CATALOG.processors[fam] : [], true, !!fam);
         if (clearModel) {
             $processorModel.value = '';
@@ -809,7 +833,7 @@ $(document).on('click', '.product-label-btn', function () {
     }
     function setProcessorValues(fam, model) {
         clearProcessor();
-        if (!typeHasProcessorFields() || !fam || !CATALOG.processors[fam]) { syncProcessorVisibility(); return; }
+        if (!typeHasProcessorFields() || !fam || processorFamiliesForType().indexOf(fam) < 0 || !CATALOG.processors[fam]) { syncProcessorVisibility(); return; }
         $processorFamily.value = fam;
         onProcessorFamily(false);
         if ((CATALOG.processors[fam] || []).indexOf(model) >= 0) { $processorModel.value = model; }
@@ -926,7 +950,7 @@ $(document).on('click', '.product-label-btn', function () {
     fillSelect($cap, CATALOG.caps, true, false);
     fillSelect($grade, CATALOG.grades, false, false);
     fillSelect($ram, CATALOG.rams, true, false);
-    fillSelect($processorFamily, Object.keys(CATALOG.processors), true, false);
+    fillSelect($processorFamily, [], true, false);
     fillSelect($processorModel, [], true, false);
     fillSelect($cpu, CATALOG.cpus, true, false);
     fillSelect($gpu, CATALOG.gpus, true, false);

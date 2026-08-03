@@ -172,7 +172,7 @@ if (mb_strlen($in['manufacturer']) > 64) {
 if (mb_strlen($in['typ']) > 64) {
     echo json_encode(['success' => false, 'message' => 'Typ zařízení je moc dlouhý. Zkrať ho prosím na max. 64 znaků.'], JSON_UNESCAPED_UNICODE); exit;
 }
-$processorFamilies = array_keys(afxProductProcessors());
+$processorFamilies = afxProductProcessorFamiliesForType(afxProductTypeById($in['typ'], $in['manufacturer']));
 if (!afxProductHasProcessorFields($in['typ'], $in['model'])) {
     $in['processor_family'] = '';
     $in['processor_model'] = '';

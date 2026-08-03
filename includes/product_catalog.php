@@ -248,6 +248,12 @@ function afxProductProcessors(): array {
     ];
 }
 
+function afxProductProcessorFamiliesForType(array $t): array {
+    return (($t['manuf'] ?? '') === 'Apple')
+        ? ['Intel', 'M chip - ARM']
+        : ['AMD', 'Intel'];
+}
+
 function afxProductHasProcessorFields(string $typeId, string $model = ''): bool {
     $hay = mb_strtolower(trim($typeId . ' ' . $model));
     if ($hay === '') return false;
@@ -383,7 +389,7 @@ function afxProductAssemble(array $in): array {
     $cpu = trim((string)($in['cpu'] ?? ''));
     $gpu = trim((string)($in['gpu'] ?? ''));
     $processorFamily = trim((string)($in['processor_family'] ?? ''));
-    if (!in_array($processorFamily, AFX_PROCESSOR_FAMILIES, true) || !afxProductHasProcessorFields((string)$t['id'], $model)) {
+    if (!in_array($processorFamily, afxProductProcessorFamiliesForType($t), true) || !afxProductHasProcessorFields((string)$t['id'], $model)) {
         $processorFamily = '';
     }
     $processorModel = $processorFamily !== '' ? trim((string)($in['processor_model'] ?? '')) : '';
