@@ -139,7 +139,7 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
             $first = mb_strtolower((string)preg_split('/[\s–-]+/u', $grade)[0]);
             return !in_array($first, ['nový', 'nove', 'nové', 'novy', 'new'], true);
         }
-        if ((string)($l['item_type'] ?? '') === 'part') { return false; }
+        if (in_array((string)($l['item_type'] ?? ''), ['part', 'manual'], true)) { return false; }
         return $saleAfterCut;
     };
 

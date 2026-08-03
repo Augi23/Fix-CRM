@@ -2,11 +2,12 @@
 /**
  * Pokladna — dokončení prodeje.
  * Vstup: JSON { csrf_token, payment (cash|card|invoice), customer_id?, note?,
- *               items: [{type: part|product, id, qty, price}] }
+ *               items: [{type: part|product|manual, id, qty, price, name?}] }
  * V JEDNÉ transakci: odpis skladu (atomické guardy proti souběhu dvou kas
  * i zápornému skladu) + doklad pos_sales/pos_sale_items + případná faktura.
  * Selže-li COKOLI, vrátí se celý košík — nesmí projít půlka prodeje.
  * Ceny přijímáme z košíku (možnost slevy na místě), názvy/kódy VŽDY z DB.
+ * Výjimka je ruční položka mimo sklad: tam se ukládá jen serverem ověřený název.
  * Daňový režim položky se odvozuje ze STAVU zboží (grade), ne z typu položky —
  * viz afxGoodsIsUsedByGrade().
  */
@@ -109,17 +110,30 @@ foreach ($items as $it) {
     $id = (int)($it['id'] ?? 0);
     $qty = (int)($it['qty'] ?? 0);
     $price = (float)($it['price'] ?? -1);
+    $manualName = '';
+    if ($type === 'manual') {
+        $manualName = preg_replace('/\s+/u', ' ', trim((string)($it['name'] ?? ''))) ?? '';
+        $id = 0;
+    }
     // is_finite: JSON 1e999 se dekóduje na INF a prošel by testem < 0
-    if (!in_array($type, ['part', 'product'], true) || $id <= 0 || $qty < 1 || $qty > 999
+    if (!in_array($type, ['part', 'product', 'manual'], true) || ($type !== 'manual' && $id <= 0)
+        || ($type === 'manual' && ($manualName === '' || mb_strlen($manualName) > 255))
+        || $qty < 1 || $qty > 999
         || !is_finite($price) || $price < 0 || $price > 1000000) {
         echo json_encode(['success' => false, 'message' => 'Neplatná položka v košíku.']); exit;
     }
     $price = round($price, 2);   // stejné zaokrouhlení v total i v položkách — doklad musí sedět sám se sebou
-    $key = $type . ':' . $id;
+    $key = $type === 'manual'
+        ? 'manual:' . mb_strtolower($manualName) . ':' . number_format($price, 2, '.', '')
+        : $type . ':' . $id;
     if (isset($cart[$key])) {   // duplicitní řádek → sloučit (guard skladu musí vidět celkové množství)
         $cart[$key]['qty'] += $qty;
+        if ($cart[$key]['qty'] > 999) {
+            echo json_encode(['success' => false, 'message' => 'Neplatné množství v košíku.']); exit;
+        }
     } else {
         $cart[$key] = ['type' => $type, 'id' => $id, 'qty' => $qty, 'price' => $price];
+        if ($type === 'manual') { $cart[$key]['manual_name'] = $manualName; }
     }
 }
 $cart = array_values($cart);
@@ -169,7 +183,7 @@ try {
             $cart[$i]['used'] = false;
             $cart[$i]['grade'] = null;
             $cart[$i]['purchase_price'] = null;
-        } else {
+        } elseif ($line['type'] === 'product') {
             $st = $pdo->prepare("SELECT title, product_code, grade, purchase_price FROM products WHERE id = ?");
             $st->execute([$line['id']]);
             $row = $st->fetch();
@@ -187,6 +201,13 @@ try {
             // a v products se může kdykoli přepsat (nebo kus po prodeji zmizet)
             $cart[$i]['purchase_price'] = ($row['purchase_price'] === null || $row['purchase_price'] === '')
                 ? null : round((float)$row['purchase_price'], 2);
+        } else {
+            // Ruční položka mimo sklad: neváže se na inventory/products a nijak nehýbe skladem.
+            $cart[$i]['name'] = (string)$line['manual_name'];
+            $cart[$i]['code'] = '';
+            $cart[$i]['used'] = false;
+            $cart[$i]['grade'] = null;
+            $cart[$i]['purchase_price'] = null;
         }
     }
 
@@ -223,7 +244,7 @@ try {
     foreach ($cart as $line) {
         if ($line['type'] === 'part') {
             changeInventoryQuantity($line['id'], -$line['qty']);   // hází výjimku při nedostatku
-        } else {
+        } elseif ($line['type'] === 'product') {
             // pos_sold_at = „kus je CELÝ vyprodaný přes kasu" → nastavit jen když stav
             // klesl na nulu (SET se vyhodnocuje zleva, IF už vidí odečtenou hodnotu).
             // Částečný prodej vícekusového příslušenství flag nesmí zapnout — import
@@ -306,7 +327,7 @@ $hasProduct = false;
 foreach ($cart as $line) {
     if ($line['type'] === 'part') {
         crmLogInventoryMove($line['id'], -$line['qty'], 'sale', null, 'Kasa ' . $saleNumber);
-    } else {
+    } elseif ($line['type'] === 'product') {
         $hasProduct = true;
     }
 }

@@ -108,6 +108,10 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
 .pos-type { font-size: 10px; font-weight: 700; letter-spacing: .05em; border-radius: 7px; padding: 2px 7px; white-space: nowrap; }
 .pos-type.part { background: rgba(0,163,255,.18); color: #6fd0ff; }
 .pos-type.product { background: rgba(48,209,88,.16); color: #6fe08d; }
+.pos-type.manual { background: rgba(255,159,10,.16); color: #ffc46b; }
+.pos-manual { padding-bottom: 13px; margin-bottom: 13px; border-bottom: 1px solid rgba(255,255,255,.10); }
+.pos-manual .form-control { font-size: 15.5px; padding: 10px 12px; }
+.pos-manual .btn { font-weight: 700; white-space: nowrap; }
 /* Košík = hlavní plocha kasy — všechno velké a čitelné jako na skutečné pokladně */
 .pos-cart td { vertical-align: middle; padding: 12px 8px; }
 .pos-cart thead th { font-size: 15.5px; font-weight: 700; color: rgba(255,255,255,.75) !important; text-transform: uppercase; letter-spacing: .04em; }
@@ -522,6 +526,23 @@ document.addEventListener('DOMContentLoaded', function () {
     <!-- ── vyhledávání ── -->
     <div class="col-lg-6">
         <div class="glass-panel p-3 border-secondary">
+            <form id="posManualForm" class="pos-manual">
+                <label class="form-label small text-white-50 mb-2"><i class="fas fa-pen-to-square me-1 text-success"></i> Ruční položka mimo sklad</label>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-xl">
+                        <input type="text" id="posManualName" class="form-control" maxlength="255" placeholder="Název produktu" autocomplete="off">
+                    </div>
+                    <div class="col-5 col-md-3 col-xl-2">
+                        <input type="number" id="posManualQty" class="form-control text-center" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Počet kusů">
+                    </div>
+                    <div class="col-7 col-md-4 col-xl-3">
+                        <input type="text" id="posManualPrice" class="form-control text-center" inputmode="decimal" placeholder="Cena/ks">
+                    </div>
+                    <div class="col-12 col-md-auto">
+                        <button type="submit" class="btn btn-success w-100"><i class="fas fa-plus me-1"></i>Přidat</button>
+                    </div>
+                </div>
+            </form>
             <label class="form-label small text-white-50 mb-2"><i class="fas fa-search me-1"></i> Najdi produkt nebo díl (jen skladem) · <i class="fas fa-barcode me-1"></i>USB čtečka funguje kdykoli — stačí pípnout kód</label>
             <input type="text" id="posSearch" class="form-control pos-search" placeholder="iPhone 13, displej, sériové číslo…" autocomplete="off">
             <div id="posResults" class="pos-results mt-2"></div>
@@ -769,9 +790,19 @@ document.addEventListener('DOMContentLoaded', function () {
     var $total = document.getElementById('posTotal');
     var $finish = document.getElementById('posFinish');
     var $custWrap = document.getElementById('posCustomerWrap');
+    var $manualForm = document.getElementById('posManualForm');
+    var $manualName = document.getElementById('posManualName');
+    var $manualQty = document.getElementById('posManualQty');
+    var $manualPrice = document.getElementById('posManualPrice');
 
     function fmt(n) { return new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(n) + ' Kč'; }
     function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function manualKey(name, price) { return 'manual:' + String(name).trim().toLocaleLowerCase('cs-CZ') + ':' + Number(price).toFixed(2); }
+    function cartKey(c) { return c.type === 'manual' ? manualKey(c.name, c.price) : c.type + ':' + c.id; }
+    function parseCzk(v) {
+        var raw = String(v || '').replace(/\s/g, '').replace(',', '.');
+        return raw === '' ? NaN : parseFloat(raw);
+    }
 
     // ── vyhledávání ──
     var searchTimer = null;
@@ -805,20 +836,38 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── košík ──
     function addToCart(r) {
-        var found = cart.find(function (c) { return c.type === r.type && c.id === r.id; });
+        var stock = r.type === 'manual' ? 999 : (parseInt(r.stock, 10) || 0);
+        var addQty = parseInt(r.qty, 10) || 1;
+        if (addQty < 1) addQty = 1;
+        var found = cart.find(function (c) { return cartKey(c) === cartKey(r); });
         if (found) {
-            if (found.qty + 1 > r.stock) { alert('Skladem je jen ' + r.stock + ' ks.'); return; }
-            found.qty++;
+            if (found.qty + addQty > stock) { alert(r.type === 'manual' ? 'Maximum pro ruční položku je 999 ks.' : 'Skladem je jen ' + stock + ' ks.'); return; }
+            found.qty += addQty;
         } else {
-            cart.push({ type: r.type, id: r.id, name: r.name, code: r.code, price: r.price, qty: 1, stock: r.stock });
+            cart.push({ type: r.type, id: r.id || 0, name: r.name, code: r.code, price: r.price, qty: addQty, stock: stock });
         }
         render();
     }
+    $manualForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var name = $manualName.value.trim().replace(/\s+/g, ' ');
+        var qty = parseInt($manualQty.value, 10);
+        var price = parseCzk($manualPrice.value);
+        if (name === '') { alert('Zadej název ruční položky.'); $manualName.focus(); return; }
+        if (!qty || qty < 1 || qty > 999) { alert('Počet kusů musí být 1 až 999.'); $manualQty.focus(); return; }
+        if (isNaN(price) || price < 0 || price > 1000000) { alert('Cena za kus je mimo rozsah.'); $manualPrice.focus(); return; }
+        addToCart({ type: 'manual', id: 0, name: name, code: 'Ruční položka', price: Math.round(price * 100) / 100, qty: qty, stock: 999 });
+        $manualName.value = '';
+        $manualQty.value = '1';
+        $manualPrice.value = '';
+        $manualName.focus();
+    });
     window.posRemove = function (i) { cart.splice(i, 1); render(); };
     window.posQty = function (i, v) {
         v = parseInt(v, 10) || 1;
         if (v < 1) v = 1;
-        if (v > cart[i].stock) { alert('Skladem je jen ' + cart[i].stock + ' ks.'); v = cart[i].stock; }
+        var max = cart[i].type === 'manual' ? 999 : cart[i].stock;
+        if (v > max) { alert(cart[i].type === 'manual' ? 'Maximum pro ruční položku je 999 ks.' : 'Skladem je jen ' + max + ' ks.'); v = max; }
         cart[i].qty = v; render();
     };
     window.posPrice = function (i, v) {
@@ -834,7 +883,7 @@ document.addEventListener('DOMContentLoaded', function () {
         cart.forEach(function (c, i) {
             var tr = document.createElement('tr');
             tr.innerHTML = '<td><div class="pos-item-name">' + esc(c.name) + '</div><div class="pos-item-code">' + esc(c.code || '') + '</div></td>'
-                + '<td><input type="number" class="form-control pos-qty" min="1" max="' + c.stock + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"></td>'
+                + '<td><input type="number" class="form-control pos-qty" min="1" max="' + (c.type === 'manual' ? 999 : c.stock) + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"></td>'
                 + '<td><input type="text" class="form-control pos-price" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"></td>'
                 + '<td class="text-end pos-line-total">' + fmt(c.price * c.qty) + '</td>'
                 + '<td><button type="button" class="pos-remove" onclick="posRemove(' + i + ')" title="Smazat položku z košíku"><i class="fas fa-times"></i></button></td>';
@@ -979,7 +1028,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 payment: payment,
                 customer_id: parseInt($('#posCustomer').val() || 0, 10),
                 cash_received: payment === 'cash' ? (cashVal() === null ? null : cashVal()) : null,
-                items: cart.map(function (c) { return { type: c.type, id: c.id, qty: c.qty, price: c.price }; })
+                items: cart.map(function (c) {
+                    var item = { type: c.type, id: c.type === 'manual' ? 0 : c.id, qty: c.qty, price: c.price };
+                    if (c.type === 'manual') { item.name = c.name; }
+                    return item;
+                })
             })
         })
         .then(function (r) { return r.json(); })

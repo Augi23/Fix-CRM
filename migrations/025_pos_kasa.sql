@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS pos_sales (
 CREATE TABLE IF NOT EXISTS pos_sale_items (
     id INT NOT NULL AUTO_INCREMENT,
     sale_id INT NOT NULL,
-    item_type ENUM('part','product') NOT NULL,
+    item_type ENUM('part','product','manual') NOT NULL,
     item_id INT NOT NULL,
     item_name VARCHAR(255) NOT NULL,
     item_code VARCHAR(64) NULL DEFAULT NULL,

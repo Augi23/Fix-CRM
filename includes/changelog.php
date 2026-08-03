@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.0',
+        'date' => '2026-08-03',
+        'time' => '15:09',
+        'title' => 'Pokladna: ruční položka mimo sklad',
+        'items' => [
+            'Do Pokladny přibylo pole <b>Ruční položka mimo sklad</b> nad vyhledáváním produktu: obsluha zadá název, počet kusů a cenu za kus a zeleným tlačítkem ji přidá rovnou do košíku.',
+            'Ruční položka se uloží na pokladní doklad, účtenku i případnou fakturu, ale <b>nehýbe skladem</b> — je určená pro věci, které nejsou založené v systému.',
+            'Server nově rozlišuje typ položky <code>manual</code>, validuje název/množství/cenu, při stornu ji nevrací do skladu a běžné skladové produkty/díly dál odepisuje stejně jako dřív.',
+        ],
+    ],
+    [
         'version' => '3.40.0',
         'date' => '2026-08-01',
         'time' => '16:30',

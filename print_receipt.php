@@ -88,7 +88,7 @@ $lineIsUsed = static function (array $l) use ($__saleAfterCut): bool {
     if ((int)($l['is_used_goods'] ?? 0) !== 1) { return false; }
     $grade = trim((string)($l['grade'] ?? ''));
     if ($grade !== '') { return afxGoodsIsUsedByGrade($grade, 'účtenka, řádek #' . (int)($l['id'] ?? 0)); }
-    if ((string)($l['item_type'] ?? '') === 'part') { return false; }
+    if (in_array((string)($l['item_type'] ?? ''), ['part', 'manual'], true)) { return false; }
     return $__saleAfterCut;
 };
 

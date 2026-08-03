@@ -1683,7 +1683,7 @@ function ensurePosTables(): void {
         $pdo->exec("CREATE TABLE IF NOT EXISTS pos_sale_items (
             id INT NOT NULL AUTO_INCREMENT,
             sale_id INT NOT NULL,
-            item_type ENUM('part','product') NOT NULL,
+            item_type ENUM('part','product','manual') NOT NULL,
             item_id INT NOT NULL,
             item_name VARCHAR(255) NOT NULL,
             item_code VARCHAR(64) NULL DEFAULT NULL,
@@ -1693,6 +1693,10 @@ function ensurePosTables(): void {
             PRIMARY KEY (id),
             KEY idx_pos_items_sale (sale_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $col = $pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'item_type'")->fetch(PDO::FETCH_ASSOC);
+        if ($col && !str_contains((string)($col['Type'] ?? ''), "'manual'")) {
+            $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual') NOT NULL");
+        }
     } catch (Throwable $e) { error_log('ensurePosTables: ' . $e->getMessage()); }
 }
 

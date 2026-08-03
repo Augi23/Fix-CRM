@@ -87,7 +87,7 @@ try {
             } else {
                 $missingParts[] = (string)$line['item_name'];
             }
-        } else {
+        } elseif ((string)$line['item_type'] === 'product') {
             // vrácení produktu: zpět skladem, flag kasy pryč (kus je zase v appce pravdivě skladem)
             $pdo->prepare("UPDATE products SET stock_qty = stock_qty + ?, pos_sold_at = NULL WHERE id = ?")
                 ->execute([(int)$line['quantity'], (int)$line['item_id']]);
