@@ -126,6 +126,8 @@ try {
         $branchId = (int)($p['branch_id'] ?? 0) ?: skladBranchIdForStockKey((string)($p['stock_key'] ?? ''));
         $branchLabel = skladBranchLabel($branchId);
         $productType = trim((string)($raw['[PARAMETER "Typ zařízení"]'] ?? $raw['PRODUKT_TYP'] ?? ''));
+        $accessoryForModel = trim((string)($raw['[PARAMETER "Pro model"]'] ?? ''));
+        $accessoryProperty = trim((string)($raw['[PARAMETER "Vlastnost"]'] ?? ''));
         $processorFamily = trim((string)($raw['[PARAMETER "Výrobce procesoru"]'] ?? $raw['PROCESOR_TYP'] ?? ''));
         $processor = trim((string)($raw['[PARAMETER "Procesor"]'] ?? ''));
 
@@ -136,6 +138,8 @@ try {
             'category_code'        => $p['category_code'] !== null ? (string)$p['category_code'] : null,
             'product_type'         => $productType !== '' ? $productType : null,
             'model'                => $p['model'] !== null ? (string)$p['model'] : null,
+            'accessory_for_model'  => $accessoryForModel !== '' ? $accessoryForModel : null,
+            'accessory_property'   => $accessoryProperty !== '' ? $accessoryProperty : null,
             'capacity'             => $p['capacity'] !== null ? (string)$p['capacity'] : null,
             'color'                => $p['color'] !== null ? (string)$p['color'] : null,
             'grade'                => $p['grade'] !== null ? (string)$p['grade'] : null,

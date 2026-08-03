@@ -11,6 +11,7 @@ const AFX_APPLE_COLORS = ['Black', 'White', 'Space Black', 'Space Gray', 'Silver
 const AFX_ANDROID_COLORS = ['Black', 'White', 'Blue', 'Green', 'Grey', 'Silver', 'Gold', 'Purple', 'Red'];
 const AFX_COMPUTER_COLORS = ['Black', 'White', 'Silver', 'Grey', 'Space Gray', 'Graphite', 'Blue', 'Red'];
 const AFX_ACCESSORY_COLORS = ['Black', 'White', 'Grey', 'Silver', 'Transparent', 'Blue', 'Green', 'Pink', 'Purple', 'Red'];
+const AFX_ACCESSORY_PROPERTIES = ['ochranný', 'designový', 'vodotěsný', 'průhledný', 'MagSafe', 'odolný', 'slim', 'kožený', 'sportovní', 'univerzální'];
 const AFX_CAPS = ['16 GB', '32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB', '2 TB'];
 // RAM/jádra mají i telefony, tablety, konzole… — menší hodnoty pro ne-Macy (31.7. rozšířeno)
 const AFX_RAMS = ['2 GB', '3 GB', '4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '18 GB', '24 GB', '32 GB', '36 GB', '48 GB', '64 GB', '96 GB', '128 GB'];
@@ -541,6 +542,17 @@ function afxProductTitleModel(array $t, string $displayModel): string {
     return $displayModel;
 }
 
+function afxProductAccessoryModelText(array $t, string $model, string $forModel, string $property): string {
+    if (empty($t['accessory'])) return $model;
+    $base = trim($model) !== '' ? trim($model) : trim((string)($t['id'] ?? ''));
+    $forModel = trim($forModel);
+    $property = trim($property);
+    $parts = [$base];
+    if ($forModel !== '') $parts[] = 'pro ' . $forModel;
+    if ($property !== '') $parts[] = $property;
+    return trim(implode(' ', array_filter($parts, static fn($p) => $p !== '')));
+}
+
 /**
  * Složení kompletního „řádku" produktu z polí formuláře — port form_row()+build_title().
  * $in: typ, model, cap, color, grade (celý label nebo token), battery, price, serial,
@@ -550,7 +562,17 @@ function afxProductTitleModel(array $t, string $displayModel): string {
  */
 function afxProductAssemble(array $in): array {
     $t = afxProductTypeById(trim((string)($in['typ'] ?? '')), trim((string)($in['manufacturer'] ?? '')));
+    if ((string)($in['catalog_mode'] ?? '') === 'accessory') {
+        $t['accessory'] = true;
+        $t['cap'] = false;
+        $t['ram'] = false;
+        $t['gen'] = false;
+        $t['manuf'] = '';
+        $t['k'] = '';
+    }
     $model = trim((string)($in['model'] ?? ''));
+    $accessoryForModel = trim((string)($in['accessory_for_model'] ?? ''));
+    $accessoryProperty = trim((string)($in['accessory_property'] ?? ''));
     $cap = $t['cap'] ? trim((string)($in['cap'] ?? '')) : '';
     $color = trim((string)($in['color'] ?? ''));
     // RAM/jádra bere KAŽDÝ typ (mají je i telefony/tablety/konzole — přání 31.7.);
@@ -569,6 +591,9 @@ function afxProductAssemble(array $in): array {
     $bat = trim($bat);
     $rocnik = trim((string)($in['rocnik'] ?? ''));
     $generace = $t['gen'] ? trim((string)($in['generace'] ?? '')) : '';
+    if (!empty($t['accessory'])) {
+        $cap = $ram = $cpu = $gpu = $processorFamily = $processorModel = $processorDisplay = $bat = $rocnik = $generace = '';
+    }
     $sold = !empty($in['sold']);
     $priceStr = trim((string)($in['price'] ?? ''));
 
@@ -577,6 +602,7 @@ function afxProductAssemble(array $in): array {
     $gradeToken = $gradeRaw !== '' ? trim(explode(' ', $gradeRaw)[0]) : 'A';
 
     $displayModel = afxProductDisplayModel($t, $model);
+    $displayModel = afxProductAccessoryModelText($t, $displayModel, $accessoryForModel, $accessoryProperty);
     $titleModel = afxProductTitleModel($t, $displayModel);
     $categoryCode = afxProductCategoryCode($t, $displayModel);
 
@@ -617,6 +643,8 @@ function afxProductAssemble(array $in): array {
     if ($gpu !== '') $sd[] = 'Jader GPU: ' . $gpu;
     if ($ram !== '') $sd[] = 'RAM: ' . $ram;
     if ($cap !== '') $sd[] = 'Úložiště: ' . $cap;
+    if ($accessoryForModel !== '') $sd[] = 'Pro model: ' . $accessoryForModel;
+    if ($accessoryProperty !== '') $sd[] = 'Vlastnost: ' . $accessoryProperty;
     if ($color !== '') $sd[] = 'Barva: ' . $color;
     if ($rocnik !== '') $sd[] = 'Ročník: ' . $rocnik;
     if ($generace !== '') $sd[] = 'Generace: ' . $generace;
@@ -646,6 +674,8 @@ function afxProductAssemble(array $in): array {
         '[PARAMETER "Typ zařízení"]' => (string)$t['id'],
         '[PARAMETER "Model"]' => $displayModel,
         '[PARAMETER "Kapacita"]' => $cap,
+        '[PARAMETER "Pro model"]' => $accessoryForModel,
+        '[PARAMETER "Vlastnost"]' => $accessoryProperty,
         '[PARAMETER "Barva"]' => $color,
         '[PARAMETER "Stav"]' => $gradeToken,
         '[PARAMETER "Baterie"]' => $bat !== '' ? $bat . ' %' : '',
@@ -683,7 +713,7 @@ function afxProductAssemble(array $in): array {
 function afxProductCsvHeader(): array {
     return ['[PRODUCT_CODE]', '[ACTIVE_YN]', '[TITLE]', '[MANUFACTURER]', '[CATEGORIES]', '[AVAILABILITY]',
         '[STOCK]', '[PRICE_ORIGINAL "Výchozí"]', '[IS_PRICES_WITH_VAT_YN]', '[VAT]', '[SHORT_DESCRIPTION]',
-        '[PARAMETER "Výrobce"]', '[PARAMETER "Typ zařízení"]', '[PARAMETER "Model"]', '[PARAMETER "Kapacita"]', '[PARAMETER "Barva"]', '[PARAMETER "Stav"]',
+        '[PARAMETER "Výrobce"]', '[PARAMETER "Typ zařízení"]', '[PARAMETER "Model"]', '[PARAMETER "Kapacita"]', '[PARAMETER "Pro model"]', '[PARAMETER "Vlastnost"]', '[PARAMETER "Barva"]', '[PARAMETER "Stav"]',
         '[PARAMETER "Baterie"]', '[STOCK_STOCK "karlin"]', '[STOCK_STOCK "vaclavak"]', '[PARAMETER "RAM"]',
         '[PARAMETER "Výrobce procesoru"]', '[PARAMETER "Procesor"]',
         'PRIDANO', 'CPU_JADRA', 'GPU_JADRA', '[PARAMETER "Ročník"]', '[PARAMETER "Generace"]',

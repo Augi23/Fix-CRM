@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.9',
+        'date' => '2026-08-03',
+        'time' => '18:41',
+        'title' => 'Sklad: příslušenství má cílový model a vlastnost',
+        'items' => [
+            'V režimu <b>Naskladnit příslušenství</b> přibyla pole <b>Pro model</b> a <b>Vlastnost</b>. U krytů, skel, fólií nebo podobných doplňků tak lze rovnou zapsat, pro jaký model jsou určené a jestli jsou ochranné, designové, vodotěsné apod.',
+            'Vlastnost má předvyplněný dropdown s běžnými možnostmi a volbou <b>✏️ Vlastní…</b>. Pole se zobrazují jen v záložce Příslušenství, běžné naskladnění telefonů/notebooků tím není dotčené.',
+            'Cílový model a vlastnost se propisují do názvu, krátkého popisu, raw parametrů, CSV exportu, e-shop feedu a produktového štítku.',
+        ],
+    ],
+    [
         'version' => '3.42.8',
         'date' => '2026-08-03',
         'time' => '18:22',

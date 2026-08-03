@@ -102,6 +102,8 @@ if ($action === 'get') {
         'show_360'         => (int)($p['show_360'] ?? 1),
 
         'ram' => (string)($raw['[PARAMETER "RAM"]'] ?? ''),
+        'accessory_for_model' => (string)($raw['[PARAMETER "Pro model"]'] ?? ''),
+        'accessory_property' => (string)($raw['[PARAMETER "Vlastnost"]'] ?? ''),
         'processor_family' => $rawProcessorFamily,
         'processor_model' => $rawProcessorModel,
         'cpu' => (string)($raw['CPU_JADRA'] ?? ''),
@@ -125,6 +127,8 @@ $in = [
     'manufacturer' => trim((string)($_POST['manufacturer'] ?? '')),
     'typ' => trim((string)($_POST['typ'] ?? '')),
     'model' => trim((string)($_POST['model'] ?? '')),
+    'accessory_for_model' => trim((string)($_POST['accessory_for_model'] ?? '')),
+    'accessory_property' => trim((string)($_POST['accessory_property'] ?? '')),
     'cap' => trim((string)($_POST['cap'] ?? '')),
     'color' => trim((string)($_POST['color'] ?? '')),
     'grade' => trim((string)($_POST['grade'] ?? '')),
@@ -155,6 +159,7 @@ $in = [
 ];
 $serial = trim((string)($_POST['serial'] ?? ''));
 $catalogMode = (string)($_POST['catalog_mode'] ?? 'product');
+$in['catalog_mode'] = $catalogMode;
 $force = !empty($_POST['force']);
 $editId = (int)($_POST['id'] ?? 0);
 
@@ -194,6 +199,12 @@ if (mb_strlen($in['manufacturer']) > 64) {
 }
 if (mb_strlen($in['typ']) > 64) {
     echo json_encode(['success' => false, 'message' => 'Typ zařízení je moc dlouhý. Zkrať ho prosím na max. 64 znaků.'], JSON_UNESCAPED_UNICODE); exit;
+}
+if (mb_strlen($in['accessory_for_model']) > 120) {
+    echo json_encode(['success' => false, 'message' => 'Pole „Pro model“ je moc dlouhé. Zkrať ho prosím na max. 120 znaků.'], JSON_UNESCAPED_UNICODE); exit;
+}
+if (mb_strlen($in['accessory_property']) > 80) {
+    echo json_encode(['success' => false, 'message' => 'Vlastnost příslušenství je moc dlouhá. Zkrať ji prosím na max. 80 znaků.'], JSON_UNESCAPED_UNICODE); exit;
 }
 $processorFamilies = afxProductProcessorFamiliesForType(afxProductTypeById($in['typ'], $in['manufacturer']));
 if (!afxProductHasProcessorFields($in['typ'], $in['model'])) {
@@ -375,6 +386,8 @@ try {
             && (trim((string)($exRaw['[PARAMETER "Typ zařízení"]'] ?? $exRaw['PRODUKT_TYP'] ?? '')) === ''
                 || $in['typ'] === trim((string)($exRaw['[PARAMETER "Typ zařízení"]'] ?? $exRaw['PRODUKT_TYP'] ?? '')))
             && $in['ram'] === trim((string)($exRaw['[PARAMETER "RAM"]'] ?? ''))
+            && $in['accessory_for_model'] === trim((string)($exRaw['[PARAMETER "Pro model"]'] ?? ''))
+            && $in['accessory_property'] === trim((string)($exRaw['[PARAMETER "Vlastnost"]'] ?? ''))
             && $in['processor_family'] === trim((string)($exRaw['[PARAMETER "Výrobce procesoru"]'] ?? $exRaw['PROCESOR_TYP'] ?? ''))
             && $in['processor_model'] === trim((string)($exRaw['PROCESOR_MODEL'] ?? $exRaw['[PARAMETER "Procesor"]'] ?? ''))
             && $in['cpu'] === trim((string)($exRaw['CPU_JADRA'] ?? ''))
