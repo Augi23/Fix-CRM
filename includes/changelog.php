@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.6',
+        'date' => '2026-08-03',
+        'time' => '17:18',
+        'title' => 'Naskladnění: konkrétní notebookové modely od roku 2020',
+        'items' => [
+            'Dropdown <b>Model</b> u typu <b>Notebook</b> má nově konkrétnější modely a generace od roku 2020 po současnost pro hlavní výrobce.',
+            'Rozšířené jsou hlavně Lenovo, HP, Asus, MSI, Dell a Acer; doplněné jsou také Samsung, Huawei, Honor a Microsoft Surface.',
+            'Výběr dál respektuje logiku <b>Výrobce → Typ zařízení → Model</b> a dole zůstává volba <b>✏️ Vlastní…</b> pro kusy mimo seznam.',
+        ],
+    ],
+    [
         'version' => '3.42.5',
         'date' => '2026-08-03',
         'time' => '17:09',
