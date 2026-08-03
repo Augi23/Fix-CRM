@@ -2893,6 +2893,9 @@ function runUpdateDiagnostics() {
             add('lokální změny', c.dirty
                 ? '<span class="text-warning">' + escapeHtml(c.dirty_files || 'ano') + '</span> <span class="text-muted">(neblokuje aktualizaci)</span>'
                 : '<span class="text-success">žádné</span>');
+            add('nesledované soubory', c.untracked_files
+                ? '<span class="text-muted">' + escapeHtml(c.untracked_files) + '</span> <span class="text-muted">(ignorováno)</span>'
+                : '<span class="text-success">žádné</span>');
             if (c.error_detail) add('detail chyby', '<span class="text-warning">' + escapeHtml(c.error_detail) + '</span>');
             area.style.display = 'block';
             area.innerHTML = `
@@ -2992,4 +2995,3 @@ document.addEventListener('DOMContentLoaded', () => checkForUpdates(false));
 <?php endif; ?>
 
 <?php require_once 'includes/footer.php'; ?>
-

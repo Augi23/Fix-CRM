@@ -72,6 +72,8 @@ $checks = [
     'ahead_by'          => (int)($info['ahead_by'] ?? 0),
     'dirty'             => !empty($info['dirty']),
     'dirty_files'       => (string)($info['dirty_files'] ?? ''),
+    'untracked_files'   => (string)($info['untracked_files'] ?? ''),
+    'working_tree_files' => (string)($info['working_tree_files'] ?? ''),
     'update_available'  => !empty($info['update_available']),
     'error'             => (string)($info['error'] ?? ''),
     'error_detail'      => (string)($info['error_detail'] ?? ''),
@@ -98,6 +100,8 @@ if (!$checks['exec_available']) {
 // Non-blocking note: local changes no longer prevent the update (git --ff-only handles conflicts).
 if (!empty($checks['dirty']) && strpos($verdict, 'BLOCKED') !== 0) {
     $verdict .= ' Note: local changes present — they will not block the update.';
+} elseif (!empty($checks['untracked_files']) && strpos($verdict, 'BLOCKED') !== 0) {
+    $verdict .= ' Note: untracked helper/OS files are present, but ignored by the update check.';
 }
 
 echo json_encode([

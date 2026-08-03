@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.7',
+        'date' => '2026-08-03',
+        'time' => '17:31',
+        'title' => 'Aktualizace: nesledované systémové soubory už nehlásí chybu',
+        'items' => [
+            'Kontrola aktualizací v CRM nově bere jako problém jen změněné sledované soubory v gitu. Nesledované systémové soubory, například <code>._.DS_Store</code>, už nezobrazí Aktualizace jako rozbitý nebo nečistý stav.',
+            'Diagnostika serveru dál ukáže skutečné lokální změny i nesledované soubory odděleně, takže je vidět příčina bez falešného blokování aktualizace.',
+            'Do git ignore přibyl vzor pro macOS AppleDouble soubory <code>._*</code>, aby se stejná situace nevracela.',
+        ],
+    ],
+    [
         'version' => '3.42.6',
         'date' => '2026-08-03',
         'time' => '17:18',

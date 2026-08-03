@@ -2453,6 +2453,9 @@ function getGitRepoInfo(string $repoRoot): array {
         'local_short' => '',
         'local_date' => '',
         'dirty' => false,
+        'dirty_files' => '',
+        'untracked_files' => '',
+        'working_tree_files' => '',
         'remote_name' => $remoteName,
         'remote_url' => $remoteUrl,
         'remote_commit' => '',
@@ -2503,11 +2506,22 @@ function getGitRepoInfo(string $repoRoot): array {
         $info['local_date'] = $localDate;
     }
 
-    $dirty = runGitCommand($repoRoot, 'status --porcelain', $code);
-    $info['dirty'] = ($code === 0 && $dirty !== '');
-    // Keep the actual changed paths so the updater/diagnostics can show *what* is dirty
-    // (a non-conflicting local change should never be an opaque, permanent blocker).
-    $info['dirty_files'] = ($code === 0 && $dirty !== '') ? trim($dirty) : '';
+    $statusAll = runGitCommand($repoRoot, 'status --porcelain', $code);
+    if ($code === 0 && $statusAll !== '') {
+        $info['working_tree_files'] = trim($statusAll);
+        $untracked = [];
+        foreach (explode("\n", $statusAll) as $statusLine) {
+            if (substr($statusLine, 0, 3) === '?? ') {
+                $untracked[] = $statusLine;
+            }
+        }
+        $info['untracked_files'] = trim(implode("\n", $untracked));
+    }
+    $trackedStatus = runGitCommand($repoRoot, 'status --porcelain --untracked-files=no', $code);
+    $info['dirty'] = ($code === 0 && $trackedStatus !== '');
+    // Dirty means tracked local modifications. Untracked OS/helper files are reported
+    // separately, but they must not make the in-app updater look broken.
+    $info['dirty_files'] = ($code === 0 && $trackedStatus !== '') ? trim($trackedStatus) : '';
 
     $remoteName = $info['remote_name'] ?: 'origin';
     $remoteBranch = $branch !== '' ? $branch : 'main';

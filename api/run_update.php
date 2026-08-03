@@ -44,11 +44,11 @@ if (!empty($info['error'])) {
     exit;
 }
 
-// Do NOT hard-block on a "dirty" working tree. `git pull --ff-only` refuses on its own to
-// overwrite locally-modified TRACKED files (and untracked files never block it), so git is
-// the authority: a non-conflicting local change (e.g. a dev helper script tweaked on the
-// server) no longer permanently locks the in-app updater, while a real conflict is surfaced
-// verbatim from git below.
+// Do NOT hard-block on tracked local modifications. `git pull --ff-only` refuses on its
+// own to overwrite conflicting tracked files, so git is the authority: a non-conflicting
+// server-side helper tweak no longer permanently locks the in-app updater, while a real
+// conflict is surfaced verbatim from git below. Untracked helper/OS files are reported
+// separately by getGitRepoInfo() and do not make the repo "dirty".
 $dirtyWarning = !empty($info['dirty'])
     ? ('Local changes present (left untouched): ' . trim((string)($info['dirty_files'] ?? '')))
     : '';

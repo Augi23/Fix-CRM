@@ -27,6 +27,7 @@ vendor/
 
 # OS
 .DS_Store
+._*
 Thumbs.db
 __pycache__/
 print-bridge/.venv/
