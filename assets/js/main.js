@@ -133,7 +133,33 @@ function crmIsAppleBrand(value) {
     return normalized === 'apple' || normalized.includes('apple');
 }
 
-window.crmUpdateAppleModelOptions = function(modalEl) {
+function crmOrderCatalogModels(brand, type) {
+    const catalog = window.CRM_ORDER_MODEL_CATALOG || {};
+    const rawBrand = String(brand || '').trim();
+    const rawType = String(type || '').trim();
+    if (!rawBrand || !rawType) return [];
+
+    let catalogModels = [];
+    if (catalog[rawBrand] && Array.isArray(catalog[rawBrand][rawType])) {
+        catalogModels = catalog[rawBrand][rawType];
+    } else {
+        const normalizedBrand = rawBrand.toLowerCase().replace(/[^a-z0-9]+/g, '');
+        const brandKey = Object.keys(catalog).find(function (key) {
+            return key.toLowerCase().replace(/[^a-z0-9]+/g, '') === normalizedBrand;
+        });
+        if (brandKey && Array.isArray(catalog[brandKey][rawType])) {
+            catalogModels = catalog[brandKey][rawType];
+        }
+    }
+
+    if (crmIsAppleBrand(rawBrand) && CRM_APPLE_MODELS_BY_TYPE[rawType]) {
+        return Array.from(new Set([].concat(CRM_APPLE_MODELS_BY_TYPE[rawType], catalogModels)));
+    }
+
+    return catalogModels;
+}
+
+window.crmUpdateOrderModelOptions = function(modalEl) {
     if (!modalEl || typeof window.jQuery === 'undefined') return;
 
     const $modal = window.jQuery(modalEl);
@@ -144,32 +170,29 @@ window.crmUpdateAppleModelOptions = function(modalEl) {
 
     const brand = String($brand.val() || '').trim();
     const type = String($type.val() || '').trim();
-    const isApple = crmIsAppleBrand(brand);
-    const models = (isApple && CRM_APPLE_MODELS_BY_TYPE[type]) ? CRM_APPLE_MODELS_BY_TYPE[type] : [];
+    const models = crmOrderCatalogModels(brand, type);
     const current = String($model.val() || '').trim();
     const placeholder = String($model.attr('data-placeholder') || 'Model');
-
-    const hasOption = (val) => $model.find('option').filter(function() {
-        return String(this.value) === String(val);
-    }).length > 0;
 
     $model.empty();
     $model.append(new Option(placeholder, '', false, false));
 
     if (models.length > 0) {
-        models.forEach((m) => $model.append(new Option(m, m, false, false)));
-        $model.data('appleLocked', '1');
-        if (current && hasOption(current)) {
+        models.forEach(function (m) { $model.append(new Option(m, m, false, false)); });
+        $model.data('modelPreset', '1');
+        const hasCurrent = current && models.some(function (m) { return String(m) === current; });
+        if (hasCurrent) {
+            $model.val(current);
+        } else if (current) {
+            $model.append(new Option(current, current, true, true));
             $model.val(current);
         } else {
             $model.val('');
         }
     } else {
-        $model.data('appleLocked', '0');
+        $model.data('modelPreset', '0');
         if (current) {
-            if (!hasOption(current)) {
-                $model.append(new Option(current, current, true, true));
-            }
+            $model.append(new Option(current, current, true, true));
             $model.val(current);
         } else {
             $model.val('');
@@ -180,6 +203,8 @@ window.crmUpdateAppleModelOptions = function(modalEl) {
         $model.trigger('change.select2');
     }
 };
+
+window.crmUpdateAppleModelOptions = window.crmUpdateOrderModelOptions;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -736,6 +761,89 @@ function openPreviewInNewTab() {
         render();
     }
 
+    function newOrderHasIntakeMedia(form) {
+        var input = form ? form.querySelector('input[type="file"][name="files[]"]') : null;
+        return !!(input && input.files && input.files.length > 0);
+    }
+
+    function resetPreventedOrderSubmit(form, submitter, oldHtml) {
+        setTimeout(function () {
+            if (form) form.dataset.afxSubmitting = '';
+            if (submitter) {
+                submitter.disabled = false;
+                if (oldHtml) submitter.innerHTML = oldHtml;
+            }
+        }, 0);
+    }
+
+    function showIntakePhotoWaiverPrompt(form, submitter) {
+        var cfg = window.CRM_INTAKE_PHOTO_WARNING || {};
+        var title = cfg.title || 'Fotodokumentace při příjmu';
+        var message = cfg.body || 'Zakázka je bez fotodokumentace stavu zařízení při příjmu. Pokračováním berete na vědomí zvýšené riziko sporů a odpovědnosti za později tvrzené nebo zjištěné vady, které nebyly při příjmu zdokumentované.';
+        var confirmLabel = cfg.confirm || 'Beru na vědomí a pokračovat bez fotek';
+        var cancelLabel = cfg.cancel || 'Doplnit fotky';
+        var waiver = form.querySelector('input[name="intake_photo_waiver"]');
+
+        var continueWithoutPhotos = function () {
+            if (waiver) waiver.value = '1';
+            form.dataset.afxSubmitting = '1';
+            if (form.requestSubmit) {
+                form.requestSubmit(submitter || undefined);
+            } else {
+                form.submit();
+            }
+            if (submitter) {
+                submitter.disabled = true;
+                submitter.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + (window.LANG_SAVING || 'Ukládám…');
+            }
+        };
+
+        if (typeof showConfirm === 'function') {
+            showConfirm(message, continueWithoutPhotos, title);
+            var okBtn = document.getElementById('globalConfirmOk');
+            var cancelBtn = document.getElementById('globalConfirmCancel');
+            var confirmEl = document.getElementById('globalConfirmModal');
+            var oldOkText = okBtn ? okBtn.textContent : '';
+            var oldOkClass = okBtn ? okBtn.className : '';
+            var oldCancelText = cancelBtn ? cancelBtn.textContent : '';
+            if (okBtn) {
+                okBtn.textContent = confirmLabel;
+                okBtn.className = 'btn btn-warning';
+            }
+            if (cancelBtn) cancelBtn.textContent = cancelLabel;
+            if (confirmEl) {
+                confirmEl.addEventListener('hidden.bs.modal', function () {
+                    var currentOk = document.getElementById('globalConfirmOk');
+                    var currentCancel = document.getElementById('globalConfirmCancel');
+                    if (currentOk) {
+                        currentOk.textContent = oldOkText || currentOk.textContent;
+                        currentOk.className = oldOkClass || 'btn btn-danger';
+                    }
+                    if (currentCancel) currentCancel.textContent = oldCancelText || currentCancel.textContent;
+                }, { once: true });
+            }
+            return;
+        }
+
+        if (window.confirm((title ? title + "\n\n" : '') + message.replace(/<[^>]+>/g, ''))) {
+            continueWithoutPhotos();
+        }
+    }
+
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form || form.id !== 'newOrderForm') return;
+        var waiver = form.querySelector('input[name="intake_photo_waiver"]');
+        if (!newOrderHasIntakeMedia(form) && (!waiver || waiver.value !== '1')) {
+            var submitter = e.submitter || form.querySelector('[data-wizard-submit]');
+            var oldHtml = submitter ? submitter.innerHTML : '';
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            resetPreventedOrderSubmit(form, submitter, oldHtml);
+            showIntakePhotoWaiverPrompt(form, submitter);
+        }
+    }, true);
+
     // Globální potvrzení destruktivních formulářů: tlačítko/form s data-confirm
 // zobrazí potvrzovací dotaz PŘED odesláním (mazání zaměstnance, admina…).
 // Dřív atribut data-confirm nikdo neobsluhoval a mazalo se na jeden klik.
@@ -854,19 +962,18 @@ function initNewOrderModalSelects() {
             createTag: function(params) {
                 const term = $.trim(params.term || '');
                 if (!term) return null;
-                if (String($modelSelect.data('appleLocked') || '0') === '1') return null;
                 return { id: term, text: term, newTag: true };
             }
         });
     }
 
-    if (typeof window.crmUpdateAppleModelOptions === 'function') {
-        window.crmUpdateAppleModelOptions($modal[0]);
+    if (typeof window.crmUpdateOrderModelOptions === 'function') {
+        window.crmUpdateOrderModelOptions($modal[0]);
         $brandSelect.off('change.crmModel').on('change.crmModel', function() {
-            window.crmUpdateAppleModelOptions($modal[0]);
+            window.crmUpdateOrderModelOptions($modal[0]);
         });
         $deviceTypeSelect.off('change.crmModel').on('change.crmModel', function() {
-            window.crmUpdateAppleModelOptions($modal[0]);
+            window.crmUpdateOrderModelOptions($modal[0]);
         });
     }
 }

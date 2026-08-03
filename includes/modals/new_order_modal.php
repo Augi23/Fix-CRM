@@ -4,10 +4,45 @@
  * This file is included in footer.php so it's available on all pages.
  */
 require_once __DIR__ . '/../functions.php';
+require_once __DIR__ . '/../product_catalog.php';
 $techs_list_modal = getActiveTechnicians();   // technici SVÉ pobočky (admin/Boss všichni) — pobočková izolace
 $branches_modal = getBranches();
 $order_templates_modal = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)get_setting('order_templates', '')))));
 $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)get_setting('order_note_templates', '')))));
+$crm_order_brands_modal = array_values(array_unique(array_filter(array_merge(getDeviceBrands(), afxProductManufacturers()), static fn($b) => trim((string)$b) !== '')));
+natcasesort($crm_order_brands_modal);
+$crm_order_brands_modal = array_values($crm_order_brands_modal);
+
+if (!function_exists('crmOrderDeviceTypeKeysForProductType')) {
+    function crmOrderDeviceTypeKeysForProductType(string $productType): array {
+        return match ($productType) {
+            'iPhone', 'Telefon' => ['Phone'],
+            'iPad', 'Tablet' => ['Tablet'],
+            'MacBook', 'Notebook' => ['Notebook'],
+            'iMac', 'Mac mini', 'Mac Studio', 'Mac Pro', 'Počítač' => ['PC'],
+            default => ['Other'],
+        };
+    }
+}
+
+if (!function_exists('crmNewOrderModelCatalog')) {
+    function crmNewOrderModelCatalog(): array {
+        $catalog = [];
+        foreach (afxProductTypes() as $type) {
+            $brand = trim((string)($type['manuf'] ?? ''));
+            $models = array_values(array_filter(array_map('trim', $type['models'] ?? [])));
+            if ($brand === '' || empty($models)) {
+                continue;
+            }
+            foreach (crmOrderDeviceTypeKeysForProductType((string)($type['id'] ?? '')) as $orderType) {
+                $catalog[$brand][$orderType] = array_values(array_unique(array_merge($catalog[$brand][$orderType] ?? [], $models)));
+            }
+        }
+        ksort($catalog, SORT_NATURAL | SORT_FLAG_CASE);
+        return $catalog;
+    }
+}
+$crm_order_model_catalog = crmNewOrderModelCatalog();
 ?>
 <div class="modal fade crm-wizard-modal" id="newOrderModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-lg">
@@ -172,8 +207,8 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                     <label class="form-label"><?php echo __('device_brand'); ?></label>
                                     <select name="device_brand" class="form-select select2-brand" style="width: 100%;" required>
                                         <option value=""><?php echo __('brand_placeholder'); ?></option>
-                                        <?php foreach(getDeviceBrands() as $brand): ?>
-                                            <option value="<?php echo $brand; ?>"><?php echo $brand; ?></option>
+                                        <?php foreach($crm_order_brands_modal as $brand): ?>
+                                            <option value="<?php echo e($brand); ?>"><?php echo e($brand); ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
@@ -203,6 +238,7 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                                     <label class="form-label"><i class="fas fa-camera me-1 text-info"></i> <?php echo __('intake_photos_label'); ?></label>
                                     <input type="file" name="files[]" class="form-control" multiple accept="image/*,video/*">
                                     <div class="form-text"><?php echo __('intake_photos_hint'); ?></div>
+                                    <input type="hidden" name="intake_photo_waiver" value="0">
                                 </div>
                             </div>
                         </div>
@@ -364,6 +400,15 @@ $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_s
                 }());
                 </script>
                 <?php endif; ?>
+                <script>
+                window.CRM_ORDER_MODEL_CATALOG = <?php echo json_encode($crm_order_model_catalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+                window.CRM_INTAKE_PHOTO_WARNING = <?php echo json_encode([
+                    'title' => __('intake_photos_required_warning_title'),
+                    'body' => __('intake_photos_required_warning_body'),
+                    'confirm' => __('intake_photos_required_confirm'),
+                    'cancel' => __('intake_photos_required_cancel'),
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+                </script>
                 <div class="modal-footer bg-transparent border-secondary crm-wizard-footer">
                     <button type="button" class="btn btn-secondary" data-wizard-prev hidden>← <?php echo __('back'); ?></button>
                     <button type="button" class="btn btn-primary" data-wizard-next><?php echo __('wizard_next_btn'); ?> →</button>

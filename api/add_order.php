@@ -15,6 +15,21 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     die(__('csrf_token_invalid'));
 }
 
+if (!function_exists('crmOrderFilesHaveUploadAttempt')) {
+    function crmOrderFilesHaveUploadAttempt($files): bool {
+        if (!is_array($files) || !isset($files['name'])) return false;
+        $names = is_array($files['name']) ? $files['name'] : [$files['name']];
+        $errors = is_array($files['error'] ?? null) ? $files['error'] : [$files['error'] ?? UPLOAD_ERR_NO_FILE];
+        foreach ($names as $i => $name) {
+            $err = (int)($errors[$i] ?? UPLOAD_ERR_NO_FILE);
+            if ($err !== UPLOAD_ERR_NO_FILE && trim((string)$name) !== '') {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
 // ── Input validation ──────────────────────────────────────────────────────────
 $customer_id      = filter_input(INPUT_POST, 'customer_id', FILTER_VALIDATE_INT);
 $technician_id    = filter_input(INPUT_POST, 'technician_id', FILTER_VALIDATE_INT) ?: null;
@@ -41,9 +56,22 @@ if ($priority_adjust != 0.0) {
 }
 $shipping_method  = trim($_POST['shipping_method'] ?? '') ?: null;
 $status           = getDefaultOrderStatus();
+$intake_photo_waiver = (string)($_POST['intake_photo_waiver'] ?? '') === '1';
+$intake_upload_attempt = crmOrderFilesHaveUploadAttempt($_FILES['files'] ?? null);
+$intake_photo_required_msg = __('intake_photos_server_required');
+$intake_photo_failed_msg = __('intake_photos_upload_failed');
 
 if (!$customer_id || !$device_model || $pin_code === '') {
     die(__('missing_fields'));
+}
+
+if (!$intake_upload_attempt && !$intake_photo_waiver) {
+    die($intake_photo_required_msg);
+}
+
+if ($intake_photo_waiver && !$intake_upload_attempt) {
+    $waiverNote = __('intake_photos_waiver_note');
+    $technician_notes = trim($technician_notes . ($technician_notes !== '' ? "\n\n" : '') . $waiverNote);
 }
 
 if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
@@ -135,6 +163,7 @@ try {
     }
 
     // ── Secure file upload ────────────────────────────────────────────────────
+    $intake_attachment_count = 0;
     if (!empty($_FILES['files']['name'][0])) {
         $upload_dir = __DIR__ . '/../uploads/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
@@ -180,9 +209,15 @@ try {
             if (move_uploaded_file($tmp, $upload_dir . $new_name)) {
                 $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name) VALUES (?, ?, ?, ?)")
                     ->execute([$order_id, 'uploads/' . $new_name, $real_type, basename($_FILES['files']['name'][$key])]);
+                $intake_attachment_count++;
             }
         }
         finfo_close($finfo);
+    }
+
+    if (!$intake_photo_waiver && $intake_attachment_count < 1) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        die($intake_photo_failed_msg);
     }
 
     $pdo->commit();

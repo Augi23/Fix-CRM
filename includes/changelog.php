@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.11',
+        'date' => '2026-08-03',
+        'time' => '19:54',
+        'title' => 'Zakázky: povinná fotodokumentace příjmu a modely ve výběru',
+        'items' => [
+            'Při vytváření zakázky se nově hlídá pole <b>Foto stavu zařízení při příjmu</b>. Bez přiložené fotky/videa CRM zobrazí výstrahu o riziku sporů a odpovědnosti za později tvrzené nebo zjištěné vady.',
+            'Obsluha může pokračovat bez fotek jen po vědomém potvrzení rizika. Toto potvrzení se ukládá do poznámky zakázky, aby u zakázky zůstala dohledatelná stopa.',
+            'Server kontroluje stejnou podmínku i při ručním odeslání requestu: bez validní fotodokumentace nebo potvrzení rizika zakázku neuloží.',
+            'Modelový výběr při založení zakázky teď používá předvyplněné seznamy ze skladového katalogu podle značky a typu zařízení. Například Lenovo + Notebook nabídne notebookové modely Lenovo, Samsung + Telefon nabídne telefony Samsung a Apple dál nabízí svoje modelové řady. Vlastní model lze pořád dopsat ručně.',
+        ],
+    ],
+    [
         'version' => '3.42.10',
         'date' => '2026-08-03',
         'time' => '18:54',
