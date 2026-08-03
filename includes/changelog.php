@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.2',
+        'date' => '2026-08-03',
+        'time' => '16:28',
+        'title' => 'Naskladnění: typy Notebook a Počítač ve výběru',
+        'items' => [
+            'Do pole <b>Typ zařízení</b> v naskladnění produktů přibyly obecné položky <b>Notebook</b> a <b>Počítač</b>, takže procesorová pole nejsou dostupná jen přes MacBook Air/Pro nebo ruční vlastní typ.',
+            'Oba nové typy používají běžné barvy počítačů, podporují úložiště, RAM, jádra CPU/GPU a nově i procesor AMD/Intel/M chip - ARM s modelem procesoru.',
+            'Filtr Produkty/Příslušenství teď obecné notebooky a počítače bere jako zařízení, aby nespadly omylem mezi příslušenství.',
+        ],
+    ],
+    [
         'version' => '3.42.1',
         'date' => '2026-08-03',
         'time' => '15:50',

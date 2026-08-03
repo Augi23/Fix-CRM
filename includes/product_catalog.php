@@ -9,6 +9,7 @@
 
 const AFX_APPLE_COLORS = ['Black', 'White', 'Space Black', 'Space Gray', 'Silver', 'Gold', 'Graphite', 'Sierra Blue', 'Pacific Blue', 'Blue', 'Green', 'Alpine Green', 'Pink', 'Purple', 'Deep Purple', 'Red', 'Midnight', 'Starlight', 'Yellow', 'Coral', 'Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium', 'Desert Titanium', 'Ultramarine', 'Teal', 'Cosmic Orange', 'Mist Blue'];
 const AFX_ANDROID_COLORS = ['Black', 'White', 'Blue', 'Green', 'Grey', 'Silver', 'Gold', 'Purple', 'Red'];
+const AFX_COMPUTER_COLORS = ['Black', 'White', 'Silver', 'Grey', 'Space Gray', 'Graphite', 'Blue', 'Red'];
 const AFX_CAPS = ['16 GB', '32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB', '2 TB'];
 // RAM/jádra mají i telefony, tablety, konzole… — menší hodnoty pro ne-Macy (31.7. rozšířeno)
 const AFX_RAMS = ['2 GB', '3 GB', '4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '18 GB', '24 GB', '32 GB', '36 GB', '48 GB', '64 GB', '96 GB', '128 GB'];
@@ -156,6 +157,8 @@ function afxProductTypes(): array {
             ['id' => 'iPad', 'manuf' => 'Apple', 'k' => 'K00041', 'cap' => true, 'ram' => false, 'gen' => true, 'colors' => AFX_APPLE_COLORS, 'models' => AFX_IPADS],
             ['id' => 'MacBook Pro', 'manuf' => 'Apple', 'k' => 'K00143', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Space Gray', 'Silver', 'Space Black'], 'models' => AFX_MACBOOKS_PRO],
             ['id' => 'MacBook Air', 'manuf' => 'Apple', 'k' => 'K00144', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Space Gray', 'Silver', 'Starlight', 'Midnight', 'Sky Blue'], 'models' => AFX_MACBOOKS_AIR],
+            ['id' => 'Notebook', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_COMPUTER_COLORS, 'models' => []],
+            ['id' => 'Počítač', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_COMPUTER_COLORS, 'models' => []],
             ['id' => 'Samsung', 'manuf' => 'Samsung', 'k' => 'K00135', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
             ['id' => 'Xiaomi', 'manuf' => 'Xiaomi', 'k' => 'K00136', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
             ['id' => 'Asus', 'manuf' => 'Asus', 'k' => 'K00137', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
