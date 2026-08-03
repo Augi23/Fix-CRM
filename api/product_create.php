@@ -154,6 +154,7 @@ $in = [
     'show_360'     => isset($_POST['show_360'])     ? (((string)$_POST['show_360']     === '1') ? 1 : 0) : 1,
 ];
 $serial = trim((string)($_POST['serial'] ?? ''));
+$catalogMode = (string)($_POST['catalog_mode'] ?? 'product');
 $force = !empty($_POST['force']);
 $editId = (int)($_POST['id'] ?? 0);
 
@@ -161,6 +162,28 @@ $editId = (int)($_POST['id'] ?? 0);
 $prodBranch = skladBranchIdForStockKey($in['stock_key']);
 if (!crmCanModifyBranchStock($prodBranch)) {
     echo json_encode(['success' => false, 'message' => 'Na tuto prodejnu (pobočku) smí naskladňovat jen její zaměstnanci.'], JSON_UNESCAPED_UNICODE); exit;
+}
+
+if ($catalogMode === 'accessory') {
+    $knownAccessoryTypes = array_column(afxProductAccessoryTypes(), 'id');
+    $knownDeviceTypes = array_unique(array_column(afxProductTypes(), 'id'));
+    if ($in['typ'] === '') {
+        echo json_encode(['success' => false, 'message' => 'Vyber typ příslušenství.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    if (!in_array($in['typ'], $knownAccessoryTypes, true) && in_array($in['typ'], $knownDeviceTypes, true)) {
+        echo json_encode(['success' => false, 'message' => 'V režimu Příslušenství nejde uložit běžný typ zařízení. Vyber typ příslušenství nebo použij vlastní doplněk.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    $in['manufacturer'] = '';
+    $in['model'] = $in['typ'];
+    $in['cap'] = '';
+    $in['battery'] = '';
+    $in['ram'] = '';
+    $in['processor_family'] = '';
+    $in['processor_model'] = '';
+    $in['cpu'] = '';
+    $in['gpu'] = '';
+    $in['rocnik'] = '';
+    $in['generace'] = '';
 }
 
 if ($in['model'] === '') {

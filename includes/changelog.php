@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.8',
+        'date' => '2026-08-03',
+        'time' => '18:22',
+        'title' => 'Sklad: naskladnění příslušenství má vlastní typy',
+        'items' => [
+            'V záložce <b>Sklad → Příslušenství</b> se při naskladnění už nenabízí produktové typy jako Notebook nebo Počítač. Formulář má vlastní obecné typy doplňků: adaptér, nabíječka, kabel USB-C/Lightning/Micro USB/HDMI, obal/kryt, ochranné sklo, klávesnice, myš, sluchátka, powerbanka, MagSafe příslušenství a další.',
+            'U příslušenství se nevyžaduje samostatný model — vybraný typ doplňku se použije jako název/model položky a obsluha řeší hlavně stav, barvu, cenu, počet a prodejnu.',
+            'Při editaci staršího doplňku CRM umí typ příslušenství odvodit podle názvu, takže kabel, kryt, adaptér, klávesnice nebo myš nespadnou omylem na první položku seznamu.',
+            'Server má stejnou pojistku jako formulář: v režimu příslušenství nejde omylem uložit běžný typ zařízení typu Notebook/Počítač, ale volba <b>✏️ Vlastní…</b> pro vlastní doplněk zůstává zachovaná.',
+        ],
+    ],
+    [
         'version' => '3.42.7',
         'date' => '2026-08-03',
         'time' => '17:31',

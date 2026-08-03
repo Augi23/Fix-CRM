@@ -57,8 +57,9 @@ if ($avail === 'loan') { $where_clauses[] = "loan_at IS NOT NULL"; }
 // Doplněk = má accessory-slovo v názvu, NEBO název/model neodpovídá žádnému zařízení/značce.
 // (Zrcadlí kategorii „Příslušenství" na e-shopu; „kryt na iPhone" tak spadne mezi doplňky, ne mezi telefony.)
 $cat = (string)($_GET['cat'] ?? '');
+$isAccessoryTab = ($cat === 'prislusenstvi');
 $catWhere = ''; $catParams = [];
-if ($cat === 'prislusenstvi') {
+if ($isAccessoryTab) {
     $__ac = afxProductAccessoryCond();   // jediný zdroj pravdy (functions.php)
     $catWhere = $__ac['sql'];
     $where_clauses[] = $catWhere;
@@ -106,7 +107,7 @@ $stats = $statStmt->fetch();
         <?php endif; ?>
         <?php if ($canManageBranch): ?>
         <button class="btn btn-success" id="productCreateOpen" data-bs-toggle="modal" data-bs-target="#productCreateModal">
-            <i class="fas fa-box-open me-2"></i> Naskladnit produkt
+            <i class="fas fa-box-open me-2"></i> <?php echo $isAccessoryTab ? 'Naskladnit příslušenství' : 'Naskladnit produkt'; ?>
         </button>
         <a class="btn btn-outline-secondary" href="api/export_products_csv.php" title="Kompletní sklad ve formátu souboru appky — pro ruční import do Upgates">
             <i class="fas fa-file-csv me-2"></i> CSV pro Upgates
@@ -418,21 +419,21 @@ try {
                                  „Vlastní…" pole se VŽDY otevírá POD svým výběrem (jednotné). -->
                             <div class="col-12">
                                 <div class="d-flex align-items-center gap-2 mb-1">
-                                    <i class="fas fa-mobile-alt text-info"></i>
-                                    <span class="fw-semibold">Zařízení</span>
+                                    <i class="fas fa-mobile-alt text-info" id="pcDeviceIcon"></i>
+                                    <span class="fw-semibold" id="pcDeviceHeading">Zařízení</span>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4" id="pcManufacturerGroup">
                                 <label class="form-label small">Výrobce</label>
                                 <select id="pcManufacturer" class="form-select"></select>
                                 <input type="text" id="pcManufacturerCustom" class="form-control mt-1" placeholder="vlastní výrobce…" style="display:none;">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small">Typ zařízení</label>
+                                <label class="form-label small" id="pcTypLabel">Typ zařízení</label>
                                 <select id="pcTyp" class="form-select"></select>
                                 <input type="text" id="pcTypCustom" class="form-control mt-1" placeholder="vlastní typ…" style="display:none;">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4" id="pcModelGroup">
                                 <label class="form-label small">Model <span class="text-danger">*</span></label>
                                 <select id="pcModel" class="form-select"></select>
                                 <input type="text" id="pcModelCustom" class="form-control mt-1" placeholder="vlastní model…" style="display:none;">
@@ -666,6 +667,8 @@ $(document).on('click', '.product-label-btn', function () {
     var CATALOG = <?php echo json_encode([
         'manufacturers' => afxProductManufacturers(),
         'types' => afxProductTypes(),
+        'accessoryTypes' => afxProductAccessoryTypes(),
+        'accessoryColors' => AFX_ACCESSORY_COLORS,
         'caps' => AFX_CAPS, 'rams' => AFX_RAMS, 'cpus' => AFX_CPU_CORES, 'gpus' => AFX_GPU_CORES,
         'processors' => afxProductProcessors(),
         'grades' => AFX_GRADE_LABELS,
@@ -674,6 +677,7 @@ $(document).on('click', '.product-label-btn', function () {
     ], JSON_UNESCAPED_UNICODE); ?>;
     var CSRF = '<?php echo $_SESSION['csrf_token'] ?? ''; ?>';
     var DEFAULT_STOCK = '<?php echo $defaultStockKey; ?>';
+    var ACCESSORY_MODE = <?php echo $isAccessoryTab ? 'true' : 'false'; ?>;
     var CUSTOM = '✏️ Vlastní…';
 
     var el = function (id) { return document.getElementById(id); };
@@ -693,13 +697,14 @@ $(document).on('click', '.product-label-btn', function () {
         values.forEach(function (v) { sel.appendChild(new Option(v, v)); });
         if (withCustom) sel.appendChild(new Option(CUSTOM, CUSTOM));
     }
-    function manufacturerVal() { return $manuf.value === CUSTOM ? $manufC.value.trim() : $manuf.value.trim(); }
+    function manufacturerVal() { return ACCESSORY_MODE ? '' : ($manuf.value === CUSTOM ? $manufC.value.trim() : $manuf.value.trim()); }
     function typVal() { return $typ.value === CUSTOM ? $typC.value.trim() : $typ.value; }
     function typeMatchesManufacturer(t, manuf) { return (t.manuf || '') === manuf; }
     function typeMatchesCategory(t, categoryCode) {
         return !!categoryCode && (t.k === categoryCode || ((t.kmatch || []).indexOf(categoryCode) >= 0));
     }
     function typeOptionsForManufacturer(manuf) {
+        if (ACCESSORY_MODE) return CATALOG.accessoryTypes || [];
         var opts = CATALOG.types.filter(function (t) { return typeMatchesManufacturer(t, manuf); });
         if (!opts.length || $manuf.value === CUSTOM) {
             opts = CATALOG.types.filter(function (t) { return !(t.manuf || ''); });
@@ -714,6 +719,12 @@ $(document).on('click', '.product-label-btn', function () {
     function typeDef() {
         var tv = typVal();
         var mv = manufacturerVal();
+        if (ACCESSORY_MODE) {
+            for (var a = 0; a < (CATALOG.accessoryTypes || []).length; a++) {
+                if (CATALOG.accessoryTypes[a].id === tv) return CATALOG.accessoryTypes[a];
+            }
+            return { id: tv, manuf: '', k: '', cap: false, ram: false, gen: false, colors: CATALOG.accessoryColors || [], models: [], accessory: true };
+        }
         for (var i = 0; i < CATALOG.types.length; i++) {
             if (CATALOG.types[i].id === tv && typeMatchesManufacturer(CATALOG.types[i], mv)) return CATALOG.types[i];
         }
@@ -726,7 +737,10 @@ $(document).on('click', '.product-label-btn', function () {
         }
         return { id: tv, manuf: mv, k: '', cap: true, ram: false, gen: false, colors: [], models: [] };
     }
-    function modelVal() { return $model.value === CUSTOM ? $modelC.value.trim() : $model.value.trim(); }
+    function modelVal() {
+        if (ACCESSORY_MODE) return typVal();
+        return $model.value === CUSTOM ? $modelC.value.trim() : $model.value.trim();
+    }
     function colorVal() { return $color.value === CUSTOM ? $colorC.value.trim() : $color.value.trim(); }
     function processorFamilyVal() {
         var fam = $processorFamily.value.trim();
@@ -734,6 +748,7 @@ $(document).on('click', '.product-label-btn', function () {
     }
     function processorModelVal() { return $processorModel.value === CUSTOM ? $processorModelC.value.trim() : $processorModel.value.trim(); }
     function typeHasProcessorFields() {
+        if (ACCESSORY_MODE) return false;
         var hay = (typVal() + ' ' + modelVal()).toLowerCase();
         return ['macbook', 'notebook', 'laptop', 'počítač', 'pocitac', 'computer', 'desktop', 'pc', 'imac', 'mac mini', 'mac studio', 'mac pro']
             .some(function (needle) { return hay.indexOf(needle) >= 0; });
@@ -773,6 +788,7 @@ $(document).on('click', '.product-label-btn', function () {
     }
     function displayModelVal(t, model) {
         model = String(model || '').trim();
+        if (ACCESSORY_MODE) return model || String((t && t.id) || '').trim();
         if (!model) return '';
         var typeId = String((t && t.id) || '').trim();
         var manuf = String((t && t.manuf) || manufacturerVal() || '').trim();
@@ -813,7 +829,7 @@ $(document).on('click', '.product-label-btn', function () {
         $processorModelC.style.display = 'none';
     }
     function syncProcessorVisibility() {
-        var show = typeHasProcessorFields();
+        var show = !ACCESSORY_MODE && typeHasProcessorFields();
         if (show) syncProcessorFamilyOptions();
         document.querySelectorAll('.pc-processor').forEach(function (n) { n.style.display = show ? '' : 'none'; });
         if (!show) clearProcessor();
@@ -906,6 +922,30 @@ $(document).on('click', '.product-label-btn', function () {
         refreshPreview();
     }
 
+    function syncCatalogModeLayout() {
+        var accessoryOnlyIds = ['pcCap', 'pcBattery', 'pcRam', 'pcCpu', 'pcGpu', 'pcRocnik'];
+        var heading = el('pcDeviceHeading'), icon = el('pcDeviceIcon'), typLabel = el('pcTypLabel');
+        if (heading) heading.textContent = ACCESSORY_MODE ? 'Příslušenství' : 'Zařízení';
+        if (typLabel) typLabel.textContent = ACCESSORY_MODE ? 'Typ příslušenství' : 'Typ zařízení';
+        if (icon) icon.className = ACCESSORY_MODE ? 'fas fa-plug text-info' : 'fas fa-mobile-alt text-info';
+        if (el('pcManufacturerGroup')) el('pcManufacturerGroup').style.display = ACCESSORY_MODE ? 'none' : '';
+        if (el('pcModelGroup')) el('pcModelGroup').style.display = ACCESSORY_MODE ? 'none' : '';
+        accessoryOnlyIds.forEach(function (id) {
+            var n = el(id), box = n ? n.closest('[class*="col-md-"]') : null;
+            if (box) box.style.display = ACCESSORY_MODE ? 'none' : '';
+            if (ACCESSORY_MODE && n) n.value = '';
+        });
+        if (ACCESSORY_MODE) {
+            $bat.value = '';
+            $ram.value = '';
+            $cpu.value = '';
+            $gpu.value = '';
+            $rocnik.value = '';
+            $gen.value = '';
+            clearProcessor();
+        }
+    }
+
     // hodnota mimo výčet selectu se nesmí tiše zahodit (starší kusy: 3 TB, rok 2009…)
     function setSelectValue(sel, val) {
         val = val || '';
@@ -936,12 +976,59 @@ $(document).on('click', '.product-label-btn', function () {
         });
         return manuf;
     }
+    function inferAccessoryTypeFromText(text, opts) {
+        if (!ACCESSORY_MODE) return '';
+        var hay = (' ' + String(text || '').toLowerCase() + ' ').replace(/\s+/g, ' ');
+        var hasOption = function (id) {
+            return opts.some(function (t) { return t.id === id; });
+        };
+        var rules = [
+            ['Kabel USB-C', ['usb-c', 'usb c', 'type-c', 'type c']],
+            ['Kabel Lightning', ['lightning', 'lighting']],
+            ['Kabel Micro USB', ['micro usb', 'micro-usb']],
+            ['Kabel HDMI', ['hdmi']],
+            ['Kabel USB-A', ['usb-a', 'usb a']],
+            ['Obal / kryt', ['obal', 'kryt', 'pouzdro', 'case', 'cover']],
+            ['Ochranné sklo', ['sklo', 'glass']],
+            ['Fólie', ['folie', 'fólie']],
+            ['Adaptér', ['adaptér', 'adapter']],
+            ['Nabíječka', ['nabíječka', 'nabijecka', 'charger']],
+            ['Redukce / hub', ['redukce', 'hub']],
+            ['Klávesnice', ['klávesnice', 'klavesnice', 'keyboard']],
+            ['Myš', ['myš', 'mys', 'mouse']],
+            ['Sluchátka', ['sluchátka', 'sluchatka', 'airpods', 'beats', 'headphone', 'earphone']],
+            ['Powerbanka', ['powerbanka', 'powerbank']],
+            ['MagSafe příslušenství', ['magsafe']],
+            ['Řemínek', ['řemínek', 'reminek', 'pásek', 'pasek', 'strap']],
+            ['Stylus / Apple Pencil', ['stylus', 'pencil', 'apple pencil']],
+            ['AirTag / lokátor', ['airtag', 'lokátor', 'lokator']],
+            ['Dock / stanice', ['dock', 'stanice']],
+            ['Držák / stojan', ['držák', 'drzak', 'stojan']],
+            ['Čtečka karet', ['čtečka', 'ctecka', 'reader']],
+            ['Externí disk / box', ['externí disk', 'externi disk', 'box']],
+            ['Reproduktor', ['reproduktor', 'speaker']],
+        ];
+        for (var i = 0; i < rules.length; i++) {
+            if (!hasOption(rules[i][0])) continue;
+            for (var j = 0; j < rules[i][1].length; j++) {
+                if (hay.indexOf(rules[i][1][j]) >= 0) return rules[i][0];
+            }
+        }
+        return '';
+    }
     function inferTypeFromProduct(p) {
         var opts = typeOptionsForManufacturer(manufacturerVal());
         var typ = p.typ || '';
         if (typ && opts.some(function (t) { return t.id === typ; })) return typ;
         opts.forEach(function (t) { if (!typ && typeMatchesCategory(t, p.category_code || '')) typ = t.id; });
         opts.forEach(function (t) { if (!typ && p.title && p.title.indexOf(t.id) === 0) typ = t.id; });
+        if (ACCESSORY_MODE && !typ) {
+            var hay = ((p.title || '') + ' ' + (p.model || '')).toLowerCase();
+            typ = inferAccessoryTypeFromText(hay, opts);
+            opts.forEach(function (t) {
+                if (!typ && hay.indexOf(String(t.id || '').toLowerCase()) >= 0) typ = t.id;
+            });
+        }
         return typ;
     }
 
@@ -958,7 +1045,8 @@ $(document).on('click', '.product-label-btn', function () {
     fillSelect($gen, CATALOG.gens, true, false);
     $grade.value = 'Nový';
     $stockKey.value = DEFAULT_STOCK;
-    if (CATALOG.manufacturers.indexOf('Apple') >= 0) $manuf.value = 'Apple';
+    if (!ACCESSORY_MODE && CATALOG.manufacturers.indexOf('Apple') >= 0) $manuf.value = 'Apple';
+    syncCatalogModeLayout();
     onManufacturer();
 
     $manuf.addEventListener('change', function () {
@@ -1220,7 +1308,7 @@ $(document).on('click', '.product-label-btn', function () {
         }
         if (saving) return;
         if (pending > 0) { $msg.textContent = 'Počkej — média se ještě nahrávají…'; return; }
-        if (!modelVal()) { $msg.textContent = 'Vyplň model.'; return; }
+        if (!modelVal()) { $msg.textContent = ACCESSORY_MODE ? 'Vyber typ příslušenství.' : 'Vyplň model.'; return; }
         if (!$price.value.trim()) { $msg.textContent = 'Vyplň cenu.'; return; }
         saving = true;
         $msg.textContent = 'Ukládám…';
@@ -1228,6 +1316,7 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('action', $editId.value ? 'update' : 'create');
         if ($editId.value) fd.append('id', $editId.value);
         fd.append('csrf_token', CSRF);
+        fd.append('catalog_mode', ACCESSORY_MODE ? 'accessory' : 'product');
         fd.append('manufacturer', manufacturerVal());
         fd.append('typ', typVal());
         fd.append('model', modelVal());
@@ -1364,13 +1453,13 @@ $(document).on('click', '.product-label-btn', function () {
         // režim NOVÝ produkt — vyčistit VŠE (i pozůstatky předchozí editace)
         formGen++;
         $editId.value = '';
-        el('pcTitleMode').textContent = 'Naskladnit produkt';
+        el('pcTitleMode').textContent = ACCESSORY_MODE ? 'Naskladnit příslušenství' : 'Naskladnit produkt';
         if (el('pcQty')) { el('pcQty').value = '1'; el('pcQty').readOnly = false; el('pcQty').disabled = false; }
         qtyOriginal = ''; qtyBeforeSold = '1';
         el('pcSaveBtn').style.display = 'none';          // při naskladnění se štítek tiskne vždy
         el('pcSavePrintBtn').innerHTML = '<i class="fas fa-tag me-1"></i> Přidat a vytisknout štítek';
         $manufC.value = ''; $manufC.style.display = 'none';
-        if ($manuf.value === CUSTOM) { $manuf.value = 'Apple'; onManufacturer(); }
+        if (!ACCESSORY_MODE && $manuf.value === CUSTOM) { $manuf.value = 'Apple'; onManufacturer(); }
         $typC.value = ''; $typC.style.display = 'none';
         if ($typ.value === CUSTOM) { onManufacturer(); }
         [$modelC, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
@@ -1386,6 +1475,7 @@ $(document).on('click', '.product-label-btn', function () {
         $hint.style.display = 'none';
         $msg.textContent = '';
         setBadge('none');
+        syncCatalogModeLayout();
         refreshPreview();
     });
 
@@ -1451,6 +1541,7 @@ $(document).on('click', '.product-label-btn', function () {
                 resetGalleryAll(Array.isArray(galArr) ? galArr : [], p.studio_image_url || '', p.video_360_url || '',
                     { studio: p.show_studio, gallery: p.show_gallery, v360: p.show_360 });
                 setBadge(p.pcr_status || 'none');
+                syncCatalogModeLayout();
                 $msg.textContent = p.source === 'app' ? 'Pozor: kus z appky — uložením ho převezme CRM (import appky ho už nepřepíše).' : '';
                 refreshPreview();
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('productCreateModal')).show();

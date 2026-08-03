@@ -10,6 +10,7 @@
 const AFX_APPLE_COLORS = ['Black', 'White', 'Space Black', 'Space Gray', 'Silver', 'Gold', 'Graphite', 'Sierra Blue', 'Pacific Blue', 'Blue', 'Green', 'Alpine Green', 'Pink', 'Purple', 'Deep Purple', 'Red', 'Midnight', 'Starlight', 'Yellow', 'Coral', 'Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium', 'Desert Titanium', 'Ultramarine', 'Teal', 'Cosmic Orange', 'Mist Blue'];
 const AFX_ANDROID_COLORS = ['Black', 'White', 'Blue', 'Green', 'Grey', 'Silver', 'Gold', 'Purple', 'Red'];
 const AFX_COMPUTER_COLORS = ['Black', 'White', 'Silver', 'Grey', 'Space Gray', 'Graphite', 'Blue', 'Red'];
+const AFX_ACCESSORY_COLORS = ['Black', 'White', 'Grey', 'Silver', 'Transparent', 'Blue', 'Green', 'Pink', 'Purple', 'Red'];
 const AFX_CAPS = ['16 GB', '32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB', '2 TB'];
 // RAM/jádra mají i telefony, tablety, konzole… — menší hodnoty pro ne-Macy (31.7. rozšířeno)
 const AFX_RAMS = ['2 GB', '3 GB', '4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '18 GB', '24 GB', '32 GB', '36 GB', '48 GB', '64 GB', '96 GB', '128 GB'];
@@ -312,6 +313,50 @@ function afxBrandProductTypes(string $manufacturer, string $k, array $typeIds, a
     return $out;
 }
 
+function afxProductAccessoryTypes(): array {
+    static $types = null;
+    if ($types === null) {
+        $ids = [
+            'Adaptér',
+            'Nabíječka',
+            'Kabel USB-C',
+            'Kabel Lightning',
+            'Kabel Micro USB',
+            'Kabel USB-A',
+            'Kabel HDMI',
+            'Redukce / hub',
+            'Obal / kryt',
+            'Ochranné sklo',
+            'Fólie',
+            'Klávesnice',
+            'Myš',
+            'Sluchátka',
+            'Reproduktor',
+            'Powerbanka',
+            'MagSafe příslušenství',
+            'Držák / stojan',
+            'Dock / stanice',
+            'Řemínek',
+            'Stylus / Apple Pencil',
+            'AirTag / lokátor',
+            'Externí disk / box',
+            'Čtečka karet',
+        ];
+        $types = array_map(static fn($id): array => [
+            'id' => $id,
+            'manuf' => '',
+            'k' => '',
+            'cap' => false,
+            'ram' => false,
+            'gen' => false,
+            'colors' => AFX_ACCESSORY_COLORS,
+            'models' => [],
+            'accessory' => true,
+        ], $ids);
+    }
+    return $types;
+}
+
 /** Typy zařízení: id → [výrobce, K-kód kategorie, cap?, ram?, gen?, barvy, modely]
  *  POZOR: 'ram' už NEznamená „má RAM pole" (RAM/jádra bere každý typ) — znamená
  *  „macový formát názvu" (32 GB/512 GB SSD). Ne-Macy skládají „8 GB RAM 256 GB". */
@@ -442,6 +487,11 @@ function afxProductTypeById(string $id, string $manufacturer = ''): array {
     } elseif ($manufacturer === '' && in_array($id, ['MacBook Pro', 'MacBook Air'], true)) {
         $manufacturer = 'Apple';
         $id = 'MacBook';
+    }
+    if ($manufacturer === '') {
+        foreach (afxProductAccessoryTypes() as $t) {
+            if ($t['id'] === $id) return $t;
+        }
     }
     foreach (afxProductTypes() as $t) {
         if ($t['id'] === $id && $manufacturer !== '' && $t['manuf'] === $manufacturer) return $t;
