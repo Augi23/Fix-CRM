@@ -1,7 +1,7 @@
 <?php
 /**
- * Export skladu Produktů ve formátu souboru naskladňovací appky (27 sloupců,
- * středník, UTF-8 s BOM) — ke stažení pro ruční import do Upgates, později
+ * Export skladu Produktů ve formátu rozšířeného souboru naskladnění (středník,
+ * UTF-8 s BOM) — ke stažení pro ruční import do Upgates, později
  * jako URL pro pravidelný import (auth tokenem v settingu products_export_token).
  * Základ řádku = raw_csv (kompletní historická data), přes něj se přepíší
  * ŽIVÉ hodnoty ze strukturovaných sloupců — vyhrají úpravy v CRM i prodeje

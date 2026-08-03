@@ -220,6 +220,7 @@ if ($action === 'print_product') {
     $grade = trim((string)($p['grade'] ?? ''));
     $bat = trim((string)($p['battery'] ?? ''));
     $ram = trim((string)($raw['[PARAMETER "RAM"]'] ?? ''));
+    $processor = trim((string)($raw['[PARAMETER "Procesor"]'] ?? ''));
     $cpu = trim((string)($raw['CPU_JADRA'] ?? ''));
     $gpu = trim((string)($raw['GPU_JADRA'] ?? ''));
     $sn = (string)$p['product_code'];
@@ -251,7 +252,7 @@ if ($action === 'print_product') {
     else { $cena = rtrim(rtrim(number_format($priceF, 2, '.', ''), '0'), '.') . ' Kč'; }
     $data = [
         'nazev' => $nazev, 'barva' => $color, 'stav' => $grade, 'uloziste' => $cap,
-        'baterie' => $bat, 'ram' => $ram, 'cpu' => $cpu, 'gpu' => $gpu,
+        'baterie' => $bat, 'ram' => $ram, 'procesor' => $processor, 'cpu' => $cpu, 'gpu' => $gpu,
         'sn' => $sn, 'cena' => $cena,
         'mac' => str_contains(mb_strtolower($nazev !== '' ? $nazev : $title), 'macbook'),
     ];

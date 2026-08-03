@@ -2,7 +2,7 @@
 """Cenový štítek PRODUKTU pro Brother QL-810W — 1:1 port renderu z naskladňovací
 Mac appky (macapp/app.py: render_label / render_label_big / _label_logo).
 Server je Linux → místo Arial se používá DejaVu Sans (rozměry zachované).
-Vstup: dict(nazev, barva, stav, uloziste, baterie, ram, cpu, gpu, sn, cena, mac).
+Vstup: dict(nazev, barva, stav, uloziste, baterie, ram, procesor, cpu, gpu, sn, cena, mac).
 Výstup: PIL Image připravený k tisku (velký MacBook štítek už OTOČENÝ na 696 šířky).
 """
 import os
@@ -60,6 +60,7 @@ def render_label_big(data):
     d.line([PAD, DIV1, W - PAD, DIV1], fill="black", width=4)
     rows = [("Barva:", data.get("barva", "")), ("Stav:", data.get("stav", "")), ("Úložiště:", data.get("uloziste", ""))]
     if data.get("ram"): rows.append(("RAM:", data["ram"]))
+    if data.get("procesor"): rows.append(("Procesor:", data["procesor"]))
     if data.get("cpu"): rows.append(("Jader CPU:", data["cpu"]))
     if data.get("gpu"): rows.append(("Jader GPU:", data["gpu"]))
     if data.get("baterie"): rows.append(("Baterie:", data["baterie"]))
@@ -76,8 +77,17 @@ def render_label_big(data):
         y, step, fs_l, fs_v = 164, 45, 32, 39
     fl, fv = _lblfont(fs_l, False), _lblfont(fs_v, True)
     fv_sn = _lblfont(min(fs_v, 40), True)
+    max_vw = W - (PAD + 300) - PAD
+    def value_font(v, base, minimum):
+        s = base
+        while s > minimum:
+            f = _lblfont(s, True)
+            if d.textlength(v, font=f) <= max_vw:
+                return f
+            s -= 1
+        return _lblfont(minimum, True)
     for lb, v in rows:
-        vf = fv_sn if lb == "SN/IMEI:" else fv
+        vf = fv_sn if lb == "SN/IMEI:" else value_font(v, fs_v, 26)
         d.text((PAD, y + 5), lb, font=fl, fill="black")
         d.text((PAD + 300, y), v, font=vf, fill="black")
         y += step
@@ -127,6 +137,7 @@ def render_product_label(data):
     d.line([PAD, DIV1, W - PAD, DIV1], fill="black", width=3)
     rows = [("Barva:", data.get("barva", "")), ("Stav:", data.get("stav", "")), ("Úložiště:", data.get("uloziste", ""))]
     if data.get("ram"): rows.append(("RAM:", data["ram"]))
+    if data.get("procesor"): rows.append(("Procesor:", data["procesor"]))
     if data.get("cpu"): rows.append(("Jader CPU:", data["cpu"]))
     if data.get("gpu"): rows.append(("Jader GPU:", data["gpu"]))
     if data.get("baterie"): rows.append(("Baterie:", data["baterie"]))
@@ -145,8 +156,17 @@ def render_product_label(data):
         y, step, fs_l, fs_v = 106, 29, 21, 26
     fl, fv = _lblfont(fs_l, False), _lblfont(fs_v, True)
     fv_sn = _lblfont(min(fs_v, 27), True)
+    max_vw = W - (PAD + 200) - PAD
+    def value_font(v, base, minimum):
+        s = base
+        while s > minimum:
+            f = _lblfont(s, True)
+            if d.textlength(v, font=f) <= max_vw:
+                return f
+            s -= 1
+        return _lblfont(minimum, True)
     for lb, v in rows:
-        vf = fv_sn if lb == "SN/IMEI:" else fv
+        vf = fv_sn if lb == "SN/IMEI:" else value_font(v, fs_v, 18)
         d.text((PAD, y + 5), lb, font=fl, fill="black")
         d.text((PAD + 200, y), v, font=vf, fill="black")
         y += step

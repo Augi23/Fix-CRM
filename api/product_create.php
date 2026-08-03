@@ -64,6 +64,11 @@ if ($action === 'get') {
     $p = $st->fetch(PDO::FETCH_ASSOC);
     if (!$p) { echo json_encode(['success' => false, 'message' => 'Produkt nenalezen.']); exit; }
     $raw = json_decode((string)($p['raw_csv'] ?? ''), true) ?: [];
+    $rawProcessorFamily = trim((string)($raw['[PARAMETER "Výrobce procesoru"]'] ?? $raw['PROCESOR_TYP'] ?? ''));
+    $rawProcessorModel = trim((string)($raw['PROCESOR_MODEL'] ?? ''));
+    if ($rawProcessorModel === '') {
+        $rawProcessorModel = trim((string)($raw['[PARAMETER "Procesor"]'] ?? ''));
+    }
     $code = (string)$p['product_code'];
     echo json_encode(['success' => true, 'product' => [
         'id' => (int)$p['id'],
@@ -95,6 +100,8 @@ if ($action === 'get') {
         'show_360'         => (int)($p['show_360'] ?? 1),
 
         'ram' => (string)($raw['[PARAMETER "RAM"]'] ?? ''),
+        'processor_family' => $rawProcessorFamily,
+        'processor_model' => $rawProcessorModel,
         'cpu' => (string)($raw['CPU_JADRA'] ?? ''),
         'gpu' => (string)($raw['GPU_JADRA'] ?? ''),
         'rocnik' => (string)($raw['[PARAMETER "Ročník"]'] ?? ''),
@@ -122,6 +129,8 @@ $in = [
     'price' => trim((string)($_POST['price'] ?? '')),
     'purchase_price' => trim((string)($_POST['purchase_price'] ?? '')),
     'ram' => trim((string)($_POST['ram'] ?? '')),
+    'processor_family' => trim((string)($_POST['processor_family'] ?? '')),
+    'processor_model' => trim((string)($_POST['processor_model'] ?? '')),
     'cpu' => trim((string)($_POST['cpu'] ?? '')),
     'gpu' => trim((string)($_POST['gpu'] ?? '')),
     'rocnik' => trim((string)($_POST['rocnik'] ?? '')),
@@ -153,6 +162,16 @@ if (!crmCanModifyBranchStock($prodBranch)) {
 
 if ($in['model'] === '') {
     echo json_encode(['success' => false, 'message' => 'Vyplň model.']); exit;
+}
+$processorFamilies = array_keys(afxProductProcessors());
+if (!afxProductHasProcessorFields($in['typ'], $in['model'])) {
+    $in['processor_family'] = '';
+    $in['processor_model'] = '';
+} elseif ($in['processor_family'] === '' || !in_array($in['processor_family'], $processorFamilies, true)) {
+    $in['processor_family'] = '';
+    $in['processor_model'] = '';
+} elseif (mb_strlen($in['processor_model']) > 120) {
+    echo json_encode(['success' => false, 'message' => 'Model procesoru je moc dlouhý. Zkrať ho prosím na max. 120 znaků.'], JSON_UNESCAPED_UNICODE); exit;
 }
 $priceNum = (float)str_replace(',', '.', str_replace(' ', '', $in['price']));
 if ($in['price'] === '' || !is_finite($priceNum) || $priceNum <= 0 || $priceNum > 10000000) {
@@ -321,6 +340,8 @@ try {
             && ($in['image_url'] === '' || $in['image_url'] === (string)($existing['image_url'] ?? ''))
             // Mac/iPad parametry žijí jen v raw_csv — jejich změna vyžaduje přeskládání řádku
             && $in['ram'] === trim((string)($exRaw['[PARAMETER "RAM"]'] ?? ''))
+            && $in['processor_family'] === trim((string)($exRaw['[PARAMETER "Výrobce procesoru"]'] ?? $exRaw['PROCESOR_TYP'] ?? ''))
+            && $in['processor_model'] === trim((string)($exRaw['PROCESOR_MODEL'] ?? $exRaw['[PARAMETER "Procesor"]'] ?? ''))
             && $in['cpu'] === trim((string)($exRaw['CPU_JADRA'] ?? ''))
             && $in['gpu'] === trim((string)($exRaw['GPU_JADRA'] ?? ''))
             && $in['rocnik'] === trim((string)($exRaw['[PARAMETER "Ročník"]'] ?? ''))

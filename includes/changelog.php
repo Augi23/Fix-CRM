@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.1',
+        'date' => '2026-08-03',
+        'time' => '15:50',
+        'title' => 'Naskladnění: procesor u počítačů a notebooků',
+        'items' => [
+            'Ve formuláři <b>Naskladnit produkt</b> se u počítačů/notebooků nově zobrazuje nepovinné pole <b>Procesor</b>: nejdřív výběr <b>AMD / Intel / M chip - ARM</b>, potom konkrétní model podle výrobce.',
+            'Seznamy procesorů jsou předvyplněné zhruba od roku 2010 po současnost a model má dole stejnou volbu <b>✏️ Vlastní…</b> jako ostatní vlastní výběry ve formuláři.',
+            'Procesor se ukládá do raw dat produktu, propisuje se do krátkého popisu, exportu, e-shop feedu a produktového štítku; při editaci existujícího kusu se zase načte zpět do formuláře.',
+        ],
+    ],
+    [
         'version' => '3.42.0',
         'date' => '2026-08-03',
         'time' => '15:09',

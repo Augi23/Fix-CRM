@@ -125,6 +125,8 @@ try {
         // branch_id ještě neexistuje (feed nevolá ensureSkladBranchSchema()).
         $branchId = (int)($p['branch_id'] ?? 0) ?: skladBranchIdForStockKey((string)($p['stock_key'] ?? ''));
         $branchLabel = skladBranchLabel($branchId);
+        $processorFamily = trim((string)($raw['[PARAMETER "Výrobce procesoru"]'] ?? $raw['PROCESOR_TYP'] ?? ''));
+        $processor = trim((string)($raw['[PARAMETER "Procesor"]'] ?? ''));
 
         $products[] = [
             'code'                 => (string)$p['product_code'],
@@ -136,6 +138,8 @@ try {
             'color'                => $p['color'] !== null ? (string)$p['color'] : null,
             'grade'                => $p['grade'] !== null ? (string)$p['grade'] : null,
             'battery'              => $p['battery'] !== null ? (string)$p['battery'] : null,
+            'processor_family'     => $processorFamily !== '' ? $processorFamily : null,
+            'processor'            => $processor !== '' ? $processor : null,
             'price'                => (float)$p['price'],
             'currency'             => 'CZK',
             'prices_include_vat'   => true,
@@ -157,7 +161,7 @@ try {
             'added_at'             => $p['added_at'] !== null ? (string)$p['added_at'] : null,
             'updated_at'           => (string)$p['updated_at'],
             'last_seen_at'         => (string)$p['last_seen_at'],
-            // Kompletní zdrojová data (SHORT_DESCRIPTION, RAM, ročník, generace, CPU/GPU…).
+            // Kompletní zdrojová data (SHORT_DESCRIPTION, RAM, procesor, ročník, generace, CPU/GPU…).
             // Pozn.: [IMAGES] z tohoto pole jsou cizí URL — pro obrázek použij pole `image`.
             'attributes'           => $raw,
         ];

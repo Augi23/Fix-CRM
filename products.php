@@ -457,6 +457,15 @@ try {
                                 <label class="form-label small">RAM</label>
                                 <select id="pcRam" class="form-select"></select>
                             </div>
+                            <div class="col-md-3 pc-processor" style="display:none;">
+                                <label class="form-label small">Procesor:</label>
+                                <select id="pcProcessorFamily" class="form-select"></select>
+                            </div>
+                            <div class="col-md-6 pc-processor pc-processor-model" style="display:none;">
+                                <label class="form-label small">Model procesoru</label>
+                                <select id="pcProcessorModel" class="form-select"></select>
+                                <input type="text" id="pcProcessorModelCustom" class="form-control mt-1" placeholder="vlastní procesor…" style="display:none;">
+                            </div>
                             <div class="col-md-3">
                                 <label class="form-label small">Jader CPU</label>
                                 <select id="pcCpu" class="form-select"></select>
@@ -652,6 +661,7 @@ $(document).on('click', '.product-label-btn', function () {
     var CATALOG = <?php echo json_encode([
         'types' => afxProductTypes(),
         'caps' => AFX_CAPS, 'rams' => AFX_RAMS, 'cpus' => AFX_CPU_CORES, 'gpus' => AFX_GPU_CORES,
+        'processors' => afxProductProcessors(),
         'grades' => AFX_GRADE_LABELS,
         'years' => array_map('strval', range(2026, 2010)),
         'gens' => array_map('strval', range(1, 11)),
@@ -666,6 +676,7 @@ $(document).on('click', '.product-label-btn', function () {
         $cap = el('pcCap'), $color = el('pcColor'), $colorC = el('pcColorCustom'),
         $grade = el('pcGrade'), $stockKey = el('pcStockKey'), $bat = el('pcBattery'),
         $price = el('pcPrice'), $purchase = el('pcPurchasePrice'), $serial = el('pcSerial'), $ram = el('pcRam'),
+        $processorFamily = el('pcProcessorFamily'), $processorModel = el('pcProcessorModel'), $processorModelC = el('pcProcessorModelCustom'),
         $cpu = el('pcCpu'), $gpu = el('pcGpu'), $rocnik = el('pcRocnik'), $gen = el('pcGenerace'),
         $sold = el('pcSold'), $photo = el('pcPhoto'), $imageUrl = el('pcImageUrl'),
         $badge = el('pcPcrBadge'), $msg = el('pcMsg'), $hint = el('pcHint'), $editId = el('pcEditId');
@@ -684,6 +695,74 @@ $(document).on('click', '.product-label-btn', function () {
     }
     function modelVal() { return $model.value === CUSTOM ? $modelC.value.trim() : $model.value.trim(); }
     function colorVal() { return $color.value === CUSTOM ? $colorC.value.trim() : $color.value.trim(); }
+    function processorFamilyVal() { return $processorFamily.value.trim(); }
+    function processorModelVal() { return $processorModel.value === CUSTOM ? $processorModelC.value.trim() : $processorModel.value.trim(); }
+    function typeHasProcessorFields() {
+        var hay = (typVal() + ' ' + modelVal()).toLowerCase();
+        return ['macbook', 'notebook', 'laptop', 'počítač', 'pocitac', 'computer', 'desktop', 'pc', 'imac', 'mac mini', 'mac studio']
+            .some(function (needle) { return hay.indexOf(needle) >= 0; });
+    }
+    function processorDisplayVal() {
+        if (!typeHasProcessorFields()) return '';
+        var fam = processorFamilyVal(), model = processorModelVal();
+        if (!fam) return '';
+        if (!model) return fam;
+        var low = model.toLowerCase();
+        if (fam !== 'M chip - ARM' && low.indexOf(fam.toLowerCase()) >= 0) return model;
+        if (fam === 'M chip - ARM') {
+            if (/^(apple\s+)?m\d/i.test(model)) return model;
+            return 'Apple ' + model;
+        }
+        return fam + ' ' + model;
+    }
+    function normSpec(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9á-ž]+/gi, ' ').replace(/\s+/g, ' ').trim(); }
+    function titleHasProcessor(titleBase, processor) {
+        var hay = normSpec(titleBase), needle = normSpec(processor);
+        var noBrand = needle.replace(/^(apple|amd|intel)\s+/, '').trim();
+        return !!needle && (hay.indexOf(needle) >= 0 || (!!noBrand && hay.indexOf(noBrand) >= 0));
+    }
+    function processorTitlePart(titleBase, processor) {
+        if (!processor || titleHasProcessor(titleBase, processor)) return '';
+        var part = processor, m = part.match(/^(Intel|AMD|Apple)\s+/);
+        if (m && (' ' + normSpec(titleBase) + ' ').indexOf(' ' + m[1].toLowerCase() + ' ') >= 0) {
+            part = part.replace(/^(Intel|AMD|Apple)\s+/, '');
+        }
+        return part.trim();
+    }
+    function clearProcessor() {
+        $processorFamily.value = '';
+        fillSelect($processorModel, [], true, false);
+        $processorModel.value = '';
+        $processorModelC.value = '';
+        $processorModelC.style.display = 'none';
+    }
+    function syncProcessorVisibility() {
+        var show = typeHasProcessorFields();
+        document.querySelectorAll('.pc-processor').forEach(function (n) { n.style.display = show ? '' : 'none'; });
+        if (!show) clearProcessor();
+        document.querySelectorAll('.pc-processor-model').forEach(function (n) { n.style.display = (show && processorFamilyVal()) ? '' : 'none'; });
+    }
+    function onProcessorFamily(clearModel) {
+        var fam = processorFamilyVal();
+        fillSelect($processorModel, (fam && CATALOG.processors[fam]) ? CATALOG.processors[fam] : [], true, !!fam);
+        if (clearModel) {
+            $processorModel.value = '';
+            $processorModelC.value = '';
+            $processorModelC.style.display = 'none';
+        }
+        syncProcessorVisibility();
+        refreshPreview();
+    }
+    function setProcessorValues(fam, model) {
+        clearProcessor();
+        if (!typeHasProcessorFields() || !fam || !CATALOG.processors[fam]) { syncProcessorVisibility(); return; }
+        $processorFamily.value = fam;
+        onProcessorFamily(false);
+        if ((CATALOG.processors[fam] || []).indexOf(model) >= 0) { $processorModel.value = model; }
+        else if (model) { $processorModel.value = CUSTOM; $processorModelC.style.display = ''; $processorModelC.value = model; }
+        syncProcessorVisibility();
+        refreshPreview();
+    }
 
     // JS zrcadlo build_title() — jen pro živý náhled, server počítá autoritativně
     function buildTitle() {
@@ -698,7 +777,13 @@ $(document).on('click', '.product-label-btn', function () {
             ? ((ram && cap) ? ram + '/' + cap + ' SSD' : (ram ? ram + ' RAM' : cap))
             : [ram ? ram + ' RAM' : '', cap].filter(Boolean).join(' ');
         var cores = [cpu ? cpu + ' CPU' : '', gpu ? gpu + ' GPU' : ''].filter(Boolean).join(' ');
-        var spec = (cores && mem) ? cores + ', ' + mem : (cores || mem);
+        var processor = processorDisplayVal();
+        var specParts = [];
+        var processorTitle = processorTitlePart(dm, processor);
+        if (processorTitle) specParts.push(processorTitle);
+        if (cores && mem) specParts.push(cores + ', ' + mem);
+        else if (cores || mem) specParts.push(cores || mem);
+        var spec = specParts.join(', ');
         // stav (grade) do názvu nepatří — jen v buňce/parametru/popisu
         return [dm, spec, colorVal()].filter(Boolean).join(' ').trim();
     }
@@ -708,6 +793,8 @@ $(document).on('click', '.product-label-btn', function () {
         var gr = ($grade.value || '').split(' ')[0] || 'A';
         if (gr) out.push('Stav: ' + gr);
         if ($bat.value) out.push('Kondice baterie: ' + $bat.value + ' %');
+        var processor = processorDisplayVal();
+        if (processor) out.push('Procesor: ' + processor);
         if ($cpu.value) out.push('Jader CPU: ' + $cpu.value);
         if ($gpu.value) out.push('Jader GPU: ' + $gpu.value);
         if ($ram.value) out.push('RAM: ' + $ram.value);
@@ -728,6 +815,8 @@ $(document).on('click', '.product-label-btn', function () {
         fillSelect($model, t.models, true, true);
         fillSelect($color, t.colors, true, true);
         $modelC.style.display = 'none'; $colorC.style.display = 'none';
+        clearProcessor();
+        syncProcessorVisibility();
         document.querySelectorAll('.pc-ipad').forEach(function (n) { n.style.display = t.gen ? '' : 'none'; });
         refreshPreview();
     }
@@ -746,6 +835,8 @@ $(document).on('click', '.product-label-btn', function () {
     fillSelect($cap, CATALOG.caps, true, false);
     fillSelect($grade, CATALOG.grades, false, false);
     fillSelect($ram, CATALOG.rams, true, false);
+    fillSelect($processorFamily, Object.keys(CATALOG.processors), true, false);
+    fillSelect($processorModel, [], true, false);
     fillSelect($cpu, CATALOG.cpus, true, false);
     fillSelect($gpu, CATALOG.gpus, true, false);
     fillSelect($rocnik, CATALOG.years, true, false);
@@ -758,9 +849,15 @@ $(document).on('click', '.product-label-btn', function () {
         $typC.style.display = $typ.value === CUSTOM ? '' : 'none';
         onType();
     });
-    $model.addEventListener('change', function () { $modelC.style.display = $model.value === CUSTOM ? '' : 'none'; refreshPreview(); });
+    $model.addEventListener('change', function () { $modelC.style.display = $model.value === CUSTOM ? '' : 'none'; syncProcessorVisibility(); refreshPreview(); });
     $color.addEventListener('change', function () { $colorC.style.display = $color.value === CUSTOM ? '' : 'none'; refreshPreview(); });
-    [$typC, $modelC, $colorC, $cap, $grade, $bat, $ram, $cpu, $gpu, $rocnik, $gen].forEach(function (n) {
+    $processorFamily.addEventListener('change', function () { onProcessorFamily(true); });
+    $processorModel.addEventListener('change', function () { $processorModelC.style.display = $processorModel.value === CUSTOM ? '' : 'none'; refreshPreview(); });
+    [$typC, $modelC].forEach(function (n) {
+        n.addEventListener('input', function () { syncProcessorVisibility(); refreshPreview(); });
+        n.addEventListener('change', function () { syncProcessorVisibility(); refreshPreview(); });
+    });
+    [$typC, $modelC, $colorC, $cap, $grade, $bat, $ram, $processorModelC, $cpu, $gpu, $rocnik, $gen].forEach(function (n) {
         n.addEventListener('input', refreshPreview);
         n.addEventListener('change', refreshPreview);
     });
@@ -1021,6 +1118,8 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('purchase_price', $purchase.value.trim());   // nepovinné; prázdné = neznámá nákupní cena
         fd.append('serial', $serial.value.trim());
         fd.append('ram', $ram.value);
+        fd.append('processor_family', typeHasProcessorFields() ? processorFamilyVal() : '');
+        fd.append('processor_model', typeHasProcessorFields() ? processorModelVal() : '');
         fd.append('cpu', $cpu.value);
         fd.append('gpu', $gpu.value);
         fd.append('rocnik', $rocnik.value);
@@ -1084,6 +1183,7 @@ $(document).on('click', '.product-label-btn', function () {
                 formGen++;
                 [$modelC, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
                 $model.value = ''; $color.value = ''; $cap.value = '';
+                clearProcessor(); syncProcessorVisibility();
                 $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
                 $modelC.style.display = 'none'; $colorC.style.display = 'none';
                 $sold.checked = false;
@@ -1152,6 +1252,7 @@ $(document).on('click', '.product-label-btn', function () {
         if ($typ.value === CUSTOM) { $typ.value = CATALOG.types[0].id; onType(); }
         [$modelC, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
         $model.value = ''; $color.value = ''; $cap.value = '';
+        clearProcessor(); syncProcessorVisibility();
         $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
         $modelC.style.display = 'none'; $colorC.style.display = 'none';
         $sold.checked = false;
@@ -1201,6 +1302,7 @@ $(document).on('click', '.product-label-btn', function () {
                 else if (m) { $model.value = CUSTOM; $modelC.style.display = ''; $modelC.value = m; }
                 if (t.colors.indexOf(p.color) >= 0) { $color.value = p.color; }
                 else if (p.color) { $color.value = CUSTOM; $colorC.style.display = ''; $colorC.value = p.color; }
+                syncProcessorVisibility();
                 setSelectValue($cap, p.cap);
                 // grade token → celý label
                 var gl = CATALOG.grades.filter(function (g) { return g.split(' ')[0] === p.grade; });
@@ -1209,7 +1311,8 @@ $(document).on('click', '.product-label-btn', function () {
                 $price.value = p.price || '';
                 $purchase.value = p.purchase_price || '';   // '' = u kusu nikdy nezadaná (nepřepisovat nulou)
                 $serial.value = p.serial || '';
-                setSelectValue($ram, p.ram); setSelectValue($cpu, p.cpu); setSelectValue($gpu, p.gpu);
+                setSelectValue($ram, p.ram); setProcessorValues(p.processor_family || '', p.processor_model || '');
+                setSelectValue($cpu, p.cpu); setSelectValue($gpu, p.gpu);
                 setSelectValue($rocnik, p.rocnik); setSelectValue($gen, p.generace);
                 $sold.checked = !!p.sold;
                 syncQtyWithSerial();   // AŽ TEĎ — funkce se řídí i stavem „Prodáno"
