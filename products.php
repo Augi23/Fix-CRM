@@ -506,12 +506,16 @@ try {
                                     <span class="fw-semibold">Identifikace kusu</span>
                                 </div>
                             </div>
-                            <div class="col-md-8">
+                            <div class="col-md-8" id="pcSerialGroup">
                                 <label class="form-label small">SN / IMEI <span class="text-white-50">(naskenuj čtečkou nebo zapiš)</span></label>
                                 <input type="text" id="pcSerial" class="form-control" autocomplete="off">
                             </div>
-                            <div class="col-md-4 d-flex align-items-end">
+                            <div class="col-md-4 d-flex align-items-end" id="pcPcrGroup">
                                 <div id="pcPcrBadge" class="w-100 text-center small fw-bold rounded py-2" style="background:rgba(255,255,255,.06);color:#9aa3b2;">PČR: nekontrolováno</div>
+                            </div>
+                            <div class="col-12" id="pcAccessoryTextGroup" style="display:none;">
+                                <label class="form-label small">Vlastní text</label>
+                                <input type="text" id="pcAccessoryText" class="form-control" placeholder="např. poznámka k příslušenství">
                             </div>
 
                             <!-- ── 3) CENA A PRODEJ ── -->
@@ -694,6 +698,7 @@ $(document).on('click', '.product-label-btn', function () {
     var $manuf = el('pcManufacturer'), $manufC = el('pcManufacturerCustom'), $typC = el('pcTypCustom');
     var $typ = el('pcTyp'), $model = el('pcModel'), $modelC = el('pcModelCustom'),
         $accessoryForModel = el('pcAccessoryForModel'), $accessoryProperty = el('pcAccessoryProperty'), $accessoryPropertyC = el('pcAccessoryPropertyCustom'),
+        $accessoryText = el('pcAccessoryText'),
         $cap = el('pcCap'), $color = el('pcColor'), $colorC = el('pcColorCustom'),
         $grade = el('pcGrade'), $stockKey = el('pcStockKey'), $bat = el('pcBattery'),
         $price = el('pcPrice'), $purchase = el('pcPurchasePrice'), $serial = el('pcSerial'), $ram = el('pcRam'),
@@ -754,6 +759,8 @@ $(document).on('click', '.product-label-btn', function () {
     }
     function accessoryForModelVal() { return ACCESSORY_MODE ? $accessoryForModel.value.trim() : ''; }
     function accessoryPropertyVal() { return ACCESSORY_MODE ? ($accessoryProperty.value === CUSTOM ? $accessoryPropertyC.value.trim() : $accessoryProperty.value.trim()) : ''; }
+    function accessoryTextVal() { return ACCESSORY_MODE ? $accessoryText.value.trim() : ''; }
+    function serialVal() { return ACCESSORY_MODE ? '' : $serial.value.trim(); }
     function colorVal() { return $color.value === CUSTOM ? $colorC.value.trim() : $color.value.trim(); }
     function processorFamilyVal() {
         var fam = $processorFamily.value.trim();
@@ -914,6 +921,7 @@ $(document).on('click', '.product-label-btn', function () {
         if (t.cap && $cap.value) out.push('Úložiště: ' + $cap.value);
         if (accessoryForModelVal()) out.push('Pro model: ' + accessoryForModelVal());
         if (accessoryPropertyVal()) out.push('Vlastnost: ' + accessoryPropertyVal());
+        if (accessoryTextVal()) out.push('Vlastní text: ' + accessoryTextVal());
         if (colorVal()) out.push('Barva: ' + colorVal());
         if ($rocnik.value) out.push('Ročník: ' + $rocnik.value);
         if (t.gen && $gen.value) out.push('Generace: ' + $gen.value);
@@ -953,6 +961,9 @@ $(document).on('click', '.product-label-btn', function () {
         if (el('pcModelGroup')) el('pcModelGroup').style.display = ACCESSORY_MODE ? 'none' : '';
         if (el('pcAccessoryForModelGroup')) el('pcAccessoryForModelGroup').style.display = ACCESSORY_MODE ? '' : 'none';
         if (el('pcAccessoryPropertyGroup')) el('pcAccessoryPropertyGroup').style.display = ACCESSORY_MODE ? '' : 'none';
+        if (el('pcSerialGroup')) el('pcSerialGroup').style.display = ACCESSORY_MODE ? 'none' : '';
+        if (el('pcPcrGroup')) el('pcPcrGroup').style.display = ACCESSORY_MODE ? 'none' : '';
+        if (el('pcAccessoryTextGroup')) el('pcAccessoryTextGroup').style.display = ACCESSORY_MODE ? '' : 'none';
         accessoryOnlyIds.forEach(function (id) {
             var n = el(id), box = n ? n.closest('[class*="col-md-"]') : null;
             if (box) box.style.display = ACCESSORY_MODE ? 'none' : '';
@@ -965,12 +976,15 @@ $(document).on('click', '.product-label-btn', function () {
             $gpu.value = '';
             $rocnik.value = '';
             $gen.value = '';
+            $serial.value = '';
             clearProcessor();
+            setBadge('none');
         } else {
             $accessoryForModel.value = '';
             $accessoryProperty.value = '';
             $accessoryPropertyC.value = '';
             $accessoryPropertyC.style.display = 'none';
+            $accessoryText.value = '';
         }
     }
 
@@ -1095,7 +1109,7 @@ $(document).on('click', '.product-label-btn', function () {
         n.addEventListener('input', function () { syncProcessorVisibility(); refreshPreview(); });
         n.addEventListener('change', function () { syncProcessorVisibility(); refreshPreview(); });
     });
-    [$manufC, $typC, $modelC, $accessoryForModel, $accessoryPropertyC, $colorC, $cap, $grade, $bat, $ram, $processorModelC, $cpu, $gpu, $rocnik, $gen].forEach(function (n) {
+    [$manufC, $typC, $modelC, $accessoryForModel, $accessoryPropertyC, $accessoryText, $colorC, $cap, $grade, $bat, $ram, $processorModelC, $cpu, $gpu, $rocnik, $gen].forEach(function (n) {
         n.addEventListener('input', refreshPreview);
         n.addEventListener('change', refreshPreview);
     });
@@ -1352,13 +1366,14 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('model', modelVal());
         fd.append('accessory_for_model', accessoryForModelVal());
         fd.append('accessory_property', accessoryPropertyVal());
+        fd.append('accessory_note', accessoryTextVal());
         fd.append('cap', typeDef().cap ? $cap.value : '');
         fd.append('color', colorVal());
         fd.append('grade', $grade.value);
         fd.append('battery', $bat.value);
         fd.append('price', $price.value.trim());
         fd.append('purchase_price', $purchase.value.trim());   // nepovinné; prázdné = neznámá nákupní cena
-        fd.append('serial', $serial.value.trim());
+        fd.append('serial', serialVal());
         fd.append('ram', $ram.value);
         fd.append('processor_family', typeHasProcessorFields() ? processorFamilyVal() : '');
         fd.append('processor_model', typeHasProcessorFields() ? processorModelVal() : '');
@@ -1423,7 +1438,7 @@ $(document).on('click', '.product-label-btn', function () {
                 if ($editId.value) { printPromise.then(function () { location.reload(); }); return; }
                 // vyčistit vše KROMĚ Typ / Stav / Prodejna — sériové naskladňování jako v appce
                 formGen++;
-                [$modelC, $accessoryForModel, $accessoryPropertyC, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
+                [$modelC, $accessoryForModel, $accessoryPropertyC, $accessoryText, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
                 $model.value = ''; $color.value = ''; $cap.value = '';
                 $accessoryProperty.value = ''; $accessoryPropertyC.style.display = 'none';
                 clearProcessor(); syncProcessorVisibility();
@@ -1446,7 +1461,7 @@ $(document).on('click', '.product-label-btn', function () {
     // Sériové číslo = jeden konkrétní kus → počet se zamkne na 1 (dva kusy se
     // stejným SN nedávají smysl a e-shop i kasa by je nerozlišily).
     function syncQtyWithSerial() {
-        var q = el('pcQty'), sn = $serial.value.trim();
+        var q = el('pcQty'), sn = serialVal();
         if (!q) { return; }
         if (sn !== '') {
             // POZOR: jen SRÁŽET dolů, nikdy nezvyšovat. Prodaný kus má 0 ks a natvrdo
@@ -1495,7 +1510,7 @@ $(document).on('click', '.product-label-btn', function () {
         if (!ACCESSORY_MODE && $manuf.value === CUSTOM) { $manuf.value = 'Apple'; onManufacturer(); }
         $typC.value = ''; $typC.style.display = 'none';
         if ($typ.value === CUSTOM) { onManufacturer(); }
-        [$modelC, $accessoryForModel, $accessoryPropertyC, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
+        [$modelC, $accessoryForModel, $accessoryPropertyC, $accessoryText, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
         $model.value = ''; $color.value = ''; $cap.value = '';
         $accessoryProperty.value = ''; $accessoryPropertyC.style.display = 'none';
         clearProcessor(); syncProcessorVisibility();
@@ -1551,6 +1566,7 @@ $(document).on('click', '.product-label-btn', function () {
                 if (t.models.indexOf(m) >= 0) { $model.value = m; }
                 else if (m) { $model.value = CUSTOM; $modelC.style.display = ''; $modelC.value = m; }
                 $accessoryForModel.value = p.accessory_for_model || '';
+                $accessoryText.value = p.accessory_note || '';
                 setSelectValue($accessoryProperty, p.accessory_property || '');
                 if ((p.accessory_property || '') && (CATALOG.accessoryProperties || []).indexOf(p.accessory_property) < 0) {
                     $accessoryProperty.value = CUSTOM;

@@ -573,6 +573,7 @@ function afxProductAssemble(array $in): array {
     $model = trim((string)($in['model'] ?? ''));
     $accessoryForModel = trim((string)($in['accessory_for_model'] ?? ''));
     $accessoryProperty = trim((string)($in['accessory_property'] ?? ''));
+    $accessoryNote = trim((string)($in['accessory_note'] ?? ''));
     $cap = $t['cap'] ? trim((string)($in['cap'] ?? '')) : '';
     $color = trim((string)($in['color'] ?? ''));
     // RAM/jádra bere KAŽDÝ typ (mají je i telefony/tablety/konzole — přání 31.7.);
@@ -593,6 +594,8 @@ function afxProductAssemble(array $in): array {
     $generace = $t['gen'] ? trim((string)($in['generace'] ?? '')) : '';
     if (!empty($t['accessory'])) {
         $cap = $ram = $cpu = $gpu = $processorFamily = $processorModel = $processorDisplay = $bat = $rocnik = $generace = '';
+    } else {
+        $accessoryForModel = $accessoryProperty = $accessoryNote = '';
     }
     $sold = !empty($in['sold']);
     $priceStr = trim((string)($in['price'] ?? ''));
@@ -645,6 +648,7 @@ function afxProductAssemble(array $in): array {
     if ($cap !== '') $sd[] = 'Úložiště: ' . $cap;
     if ($accessoryForModel !== '') $sd[] = 'Pro model: ' . $accessoryForModel;
     if ($accessoryProperty !== '') $sd[] = 'Vlastnost: ' . $accessoryProperty;
+    if ($accessoryNote !== '') $sd[] = 'Vlastní text: ' . $accessoryNote;
     if ($color !== '') $sd[] = 'Barva: ' . $color;
     if ($rocnik !== '') $sd[] = 'Ročník: ' . $rocnik;
     if ($generace !== '') $sd[] = 'Generace: ' . $generace;
@@ -676,6 +680,7 @@ function afxProductAssemble(array $in): array {
         '[PARAMETER "Kapacita"]' => $cap,
         '[PARAMETER "Pro model"]' => $accessoryForModel,
         '[PARAMETER "Vlastnost"]' => $accessoryProperty,
+        '[PARAMETER "Vlastní text"]' => $accessoryNote,
         '[PARAMETER "Barva"]' => $color,
         '[PARAMETER "Stav"]' => $gradeToken,
         '[PARAMETER "Baterie"]' => $bat !== '' ? $bat . ' %' : '',
@@ -713,7 +718,7 @@ function afxProductAssemble(array $in): array {
 function afxProductCsvHeader(): array {
     return ['[PRODUCT_CODE]', '[ACTIVE_YN]', '[TITLE]', '[MANUFACTURER]', '[CATEGORIES]', '[AVAILABILITY]',
         '[STOCK]', '[PRICE_ORIGINAL "Výchozí"]', '[IS_PRICES_WITH_VAT_YN]', '[VAT]', '[SHORT_DESCRIPTION]',
-        '[PARAMETER "Výrobce"]', '[PARAMETER "Typ zařízení"]', '[PARAMETER "Model"]', '[PARAMETER "Kapacita"]', '[PARAMETER "Pro model"]', '[PARAMETER "Vlastnost"]', '[PARAMETER "Barva"]', '[PARAMETER "Stav"]',
+        '[PARAMETER "Výrobce"]', '[PARAMETER "Typ zařízení"]', '[PARAMETER "Model"]', '[PARAMETER "Kapacita"]', '[PARAMETER "Pro model"]', '[PARAMETER "Vlastnost"]', '[PARAMETER "Vlastní text"]', '[PARAMETER "Barva"]', '[PARAMETER "Stav"]',
         '[PARAMETER "Baterie"]', '[STOCK_STOCK "karlin"]', '[STOCK_STOCK "vaclavak"]', '[PARAMETER "RAM"]',
         '[PARAMETER "Výrobce procesoru"]', '[PARAMETER "Procesor"]',
         'PRIDANO', 'CPU_JADRA', 'GPU_JADRA', '[PARAMETER "Ročník"]', '[PARAMETER "Generace"]',

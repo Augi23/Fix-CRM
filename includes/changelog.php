@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.10',
+        'date' => '2026-08-03',
+        'time' => '18:54',
+        'title' => 'Sklad: příslušenství bez IMEI kontroly',
+        'items' => [
+            'V režimu <b>Naskladnit příslušenství</b> se už nezobrazuje pole SN/IMEI ani PČR kontrola. Příslušenství tak nezamyká počet kusů na jeden kus a zbytečně nespouští kontrolu IMEI.',
+            'Místo toho je v identifikační části formuláře volitelné pole <b>Vlastní text</b> pro poznámku k doplňku.',
+            'Server v režimu příslušenství ignoruje případně poslané sériové číslo i při ručním requestu; vlastní text se ukládá do raw parametrů, CSV exportu a e-shop feedu.',
+        ],
+    ],
+    [
         'version' => '3.42.9',
         'date' => '2026-08-03',
         'time' => '18:41',

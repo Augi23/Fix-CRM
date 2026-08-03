@@ -128,6 +128,7 @@ try {
         $productType = trim((string)($raw['[PARAMETER "Typ zařízení"]'] ?? $raw['PRODUKT_TYP'] ?? ''));
         $accessoryForModel = trim((string)($raw['[PARAMETER "Pro model"]'] ?? ''));
         $accessoryProperty = trim((string)($raw['[PARAMETER "Vlastnost"]'] ?? ''));
+        $accessoryNote = trim((string)($raw['[PARAMETER "Vlastní text"]'] ?? ''));
         $processorFamily = trim((string)($raw['[PARAMETER "Výrobce procesoru"]'] ?? $raw['PROCESOR_TYP'] ?? ''));
         $processor = trim((string)($raw['[PARAMETER "Procesor"]'] ?? ''));
 
@@ -140,6 +141,7 @@ try {
             'model'                => $p['model'] !== null ? (string)$p['model'] : null,
             'accessory_for_model'  => $accessoryForModel !== '' ? $accessoryForModel : null,
             'accessory_property'   => $accessoryProperty !== '' ? $accessoryProperty : null,
+            'accessory_note'       => $accessoryNote !== '' ? $accessoryNote : null,
             'capacity'             => $p['capacity'] !== null ? (string)$p['capacity'] : null,
             'color'                => $p['color'] !== null ? (string)$p['color'] : null,
             'grade'                => $p['grade'] !== null ? (string)$p['grade'] : null,
