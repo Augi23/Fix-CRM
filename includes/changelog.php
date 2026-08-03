@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.5',
+        'date' => '2026-08-03',
+        'time' => '17:09',
+        'title' => 'Naskladnění: předvyplněné modely podle výrobce',
+        'items' => [
+            'Modely ve formuláři <b>Naskladnit produkt</b> jsou nově předvyplněné i pro další výrobce, nejen pro Apple. Po výběru výrobce a typu zařízení se nabídne odpovídající seznam známých modelů.',
+            'Doplněné jsou hlavní modelové řady pro Samsung, Xiaomi, Asus, Doogee, Honor, Huawei, Motorola, Nokia, Lenovo, Dell, HP, Acer, MSI, Sony, Nintendo a Microsoft podle typu zařízení (telefon, tablet, notebook, počítač, hodinky, konzole nebo sluchátka).',
+            'Volba <b>✏️ Vlastní…</b> zůstává dole u každého modelového výběru pro kusy, které v předvyplněném seznamu nejsou.',
+        ],
+    ],
+    [
         'version' => '3.42.4',
         'date' => '2026-08-03',
         'time' => '17:01',

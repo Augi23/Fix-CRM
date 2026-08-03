@@ -176,6 +176,126 @@ const AFX_AIRPODS = [
 const AFX_APPLE_TV = ['Apple TV HD', 'Apple TV 4K (1. generace)', 'Apple TV 4K (2. generace)', 'Apple TV 4K (3. generace)'];
 const AFX_HOMEPODS = ['HomePod (1. generace)', 'HomePod mini', 'HomePod (2. generace)'];
 
+const AFX_BRAND_MODELS = [
+    'Samsung' => [
+        'Telefon' => [
+            'Galaxy S II', 'Galaxy S III', 'Galaxy S4', 'Galaxy S5', 'Galaxy S6', 'Galaxy S6 edge',
+            'Galaxy S7', 'Galaxy S7 edge', 'Galaxy S8', 'Galaxy S8+', 'Galaxy S9', 'Galaxy S9+',
+            'Galaxy S10e', 'Galaxy S10', 'Galaxy S10+', 'Galaxy S10 5G', 'Galaxy S20', 'Galaxy S20+',
+            'Galaxy S20 Ultra', 'Galaxy S20 FE', 'Galaxy S21', 'Galaxy S21+', 'Galaxy S21 Ultra',
+            'Galaxy S21 FE', 'Galaxy S22', 'Galaxy S22+', 'Galaxy S22 Ultra', 'Galaxy S23',
+            'Galaxy S23+', 'Galaxy S23 Ultra', 'Galaxy S23 FE', 'Galaxy S24', 'Galaxy S24+',
+            'Galaxy S24 Ultra', 'Galaxy S24 FE', 'Galaxy S25', 'Galaxy S25+', 'Galaxy S25 Ultra',
+            'Galaxy Note 8', 'Galaxy Note 9', 'Galaxy Note 10', 'Galaxy Note 10+', 'Galaxy Note 20',
+            'Galaxy Note 20 Ultra', 'Galaxy Z Fold', 'Galaxy Z Fold2', 'Galaxy Z Fold3',
+            'Galaxy Z Fold4', 'Galaxy Z Fold5', 'Galaxy Z Fold6', 'Galaxy Z Flip', 'Galaxy Z Flip3',
+            'Galaxy Z Flip4', 'Galaxy Z Flip5', 'Galaxy Z Flip6', 'Galaxy A3', 'Galaxy A5',
+            'Galaxy A7', 'Galaxy A8', 'Galaxy A10', 'Galaxy A12', 'Galaxy A13', 'Galaxy A14',
+            'Galaxy A15', 'Galaxy A16', 'Galaxy A20e', 'Galaxy A21s', 'Galaxy A22', 'Galaxy A23',
+            'Galaxy A25', 'Galaxy A30s', 'Galaxy A31', 'Galaxy A32', 'Galaxy A33', 'Galaxy A34',
+            'Galaxy A35', 'Galaxy A40', 'Galaxy A41', 'Galaxy A42', 'Galaxy A50', 'Galaxy A51',
+            'Galaxy A52', 'Galaxy A52s', 'Galaxy A53', 'Galaxy A54', 'Galaxy A55', 'Galaxy A56',
+            'Galaxy A70', 'Galaxy A71', 'Galaxy A72', 'Galaxy A73', 'Galaxy M21', 'Galaxy M31',
+            'Galaxy M51', 'Galaxy M52', 'Galaxy M53', 'Galaxy M54',
+        ],
+        'Tablet' => [
+            'Galaxy Tab 2', 'Galaxy Tab 3', 'Galaxy Tab 4', 'Galaxy Tab A 8.0', 'Galaxy Tab A 10.1',
+            'Galaxy Tab A7', 'Galaxy Tab A7 Lite', 'Galaxy Tab A8', 'Galaxy Tab A9', 'Galaxy Tab A9+',
+            'Galaxy Tab Active 2', 'Galaxy Tab Active 3', 'Galaxy Tab Active4 Pro', 'Galaxy Tab Active5',
+            'Galaxy Tab S', 'Galaxy Tab S2', 'Galaxy Tab S3', 'Galaxy Tab S4', 'Galaxy Tab S5e',
+            'Galaxy Tab S6', 'Galaxy Tab S6 Lite', 'Galaxy Tab S7', 'Galaxy Tab S7+', 'Galaxy Tab S7 FE',
+            'Galaxy Tab S8', 'Galaxy Tab S8+', 'Galaxy Tab S8 Ultra', 'Galaxy Tab S9', 'Galaxy Tab S9+',
+            'Galaxy Tab S9 Ultra', 'Galaxy Tab S9 FE', 'Galaxy Tab S9 FE+', 'Galaxy Tab S10+',
+            'Galaxy Tab S10 Ultra',
+        ],
+        'Notebook' => ['Galaxy Book', 'Galaxy Book Pro', 'Galaxy Book Pro 360', 'Galaxy Book2', 'Galaxy Book2 Pro', 'Galaxy Book2 Pro 360', 'Galaxy Book3', 'Galaxy Book3 Pro', 'Galaxy Book3 Pro 360', 'Galaxy Book3 Ultra', 'Galaxy Book4', 'Galaxy Book4 Pro', 'Galaxy Book4 Pro 360', 'Galaxy Book4 Ultra', 'Galaxy Book5 Pro', 'Galaxy Chromebook'],
+        'Hodinky' => ['Galaxy Gear', 'Gear S2', 'Gear S3', 'Galaxy Watch', 'Galaxy Watch Active', 'Galaxy Watch Active2', 'Galaxy Watch3', 'Galaxy Watch4', 'Galaxy Watch4 Classic', 'Galaxy Watch5', 'Galaxy Watch5 Pro', 'Galaxy Watch6', 'Galaxy Watch6 Classic', 'Galaxy Watch7', 'Galaxy Watch Ultra', 'Galaxy Fit', 'Galaxy Fit2', 'Galaxy Fit3'],
+        'Sluchátka' => ['Galaxy Buds', 'Galaxy Buds+', 'Galaxy Buds Live', 'Galaxy Buds Pro', 'Galaxy Buds2', 'Galaxy Buds2 Pro', 'Galaxy Buds FE', 'Galaxy Buds3', 'Galaxy Buds3 Pro'],
+    ],
+    'Xiaomi' => [
+        'Telefon' => [
+            'Mi 8', 'Mi 8 Lite', 'Mi 9', 'Mi 9T', 'Mi 9T Pro', 'Mi 10', 'Mi 10T', 'Mi 10T Pro',
+            'Mi 11', 'Mi 11 Lite', 'Mi 11 Ultra', 'Xiaomi 11T', 'Xiaomi 11T Pro', 'Xiaomi 12',
+            'Xiaomi 12 Pro', 'Xiaomi 12T', 'Xiaomi 12T Pro', 'Xiaomi 13', 'Xiaomi 13 Pro',
+            'Xiaomi 13T', 'Xiaomi 13T Pro', 'Xiaomi 14', 'Xiaomi 14 Ultra', 'Xiaomi 14T',
+            'Xiaomi 14T Pro', 'Xiaomi 15', 'Xiaomi 15 Ultra', 'Mi Mix 2', 'Mi Mix 3', 'Mi Mix Fold',
+            'Xiaomi Mix Fold 2', 'Xiaomi Mix Fold 3', 'Poco F1', 'Poco F2 Pro', 'Poco F3',
+            'Poco F4', 'Poco F5', 'Poco F5 Pro', 'Poco F6', 'Poco F6 Pro', 'Poco X3',
+            'Poco X3 Pro', 'Poco X4 Pro', 'Poco X5', 'Poco X5 Pro', 'Poco X6', 'Poco X6 Pro',
+            'Redmi Note 7', 'Redmi Note 8', 'Redmi Note 8 Pro', 'Redmi Note 9', 'Redmi Note 9 Pro',
+            'Redmi Note 10', 'Redmi Note 10 Pro', 'Redmi Note 11', 'Redmi Note 11 Pro',
+            'Redmi Note 12', 'Redmi Note 12 Pro', 'Redmi Note 13', 'Redmi Note 13 Pro',
+            'Redmi Note 14', 'Redmi Note 14 Pro', 'Redmi 9', 'Redmi 10', 'Redmi 12',
+            'Redmi 13', 'Redmi 14C',
+        ],
+        'Tablet' => ['Mi Pad 4', 'Mi Pad 4 Plus', 'Xiaomi Pad 5', 'Xiaomi Pad 5 Pro', 'Xiaomi Pad 6', 'Xiaomi Pad 6 Pro', 'Xiaomi Pad 6S Pro', 'Xiaomi Pad 7', 'Xiaomi Pad 7 Pro', 'Redmi Pad', 'Redmi Pad SE', 'Redmi Pad Pro'],
+        'Hodinky' => ['Mi Watch', 'Mi Watch Lite', 'Xiaomi Watch S1', 'Xiaomi Watch S1 Active', 'Xiaomi Watch S3', 'Xiaomi Watch 2', 'Xiaomi Watch 2 Pro', 'Xiaomi Smart Band 6', 'Xiaomi Smart Band 7', 'Xiaomi Smart Band 8', 'Xiaomi Smart Band 9', 'Redmi Watch 2 Lite', 'Redmi Watch 3', 'Redmi Watch 4', 'Redmi Watch 5'],
+    ],
+    'Asus' => [
+        'Telefon' => ['Zenfone 4', 'Zenfone 5', 'Zenfone 5Z', 'Zenfone 6', 'Zenfone 7', 'Zenfone 7 Pro', 'Zenfone 8', 'Zenfone 8 Flip', 'Zenfone 9', 'Zenfone 10', 'Zenfone 11 Ultra', 'ROG Phone', 'ROG Phone II', 'ROG Phone 3', 'ROG Phone 5', 'ROG Phone 6', 'ROG Phone 7', 'ROG Phone 8', 'ROG Phone 9'],
+        'Tablet' => ['Transformer Pad TF300', 'Transformer Book T100', 'ZenPad 8', 'ZenPad 10', 'VivoTab', 'ROG Flow Z13'],
+        'Notebook' => ['ZenBook', 'ZenBook UX305', 'ZenBook 13', 'ZenBook 14', 'ZenBook 15', 'ZenBook Duo', 'VivoBook', 'VivoBook S14', 'VivoBook S15', 'ROG Zephyrus G14', 'ROG Zephyrus G15', 'ROG Zephyrus G16', 'ROG Strix G15', 'ROG Strix G16', 'ROG Strix Scar 16', 'TUF Gaming A15', 'TUF Gaming F15', 'ProArt StudioBook', 'ExpertBook B9'],
+        'Počítač' => ['ROG Strix G10', 'ROG Strix G15DK', 'ROG Strix G16CHR', 'ROG G20', 'ROG G22CH', 'ProArt Station', 'ExpertCenter', 'ASUS Mini PC PN50', 'ASUS Mini PC PN64'],
+    ],
+    'Doogee' => [
+        'Telefon' => ['Doogee S40', 'Doogee S41', 'Doogee S55', 'Doogee S58 Pro', 'Doogee S59 Pro', 'Doogee S68 Pro', 'Doogee S86', 'Doogee S88 Pro', 'Doogee S89 Pro', 'Doogee S95 Pro', 'Doogee S96 Pro', 'Doogee S98', 'Doogee S98 Pro', 'Doogee S99', 'Doogee S100', 'Doogee S110', 'Doogee S118', 'Doogee V10', 'Doogee V20', 'Doogee V30', 'Doogee V30T', 'Doogee V31GT', 'Doogee V Max', 'Doogee N30', 'Doogee N40 Pro', 'Doogee N50', 'Doogee N55'],
+    ],
+    'Honor' => [
+        'Telefon' => ['Honor 8', 'Honor 9', 'Honor 10', 'Honor 20', 'Honor 20 Pro', 'Honor 30', 'Honor 50', 'Honor 70', 'Honor 90', 'Honor 200', 'Honor 200 Pro', 'Honor Magic4 Pro', 'Honor Magic5 Pro', 'Honor Magic6 Pro', 'Honor Magic V2', 'Honor Magic V3', 'Honor X6', 'Honor X7', 'Honor X8', 'Honor X9', 'Honor X50', 'Honor X60', 'Honor Play', 'Honor View 10', 'Honor View 20'],
+        'Tablet' => ['Honor Pad 5', 'Honor Pad 6', 'Honor Pad 7', 'Honor Pad 8', 'Honor Pad 9', 'Honor Pad X8', 'Honor Pad X9', 'Honor MagicPad 2'],
+        'Notebook' => ['MagicBook 14', 'MagicBook 15', 'MagicBook 16', 'MagicBook Pro', 'MagicBook X14', 'MagicBook X15', 'MagicBook Art 14'],
+    ],
+    'Huawei' => [
+        'Telefon' => ['Huawei P8', 'Huawei P9', 'Huawei P10', 'Huawei P20', 'Huawei P20 Pro', 'Huawei P30', 'Huawei P30 Pro', 'Huawei P40', 'Huawei P40 Pro', 'Huawei P50 Pro', 'Huawei P60 Pro', 'Huawei Pura 70', 'Huawei Pura 70 Pro', 'Huawei Mate 8', 'Huawei Mate 9', 'Huawei Mate 10 Pro', 'Huawei Mate 20', 'Huawei Mate 20 Pro', 'Huawei Mate 30 Pro', 'Huawei Mate 40 Pro', 'Huawei Mate 50 Pro', 'Huawei Mate 60 Pro', 'Huawei Nova 5T', 'Huawei Nova 9', 'Huawei Nova 10', 'Huawei Nova 11', 'Huawei Nova 12', 'Huawei Y6', 'Huawei Y7', 'Huawei Y9'],
+        'Tablet' => ['MediaPad M3', 'MediaPad M5', 'MediaPad T3', 'MediaPad T5', 'MatePad 10.4', 'MatePad 11', 'MatePad 11.5', 'MatePad Pro 10.8', 'MatePad Pro 11', 'MatePad Pro 12.6', 'MatePad Pro 13.2'],
+        'Notebook' => ['MateBook D 14', 'MateBook D 15', 'MateBook 13', 'MateBook 14', 'MateBook X', 'MateBook X Pro', 'MateBook 16', 'MateBook 16s', 'MateBook E'],
+        'Hodinky' => ['Huawei Watch', 'Huawei Watch 2', 'Huawei Watch GT', 'Huawei Watch GT 2', 'Huawei Watch GT 2 Pro', 'Huawei Watch GT 3', 'Huawei Watch GT 4', 'Huawei Watch GT 5', 'Huawei Watch 3', 'Huawei Watch 4', 'Huawei Watch Fit', 'Huawei Watch Fit 2', 'Huawei Watch Fit 3'],
+    ],
+    'Motorola' => [
+        'Telefon' => ['Moto G', 'Moto G2', 'Moto G3', 'Moto G4', 'Moto G5', 'Moto G6', 'Moto G7', 'Moto G8', 'Moto G9', 'Moto G10', 'Moto G20', 'Moto G30', 'Moto G50', 'Moto G60', 'Moto G72', 'Moto G73', 'Moto G84', 'Moto G85', 'Moto E', 'Moto E4', 'Moto E5', 'Moto E6', 'Moto E7', 'Moto E13', 'Moto E22', 'Moto X', 'Moto X Style', 'Moto X4', 'Moto Z', 'Moto Z2 Play', 'Moto Z3 Play', 'Motorola Edge', 'Motorola Edge 20', 'Motorola Edge 30', 'Motorola Edge 40', 'Motorola Edge 50', 'Razr 2019', 'Razr 5G', 'Razr 40', 'Razr 40 Ultra', 'Razr 50', 'Razr 50 Ultra'],
+        'Tablet' => ['Moto Tab G20', 'Moto Tab G62', 'Moto Tab G70', 'Moto Tab G84', 'Moto Tab G85'],
+    ],
+    'Nokia' => [
+        'Telefon' => ['Nokia Lumia 520', 'Nokia Lumia 630', 'Nokia Lumia 735', 'Nokia Lumia 830', 'Nokia Lumia 930', 'Nokia 1', 'Nokia 2', 'Nokia 3', 'Nokia 5', 'Nokia 6', 'Nokia 7 Plus', 'Nokia 8', 'Nokia 8 Sirocco', 'Nokia 9 PureView', 'Nokia C20', 'Nokia C21', 'Nokia C30', 'Nokia C32', 'Nokia G10', 'Nokia G11', 'Nokia G20', 'Nokia G21', 'Nokia G22', 'Nokia G42', 'Nokia X10', 'Nokia X20', 'Nokia X30', 'Nokia XR20', 'Nokia XR21'],
+        'Tablet' => ['Nokia N1', 'Nokia T10', 'Nokia T20', 'Nokia T21'],
+    ],
+    'Lenovo' => [
+        'Telefon' => ['Lenovo K5', 'Lenovo K6', 'Lenovo K8 Note', 'Lenovo K10 Note', 'Lenovo P2', 'Lenovo Z5', 'Lenovo Z6 Pro', 'Lenovo Legion Phone Duel', 'Lenovo Legion Phone Duel 2'],
+        'Tablet' => ['Lenovo Tab M7', 'Lenovo Tab M8', 'Lenovo Tab M9', 'Lenovo Tab M10', 'Lenovo Tab M11', 'Lenovo Tab P10', 'Lenovo Tab P11', 'Lenovo Tab P11 Pro', 'Lenovo Tab P12', 'Lenovo Tab P12 Pro', 'Lenovo Yoga Tab 3', 'Lenovo Yoga Tab 11', 'Lenovo Yoga Tab 13', 'Lenovo Legion Tab', 'Lenovo IdeaTab'],
+        'Notebook' => ['ThinkPad T14', 'ThinkPad T14s', 'ThinkPad T15', 'ThinkPad T16', 'ThinkPad X1 Carbon', 'ThinkPad X1 Yoga', 'ThinkPad X1 Nano', 'ThinkPad X13', 'ThinkPad X280', 'ThinkPad P1', 'ThinkPad P14s', 'ThinkPad P16', 'ThinkPad E14', 'ThinkPad E15', 'IdeaPad 3', 'IdeaPad 5', 'IdeaPad Flex 5', 'Yoga Slim 7', 'Yoga 7', 'Yoga 9', 'Legion 5', 'Legion 5 Pro', 'Legion 7', 'Legion Pro 5', 'Legion Pro 7', 'LOQ 15', 'ThinkBook 14', 'ThinkBook 15', 'ThinkBook 16'],
+        'Počítač' => ['ThinkCentre M720', 'ThinkCentre M920', 'ThinkCentre M70q', 'ThinkCentre M80q', 'ThinkCentre M90q', 'IdeaCentre 3', 'IdeaCentre 5', 'IdeaCentre AIO 3', 'IdeaCentre AIO 5', 'Legion T5', 'Legion T7', 'ThinkStation P330', 'ThinkStation P360', 'ThinkStation P520', 'ThinkStation P620'],
+    ],
+    'Dell' => [
+        'Notebook' => ['XPS 13', 'XPS 13 Plus', 'XPS 14', 'XPS 15', 'XPS 16', 'XPS 17', 'Inspiron 13', 'Inspiron 14', 'Inspiron 15', 'Inspiron 16', 'Latitude 5280', 'Latitude 5400', 'Latitude 5420', 'Latitude 5430', 'Latitude 5440', 'Latitude 5450', 'Latitude 7400', 'Latitude 7420', 'Latitude 7430', 'Latitude 7440', 'Latitude 7450', 'Precision 3560', 'Precision 3570', 'Precision 3580', 'Precision 5480', 'Precision 5680', 'Vostro 14', 'Vostro 15', 'G3 15', 'G5 15', 'G15', 'Alienware m15', 'Alienware m16', 'Alienware m17', 'Alienware x14', 'Alienware x16'],
+        'Počítač' => ['OptiPlex 3020', 'OptiPlex 3040', 'OptiPlex 3050', 'OptiPlex 3060', 'OptiPlex 3070', 'OptiPlex 3080', 'OptiPlex 3090', 'OptiPlex 5000', 'OptiPlex 7000', 'Precision T1700', 'Precision 3430', 'Precision 3630', 'Precision 5820', 'Precision 7820', 'XPS Desktop', 'Inspiron Desktop', 'Vostro Desktop', 'Alienware Aurora R10', 'Alienware Aurora R12', 'Alienware Aurora R13', 'Alienware Aurora R15', 'Alienware Aurora R16'],
+    ],
+    'HP' => [
+        'Notebook' => ['Pavilion 14', 'Pavilion 15', 'Pavilion x360', 'Envy 13', 'Envy 14', 'Envy 15', 'Envy x360 13', 'Envy x360 15', 'Spectre x360 13', 'Spectre x360 14', 'Spectre x360 15', 'ProBook 430', 'ProBook 440', 'ProBook 450', 'EliteBook 840', 'EliteBook 845', 'EliteBook 850', 'EliteBook 1040', 'ZBook Firefly', 'ZBook Studio', 'ZBook Fury', 'OMEN 15', 'OMEN 16', 'OMEN 17', 'Victus 15', 'Victus 16', 'HP 250 G8', 'HP 250 G9', 'HP 255 G9'],
+        'Počítač' => ['Pavilion Desktop', 'Envy Desktop', 'OMEN 25L', 'OMEN 30L', 'OMEN 40L', 'OMEN 45L', 'Victus 15L', 'EliteDesk 800', 'ProDesk 400', 'ProDesk 600', 'Z2 Workstation', 'Z4 Workstation', 'Z6 Workstation', 'Z8 Workstation', 'HP All-in-One 22', 'HP All-in-One 24', 'HP All-in-One 27'],
+    ],
+    'Acer' => [
+        'Notebook' => ['Aspire 3', 'Aspire 5', 'Aspire 7', 'Swift 1', 'Swift 3', 'Swift 5', 'Swift Go 14', 'Swift Go 16', 'Spin 3', 'Spin 5', 'TravelMate P2', 'TravelMate P4', 'TravelMate P6', 'Predator Helios 300', 'Predator Helios Neo 16', 'Predator Triton 500', 'Nitro 5', 'Nitro 16', 'Nitro 17', 'Chromebook 311', 'Chromebook 314', 'Chromebook Spin'],
+        'Počítač' => ['Aspire TC', 'Aspire XC', 'Veriton X', 'Veriton M', 'Predator Orion 3000', 'Predator Orion 5000', 'Nitro 50', 'ConceptD 300', 'ConceptD 500'],
+    ],
+    'MSI' => [
+        'Notebook' => ['Modern 14', 'Modern 15', 'Prestige 13', 'Prestige 14', 'Prestige 15', 'Summit E13 Flip', 'Summit E14 Flip', 'Katana 15', 'Katana 17', 'Cyborg 15', 'GF63 Thin', 'GF65 Thin', 'Pulse 15', 'Stealth 14', 'Stealth 15', 'Stealth 16', 'Raider GE66', 'Raider GE67', 'Raider GE78', 'Vector GP66', 'Vector GP68', 'Creator Z16', 'Titan GT77', 'Titan 18 HX'],
+        'Počítač' => ['MAG Infinite', 'MAG Codex', 'MEG Trident X', 'Trident 3', 'Aegis RS', 'Creator P50', 'Cubi 5', 'Cubi N', 'Pro DP21', 'Pro DP130'],
+    ],
+    'Sony' => [
+        'Telefon' => ['Xperia Z', 'Xperia Z1', 'Xperia Z2', 'Xperia Z3', 'Xperia Z5', 'Xperia X', 'Xperia X Compact', 'Xperia X Performance', 'Xperia XZ', 'Xperia XZ1', 'Xperia XZ2', 'Xperia XZ3', 'Xperia 1', 'Xperia 1 II', 'Xperia 1 III', 'Xperia 1 IV', 'Xperia 1 V', 'Xperia 1 VI', 'Xperia 5', 'Xperia 5 II', 'Xperia 5 III', 'Xperia 5 IV', 'Xperia 5 V', 'Xperia 10', 'Xperia 10 II', 'Xperia 10 III', 'Xperia 10 IV', 'Xperia 10 V', 'Xperia 10 VI', 'Xperia Pro', 'Xperia Pro-I', 'Xperia Ace'],
+        'Herní konzole' => ['PlayStation 3 Slim', 'PlayStation 3 Super Slim', 'PlayStation 4', 'PlayStation 4 Slim', 'PlayStation 4 Pro', 'PlayStation 5', 'PlayStation 5 Digital Edition', 'PlayStation 5 Slim', 'PlayStation 5 Pro', 'PSP', 'PSP Go', 'PlayStation Vita', 'PlayStation Portal'],
+        'Sluchátka' => ['WH-1000XM3', 'WH-1000XM4', 'WH-1000XM5', 'WF-1000XM3', 'WF-1000XM4', 'WF-1000XM5', 'WF-C500', 'WF-C700N', 'WH-CH720N', 'WH-XB910N', 'LinkBuds', 'LinkBuds S', 'Pulse 3D', 'Pulse Elite', 'Pulse Explore'],
+    ],
+    'Nintendo' => [
+        'Herní konzole' => ['Nintendo DS Lite', 'Nintendo DSi', 'Nintendo 3DS', 'Nintendo 3DS XL', 'Nintendo 2DS', 'New Nintendo 3DS', 'New Nintendo 3DS XL', 'Nintendo Wii', 'Nintendo Wii U', 'Nintendo Switch', 'Nintendo Switch Lite', 'Nintendo Switch OLED', 'Nintendo Switch 2'],
+    ],
+    'Microsoft' => [
+        'Herní konzole' => ['Xbox 360 S', 'Xbox 360 E', 'Xbox One', 'Xbox One S', 'Xbox One X', 'Xbox Series S', 'Xbox Series X'],
+        'Tablet' => ['Surface RT', 'Surface 2', 'Surface 3', 'Surface Pro 3', 'Surface Pro 4', 'Surface Pro 5', 'Surface Pro 6', 'Surface Pro 7', 'Surface Pro 7+', 'Surface Pro 8', 'Surface Pro 9', 'Surface Pro 10', 'Surface Pro 11', 'Surface Go', 'Surface Go 2', 'Surface Go 3', 'Surface Go 4'],
+        'Notebook' => ['Surface Laptop', 'Surface Laptop 2', 'Surface Laptop 3', 'Surface Laptop 4', 'Surface Laptop 5', 'Surface Laptop 6', 'Surface Laptop 7', 'Surface Laptop Go', 'Surface Laptop Go 2', 'Surface Laptop Go 3', 'Surface Laptop Studio', 'Surface Laptop Studio 2', 'Surface Book', 'Surface Book 2', 'Surface Book 3'],
+    ],
+];
+
 function afxProductManufacturers(): array {
     return ['Apple', 'Samsung', 'Xiaomi', 'Asus', 'Doogee', 'Honor', 'Huawei', 'Motorola', 'Nokia',
         'Lenovo', 'Dell', 'HP', 'Acer', 'MSI', 'Sony', 'Nintendo', 'Microsoft'];
@@ -187,7 +307,7 @@ function afxBrandProductTypes(string $manufacturer, string $k, array $typeIds, a
         $out[] = ['id' => $id, 'manuf' => $manufacturer, 'k' => $k, 'cap' => true,
             'ram' => false, 'gen' => false,
             'colors' => in_array($id, ['Notebook', 'Počítač'], true) ? AFX_COMPUTER_COLORS : $colors,
-            'models' => []];
+            'models' => AFX_BRAND_MODELS[$manufacturer][$id] ?? []];
     }
     return $out;
 }
