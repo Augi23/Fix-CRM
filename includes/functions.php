@@ -3901,7 +3901,7 @@ function crmEnqueueTechAssignmentPopup(int $techId, int $orderId): void
     } catch (Throwable $e) { /* best-effort — nesmí shodit změnu zakázky */ }
 }
 
-/** Naskenovaný kód → kandidáti (řeší CZ QWERTZ: číslice↔háčky a Y↔Z, i nekonzistentní přepis).
+/** Naskenovaný kód → kandidáti (řeší CZ QWERTZ: číslice↔háčky, "-"→"=" a Y↔Z, i nekonzistentní přepis).
  *  Vrací unikátní varianty VELKÝMI písmeny, jen znaky [0-9A-Z-]. */
 function scanNormalizeCandidates(string $raw): array
 {
@@ -3909,12 +3909,16 @@ function scanNormalizeCandidates(string $raw): array
     if ($raw === '') return [];
     $mapDigits = ['+'=>'1','ě'=>'2','š'=>'3','č'=>'4','ř'=>'5','ž'=>'6','ý'=>'7','á'=>'8','í'=>'9','é'=>'0',
                   'Ě'=>'2','Š'=>'3','Č'=>'4','Ř'=>'5','Ž'=>'6','Ý'=>'7','Á'=>'8','Í'=>'9','É'=>'0'];
+    $mapSymbols = ['='=>'-'];
     $mapYZ     = ['y'=>'z','z'=>'y','Y'=>'Z','Z'=>'Y'];
     $variants = [
         $raw,                                 // jak přišlo
+        strtr($raw, $mapSymbols),             // česká klávesnice: US "-" přijde jako "="
         strtr($raw, $mapDigits),              // háčky→číslice
+        strtr($raw, $mapDigits + $mapSymbols),
         strtr($raw, $mapYZ),                  // jen Y↔Z
-        strtr($raw, $mapDigits + $mapYZ),     // obojí (plný demangle)
+        strtr($raw, $mapSymbols + $mapYZ),
+        strtr($raw, $mapDigits + $mapSymbols + $mapYZ), // plný demangle
     ];
     $out = [];
     foreach ($variants as $v) {

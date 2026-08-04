@@ -1312,7 +1312,10 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 var results = (d.success && d.results) || [];
-                var exact = results.filter(function (r) { return (r.code || '').toLowerCase() === code.toLowerCase(); });
+                var exactCodes = [code].concat(Array.isArray(d.code_candidates) ? d.code_candidates : [])
+                    .map(function (v) { return String(v || '').toLowerCase(); })
+                    .filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+                var exact = results.filter(function (r) { return exactCodes.indexOf(String(r.code || '').toLowerCase()) !== -1; });
                 var hit = exact.length === 1 ? exact[0] : (exact.length === 0 && results.length === 1 ? results[0] : null);
                 if (hit) {
                     addToCart(hit);

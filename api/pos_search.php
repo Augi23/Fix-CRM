@@ -22,6 +22,28 @@ ensureOrderPaymentMethodColumn();
 
 $qRaw = trim((string)($_GET['q'] ?? ''));
 $like = '%' . $qRaw . '%';
+$codeTerms = [];
+if ($qRaw !== '') {
+    $codeTerms[] = $qRaw;
+    if (function_exists('scanNormalizeCandidates')) {
+        $rawCodeLen = function_exists('mb_strlen') ? mb_strlen($qRaw, 'UTF-8') : strlen($qRaw);
+        $minCandidateLen = $rawCodeLen >= 6 ? max(6, $rawCodeLen - 3) : 1;
+        foreach (scanNormalizeCandidates($qRaw) as $candidate) {
+            if ($rawCodeLen >= 6 && strlen((string)$candidate) < $minCandidateLen) continue;
+            $codeTerms[] = (string)$candidate;
+        }
+    }
+    $codeTerms = array_values(array_unique(array_filter(array_map('trim', $codeTerms), static fn($v) => $v !== '')));
+}
+$codeLikeSql = static function (string $column, array $terms, array &$params): string {
+    if (!$terms) return '0=1';
+    $parts = [];
+    foreach ($terms as $term) {
+        $parts[] = $column . ' LIKE ?';
+        $params[] = '%' . $term . '%';
+    }
+    return '(' . implode(' OR ', $parts) . ')';
+};
 $results = [];
 
 try {
@@ -30,9 +52,11 @@ try {
         $st = $pdo->query("SELECT id, part_name, sku, quantity, sale_price FROM inventory
             WHERE quantity > 0 ORDER BY part_name ASC LIMIT 8");
     } else {
+        $params = [$like];
+        $skuSql = $codeLikeSql('sku', $codeTerms, $params);
         $st = $pdo->prepare("SELECT id, part_name, sku, quantity, sale_price FROM inventory
-            WHERE quantity > 0 AND (part_name LIKE ? OR sku LIKE ?) ORDER BY part_name ASC LIMIT 15");
-        $st->execute([$like, $like]);
+            WHERE quantity > 0 AND (part_name LIKE ? OR $skuSql) ORDER BY part_name ASC LIMIT 15");
+        $st->execute($params);
     }
     foreach ($st->fetchAll() as $r) {
         $results[] = [
@@ -51,9 +75,11 @@ try {
         $st = $pdo->query("SELECT id, title, product_code, stock_qty, price, grade FROM products
             WHERE stock_qty > 0 ORDER BY added_at DESC, id DESC LIMIT 8");
     } else {
+        $params = [$like, $like];
+        $productCodeSql = $codeLikeSql('product_code', $codeTerms, $params);
         $st = $pdo->prepare("SELECT id, title, product_code, stock_qty, price, grade FROM products
-            WHERE stock_qty > 0 AND (title LIKE ? OR product_code LIKE ? OR model LIKE ?) ORDER BY title ASC LIMIT 15");
-        $st->execute([$like, $like, $like]);
+            WHERE stock_qty > 0 AND (title LIKE ? OR model LIKE ? OR $productCodeSql) ORDER BY title ASC LIMIT 15");
+        $st->execute($params);
     }
     foreach ($st->fetchAll() as $r) {
         $results[] = [
@@ -72,6 +98,9 @@ try {
     // kasu seznamem všech připravených oprav.
     if ($qRaw !== '') {
         $statusSql = orderStatusSqlIn($pdo, 'completed') . "," . $pdo->quote('Vydáno - čeká na platbu');
+        $codeParams = [];
+        $orderCodeSql = $codeLikeSql('o.order_code', $codeTerms, $codeParams);
+        $legacyCodeSql = $codeLikeSql('o.legacy_code', $codeTerms, $codeParams);
         $st = $pdo->prepare("SELECT o.id, o.order_code, o.legacy_code, o.device_brand, o.device_model,
                    o.final_cost, o.estimated_cost, c.first_name, c.last_name, c.company
             FROM orders o
@@ -80,11 +109,11 @@ try {
               AND (o.payment_method IS NULL OR o.payment_method = '')
               AND COALESCE(NULLIF(o.final_cost, 0), NULLIF(o.estimated_cost, 0), 0) > 0
               AND NOT EXISTS (SELECT 1 FROM pos_sales ps WHERE ps.order_id = o.id AND ps.status = 'completed')
-              AND (o.order_code LIKE ? OR o.legacy_code LIKE ? OR o.device_brand LIKE ? OR o.device_model LIKE ?
+              AND ($orderCodeSql OR $legacyCodeSql OR o.device_brand LIKE ? OR o.device_model LIKE ?
                    OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)"
               . orderBranchScopeSql('o.branch_id', 'o.technician_id') . "
             ORDER BY o.updated_at DESC, o.id DESC LIMIT 10");
-        $st->execute([$like, $like, $like, $like, $like, $like, $like]);
+        $st->execute(array_merge($codeParams, [$like, $like, $like, $like, $like]));
         foreach ($st->fetchAll() as $r) {
             $cust = trim((string)($r['company'] ?? '')) ?: trim((string)($r['first_name'] ?? '') . ' ' . (string)($r['last_name'] ?? ''));
             $results[] = [
@@ -102,4 +131,4 @@ try {
     error_log('pos_search: ' . $e->getMessage());
 }
 
-echo json_encode(['success' => true, 'results' => $results]);
+echo json_encode(['success' => true, 'results' => $results, 'code_candidates' => $codeTerms]);

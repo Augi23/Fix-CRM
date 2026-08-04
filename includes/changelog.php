@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.13',
+        'date' => '2026-08-04',
+        'time' => '06:18',
+        'title' => 'Pokladna: čtečka kódů funguje i s českou klávesnicí',
+        'items' => [
+            'Vyhledávání položek v <b>Pokladně</b> teď při skenu čárového kódu používá stejnou normalizaci jako horní CRM vyhledávání. Když USB čtečka na českém rozložení pošle číslice jako <code>ěščř...</code>, Pokladna je převede zpět na čísla.',
+            'Opravený je i znak pomlčky: na české klávesnici může čtečka poslat místo <code>-</code> znak <code>=</code>, takže kód typu <code>AFX-202608...</code> se teď správně dohledá jako produktový kód.',
+            'Změna platí pro produktové kódy, SKU servisních dílů i čísla hotových zakázek v Pokladně; běžné ruční hledání podle názvu zůstává stejné.',
+        ],
+    ],
+    [
         'version' => '3.42.12',
         'date' => '2026-08-04',
         'time' => '05:09',
