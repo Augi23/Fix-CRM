@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.16',
+        'date' => '2026-08-04',
+        'time' => '18:32',
+        'title' => 'Admin účet může mít navázaný technický profil',
+        'items' => [
+            'Administrátorský login může mít nově zároveň přiřazený technický profil. Admin tím nepřichází o plná práva, ale dostane vlastní <code>tech_id</code> pro převzetí zakázek/reklamací a měření servisní práce.',
+            'Výchozí účet <code>admin</code> je přejmenovaný na <b>Jan Augustin</b>; samotný login zůstává <code>admin</code>.',
+            'Jan Augustin je zároveň aktivní technik na pobočce Karlín, takže ho jde vybrat jako technika u zakázky a práce se propíše do statistik stejně jako ostatním technikům.',
+        ],
+    ],
+    [
         'version' => '3.42.15',
         'date' => '2026-08-04',
         'time' => '15:22',

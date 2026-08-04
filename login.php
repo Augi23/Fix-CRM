@@ -140,6 +140,7 @@ if (isset($_POST['login'])) {
             }
 
             if ($user && password_verify($password, $user['password'])) {
+                $linkedTech = function_exists('crmUserLinkedTechnician') ? crmUserLinkedTechnician($user) : null;
                 session_regenerate_id(true);
                 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));   // nový token k nové relaci
                 clearClientSession();
@@ -147,10 +148,12 @@ if (isset($_POST['login'])) {
                 $_SESSION['username']  = $user['username'];
                 $_SESSION['role']      = 'admin';
                 $_SESSION['full_name'] = $user['full_name'];
-                $_SESSION['tech_id']   = null;
+                $_SESSION['tech_id']   = $linkedTech ? (int)$linkedTech['id'] : null;
                 // Admin má globální výhled (řídí se rolí), ale výchozí pobočku Karlín —
                 // aby se všude zobrazovala a předvybírala. Viz ensureUsersBranchColumn().
-                $_SESSION['branch_id'] = (int)($user['branch_id'] ?? 0) ?: getDefaultBranchId();
+                $_SESSION['branch_id'] = $linkedTech && !empty($linkedTech['branch_id'])
+                    ? (int)$linkedTech['branch_id']
+                    : ((int)($user['branch_id'] ?? 0) ?: getDefaultBranchId());
                 invalidatePermissionsCache();
                 recordLoginAttempt($pdo, true);
                 crmAuditLog('auth.login', ['entity_type' => 'auth', 'summary' => 'Přihlášení do systému (administrátor)']);

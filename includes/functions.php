@@ -1388,10 +1388,12 @@ function ensureInventoryStockedSchema(): void {
 }
 
 /**
- * Přiřazení pobočky administrátorům (účty v tabulce `users`).
+ * Přiřazení pobočky a volitelného technického profilu administrátorům
+ * (účty v tabulce `users`).
  * Admin má globální výhled (řídí se rolí/admin_access, ne pobočkou), ale „pro pořádek"
  * má i výchozí pobočku Karlín — aby se všude zobrazovala a předvybírala.
- * Sloupec users.branch_id + backfill stávajících adminů na Karlín (jednorázově).
+ * Sloupec users.technician_id umožní, aby admin login měl zároveň technický profil
+ * pro převzetí práce a měření vlastního servisního času.
  */
 function ensureUsersBranchColumn(): void {
     global $pdo;
@@ -1401,6 +1403,9 @@ function ensureUsersBranchColumn(): void {
     try {
         if (!$pdo->query("SHOW COLUMNS FROM users LIKE 'branch_id'")->fetch()) {
             $pdo->exec("ALTER TABLE users ADD COLUMN branch_id INT NULL DEFAULT NULL");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM users LIKE 'technician_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN technician_id INT NULL DEFAULT NULL, ADD KEY idx_users_technician_id (technician_id)");
         }
         if (get_setting('users_branch_backfilled', '') !== '1') {
             $def = getDefaultBranchId();   // Karlín
@@ -1412,6 +1417,23 @@ function ensureUsersBranchColumn(): void {
             }
         }
     } catch (Throwable $e) { error_log('ensureUsersBranchColumn: ' . $e->getMessage()); }
+}
+
+/** Aktivní technický profil navázaný na admin účet v `users`, nebo null.
+ *  Admin tím nepřichází o žádná práva; jen dostane `tech_id` pro převzetí práce. */
+function crmUserLinkedTechnician(array $user): ?array {
+    global $pdo;
+    $techId = (int)($user['technician_id'] ?? 0);
+    if ($techId <= 0 || !isset($pdo)) { return null; }
+    try {
+        $st = $pdo->prepare('SELECT id, name, branch_id FROM technicians WHERE id = ? AND is_active = 1 LIMIT 1');
+        $st->execute([$techId]);
+        $tech = $st->fetch();
+        return $tech ?: null;
+    } catch (Throwable $e) {
+        error_log('crmUserLinkedTechnician: ' . $e->getMessage());
+        return null;
+    }
 }
 
 /** SQL fragment for "this part belongs in the warehouse view" (real stock). */

@@ -51,13 +51,16 @@ try {
     $st->execute([$username]);
     $user = $st->fetch();
     if ($user && password_verify($password, (string)$user['password'])) {
+        $linkedTech = function_exists('crmUserLinkedTechnician') ? crmUserLinkedTechnician($user) : null;
         $sessionData = [
             'user_id' => $user['id'],
             'username' => $user['username'],
             'role' => 'admin',
             'full_name' => $user['full_name'],
-            'tech_id' => null,
-            'branch_id' => (int)($user['branch_id'] ?? 0) ?: getDefaultBranchId(),
+            'tech_id' => $linkedTech ? (int)$linkedTech['id'] : null,
+            'branch_id' => $linkedTech && !empty($linkedTech['branch_id'])
+                ? (int)$linkedTech['branch_id']
+                : ((int)($user['branch_id'] ?? 0) ?: getDefaultBranchId()),
         ];
         $ok = true;
     }
