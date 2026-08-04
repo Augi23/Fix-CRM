@@ -1356,6 +1356,14 @@ document.addEventListener('DOMContentLoaded', function() {
    a otevřeme danou zakázku. Funguje i když čtečka posílá čísla správně (mapuje jen háčky).
    ═══════════════════════════════════════════════════════════════════════════ */
 (function() {
+    function isPosRegisterPage() {
+        return /\/pokladna\.php$/i.test(window.location.pathname || '');
+    }
+
+    if (isPosRegisterPage()) {
+        return; // Na Pokladně má sken převzít kasa a přidat položku do košíku.
+    }
+
     // Číslice horní řady → háčky; navíc CZ QWERTZ prohazuje Y↔Z (proto i písmena v APFAZ…).
     var MAP = {
         '+': '1', 'ě': '2', 'š': '3', 'č': '4', 'ř': '5', 'ž': '6', 'ý': '7', 'á': '8', 'í': '9', 'é': '0',
@@ -1663,6 +1671,10 @@ window.openComplaintDocChoice = function (complaintId, code) {
    Běžné psaní (jména s diakritikou, telefony) se NEmění.
    ═══════════════════════════════════════════════════════════ */
 (function () {
+    function isPosRegisterPage() {
+        return /\/pokladna\.php$/i.test(window.location.pathname || '');
+    }
+
     // stejné mapování jako globální wedge výše: číslice horní řady → háčky
     // a CZ QWERTZ prohazuje Y↔Z (APFAZ → APFAY). Aplikuje se JEN když vstup
     // opravdu obsahuje háčky (= přepsáno českou klávesnicí) — běžné psaní nemění.
@@ -1698,6 +1710,7 @@ window.openComplaintDocChoice = function (complaintId, code) {
         });
     }
     function init() {
+        if (isPosRegisterPage()) { return; }
         document.querySelectorAll('.crm-navbar-search input[name="search"], form input[name="search"]').forEach(attach);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

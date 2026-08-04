@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.14',
+        'date' => '2026-08-04',
+        'time' => '09:43',
+        'title' => 'Pokladna: sken produktu funguje bez kliknutí do pole',
+        'items' => [
+            'Když je otevřená stránka <b>Pokladna</b>, USB čtečka má nově přednost před celosystémovým hledáním zakázek. Produktový kód se tedy přidá rovnou do košíku i tehdy, když kurzor není v poli pro hledání zboží.',
+            'Globální sken zakázek mimo Pokladnu zůstává zachovaný: na ostatních stránkách CRM dál otevře naskenovanou zakázku stejně jako dosud.',
+            'Pokladní skener se nespouští pod zámkem kasy ani pod obrazovkou převzetí pokladny, aby se položky nepřidávaly na pozadí.',
+        ],
+    ],
+    [
         'version' => '3.42.13',
         'date' => '2026-08-04',
         'time' => '06:18',

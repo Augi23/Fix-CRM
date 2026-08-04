@@ -1332,7 +1332,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.addEventListener('keydown', function (e) {
-        if (locked) return;
+        if (locked || document.getElementById('posShiftGate')) { scanBuf = ''; return; }
         // Pole s HESLEM je pro čtečku tabu: heuristika „strojové tempo + Enter" by
         // svižně naklepané heslo vyhodnotila jako sken, snědla Enter (formulář by
         // se neodeslal) a heslo poslala do URL api/pos_search.php?q=… tedy do logu.
@@ -1345,10 +1345,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 var code = scanBuf;
                 scanBuf = '';
                 e.preventDefault();
+                e.stopImmediatePropagation();
                 // čtečka znaky „napsala" i do zrovna aktivního pole — uklidit je
                 var el = document.activeElement;
                 if (el && ('value' in el) && typeof el.value === 'string' && el.value.slice(-code.length) === code) {
                     el.value = el.value.slice(0, -code.length);
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
                 }
                 handleScan(code);
             } else {
