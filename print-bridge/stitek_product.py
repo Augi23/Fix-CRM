@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cenový štítek PRODUKTU pro Brother QL-810W — 1:1 port renderu z naskladňovací
+"""Cenový štítek PRODUKTU pro Brother QL-8xx — 1:1 port renderu z naskladňovací
 Mac appky (macapp/app.py: render_label / render_label_big / _label_logo).
 Server je Linux → místo Arial se používá DejaVu Sans (rozměry zachované).
 Vstup: dict(nazev, barva, stav, uloziste, baterie, ram, procesor, cpu, gpu, sn, cena, mac).

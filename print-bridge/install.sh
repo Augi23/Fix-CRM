@@ -1,5 +1,5 @@
 #!/bin/bash
-# Instalace štítkového můstku Fix-CRM -> Brother QL-810W (macOS)
+# Instalace štítkového můstku Fix-CRM -> Brother QL-8xx (macOS)
 # - vytvoří venv s brother_ql + python-barcode + Pillow
 # - založí LaunchAgent, ať můstek běží trvale (i po restartu Macu)
 set -euo pipefail

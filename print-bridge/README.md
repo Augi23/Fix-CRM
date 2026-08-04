@@ -1,7 +1,7 @@
-# Štítkový můstek — Fix-CRM → Brother QL-810W
+# Štítkový můstek — Fix-CRM → Brother QL-8xx
 
 Lokální služba na recepčním Macu, přes kterou CRM tiskne štítky zakázek
-na Brother QL-810W **stejně jako aplikace „Naskladnění produktů"**
+na Brother QL-810W / QL-820NWB **stejně jako aplikace „Naskladnění produktů"**
 (stejná tiskárna z `~/.naskladneni_produktu.json` → `printer_ip`,
 stejná knihovna `brother_ql`, 62mm role, stejné parametry rastru).
 
@@ -47,3 +47,5 @@ Vytvoří venv `~/.stitek_bridge_venv` a LaunchAgent
 - **Stav**: http://127.0.0.1:9110/health
 - Jiná IP tiskárny: změň `printer_ip` v `~/.naskladneni_produktu.json`
   (sdílené s naskladňovací appkou) a restartuj můstek.
+- Model QL-820NWB: do stejného JSONu doplň `"printer_model": "QL-820NWB"`.
+  Když hodnota chybí, můstek použije výchozí `QL-810W`.

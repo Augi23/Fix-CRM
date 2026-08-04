@@ -1938,9 +1938,12 @@ require_once 'includes/header.php';
                         $labelBranches = getBranches(true);
                         ensureBranchPrinterColumn();
                         $labelIps = [];
+                        $labelPrinterModels = [];
+                        $labelModels = labelPrinterModels();
                         try {
-                            foreach ($pdo->query("SELECT id, COALESCE(label_printer_ip,'') AS ip FROM branches")->fetchAll(PDO::FETCH_ASSOC) as $__r) {
+                            foreach ($pdo->query("SELECT id, COALESCE(label_printer_ip,'') AS ip, COALESCE(label_printer_model,'QL-810W') AS model FROM branches")->fetchAll(PDO::FETCH_ASSOC) as $__r) {
                                 $labelIps[(int)$__r['id']] = (string)$__r['ip'];
+                                $labelPrinterModels[(int)$__r['id']] = normalizeLabelPrinterModel((string)$__r['model']);
                             }
                         } catch (Throwable $e) {}
                         ?>
@@ -1956,14 +1959,21 @@ require_once 'includes/header.php';
                             <label class="form-label small text-white-75 mb-1">
                                 <i class="fas fa-location-dot me-1 text-info"></i><strong><?php echo e($__b['name']); ?></strong>
                                 <?php if ($__isMine): ?><span class="badge bg-info text-dark ms-1">tvoje pobočka</span><?php endif; ?>
-                                — tiskárna štítků (Brother QL-810W)
+                                — tiskárna štítků (Brother QL-8xx)
                             </label>
                             <?php if ($__canPair): ?>
-                            <div class="row g-2 align-items-center" style="max-width:640px;">
-                                <div class="col-md-5">
+                            <div class="row g-2 align-items-center" style="max-width:780px;">
+                                <div class="col-md-4">
                                     <input type="text" id="srvIp<?php echo $__bid; ?>" class="form-control font-monospace" placeholder="IP tiskárny, např. 192.168.1.220" value="<?php echo e($labelIps[$__bid] ?? ''); ?>" data-orig="<?php echo e($labelIps[$__bid] ?? ''); ?>">
                                 </div>
-                                <div class="col-md-7 d-flex gap-2 flex-wrap">
+                                <div class="col-md-3">
+                                    <select id="srvModel<?php echo $__bid; ?>" class="form-select">
+                                        <?php foreach ($labelModels as $__mk => $__ml): ?>
+                                        <option value="<?php echo e($__mk); ?>"<?php echo (($labelPrinterModels[$__bid] ?? 'QL-810W') === $__mk) ? ' selected' : ''; ?>><?php echo e($__ml); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-5 d-flex gap-2 flex-wrap">
                                     <?php if ($__isMine): ?>
                                     <button type="button" class="btn btn-primary btn-sm" onclick="srvPair(<?php echo $__bid; ?>)"><i class="fas fa-link me-1"></i>Spárovat tiskárnu</button>
                                     <?php else: ?>
@@ -1979,7 +1989,7 @@ require_once 'includes/header.php';
                             </div>
                             <div class="form-text small text-white-50 mt-1">
                                 <i class="fas fa-wand-magic-sparkles me-1"></i><b>Spárovat</b> zkusí tiskárnu najít samo na tomto počítači.
-                                Když ji nenajde, opiš IP z tiskárny: na QL-810W podrž <b>tlačítko Wi-Fi/střihu</b>, dokud nevyjede lístek se síťovým nastavením — IP je na něm.
+                                Když ji nenajde, opiš IP z tiskárny a vyber model: na QL-810W/QL-820NWB podrž <b>tlačítko Wi-Fi/střihu</b>, dokud nevyjede lístek se síťovým nastavením — IP je na něm.
                             </div>
                             <?php endif; ?>
                             <div id="srvStatus<?php echo $__bid; ?>" class="small mt-2 text-white-50"><i class="fas fa-circle-notch fa-spin me-1"></i>Zjišťuji stav…</div>
@@ -2002,7 +2012,9 @@ require_once 'includes/header.php';
                                         el.innerHTML = '<i class="fas fa-plug-circle-xmark me-1"></i><b>Tiskárna zatím není spárovaná</b> — štítky téhle pobočky se nikde nevytisknou (a hlavně ne u kolegů na druhé pobočce).';
                                     } else if (d.printer_reachable) {
                                         el.className = 'small mt-2 text-success';
-                                        el.innerHTML = '<i class="fas fa-check-circle me-1"></i>Server vidí tiskárnu <strong>' + d.printer_ip + '</strong>' + (d.env_ready ? '' : ' · první tisk chvíli potrvá (server si připraví prostředí)');
+                                        el.innerHTML = '<i class="fas fa-check-circle me-1"></i>Server vidí tiskárnu <strong>' + d.printer_ip + '</strong>'
+                                            + (d.printer_model ? ' · ' + d.printer_model : '')
+                                            + (d.env_ready ? '' : ' · první tisk chvíli potrvá (server si připraví prostředí)');
                                     } else {
                                         el.className = 'small mt-2 text-warning';
                                         el.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>Tiskárna <strong>' + (d.printer_ip || '?') + '</strong> ze serveru neodpovídá — buď je vypnutá, nebo je pobočka v jiné síti (pak potřebuje propojení: VPN/agenta).';
@@ -2016,9 +2028,11 @@ require_once 'includes/header.php';
                         }
                         function srvSaveIp(bid, ip, done) {
                             var fd = new FormData();
+                            var modelEl = document.getElementById('srvModel' + bid);
                             fd.append('action', 'save_ip');
                             fd.append('branch_id', bid);
                             fd.append('ip', ip);
+                            fd.append('model', modelEl ? modelEl.value : 'QL-810W');
                             fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
                             return fetch('api/print_label_server.php', { method: 'POST', body: fd })
                                 .then(function (r) { return r.json(); })
@@ -2033,15 +2047,15 @@ require_once 'includes/header.php';
                            (naskladňovací appka / stitek_bridge). Zeptáme se ho na IP a rovnou ji
                            uložíme pobočce. Když můstek neběží (nebo je to Safari, které na
                            http://127.0.0.1 z https stránky nepustí), použije se IP z políčka. */
-                        function srvBridgeIp() {
+                        function srvBridgeInfo() {
                             var ports = [9110, 9101];
                             var tryPort = function (i) {
-                                if (i >= ports.length) { return Promise.resolve(''); }
+                                if (i >= ports.length) { return Promise.resolve({ ip: '', model: '' }); }
                                 var ctl = new AbortController();
                                 var t = setTimeout(function () { ctl.abort(); }, 1200);
                                 return fetch('http://127.0.0.1:' + ports[i] + '/health', { signal: ctl.signal })
                                     .then(function (r) { clearTimeout(t); return r.json(); })
-                                    .then(function (d) { return (d && d.printer_ip) ? String(d.printer_ip) : tryPort(i + 1); })
+                                    .then(function (d) { return (d && d.printer_ip) ? { ip: String(d.printer_ip), model: String(d.printer_model || '') } : tryPort(i + 1); })
                                     .catch(function () { clearTimeout(t); return tryPort(i + 1); });
                             };
                             return tryPort(0);
@@ -2051,7 +2065,9 @@ require_once 'includes/header.php';
                             srvSay(bid, 'text-white-50', manualOnly
                                 ? '<i class="fas fa-circle-notch fa-spin me-1"></i>Ukládám…'
                                 : '<i class="fas fa-circle-notch fa-spin me-1"></i>Hledám tiskárnu na tomhle počítači…');
-                            (manualOnly ? Promise.resolve('') : srvBridgeIp()).then(function (found) {
+                            (manualOnly ? Promise.resolve({ ip: '', model: '' }) : srvBridgeInfo()).then(function (foundInfo) {
+                                var found = foundInfo.ip || '';
+                                var foundModel = foundInfo.model || '';
                                 // ČLOVĚK MÁ PŘEDNOST: můstek může hlásit IP zkopírovanou
                                 // z jiné pobočky (sdílený config) — kdyby autodetekce
                                 // přebíjela ruční zadání, spárovala by pobočku na cizí tiskárnu
@@ -2064,11 +2080,13 @@ require_once 'includes/header.php';
                                 var typed = (val !== orig) ? val : '';
                                 var ip = typed || found || val;
                                 if (ip === '') {
-                                    srvSay(bid, 'text-warning', '<i class="fas fa-triangle-exclamation me-1"></i>Tiskárnu se nepodařilo najít samo — <b>opiš její IP</b> do políčka vlevo a dej Spárovat znovu. (IP vytiskne QL-810W po podržení tlačítka Wi-Fi/střihu.)');
+                                    srvSay(bid, 'text-warning', '<i class="fas fa-triangle-exclamation me-1"></i>Tiskárnu se nepodařilo najít samo — <b>opiš její IP</b> do políčka vlevo, vyber model a dej Spárovat znovu. (IP vytiskne QL-810W/QL-820NWB po podržení tlačítka Wi-Fi/střihu.)');
                                     return;
                                 }
                                 if (!typed && found && input) { input.value = found; input.setAttribute('data-orig', found); }
                                 else if (input) { input.setAttribute('data-orig', ip); }
+                                var modelEl = document.getElementById('srvModel' + bid);
+                                if (foundModel && modelEl && !manualOnly) { modelEl.value = foundModel; }
                                 var mismatch = (typed && found && typed !== found)
                                     ? ' <span class="text-white-50">(můstek na tomhle počítači hlásí ' + found + ', ukládám tvoje ' + typed + ')</span>' : '';
                                 srvSaveIp(bid, ip, function () {
@@ -2080,7 +2098,7 @@ require_once 'includes/header.php';
                                         srvSay(bid, 'text-success', '<i class="fas fa-check-circle me-1"></i><b>Spárováno</b> — tiskárna <strong>' + ip + '</strong> odpovídá'
                                             + (!typed && found ? ' (našla se sama na tomhle počítači)' : '') + '. Vyzkoušej <b>Zkušební štítek</b>.' + mismatch);
                                     } else {
-                                        srvSay(bid, 'text-warning', '<i class="fas fa-circle-info me-1"></i>Uloženo: <strong>' + ip + '</strong>, ale <b>server ji zatím nevidí</b>. Zkontroluj, že je tiskárna zapnutá a na stejné síti; pokud je pobočka v jiné síti než server, štítky zakázek se vytisknou přes tenhle počítač (musí běžet štítkový můstek) — reklamační a cenové štítky ale potřebují propojení se serverem, ozvi se vedení.' + mismatch);
+                                        srvSay(bid, 'text-warning', '<i class="fas fa-circle-info me-1"></i>Uloženo: <strong>' + ip + '</strong>, ale <b>server ji zatím nevidí</b>. Zkontroluj, že je tiskárna zapnutá a na stejné síti; pokud je pobočka v jiné síti než server, štítky se zkusí vytisknout přes tenhle počítač (musí běžet štítkový můstek).' + mismatch);
                                     }
                                       })
                                       .catch(function () { srvStatus(bid); });

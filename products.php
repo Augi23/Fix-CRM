@@ -331,7 +331,7 @@ try {
                                     <?php if ($canManageBranch): ?>
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm afx-row-actions">
-                                            <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-810W)"><i class="fas fa-tag"></i></button>
+                                            <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-8xx)"><i class="fas fa-tag"></i></button>
                                             <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vrátit do skladu' : 'Zapůjčeno / komisní prodej'; ?>"><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i></button>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>
                                             <button type="button" class="btn btn-white border tr-add-btn" data-type="product" data-id="<?php echo (int)$p['id']; ?>" data-name="<?php echo e($p['title']); ?>" title="Přesun na druhou pobočku"><i class="fas fa-right-left text-info"></i></button>
@@ -654,24 +654,40 @@ try {
 <?php endif; ?>
 
 <script>
+function printProductLabel(productId, copies) {
+    copies = Math.max(1, Math.min(20, parseInt(copies || 1, 10) || 1));
+    var fd = new FormData();
+    fd.append('action', 'print_product');
+    fd.append('id', productId);
+    fd.append('copies', String(copies));
+    fd.append('csrf_token', '<?php echo $_SESSION['csrf_token'] ?? ''; ?>');
+    return fetch('api/print_label_server.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d.ok) { return { ok: true, copies: d.copies || copies, via_bridge: false }; }
+            if (d.bridge_ok && d.bridge_product && (d.not_paired || d.unreachable) && window.afxProductLabelViaBridge) {
+                return window.afxProductLabelViaBridge(d.bridge_product, d.copies || copies, d.printer_model)
+                    .then(function (printed) {
+                        if (printed) { return { ok: true, copies: d.copies || copies, via_bridge: true }; }
+                        throw new Error(d.error || 'Lokální můstek štítek nevytiskl.');
+                    });
+            }
+            throw new Error(d.error || 'Tisk selhal.');
+        });
+}
+
 // tisk cenového štítku — smí každý přihlášený (recepce tiskne cenovky)
 $(document).on('click', '.product-label-btn', function () {
     var btn = this, ic = btn.querySelector('i');
     if (btn.disabled) return;
     btn.disabled = true;
     ic.className = 'fas fa-spinner fa-spin';
-    var fd = new FormData();
-    fd.append('action', 'print_product');
-    fd.append('id', btn.dataset.id);
-    fd.append('csrf_token', '<?php echo $_SESSION['csrf_token'] ?? ''; ?>');
-    fetch('api/print_label_server.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
+    printProductLabel(btn.dataset.id, 1)
         .then(function (d) {
             btn.disabled = false; ic.className = 'fas fa-tag';
-            if (d.ok) { showAlert('Štítek odeslán na tiskárnu.'); }
-            else { showAlert('Tisk selhal: ' + escHtml(d.error || '')); }
+            showAlert(d.via_bridge ? 'Štítek vytištěn přes tenhle počítač.' : 'Štítek odeslán na tiskárnu.');
         })
-        .catch(function () { btn.disabled = false; ic.className = 'fas fa-tag'; showAlert('Síťová chyba při tisku.'); });
+        .catch(function (err) { btn.disabled = false; ic.className = 'fas fa-tag'; showAlert('Tisk selhal: ' + escHtml(err.message || '')); });
 });
 
 <?php if ($canManage): ?>
@@ -1421,18 +1437,15 @@ $(document).on('click', '.product-label-btn', function () {
                 }
                 var printPromise = Promise.resolve();
                 if (printAfter && d.id) {
-                    var pf = new FormData();
-                    pf.append('action', 'print_product'); pf.append('id', d.id); pf.append('csrf_token', CSRF);
                     // dávka štítků jen při NASKLADNĚNÍ; editace by jinak vytiskla tolik
                     // štítků, kolik je zrovna kusů skladem
-                    pf.append('copies', String($editId.value ? 1 : Math.min(20, Math.max(1, qty))));
-                    printPromise = fetch('api/print_label_server.php', { method: 'POST', body: pf, credentials: 'same-origin' })
-                        .then(function (r) { return r.json(); })
+                    var labelCopies = $editId.value ? 1 : Math.min(20, Math.max(1, qty));
+                    printPromise = printProductLabel(d.id, labelCopies)
                         .then(function (p) {
-                            if (!p.ok) { labelFail(p.error || ''); return; }
                             if (p.copies && p.copies > 1) { $msg.textContent += ' · vytištěno ' + p.copies + ' štítků'; }
+                            else if (p.via_bridge) { $msg.textContent += ' · štítek vytištěn přes tenhle počítač'; }
                         })
-                        .catch(function () { labelFail('síť — server neodpověděl'); });
+                        .catch(function (err) { labelFail(err.message || 'tisk selhal'); });
                 }
                 // reload při editaci až PO doběhnutí tisku — unload by in-flight tisk zrušil
                 if ($editId.value) { printPromise.then(function () { location.reload(); }); return; }

@@ -1,5 +1,5 @@
 <?php
-/* SERVEROVÝ tisk štítků (Brother QL-810W) — IP tiskárny PER POBOČKU:
+/* SERVEROVÝ tisk štítků (Brother QL-8xx) — IP tiskárny PER POBOČKU:
    prohlížeč → HTTPS → server → tiskárna té pobočky (tcp 9100). Bez můstku na počítačích,
    funguje ze Safari, iPadu i telefonu. Štítek zakázky vyjede na tiskárně pobočky, které
    zakázka patří (branchPrinterIp). Pobočka v jiné síti než server potřebuje agenta/VPN.
@@ -66,6 +66,7 @@ if ($action === 'save_ip') {
         echo json_encode(['ok' => false, 'error' => 'Neplatný token']); exit;
     }
     $ip = trim((string)($_POST['ip'] ?? ''));
+    $model = normalizeLabelPrinterModel((string)($_POST['model'] ?? 'QL-810W'));
     $bid = (int)($_POST['branch_id'] ?? 0);
     // Párovat smí admin kteroukoli pobočku, ostatní zaměstnanci JEN tu svou —
     // druhá pobočka si tak tiskárnu nastaví sama a nikomu ji nepřepíše.
@@ -89,14 +90,14 @@ if ($action === 'save_ip') {
     }
     if ($bid > 0) {
         // prázdná IP = rozpárovat (pobočka pak nemá tiskárnu a tisk to řekne)
-        $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ? WHERE id = ?");
-        $st->execute([$ip !== '' ? $ip : null, $bid]);
+        $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ?, label_printer_model = ? WHERE id = ?");
+        $st->execute([$ip !== '' ? $ip : null, $ip !== '' ? $model : null, $bid]);
         $__bn = $pdo->prepare("SELECT name FROM branches WHERE id = ?");
         $__bn->execute([$bid]);
         crmAuditLog('settings.printer', [
             'entity_type' => 'branch', 'entity_id' => $bid, 'entity_label' => (string)$__bn->fetchColumn(),
             'branch_id' => $bid,
-            'summary' => $ip !== '' ? 'Spárována tiskárna štítků ' . $ip : 'Tiskárna štítků odpárována',
+            'summary' => $ip !== '' ? 'Spárována tiskárna štítků ' . $ip . ' (' . $model . ')' : 'Tiskárna štítků odpárována',
         ]);
         // ZÁMĚRNĚ BEZ sondy dosažitelnosti: kdyby uložení rovnou hlásilo „odpovídá",
         // dalo by se opakovaným ukládáním proskenovat port 9100 po celé síti serveru.
@@ -111,16 +112,71 @@ if ($action === 'save_ip') {
 if ($action === 'status') {
     $bid = (int)($_REQUEST['branch_id'] ?? 0);
     $printerIp = branchPrinterIp($bid ?: null);
+    $printerModel = branchPrinterModel($bid ?: null);
     $canPair = crmCanPairBranchPrinter($bid ?: null);
     echo json_encode([
         'ok' => true,
         'branch_id' => $bid,
         'printer_ip' => $canPair ? $printerIp : '',   // adresu vidí jen ten, kdo pobočku spravuje
+        'printer_model' => $canPair ? $printerModel : '',
         'paired' => $printerIp !== '',
         'can_pair' => $canPair,
         'printer_reachable' => $printerIp !== '' && afxPrinterReachable($printerIp),
         'env_ready' => is_file($PY),
     ]); exit;
+}
+
+function afxProductLabelData(PDO $pdo, int $pid): array {
+    ensureProductsTable();
+    $st = $pdo->prepare("SELECT * FROM products WHERE id = ?");
+    $st->execute([$pid]);
+    $p = $st->fetch();
+    if (!$p) { return ['ok' => false, 'error' => 'Produkt nenalezen']; }
+    $raw = json_decode((string)($p['raw_csv'] ?? ''), true) ?: [];
+
+    $title = (string)$p['title'];
+    $model = trim((string)($p['model'] ?? ''));
+    $cap = trim((string)($p['capacity'] ?? ''));
+    $color = trim((string)($p['color'] ?? ''));
+    $grade = trim((string)($p['grade'] ?? ''));
+    $bat = trim((string)($p['battery'] ?? ''));
+    $ram = trim((string)($raw['[PARAMETER "RAM"]'] ?? ''));
+    $processor = trim((string)($raw['[PARAMETER "Procesor"]'] ?? ''));
+    $cpu = trim((string)($raw['CPU_JADRA'] ?? ''));
+    $gpu = trim((string)($raw['GPU_JADRA'] ?? ''));
+    $sn = (string)$p['product_code'];
+    if (str_starts_with(strtoupper($sn), 'AFX') || str_starts_with(strtoupper($sn), 'PREVIEW')) { $sn = ''; }
+
+    $nazev = $model;
+    if ($nazev === '') {   // ostatní značky bez PARAMETER Model — odsekat suffixy z názvu
+        $nazev = $title;
+        foreach ([$grade, $color, $cap] as $suf) {
+            if ($suf !== '' && str_ends_with($nazev, ' ' . $suf)) {
+                $nazev = rtrim(mb_substr($nazev, 0, mb_strlen($nazev) - mb_strlen(' ' . $suf)));
+            }
+        }
+    }
+    if (str_contains(mb_strtolower($title), 'macbook')) {
+        // MacBook: starší kusy mají RAM/úložiště jen v názvu — doplnit odsud
+        if (preg_match('/(\d+\s*GB)\s*\/\s*(\d+(?:[.,]\d+)?\s*(?:GB|TB))(?:\s*SSD)?/u', $title, $mm, PREG_OFFSET_CAPTURE)) {
+            $pname = rtrim(mb_strcut($title, 0, $mm[0][1]), ' ,');
+            $pname = trim(preg_replace('/\s+\d+\s*CPU.*$/u', '', $pname));
+            if ($pname !== '' && mb_strlen($pname) > mb_strlen($nazev)) { $nazev = $pname; }
+            if ($ram === '') { $ram = $mm[1][0]; }
+            if ($cap === '') { $cap = $mm[2][0]; }
+        }
+    }
+    // celá cena → „21 290 Kč"; necelá se NEzaokrouhluje (přesně jako appka)
+    $priceF = (float)$p['price'];
+    if ($priceF <= 0) { $cena = ''; }
+    elseif ($priceF == (int)$priceF) { $cena = number_format($priceF, 0, ',', ' ') . ' Kč'; }
+    else { $cena = rtrim(rtrim(number_format($priceF, 2, '.', ''), '0'), '.') . ' Kč'; }
+    return ['ok' => true, 'data' => [
+        'nazev' => $nazev, 'barva' => $color, 'stav' => $grade, 'uloziste' => $cap,
+        'baterie' => $bat, 'ram' => $ram, 'procesor' => $processor, 'cpu' => $cpu, 'gpu' => $gpu,
+        'sn' => $sn, 'cena' => $cena,
+        'mac' => str_contains(mb_strtolower($nazev !== '' ? $nazev : $title), 'macbook'),
+    ]];
 }
 
 // ── tisk (print / test / print_product) ──
@@ -167,6 +223,15 @@ if ($action === 'print_complaint') {
     $branchId = ($reqBid > 0 && hasPermission('admin_access')) ? $reqBid : getCurrentStaffBranchId();
 }
 $printerIp = branchPrinterIp($branchId);
+$printerModel = branchPrinterModel($branchId);
+$productLabel = null;
+$productCopies = max(1, min(20, (int)($_POST['copies'] ?? 1)));
+if ($action === 'print_product') {
+    $productLabel = afxProductLabelData($pdo, (int)($_POST['id'] ?? 0));
+    if (empty($productLabel['ok'])) {
+        echo json_encode(['ok' => false, 'error' => (string)($productLabel['error'] ?? 'Produkt nenalezen')], JSON_UNESCAPED_UNICODE); exit;
+    }
+}
 
 /** Zápis neúspěšného tisku do Historie — ať jde po hlášce „netiskne to" dohledat,
  *  co se dělo. Voláno i u nespárované/nedostupné tiskárny: to jsou nejčastější důvody. */
@@ -187,16 +252,30 @@ if ($printerIp === '') {
     $__bn->execute([(int)$branchId]);
     $__bname = (string)$__bn->fetchColumn();
     afxLabelAuditFail('pobočka nemá spárovanou tiskárnu', (int)$branchId, $action);
-    echo json_encode(['ok' => false, 'not_paired' => true, 'branch_id' => (int)$branchId,
-        'bridge_ok' => afxLabelBridgeAllowed((int)$branchId),
+    $bridgeOk = afxLabelBridgeAllowed((int)$branchId);
+    $payload = ['ok' => false, 'not_paired' => true, 'branch_id' => (int)$branchId,
+        'printer_model' => $printerModel,
+        'bridge_ok' => $bridgeOk,
         'error' => 'Pobočka ' . ($__bname !== '' ? $__bname : '#' . (int)$branchId)
-            . ' nemá spárovanou tiskárnu štítků — spáruj ji v Nastavení → Tisk štítků.'], JSON_UNESCAPED_UNICODE); exit;
+            . ' nemá spárovanou tiskárnu štítků — spáruj ji v Nastavení → Tisk štítků.'];
+    if ($bridgeOk && $action === 'print_product' && !empty($productLabel['data'])) {
+        $payload['bridge_product'] = $productLabel['data'];
+        $payload['copies'] = $productCopies;
+    }
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE); exit;
 }
 if (!afxPrinterReachable($printerIp)) {
     afxLabelAuditFail('tiskárna ' . $printerIp . ' neodpovídá (port 9100)', (int)$branchId, $action);
-    echo json_encode(['ok' => false, 'unreachable' => true, 'printer_ip' => $printerIp,
-        'branch_id' => (int)$branchId, 'bridge_ok' => afxLabelBridgeAllowed((int)$branchId),
-        'error' => 'Tiskárna ' . $printerIp . ' neodpovídá (port 9100). Je zapnutá a na síti pobočky?'], JSON_UNESCAPED_UNICODE); exit;
+    $bridgeOk = afxLabelBridgeAllowed((int)$branchId);
+    $payload = ['ok' => false, 'unreachable' => true, 'printer_ip' => $printerIp,
+        'printer_model' => $printerModel,
+        'branch_id' => (int)$branchId, 'bridge_ok' => $bridgeOk,
+        'error' => 'Tiskárna ' . $printerIp . ' neodpovídá (port 9100). Je zapnutá a na síti pobočky?'];
+    if ($bridgeOk && $action === 'print_product' && !empty($productLabel['data'])) {
+        $payload['bridge_product'] = $productLabel['data'];
+        $payload['copies'] = $productCopies;
+    }
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE); exit;
 }
 [$envOk, $envErr] = afxEnsureLabelEnv($VENV_DIR, $PY);
 if (!$envOk) {
@@ -205,58 +284,7 @@ if (!$envOk) {
 
 if ($action === 'print_product') {
     // ── cenový štítek PRODUKTU (Sklad → Produkty) — port label_data() z appky ──
-    ensureProductsTable();
-    $pid = (int)($_POST['id'] ?? 0);
-    $st = $pdo->prepare("SELECT * FROM products WHERE id = ?");
-    $st->execute([$pid]);
-    $p = $st->fetch();
-    if (!$p) { echo json_encode(['ok' => false, 'error' => 'Produkt nenalezen']); exit; }
-    $raw = json_decode((string)($p['raw_csv'] ?? ''), true) ?: [];
-
-    $title = (string)$p['title'];
-    $model = trim((string)($p['model'] ?? ''));
-    $cap = trim((string)($p['capacity'] ?? ''));
-    $color = trim((string)($p['color'] ?? ''));
-    $grade = trim((string)($p['grade'] ?? ''));
-    $bat = trim((string)($p['battery'] ?? ''));
-    $ram = trim((string)($raw['[PARAMETER "RAM"]'] ?? ''));
-    $processor = trim((string)($raw['[PARAMETER "Procesor"]'] ?? ''));
-    $cpu = trim((string)($raw['CPU_JADRA'] ?? ''));
-    $gpu = trim((string)($raw['GPU_JADRA'] ?? ''));
-    $sn = (string)$p['product_code'];
-    if (str_starts_with(strtoupper($sn), 'AFX') || str_starts_with(strtoupper($sn), 'PREVIEW')) { $sn = ''; }
-
-    $nazev = $model;
-    if ($nazev === '') {   // ostatní značky bez PARAMETER Model — odsekat suffixy z názvu
-        $nazev = $title;
-        foreach ([$grade, $color, $cap] as $suf) {
-            if ($suf !== '' && str_ends_with($nazev, ' ' . $suf)) {
-                $nazev = rtrim(mb_substr($nazev, 0, mb_strlen($nazev) - mb_strlen(' ' . $suf)));
-            }
-        }
-    }
-    if (str_contains(mb_strtolower($title), 'macbook')) {
-        // MacBook: starší kusy mají RAM/úložiště jen v názvu — doplnit odsud
-        if (preg_match('/(\d+\s*GB)\s*\/\s*(\d+(?:[.,]\d+)?\s*(?:GB|TB))(?:\s*SSD)?/u', $title, $mm, PREG_OFFSET_CAPTURE)) {
-            $pname = rtrim(mb_strcut($title, 0, $mm[0][1]), ' ,');
-            $pname = trim(preg_replace('/\s+\d+\s*CPU.*$/u', '', $pname));
-            if ($pname !== '' && mb_strlen($pname) > mb_strlen($nazev)) { $nazev = $pname; }
-            if ($ram === '') { $ram = $mm[1][0]; }
-            if ($cap === '') { $cap = $mm[2][0]; }
-        }
-    }
-    // celá cena → „21 290 Kč"; necelá se NEzaokrouhluje (přesně jako appka)
-    $priceF = (float)$p['price'];
-    if ($priceF <= 0) { $cena = ''; }
-    elseif ($priceF == (int)$priceF) { $cena = number_format($priceF, 0, ',', ' ') . ' Kč'; }
-    else { $cena = rtrim(rtrim(number_format($priceF, 2, '.', ''), '0'), '.') . ' Kč'; }
-    $data = [
-        'nazev' => $nazev, 'barva' => $color, 'stav' => $grade, 'uloziste' => $cap,
-        'baterie' => $bat, 'ram' => $ram, 'procesor' => $processor, 'cpu' => $cpu, 'gpu' => $gpu,
-        'sn' => $sn, 'cena' => $cena,
-        'mac' => str_contains(mb_strtolower($nazev !== '' ? $nazev : $title), 'macbook'),
-    ];
-    $args = ['--product-json' => base64_encode((string)json_encode($data, JSON_UNESCAPED_UNICODE))];
+    $args = ['--product-json' => base64_encode((string)json_encode($productLabel['data'], JSON_UNESCAPED_UNICODE))];
 } elseif ($action === 'test') {
     $args = ['--code' => 'TEST' . date('His'), '--defect' => 'Testovací štítek ze serveru', '--date' => date('d.m.Y'), '--client' => 'Fix-CRM'];
 } elseif ($action === 'print_complaint') {
@@ -286,13 +314,14 @@ if ($action === 'print_product') {
     ];
 }
 
-$cmd = escapeshellarg($PY) . ' ' . escapeshellarg($CLI) . ' --ip ' . escapeshellarg($printerIp);
+$cmd = escapeshellarg($PY) . ' ' . escapeshellarg($CLI) . ' --ip ' . escapeshellarg($printerIp)
+    . ' --model ' . escapeshellarg($printerModel);
 foreach ($args as $k => $v) { $cmd .= ' ' . $k . ' ' . escapeshellarg((string)$v); }
 // POČET KOPIÍ: u produktu naskladněného po víc kusech chce obsluha štítek na každý
 // kus (jinak by 19 z 20 krytů leželo v regále bez ceny — přesně to, kvůli čemu se
 // rušilo tlačítko „Přidat" bez tisku). Strop 20, ať překlep nevytiskne roli.
 $copies = 1;
-if ($action === 'print_product') { $copies = max(1, min(20, (int)($_POST['copies'] ?? 1))); }
+if ($action === 'print_product') { $copies = $productCopies; }
 
 $outLines = [];
 $rc = 0;

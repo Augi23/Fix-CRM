@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.15',
+        'date' => '2026-08-04',
+        'time' => '15:22',
+        'title' => 'Tisk štítků: podpora Brother QL-820NWB a cenovky přes lokální můstek',
+        'items' => [
+            'V <b>Nastavení → Tisk štítků</b> má pobočková tiskárna nově i volbu modelu: <b>Brother QL-810W</b> nebo <b>Brother QL-820NWB</b>. Tiskový raster se pak posílá knihovně Brother pod správným modelem.',
+            'Pobočka <b>Praha 1 - Na Příkopě</b> může mít uloženou tiskárnu <code>192.168.0.200</code> jako <b>QL-820NWB</b>; pokud je server mimo její lokální síť, CRM to nezamění za karlínskou tiskárnu.',
+            'Cenové štítky produktů mají nově stejný fallback jako štítky zakázek: když server na tiskárnu pobočky nedosáhne, zkusí se tisk přes lokální můstek na počítači prodejny. Funguje to i při naskladnění dávky více kusů.',
+            'Lokální štítkový můstek umí nově tisknout nejen štítky zakázek/reklamací, ale i produktové cenovky a přes <code>/health</code> hlásí IP i model tiskárny.',
+        ],
+    ],
+    [
         'version' => '3.42.14',
         'date' => '2026-08-04',
         'time' => '09:43',

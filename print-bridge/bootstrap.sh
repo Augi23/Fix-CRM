@@ -1,10 +1,10 @@
 #!/bin/bash
-# Instalace štítkového můstku Fix-CRM (Brother QL-810W) — spouští se z Nastavení CRM:
+# Instalace štítkového můstku Fix-CRM (Brother QL-8xx) — spouští se z Nastavení CRM:
 #   curl -fsSL https://admin.applefix.cloud/print-bridge/bootstrap.sh | bash
 set -euo pipefail
 BASE="${STITEK_BASE:-https://admin.applefix.cloud/print-bridge}"
 DIR="$HOME/stitek-bridge"
-echo "🏷️  Instalace štítkového můstku (Brother QL-810W)…"
+echo "🏷️  Instalace štítkového můstku (Brother QL-8xx)…"
 mkdir -p "$DIR"; cd "$DIR"
 curl -fsSL -o stitek_bridge.py "$BASE/stitek_bridge.py"
 curl -fsSL -o install.sh "$BASE/install.sh"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serverový tisk štítku na Brother QL-810W — CLI pro api/print_label_server.php.
+"""Serverový tisk štítku na Brother QL-8xx — CLI pro api/print_label_server.php.
 Vykreslení i tisk sdílí se štítkovým můstkem (stitek_bridge.py), jen běží na
 serveru CRM a data dostává parametry. Výstup: JSON {"ok": bool, "error": str}.
 
@@ -19,6 +19,7 @@ from stitek_bridge import render_label, print_image  # noqa: E402
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--ip", required=True)
+    p.add_argument("--model", default="QL-810W")
     p.add_argument("--code", default="")
     p.add_argument("--defect", default="")
     p.add_argument("--date", default="")
@@ -27,6 +28,7 @@ def main() -> int:
     a = p.parse_args()
 
     os.environ["STITEK_PRINTER_IP"] = a.ip
+    os.environ["STITEK_PRINTER_MODEL"] = a.model
     try:
         if a.product_json:
             from stitek_product import render_product_label  # noqa: E402

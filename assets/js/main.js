@@ -1407,7 +1407,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }());
 
 /* ============================================================
-   TISK ŠTÍTKU ZAKÁZKY — Brother QL-810W přes lokální můstek
+   TISK ŠTÍTKU — Brother QL-8xx přes lokální můstek
    (print-bridge/stitek_bridge.py na recepčním Macu, port 9110).
    Prohlížeč smí z HTTPS volat http://127.0.0.1 (localhost výjimka).
    ============================================================ */
@@ -1426,7 +1426,7 @@ window.afxLabelToast = function (msg, ok) {
 /* Záložní tisk štítku PŘES TENTO POČÍTAČ (lokální můstek 127.0.0.1:9110).
    Potřebuje ho pobočka, která je v jiné síti než server — server na její tiskárnu
    nedosáhne, ale počítač u pultu ano. Vrací Promise: true = vytištěno. */
-window.afxLabelViaBridge = function (orderId, isComplaint) {
+window.afxLabelViaBridge = function (orderId, isComplaint, printerModel) {
     // Na iPadu/Safari se http://127.0.0.1 z HTTPS stránky nikdy nepovolí — výsledek
     // testu si proto zapamatujeme na relaci, ať se do konzole nesype chyba při
     // každém tisku.
@@ -1437,13 +1437,13 @@ window.afxLabelViaBridge = function (orderId, isComplaint) {
         .then(function (d) {
             if (!d || d.ok === false) { return false; }
             var ctl = new AbortController();
-            // 15 s: render štítku + přenos rastru na QL-810W běžně trvá déle než pár
+            // 15 s: render štítku + přenos rastru na QL-8xx běžně trvá déle než pár
             // vteřin, u pomalejšího Macu klidně 10 s
             var t = setTimeout(function () { ctl.aborted = true; ctl.abort(); }, 15000);
             return fetch('http://127.0.0.1:9110/print', {
                 method: 'POST', signal: ctl.signal,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: d.code || '', defect: d.defect || '', date: d.date || '', client: d.client || '' })
+                body: JSON.stringify({ code: d.code || '', defect: d.defect || '', date: d.date || '', client: d.client || '', printer_model: printerModel || '' })
             })
                 .then(function (r2) { clearTimeout(t); return r2.json(); })
                 .then(function (j) { return !!(j && j.ok); })
@@ -1459,6 +1459,28 @@ window.afxLabelViaBridge = function (orderId, isComplaint) {
                 });
         })
         .catch(function () { return false; });
+};
+
+window.afxProductLabelViaBridge = function (product, copies, printerModel) {
+    if (!product || typeof product !== 'object') { return Promise.resolve(false); }
+    if (sessionStorage.getItem('afxNoLabelBridge') === '1') { return Promise.resolve(false); }
+    copies = Math.max(1, Math.min(20, parseInt(copies || 1, 10) || 1));
+    var ctl = new AbortController();
+    var timeoutMs = Math.max(15000, Math.min(180000, 15000 * copies));
+    var t = setTimeout(function () { ctl.aborted = true; ctl.abort(); }, timeoutMs);
+    return fetch('http://127.0.0.1:9110/print', {
+        method: 'POST', signal: ctl.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product: product, copies: copies, printer_model: printerModel || '' })
+    })
+        .then(function (r) { clearTimeout(t); return r.json(); })
+        .then(function (j) { return !!(j && j.ok); })
+        .catch(function (err) {
+            clearTimeout(t);
+            var aborted = ctl.aborted || (err && err.name === 'AbortError');
+            if (!aborted) { sessionStorage.setItem('afxNoLabelBridge', '1'); }
+            return false;
+        });
 };
 
 window.printOrderLabel = function (orderId, opts) {
@@ -1478,7 +1500,7 @@ window.printOrderLabel = function (orderId, opts) {
                 // bridge_ok určuje SERVER: můstek smí nastoupit jen u zakázky VLASTNÍ
                 // pobočky, jinak by vedení tisklo štítky druhé pobočky u sebe
                 if (res.bridge_ok && (res.not_paired || res.unreachable)) {
-                    return window.afxLabelViaBridge(orderId).then(function (printed) {
+                    return window.afxLabelViaBridge(orderId, false, res.printer_model).then(function (printed) {
                         if (printed) {
                             window.afxLabelToast('🏷️ Štítek vytištěn přes tenhle počítač', true);
                             return;
@@ -1592,7 +1614,7 @@ window.printComplaintLabel = function (complaintId, opts) {
                 // stejná záložní cesta jako u zakázek: můstek na počítači obsluhy,
                 // a jen u vlastní pobočky (rozhoduje server přes bridge_ok)
                 if (res.bridge_ok && (res.not_paired || res.unreachable)) {
-                    return window.afxLabelViaBridge(complaintId, true).then(function (printed) {
+                    return window.afxLabelViaBridge(complaintId, true, res.printer_model).then(function (printed) {
                         if (printed) { window.afxLabelToast('🏷️ Štítek reklamace vytištěn přes tenhle počítač', true); return; }
                         throw new Error(res.error || 'tisk selhal');
                     });

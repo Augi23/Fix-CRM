@@ -4009,9 +4009,21 @@ function ensurePickupReadyColumns(PDO $pdo): void
     } catch (Throwable $e) { /* starší DB / bez oprávnění — funguje i bez těchto sloupců */ }
 }
 
+function labelPrinterModels(): array {
+    return [
+        'QL-810W' => 'Brother QL-810W',
+        'QL-820NWB' => 'Brother QL-820NWB',
+    ];
+}
+
+function normalizeLabelPrinterModel(?string $model): string {
+    $model = strtoupper(trim((string)$model));
+    return array_key_exists($model, labelPrinterModels()) ? $model : 'QL-810W';
+}
+
 /** IP tiskárny štítků PER POBOČKU: branches.label_printer_ip (NULL/'' = použij globální
  *  label_printer_ip). Umožňuje, aby štítek zakázky vyjel na tiskárně TÉ pobočky, které
- *  zakázka patří — Karlín i Na Příkopě mají každá svou Brother QL-810W. Idempotentní.
+ *  zakázka patří — Karlín i Na Příkopě mají každá svou Brother QL-8xx. Idempotentní.
  *  POZOR: serverový tisk (tcp 9100) funguje jen na tiskárnu, na kterou server DOSÁHNE
  *  (stejná LAN / VPN). Pobočka v jiné síti potřebuje lokálního agenta/VPN — IP se tu
  *  přesto uloží, ať je vše připravené. */
@@ -4024,6 +4036,9 @@ function ensureBranchPrinterColumn(): void {
         $bc = $pdo->query("SHOW COLUMNS FROM branches")->fetchAll(PDO::FETCH_COLUMN);
         if ($bc && !in_array('label_printer_ip', $bc, true)) {
             $pdo->exec("ALTER TABLE `branches` ADD COLUMN `label_printer_ip` VARCHAR(64) NULL DEFAULT NULL");
+        }
+        if ($bc && !in_array('label_printer_model', $bc, true)) {
+            $pdo->exec("ALTER TABLE `branches` ADD COLUMN `label_printer_model` VARCHAR(32) NULL DEFAULT 'QL-810W'");
         }
         // JEDNORÁZOVÝ seed Karlína: 192.168.1.220 je karlínský Brother, který byl do
         // v3.39.0 natvrdo v kódu jako výchozí hodnota — bez něj by Karlín po zrušení
@@ -4071,6 +4086,19 @@ function branchPrinterIp(?int $branchId): string {
         return trim((string)$st->fetchColumn());
     } catch (Throwable $e) {
         return '';
+    }
+}
+
+function branchPrinterModel(?int $branchId): string {
+    global $pdo;
+    if (!$branchId) { return 'QL-810W'; }
+    try {
+        ensureBranchPrinterColumn();
+        $st = $pdo->prepare("SELECT label_printer_model FROM branches WHERE id = ? LIMIT 1");
+        $st->execute([(int)$branchId]);
+        return normalizeLabelPrinterModel((string)$st->fetchColumn());
+    } catch (Throwable $e) {
+        return 'QL-810W';
     }
 }
 

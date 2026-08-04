@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Štítkový můstek Fix-CRM -> Brother QL-810W
+Štítkový můstek Fix-CRM -> Brother QL-8xx
 ==========================================
 Malý lokální HTTP server (port 9110), přes který CRM v prohlížeči tiskne
-štítky zakázek na Brother QL-810W — ÚPLNĚ STEJNĚ jako aplikace
+štítky na Brother QL-810W / QL-820NWB — ÚPLNĚ STEJNĚ jako aplikace
 „Naskladnění produktů": stejná tiskárna (printer_ip z
 ~/.naskladneni_produktu.json), stejná knihovna brother_ql, stejné
 parametry rastru (62mm role, threshold 70, dither off, cut).
 
 Endpointy:
-  GET  /health   -> {"ok": true, "printer_ip": "..."}
+  GET  /health   -> {"ok": true, "printer_ip": "...", "printer_model": "..."}
   GET  /preview?code=...&defect=...&date=...  -> PNG náhled štítku (bez tisku)
   POST /print    -> JSON {"code","defect","date"} -> tisk; {"ok":true} / {"ok":false,"error"}
 
@@ -48,6 +48,18 @@ def printer_ip() -> str:
             return (json.load(fh).get("printer_ip") or "").strip()
     except Exception:
         return ""
+
+
+def printer_model(override: str = "") -> str:
+    model = (override or os.environ.get("STITEK_PRINTER_MODEL") or "").strip().upper()
+    if not model:
+        try:
+            with open(CONFIG, encoding="utf-8") as fh:
+                cfg = json.load(fh)
+            model = (cfg.get("printer_model") or cfg.get("model") or "").strip().upper()
+        except Exception:
+            model = ""
+    return model if model in {"QL-810W", "QL-820NWB"} else "QL-810W"
 
 
 def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -138,7 +150,7 @@ def render_label(code: str, defect: str, date: str, client: str = "") -> Image.I
     return img.convert("RGB")
 
 
-def print_image(img: Image.Image) -> tuple[bool, str]:
+def print_image(img: Image.Image, model: str = "") -> tuple[bool, str]:
     """Tisk shodný s naskladňovací appkou (brother_ql, tcp://ip, network backend)."""
     ip = printer_ip()
     if not ip:
@@ -151,7 +163,7 @@ def print_image(img: Image.Image) -> tuple[bool, str]:
         from brother_ql.raster import BrotherQLRaster
         from brother_ql.conversion import convert
         from brother_ql.backends.helpers import send
-        qlr = BrotherQLRaster("QL-810W")
+        qlr = BrotherQLRaster(printer_model(model))
         qlr.exception_on_warning = True
         instr = convert(qlr=qlr, images=[img], label="62", rotate="auto",
                         threshold=70, dither=False, cut=True)
@@ -194,7 +206,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         if url.path == "/health":
-            self._json(200, {"ok": True, "printer_ip": printer_ip()})
+            self._json(200, {"ok": True, "printer_ip": printer_ip(), "printer_model": printer_model()})
             return
         if url.path == "/preview":
             q = {k: v[0] for k, v in parse_qs(url.query).items()}
@@ -222,13 +234,26 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length") or 0)
             data = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
-            img = render_label(str(data.get("code", "")), str(data.get("defect", "")), str(data.get("date", "")), str(data.get("client", "")))
-            ok, err = print_image(img)
+            model = str(data.get("printer_model") or "")
+            if isinstance(data.get("product"), dict):
+                from stitek_product import render_product_label
+                img = render_product_label(data["product"])
+                copies = max(1, min(20, int(data.get("copies") or 1)))
+            else:
+                img = render_label(str(data.get("code", "")), str(data.get("defect", "")), str(data.get("date", "")), str(data.get("client", "")))
+                copies = 1
+            ok, err = True, ""
+            for i in range(copies):
+                ok, err = print_image(img, model)
+                if not ok:
+                    if i > 0:
+                        err = f"{err} (vytištěno {i} z {copies})"
+                    break
             self._json(200 if ok else 500, {"ok": ok, "error": err})
         except Exception as e:
             self._json(500, {"ok": False, "error": str(e)})
 
 
 if __name__ == "__main__":
-    print(f"Štítkový můstek běží na http://127.0.0.1:{PORT} (tiskárna: {printer_ip() or 'NENASTAVENA'})")
+    print(f"Štítkový můstek běží na http://127.0.0.1:{PORT} (tiskárna: {printer_ip() or 'NENASTAVENA'}, model: {printer_model()})")
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
