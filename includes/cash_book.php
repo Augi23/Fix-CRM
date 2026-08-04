@@ -579,7 +579,7 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
         // Stejná pravidla jako v afxCashSums: stornovaný prodej s kompenzačním
         // pohybem v knize zůstává (příjem v den prodeje, výdej v den storna);
         // rozsah přes created_at bez funkce kvůli indexům.
-        $st = $pdo->prepare("SELECT s.id, s.sale_number, s.total, s.seller_name, s.created_at, s.status FROM pos_sales s
+        $st = $pdo->prepare("SELECT s.id, s.sale_number, s.order_id, s.total, s.seller_name, s.created_at, s.status FROM pos_sales s
             WHERE s.payment_method = 'cash'
               AND (s.status = 'completed' OR (s.status = 'cancelled' AND EXISTS (
                     SELECT 1 FROM pos_cash_movements m
@@ -593,7 +593,7 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
                 'sort' => (string)$r['created_at'], 'date' => date('Y-m-d', strtotime((string)$r['created_at'])),
                 'time' => date('H:i', strtotime((string)$r['created_at'])),
                 'dir' => 'in', 'amount' => (float)$r['total'],
-                'title' => 'Prodej na kase',
+                'title' => (int)($r['order_id'] ?? 0) > 0 ? 'Úhrada zakázky' : 'Prodej na kase',
                 'detail' => (string)$r['sale_number'] . ($cancelled ? ' · stornováno (výdej v den storna)' : ''),
                 'source' => 'pos_sale', 'ref_id' => (int)$r['id'],
                 'by' => (string)$r['seller_name'], 'doc_number' => '', 'doc_id' => 0,

@@ -24,6 +24,8 @@ if (!$id) die(__('order_id_missing'));
 
 ensureOrderDeviceBranchColumn(); // fyzické umístění zařízení (přesun mezi pobočkami)
 ensureOrderRepairSolutionColumn(); // „Provedená oprava" (povinná před dokončením)
+ensureOrderPaymentMethodColumn(); // hotově/kartou/převodem při výdeji
+ensurePosTables(); // vazba hotovostní účtenky z kasy zpět na zakázku
 
 $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.email, t.name as tech_name
                        FROM orders o 
@@ -72,6 +74,9 @@ $__canEditCustomer = true;
 
 // Podpisy klienta (příjem/výdej) — blok v pravém sloupci + tisk na zakázkovém listu
 $orderSignatures = crmGetOrderSignatures((int)$order['id']);
+$orderCashReceipt = ((string)($order['payment_method'] ?? '') === 'cash')
+    ? crmOrderPosReceiptSale((int)$order['id'])
+    : null;
 
 // Vazba na rezervaci z webu (RepairPlugin) — číslo objednávky z webu se ukazuje pod kódem zakázky.
 $webBookingRef = null;
@@ -692,6 +697,9 @@ function localizedOrderStatusLabel(string $status): string {
                             <div class="d-grid gap-1">
                                 <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-paper-plane me-2 text-primary"></i><?php echo __('order_sheet_print_email'); ?></button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-tools me-2 text-warning"></i><?php echo __('work_order'); ?></button>
+                                <?php if ($orderCashReceipt && crmCanUsePos()): ?>
+                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_receipt.php?id=<?php echo (int)$orderCashReceipt['id']; ?>&format=58&auto=1', 'Účtenka <?php echo e((string)$orderCashReceipt['sale_number']); ?>')"><i class="fas fa-receipt me-2 text-success"></i>Dotisk účtenky <?php echo e((string)$orderCashReceipt['sale_number']); ?></button>
+                                <?php endif; ?>
                                 <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="printOrderLabel(<?php echo (int)$order['id']; ?>)"><i class="fas fa-barcode me-2 text-info"></i><?php echo __('print_label'); ?></button>
                             </div>
                         </div>
@@ -1849,4 +1857,3 @@ function deleteOrder(id) {
 
 
 <?php require_once 'includes/footer.php'; ?>
-

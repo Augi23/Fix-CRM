@@ -1665,6 +1665,7 @@ function ensurePosTables(): void {
             branch_id INT NULL DEFAULT NULL,
             seller_name VARCHAR(100) NOT NULL DEFAULT '',
             customer_id INT NULL DEFAULT NULL,
+            order_id INT NULL DEFAULT NULL,
             payment_method ENUM('cash','card','invoice') NOT NULL DEFAULT 'cash',
             total DECIMAL(10,2) NOT NULL DEFAULT 0,
             vat_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
@@ -1678,12 +1679,13 @@ function ensurePosTables(): void {
             PRIMARY KEY (id),
             UNIQUE KEY uniq_pos_sale_number (sale_number),
             KEY idx_pos_created (created_at),
+            KEY idx_pos_order (order_id),
             KEY idx_pos_payment (payment_method)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         $pdo->exec("CREATE TABLE IF NOT EXISTS pos_sale_items (
             id INT NOT NULL AUTO_INCREMENT,
             sale_id INT NOT NULL,
-            item_type ENUM('part','product','manual') NOT NULL,
+            item_type ENUM('part','product','manual','order') NOT NULL,
             item_id INT NOT NULL,
             item_name VARCHAR(255) NOT NULL,
             item_code VARCHAR(64) NULL DEFAULT NULL,
@@ -1693,9 +1695,22 @@ function ensurePosTables(): void {
             PRIMARY KEY (id),
             KEY idx_pos_items_sale (sale_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        if (!$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'order_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE pos_sales ADD COLUMN order_id INT NULL DEFAULT NULL AFTER customer_id");
+        }
+        try {
+            $idx = $pdo->query("SHOW INDEX FROM pos_sales WHERE Key_name = 'idx_pos_order'")->fetch(PDO::FETCH_ASSOC);
+            if (!$idx) { $pdo->exec("ALTER TABLE pos_sales ADD KEY idx_pos_order (order_id)"); }
+        } catch (Throwable $e) {}
         $col = $pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'item_type'")->fetch(PDO::FETCH_ASSOC);
-        if ($col && !str_contains((string)($col['Type'] ?? ''), "'manual'")) {
-            $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual') NOT NULL");
+        if ($col && !str_contains((string)($col['Type'] ?? ''), "'order'")) {
+            $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order') NOT NULL");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'grade'")->fetch()) {
+            $pdo->exec("ALTER TABLE pos_sale_items ADD COLUMN grade VARCHAR(16) NULL DEFAULT NULL");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'purchase_price'")->fetch()) {
+            $pdo->exec("ALTER TABLE pos_sale_items ADD COLUMN purchase_price DECIMAL(12,2) NULL DEFAULT NULL");
         }
     } catch (Throwable $e) { error_log('ensurePosTables: ' . $e->getMessage()); }
 }
@@ -2172,6 +2187,134 @@ function generatePosSaleNumber(PDO $pdo, int $bump = 0): string {
         }
     } catch (Throwable $e) {}
     return $prefix . str_pad((string)(1 + $bump), 5, '0', STR_PAD_LEFT);
+}
+
+function crmOrderPosAmount(array $order): float {
+    $final = (float)($order['final_cost'] ?? 0);
+    if ($final > 0) { return round($final, 2); }
+    return round((float)($order['estimated_cost'] ?? 0), 2);
+}
+
+function crmOrderPosItemName(array $order): string {
+    $device = trim(preg_replace('/\s+/u', ' ', trim((string)($order['device_brand'] ?? '') . ' ' . (string)($order['device_model'] ?? ''))));
+    $code = orderDisplayCode($order);
+    return 'Servisní oprava ' . $code . ($device !== '' ? ' — ' . $device : '');
+}
+
+function crmOrderPosSale(int $orderId, ?string $paymentMethod = null): ?array {
+    global $pdo;
+    if ($orderId <= 0 || !isset($pdo)) { return null; }
+    ensurePosTables();
+    try {
+        $wherePayment = in_array($paymentMethod, ['cash', 'card', 'invoice'], true) ? ' AND payment_method = ?' : '';
+        $st = $pdo->prepare("SELECT id, sale_number, payment_method FROM pos_sales
+            WHERE order_id = ? AND status = 'completed'" . $wherePayment . "
+            ORDER BY id DESC LIMIT 1");
+        $params = [$orderId];
+        if ($wherePayment !== '') { $params[] = $paymentMethod; }
+        $st->execute($params);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    } catch (Throwable $e) {
+        error_log('crmOrderPosSale: ' . $e->getMessage());
+        return null;
+    }
+}
+
+function crmOrderPosReceiptSale(int $orderId): ?array {
+    return crmOrderPosSale($orderId, 'cash');
+}
+
+/** Vystaví idempotentní pokladní účtenku k hotově zaplacené zakázce.
+ *  Používá se při výdeji z detailu zakázky; běžný prodej přes Pokladnu si
+ *  pos_sales zakládá přímo v api/pos_checkout.php. */
+function crmEnsureOrderCashReceipt(int $orderId): array {
+    global $pdo;
+    if ($orderId <= 0 || !isset($pdo)) { return ['ok' => false, 'error' => 'Chybí zakázka.']; }
+    ensurePosTables();
+    ensureOrderPaymentMethodColumn();
+    if (!function_exists('afxEnsurePosCashColumns') && is_file(__DIR__ . '/receipt58.php')) {
+        require_once __DIR__ . '/receipt58.php';
+    }
+    if (function_exists('afxEnsurePosCashColumns')) { afxEnsurePosCashColumns(); }
+
+    $existing = crmOrderPosReceiptSale($orderId);
+    if ($existing) {
+        return ['ok' => true, 'sale_id' => (int)$existing['id'], 'sale_number' => (string)$existing['sale_number'], 'existing' => true];
+    }
+
+    $ownTx = false;
+    try {
+        $ownTx = !$pdo->inTransaction();
+        if ($ownTx) { $pdo->beginTransaction(); }
+        $st = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.company
+            FROM orders o JOIN customers c ON o.customer_id = c.id
+            WHERE o.id = ? LIMIT 1 FOR UPDATE");
+        $st->execute([$orderId]);
+        $order = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$order) {
+            if ($ownTx) { $pdo->rollBack(); }
+            return ['ok' => false, 'error' => 'Zakázka nenalezena.'];
+        }
+        $existing = crmOrderPosReceiptSale($orderId);
+        if ($existing) {
+            if ($ownTx) { $pdo->commit(); }
+            return ['ok' => true, 'sale_id' => (int)$existing['id'], 'sale_number' => (string)$existing['sale_number'], 'existing' => true];
+        }
+        $amount = crmOrderPosAmount($order);
+        if ($amount <= 0) {
+            if ($ownTx) { $pdo->rollBack(); }
+            return ['ok' => false, 'error' => 'Zakázka nemá částku k úhradě.'];
+        }
+
+        $seller = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+        $isVat = get_setting('acc_is_vat_payer', '0') == '1';
+        $vatRate = (float)get_setting('acc_vat_rate', '21');
+        $branchId = (int)($order['branch_id'] ?? getCurrentStaffBranchId());
+        $saleNumber = ''; $saleId = 0;
+        $insSale = $pdo->prepare("INSERT INTO pos_sales
+                (sale_number, branch_id, seller_name, customer_id, order_id, payment_method,
+                 total, vat_rate, is_vat_payer, note, cash_received, cash_change)
+            VALUES (?, ?, ?, ?, ?, 'cash', ?, ?, ?, ?, NULL, NULL)");
+        for ($try = 0; $try < 6; $try++) {
+            $saleNumber = generatePosSaleNumber($pdo, $try);
+            try {
+                $insSale->execute([
+                    $saleNumber,
+                    $branchId > 0 ? $branchId : null,
+                    $seller,
+                    (int)$order['customer_id'],
+                    $orderId,
+                    $amount,
+                    $isVat ? $vatRate : 0,
+                    $isVat ? 1 : 0,
+                    'Úhrada zakázky ' . orderDisplayCode($order),
+                ]);
+                $saleId = (int)$pdo->lastInsertId();
+                break;
+            } catch (PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) !== 1062) { throw $e; }
+            }
+        }
+        if ($saleId <= 0) {
+            if ($ownTx) { $pdo->rollBack(); }
+            return ['ok' => false, 'error' => 'Nepodařilo se přidělit číslo účtenky.'];
+        }
+
+        $pdo->prepare("INSERT INTO pos_sale_items
+                (sale_id, item_type, item_id, item_name, item_code, quantity, unit_price,
+                 is_used_goods, grade, purchase_price)
+            VALUES (?, 'order', ?, ?, ?, 1, ?, 0, NULL, NULL)")
+            ->execute([$saleId, $orderId, mb_substr(crmOrderPosItemName($order), 0, 255), mb_substr(orderDisplayCode($order), 0, 64), $amount]);
+        $pdo->prepare("UPDATE orders SET payment_method = 'cash' WHERE id = ?")->execute([$orderId]);
+
+        if ($ownTx) { $pdo->commit(); }
+        return ['ok' => true, 'sale_id' => $saleId, 'sale_number' => $saleNumber, 'existing' => false];
+    } catch (Throwable $e) {
+        if ($ownTx && $pdo->inTransaction()) { $pdo->rollBack(); }
+        error_log('crmEnsureOrderCashReceipt: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'Účtenku k zakázce se nepodařilo vystavit.'];
+    }
 }
 
 function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $quantity, string $notes = ''): bool {

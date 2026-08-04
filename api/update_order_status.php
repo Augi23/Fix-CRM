@@ -29,6 +29,8 @@ $requested_status = $_REQUEST['status'] ?? null;
 $new_status = $requested_status !== null ? normalizeOrderStatus($requested_status) : null;
 $final_cost = $_REQUEST['final_cost'] ?? null;
 $technician_id = $_REQUEST['technician_id'] ?? null;
+$payment_method = (string)($_POST['payment_method'] ?? '');
+if (!in_array($payment_method, ['cash', 'card', 'transfer'], true)) { $payment_method = ''; }
 
 ensureOrderWorkTrackingSchema();
 ensureOrderWorkLogSchema(); // DDL — must run before beginTransaction()
@@ -57,6 +59,7 @@ try {
 
     $current_status = $order_data['status'];
     $current_tech_id = $order_data['technician_id'];
+    $has_existing_cash_receipt = $payment_method === 'cash' ? (bool)crmOrderPosReceiptSale((int)$order_id) : false;
 
     // UZÁVĚRKA — kontrola PŘED zápisem: výdej s platbou hotově zapisuje tržbu
     // k dnešku. Při zamčeném aktuálním měsíci se odmítne CELÝ výdej (rollback),
@@ -64,6 +67,7 @@ try {
     // stopy v pokladním deníku a tržba by se už nikdy nedozapsala.
     if ($payment_method === 'cash'
         && isOrderStatusIn($new_status, 'collected') && !isOrderStatusIn($current_status, 'collected')
+        && !$has_existing_cash_receipt
         && function_exists('afxAccountingClosedError')) {
         $lockErr = afxAccountingClosedError(date('Y-m-d'), 'příjem hotovosti za zakázku');
         if ($lockErr !== null) { throw new Exception($lockErr); }
@@ -137,11 +141,6 @@ try {
         $sql .= ', work_finished_at = IFNULL(work_finished_at, CURRENT_TIMESTAMP), work_finished_by = IFNULL(work_finished_by, ?), work_duration_seconds = COALESCE(work_duration_seconds, 0) + CASE WHEN work_started_at IS NOT NULL THEN GREATEST(0, TIMESTAMPDIFF(MINUTE, work_started_at, IFNULL(work_finished_at, CURRENT_TIMESTAMP))) ELSE 0 END';
         $params[] = $target_tech_id;
     }
-
-    // Platba při výdeji (hotově / kartou / převodem) — volitelný parametr;
-    // akce (příjem do kasy / faktura s QR e-mailem) běží až po commitu níže.
-    $payment_method = (string)($_POST['payment_method'] ?? '');
-    if (!in_array($payment_method, ['cash', 'card', 'transfer'], true)) { $payment_method = ''; }
 
     if (isOrderStatusIn($new_status, 'collected')) {
         $sql .= ', shipping_date = IFNULL(shipping_date, CURRENT_TIMESTAMP)';
@@ -261,22 +260,22 @@ try {
                 // commitnutý, tak aspoň VIDITELNÁ stopa místo tichého nezapsání
                 $payment_note = 'POZOR: hotovost NEZAPSÁNA do pokladního deníku — období je uzavřené. Po odemčení doplň pohyb ručně.';
             } elseif ($payment_method === 'cash' && $amount > 0) {
-                // hotovost prošla kasou → příjem do pokladního deníku (idempotentně)
-                ensurePosCashMovementsTable();
-                $ck = $pdo->prepare("SELECT id FROM pos_cash_movements WHERE ref_type = 'order' AND ref_id = ? LIMIT 1");
-                $ck->execute([(int)$order_id]);
-                if (!$ck->fetchColumn()) {
-                    $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
-                    $pdo->prepare("INSERT INTO pos_cash_movements (branch_id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by)
-                                   VALUES (?, 'in', ?, 'zakazka', 'order', ?, ?, ?, ?)")
-                        ->execute([(int)($order_data['branch_id'] ?? 0) ?: null, $amount, (int)$order_id, mb_substr($__oc, 0, 40),
-                                   'Výdej zakázky — platba hotově', $by !== '' ? mb_substr($by, 0, 100) : null]);
-                    crmAuditLog('kasa.cash_move', [
-                        'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
-                        'summary' => 'Příjem do kasy ' . formatMoney($amount) . ' — zakázka ' . $__oc . ' (hotově při výdeji)',
-                    ]);
+                // hotovost prošla kasou → normální pokladní účtenka (idempotentně)
+                // místo anonymního pohybu. Díky pos_sales.order_id ji detail zakázky
+                // i Pokladna umí kdykoli dotisknout.
+                $receipt = crmEnsureOrderCashReceipt((int)$order_id);
+                if (!($receipt['ok'] ?? false)) {
+                    $payment_note = (string)($receipt['error'] ?? 'Účtenku k zakázce se nepodařilo vystavit.');
+                } else {
+                    if (empty($receipt['existing'])) {
+                        crmAuditLog('kasa.sale', [
+                            'entity_type' => 'pos_sale', 'entity_id' => (int)$receipt['sale_id'], 'entity_label' => (string)$receipt['sale_number'],
+                            'summary' => 'Pokladní účtenka ' . (string)$receipt['sale_number'] . ' k zakázce ' . $__oc . ' (' . formatMoney($amount) . ', hotově při výdeji)',
+                            'branch_id' => (int)($order_data['branch_id'] ?? 0),
+                        ]);
+                    }
+                    $payment_note = 'Hotovost zapsána do pokladny účtenkou ' . (string)$receipt['sale_number'] . ' (' . formatMoney($amount) . ').';
                 }
-                $payment_note = 'Hotovost zapsána do pokladny (' . formatMoney($amount) . ').';
             } elseif ($payment_method === 'transfer') {
                 $invId = crmEnsureOrderInvoice((int)$order_id, 'bank_transfer');
                 if ($invId > 0) {

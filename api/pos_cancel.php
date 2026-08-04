@@ -101,6 +101,11 @@ try {
     if (!empty($sale['invoice_id'])) {
         $pdo->prepare("UPDATE invoices SET status = 'cancelled' WHERE id = ?")->execute([(int)$sale['invoice_id']]);
     }
+    if (!empty($sale['order_id'])) {
+        ensureOrderPaymentMethodColumn();
+        $pdo->prepare("UPDATE orders SET payment_method = NULL WHERE id = ? AND payment_method IN ('cash','card')")
+            ->execute([(int)$sale['order_id']]);
+    }
 
     // Hotovostní prodej: výdej peněz zapsat do pokladního deníku ke DNI STORNA
     // (v jedné transakci se stornem — buď se povede obojí, nebo nic). Kniha

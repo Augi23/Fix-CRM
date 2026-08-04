@@ -17,6 +17,8 @@ if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
 
 ensureProductsTable();
 ensureProductsPosColumn();
+ensurePosTables();
+ensureOrderPaymentMethodColumn();
 
 $qRaw = trim((string)($_GET['q'] ?? ''));
 $like = '%' . $qRaw . '%';
@@ -63,6 +65,38 @@ try {
             'price' => (float)$r['price'],
             'used' => true,   // §90 — použité zboží
         ];
+    }
+
+    // ── hotové zakázky k úhradě přes kasu ──
+    // Nabízet až při konkrétním hledání, aby prázdné kliknutí do pole nezahltilo
+    // kasu seznamem všech připravených oprav.
+    if ($qRaw !== '') {
+        $statusSql = orderStatusSqlIn($pdo, 'completed') . "," . $pdo->quote('Vydáno - čeká na platbu');
+        $st = $pdo->prepare("SELECT o.id, o.order_code, o.legacy_code, o.device_brand, o.device_model,
+                   o.final_cost, o.estimated_cost, c.first_name, c.last_name, c.company
+            FROM orders o
+            JOIN customers c ON c.id = o.customer_id
+            WHERE o.status IN ($statusSql)
+              AND (o.payment_method IS NULL OR o.payment_method = '')
+              AND COALESCE(NULLIF(o.final_cost, 0), NULLIF(o.estimated_cost, 0), 0) > 0
+              AND NOT EXISTS (SELECT 1 FROM pos_sales ps WHERE ps.order_id = o.id AND ps.status = 'completed')
+              AND (o.order_code LIKE ? OR o.legacy_code LIKE ? OR o.device_brand LIKE ? OR o.device_model LIKE ?
+                   OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)"
+              . orderBranchScopeSql('o.branch_id', 'o.technician_id') . "
+            ORDER BY o.updated_at DESC, o.id DESC LIMIT 10");
+        $st->execute([$like, $like, $like, $like, $like, $like, $like]);
+        foreach ($st->fetchAll() as $r) {
+            $cust = trim((string)($r['company'] ?? '')) ?: trim((string)($r['first_name'] ?? '') . ' ' . (string)($r['last_name'] ?? ''));
+            $results[] = [
+                'type' => 'order',
+                'id' => (int)$r['id'],
+                'name' => crmOrderPosItemName($r) . ($cust !== '' ? ' · ' . $cust : ''),
+                'code' => orderDisplayCode($r),
+                'stock' => 1,
+                'price' => crmOrderPosAmount($r),
+                'used' => false,
+            ];
+        }
     }
 } catch (Throwable $e) {
     error_log('pos_search: ' . $e->getMessage());

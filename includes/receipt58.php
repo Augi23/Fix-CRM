@@ -139,7 +139,7 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
             $first = mb_strtolower((string)preg_split('/[\s–-]+/u', $grade)[0]);
             return !in_array($first, ['nový', 'nove', 'nové', 'novy', 'new'], true);
         }
-        if (in_array((string)($l['item_type'] ?? ''), ['part', 'manual'], true)) { return false; }
+        if (in_array((string)($l['item_type'] ?? ''), ['part', 'manual', 'order'], true)) { return false; }
         return $saleAfterCut;
     };
 
@@ -157,9 +157,7 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
             'used' => $used,
             'par90' => $used && $isVat,
         ];
-        // kasa dnes prodává jen zboží (díly + produkty); servisní položka by sem
-        // přišla s příznakem service — záruční věta o opravě se pak přidá sama
-        $warrantyItems[] = ['used' => $used, 'service' => !empty($l['is_service'])];
+        $warrantyItems[] = ['used' => $used, 'service' => !empty($l['is_service']) || (string)($l['item_type'] ?? '') === 'order'];
     }
     $total = (float)($sale['total'] ?? 0);
 

@@ -109,6 +109,7 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
 .pos-type.part { background: rgba(0,163,255,.18); color: #6fd0ff; }
 .pos-type.product { background: rgba(48,209,88,.16); color: #6fe08d; }
 .pos-type.manual { background: rgba(255,159,10,.16); color: #ffc46b; }
+.pos-type.order { background: rgba(191,90,242,.18); color: #d9a7ff; }
 .pos-manual { padding-bottom: 13px; margin-bottom: 13px; border-bottom: 1px solid rgba(255,255,255,.10); }
 .pos-manual .form-control { font-size: 15.5px; padding: 10px 12px; }
 .pos-manual .btn { font-weight: 700; white-space: nowrap; }
@@ -344,6 +345,7 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
         <div class="text-white-50 small py-2">Za zvolené období nejsou žádné pohyby hotovosti.</div>
     <?php else: ?>
     <div class="table-responsive cash-book">
+        <?php $cbShowActions = $cbCanEdit || crmCanUsePos(); ?>
         <table class="table table-dark table-sm align-middle mb-0">
             <thead>
                 <tr class="text-white-50">
@@ -354,7 +356,7 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
                     <th class="text-end" style="width:110px;">Výdej</th>
                     <th class="text-end" style="width:120px;">Zůstatek</th>
                     <th style="width:130px;">Vystavil</th>
-                    <?php if ($cbCanEdit): ?><th style="width:80px;"></th><?php endif; ?>
+                    <?php if ($cbShowActions): ?><th style="width:96px;"></th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -374,8 +376,13 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
                     <td class="text-end small text-warning"><?php echo $r['dir'] === 'out' ? '−' . formatMoney((float)$r['amount']) : ''; ?></td>
                     <td class="text-end small"><strong><?php echo formatMoney((float)($r['balance'] ?? 0)); ?></strong></td>
                     <td class="small text-white-50"><?php echo e(mb_substr((string)$r['by'], 0, 22)); ?></td>
-                    <?php if ($cbCanEdit): ?>
+                    <?php if ($cbShowActions): ?>
                     <td class="text-end">
+                        <?php if (crmCanUsePos() && $r['source'] === 'pos_sale' && empty($r['is_storno'])): ?>
+                        <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 me-1" title="Dotisknout účtenku"
+                                onclick="window.posReprintReceipt ? window.posReprintReceipt(<?php echo (int)$r['ref_id']; ?>) : window.open('print_receipt.php?id=<?php echo (int)$r['ref_id']; ?>&format=58&auto=1', '_blank')"><i class="fas fa-receipt"></i></button>
+                        <?php endif; ?>
+                        <?php if ($cbCanEdit): ?>
                         <?php
                         // Doklad se nikdy nemaže — jen stornuje protidokladem (§ 11 zák. 563/1991 Sb.).
                         // Nabízí se i u dokladu NAVÁZANÉHO na pohyb (vklad/výběr/výkup):
@@ -392,6 +399,7 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
                         <?php if ($rowStornoable): ?>
                         <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Vystavit storno doklad<?php echo $r['source'] === 'movement' ? ' — založí i opačný pohyb v deníku, peníze se vrátí' : ''; ?>"
                                 onclick="posCashDocStorno(<?php echo (int)$r['doc_id']; ?>, '<?php echo e((string)$r['doc_number']); ?>')">Storno</button>
+                        <?php endif; ?>
                         <?php endif; ?>
                     </td>
                     <?php endif; ?>
@@ -543,8 +551,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 </div>
             </form>
-            <label class="form-label small text-white-50 mb-2"><i class="fas fa-search me-1"></i> Najdi produkt nebo díl (jen skladem) · <i class="fas fa-barcode me-1"></i>USB čtečka funguje kdykoli — stačí pípnout kód</label>
-            <input type="text" id="posSearch" class="form-control pos-search" placeholder="iPhone 13, displej, sériové číslo…" autocomplete="off">
+            <label class="form-label small text-white-50 mb-2"><i class="fas fa-search me-1"></i> Najdi produkt, díl nebo hotovou zakázku · <i class="fas fa-barcode me-1"></i>USB čtečka funguje kdykoli — stačí pípnout kód</label>
+            <input type="text" id="posSearch" class="form-control pos-search" placeholder="iPhone 13, displej, číslo zakázky…" autocomplete="off">
             <div id="posResults" class="pos-results mt-2"></div>
         </div>
     </div>
@@ -821,9 +829,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 d.results.forEach(function (r) {
                     var el = document.createElement('div');
+                    var typeLabel = { part: 'DÍL', product: 'PRODUKT', order: 'ZAKÁZKA' }[r.type] || 'POLOŽKA';
+                    var detail = r.type === 'order' ? 'připraveno k úhradě' : ('skladem ' + r.stock + ' ks');
                     el.className = 'pos-hit';
-                    el.innerHTML = '<span class="pos-type ' + r.type + '">' + (r.type === 'part' ? 'DÍL' : 'PRODUKT') + '</span>'
-                        + '<div><div class="nm">' + esc(r.name) + '</div><div class="cd">' + esc(r.code || '') + ' · skladem ' + r.stock + ' ks</div></div>'
+                    el.innerHTML = '<span class="pos-type ' + r.type + '">' + typeLabel + '</span>'
+                        + '<div><div class="nm">' + esc(r.name) + '</div><div class="cd">' + esc(r.code || '') + ' · ' + detail + '</div></div>'
                         + '<span class="pr">' + fmt(r.price) + '</span>';
                     el.addEventListener('click', function () { addToCart(r); });
                     $results.appendChild(el);
@@ -866,7 +876,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.posQty = function (i, v) {
         v = parseInt(v, 10) || 1;
         if (v < 1) v = 1;
-        var max = cart[i].type === 'manual' ? 999 : cart[i].stock;
+        var max = cart[i].type === 'manual' ? 999 : (cart[i].type === 'order' ? 1 : cart[i].stock);
         if (v > max) { alert(cart[i].type === 'manual' ? 'Maximum pro ruční položku je 999 ks.' : 'Skladem je jen ' + max + ' ks.'); v = max; }
         cart[i].qty = v; render();
     };
@@ -882,9 +892,12 @@ document.addEventListener('DOMContentLoaded', function () {
         $body.innerHTML = '';
         cart.forEach(function (c, i) {
             var tr = document.createElement('tr');
+            var lockedOrder = c.type === 'order';
+            var qtyAttrs = lockedOrder ? ' readonly title="Zakázka se účtuje vždy jako 1 ks"' : '';
+            var priceAttrs = lockedOrder ? ' readonly title="Cena zakázky se bere z detailu zakázky"' : '';
             tr.innerHTML = '<td><div class="pos-item-name">' + esc(c.name) + '</div><div class="pos-item-code">' + esc(c.code || '') + '</div></td>'
-                + '<td><input type="number" class="form-control pos-qty" min="1" max="' + (c.type === 'manual' ? 999 : c.stock) + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"></td>'
-                + '<td><input type="text" class="form-control pos-price" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"></td>'
+                + '<td><input type="number" class="form-control pos-qty" min="1" max="' + (c.type === 'manual' ? 999 : c.stock) + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"' + qtyAttrs + '></td>'
+                + '<td><input type="text" class="form-control pos-price" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"' + priceAttrs + '></td>'
                 + '<td class="text-end pos-line-total">' + fmt(c.price * c.qty) + '</td>'
                 + '<td><button type="button" class="pos-remove" onclick="posRemove(' + i + ')" title="Smazat položku z košíku"><i class="fas fa-times"></i></button></td>';
             $body.appendChild(tr);
@@ -1015,6 +1028,10 @@ document.addEventListener('DOMContentLoaded', function () {
             window.open('print_receipt.php?id=' + saleId + '&format=58&auto=1', '_blank');
         });
     }
+    window.posReprintReceipt = function (saleId) {
+        saleId = parseInt(saleId, 10) || 0;
+        if (saleId > 0) { serverPrintReceipt(saleId, false); }
+    };
 
     function submitSale() {
         var wasCash = payment === 'cash';   // payment se po úspěchu nuluje — šuplík potřebuje hodnotu z doby prodeje

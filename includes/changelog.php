@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.12',
+        'date' => '2026-08-04',
+        'time' => '05:09',
+        'title' => 'Pokladna: dotisk účtenky a úhrada hotové zakázky přes kasu',
+        'items' => [
+            'V <b>Pokladně</b> je u hotovostních prodejů v pokladní knize nové tlačítko pro <b>dotisk účtenky</b>. Dotisk používá stejný pokladní doklad jako původní prodej.',
+            'Hotová zakázka ve stavu <b>Připraveno k převzetí</b> se dá nově najít přímo ve vyhledávacím poli Pokladny podle čísla zakázky, zařízení nebo zákazníka a vložit do košíku jako servisní položka.',
+            'Zakázka účtovaná přes kasu se naváže na pokladní doklad <code>KP…</code>, takže v detailu zakázky v pravém tiskovém menu přibude <b>Dotisk účtenky</b>, pokud byla zaplacená hotově.',
+            'Server hlídá, aby stejná zakázka nešla zaplatit dvakrát: při pokladním checkoutu zamkne řádek zakázky, ověří existující platbu/účtenku a servisní řádek nehýbe skladem.',
+        ],
+    ],
+    [
         'version' => '3.42.11',
         'date' => '2026-08-03',
         'time' => '19:54',
