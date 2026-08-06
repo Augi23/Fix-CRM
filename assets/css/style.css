@@ -744,6 +744,14 @@ body.modal-open {
     background-color: #ffffff !important;
 }
 
+/* Product stock modal: native select option popups inherit the dark input text
+   on some browsers, so TYP/BARVA can become unreadable after opening. */
+#productCreateModal .form-select option,
+#productCreateModal .form-select optgroup {
+    color: #111318 !important;
+    background-color: #ffffff !important;
+}
+
 /* Keep dropdowns usable inside redesigned table wrappers */
 .table-responsive {
     overflow-x: auto;

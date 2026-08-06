@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.17',
+        'date' => '2026-08-06',
+        'time' => '15:34',
+        'title' => 'Sklad: čitelné výběry při naskladnění příslušenství',
+        'items' => [
+            'V modalu <b>Sklad → Příslušenství → Naskladnit příslušenství</b> jsou rozbalené volby polí <b>Typ příslušenství</b> a <b>Barva</b> znovu čitelné i v prohlížečích, které nativním selectům zdědily tmavý styl CRM.',
+            'Oprava je omezená na modal naskladnění produktu/příslušenství, takže nemění chování skladového katalogu ani ukládání položek.',
+        ],
+    ],
+    [
         'version' => '3.42.16',
         'date' => '2026-08-04',
         'time' => '18:32',
