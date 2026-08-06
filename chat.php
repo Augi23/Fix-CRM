@@ -37,7 +37,10 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 .chat-msg.other .bubble { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.10); color: #fff; border-bottom-left-radius: 5px; }
 .chat-msg.mine { align-self: flex-end; text-align: right; }
 .chat-msg.mine .bubble { background: rgba(10,132,255,.85); color: #fff; border-bottom-right-radius: 5px; text-align: left; }
-.chat-msg .meta { font-size: .74rem; color: rgba(255,255,255,.5); margin: 3px 6px 0; }
+.chat-msg .meta { display: flex; align-items: center; gap: 5px; font-size: .74rem; color: rgba(255,255,255,.5); margin: 3px 6px 0; }
+.chat-msg.mine .meta { justify-content: flex-end; }
+.chat-delete-btn { border: 0; padding: 1px 4px; background: transparent; color: rgba(255,255,255,.42); line-height: 1; border-radius: 5px; }
+.chat-delete-btn:hover, .chat-delete-btn:focus { color: #ff6b6b; background: rgba(255,59,48,.12); outline: none; }
 .chat-msg .who { font-weight: 700; color: rgba(140,200,255,.95); }
 .chat-msg.mine .who { color: rgba(255,255,255,.75); }
 .chat-day { align-self: center; font-size: .72rem; color: rgba(255,255,255,.45); background: rgba(255,255,255,.06); border-radius: 10px; padding: 2px 12px; margin: 6px 0; }
@@ -73,6 +76,7 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
             }
             var el = document.createElement('div');
             el.className = 'chat-msg ' + (m.mine ? 'mine' : 'other');
+            el.dataset.messageId = String(m.id);
             if (!m.mine) gotOther = true;
             var b = document.createElement('div'); b.className = 'bubble'; b.textContent = m.text;
             el.appendChild(b);
@@ -81,6 +85,16 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
             var who = document.createElement('span'); who.className = 'who'; who.textContent = m.author;
             meta.appendChild(who);
             meta.appendChild(document.createTextNode(' · ' + m.time));
+            if (m.mine) {
+                var del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'chat-delete-btn';
+                del.dataset.deleteMessageId = String(m.id);
+                del.title = 'Smazat vlastní zprávu';
+                del.setAttribute('aria-label', 'Smazat vlastní zprávu');
+                del.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                meta.appendChild(del);
+            }
             el.appendChild(meta);
             box.appendChild(el);
         });
@@ -99,6 +113,42 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
             .then(function (d) { if (d && d.ok) render(d.messages); })
             .catch(function () {});
     }
+
+    function reloadChat() {
+        return fetch('api/chat.php?after=0', { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.ok) throw new Error((d && d.message) || 'Načtení chatu selhalo');
+                box.innerHTML = '';
+                lastId = 0;
+                lastDay = '';
+                firstLoad = true;
+                render(d.messages || []);
+            });
+    }
+
+    box.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-delete-message-id]');
+        if (!btn || !box.contains(btn)) return;
+        var id = parseInt(btn.dataset.deleteMessageId || '0', 10);
+        if (!id || !confirm('Smazat tuto zprávu?')) return;
+        btn.disabled = true;
+        var fd = new FormData();
+        fd.append('action', 'delete');
+        fd.append('id', String(id));
+        fd.append('csrf_token', csrf);
+        fetch('api/chat.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.ok) throw new Error((d && d.message) || 'Smazání selhalo');
+                return reloadChat();
+            })
+            .catch(function (err) {
+                btn.disabled = false;
+                if (window.showAlert) showAlert(err.message || 'Smazání selhalo');
+                else alert(err.message || 'Smazání selhalo');
+            });
+    });
 
     form.addEventListener('submit', function (e) {
         e.preventDefault();
