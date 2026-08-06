@@ -995,7 +995,10 @@ $(document).on('click', '.product-label-btn', function () {
             $gen.value = '';
             $serial.value = '';
             clearProcessor();
-            setBadge('none');
+            // Při prvotní inicializaci je badgeStyles ještě nedefinované.
+            // Nevyhazovat zde JS chybu: jinak se onManufacturer() už nespustí
+            // a dropdowny Typ a Barva zůstanou úplně bez položek.
+            if (typeof badgeStyles !== 'undefined' && badgeStyles) setBadge('none');
         } else {
             $accessoryForModel.value = '';
             $accessoryProperty.value = '';
