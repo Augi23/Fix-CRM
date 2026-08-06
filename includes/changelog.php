@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.24',
+        'date' => '2026-08-06',
+        'time' => '18:45',
+        'title' => 'Sklad: katalog Typ a Barva se při otevření správně naplní',
+        'items' => [
+            'Opravena chyba pořadí inicializace JavaScriptu: režim Příslušenství už nespadne na dosud nedefinovaném <code>badgeStyles</code> před zavoláním <code>onManufacturer()</code>.',
+            'Dropdown <b>Typ</b> nyní dostane katalog příslušenství a po zvoleném typu se správně naplní také dropdown <b>Barva</b>; ovládací prvky zůstávají stejné jako funkční pole Stav.',
+        ],
+    ],
+    [
         'version' => '3.42.23',
         'date' => '2026-08-06',
         'time' => '18:20',
