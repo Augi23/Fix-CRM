@@ -723,49 +723,12 @@ $(document).on('click', '.product-label-btn', function () {
         $sold = el('pcSold'), $photo = el('pcPhoto'), $imageUrl = el('pcImageUrl'),
         $badge = el('pcPcrBadge'), $msg = el('pcMsg'), $hint = el('pcHint'), $editId = el('pcEditId');
 
-    function refreshSelectUi(sel) {
-        if (!sel || !window.jQuery || !jQuery.fn.select2) return;
-        var $sel = jQuery(sel);
-        if ($sel.data('select2')) $sel.trigger('change.select2');
-    }
-    function refreshCatalogDropdowns() {
-        refreshSelectUi($typ);
-        refreshSelectUi($color);
-    }
-    function enhanceCatalogDropdown(sel, placeholder) {
-        if (!sel || !window.jQuery || !jQuery.fn.select2) return;
-        var $sel = jQuery(sel);
-        var current = sel.value;
-        if ($sel.data('select2')) $sel.select2('destroy');
-        sel.value = current;
-        // Připojit nabídku k dialogu, ne k celému .modal elementu. Dialog je
-        // správný stacking/positioning kontext; nabídka se tak neotevře za
-        // modalem ani na nesprávné úrovni stránky.
-        var $dropdownParent = $sel.closest('.modal-dialog');
-        if (!$dropdownParent.length) $dropdownParent = jQuery('#productCreateModal');
-        $sel.select2({
-            width: '100%',
-            dropdownParent: $dropdownParent,
-            placeholder: placeholder || '',
-            allowClear: false,
-            dropdownAutoWidth: false,
-            minimumResultsForSearch: 0
-        });
-        $sel.off('select2:open.crmLayer').on('select2:open.crmLayer', function () {
-            jQuery('.select2-container--open, .select2-dropdown').css('z-index', 2000);
-        });
-        refreshSelectUi(sel);
-    }
-    function enhanceCatalogDropdowns() {
-        enhanceCatalogDropdown($typ, ACCESSORY_MODE ? 'Vyber typ příslušenství' : 'Vyber typ zařízení');
-        enhanceCatalogDropdown($color, 'Vyber barvu');
-    }
+    // Stejný nativní mechanismus jako pole Stav: pouze naplnění <select>.
     function fillSelect(sel, values, withEmpty, withCustom) {
         sel.innerHTML = '';
         if (withEmpty) sel.appendChild(new Option('—', ''));
         values.forEach(function (v) { sel.appendChild(new Option(v, v)); });
         if (withCustom) sel.appendChild(new Option(CUSTOM, CUSTOM));
-        refreshSelectUi(sel);
     }
     function manufacturerVal() { return ACCESSORY_MODE ? '' : ($manuf.value === CUSTOM ? $manufC.value.trim() : $manuf.value.trim()); }
     function typVal() { return $typ.value === CUSTOM ? $typC.value.trim() : $typ.value; }
@@ -992,7 +955,6 @@ $(document).on('click', '.product-label-btn', function () {
         fillSelect($typ, opts.map(function (t) { return t.id; }), false, true);
         $typC.style.display = 'none';
         onType();
-        refreshCatalogDropdowns();
     }
 
     function onType() {
@@ -1004,7 +966,6 @@ $(document).on('click', '.product-label-btn', function () {
         syncProcessorVisibility();
         document.querySelectorAll('.pc-ipad').forEach(function (n) { n.style.display = t.gen ? '' : 'none'; });
         refreshPreview();
-        refreshCatalogDropdowns();
     }
 
     function syncCatalogModeLayout() {
@@ -1508,7 +1469,6 @@ $(document).on('click', '.product-label-btn', function () {
                 el('pcPreviewImgWrap').style.display = 'none';
                 setBadge('none');
                 refreshPreview();
-                refreshCatalogDropdowns();
             })
             .catch(function () { saving = false; $msg.textContent = 'Síťová chyba — zkus to znovu.'; });
     }
@@ -1547,27 +1507,8 @@ $(document).on('click', '.product-label-btn', function () {
     document.getElementById('productCreateModal').addEventListener('keydown', function (e) {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); save(true, false); }
     });
-    // Typ a Barva musí zůstat nativní <select> stejně jako funkční pole
-    // Vlastnost a Stav. Některý globální inicializátor může Select2 připojit
-    // znovu, proto ho při každém otevření modalu výslovně odstraníme.
-    function restoreNativeCatalogDropdown(sel) {
-        if (!sel) return;
-        if (window.jQuery && jQuery.fn.select2) {
-            var $sel = jQuery(sel);
-            if ($sel.data('select2')) $sel.select2('destroy');
-        }
-        sel.classList.remove('select2-hidden-accessible');
-        sel.removeAttribute('data-select2-id');
-        sel.removeAttribute('aria-hidden');
-        sel.removeAttribute('tabindex');
-        sel.style.removeProperty('display');
-        // Odstranit případný osiřelý Select2 kontejner hned za selectem.
-        var sibling = sel.nextElementSibling;
-        if (sibling && sibling.classList.contains('select2-container')) sibling.remove();
-    }
+    // Typ a Barva jsou obyčejné nativní selecty stejně jako Stav.
     document.getElementById('productCreateModal').addEventListener('shown.bs.modal', function () {
-        restoreNativeCatalogDropdown($typ);
-        restoreNativeCatalogDropdown($color);
         refreshPreview();
     });
     // po zavření modalu obnovit tabulku (nové kusy) — při otevřeném se nerefreshuje
@@ -1603,7 +1544,6 @@ $(document).on('click', '.product-label-btn', function () {
         setBadge('none');
         syncCatalogModeLayout();
         refreshPreview();
-        refreshCatalogDropdowns();
     });
 
     // ── editace existujícího produktu ──
@@ -1682,7 +1622,6 @@ $(document).on('click', '.product-label-btn', function () {
                 syncCatalogModeLayout();
                 $msg.textContent = p.source === 'app' ? 'Pozor: kus z appky — uložením ho převezme CRM (import appky ho už nepřepíše).' : '';
                 refreshPreview();
-                refreshCatalogDropdowns();
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('productCreateModal')).show();
             })
             .catch(function () { showAlert('Načtení produktu selhalo.'); });
