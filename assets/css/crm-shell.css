@@ -809,5 +809,17 @@ a.afx-chat-glow small {
   .afx-cell small { font-size: 9.5px; }
 }
 
+/* Native select popups: browsers render option lists outside normal CRM glass
+   styling. Keep every system dropdown readable even when it ignores dark popup
+   backgrounds but inherits text color from .form-select. */
+select option,
+select optgroup,
+.form-select option,
+.form-select optgroup {
+  color: #111318 !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
 /* Podpisovy overlay: na nizsich viewportech (landscape/split view) musi jit scrollovat */
 .afx-signpad-overlay { overflow-y: auto; -webkit-overflow-scrolling: touch; }

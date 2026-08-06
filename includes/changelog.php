@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.18',
+        'date' => '2026-08-06',
+        'time' => '15:50',
+        'title' => 'CRM: čitelné nativní dropdowny napříč systémem',
+        'items' => [
+            'Po širší kontrole dropdownů je oprava rozšířená z naskladnění příslušenství na všechny nativní <code>&lt;select&gt;</code> výběry v CRM. Rozbalené systémové volby mají jisté světlé pozadí a tmavý text, takže nezmizí ani v prohlížečích, které špatně kombinují tmavý CRM input se systémovým dropdownem.',
+            'Select2 vyhledávací dropdowny a běžná Bootstrap akční menu zůstávají ve stávajícím CRM stylu; změna se týká jen nativních voleb selectů.',
+        ],
+    ],
+    [
         'version' => '3.42.17',
         'date' => '2026-08-06',
         'time' => '15:34',

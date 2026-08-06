@@ -733,19 +733,14 @@ body.modal-open {
     margin-right: -8px;
 }
 
-/* Edit order: force readable native select dropdown options */
+/* Native select popups are finalized globally in crm-shell.css. These scoped
+   fallbacks stay for older cached CSS bundles that load only style.css. */
 .edit-order-form .form-select option,
 .edit-order-form .form-select optgroup,
 #editOrderFullModal .form-select option,
 #editOrderFullModal .form-select optgroup,
 #quickOrderModal .form-select option,
-#quickOrderModal .form-select optgroup {
-    color: #111318 !important;
-    background-color: #ffffff !important;
-}
-
-/* Product stock modal: native select option popups inherit the dark input text
-   on some browsers, so TYP/BARVA can become unreadable after opening. */
+#quickOrderModal .form-select optgroup,
 #productCreateModal .form-select option,
 #productCreateModal .form-select optgroup {
     color: #111318 !important;
