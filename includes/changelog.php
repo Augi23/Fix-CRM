@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.21',
+        'date' => '2026-08-06',
+        'time' => '17:30',
+        'title' => 'Sklad: Typ a Barva používají spolehlivé nativní dropdowny',
+        'items' => [
+            'Pole <b>Typ příslušenství</b> a <b>Barva</b> používají stejný nativní dropdown jako funkční pole <b>Vlastnost</b> a <b>Stav</b> ve stejném modalu.',
+            'Odstraněná Select2 inicializace už nevytváří oddělenou nabídku v nesprávné vrstvě; katalogové položky, volba Vlastní a ukládání hodnot zůstávají zachované.',
+        ],
+    ],
+    [
         'version' => '3.42.20',
         'date' => '2026-08-06',
         'time' => '17:15',
