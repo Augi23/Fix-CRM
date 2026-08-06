@@ -1547,8 +1547,11 @@ $(document).on('click', '.product-label-btn', function () {
     document.getElementById('productCreateModal').addEventListener('keydown', function (e) {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); save(true, false); }
     });
+    // Typ a Barva zůstávají nativní <select> stejně jako funkční pole
+    // Vlastnost a Stav. Select2 je zde záměrně neinicializujeme: v tomto
+    // scrollovacím modalu vytvářel oddělenou nabídku v nesprávné vrstvě.
     document.getElementById('productCreateModal').addEventListener('shown.bs.modal', function () {
-        enhanceCatalogDropdowns();
+        refreshPreview();
     });
     // po zavření modalu obnovit tabulku (nové kusy) — při otevřeném se nerefreshuje
     document.getElementById('productCreateModal').addEventListener('hidden.bs.modal', function () {
