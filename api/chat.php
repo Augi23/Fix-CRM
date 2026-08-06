@@ -20,6 +20,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         http_response_code(403);
         echo json_encode(['ok' => false, 'message' => __('csrf_token_invalid')]); exit;
     }
+
+    $action = trim((string)($_POST['action'] ?? 'send'));
+    if ($action === 'delete') {
+        $messageId = max(0, (int)($_POST['id'] ?? 0));
+        if ($messageId <= 0) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'message' => 'Neplatná zpráva']); exit;
+        }
+        try {
+            // Vlastnictví se kontroluje v DELETE podmínce — uživatel nemůže
+            // smazat cizí zprávu ani podvržením ID v požadavku.
+            $st = $pdo->prepare("DELETE FROM staff_chat WHERE id = ? AND actor_type = ? AND actor_id = ?");
+            $st->execute([$messageId, $actor[0], $actor[1]]);
+            if ($st->rowCount() !== 1) {
+                http_response_code(404);
+                echo json_encode(['ok' => false, 'message' => 'Zpráva neexistuje nebo není vaše']); exit;
+            }
+            if (function_exists('crmAuditLog')) {
+                crmAuditLog('chat.delete', [
+                    'entity_type' => 'staff_chat',
+                    'entity_id' => $messageId,
+                    'summary' => 'Odesílatel smazal vlastní zprávu z týmového chatu',
+                ]);
+            }
+            echo json_encode(['ok' => true, 'deleted_id' => $messageId]); exit;
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'message' => 'Smazání zprávy selhalo']); exit;
+        }
+    }
+
     $msg = trim((string)($_POST['message'] ?? ''));
     if ($msg === '') { echo json_encode(['ok' => false, 'message' => 'Prázdná zpráva']); exit; }
     if (function_exists('mb_substr')) { $msg = mb_substr($msg, 0, 2000); } else { $msg = substr($msg, 0, 2000); }
