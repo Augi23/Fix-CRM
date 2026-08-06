@@ -738,13 +738,21 @@ $(document).on('click', '.product-label-btn', function () {
         var current = sel.value;
         if ($sel.data('select2')) $sel.select2('destroy');
         sel.value = current;
+        // Připojit nabídku k dialogu, ne k celému .modal elementu. Dialog je
+        // správný stacking/positioning kontext; nabídka se tak neotevře za
+        // modalem ani na nesprávné úrovni stránky.
+        var $dropdownParent = $sel.closest('.modal-dialog');
+        if (!$dropdownParent.length) $dropdownParent = jQuery('#productCreateModal');
         $sel.select2({
             width: '100%',
-            dropdownParent: jQuery('#productCreateModal'),
+            dropdownParent: $dropdownParent,
             placeholder: placeholder || '',
             allowClear: false,
             dropdownAutoWidth: false,
             minimumResultsForSearch: 0
+        });
+        $sel.off('select2:open.crmLayer').on('select2:open.crmLayer', function () {
+            jQuery('.select2-container--open, .select2-dropdown').css('z-index', 2000);
         });
         refreshSelectUi(sel);
     }
