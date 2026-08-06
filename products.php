@@ -1547,10 +1547,27 @@ $(document).on('click', '.product-label-btn', function () {
     document.getElementById('productCreateModal').addEventListener('keydown', function (e) {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); save(true, false); }
     });
-    // Typ a Barva zůstávají nativní <select> stejně jako funkční pole
-    // Vlastnost a Stav. Select2 je zde záměrně neinicializujeme: v tomto
-    // scrollovacím modalu vytvářel oddělenou nabídku v nesprávné vrstvě.
+    // Typ a Barva musí zůstat nativní <select> stejně jako funkční pole
+    // Vlastnost a Stav. Některý globální inicializátor může Select2 připojit
+    // znovu, proto ho při každém otevření modalu výslovně odstraníme.
+    function restoreNativeCatalogDropdown(sel) {
+        if (!sel) return;
+        if (window.jQuery && jQuery.fn.select2) {
+            var $sel = jQuery(sel);
+            if ($sel.data('select2')) $sel.select2('destroy');
+        }
+        sel.classList.remove('select2-hidden-accessible');
+        sel.removeAttribute('data-select2-id');
+        sel.removeAttribute('aria-hidden');
+        sel.removeAttribute('tabindex');
+        sel.style.removeProperty('display');
+        // Odstranit případný osiřelý Select2 kontejner hned za selectem.
+        var sibling = sel.nextElementSibling;
+        if (sibling && sibling.classList.contains('select2-container')) sibling.remove();
+    }
     document.getElementById('productCreateModal').addEventListener('shown.bs.modal', function () {
+        restoreNativeCatalogDropdown($typ);
+        restoreNativeCatalogDropdown($color);
         refreshPreview();
     });
     // po zavření modalu obnovit tabulku (nové kusy) — při otevřeném se nerefreshuje
