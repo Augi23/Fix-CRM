@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.20',
+        'date' => '2026-08-06',
+        'time' => '17:15',
+        'title' => 'Sklad: správná vrstva dropdownů Typ a Barva',
+        'items' => [
+            'Dropdowny <b>Typ příslušenství</b> a <b>Barva</b> v modalu naskladnění jsou ukotvené ke konkrétnímu dialogu a otevírají se nad jeho obsahem ve správné pozici.',
+            'Ostatní funkční dropdowny v sekci zůstávají beze změny.',
+        ],
+    ],
+    [
         'version' => '3.42.19',
         'date' => '2026-08-06',
         'time' => '15:55',
