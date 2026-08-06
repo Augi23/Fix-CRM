@@ -723,11 +723,41 @@ $(document).on('click', '.product-label-btn', function () {
         $sold = el('pcSold'), $photo = el('pcPhoto'), $imageUrl = el('pcImageUrl'),
         $badge = el('pcPcrBadge'), $msg = el('pcMsg'), $hint = el('pcHint'), $editId = el('pcEditId');
 
+    function refreshSelectUi(sel) {
+        if (!sel || !window.jQuery || !jQuery.fn.select2) return;
+        var $sel = jQuery(sel);
+        if ($sel.data('select2')) $sel.trigger('change.select2');
+    }
+    function refreshCatalogDropdowns() {
+        refreshSelectUi($typ);
+        refreshSelectUi($color);
+    }
+    function enhanceCatalogDropdown(sel, placeholder) {
+        if (!sel || !window.jQuery || !jQuery.fn.select2) return;
+        var $sel = jQuery(sel);
+        var current = sel.value;
+        if ($sel.data('select2')) $sel.select2('destroy');
+        sel.value = current;
+        $sel.select2({
+            width: '100%',
+            dropdownParent: jQuery('#productCreateModal'),
+            placeholder: placeholder || '',
+            allowClear: false,
+            dropdownAutoWidth: false,
+            minimumResultsForSearch: 0
+        });
+        refreshSelectUi(sel);
+    }
+    function enhanceCatalogDropdowns() {
+        enhanceCatalogDropdown($typ, ACCESSORY_MODE ? 'Vyber typ příslušenství' : 'Vyber typ zařízení');
+        enhanceCatalogDropdown($color, 'Vyber barvu');
+    }
     function fillSelect(sel, values, withEmpty, withCustom) {
         sel.innerHTML = '';
         if (withEmpty) sel.appendChild(new Option('—', ''));
         values.forEach(function (v) { sel.appendChild(new Option(v, v)); });
         if (withCustom) sel.appendChild(new Option(CUSTOM, CUSTOM));
+        refreshSelectUi(sel);
     }
     function manufacturerVal() { return ACCESSORY_MODE ? '' : ($manuf.value === CUSTOM ? $manufC.value.trim() : $manuf.value.trim()); }
     function typVal() { return $typ.value === CUSTOM ? $typC.value.trim() : $typ.value; }
@@ -954,6 +984,7 @@ $(document).on('click', '.product-label-btn', function () {
         fillSelect($typ, opts.map(function (t) { return t.id; }), false, true);
         $typC.style.display = 'none';
         onType();
+        refreshCatalogDropdowns();
     }
 
     function onType() {
@@ -965,6 +996,7 @@ $(document).on('click', '.product-label-btn', function () {
         syncProcessorVisibility();
         document.querySelectorAll('.pc-ipad').forEach(function (n) { n.style.display = t.gen ? '' : 'none'; });
         refreshPreview();
+        refreshCatalogDropdowns();
     }
 
     function syncCatalogModeLayout() {
@@ -1468,6 +1500,7 @@ $(document).on('click', '.product-label-btn', function () {
                 el('pcPreviewImgWrap').style.display = 'none';
                 setBadge('none');
                 refreshPreview();
+                refreshCatalogDropdowns();
             })
             .catch(function () { saving = false; $msg.textContent = 'Síťová chyba — zkus to znovu.'; });
     }
@@ -1506,6 +1539,9 @@ $(document).on('click', '.product-label-btn', function () {
     document.getElementById('productCreateModal').addEventListener('keydown', function (e) {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); save(true, false); }
     });
+    document.getElementById('productCreateModal').addEventListener('shown.bs.modal', function () {
+        enhanceCatalogDropdowns();
+    });
     // po zavření modalu obnovit tabulku (nové kusy) — při otevřeném se nerefreshuje
     document.getElementById('productCreateModal').addEventListener('hidden.bs.modal', function () {
         if (savedSomething) { location.reload(); }
@@ -1539,6 +1575,7 @@ $(document).on('click', '.product-label-btn', function () {
         setBadge('none');
         syncCatalogModeLayout();
         refreshPreview();
+        refreshCatalogDropdowns();
     });
 
     // ── editace existujícího produktu ──
@@ -1617,6 +1654,7 @@ $(document).on('click', '.product-label-btn', function () {
                 syncCatalogModeLayout();
                 $msg.textContent = p.source === 'app' ? 'Pozor: kus z appky — uložením ho převezme CRM (import appky ho už nepřepíše).' : '';
                 refreshPreview();
+                refreshCatalogDropdowns();
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('productCreateModal')).show();
             })
             .catch(function () { showAlert('Načtení produktu selhalo.'); });

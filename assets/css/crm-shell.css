@@ -821,5 +821,25 @@ select optgroup,
   background-color: #ffffff !important;
 }
 
+/* Naskladneni produktu: katalogova pole Typ/Barva pouzivaji Select2 uvnitr
+   modalu, aby dropdown nebyl zavisly na nativnim systemovem popupu prohlizece. */
+#productCreateModal .select2-container {
+  width: 100% !important;
+}
+#productCreateModal .select2-container--open,
+#productCreateModal .select2-dropdown {
+  z-index: 1085 !important;
+}
+#productCreateModal .select2-container--default .select2-selection--single {
+  min-height: 44px !important;
+  height: 44px !important;
+}
+#productCreateModal .select2-container--default .select2-selection--single .select2-selection__rendered {
+  line-height: 34px !important;
+}
+#productCreateModal .select2-container--default .select2-selection--single .select2-selection__arrow {
+  height: 42px !important;
+}
+
 /* Podpisovy overlay: na nizsich viewportech (landscape/split view) musi jit scrollovat */
 .afx-signpad-overlay { overflow-y: auto; -webkit-overflow-scrolling: touch; }
