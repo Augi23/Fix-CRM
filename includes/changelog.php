@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.23',
+        'date' => '2026-08-06',
+        'time' => '18:20',
+        'title' => 'Sklad: Typ a Barva sjednoceny s dropdownem Stav',
+        'items' => [
+            'Pole <b>Typ</b> a <b>Barva</b> nyní používají úplně stejný nativní mechanismus jako funkční pole <b>Stav</b>: obyčejný <code>&lt;select class="form-select"&gt;</code> naplněný katalogovými hodnotami.',
+            'Z kódu byla odstraněna veškerá speciální Select2 inicializace, synchronizace, obnovování i CSS určené jen pro tato dvě pole.',
+        ],
+    ],
+    [
         'version' => '3.42.22',
         'date' => '2026-08-06',
         'time' => '18:00',
