@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.25',
+        'date' => '2026-08-06',
+        'time' => '19:00',
+        'title' => 'Sklad: příslušenství bez kontroly PČR',
+        'items' => [
+            'V modalu naskladnění příslušenství je pole kontroly PČR skryté už při serverovém vykreslení stránky.',
+            'Kontrola PČR zůstává zachovaná u zařízení se sériovým číslem nebo IMEI.',
+        ],
+    ],
+    [
         'version' => '3.42.24',
         'date' => '2026-08-06',
         'time' => '18:45',
