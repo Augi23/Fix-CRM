@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.22',
+        'date' => '2026-08-06',
+        'time' => '18:00',
+        'title' => 'Sklad: vynucené nativní dropdowny Typ a Barva',
+        'items' => [
+            'Při každém otevření modalu CRM výslovně odstraní případnou globálně připojenou Select2 nadstavbu z polí <b>Typ</b> a <b>Barva</b> a obnoví původní nativní select.',
+            'Obě pole se tak chovají stejně jako funkční dropdowny Vlastnost a Stav a jejich nabídka nevzniká v oddělené chybné vrstvě.',
+        ],
+    ],
+    [
         'version' => '3.42.21',
         'date' => '2026-08-06',
         'time' => '17:30',
