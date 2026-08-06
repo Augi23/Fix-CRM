@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.26',
+        'date' => '2026-08-06',
+        'time' => '19:20',
+        'title' => 'Týmový chat: mazání vlastních odeslaných zpráv',
+        'items' => [
+            'U každé vlastní zprávy se zobrazuje malé tlačítko koše; po potvrzení se zpráva odstraní a chat se znovu načte.',
+            'API kontroluje typ a ID přihlášeného odesílatele přímo v podmínce DELETE, takže uživatel nemůže smazat cizí zprávu podvržením ID.',
+        ],
+    ],
+    [
         'version' => '3.42.25',
         'date' => '2026-08-06',
         'time' => '19:00',
