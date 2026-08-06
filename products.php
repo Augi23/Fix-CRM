@@ -510,7 +510,7 @@ try {
                                 <label class="form-label small">SN / IMEI <span class="text-white-50">(naskenuj čtečkou nebo zapiš)</span></label>
                                 <input type="text" id="pcSerial" class="form-control" autocomplete="off">
                             </div>
-                            <div class="col-md-4 d-flex align-items-end" id="pcPcrGroup">
+                            <div class="col-md-4 d-flex align-items-end<?php echo $isAccessoryTab ? ' d-none' : ''; ?>" id="pcPcrGroup">
                                 <div id="pcPcrBadge" class="w-100 text-center small fw-bold rounded py-2" style="background:rgba(255,255,255,.06);color:#9aa3b2;">PČR: nekontrolováno</div>
                             </div>
                             <div class="col-12" id="pcAccessoryTextGroup" style="display:none;">
