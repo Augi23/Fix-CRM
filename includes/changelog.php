@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.19',
+        'date' => '2026-08-06',
+        'time' => '15:55',
+        'title' => 'Sklad: spolehlivý dropdown Typ a Barva při naskladnění',
+        'items' => [
+            'Pole <b>Typ příslušenství / Typ zařízení</b> a <b>Barva</b> v modalu <b>Naskladnit produkt</b> už nepoužívají nativní systémové rozbalení prohlížeče. CRM je vykresluje přes interní Select2 dropdown přímo v modalu, takže nabídka nezůstane prázdná ani se neztratí ve skleněném tmavém stylu.',
+            'Ukládání hodnot, vlastní volba <b>Vlastní…</b>, živý náhled názvu produktu i editace existujících kusů zůstávají napojené na původní katalogová pole.',
+        ],
+    ],
+    [
         'version' => '3.42.18',
         'date' => '2026-08-06',
         'time' => '15:50',
