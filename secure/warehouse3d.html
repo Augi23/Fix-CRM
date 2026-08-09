@@ -635,6 +635,32 @@
 
   function rackByN(n) { return racks.find((r) => r.n === n) || null; }
 
+  // poziční kód „R3-P2-B4": R/P z kódů, B = pořadí krabičky na polici podle kódu
+  // vzestupně (= fyzicky zleva doprava; konvence skladu). Police číslované shora.
+  function posOfLoc(l) {
+    if (!l) return '';
+    const numc = (c) => { const m = /(\d+)$/.exec(c || ''); return m ? parseInt(m[1], 10) : null; };
+    const pnoc = (c) => { const m = /-P(\d+)$/i.exec(c || ''); return m ? parseInt(m[1], 10) : null; };
+    if (l.type === 'regal') { const n = numc(l.code); return n != null ? 'R' + n : l.code; }
+    if (l.type === 'police') {
+      const rk = byLoc[l.parent_id]; const rn = rk ? numc(rk.code) : null; const p = pnoc(l.code);
+      return (rn != null && p != null) ? 'R' + rn + '-P' + p : l.code;
+    }
+    const par = byLoc[l.parent_id];
+    if (!par) return l.code;
+    const sibs = (D.locations || []).filter((x) => x.type === 'krabicka' && x.parent_id === par.id)
+      .sort((a, b) => (a.code.length - b.code.length) || (a.code < b.code ? -1 : (a.code > b.code ? 1 : 0)));
+    const b = sibs.findIndex((x) => x.id === l.id) + 1;
+    if (par.type === 'police') {
+      const rk = byLoc[par.parent_id]; const rn = rk ? numc(rk.code) : null; const p = pnoc(par.code);
+      if (rn != null && p != null && b > 0) return 'R' + rn + '-P' + p + '-B' + b;
+    } else {
+      const rn = numc(par.code);
+      if (rn != null && b > 0) return 'R' + rn + '-B' + b;
+    }
+    return l.code;
+  }
+
   function render() {
     const model = {
       racks: racks.map((r) => ({ id: r.n, label: r.code, x: r.x, y: r.y, rot: r.rot, sh: r.sh })),
@@ -663,11 +689,7 @@
   }
 
   function posLabel(t) {
-    const bits = [];
-    if (t.boxLoc) bits.push(t.boxLoc.code);
-    if (t.policeLoc) bits.push(t.policeLoc.code);
-    else if (t.rackLoc && !t.boxLoc) bits.push(t.rackLoc.code);
-    return bits.join(' · ');
+    return posOfLoc(t.boxLoc || t.policeLoc || t.rackLoc);
   }
 
   function renderPanel() {
@@ -680,24 +702,25 @@
 
     if (target && target.rackN === r.n) {
       html += '<div class="targetBox"><span>' + esc(target.part.name) + '</span> <span style="color:rgba(255,255,255,.5)">· ' + target.part.qty + ' ks</span><br>'
-        + '<span class="ps mono">' + esc(posLabel(target)) + '</span>'
+        + '<span class="ps mono" title="' + esc(target.boxLoc ? target.boxLoc.code : '') + '">' + esc(posLabel(target)) + '</span>'
+        + (target.boxLoc ? ' <span style="color:rgba(255,255,255,.35);font-size:10px">· ' + esc(target.boxLoc.code) + '</span>' : '')
         + ' &nbsp;<a href="#" id="openPart" style="color:#BF5AF2;font-size:11px;text-decoration:none">karta dílu →</a></div>';
     }
 
     html += '<div class="cap">3D náhled regálu · táhni pro otočení</div>';
     html += '<div id="rackView"><rack-3d id="rack" model="{}"></rack-3d></div>';
 
-    // police shora dolů
-    const rows = r.police.slice().sort((a, b) => b.no - a.no);
+    // police SHORA: P1 = nejvrchnější (konvence štítků), v seznamu tedy P1 první
+    const rows = r.police.slice().sort((a, b) => a.no - b.no);
     rows.forEach((po) => {
       const hotShelf = !!(target && target.policeLoc && target.policeLoc.id === po.loc.id);
       html += '<div class="shelfRow' + (hotShelf ? ' hotShelf' : '') + '">';
       html += '<div class="shelfHead"><span class="cd mono">' + esc(po.loc.code) + '</span><span class="nm">' + esc(po.loc.name || '') + '</span></div>';
       html += '<div class="chips">';
-      po.boxes.forEach((b) => {
+      po.boxes.forEach((b, bi) => {
         const hot = !!(target && target.boxLoc && target.boxLoc.id === b.id);
-        html += '<span class="chip' + (hot ? ' hot' : '') + '" data-loc="' + b.id + '" title="Otevřít obsah krabičky">'
-          + '<span class="cd mono">' + esc(b.code) + '</span>' + (b.name ? '<span>' + esc(b.name) + '</span>' : '')
+        html += '<span class="chip' + (hot ? ' hot' : '') + '" data-loc="' + b.id + '" title="Otevřít obsah krabičky — ' + esc(b.code) + '">'
+          + '<span class="cd mono">B' + (bi + 1) + '</span><span class="cd mono" style="opacity:.55">' + esc(b.code) + '</span>' + (b.name ? '<span>' + esc(b.name) + '</span>' : '')
           + '<span class="n">' + (b.parts_count || 0) + '</span></span>';
       });
       if (po.loose > 0) {
@@ -720,12 +743,14 @@
     html += '<div style="font-size:10px;color:rgba(255,255,255,.3);line-height:1.6">Názvy a struktura polic/krabiček se spravují v CRM (Sklad → Umístění); mapa je jen zobrazuje.</div>';
     P.innerHTML = html;
 
-    // rack-3d model: police → patra, krabičky → boxy (b = pořadí), „volně" = box navíc
+    // rack-3d model: police → patra (P1 NAHOŘE → pořadí obrátit: první police
+    // v seznamu dostane nejvyšší patro), krabičky → boxy zleva (b = pořadí), „volně" = box navíc
     let maxCells = 2;
     r.police.forEach((po) => { maxCells = Math.max(maxCells, po.boxes.length + (po.loose > 0 ? 1 : 0)); });
     const boxes3d = [];
-    r.police.forEach((po) => {
-      const p = Math.max(1, Math.min(r.sh, po.no || 1));
+    const asc = r.police.slice().sort((a, b) => a.no - b.no);   // P1, P2, …
+    asc.forEach((po, idx) => {
+      const p = Math.max(1, r.sh - idx);   // P1 → horní patro
       po.boxes.forEach((b, i) => {
         boxes3d.push({ p: p, b: i + 1, hot: !!(target && target.boxLoc && target.boxLoc.id === b.id) });
       });
@@ -759,7 +784,7 @@
       || (p.components || '').toLowerCase().includes(v)
     ).slice(0, 8);
     res.innerHTML = m.length
-      ? m.map((p, i) => '<div class="row" data-i="' + i + '"><span class="nm">' + esc(p.name) + '</span><span class="ps mono">' + esc(p.loc.code) + '</span></div>').join('')
+      ? m.map((p, i) => '<div class="row" data-i="' + i + '"><span class="nm">' + esc(p.name) + '</span><span class="ps mono">' + esc(posOfLoc(p.loc)) + '</span></div>').join('')
       : '<div class="none">Nic nenalezeno.</div>';
     res.style.display = 'flex';
     res.querySelectorAll('.row').forEach((row) => {

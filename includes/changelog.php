@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.44.3',
+        'date' => '2026-08-09',
+        'time' => '19:55',
+        'title' => 'Pozice dílu ve formátu R3-P2-B4',
+        'items' => [
+            'U dílů se místo kódu krabičky nově všude ukazuje <b>poziční kód R–P–B</b> (regál – police – kolikátá krabička): ve Skladu na odznaku, ve výběru dílu k zakázce (📍 R3-P2-B4), po skenu QR dílu i v 3D mapě (hledání a cílový díl; vedle pozice zůstává i kód krabičky).',
+            '<b>Konvence skladu:</b> police se číslují <b>shora</b> (P1 = nejvrchnější — tak lep štítky polic) a krabičky na polici <b>zleva doprava</b> (B1 vlevo). B se dopočítává z pořadí kódů krabiček na polici — krabičky proto na polici rovnej <b>vzestupně podle čísla</b> (KrK013 vlevo od KrK014). 3D náhled regálu kreslí P1 nahoře a u krabiček ukazuje B čísla.',
+            'Trvalé kódy krabiček (KrK028) a vytištěné štítky <b>zůstávají v platnosti</b> — pozice je odvozená a při přestěhování krabičky se přepočítá sama, nic se nepřetiskuje.',
+        ],
+    ],
+    [
         'version' => '3.44.2',
         'date' => '2026-08-09',
         'time' => '19:30',

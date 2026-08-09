@@ -3860,6 +3860,91 @@ function stockLocationFullLabel(array $loc): string {
 }
 
 /**
+ * POZIČNÍ kód umístění „R3-P2-B4" (regál – police – kolikátá krabička) pro
+ * zobrazování u DÍLŮ (Jan, 9.8.2026 dle Design návrhu). Odvozuje se z hierarchie:
+ *   R = číslo regálu z kódu (RegK3 → R3), P = číslo police z kódu (RegK3-P2 → P2),
+ *   B = pořadí krabičky na polici podle kódu VZESTUPNĚ = FYZICKY ZLEVA DOPRAVA
+ *       (konvence: krabičky se na polici rovnají vzestupně zleva; B1 vlevo).
+ * Police se číslují SHORA (P1 = nejvrchnější) — to je věc nalepení štítků,
+ * 3D náhled to kreslí stejně. IDENTITA krabičky zůstává trvalý kód (KrK028,
+ * štítek se nepřetiskuje) — poziční kód se při přesunu přepočítá sám.
+ * Vrací mapu id → poziční kód; kde nejde odvodit, vrací kód umístění.
+ */
+function stockLocationPosCodes(PDO $pdo, array $locIds): array {
+    $locIds = array_values(array_unique(array_filter(array_map('intval', $locIds))));
+    if (!$locIds) { return []; }
+    ensureStockLocationsSchema();
+    $out = [];
+    try {
+        $byId = [];
+        $fetch = function (array $ids) use ($pdo, &$byId): void {
+            $ids = array_values(array_diff(array_unique(array_map('intval', $ids)), array_keys($byId), [0]));
+            if (!$ids) { return; }
+            $st = $pdo->prepare("SELECT id, code, type, parent_id FROM stock_locations WHERE id IN (" . implode(',', array_fill(0, count($ids), '?')) . ")");
+            $st->execute($ids);
+            foreach ($st as $r) { $byId[(int)$r['id']] = $r; }
+        };
+        $fetch($locIds);
+        $fetch(array_map(fn($r) => (int)($r['parent_id'] ?? 0), $byId));           // rodiče
+        $fetch(array_map(fn($r) => (int)($r['parent_id'] ?? 0), $byId));           // prarodiče
+
+        // pořadí krabiček u dotčených rodičů (jen aktivní; delší kód řadit za kratší)
+        $parents = [];
+        foreach ($byId as $r) { if ($r['type'] === 'krabicka' && (int)$r['parent_id'] > 0) { $parents[(int)$r['parent_id']] = 1; } }
+        $orderMap = [];
+        if ($parents) {
+            $pids = array_keys($parents);
+            $st = $pdo->prepare("SELECT id, parent_id FROM stock_locations WHERE type = 'krabicka' AND is_active = 1 AND parent_id IN (" . implode(',', array_fill(0, count($pids), '?')) . ") ORDER BY parent_id, LENGTH(code), code");
+            $st->execute($pids);
+            $cnt = [];
+            foreach ($st as $r) {
+                $p = (int)$r['parent_id'];
+                $cnt[$p] = ($cnt[$p] ?? 0) + 1;
+                $orderMap[$p][(int)$r['id']] = $cnt[$p];
+            }
+        }
+
+        $num = fn($c) => preg_match('/(\d+)$/', (string)$c, $m) ? (int)$m[1] : null;
+        $pno = fn($c) => preg_match('/-P(\d+)$/i', (string)$c, $m) ? (int)$m[1] : null;
+        foreach ($locIds as $lid) {
+            $l = $byId[$lid] ?? null;
+            if (!$l) { continue; }
+            if ($l['type'] === 'regal') {
+                $n = $num($l['code']);
+                $out[$lid] = $n !== null ? 'R' . $n : (string)$l['code'];
+            } elseif ($l['type'] === 'police') {
+                $rk = $byId[(int)$l['parent_id']] ?? null;
+                $rn = $rk ? $num($rk['code']) : null;
+                $p = $pno($l['code']);
+                $out[$lid] = ($rn !== null && $p !== null) ? 'R' . $rn . '-P' . $p : (string)$l['code'];
+            } else {
+                $par = $byId[(int)$l['parent_id']] ?? null;
+                $b = $orderMap[(int)$l['parent_id']][$lid] ?? null;
+                $pos = null;
+                if ($par && $par['type'] === 'police' && $b !== null) {
+                    $rk = $byId[(int)$par['parent_id']] ?? null;
+                    $rn = $rk ? $num($rk['code']) : null;
+                    $p = $pno($par['code']);
+                    if ($rn !== null && $p !== null) { $pos = 'R' . $rn . '-P' . $p . '-B' . $b; }
+                } elseif ($par && $par['type'] === 'regal' && $b !== null) {
+                    $rn = $num($par['code']);
+                    if ($rn !== null) { $pos = 'R' . $rn . '-B' . $b; }
+                }
+                $out[$lid] = $pos ?? (string)$l['code'];
+            }
+        }
+    } catch (Throwable $e) { error_log('stockLocationPosCodes: ' . $e->getMessage()); }
+    return $out;
+}
+
+/** Poziční kód jednoho umístění („R3-P2-B4"); '' když umístění neexistuje. */
+function stockLocationPosCode(PDO $pdo, int $locationId): string {
+    if ($locationId <= 0) { return ''; }
+    $m = stockLocationPosCodes($pdo, [$locationId]);
+    return (string)($m[$locationId] ?? '');
+}
+
+/**
  * Sklad při změně stavu zakázky (dokončení = odečíst díly, vrácení = přičíst).
  *
  * NEDOSTATEK ZÁSOBY NESMÍ ZASTAVIT ZMĚNU STAVU. Zařízení je fyzicky opravené a

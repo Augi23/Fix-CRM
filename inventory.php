@@ -92,6 +92,10 @@ try {
     }
 } catch (Throwable $e) {}
 
+// poziční kódy umístění (R3-P2-B4) k odznakům u dílů
+$posByLoc = [];
+try { $posByLoc = stockLocationPosCodes($pdo, array_column($inventory, 'location_id')); } catch (Throwable $e) {}
+
 $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity <= min_stock THEN 1 ELSE 0 END) as low_stock FROM inventory WHERE branch_id = " . (int)$skladBranch . " AND " . inventoryStockedWhereSql())->fetch();
 
 // nabídky pro filtry / hromadné akce / modal nového dílu (jen vybraná pobočka)
@@ -248,8 +252,9 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                                     <td><code><?php echo htmlspecialchars($item['sku']); ?></code></td>
                                     <td>
                                         <?php if (!empty($item['loc_code'])): ?>
-                                            <a href="sklad_mapa.php?branch=<?php echo (int)$skladBranch; ?>&focus=<?php echo (int)$item['id']; ?>" class="text-decoration-none" title="Ukázat na 3D mapě skladu<?php echo trim((string)($item['loc_name'] ?? '')) !== '' ? ' — ' . htmlspecialchars($item['loc_name']) : ''; ?>">
-                                                <span class="badge bg-info text-dark"><i class="fas fa-cube me-1"></i><?php echo htmlspecialchars($item['loc_code']); ?></span>
+                                            <?php $__pos = $posByLoc[(int)$item['location_id']] ?? $item['loc_code']; ?>
+                                            <a href="sklad_mapa.php?branch=<?php echo (int)$skladBranch; ?>&focus=<?php echo (int)$item['id']; ?>" class="text-decoration-none" title="Ukázat na 3D mapě skladu — <?php echo htmlspecialchars($item['loc_code'] . (trim((string)($item['loc_name'] ?? '')) !== '' ? ' · ' . $item['loc_name'] : '')); ?>">
+                                                <span class="badge bg-info text-dark"><i class="fas fa-cube me-1"></i><?php echo htmlspecialchars($__pos); ?></span>
                                             </a>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>

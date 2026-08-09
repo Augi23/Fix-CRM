@@ -39,7 +39,7 @@ $myBranch = (int)getCurrentStaffBranchId();
 $defBranch = (int)getDefaultBranchId();
 
 try {
-    $sql = "SELECT inventory.id, part_name, sku, quantity, sale_price, source_supplier, sl.code AS loc_code FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id WHERE 1=1";
+    $sql = "SELECT inventory.id, part_name, sku, quantity, sale_price, source_supplier, inventory.location_id, sl.code AS loc_code FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id WHERE 1=1";
     $params = [];
 
     if ($supplier !== '') {
@@ -73,6 +73,10 @@ try {
     $stmt->execute($params);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // poziční kódy umístění (R3-P2-B4) — u dílů se zobrazuje pozice, ne kód krabičky
+    $posByLoc = [];
+    try { $posByLoc = stockLocationPosCodes($pdo, array_column($items, 'location_id')); } catch (Throwable $e) {}
+
     // součástky uvnitř nalezených dílů (dárci) — do popisku, ať je jasné,
     // proč se „displej" našel v celém iPhonu
     $compByInv = [];
@@ -94,8 +98,9 @@ try {
         if (!empty($item['sale_price'])) {
             $label .= ' — ' . number_format((float)$item['sale_price'], 0, ',', ' ') . ' Kč';
         }
-        if (!empty($item['loc_code'])) {
-            $label .= ' · 📍 ' . $item['loc_code'];   // kde díl fyzicky leží
+        $__pos = $posByLoc[(int)($item['location_id'] ?? 0)] ?? ($item['loc_code'] ?? '');
+        if ($__pos !== '') {
+            $label .= ' · 📍 ' . $__pos;   // pozice R3-P2-B4 (kde díl fyzicky leží)
         }
         $__comps = $compByInv[(int)$item['id']] ?? [];
         if ($__comps) {
@@ -111,6 +116,7 @@ try {
             'sale_price' => (float)($item['sale_price'] ?? 0),
             'supplier_key' => $item['source_supplier'] ?? '',
             'loc_code' => $item['loc_code'] ?? '',
+            'pos_code' => $__pos,
             'components' => $__comps,
         ];
     }

@@ -31,6 +31,7 @@ if ($qrId > 0) {
             $ls = $pdo->prepare("SELECT l.*, p.code AS parent_code FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id WHERE l.id = ?");
             $ls->execute([(int)$inv['location_id']]);
             $invLoc = $ls->fetch() ?: null;
+            if ($invLoc) { $invLoc['pos_code'] = stockLocationPosCode($pdo, (int)$invLoc['id']); }
         } catch (Throwable $e) {}
     }
 }
@@ -258,7 +259,7 @@ if ($inv) {
             <div class="small text-white-75"><?php echo $inv['sku'] ? 'SKU: ' . e($inv['sku']) . ' · ' : ''; ?><?php echo number_format((float)$inv['sale_price'], 0, ',', ' '); ?> Kč</div>
             <div class="small mt-1"><span class="badge <?php echo (int)$inv['quantity'] > 0 ? 'bg-success' : 'bg-danger'; ?>" id="stockBadge">Skladem: <?php echo (int)$inv['quantity']; ?> ks</span>
                 <?php if ($invLoc): ?>
-                    <a href="sklad.php?loc=<?php echo (int)$invLoc['id']; ?>" class="badge bg-info text-dark text-decoration-none" title="Otevřít obsah umístění"><i class="fas fa-location-dot me-1"></i><?php echo e($invLoc['code']); ?><?php echo trim((string)($invLoc['parent_code'] ?? '')) !== '' ? ' (' . e($invLoc['parent_code']) . ')' : ''; ?></a>
+                    <a href="sklad.php?loc=<?php echo (int)$invLoc['id']; ?>" class="badge bg-info text-dark text-decoration-none" title="Otevřít obsah umístění — <?php echo e($invLoc['code']); ?>"><i class="fas fa-location-dot me-1"></i><?php echo e(trim((string)($invLoc['pos_code'] ?? '')) !== '' ? $invLoc['pos_code'] : $invLoc['code']); ?></a>
                 <?php endif; ?>
             </div>
             <?php if ($invComps): ?>
