@@ -40,6 +40,9 @@ ensureSkladBranchSchema();
 
 $branchId = (int)skladBranchOrOwn();
 $hasMap = is_file($mapFile);
+// deep-link „ukázat díl na mapě": ?focus=<id dílu> se protahuje do iframe —
+// mapa díl vyhledá, rozsvítí regál majákem a vpravo zvýrazní jeho krabičku
+$focusId = (int)($_GET['focus'] ?? 0);
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
@@ -68,7 +71,7 @@ $hasMap = is_file($mapFile);
     </div>
 <?php else: ?>
     <div class="glass-panel p-2 border-secondary">
-        <iframe id="mapFrame" src="sklad_mapa.php?raw=1&amp;branch=<?php echo (int)$branchId; ?>"
+        <iframe id="mapFrame" src="sklad_mapa.php?raw=1&amp;branch=<?php echo (int)$branchId; ?><?php echo $focusId > 0 ? '&amp;focus=' . $focusId : ''; ?>"
                 style="width:100%; height:78vh; border:0; border-radius:12px; display:block; background:#0B0B0D;"
                 title="3D mapa skladu"></iframe>
     </div>

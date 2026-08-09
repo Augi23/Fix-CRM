@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.44.2',
+        'date' => '2026-08-09',
+        'time' => '19:30',
+        'title' => 'Klik na umístění dílu otevře 3D mapu s přesnou krabičkou',
+        'items' => [
+            'Odznak umístění u dílu ve Skladu (např. <b>KrK028</b>, nově s kostičkou) po kliknutí otevře <b>3D mapu skladu</b>: regál s dílem se rozsvítí <b>majákem</b> a vpravo se ukáže jeho <b>3D náhled se zvýrazněnou konkrétní krabičkou</b> na správné polici — přesně podle původního návrhu. Karta dílu je odtud na jeden klik.',
+        ],
+    ],
+    [
         'version' => '3.44.1',
         'date' => '2026-08-09',
         'time' => '19:10',

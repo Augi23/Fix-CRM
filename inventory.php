@@ -248,8 +248,8 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                                     <td><code><?php echo htmlspecialchars($item['sku']); ?></code></td>
                                     <td>
                                         <?php if (!empty($item['loc_code'])): ?>
-                                            <a href="inventory.php?branch=<?php echo (int)$skladBranch; ?>&location=<?php echo (int)$item['location_id']; ?>" class="text-decoration-none" title="<?php echo htmlspecialchars((string)($item['loc_name'] ?? '')); ?>">
-                                                <span class="badge bg-info text-dark"><?php echo htmlspecialchars($item['loc_code']); ?></span>
+                                            <a href="sklad_mapa.php?branch=<?php echo (int)$skladBranch; ?>&focus=<?php echo (int)$item['id']; ?>" class="text-decoration-none" title="Ukázat na 3D mapě skladu<?php echo trim((string)($item['loc_name'] ?? '')) !== '' ? ' — ' . htmlspecialchars($item['loc_name']) : ''; ?>">
+                                                <span class="badge bg-info text-dark"><i class="fas fa-cube me-1"></i><?php echo htmlspecialchars($item['loc_code']); ?></span>
                                             </a>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>
