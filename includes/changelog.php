@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.43.0',
+        'date' => '2026-08-09',
+        'time' => '15:40',
+        'title' => '3D mapa skladu — příprava napojení vizualizace',
+        'items' => [
+            '<b>Nová stránka Sklad → 3D mapa</b> (tlačítko v Umístěních): zobrazí interaktivní 3D vizualizaci skladu vyrobenou v Claude Design. Mapa se do CRM nahrává jako jeden HTML soubor (<code>secure/warehouse3d.html</code>) — dokud tam není, stránka ukáže návod, jak ji z Claude Design dostat.',
+            '<b>Živá data pro mapu:</b> nový endpoint <code>api/warehouse_map_data.php</code> — vrací regály/police/krabičky vybrané pobočky včetně obsazenosti (počet dílů a kusů, volitelně i seznam dílů v každém umístění). Mapa se tak nikdy nerozjede se skutečným skladem: co je v CRM, to je v mapě.',
+            'Vše jen pro přihlášené se skladovým oprávněním — rozvržení skladu je provozní informace (stejné pravidlo jako štítky umístění).',
+        ],
+    ],
+    [
         'version' => '3.42.34',
         'date' => '2026-08-09',
         'time' => date('H:i'),
