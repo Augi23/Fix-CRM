@@ -1003,11 +1003,16 @@ $(document).ready(function() {
         if (paymentMethod) { data.payment_method = paymentMethod; }
         $.post('api/update_order_status.php', data, function(res) {
             if (res.success) {
-                showQuickToast(res.payment_note ? res.payment_note : '<?php echo __('updated_success'); ?>', 'success');
-                setTimeout(() => window.location.reload(), res.payment_note ? 1600 : 300);
+                const warn = !!res.payment_warning;
+                showQuickToast(res.payment_note ? res.payment_note : '<?php echo __('updated_success'); ?>', warn ? 'danger' : 'success');
+                // varování si obsluha musí stihnout přečíst → reload až po dojetí toastu
+                setTimeout(() => window.location.reload(), warn ? 5000 : (res.payment_note ? 1600 : 300));
             } else if (res.code === 'repair_solution_required') {
-                // Chybí „Provedená oprava" → doplnit rovnou v okně a přechod dokončit
-                showRepairSolutionQuickModal(id, status, btn);
+                // Chybí „Provedená oprava" → doplnit rovnou v okně a přechod dokončit.
+                // Zvolenou platbu MUSÍME protáhnout dál (přednostně tu, kterou vrátil
+                // server), jinak se výdej dokončí bez ní — hotovost nedojde do pokladny
+                // a faktura s QR se nevystaví, přitom obsluha vidí zelené „Aktualizováno".
+                showRepairSolutionQuickModal(id, status, btn, res.payment_method || paymentMethod || '');
             } else {
                 if (btn) btn.prop('disabled', false);
                 showQuickToast(res.message || '<?php echo __('error'); ?>', 'danger');
@@ -1018,7 +1023,7 @@ $(document).ready(function() {
         });
     }
 
-    function showRepairSolutionQuickModal(id, status, btn) {
+    function showRepairSolutionQuickModal(id, status, btn, paymentMethod) {
         const m = $('#repairSolutionQuickModal');
         // text z předchozí zakázky se NESMÍ přenést do jiné (seznam se mezitím nereloaduje)
         $('#repairSolutionQuickInput').val('').removeClass('is-invalid');
@@ -1033,7 +1038,7 @@ $(document).ready(function() {
             // hidden handler odvázat, jinak by tlačítko povolil během letícího POSTu (dvojklik = duplicitní request)
             m.off('hidden.bs.modal');
             m.modal('hide');
-            performQuickStatusUpdate(id, status, btn, val);
+            performQuickStatusUpdate(id, status, btn, val, paymentMethod);
         });
     }
 

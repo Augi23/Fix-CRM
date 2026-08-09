@@ -1074,10 +1074,16 @@ $(document).ready(function() {
         });
     });
 
-    // Po reloadu ukázat výsledek platební akce z výdeje (faktura/pokladna).
+    // Po reloadu ukázat výsledek platební akce z výdeje (faktura/pokladna),
+    // u varování (platba se nezapsala) výstražnou ikonou místo zelené.
     try {
         const __pn = sessionStorage.getItem('afx_payment_note');
-        if (__pn) { sessionStorage.removeItem('afx_payment_note'); showAlert('<i class="fas fa-money-bill-wave me-1 text-success"></i>' + __pn); }
+        if (__pn) {
+            const __pw = sessionStorage.getItem('afx_payment_warn') === '1';
+            sessionStorage.removeItem('afx_payment_note');
+            sessionStorage.removeItem('afx_payment_warn');
+            showAlert((__pw ? '<i class="fas fa-triangle-exclamation me-1 text-warning"></i>' : '<i class="fas fa-money-bill-wave me-1 text-success"></i>') + __pn);
+        }
     } catch (e) {}
 
     $('#statusForm').on('submit', function(e) {
@@ -1463,7 +1469,10 @@ function showStatusConfirmModal(form) {
                 modal.modal('hide');
                 if (res.payment_note) {
                     // krátce ukázat výsledek platební akce (faktura odeslána / hotovost v kase)
-                    try { sessionStorage.setItem('afx_payment_note', res.payment_note); } catch (e) {}
+                    try {
+                        sessionStorage.setItem('afx_payment_note', res.payment_note);
+                        sessionStorage.setItem('afx_payment_warn', res.payment_warning ? '1' : '0');
+                    } catch (e) {}
                 }
                 location.reload();
                 return;
@@ -1471,9 +1480,12 @@ function showStatusConfirmModal(form) {
 
             btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
             if (res && res.code === 'repair_solution_required') {
-                // Chybí „Provedená oprava" → rovnou nabídnout doplnění a přechod dokončit
+                // Chybí „Provedená oprava" → rovnou nabídnout doplnění a přechod dokončit.
+                // Zvolenou platbu předáme dál (přednostně tu, kterou vrátil server), jinak
+                // by se výdej dokončil bez ní — hotovost by nedošla do pokladny a faktura
+                // s QR by se nevystavila, přitom obsluha vidí jen „uloženo".
                 modal.modal('hide');
-                showRepairSolutionModal(form);
+                showRepairSolutionModal(form, (res.payment_method || __pm || ''));
                 return;
             }
             if (res && res.message) {
@@ -1493,7 +1505,7 @@ function showStatusConfirmModal(form) {
 
 // „Provedená oprava" chybí → modal s textareou; po vyplnění se stavový přechod
 // pošle znovu i s repair_solution (API ho uloží a stav změní v jednom kroku).
-function showRepairSolutionModal(form) {
+function showRepairSolutionModal(form, paymentMethod) {
     const m = $('#repairSolutionModal');
     m.modal('show');
     setTimeout(function() { $('#repairSolutionInput').trigger('focus'); }, 300);
@@ -1503,10 +1515,25 @@ function showRepairSolutionModal(form) {
         if (!val) { $('#repairSolutionInput').addClass('is-invalid').trigger('focus'); return; }
         const btn = $(this);
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ...');
-        $.post('api/update_order_status.php', form.serialize() + '&repair_solution=' + encodeURIComponent(val), function(raw) {
+        // Platební select stojí mimo #statusForm, takže v form.serialize() NENÍ —
+        // musí se přibalit ručně, jinak by opakovaný požadavek platbu zahodil.
+        let __data = form.serialize() + '&repair_solution=' + encodeURIComponent(val);
+        const __pm2 = paymentMethod || $('#paymentMethodSelect').val() || '';
+        if (__pm2) { __data += '&payment_method=' + encodeURIComponent(__pm2); }
+        $.post('api/update_order_status.php', __data, function(raw) {
             let res = null;
             try { res = (typeof raw === 'string') ? JSON.parse(raw) : raw; } catch (e) { res = null; }
-            if (res && res.success) { location.reload(); return; }
+            if (res && res.success) {
+                if (res.payment_note) {
+                    // výsledek platební akce (nebo varování) ukázat až po reloadu
+                    try {
+                        sessionStorage.setItem('afx_payment_note', res.payment_note);
+                        sessionStorage.setItem('afx_payment_warn', res.payment_warning ? '1' : '0');
+                    } catch (e) {}
+                }
+                location.reload();
+                return;
+            }
             btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
             showAlert('<?php echo __('error'); ?>' + ((res && res.message) ? ': ' + res.message : ''));
         }).fail(function() {

@@ -11,6 +11,24 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.27',
+        'date' => '2026-08-01',
+        'time' => '18:30',
+        'title' => 'Dvanáct překážek z auditu — Na Příkopě se konečně dá normálně pracovat',
+        'items' => [
+            '<b>Kasa Na Příkopě prodá.</b> Vyhledávání nabízelo zboží obou poboček, ale dokončení prodeje položku z druhé pobočky odmítlo — technik, manažer ani brigádník tam neprodal vůbec nic. Nově se nabízí jen zboží té pobočky, na které se prodává, a když hledané zboží leží na druhé, systém to rovnou napíše.',
+            '<b>Technik Na Příkopě přidá díl na zakázku.</b> Stejná past: výběr dílů pobočku ignoroval, zápis ji vynucoval.',
+            '<b>Zakázku s dílem, který došel, jde dokončit.</b> Dřív skončila v slepé uličce — stav nešlo změnit ani na Vydáno a obsluha dostala anglickou databázovou hlášku. Nově se zakázka vydá a systém upozorní, který díl chybí, ať se sklad srovná naskladněním.',
+            '<b>Čísla faktur.</b> Počítala se jako „počet faktur + 1", takže po smazání jediné faktury (nebo když fakturovali dva lidé naráz) se vystavování zaseklo na duplicitě — a v jedné cestě to shodilo i uložení zakázky. Nově se bere nejvyšší už použité číslo a přiděluje se pod zámkem.',
+            '<b>Ztráta platby při výdeji.</b> Když CRM při bleskovém „Vydáno" ještě chtělo doplnit „Provedenou opravu", zvolený způsob platby se cestou ztratil: hotovost nedošla do pokladního deníku a u převodu nevznikla faktura s QR. Zakázka se přitom tvářila jako vyřízená.',
+            '<b>Podpisová stanice se nezasekne.</b> Neodklepnutý požadavek ji dřív zablokoval natrvalo — další podpisy se na iPadu neobjevily a kolegyně u pultu marně čekala. Nově se stanice po chvíli nečinnosti sama uvolní a staré požadavky se nevynořují cizím zákazníkům.',
+            '<b>Manažer uzavře zapomenutou směnu</b> na své pobočce (dřív jen admin nebo majitel, takže pokladna stála). A držitel směny je nově jednoznačný — dřív se za něj systém považoval kohokoli, takže se rozdíl v hotovosti mohl přiřadit špatnému člověku.',
+            '<b>Změna práv platí hned.</b> Odebrané právo, změněná role i deaktivace zaměstnance se dřív projevily až po jeho odhlášení — tedy klidně za celou směnu. Nefunkční zaškrtávátka oprávnění v Nastavení jsou srovnaná s realitou.',
+            '<b>Push notifikace</b> technikům skutečně dorazí (ukládaly se pod špatnou identitou, takže nechodily jim, ale mohly dorazit cizímu člověku).',
+            '<b>Příjem zakázky přežije souběh i velkou fotku.</b> Dřív druhá současně zakládaná zakázka spadla anglickou hláškou a <b>ztratil se celý vyplněný formulář i s podpisem</b>. Nově se to zkusí znovu, a když se opravdu nepovede, formulář zůstane vyplněný a hláška je česky.',
+        ],
+    ],
+    [
         'version' => '3.42.26',
         'date' => '2026-08-06',
         'time' => '19:20',

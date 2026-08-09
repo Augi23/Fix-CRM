@@ -3,7 +3,8 @@
    POST action=create  (order_id, sig_type)      → nový požadavek pro pobočku zakázky
    POST action=create  (complaint_id, sig_type=reklamace) → podpis reklamačního protokolu
                                                     (řádek má order_id = 0)
-   GET  ?check=<id>                              → stav požadavku (pending/done/cancelled)
+   GET  ?check=<id>                              → stav požadavku (pending/done/cancelled;
+                                                    prošlý požadavek hlásí 'cancelled')
    POST action=cancel  (request_id)              → zrušení (stanice „Přeskočit" / rozmyšlení) */
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -20,7 +21,11 @@ ensureSignatureRequestsTable();
 if (isset($_GET['check'])) {
     $st = $pdo->prepare("SELECT status FROM signature_requests WHERE id = ? LIMIT 1");
     $st->execute([(int)$_GET['check']]);
-    echo json_encode(['ok' => true, 'status' => (string)($st->fetchColumn() ?: 'missing')]);
+    $status = (string)($st->fetchColumn() ?: 'missing');
+    // Prošlý požadavek (stanice ho po čase pustila) je pro pult totéž co zrušený —
+    // ať čekající detail zakázky nestojí donekonečna na „Odesláno na tablet".
+    if ($status === 'expired') { $status = 'cancelled'; }
+    echo json_encode(['ok' => true, 'status' => $status]);
     exit;
 }
 

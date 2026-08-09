@@ -304,59 +304,34 @@ try {
     $status_changed = ((string)$current['status'] !== (string)$new_status);
     $technician_changed = ((int)($current['technician_id'] ?? 0) !== (int)$technician_id);
 
+    // Upozornění pro obsluhu (např. díl, který nebyl skladem) — sbírají se
+    // za běhu a posílají se s odpovědí, změnu stavu ale nikdy nezastaví.
+    $warnings = [];
+    // Auto-faktura se vystavuje AŽ PO COMMITU, tady se jen poznamená, že se má.
+    // InvoiceManager si otevírá vlastní transakci, takže volání odsud (uvnitř té
+    // naší) skončilo výjimkou „There is already an active transaction", model
+    // odrolloval NAŠI transakci a uložení celé zakázky spadlo.
+    $__issueInvoice = false;
+
     if ($status_changed) {
         if (!$was_finished && $is_finishing) {
-            processOrderInventoryChange($order_id, $is_finishing, $was_finished);
-
-            if (isOrderStatusIn($new_status, 'completed') && get_setting('acc_auto_create_invoice', '0') == '1') {
-                require_once '../models/InvoiceManager.php';
-                $manager = new InvoiceManager($pdo);
-                $check = $pdo->prepare('SELECT id FROM invoices WHERE order_id = ?');
-                $check->execute([$order_id]);
-                if (!$check->fetch()) {
-                    $stmt_ord = $pdo->prepare('SELECT o.*, c.first_name, c.last_name, c.company FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?');
-                    $stmt_ord->execute([$order_id]);
-                    $orderData = $stmt_ord->fetch();
-
-                    if ($orderData) {
-                        $prefix = get_setting('acc_invoice_prefix', date('Y'));
-                        $count = $pdo->query('SELECT COUNT(*) FROM invoices')->fetchColumn();
-                        $inv_number = $prefix . str_pad($count + 1, 4, '0', STR_PAD_LEFT);
-
-                        $final_price = (float)($_POST['final_cost'] ?? ($orderData['final_cost'] ?: $orderData['estimated_cost']));
-
-                        $invoiceData = [
-                            'invoice_number' => $inv_number,
-                            'customer_id' => $orderData['customer_id'],
-                            'order_id' => $order_id,
-                            'date_issue' => date('Y-m-d'),
-                            'date_tax' => date('Y-m-d'),
-                            'date_due' => date('Y-m-d', strtotime('+14 days')),
-                            'status' => 'issued',
-                            'payment_method' => 'bank_transfer',
-                            'currency' => get_setting('currency', 'Kč'),
-                            'is_vat_payer' => get_setting('acc_is_vat_payer', '0'),
-                            'items' => [
-                                [
-                                    'name' => 'Oprava ' . $orderData['device_brand'] . ' ' . $orderData['device_model'],
-                                    'quantity' => 1,
-                                    'unit' => 'ks',
-                                    'price' => $final_price,
-                                    'vat_rate' => get_setting('acc_vat_rate', '21')
-                                ]
-                            ]
-                        ];
-                        $manager->saveInvoice($invoiceData);
-                    }
-                }
-            }
+            $warnings = array_merge($warnings, processOrderInventoryChange($order_id, $is_finishing, $was_finished));
+            $__issueInvoice = isOrderStatusIn($new_status, 'completed') && get_setting('acc_auto_create_invoice', '0') == '1';
         } elseif ($was_finished && !$is_finishing) {
-            processOrderInventoryChange($order_id, $is_finishing, $was_finished);
+            $warnings = array_merge($warnings, processOrderInventoryChange($order_id, $is_finishing, $was_finished));
         }
         logOrderStatusChange($order_id, $current['status'], $new_status);
     }
 
     $pdo->commit();
+
+    if ($__issueInvoice) {
+        // Číslo si přidělí sama z maxima řady pod zámkem; 0 = nevystavena
+        // (zamčené účetní období nebo chyba) — zakázka je ale už uložená.
+        if (crmEnsureOrderInvoice((int)$order_id, 'bank_transfer') <= 0) {
+            $warnings[] = 'Zakázka je uložená, ale fakturu se nepodařilo vystavit — vystav ji ručně v Účetnictví.';
+        }
+    }
 
     // Auditní historie: seznam změněných polí (kdo/kdy řeší crmAuditLog sám).
     $__chg = [];
@@ -399,7 +374,8 @@ try {
     if (ob_get_length()) {
         ob_clean();
     }
-    echo json_encode(['success' => true]);
+    echo json_encode(['success' => true, 'warnings' => array_values($warnings),
+                      'message' => implode(' ', $warnings)], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

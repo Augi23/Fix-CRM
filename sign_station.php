@@ -135,21 +135,34 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
 (function () {
     var busy = false;
     var current = null;
+    var shownIds = [];        // id požadavků, které stanice právě ukazuje (doklad nebo výběr z fronty)
+    var shownFrom = 0;        // kdy se objevily (kvůli odpovědím rozeslaným ještě před zobrazením)
+    var padHandle = null;     // otevřené podpisové plátno — do rozepsaného podpisu se nesahá
+    var lastTouch = 0;        // poslední dotek na stanici (i uvnitř náhledu dokladu)
     var CSRF = '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>';
     var docView = document.getElementById('docView');
     var doneFlash = document.getElementById('doneFlash');
 
     var chooser = document.getElementById('queueChooser');
 
+    /* Zákazník odejde od pultu a nikdo neklepne na „Teď ne": stanice by na jeho
+       dokladu visela napořád a další zákazník by se nedočkal. Po téhle době bez
+       JEDINÉHO doteku se sama vrátí do klidu. 4 minuty jsou víc, než kolik zabere
+       přečtení a podepsání zakázkového listu, a každý dotek (i posun dokladu
+       uvnitř rámu) je počítá znovu od nuly. */
+    var IDLE_TIMEOUT_MS = 4 * 60 * 1000;
+    var VERIFY_GRACE_MS = 6000;
+
     function poll() {
-        if (busy) return;
         fetch('api/sign_station.php', { credentials: 'same-origin', cache: 'no-store' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                if (busy || !d || !d.ok) return;
+                if (!d || !d.ok) return;
                 var reqs = d.requests || (d.request ? [d.request] : []);
+                if (busy) { verifyShown(reqs); return; }
                 if (!reqs.length) return;
                 busy = true;
+                touched();
                 beep();                       // ať si toho obsluha i zákazník všimnou
                 if (reqs.length === 1) {
                     current = reqs[0];
@@ -159,6 +172,40 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
                 }
             })
             .catch(function () {});
+    }
+
+    /* Zobrazený požadavek nemusí pořád platit — obsluha ho mezitím zrušila,
+       poslala místo něj nový, nebo mu vypršela platnost. Bez téhle kontroly
+       stanice zůstane viset na mrtvém požadavku a nikomu dalšímu se neozve. */
+    function verifyShown(reqs) {
+        if (!shownIds.length || (Date.now() - shownFrom) < VERIFY_GRACE_MS) return;
+        var ids = reqs.map(function (r) { return r.id; });
+        if (current) {
+            if (ids.indexOf(current.id) !== -1) return;
+            if (padHandle) return;    // klient právě podepisuje — plátno mu pod rukou nezavřeme
+            stationIdle();
+            return;
+        }
+        // výběr z fronty se drží živý: vyřízené položky zmizí, nové přibudou
+        if (!reqs.length) { stationIdle(); return; }
+        if (ids.join(',') !== shownIds.join(',')) showChooser(reqs);
+    }
+
+    function stationIdle() {
+        if (padHandle) { try { padHandle.close(); } catch (e) {} padHandle = null; }
+        hideDocument();
+        current = null;
+        shownIds = [];
+        shownFrom = 0;
+        busy = false;
+    }
+
+    function cancelRequest(id) {
+        var fd = new FormData();
+        fd.append('action', 'cancel');
+        fd.append('request_id', id);
+        fd.append('csrf_token', CSRF);
+        return fetch('api/request_signature.php', { method: 'POST', body: fd, credentials: 'same-origin' });
     }
 
     // Výběr z fronty: karta = jméno klienta (velké) + zařízení + kdo poslal
@@ -180,6 +227,9 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
             });
             list.appendChild(b);
         });
+        current = null;
+        shownIds = reqs.map(function (r) { return r.id; });
+        shownFrom = Date.now();
         chooser.style.display = 'flex';
     }
     function esc(t) { var d = document.createElement('div'); d.textContent = String(t == null ? '' : t); return d.innerHTML; }
@@ -195,11 +245,26 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
         var sLbl = document.getElementById('docViewSignLbl'); if (sLbl) sLbl.textContent = t.sign;
         document.getElementById('docViewSub').textContent =
             req.order_code + ' · ' + req.customer + ' · ' + req.device + (req.amount ? ' · ' + req.amount : '');
-        document.getElementById('docViewFrame').src = req.document_id
+        var frame = document.getElementById('docViewFrame');
+        // Doklad je ve vlastním rámu — dotek uvnitř (posun, čtení) se do stanice
+        // jinak nedostane a auto-timeout by naskočil zákazníkovi pod rukama.
+        frame.onload = function () {
+            try {
+                var fd = frame.contentDocument;
+                if (!fd) return;
+                ['pointerdown', 'touchstart', 'touchmove', 'scroll'].forEach(function (ev) {
+                    fd.addEventListener(ev, touched, { capture: true, passive: true });
+                });
+            } catch (e) {}
+        };
+        frame.src = req.document_id
             ? 'print_document.php?id=' + encodeURIComponent(req.document_id)
             : (req.complaint_id
                 ? 'print_complaint.php?id=' + encodeURIComponent(req.complaint_id)
                 : 'print_order.php?id=' + encodeURIComponent(req.order_id) + '&plain=1');
+        shownIds = [req.id];
+        shownFrom = Date.now();
+        touched();
         docView.style.display = 'flex';
     }
     function hideDocument() {
@@ -210,12 +275,7 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
 
     window.stationDocCancel = function () {
         if (!current) return;
-        var fd = new FormData();
-        fd.append('action', 'cancel');
-        fd.append('request_id', current.id);
-        fd.append('csrf_token', CSRF);
-        fetch('api/request_signature.php', { method: 'POST', body: fd })
-            .finally(function () { hideDocument(); current = null; busy = false; });
+        cancelRequest(current.id).finally(function () { stationIdle(); });
     };
 
     // 2) Podpisové plátno; zrušení vrací na dokument (požadavek žije dál)
@@ -225,12 +285,13 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
         var t = afxSignL(req.lang);
         // popisky podpisového plátna v jazyce zakázky (Smazat / Teď ne / Uložit podpis)
         window.AFX_SIGN_L10N = { clear: t.clear, cancel: t.not_now, save: t.save };
-        afxSignaturePad({
+        padHandle = afxSignaturePad({
             title: t.signing_by + ' ' + req.customer,
             subtitle: (req.document_id ? (req.station_sub || req.station_title || '') : (req.complaint_id ? t.sub_complaint : (req.sig_type === 'vydej' ? t.sub_pickup : t.sub_reception))) + ' · ' + req.order_code + ' · ' + req.device + (req.amount ? ' · ' + req.amount : ''),
             // ⚖️ Souhlasná/právní věta: rozhodná je ČESKÁ verze, cizí jazyk je jen zdvořilostní překlad.
             terms: req.document_id ? (req.station_terms || '') : (req.complaint_id ? t.terms_complaint : (req.sig_type === 'vydej' ? t.terms_pickup : t.terms_reception)),
             onSave: function (dataUrl) {
+                padHandle = null;
                 var fd = new FormData();
                 if (req.document_id) { fd.append('document_id', req.document_id); }
                 else if (req.complaint_id) { fd.append('complaint_id', req.complaint_id); }
@@ -243,17 +304,22 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
                     .then(function (r) { return r.json(); })
                     .then(function (j) {
                         hideDocument();
+                        // podepsáno → hlídač platnosti už nemá co kontrolovat, ale stanice
+                        // zůstává „obsazená", dokud nedoběhne potvrzení (jinak by pod ním
+                        // naskočil další požadavek)
+                        current = null;
+                        shownIds = [];
                         // 3) potvrzení: dokument uložen k zakázce (+ e-mail, pokud odešel)
                         var ft = document.getElementById('doneFlashTitle'); if (ft) ft.textContent = t.signed;
                         document.getElementById('doneFlashSub').textContent = (j && j.emailed)
                             ? t.saved_emailed
                             : t.saved_stored;
                         doneFlash.style.display = 'flex';
-                        setTimeout(function () { doneFlash.style.display = 'none'; current = null; busy = false; }, 3500);
+                        setTimeout(function () { doneFlash.style.display = 'none'; stationIdle(); }, 3500);
                     })
-                    .catch(function () { hideDocument(); current = null; busy = false; });
+                    .catch(function () { stationIdle(); });
             },
-            onCancel: function () { /* zpět na dokument, požadavek trvá */ }
+            onCancel: function () { padHandle = null; /* zpět na dokument, požadavek trvá */ }
         });
     };
 
@@ -324,6 +390,25 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
             });
         } catch (e) {}
     }
+
+    /* ── AUTO-TIMEOUT U PULTU ────────────────────────────────────────────────
+       Zákazník odešel, doklad zůstal na displeji. Po IDLE_TIMEOUT_MS bez doteku
+       se stanice uvolní a požadavek ZRUŠÍ — zrušit ho musí, jinak by ho poll za
+       tři vteřiny ukázal znovu a stanice by se točila dokola. Pro pult je to
+       stejné jako klepnutí na „Teď ne", takže obsluha přestane čekat a může
+       podpis poslat znovu. Výběr z fronty se netimeoutuje: ten nic neblokuje,
+       protože ukazuje všechny čekající zakázky. */
+    function touched() { lastTouch = Date.now(); }
+    ['pointerdown', 'touchstart', 'mousedown', 'keydown'].forEach(function (ev) {
+        document.addEventListener(ev, touched, { capture: true, passive: true });
+    });
+    setInterval(function () {
+        if (!busy || !current || !lastTouch) return;
+        if ((Date.now() - lastTouch) < IDLE_TIMEOUT_MS) return;
+        var id = current.id;
+        stationIdle();
+        cancelRequest(id);
+    }, 10000);
 
     setInterval(poll, 3000);
     poll();

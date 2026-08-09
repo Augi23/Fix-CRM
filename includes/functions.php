@@ -27,10 +27,19 @@ function getCurrentStaffRole(): string {
 /**
  * Check if current user has a specific permission.
  * All permissions are loaded from the DB once per session and cached in $_SESSION['_perms'].
- * Call invalidatePermissionsCache() whenever permissions or the session is updated.
+ * Cache se sama zahodí, jakmile se posune razítko práv (crmBumpStaffPermsRev) —
+ * změna práv, role nebo aktivity zaměstnance tedy platí hned, ne až po odhlášení.
  */
 function hasPermission($permission) {
     global $pdo;
+
+    // Změna práv/role/aktivity se musí projevit HNED i druhému, kdo je právě
+    // přihlášený — relace jinak drží stará práva celých 8 hodin (viz razítko).
+    crmRefreshStaffSession();
+    if (!empty($_SESSION['_staff_revoked'])) {
+        crmKickRevokedStaff();   // deaktivovaný/smazaný účet rovnou odhlásit
+        return false;
+    }
 
     // Admins always have all permissions
     if (($_SESSION['role'] ?? '') === 'admin') {
@@ -66,29 +75,10 @@ function hasPermission($permission) {
             return true;
         }
 
-        $implicitPermissions = [];
-        // VŠICHNI zaměstnanci smí upravovat zakázky I kontakty klientů — chyby si
-        // opraví sami a viník je vždy dohledatelný v Historii (rozhodnutí majitele
-        // 18.7.2026; střídají se za kasou a zakládají zakázky). Mazání zakázek ale
-        // zůstává jen adminovi a Bossovi — viz crmCanDeleteOrders().
-        $implicitPermissions[] = 'edit_orders';
-        $implicitPermissions[] = 'edit_customers';
-        // SKLAD vidí a spravuje KAŽDÝ zaměstnanec (rozhodnutí majitele 1.8.2026 —
-        // „všem technikům": na Růži jsou engineeři bez skladu k ničemu a viník
-        // každé změny je dohledatelný v Historii). Nákupy zůstávají manažerské.
-        $implicitPermissions[] = 'manage_inventory';
-        if (in_array(getCurrentStaffRole(), ['manager', 'boss'], true)) {
-            $implicitPermissions[] = 'procurement_manage';
-        }
-        // Přehledy NAPŘÍČ pobočkami (vidět vše, Reporty) jen pro globální diváky = admin + Boss.
-        // Manažer je nově pobočkový (vidí jen svou pobočku), proto tato práva NEdostává.
-        // POZOR: zde NESMÍ být isBranchGlobalViewer() — ta volá hasPermission('admin_access')
-        // a vznikla by nekonečná rekurze. Admin_access už vrátil true výše (ř.30/43), takže
-        // sem doteče jen NE-admin technik → z globálních diváků tedy stačí otestovat Bosse.
-        if (getCurrentStaffRole() === 'boss') {
-            $implicitPermissions[] = 'view_all_orders';
-            $implicitPermissions[] = 'view_reports_all';
-        }
+        // POZOR: seznam implicitních práv NESMÍ být napsaný tady natvrdo — stejný
+        // seznam potřebuje i Nastavení, aby zaškrtávátka neslibovala něco jiného,
+        // než co systém dělá. Zdroj pravdy je crmImplicitPermissions().
+        $implicitPermissions = crmImplicitPermissions(getCurrentStaffRole());
 
         return in_array($permission, $_SESSION['_perms'], true)
             || in_array($permission, $implicitPermissions, true);
@@ -102,7 +92,142 @@ function hasPermission($permission) {
  * Call after setTechPermissions() or on logout.
  */
 function invalidatePermissionsCache(): void {
-    unset($_SESSION['_perms']);
+    unset($_SESSION['_perms'], $_SESSION['_perms_rev']);
+}
+
+/**
+ * Práva, která zaměstnanec dostává automaticky podle role — bez ohledu na to,
+ * co je zaškrtnuté v Nastavení. Jediný zdroj pravdy pro hasPermission() i pro
+ * kartu oprávnění v Nastavení (dřív byl seznam na dvou místech a zaškrtávátka
+ * Zakázky/Klienti/Sklad tak jen předstírala, že něco řídí).
+ *
+ * $role = interní role zaměstnance (engineer|brigadnik|manager|boss|admin…).
+ */
+function crmImplicitPermissions(string $role): array {
+    // Účetní je NEPROVOZNÍ role — nedostává nic (viz crmAccountantHasPermission).
+    if ($role === 'accountant') {
+        return [];
+    }
+    // Administrátor a Boss mají všechno bez ohledu na zaškrtávátka.
+    if ($role === 'admin' || $role === 'boss') {
+        return array_keys(getAvailablePermissions());
+    }
+    // VŠICHNI zaměstnanci smí upravovat zakázky I kontakty klientů — chyby si
+    // opraví sami a viník je vždy dohledatelný v Historii (rozhodnutí majitele
+    // 18.7.2026; střídají se za kasou a zakládají zakázky). Mazání zakázek ale
+    // zůstává jen adminovi a Bossovi — viz crmCanDeleteOrders().
+    // SKLAD vidí a spravuje KAŽDÝ zaměstnanec (rozhodnutí majitele 1.8.2026 —
+    // „všem technikům": na Růži jsou engineeři bez skladu k ničemu a viník
+    // každé změny je dohledatelný v Historii). Nákupy zůstávají manažerské.
+    // Přehledy NAPŘÍČ pobočkami (vidět vše, Reporty) mají jen globální diváci =
+    // admin + Boss, ti ale odešli výš. Manažer je pobočkový, proto je NEdostává —
+    // dostává jen Nákupy. POZOR: zde NESMÍ být isBranchGlobalViewer() — ta volá
+    // hasPermission('admin_access') a vznikla by nekonečná rekurze; proto se role
+    // předává parametrem.
+    $perms = ['edit_orders', 'edit_customers', 'manage_inventory'];
+    if ($role === 'manager') {
+        $perms[] = 'procurement_manage';
+    }
+    return $perms;
+}
+
+/**
+ * Razítko verze zaměstnaneckých práv (system_settings). Posune ho každá změna
+ * práv, role nebo aktivity zaměstnance — přihlášené relace podle něj poznají,
+ * že mají práva načíst znovu.
+ */
+function crmStaffPermsRev(): string {
+    return (string)get_setting('staff_perms_rev', '0');
+}
+
+/**
+ * Posunout razítko = „všem přihlášeným přenačíst práva při dalším kliknutí".
+ * Volat po KAŽDÉ změně práv, role nebo aktivity zaměstnance. Bez toho se změna
+ * projeví až po odhlášení, a relace drží 8 hodin (deaktivovaný člověk by tedy
+ * mohl pracovat celý zbytek směny).
+ */
+function crmBumpStaffPermsRev(): void {
+    try {
+        // uniqid s more_entropy: liší se i při dvou změnách ve stejné sekundě
+        set_setting('staff_perms_rev', uniqid('', true));
+    } catch (Throwable $e) {
+        error_log('crmBumpStaffPermsRev: ' . $e->getMessage());
+    }
+    invalidatePermissionsCache();
+}
+
+/**
+ * Srovná relaci zaměstnance se stavem v databázi, pokud se od jejího načtení
+ * posunulo razítko práv. Obnovuje roli (i přepnutí admin ↔ technik, jak ji
+ * počítá login.php) a seznam práv; u smazaného nebo deaktivovaného účtu
+ * nastaví příznak, na který hasPermission() reaguje odepřením všeho.
+ *
+ * Čte se jen když se razítko liší — běžný požadavek tedy stojí jediné čtení
+ * system_settings, které get_setting() stejně cachuje.
+ */
+function crmRefreshStaffSession(): void {
+    global $pdo;
+    $tid = (int)($_SESSION['tech_id'] ?? 0);
+    if ($tid <= 0 || !isset($pdo)) {
+        return;     // admin z tabulky `users` ani klient tenhle mechanismus nemá
+    }
+    $rev = crmStaffPermsRev();
+    if (isset($_SESSION['_perms'], $_SESSION['_perms_rev']) && $_SESSION['_perms_rev'] === $rev) {
+        return;
+    }
+    try {
+        $st = $pdo->prepare('SELECT role, is_active FROM technicians WHERE id = ? LIMIT 1');
+        $st->execute([$tid]);
+        $row = $st->fetch();
+        if (!$row || (int)($row['is_active'] ?? 0) !== 1) {
+            $_SESSION['_perms'] = [];
+            $_SESSION['_staff_revoked'] = 1;
+        } else {
+            unset($_SESSION['_staff_revoked']);
+            // stejné odvození jako při přihlášení (login.php) — jinak by
+            // zaměstnanci odebraná administrátorská práva zůstala v relaci
+            $dbRole = (string)($row['role'] ?: 'engineer');
+            $_SESSION['role'] = ($dbRole === 'admin') ? 'admin' : 'technician';
+            $_SESSION['internal_role'] = $dbRole;
+            $ps = $pdo->prepare('SELECT permission FROM tech_permissions WHERE technician_id = ?');
+            $ps->execute([$tid]);
+            $_SESSION['_perms'] = $ps->fetchAll(PDO::FETCH_COLUMN);
+        }
+        $_SESSION['_perms_rev'] = $rev;
+    } catch (Throwable $e) {
+        error_log('crmRefreshStaffSession: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Odhlásí zaměstnance, kterému mezitím účet zrušili nebo deaktivovali.
+ *
+ * Samotné odepření práv nestačí: spousta stránek CRM žádné oprávnění nekontroluje
+ * (zakázky, klienti, kasa), takže propuštěný člověk by mohl do konce směny dál
+ * pracovat. Relaci proto rovnou vyprázdníme a pošleme ho na přihlášení — kde ho
+ * login stejně nepustí dál (přihlásit se smí jen aktivní účet).
+ *
+ * Jen dokud se neodeslalo tělo odpovědi: uprostřed už vykreslené stránky
+ * přesměrovat nejde a rozbitá půlka relace by nadělala víc škody než užitku —
+ * tam zůstane jen odepření práv a odhlásí se při dalším kliknutí.
+ */
+function crmKickRevokedStaff(): void {
+    if (PHP_SAPI === 'cli' || headers_sent()) {
+        return;
+    }
+    $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $_SESSION = [];
+    if (strpos($script, '/api/') !== false) {
+        if (ob_get_length()) { ob_clean(); }   // ať se k odpovědi nepřilepí rozepsaný výstup
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false,
+            'message' => 'Tvůj účet už není aktivní. Přihlas se prosím znovu.'],
+            JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Location: login.php');
+    exit;
 }
 
 /**
@@ -577,8 +702,9 @@ function setTechPermissions($tech_id, $permissions) {
         }
     }
 
-    // Invalidate session permission cache so changes take effect immediately
-    invalidatePermissionsCache();
+    // Změna se musí projevit hned i tomu, komu se práva mění a je zrovna
+    // přihlášený — proto razítko pro cizí relace, ne jen vlastní cache.
+    crmBumpStaffPermsRev();
 }
 
 /**
@@ -2124,6 +2250,36 @@ function crmPosUnlockClearFails(string $accountKey): void {
 }
 
 /**
+ * Další volné číslo v číselné řadě faktur (prefix + 4 číslice).
+ *
+ * POZOR: číslo se odvozuje z NEJVYŠŠÍHO už použitého čísla v řadě, NE z počtu
+ * faktur. Původní COUNT(*)+1 přidělil po smazání (nebo stornu) jediné faktury
+ * číslo, které v řadě už existovalo → UNIQUE invoice_number → „Duplicate entry"
+ * a spadlé uložení celé zakázky.
+ *
+ * $lockRow = zamykající čtení (FOR UPDATE) pro volání UVNITŘ transakce: běžný
+ * SELECT tam pod REPEATABLE READ čte pořád týž snapshot, takže opakování po
+ * kolizi by vracelo donekonečna stejné číslo. Zároveň zamkne konec řady, takže
+ * dvě kasy naráz nedostanou stejné číslo.
+ */
+function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false): string {
+    $seq = 0;
+    try {
+        // wildcardy v prefixu (kdyby si je někdo uložil v Nastavení) nesmí rozšířit LIKE
+        $like = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $prefix) . '%';
+        $offset = mb_strlen($prefix) + 1;   // číselná část začíná hned za prefixem
+        $sql = "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number, " . (int)$offset . ") AS UNSIGNED)), 0)
+                FROM invoices WHERE invoice_number LIKE ?" . ($lockRow ? ' FOR UPDATE' : '');
+        $st = $pdo->prepare($sql);
+        $st->execute([$like]);
+        $seq = (int)$st->fetchColumn();
+    } catch (Throwable $e) {
+        error_log('afxNextInvoiceNumber: ' . $e->getMessage());
+    }
+    return $prefix . str_pad((string)($seq + 1), 4, '0', STR_PAD_LEFT);
+}
+
+/**
  * Faktura z prodeje na kase — INSERT do stávajících invoices/invoice_items.
  * Volat UVNITŘ běžící transakce checkoutu (proto ne InvoiceManager: ten si otevírá
  * vlastní transakci a má admin-only gate, prodávat smí i ne-admin).
@@ -2175,18 +2331,29 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
         VALUES (?, ?, ?, NULL, CURDATE(), CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY),
                 ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?)");
     $invoiceId = 0;
-    // číselná řada faktur je historicky COUNT+1 (závodivé) — UNIQUE klíč + retry to jistí
-    for ($try = 0; $try < 6; $try++) {
-        $cnt = (int)$pdo->query("SELECT COUNT(*) FROM invoices")->fetchColumn();
-        $number = $prefix . str_pad((string)($cnt + 1 + $try), 4, '0', STR_PAD_LEFT);
-        try {
-            $ins->execute([$number, preg_replace('/\D/', '', $number) ?: null, $customerId,
-                round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes]);
-            $invoiceId = (int)$pdo->lastInsertId();
-            break;
-        } catch (PDOException $e) {
-            if ((int)($e->errorInfo[1] ?? 0) !== 1062) { throw $e; }   // jiná chyba než duplicitní číslo
+    // Číslo z MAXIMA řady pod zámkem (stejný vzor jako pokladní doklady):
+    // GET_LOCK proti souběhu dvou kas, UNIQUE klíč + opakování jako pojistka,
+    // kdyby se zámek nepodařilo získat. Žádný posun o $try — FOR UPDATE čte
+    // pokaždé aktuální maximum, takže v řadě nevznikají díry.
+    $lockName = 'afx_invoice_number';
+    $haveLock = false;
+    try {
+        $haveLock = (int)$pdo->query("SELECT GET_LOCK(" . $pdo->quote($lockName) . ", 5)")->fetchColumn() === 1;
+    } catch (Throwable $e) { /* bez zámku to zvládne opakování níže */ }
+    try {
+        for ($try = 0; $try < 6; $try++) {
+            $number = afxNextInvoiceNumber($pdo, $prefix, true);
+            try {
+                $ins->execute([$number, preg_replace('/\D/', '', $number) ?: null, $customerId,
+                    round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes]);
+                $invoiceId = (int)$pdo->lastInsertId();
+                break;
+            } catch (PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) !== 1062) { throw $e; }   // jiná chyba než duplicitní číslo
+            }
         }
+    } finally {
+        if ($haveLock) { try { $pdo->query("SELECT RELEASE_LOCK(" . $pdo->quote($lockName) . ")"); } catch (Throwable $e) {} }
     }
     if ($invoiceId <= 0) { throw new Exception('Nepodařilo se přidělit číslo faktury.'); }
 
@@ -3627,27 +3794,83 @@ function stockLocationFullLabel(array $loc): string {
     return $s;
 }
 
-function processOrderInventoryChange($order_id, $is_finishing, $was_finished) {
+/**
+ * Sklad při změně stavu zakázky (dokončení = odečíst díly, vrácení = přičíst).
+ *
+ * NEDOSTATEK ZÁSOBY NESMÍ ZASTAVIT ZMĚNU STAVU. Zařízení je fyzicky opravené a
+ * vydané — když se díl zapomněl naskladnit, je to chyba evidence, ne důvod
+ * nepustit zakázku do stavu „Vydáno" (dřív změna stavu spadla na anglické
+ * databázové hlášce a neuložilo se vůbec nic).
+ *
+ * Proto se u dokončení odečítá PLNÉ množství i do záporu, ne jen „co jde":
+ * částečný odečet by rozbil evidenci, protože pozdější vrácení zakázky ze stavu
+ * „hotovo" vrací celé množství podle order_items — z 1 odečteného kusu by se
+ * vrátily 3 a ve skladu by vznikly kusy, které nikdy neexistovaly. Záporný stav
+ * je navíc ve skladu vidět a naskladněním se sám srovná na správné číslo.
+ *
+ * Vrací seznam českých upozornění pro obsluhu (prázdný = vše v pořádku).
+ */
+function processOrderInventoryChange($order_id, $is_finishing, $was_finished): array {
     global $pdo;
     ensureOrderItemStockFlag();
 
+    $warnings = [];
     // Položky vydané přes QR (stock_deducted=1) jsou už fyzicky odečtené —
     // dokončení/vrácení zakázky s nimi nehýbe (fyzickou pravdu drží QR pohyby).
+    $sql = 'SELECT oi.inventory_id, oi.quantity, i.part_name, i.quantity AS stock
+            FROM order_items oi
+            LEFT JOIN inventory i ON i.id = oi.inventory_id
+            WHERE oi.order_id = ? AND oi.inventory_id IS NOT NULL AND COALESCE(oi.stock_deducted, 0) = 0';
+
     if (!$was_finished && $is_finishing) {
-        $stmt = $pdo->prepare('SELECT inventory_id, quantity FROM order_items WHERE order_id = ? AND inventory_id IS NOT NULL AND COALESCE(stock_deducted, 0) = 0');
+        $stmt = $pdo->prepare($sql);
         $stmt->execute([$order_id]);
-        $items = $stmt->fetchAll();
-        foreach ($items as $item) {
-            changeInventoryQuantity($item['inventory_id'], -$item['quantity']);
+        // vlastní UPDATE místo changeInventoryQuantity(): ta při nedostatku
+        // vyhodí výjimku a shodila by celou změnu stavu
+        $upd = $pdo->prepare('UPDATE inventory SET quantity = quantity - ? WHERE id = ?');
+        foreach ($stmt->fetchAll() as $item) {
+            $need = (int)$item['quantity'];
+            if ($need <= 0) { continue; }
+            $name = trim((string)($item['part_name'] ?? '')) ?: ('díl #' . (int)$item['inventory_id']);
+            if ($item['stock'] === null) {
+                // karta dílu ve skladu už neexistuje (smazaná) — není co odečítat
+                $warnings[] = 'Díl „' . $name . '" už není ve skladu evidovaný — zakázka je uložená, sklad zkontroluj ručně.';
+                continue;
+            }
+            // I samotný odpis smí selhat (např. jiná definice sloupce na starší
+            // instalaci) — ani to nesmí shodit změnu stavu, jen se to nahlásí.
+            try {
+                $upd->execute([$need, (int)$item['inventory_id']]);
+            } catch (Throwable $e) {
+                error_log('processOrderInventoryChange (odpis): ' . $e->getMessage());
+                $warnings[] = 'Díl „' . $name . '" se nepodařilo odepsat ze skladu — zakázka je uložená, sklad srovnej ručně.';
+                continue;
+            }
+            $before = (int)$item['stock'];
+            if ($before < $need) {
+                $chybi = $need - max(0, $before);
+                $warnings[] = 'Díl „' . $name . '" nebyl celý skladem (chybí ' . $chybi
+                    . ' ks) — zakázka je uložená, sklad doplň naskladněním.';
+                crmAuditLog('inventory.shortage', [
+                    'entity_type' => 'order', 'entity_id' => (int)$order_id,
+                    'summary' => 'Zakázka dokončena bez zásoby: ' . $name . ' — odepsáno ' . $need
+                        . ' ks, skladem bylo ' . $before . ' ks (stav jde do minusu).',
+                    'details' => ['inventory_id' => (int)$item['inventory_id'], 'pozadovano' => $need, 'skladem' => $before],
+                ]);
+            }
         }
     } elseif ($was_finished && !$is_finishing) {
-        $stmt = $pdo->prepare('SELECT inventory_id, quantity FROM order_items WHERE order_id = ? AND inventory_id IS NOT NULL AND COALESCE(stock_deducted, 0) = 0');
+        $stmt = $pdo->prepare($sql);
         $stmt->execute([$order_id]);
-        $items = $stmt->fetchAll();
-        foreach ($items as $item) {
-            changeInventoryQuantity($item['inventory_id'], $item['quantity']);
+        // vrácení stav jen zvyšuje — nic tu selhat nemůže
+        $upd = $pdo->prepare('UPDATE inventory SET quantity = quantity + ? WHERE id = ?');
+        foreach ($stmt->fetchAll() as $item) {
+            $qty = (int)$item['quantity'];
+            if ($qty <= 0) { continue; }
+            $upd->execute([$qty, (int)$item['inventory_id']]);
         }
     }
+    return $warnings;
 }
 
 /** URL uvítacího zvuku zaměstnance (uploads/greetings/<username>.<ext>), null pokud není nahraný. */
@@ -4372,30 +4595,51 @@ function crmEnsureOrderInvoice(int $orderId, string $paymentMethod = 'bank_trans
 
         require_once __DIR__ . '/../models/InvoiceManager.php';
         $manager = new InvoiceManager($pdo);
-        $prefix = get_setting('acc_invoice_prefix', date('Y'));
-        $count = $pdo->query('SELECT COUNT(*) FROM invoices')->fetchColumn();
-        $inv_number = $prefix . str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+        $prefix = (string)get_setting('acc_invoice_prefix', date('Y'));
         $final_price = (float)($orderData['final_cost'] ?: $orderData['estimated_cost']);
 
-        $manager->saveInvoice([
-            'invoice_number' => $inv_number,
-            'customer_id' => $orderData['customer_id'],
-            'order_id' => $orderId,
-            'date_issue' => date('Y-m-d'),
-            'date_tax' => date('Y-m-d'),
-            'date_due' => date('Y-m-d', strtotime('+14 days')),
-            'status' => 'issued',
-            'payment_method' => $paymentMethod,
-            'currency' => get_setting('currency', 'Kč'),
-            'is_vat_payer' => get_setting('acc_is_vat_payer', '0'),
-            'items' => [[
-                'name' => 'Oprava ' . $orderData['device_brand'] . ' ' . $orderData['device_model'],
-                'quantity' => 1,
-                'unit' => 'ks',
-                'price' => $final_price,
-                'vat_rate' => get_setting('acc_vat_rate', '21'),
-            ]],
-        ]);
+        // Číslo z MAXIMA řady a pod zámkem (viz afxNextInvoiceNumber) — COUNT+1
+        // po smazané faktuře přiděloval už použité číslo a uložení spadlo.
+        $lockName = 'afx_invoice_number';
+        $haveLock = false;
+        try {
+            $haveLock = (int)$pdo->query("SELECT GET_LOCK(" . $pdo->quote($lockName) . ", 5)")->fetchColumn() === 1;
+        } catch (Throwable $e) { /* bez zámku to zvládne opakování níže */ }
+        $inv_number = '';
+        try {
+            for ($try = 0; $try < 6; $try++) {
+                $inv_number = afxNextInvoiceNumber($pdo, $prefix);
+                $res = $manager->saveInvoice([
+                    'invoice_number' => $inv_number,
+                    'customer_id' => $orderData['customer_id'],
+                    'order_id' => $orderId,
+                    'date_issue' => date('Y-m-d'),
+                    'date_tax' => date('Y-m-d'),
+                    'date_due' => date('Y-m-d', strtotime('+14 days')),
+                    'status' => 'issued',
+                    'payment_method' => $paymentMethod,
+                    'currency' => get_setting('currency', 'Kč'),
+                    'is_vat_payer' => get_setting('acc_is_vat_payer', '0'),
+                    'items' => [[
+                        'name' => 'Oprava ' . $orderData['device_brand'] . ' ' . $orderData['device_model'],
+                        'quantity' => 1,
+                        'unit' => 'ks',
+                        'price' => $final_price,
+                        'vat_rate' => get_setting('acc_vat_rate', '21'),
+                    ]],
+                ]);
+                if (!empty($res['success'])) { break; }
+                // opakovat JEN při kolizi čísla; jiná chyba (zamčené období, práva)
+                // by se opakováním nespravila a jen by spálila dalších pět čísel
+                $err = (string)($res['error'] ?? '');
+                if (stripos($err, 'Duplicate entry') === false && strpos($err, '1062') === false) {
+                    error_log('crmEnsureOrderInvoice: faktura neuložena — ' . $err);
+                    return 0;
+                }
+            }
+        } finally {
+            if ($haveLock) { try { $pdo->query("SELECT RELEASE_LOCK(" . $pdo->quote($lockName) . ")"); } catch (Throwable $e) {} }
+        }
 
         $ck->execute([$orderId]);
         $newId = (int)$ck->fetchColumn();
@@ -5366,6 +5610,7 @@ function crmAuditActionLabel(string $action): string {
         'procurement.assign_order' => 'Přiřazení dílu k zakázce', 'procurement.delete' => 'Smazání požadavku na díl',
         'inventory.create' => 'Naskladnění dílu', 'inventory.update' => 'Úprava skladového dílu',
         'inventory.delete' => 'Smazání skladového dílu',
+        'inventory.shortage' => 'Díl chyběl skladem',
         'inventory.assign_location' => 'Přiřazení dílů do umístění', 'inventory.set_model' => 'Model u skladových dílů',
         'location.create' => 'Nové umístění skladu', 'location.update' => 'Úprava umístění skladu',
         'location.delete' => 'Smazání umístění skladu',

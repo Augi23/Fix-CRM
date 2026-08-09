@@ -41,6 +41,14 @@ if (!$order_id || !$new_status) {
     exit;
 }
 
+// Platba při výdeji (hotově / kartou / převodem) — volitelný parametr.
+// Načítá se PŘED transakcí schválně: potřebuje ji jak kontrola uzávěrky níže,
+// tak odpověď „chybí provedená oprava" (vrací platbu zpět frontendu, aby ji
+// neztratil v opakovaném požadavku). Dřív se načítala až uprostřed transakce,
+// takže kontrola uzávěrky pracovala s nedefinovanou proměnnou.
+$payment_method = (string)($_POST['payment_method'] ?? '');
+if (!in_array($payment_method, ['cash', 'card', 'transfer'], true)) { $payment_method = ''; }
+
 try {
     $pdo->beginTransaction();
 
@@ -103,6 +111,10 @@ try {
             'success' => false,
             'code' => 'repair_solution_required',
             'message' => $t('repair_solution_required'),
+            // Zvolenou platbu vracíme zpět, aby ji frontend přibalil do opakovaného
+            // požadavku po doplnění opravy — jinak se výdej dokončil bez platby
+            // (hotovost nedošla do pokladny, faktura s QR se nevystavila).
+            'payment_method' => $payment_method,
         ]);
         exit;
     }
@@ -142,6 +154,7 @@ try {
         $params[] = $target_tech_id;
     }
 
+    // Akce k platbě (příjem do kasy / faktura s QR e-mailem) běží až po commitu níže.
     if (isOrderStatusIn($new_status, 'collected')) {
         $sql .= ', shipping_date = IFNULL(shipping_date, CURRENT_TIMESTAMP)';
         // Výdej bez zvoleného způsobu předání → automaticky „Osobní odběr" (Self Pickup).
@@ -242,6 +255,7 @@ try {
 
     // ── Platba při výdeji: akce podle zvoleného způsobu (best-effort po commitu) ──
     $payment_note = '';
+    $payment_warning = false;
     $entering_collected = isOrderStatusIn($new_status, 'collected') && !isOrderStatusIn($current_status, 'collected');
     if ($payment_method !== '' && $entering_collected) {
         try {
@@ -259,6 +273,7 @@ try {
                 // pojistka pro souběh (zámek vznikl během požadavku): stav už je
                 // commitnutý, tak aspoň VIDITELNÁ stopa místo tichého nezapsání
                 $payment_note = 'POZOR: hotovost NEZAPSÁNA do pokladního deníku — období je uzavřené. Po odemčení doplň pohyb ručně.';
+                $payment_warning = true;
             } elseif ($payment_method === 'cash' && $amount > 0) {
                 // hotovost prošla kasou → normální pokladní účtenka (idempotentně)
                 // místo anonymního pohybu. Díky pos_sales.order_id ji detail zakázky
@@ -283,8 +298,10 @@ try {
                     $payment_note = $eok
                         ? ('Faktura s QR platbou odeslána na ' . $eto . '.')
                         : ('Faktura vystavena, e-mail se nepodařilo odeslat: ' . $emsg);
+                    $payment_warning = !$eok;
                 } else {
                     $payment_note = 'Fakturu se nepodařilo vystavit — vystav ji ručně v Účetnictví.';
+                    $payment_warning = true;
                 }
             } elseif ($payment_method === 'card') {
                 $payment_note = 'Platba kartou zaznamenána — spáruje se s výpisem z účtu.';
@@ -292,10 +309,47 @@ try {
         } catch (Throwable $e) {
             error_log('update_order_status payment action selhala, zmena #' . (int)$order_id . ' ulozena: ' . $e->getMessage());
             $payment_note = 'Stav uložen, ale akce k platbě selhala — zkontroluj ručně.';
+            $payment_warning = true;
+        }
+    } elseif ($payment_method === '' && $entering_collected) {
+        // POJISTKA proti tiché ztrátě platby: výdej BEZ způsobu platby výdej
+        // nezastavuje (vydat se legitimně smí i bez placení — reklamace, záruka,
+        // zakázka za 0 Kč, „Vydat bez záznamu platby"), ale u nenulové částky
+        // nesmí projít potichu se zeleným „Aktualizováno". Proto viditelné
+        // varování obsluze + stopa v auditu, ať se ztráta dá dohledat.
+        try {
+            $amount = (float)($final_cost ?? 0);
+            // Falešně nevaruj tam, kde je platba už podchycená jinde:
+            // vystavená faktura (pohledávka) nebo hotovost přijatá dřív na kase.
+            $already_paid = false;
+            if ($amount > 0) {
+                $iv = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
+                $iv->execute([(int)$order_id]);
+                $already_paid = (bool)$iv->fetchColumn();
+                if (!$already_paid) {
+                    ensurePosCashMovementsTable();
+                    $cm = $pdo->prepare("SELECT id FROM pos_cash_movements WHERE ref_type = 'order' AND ref_id = ? LIMIT 1");
+                    $cm->execute([(int)$order_id]);
+                    $already_paid = (bool)$cm->fetchColumn();
+                }
+            }
+            if ($amount > 0 && !$already_paid) {
+                $__oc = trim((string)($order_data['order_code'] ?? '')) !== '' ? (string)$order_data['order_code'] : ('#' . (int)$order_id);
+                $payment_note = 'POZOR: zakázka vydána BEZ záznamu platby (' . formatMoney($amount) . '). Pokud klient platil, doplň platbu v Účetnictví — do pokladny se nic nezapsalo.';
+                $payment_warning = true;
+                // záměrně stejný typ jako u zaznamenané platby ('order.payment_set') —
+                // jen ten má v přehledu historie český popisek; rozdíl nese souhrn
+                crmAuditLog('order.payment_set', [
+                    'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
+                    'summary' => 'Zakázka ' . $__oc . ' — výdej BEZ záznamu platby (' . formatMoney($amount) . ')',
+                ]);
+            }
+        } catch (Throwable $e) {
+            error_log('update_order_status kontrola chybejici platby selhala #' . (int)$order_id . ': ' . $e->getMessage());
         }
     }
 
-    echo json_encode(['success' => true, 'message' => $t('status_updated'), 'payment_note' => $payment_note]);
+    echo json_encode(['success' => true, 'message' => $t('status_updated'), 'payment_note' => $payment_note, 'payment_warning' => $payment_warning]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

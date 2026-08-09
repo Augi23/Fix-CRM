@@ -50,9 +50,31 @@ function afxEnsurePosShiftTable(): void {
 /** Identita přihlášeného pracovníka: [label, user_id|null, tech_id|null]. */
 function afxPosShiftIdentity(): array {
     $label = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? $_SESSION['tech_name'] ?? ''));
-    $uid = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
-    $tid = !empty($_SESSION['tech_id']) ? (int)$_SESSION['tech_id'] : null;
+    // PAST DUAL-LOGINU: technikovi se do $_SESSION['user_id'] ukládá pseudo-klíč
+    // 't<id>' (login.php), takže (int) z něj udělá 0 — a nula pak „seděla" na
+    // každou směnu s prázdným opened_by_user, tedy na směnu kteréhokoli kolegy.
+    // Proto: technik má VÝHRADNĚ tech_id, číselné user_id patří jen účtu z users.
+    $tid = (int)($_SESSION['tech_id'] ?? 0) ?: null;
+    $uid = null;
+    if ($tid === null && is_numeric($_SESSION['user_id'] ?? null)) {
+        $uid = (int)$_SESSION['user_id'] ?: null;
+    }
     return [$label !== '' ? $label : 'neznámý', $uid, $tid];
+}
+
+/**
+ * Smí přihlášený uzavřít CIZÍ směnu? Vedení (admin/Boss) na obou pobočkách,
+ * manažer jen na SVÉ pobočce — bez toho stojí kasa na Příkopě, dokud se
+ * nepřipojí majitel. Směnu bez pobočky (starý záznam) nechává na vedení,
+ * protože u ní nejde spolehlivě určit, které pobočky se týká.
+ */
+function afxPosShiftCanForceClose(?array $shift): bool {
+    if (!$shift) { return false; }
+    if (function_exists('crmCanDeleteOrders') && crmCanDeleteOrders()) { return true; }
+    if (!function_exists('getCurrentStaffRole') || getCurrentStaffRole() !== 'manager') { return false; }
+    $shiftBranch = (int)($shift['branch_id'] ?? 0);
+    if ($shiftBranch <= 0) { return false; }
+    return $shiftBranch === (int)getCurrentStaffBranchId();
 }
 
 /** Otevřená směna pobočky, nebo null. */
@@ -71,8 +93,13 @@ function afxPosShiftCurrent(int $branchId): ?array {
 function afxPosShiftIsMine(?array $shift): bool {
     if (!$shift) { return false; }
     [, $uid, $tid] = afxPosShiftIdentity();
-    if ($uid !== null && (int)($shift['opened_by_user'] ?? 0) === $uid) { return true; }
-    if ($tid !== null && (int)($shift['opened_by_tech'] ?? 0) === $tid) { return true; }
+    $shiftUid = (int)($shift['opened_by_user'] ?? 0);
+    $shiftTid = (int)($shift['opened_by_tech'] ?? 0);
+    // Porovnávají se jen VYPLNĚNÉ identity na obou stranách. Prázdný sloupec
+    // (0/NULL u starších směn) nesmí sednout nikomu — za zásuvku musí odpovídat
+    // konkrétní člověk, jinak se rozdíl při uzávěrce přiřkne komukoli.
+    if ($tid !== null) { return $shiftTid > 0 && $shiftTid === $tid; }
+    if ($uid !== null) { return $shiftUid > 0 && $shiftUid === $uid; }
     return false;
 }
 
@@ -151,19 +178,28 @@ function afxPosShiftOpen(int $branchId, bool $match, ?float $counted): array {
 
 /**
  * Uzávěrka směny: napočítaná hotovost + poznámka. Uzavřít smí držitel směny,
- * nebo vedení ($force — admin/Boss zavírá zapomenutou směnu kolegy).
+ * nebo ($force) ten, kdo na to má právo podle afxPosShiftCanForceClose() —
+ * vedení kdekoli, manažer na své pobočce (zapomenutá směna kolegy).
  */
 function afxPosShiftClose(int $shiftId, float $counted, string $note, bool $force = false): array {
     global $pdo;
     afxEnsurePosShiftTable();
-    [$label] = afxPosShiftIdentity();
+    [$label, $myUid, $myTid] = afxPosShiftIdentity();
 
     $st = $pdo->prepare("SELECT * FROM pos_shifts WHERE id = ? AND status = 'open'");
     $st->execute([$shiftId]);
     $shift = $st->fetch(PDO::FETCH_ASSOC);
     if (!$shift) { return ['ok' => false, 'error' => 'Směna už je uzavřená nebo neexistuje.']; }
-    if (!afxPosShiftIsMine($shift) && !$force) {
-        return ['ok' => false, 'error' => 'Směnu může uzavřít jen ' . $shift['opened_by'] . ' nebo vedení.'];
+    // Právo na cizí směnu se ověřuje TADY, proti skutečně načtenému řádku — volající
+    // nesmí stačit „chtěl force"; jinak by pobočkový guard šel obejít jiným vstupem.
+    $mine = afxPosShiftIsMine($shift);
+    if (!$mine) {
+        if (!$force) {
+            return ['ok' => false, 'error' => 'Směnu může uzavřít jen ' . $shift['opened_by'] . ' nebo vedení.'];
+        }
+        if (!afxPosShiftCanForceClose($shift)) {
+            return ['ok' => false, 'error' => 'Cizí směnu smí uzavřít jen vedení nebo manažer téhle pobočky.'];
+        }
     }
     if (!is_finite($counted) || $counted < 0 || $counted > 100000000) {
         return ['ok' => false, 'error' => 'Zadej napočítanou hotovost.'];
@@ -180,10 +216,25 @@ function afxPosShiftClose(int $shiftId, float $counted, string $note, bool $forc
     $diff = round($counted - $expected, 2);
     crmAuditLog('kasa.shift_close', [
         'entity_type' => 'pos_shift', 'entity_id' => $shiftId,
-        'summary' => 'Uzávěrka pokladny: napočítáno ' . number_format($counted, 2, ',', ' ') . ' Kč, systém '
+        'summary' => ($mine ? 'Uzávěrka pokladny: ' : 'Uzávěrka CIZÍ směny (držel/a ji ' . $shift['opened_by'] . '): ')
+            . 'napočítáno ' . number_format($counted, 2, ',', ' ') . ' Kč, systém '
             . number_format($expected, 2, ',', ' ') . ' Kč' . (abs($diff) >= 0.005
                 ? ', ROZDÍL ' . number_format($diff, 2, ',', ' ') . ' Kč' : ', souhlasí')
-            . ($force ? ' (uzavřelo vedení za ' . $shift['opened_by'] . ')' : ''),
+            . ($mine ? '' : ' — uzavřel/a ' . $label),
+        // Jmenovitě obě strany včetně id, ať je i po přejmenování člověka jasné,
+        // komu zásuvka patřila a kdo ji zavřel.
+        'details' => [
+            'drzitel' => (string)$shift['opened_by'],
+            'drzitel_user_id' => ((int)($shift['opened_by_user'] ?? 0)) ?: null,
+            'drzitel_tech_id' => ((int)($shift['opened_by_tech'] ?? 0)) ?: null,
+            'uzavrel' => $label,
+            'uzavrel_user_id' => $myUid,
+            'uzavrel_tech_id' => $myTid,
+            'cizi_smena' => $mine ? 0 : 1,
+            'napocitano' => $counted,
+            'system' => round($expected, 2),
+            'rozdil' => $diff,
+        ],
         'branch_id' => (int)($shift['branch_id'] ?? 0),
     ]);
     return ['ok' => true, 'expected' => $expected, 'diff' => $diff];

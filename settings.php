@@ -302,6 +302,13 @@ if (isset($_POST['edit_tech'])) {
             $pdo->prepare('UPDATE orders SET branch_id = ? WHERE technician_id = ?')->execute([$branch_id, $id]);
         }
     }
+    // Role i „aktivní" se musí projevit HNED — i tomu, kdo je zrovna přihlášený
+    // (relace jinak drží stará práva 8 hodin, viz crmBumpStaffPermsRev). Jen u
+    // admina: neadmin si tu mění pouze vlastní kontakt, role/aktivita se přebírá
+    // beze změny a zbytečné razítko by nutilo všechny relace znovu číst práva.
+    if ($is_admin_check) {
+        crmBumpStaffPermsRev();
+    }
     crmAuditLog('staff.update', [
         'entity_type' => 'technician', 'entity_id' => (int)$id, 'entity_label' => $name,
         'summary' => 'Upraven zaměstnanec ' . $name . ' (role: ' . $role . ', ' . ($active ? 'aktivní' : 'neaktivní') . ')',
@@ -331,6 +338,8 @@ if (isset($_POST['delete_tech']) && $is_admin_check) {
     try { $ns = $pdo->prepare("SELECT name FROM technicians WHERE id = ?"); $ns->execute([$_POST['delete_tech']]); $__tn = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
     $stmt = $pdo->prepare("DELETE FROM technicians WHERE id = ?");
     $stmt->execute([$_POST['delete_tech']]);
+    // smazaný zaměstnanec nesmí dál pracovat ve své otevřené relaci
+    crmBumpStaffPermsRev();
     crmAuditLog('staff.delete', [
         'entity_type' => 'technician', 'entity_id' => (int)$_POST['delete_tech'], 'entity_label' => $__tn,
         'summary' => 'Smazán zaměstnanec ' . ($__tn !== '' ? $__tn : ('#' . (int)$_POST['delete_tech'])),
@@ -418,6 +427,8 @@ if (isset($_POST['demote_tech_admin']) && $is_admin_check) {
         $dtName = (string)$ns->fetchColumn();
         if ($dtName !== '') {
             $pdo->prepare("UPDATE technicians SET role = 'engineer' WHERE id = ?")->execute([$dtId]);
+            // odebraná admin práva musí platit hned, ne až po jeho odhlášení
+            crmBumpStaffPermsRev();
             crmAuditLog('admin.demote', [
                 'entity_type' => 'technician', 'entity_id' => $dtId, 'entity_label' => $dtName,
                 'summary' => 'Zaměstnanci ' . $dtName . ' odebrána administrátorská práva (role → Technik)',
@@ -2642,8 +2653,34 @@ require_once 'includes/header.php';
         <input type="hidden" name="tech_id" value="<?php echo $t['id']; ?>">
         <div class="modal-header border-secondary bg-warning bg-opacity-10"><h5 class="modal-title"><?php echo __('permissions_title'); ?><?php echo htmlspecialchars($t['name']); ?></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
-            <?php $tech_perms = getTechPermissions($t['id']); foreach (getAvailablePermissions() as $pk => $pi): ?>
-            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="permissions[]" value="<?php echo $pk; ?>" id="p_<?php echo $t['id'].$pk; ?>" <?php echo in_array($pk, $tech_perms) ? 'checked' : ''; ?>><label class="form-check-label" for="p_<?php echo $t['id'].$pk; ?>"><strong><?php echo $pi['name']; ?></strong><div class="text-white-75 small"><?php echo $pi['desc']; ?></div></label></div>
+            <?php
+            // Zaškrtávátko u práva, které zaměstnanec dostává automaticky, dřív jen
+            // předstíralo, že něco řídí (odškrtnuté právo měl dál) — proto se takové
+            // právo ukazuje jako trvale zapnuté a s vysvětlením, odkud plyne.
+            $tech_perms = getTechPermissions($t['id']);
+            $__trole = (string)($t['role'] ?? 'engineer');
+            $implicit_perms = crmImplicitPermissions($__trole);
+            ?>
+            <?php if ($__trole === 'accountant'): ?>
+            <?php /* účetní se řídí VÝHRADNĚ crmAccountantHasPermission — zaškrtávátka
+                      by tady jen předstírala, že něco mění */ ?>
+            <div class="alert alert-warning py-2 small">Účetní má přístup jen k účetním
+                funkcím (faktury, banka, sestavy) — zaškrtávátka níže se na ni nevztahují.</div>
+            <?php endif; ?>
+            <?php
+            foreach (getAvailablePermissions() as $pk => $pi):
+                $is_implicit = in_array($pk, $implicit_perms, true);
+            ?>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="permissions[]" value="<?php echo $pk; ?>" id="p_<?php echo $t['id'].$pk; ?>" <?php echo ($is_implicit || in_array($pk, $tech_perms)) ? 'checked' : ''; ?> <?php echo $is_implicit ? 'disabled' : ''; ?>>
+                <?php /* zakázané pole se neodesílá — hidden drží dřív udělené právo, ať se tichem nesmaže */ ?>
+                <?php if ($is_implicit && in_array($pk, $tech_perms)): ?><input type="hidden" name="permissions[]" value="<?php echo $pk; ?>"><?php endif; ?>
+                <label class="form-check-label" for="p_<?php echo $t['id'].$pk; ?>"><strong><?php echo $pi['name']; ?></strong>
+                    <?php if ($is_implicit): ?><span class="badge bg-secondary ms-1">má automaticky</span><?php endif; ?>
+                    <div class="text-white-75 small"><?php echo $pi['desc']; ?></div>
+                    <?php if ($is_implicit): ?><div class="text-warning small">Tohle právo má podle své role každý takový zaměstnanec — odebrat se nedá.</div><?php endif; ?>
+                </label>
+            </div>
             <?php endforeach; ?>
         </div>
         <div class="modal-footer border-secondary"><button type="submit" name="save_permissions" class="btn btn-warning"><?php echo __('save_permissions_btn'); ?></button></div>

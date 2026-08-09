@@ -10,9 +10,124 @@ if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) {
     exit;
 }
 
+// ── Chybová stránka místo holého die() ───────────────────────────────────────
+// Příjem zakázky je dlouhý formulář (klient, zařízení, závada, rozpis ceny).
+// Když založení selže, personál NESMÍ přijít o vyplněná data — proto vracíme
+// stránku s českou hláškou a se VŠEMI odeslanými poli schovanými ve formuláři,
+// který jde odeslat znovu jedním kliknutím.
+function afxOrderHiddenFields(string $name, $value): string {
+    if (is_array($value)) {
+        $out = '';
+        foreach ($value as $k => $v) { $out .= afxOrderHiddenFields($name . '[' . $k . ']', $v); }
+        return $out;
+    }
+    return '<input type="hidden" name="' . e($name) . '" value="' . e((string)$value) . '">';
+}
+
+function afxOrderFail(string $headline, string $detail, bool $canRetry = true): void
+{
+    if (!headers_sent()) {
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store');
+    }
+    $hidden = '';
+    if ($canRetry) {
+        foreach ($_POST as $k => $v) {
+            if ($k === 'csrf_token' || $k === 'files') continue;   // token vydáme čerstvý, soubory prohlížeč znovu nepošle
+            $hidden .= afxOrderHiddenFields((string)$k, $v);
+        }
+    }
+    $hadFiles = !empty($_FILES['files']['name'][0]);
+    ?>
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zakázku se nepodařilo založit</title>
+<style>
+ body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+      background:#101014;color:#f2f2f7;
+      font-family:'SF Pro Text','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+ .card{max-width:560px;width:100%;background:#1c1c22;border:1px solid #2e2e36;border-radius:18px;padding:28px 30px;}
+ h1{font-size:20px;font-weight:600;margin:0 0 10px;}
+ p{font-size:15px;font-weight:400;line-height:1.55;color:#c9c9d1;margin:0 0 14px;}
+ .note{font-size:13px;color:#9a9aa5;}
+ .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;}
+ button,a.btn{font:inherit;font-size:15px;font-weight:500;border-radius:10px;padding:11px 18px;
+      border:1px solid #3a3a44;background:#26262e;color:#f2f2f7;text-decoration:none;cursor:pointer;}
+ button.primary{background:#0a84ff;border-color:#0a84ff;color:#fff;}
+ form{display:inline;}
+</style>
+</head>
+<body>
+<div class="card">
+    <h1><?php echo e($headline); ?></h1>
+    <p><?php echo e($detail); ?></p>
+    <?php if ($canRetry): ?>
+        <p class="note">Vyplněné údaje jsou uložené v této stránce — tlačítkem níž je odešlete znovu, nemusíte nic přepisovat.<?php
+            echo $hadFiles ? ' Fotky se ale znovu nepřipojí, přidejte je až v detailu zakázky.' : ''; ?></p>
+    <?php endif; ?>
+    <div class="actions">
+        <?php if ($canRetry): ?>
+        <form method="POST" action="add_order.php" accept-charset="UTF-8">
+            <?php echo csrfField(); echo $hidden; ?>
+            <button type="submit" class="primary">Zkusit odeslat znovu</button>
+        </form>
+        <?php endif; ?>
+        <button type="button" onclick="history.back()">Zpět na formulář</button>
+        <a class="btn" href="../orders.php">Přehled zakázek</a>
+    </div>
+</div>
+</body>
+</html>
+    <?php
+    exit;
+}
+
+/** Následující číslo v řadě zakázek (APFAZ2600959 → APFAZ2600960) se zachovaným
+ *  počtem číslic. null = kód nemá očekávaný tvar (pak nemá smysl opakovat). */
+function afxNextOrderCode(?string $code): ?string {
+    if ($code === null || !preg_match('/^([A-Za-z]+)([0-9]+)$/', $code, $m)) return null;
+    return $m[1] . str_pad((string)((int)$m[2] + 1), strlen($m[2]), '0', STR_PAD_LEFT);
+}
+
+/** Hodnota z php.ini ve tvaru „8M" na bajty. */
+function afxIniBytes(string $val): int {
+    $val = trim($val);
+    if ($val === '') return 0;
+    $unit = strtolower($val[strlen($val) - 1]);
+    $num  = (int)$val;
+    if ($unit === 'g') return $num * 1024 * 1024 * 1024;
+    if ($unit === 'm') return $num * 1024 * 1024;
+    if ($unit === 'k') return $num * 1024;
+    return $num;
+}
+
+// Když je odeslaná fotka/video větší než post_max_size, PHP zahodí $_POST i
+// $_FILES — kontrola CSRF pak selže a personál dostal matoucí „neplatný token".
+// Pozná se to podle prázdného $_POST při nenulové délce těla požadavku.
+$__postMax = afxIniBytes((string)ini_get('post_max_size'));
+$__sentLen = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !$_POST && !$_FILES && $__sentLen > 0) {
+    $velikosti = $__postMax > 0
+        ? ' Odeslali jste ' . round($__sentLen / 1048576, 1) . ' MB, server přijme najednou nejvýš '
+          . round($__postMax / 1048576, 1) . ' MB.'
+        : '';
+    afxOrderFail(
+        'Fotky jsou příliš velké',
+        'Přílohy se nevešly do limitu serveru, proto se zakázka neodeslala.' . $velikosti
+            . ' Vraťte se na formulář, odeberte největší fotku nebo video a zakázku odešlete znovu — přílohy jde přidat i později v detailu zakázky.',
+        false   // $_POST je prázdné, není co vracet zpět
+    );
+}
+
 // CSRF validation
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
-    die(__('csrf_token_invalid'));
+    afxOrderFail(
+        'Bezpečnostní kontrola neprošla',
+        'Formulář byl nejspíš otevřený moc dlouho nebo mezitím vypršelo přihlášení. Zkuste zakázku odeslat znovu; pokud to nepůjde, přihlaste se prosím a příjem zopakujte.'
+    );
 }
 
 if (!function_exists('crmOrderFilesHaveUploadAttempt')) {
@@ -62,7 +177,10 @@ $intake_photo_required_msg = __('intake_photos_server_required');
 $intake_photo_failed_msg = __('intake_photos_upload_failed');
 
 if (!$customer_id || !$device_model || $pin_code === '') {
-    die(__('missing_fields'));
+    afxOrderFail(
+        'Chybí povinné údaje',
+        'Zakázku nelze založit bez klienta, modelu zařízení a PINu (hesla) k zařízení. Doplňte je prosím a odešlete znovu.'
+    );
 }
 
 if (!$intake_upload_attempt && !$intake_photo_waiver) {
@@ -75,7 +193,10 @@ if ($intake_photo_waiver && !$intake_upload_attempt) {
 }
 
 if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
-    die('Vybraný technik neexistuje nebo není aktivní.');
+    afxOrderFail(
+        'Vybraný technik nejde přiřadit',
+        'Technik už neexistuje nebo není aktivní. Vyberte jiného, nebo zakázku založte bez technika — přidělit ho jde kdykoliv později.'
+    );
 }
 
 // Pobočka zakázky = pobočka zvolená při založení (u technika jeho pobočka),
@@ -112,14 +233,34 @@ try {
          problem_description, technician_notes, serial_number, serial_number_2, pin_code, appearance, priority, estimated_cost, shipping_method, status, order_code, created_by_name)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
+    // Číslo zakázky se odvozuje z nejvyššího existujícího (generateNextOrderCode).
+    // Když dva lidi odešlou příjem ve stejnou chvíli, oba dostanou stejný kód a
+    // druhý INSERT spadne na UNIQUE idx_orders_order_code. Není to důvod obtěžovat
+    // obsluhu — prostě si vezmeme další volné číslo a zkusíme to znovu.
+    // POZOR: opakované volání generateNextOrderCode() by tady nepomohlo — uvnitř
+    // transakce (REPEATABLE READ) čteme pořád stejný snímek dat, takže zakázku,
+    // kterou kolega commitnul až po startu naší transakce, prostě neuvidíme a
+    // dostali bychom znovu totéž číslo. Další kandidát se proto počítá lokálně.
     $new_order_code = function_exists('generateNextOrderCode') ? generateNextOrderCode($pdo) : null;
-    $stmt->execute([
-        $customer_id, $technician_id, $branch_id, $device_type, $order_type, $device_brand, $device_model,
-        $problem_description, $technician_notes, $serial_number, $serial_number_2,
-        $pin_code, $appearance, $priority, $estimated_cost, $shipping_method, $status, $new_order_code,
-        $created_by_name !== '' ? $created_by_name : null
-    ]);
-    $order_id = (int)$pdo->lastInsertId();
+    $order_id = 0;
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            $stmt->execute([
+                $customer_id, $technician_id, $branch_id, $device_type, $order_type, $device_brand, $device_model,
+                $problem_description, $technician_notes, $serial_number, $serial_number_2,
+                $pin_code, $appearance, $priority, $estimated_cost, $shipping_method, $status, $new_order_code,
+                $created_by_name !== '' ? $created_by_name : null
+            ]);
+            $order_id = (int)$pdo->lastInsertId();
+            break;
+        } catch (PDOException $ePdo) {
+            // 1062 = duplicitní klíč; na tabulce orders je unikátní jen order_code
+            $next = afxNextOrderCode($new_order_code);
+            if ((int)($ePdo->errorInfo[1] ?? 0) !== 1062 || $attempt >= 5 || $next === null) { throw $ePdo; }
+            $new_order_code = $next;
+            usleep(random_int(40000, 150000));   // rozestup, ať se souběžné příjmy nesrazí znovu
+        }
+    }
 
     // Rozpis ceny na zakázkový list: položky z ceníku / základ opravy + příplatek/sleva
     try {
@@ -251,9 +392,12 @@ try {
     header("Location: ../orders.php?created_order=" . (int)$order_id);
     exit;
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log("add_order error: " . $e->getMessage());
-    die('Order creation failed. Please try again.');
+    afxOrderFail(
+        'Zakázku se nepodařilo uložit',
+        'Uložení do databáze neproběhlo, zakázka tedy nevznikla. Zkuste ji odeslat znovu — pokud to selže i podruhé, dejte prosím vědět správci.'
+    );
 }
 ?>

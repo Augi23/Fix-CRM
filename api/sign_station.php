@@ -1,6 +1,7 @@
 <?php
 /* Poll podpisové stanice: nejstarší čekající požadavek pro pobočku přihlášeného
-   zaměstnance (bez pobočky = vše). Vrací data pro podpisovou obrazovku. */
+   zaměstnance (bez pobočky = vše). Vrací data pro podpisovou obrazovku.
+   Požadavky starší než SIGN_REQUEST_TTL_MIN se cestou překlopí na 'expired'. */
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 require_once __DIR__ . '/../includes/config.php';
@@ -14,6 +15,16 @@ ensureSignatureRequestsTable();
 ensureComplaintSignatureSupport();
 require_once __DIR__ . '/../includes/documents.php';
 ensureDocumentSignatureSupport();
+
+/* Prošlé požadavky: zákazník od pultu odešel a nikdo podpis nezrušil. Po této
+   době už požadavek nepatří nikomu, kdo u pultu stojí — kdyby zůstal ve frontě,
+   vynořil by se později CIZÍMU zákazníkovi. 30 minut je dost i na to, aby obsluha
+   mezitím došla pro zařízení nebo dořešila jinou zakázku. */
+const SIGN_REQUEST_TTL_MIN = 30;
+try {
+    $pdo->exec("UPDATE signature_requests SET status = 'expired'
+                WHERE status = 'pending' AND created_at < (NOW() - INTERVAL " . SIGN_REQUEST_TTL_MIN . " MINUTE)");
+} catch (Throwable $e) { /* úklid je best-effort, poll kvůli němu nesmí přestat fungovat */ }
 
 $branchId = (int)getCurrentStaffBranchId();
 $sql = "SELECT r.id, r.order_id, r.complaint_id, r.document_id, r.sig_type, r.requested_by,
@@ -31,7 +42,9 @@ $sql = "SELECT r.id, r.order_id, r.complaint_id, r.document_id, r.sig_type, r.re
         LEFT JOIN complaints k ON k.id = r.complaint_id
         LEFT JOIN customers kc ON kc.id = k.customer_id
         LEFT JOIN crm_documents dd ON dd.id = r.document_id
-        WHERE r.status = 'pending' AND (o.id IS NOT NULL OR k.id IS NOT NULL OR dd.id IS NOT NULL)"
+        WHERE r.status = 'pending'
+              AND r.created_at >= (NOW() - INTERVAL " . SIGN_REQUEST_TTL_MIN . " MINUTE)
+              AND (o.id IS NOT NULL OR k.id IS NOT NULL OR dd.id IS NOT NULL)"
         . ($branchId > 0 ? " AND (r.branch_id = " . $branchId . " OR r.branch_id IS NULL)" : "") . "
         ORDER BY r.id ASC LIMIT 5";
 

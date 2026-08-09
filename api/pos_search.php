@@ -19,6 +19,18 @@ ensureProductsTable();
 ensureProductsPosColumn();
 ensurePosTables();
 ensureOrderPaymentMethodColumn();
+ensureSkladBranchSchema();   // sloupec branch_id (nasazení kódu předbíhá migrace)
+
+// POBOČKA: kasa smí prodat jen zboží SVÉ pobočky — api/pos_checkout.php položku
+// z cizí pobočky odmítne, takže nabízet ji je past (obsluha naskládá košík, který
+// na konci neprojde). Admin a Boss prodávají napříč, těm se nefiltruje.
+// Řádky s branch_id 0 (z doby před rozdělením skladů) patří Karlínu — stejně to
+// dopočítává crmInventoryBranchId(), aby filtr seděl s tím, co povolí checkout.
+$branchScoped = !isBranchGlobalViewer();
+$myBranch = (int)getCurrentStaffBranchId();
+$defBranch = (int)getDefaultBranchId();
+$branchSql = $branchScoped ? " AND COALESCE(NULLIF(branch_id, 0), ?) = ?" : '';
+$branchArgs = $branchScoped ? [$defBranch, $myBranch] : [];
 
 $qRaw = trim((string)($_GET['q'] ?? ''));
 $like = '%' . $qRaw . '%';
@@ -49,14 +61,15 @@ $results = [];
 try {
     // ── servisní díly ──
     if ($qRaw === '') {
-        $st = $pdo->query("SELECT id, part_name, sku, quantity, sale_price FROM inventory
-            WHERE quantity > 0 ORDER BY part_name ASC LIMIT 8");
+        $st = $pdo->prepare("SELECT id, part_name, sku, quantity, sale_price FROM inventory
+            WHERE quantity > 0" . $branchSql . " ORDER BY part_name ASC LIMIT 8");
+        $st->execute($branchArgs);
     } else {
         $params = [$like];
         $skuSql = $codeLikeSql('sku', $codeTerms, $params);
         $st = $pdo->prepare("SELECT id, part_name, sku, quantity, sale_price FROM inventory
-            WHERE quantity > 0 AND (part_name LIKE ? OR $skuSql) ORDER BY part_name ASC LIMIT 15");
-        $st->execute($params);
+            WHERE quantity > 0 AND (part_name LIKE ? OR $skuSql)" . $branchSql . " ORDER BY part_name ASC LIMIT 15");
+        $st->execute(array_merge($params, $branchArgs));
     }
     foreach ($st->fetchAll() as $r) {
         $results[] = [
@@ -72,14 +85,15 @@ try {
 
     // ── produkty (použitá elektronika + příslušenství) ──
     if ($qRaw === '') {
-        $st = $pdo->query("SELECT id, title, product_code, stock_qty, price, grade FROM products
-            WHERE stock_qty > 0 ORDER BY added_at DESC, id DESC LIMIT 8");
+        $st = $pdo->prepare("SELECT id, title, product_code, stock_qty, price, grade FROM products
+            WHERE stock_qty > 0" . $branchSql . " ORDER BY added_at DESC, id DESC LIMIT 8");
+        $st->execute($branchArgs);
     } else {
         $params = [$like, $like];
         $productCodeSql = $codeLikeSql('product_code', $codeTerms, $params);
         $st = $pdo->prepare("SELECT id, title, product_code, stock_qty, price, grade FROM products
-            WHERE stock_qty > 0 AND (title LIKE ? OR model LIKE ? OR $productCodeSql) ORDER BY title ASC LIMIT 15");
-        $st->execute($params);
+            WHERE stock_qty > 0 AND (title LIKE ? OR model LIKE ? OR $productCodeSql)" . $branchSql . " ORDER BY title ASC LIMIT 15");
+        $st->execute(array_merge($params, $branchArgs));
     }
     foreach ($st->fetchAll() as $r) {
         $results[] = [
@@ -131,4 +145,28 @@ try {
     error_log('pos_search: ' . $e->getMessage());
 }
 
-echo json_encode(['success' => true, 'results' => $results, 'code_candidates' => $codeTerms]);
+// Prázdný výsledek kvůli pobočce se musí vysvětlit: obsluha by jinak zírala na
+// „nic nenalezeno" u zboží, které v systému vidí — jen leží na druhé pobočce.
+$message = '';
+if ($branchScoped && !$results && $qRaw !== '') {
+    try {
+        $elsewhere = 0;
+        $st = $pdo->prepare("SELECT COUNT(*) FROM inventory
+            WHERE quantity > 0 AND part_name LIKE ? AND COALESCE(NULLIF(branch_id, 0), ?) <> ?");
+        $st->execute([$like, $defBranch, $myBranch]);
+        $elsewhere += (int)$st->fetchColumn();
+        $st = $pdo->prepare("SELECT COUNT(*) FROM products
+            WHERE stock_qty > 0 AND (title LIKE ? OR model LIKE ?) AND COALESCE(NULLIF(branch_id, 0), ?) <> ?");
+        $st->execute([$like, $like, $defBranch, $myBranch]);
+        $elsewhere += (int)$st->fetchColumn();
+        if ($elsewhere > 0) {
+            $message = 'Skladem na pobočce ' . skladBranchLabel($myBranch) . ' nic takového není. '
+                . 'Hledané zboží (' . $elsewhere . ' pol.) leží na druhé pobočce a odsud ho prodat nelze — '
+                . 'musí ho prodat ona, nebo se nejdřív musí převést sem.';
+        }
+    } catch (Throwable $e) {
+        error_log('pos_search (kontrola druhé pobočky): ' . $e->getMessage());
+    }
+}
+
+echo json_encode(['success' => true, 'results' => $results, 'code_candidates' => $codeTerms, 'message' => $message]);

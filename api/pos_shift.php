@@ -25,6 +25,7 @@ if (($_GET['action'] ?? '') === 'status') {
         'ok' => true,
         'shift' => $shift,
         'mine' => afxPosShiftIsMine($shift),
+        'can_force' => afxPosShiftCanForceClose($shift),
         'expected' => afxCashBalanceAt($branchId, date('Y-m-d')),
     ]); exit;
 }
@@ -60,8 +61,10 @@ try {
         $shift = afxPosShiftCurrent($branchId);
         if (!$shift) { echo json_encode(['ok' => false, 'error' => 'Žádná otevřená směna.']); exit; }
         $force = (int)($in['force'] ?? 0) === 1;
-        if ($force && !(function_exists('crmCanDeleteOrders') && crmCanDeleteOrders())) {
-            echo json_encode(['ok' => false, 'error' => 'Uzavřít cizí směnu smí jen vedení.']); exit;
+        // Cizí (zapomenutou) směnu zavře vedení kdekoli a manažer na SVÉ pobočce —
+        // jinak by kasa na Příkopě stála, dokud nedorazí admin. Cizí pobočku ne.
+        if ($force && !afxPosShiftCanForceClose($shift)) {
+            echo json_encode(['ok' => false, 'error' => 'Uzavřít cizí směnu smí jen vedení nebo manažer téhle pobočky.']); exit;
         }
         $counted = (float)str_replace(',', '.', (string)($in['counted'] ?? ''));
         $note = mb_substr(trim((string)($in['note'] ?? '')), 0, 255);
