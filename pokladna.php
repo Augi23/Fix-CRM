@@ -828,7 +828,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!d.success) return;
                 $results.innerHTML = '';
                 if (!d.results.length) {
-                    $results.innerHTML = '<div class="pos-empty">Nic skladem nenalezeno.</div>';
+                    // d.message vysvětlí, že zboží leží na druhé pobočce — bez toho
+                    // obsluha zírá na „nic nenalezeno" u kusu, který v CRM vidí
+                    $results.innerHTML = '<div class="pos-empty">'
+                        + (d.message ? String(d.message).replace(/</g, '&lt;') : 'Nic skladem nenalezeno.')
+                        + '</div>';
                     return;
                 }
                 d.results.forEach(function (r) {
@@ -1329,7 +1333,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     beep(false);
                     posToast(false, exact.length > 1 || results.length > 1
                         ? 'Kód „' + code + '" odpovídá více položkám — vyber ručně.'
-                        : 'Kód „' + code + '" není skladem ani v systému.');
+                        : (d.message ? d.message : 'Kód „' + code + '" není skladem ani v systému.'));
                 }
             })
             .catch(function () { beep(false); posToast(false, 'Síťová chyba při hledání kódu.'); });

@@ -214,10 +214,15 @@ try {
         logOrderStatusChange($order_id, $current_status, $new_status);
     }
 
-    if (!$was_finished && $is_finishing) {
-        processOrderInventoryChange($order_id, $is_finishing, $was_finished);
-    } elseif ($was_finished && !$is_finishing) {
-        processOrderInventoryChange($order_id, $is_finishing, $was_finished);
+    // Návratová hodnota nese upozornění typu „díl X nebyl skladem" — bez převzetí
+    // by se zahodila a obsluha by o chybějícím kusu nevěděla (sklad by tiše seděl
+    // v minusu). Přibalí se do odpovědi vedle platebního varování.
+    $stockWarnings = [];
+    if ($was_finished !== $is_finishing) {
+        $__inv = processOrderInventoryChange($order_id, $is_finishing, $was_finished);
+        if (is_array($__inv)) {
+            $stockWarnings = array_values(array_filter(array_map('strval', $__inv)));
+        }
     }
 
     $status_changed = ($current_status !== $new_status);
@@ -329,6 +334,10 @@ try {
             // vystavená faktura (pohledávka) nebo hotovost přijatá dřív na kase.
             $already_paid = false;
             if ($amount > 0) {
+                // Zaplaceno může být čtyřmi způsoby a každý se zapisuje jinam:
+                // faktura (invoices), hotovost při výdeji (pos_cash_movements),
+                // prodej přes kasu (pos_sales — jakýkoli způsob, ne jen hotovost)
+                // a prostý záznam způsobu platby na zakázce.
                 $iv = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
                 $iv->execute([(int)$order_id]);
                 $already_paid = (bool)$iv->fetchColumn();
@@ -337,6 +346,12 @@ try {
                     $cm = $pdo->prepare("SELECT id FROM pos_cash_movements WHERE ref_type = 'order' AND ref_id = ? LIMIT 1");
                     $cm->execute([(int)$order_id]);
                     $already_paid = (bool)$cm->fetchColumn();
+                }
+                if (!$already_paid && function_exists('crmOrderPosSale')) {
+                    $already_paid = (bool)crmOrderPosSale((int)$order_id);
+                }
+                if (!$already_paid) {
+                    $already_paid = trim((string)($order_data['payment_method'] ?? '')) !== '';
                 }
             }
             if ($amount > 0 && !$already_paid) {
@@ -355,7 +370,15 @@ try {
         }
     }
 
-    echo json_encode(['success' => true, 'message' => $t('status_updated'), 'payment_note' => $payment_note, 'payment_warning' => $payment_warning]);
+    // Skladová upozornění se připojí k platební poznámce — frontend pro ni už má
+    // červené zobrazení i prodlevu před reloadem, takže obsluha si je stihne přečíst.
+    if ($stockWarnings) {
+        $payment_note = trim($payment_note . ($payment_note !== '' ? ' ' : '') . implode(' ', $stockWarnings));
+        $payment_warning = true;
+    }
+    echo json_encode(['success' => true, 'message' => $t('status_updated'),
+        'payment_note' => $payment_note, 'payment_warning' => $payment_warning,
+        'stock_warnings' => $stockWarnings], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

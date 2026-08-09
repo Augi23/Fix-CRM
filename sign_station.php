@@ -188,7 +188,17 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
         }
         // výběr z fronty se drží živý: vyřízené položky zmizí, nové přibudou
         if (!reqs.length) { stationIdle(); return; }
-        if (ids.join(',') !== shownIds.join(',')) showChooser(reqs);
+        if (ids.join(',') !== shownIds.join(',')) {
+            // Seznam se právě přestavěl — na okamžik zablokovat klikání, ať prst
+            // mířící na svoji zakázku netrefí kartu, která se pod ním posunula
+            // (klient by otevřel doklad cizího zákazníka).
+            showChooser(reqs);
+            var list = document.getElementById('queueList');
+            if (list) {
+                list.style.pointerEvents = 'none';
+                setTimeout(function () { list.style.pointerEvents = ''; }, 800);
+            }
+        }
     }
 
     function stationIdle() {

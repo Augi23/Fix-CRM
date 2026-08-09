@@ -19,9 +19,22 @@ ensureSignatureRequestsTable();
 
 // stav požadavku (poll z detailu zakázky, čeká na stanici)
 if (isset($_GET['check'])) {
-    $st = $pdo->prepare("SELECT status FROM signature_requests WHERE id = ? LIMIT 1");
-    $st->execute([(int)$_GET['check']]);
-    $status = (string)($st->fetchColumn() ?: 'missing');
+    // Platnost se vyhodnocuje i tady: stav 'expired' přepisuje jen poll stanice,
+    // takže bez zapnutého iPadu by detail zakázky čekal navždy.
+    $st = $pdo->prepare("SELECT status,
+            (COALESCE(shown_at, created_at) < (NOW() - INTERVAL 30 MINUTE)) AS je_prosly
+        FROM signature_requests WHERE id = ? LIMIT 1");
+    try {
+        $st->execute([(int)$_GET['check']]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {   // starší DB bez shown_at
+        $st = $pdo->prepare("SELECT status, (created_at < (NOW() - INTERVAL 30 MINUTE)) AS je_prosly
+                             FROM signature_requests WHERE id = ? LIMIT 1");
+        $st->execute([(int)$_GET['check']]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+    }
+    $status = (string)($row['status'] ?? 'missing');
+    if ($status === 'pending' && !empty($row['je_prosly'])) { $status = 'expired'; }
     // Prošlý požadavek (stanice ho po čase pustila) je pro pult totéž co zrušený —
     // ať čekající detail zakázky nestojí donekonečna na „Odesláno na tablet".
     if ($status === 'expired') { $status = 'cancelled'; }

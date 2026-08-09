@@ -21,9 +21,17 @@ ensureDocumentSignatureSupport();
    vynořil by se později CIZÍMU zákazníkovi. 30 minut je dost i na to, aby obsluha
    mezitím došla pro zařízení nebo dořešila jinou zakázku. */
 const SIGN_REQUEST_TTL_MIN = 30;
+// Sloupec shown_at = kdy stanice požadavek POPRVÉ ukázala. Platnost se počítá od
+// něj, ne od vzniku: obsluha může podpis poslat dopředu a zákazník dojde za půl
+// hodiny — s TTL od vzniku by mu doklad zmizel pod rukama.
+try {
+    $__c = $pdo->query("SHOW COLUMNS FROM signature_requests LIKE 'shown_at'")->fetch();
+    if (!$__c) { $pdo->exec("ALTER TABLE signature_requests ADD COLUMN shown_at DATETIME NULL DEFAULT NULL"); }
+} catch (Throwable $e) { /* starší DB — TTL pak jede podle created_at */ }
 try {
     $pdo->exec("UPDATE signature_requests SET status = 'expired'
-                WHERE status = 'pending' AND created_at < (NOW() - INTERVAL " . SIGN_REQUEST_TTL_MIN . " MINUTE)");
+                WHERE status = 'pending'
+                  AND COALESCE(shown_at, created_at) < (NOW() - INTERVAL " . SIGN_REQUEST_TTL_MIN . " MINUTE)");
 } catch (Throwable $e) { /* úklid je best-effort, poll kvůli němu nesmí přestat fungovat */ }
 
 $branchId = (int)getCurrentStaffBranchId();
@@ -43,13 +51,20 @@ $sql = "SELECT r.id, r.order_id, r.complaint_id, r.document_id, r.sig_type, r.re
         LEFT JOIN customers kc ON kc.id = k.customer_id
         LEFT JOIN crm_documents dd ON dd.id = r.document_id
         WHERE r.status = 'pending'
-              AND r.created_at >= (NOW() - INTERVAL " . SIGN_REQUEST_TTL_MIN . " MINUTE)
+              AND COALESCE(r.shown_at, r.created_at) >= (NOW() - INTERVAL " . SIGN_REQUEST_TTL_MIN . " MINUTE)
               AND (o.id IS NOT NULL OR k.id IS NOT NULL OR dd.id IS NOT NULL)"
         . ($branchId > 0 ? " AND (r.branch_id = " . $branchId . " OR r.branch_id IS NULL)" : "") . "
         ORDER BY r.id ASC LIMIT 5";
 
 try {
     $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    // od téhle chvíle běží 30minutová platnost (viz shown_at výše)
+    if ($rows) {
+        try {
+            $ids = implode(',', array_map(static fn($r) => (int)$r['id'], $rows));
+            $pdo->exec("UPDATE signature_requests SET shown_at = NOW() WHERE id IN ($ids) AND shown_at IS NULL");
+        } catch (Throwable $e) { /* nevadí — TTL pak jede od created_at */ }
+    }
     $requests = [];
     $docTypes = crmDocTypes();
     foreach ($rows as $r) {

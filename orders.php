@@ -647,6 +647,20 @@ $__techs     = getActiveTechnicians(true);
 <script>
 // Phone QR Popover using Google Charts API (no library needed)
 document.addEventListener('DOMContentLoaded', function() {
+    // Upozornění uložené před reloadem (chybějící díl, platba se nezapsala) —
+    // stejný mechanismus jako v detailu zakázky, jinak by hláška zmizela.
+    try {
+        const __pn = sessionStorage.getItem('afx_payment_note');
+        if (__pn) {
+            const __pw = sessionStorage.getItem('afx_payment_warn') === '1';
+            sessionStorage.removeItem('afx_payment_note');
+            sessionStorage.removeItem('afx_payment_warn');
+            if (window.showAlert) {
+                showAlert((__pw ? '⚠️ ' : '') + __pn);
+            }
+        }
+    } catch (e) {}
+
     const popover = document.getElementById('phoneQrPopover');
     const qrContainer = document.getElementById('qrContainer');
     const phoneLabel = document.getElementById('qrPhoneLabel');
@@ -952,6 +966,13 @@ $(document).ready(function() {
             cache: false,
             success: function(res) {
                 if (res.success) {
+                    // upozornění ze serveru (chybějící díl apod.) ať se neztratí reloadem
+                    if (res.message) {
+                        try {
+                            sessionStorage.setItem('afx_payment_note', res.message);
+                            sessionStorage.setItem('afx_payment_warn', '1');
+                        } catch (e) {}
+                    }
                     // Hide modal first
                     const modalEl = document.getElementById('quickOrderModal');
                     const modalInstance = bootstrap.Modal.getInstance(modalEl);

@@ -55,10 +55,10 @@ function afxPosShiftIdentity(): array {
     // každou směnu s prázdným opened_by_user, tedy na směnu kteréhokoli kolegy.
     // Proto: technik má VÝHRADNĚ tech_id, číselné user_id patří jen účtu z users.
     $tid = (int)($_SESSION['tech_id'] ?? 0) ?: null;
-    $uid = null;
-    if ($tid === null && is_numeric($_SESSION['user_id'] ?? null)) {
-        $uid = (int)$_SESSION['user_id'] ?: null;
-    }
+    // Číselné user_id zapisujeme VŽDY, i když má člověk zároveň technický profil —
+    // v Historii je pak vidět i účet z `users`. Na porovnání „je směna moje" má
+    // ale přednost tech_id (viz afxPosShiftIsMine), takže nula nikomu nesedne.
+    $uid = is_numeric($_SESSION['user_id'] ?? null) ? ((int)$_SESSION['user_id'] ?: null) : null;
     return [$label !== '' ? $label : 'neznámý', $uid, $tid];
 }
 
@@ -73,7 +73,10 @@ function afxPosShiftCanForceClose(?array $shift): bool {
     if (function_exists('crmCanDeleteOrders') && crmCanDeleteOrders()) { return true; }
     if (!function_exists('getCurrentStaffRole') || getCurrentStaffRole() !== 'manager') { return false; }
     $shiftBranch = (int)($shift['branch_id'] ?? 0);
-    if ($shiftBranch <= 0) { return false; }
+    // Směna bez vyplněné pobočky (starší záznam) se do výpisu propadne OBĚMA
+    // pobočkám. Kdyby ji manažer nesměl zavřít, blokovala by kasu napořád a
+    // musel by přijet admin — proto ji zavřít smí; pobočku mu doplní uzávěrka.
+    if ($shiftBranch <= 0) { return true; }
     return $shiftBranch === (int)getCurrentStaffBranchId();
 }
 

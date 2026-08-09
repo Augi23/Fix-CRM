@@ -456,6 +456,8 @@ if (isset($_POST['delete_admin']) && $is_admin_check) {
         header("Location: settings.php?tab=admins&error=admin_self_delete"); exit;
     }
     $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$delId]);
+    // smazaný administrátor musí přijít o relaci hned, ne až za 8 hodin
+    crmBumpStaffPermsRev();
     crmAuditLog('admin.delete', [
         'entity_type' => 'user', 'entity_id' => $delId, 'entity_label' => (string)($delAdmin['full_name'] ?: $delAdmin['username']),
         'summary' => 'Odstraněn administrátorský účet @' . $delAdmin['username'] . ' (' . ($delAdmin['full_name'] ?: '—') . ')',

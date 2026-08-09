@@ -19,7 +19,7 @@ ensureProductsTable();
 ensureProductsPosColumn();
 ensurePosTables();
 ensureOrderPaymentMethodColumn();
-ensureSkladBranchSchema();   // sloupec branch_id (nasazení kódu předbíhá migrace)
+
 
 // POBOČKA: kasa smí prodat jen zboží SVÉ pobočky — api/pos_checkout.php položku
 // z cizí pobočky odmítne, takže nabízet ji je past (obsluha naskládá košík, který
@@ -29,6 +29,9 @@ ensureSkladBranchSchema();   // sloupec branch_id (nasazení kódu předbíhá m
 $branchScoped = !isBranchGlobalViewer();
 $myBranch = (int)getCurrentStaffBranchId();
 $defBranch = (int)getDefaultBranchId();
+// runtime pojistka na sloupec branch_id jen když ho opravdu použijeme —
+// jinak by tři SHOW COLUMNS běžely při KAŽDÉM úhozu ve vyhledávání
+if ($branchScoped) { ensureSkladBranchSchema(); }
 $branchSql = $branchScoped ? " AND COALESCE(NULLIF(branch_id, 0), ?) = ?" : '';
 $branchArgs = $branchScoped ? [$defBranch, $myBranch] : [];
 

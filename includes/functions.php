@@ -6,7 +6,10 @@
 // Role „účetní" + uzávěrka účetních období (balík C). Celá logika je záměrně
 // v samostatném souboru, aby se tenhle už tak velký soubor dál nenafukoval.
 require_once __DIR__ . '/accounting_role.php';
-// stráž api/* pro roli účetní — musí běžet hned po načtení rolí (viz funkce)
+// stráž api/* pro roli účetní — až PO srovnání relace s DB, jinak by o jeden
+// požadavek zaostávala za změnou role (např. nově jmenovaná účetní by se ještě
+// jednou dostala tam, kam už nemá)
+if (isset($pdo)) { crmRefreshStaffSession(); }
 afxAccountantApiGate();
 
 /**
@@ -167,9 +170,24 @@ function crmBumpStaffPermsRev(): void {
  */
 function crmRefreshStaffSession(): void {
     global $pdo;
+    if (!isset($pdo)) { return; }
     $tid = (int)($_SESSION['tech_id'] ?? 0);
-    if ($tid <= 0 || !isset($pdo)) {
-        return;     // admin z tabulky `users` ani klient tenhle mechanismus nemá
+    if ($tid <= 0) {
+        // Účet z tabulky `users`: technická práva nemá, ale smazaný účet se musí
+        // odhlásit stejně jako deaktivovaný zaměstnanec — jinak by admin, kterému
+        // někdo zrušil účet, pracoval dál celých 8 hodin.
+        if (is_numeric($_SESSION['user_id'] ?? null)) {
+            $rev = crmStaffPermsRev();
+            if (($_SESSION['_perms_rev'] ?? null) === $rev) { return; }
+            try {
+                $us = $pdo->prepare('SELECT id FROM users WHERE id = ? LIMIT 1');
+                $us->execute([(int)$_SESSION['user_id']]);
+                if (!$us->fetchColumn()) { $_SESSION['_staff_revoked'] = true; }
+                else { unset($_SESSION['_staff_revoked']); }
+            } catch (Throwable $e) { /* nedostupná DB nesmí nikoho vyhodit */ }
+            $_SESSION['_perms_rev'] = $rev;
+        }
+        return;
     }
     $rev = crmStaffPermsRev();
     if (isset($_SESSION['_perms'], $_SESSION['_perms_rev']) && $_SESSION['_perms_rev'] === $rev) {
@@ -222,6 +240,11 @@ function crmKickRevokedStaff(): void {
         return;
     }
     $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    // AJAX se pozná i podle hlaviček — accounting_actions.php leží v kořeni, ale
+    // volá se přes fetch a HTML odpověď by rozbila zpracování na klientovi.
+    $isAjax = strpos($script, '/api/') !== false
+        || strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest'
+        || strpos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') !== false;
     $_SESSION = [];
 
     // Hlavičky už odešly (stránka se rozkresluje) — přesměrovat serverem nejde.
@@ -232,7 +255,7 @@ function crmKickRevokedStaff(): void {
         echo '<script>window.location.replace("login.php");</script>';
         exit;
     }
-    if (strpos($script, '/api/') !== false) {
+    if ($isAjax) {
         if (ob_get_length()) { ob_clean(); }   // ať se k odpovědi nepřilepí rozepsaný výstup
         http_response_code(403);
         header('Content-Type: application/json; charset=utf-8');
@@ -2272,10 +2295,10 @@ function crmPosUnlockClearFails(string $accountKey): void {
  * číslo, které v řadě už existovalo → UNIQUE invoice_number → „Duplicate entry"
  * a spadlé uložení celé zakázky.
  *
- * $lockRow = zamykající čtení (FOR UPDATE) pro volání UVNITŘ transakce: běžný
- * SELECT tam pod REPEATABLE READ čte pořád týž snapshot, takže opakování po
- * kolizi by vracelo donekonečna stejné číslo. Zároveň zamkne konec řady, takže
- * dvě kasy naráz nedostanou stejné číslo.
+ * $lockRow zůstává kvůli stávajícím voláním, ale NEPOUŽÍVÁ se: FOR UPDATE nad
+ * LIKE 'prefix%' je zámek celého ROZSAHU, takže by na zbytek transakce zamkl
+ * všechny letošní faktury. Souběh dvou kas řeší GET_LOCK u volajícího, UNIQUE
+ * na invoice_number a opakování při kolizi.
  */
 function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false): string {
     $seq = 0;
@@ -2284,7 +2307,12 @@ function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false): 
         $like = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $prefix) . '%';
         $offset = mb_strlen($prefix) + 1;   // číselná část začíná hned za prefixem
         $sql = "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number, " . (int)$offset . ") AS UNSIGNED)), 0)
-                FROM invoices WHERE invoice_number LIKE ?" . ($lockRow ? ' FOR UPDATE' : '');
+                FROM invoices WHERE invoice_number LIKE ?";
+        // FOR UPDATE se ZÁMĚRNĚ nepoužívá: zamklo by všechny letošní faktury na
+        // zbytek transakce (LIKE 'prefix%' je rozsah, ne řádek) a blokovalo by
+        // i nesouvisející zápisy. Souběh řeší GET_LOCK u volajícího + UNIQUE na
+        // invoice_number + opakování.
+        unset($lockRow);
         $st = $pdo->prepare($sql);
         $st->execute([$like]);
         $seq = (int)$st->fetchColumn();
@@ -3864,10 +3892,29 @@ function processOrderInventoryChange($order_id, $is_finishing, $was_finished): a
                 $warnings[] = 'Díl „' . $name . '" se nepodařilo odepsat ze skladu — zakázka je uložená, sklad srovnej ručně.';
                 continue;
             }
+            // Skutečný stav AŽ PO odpisu: hodnota načtená před ním je při souběhu
+            // dvou dokončených zakázek se stejným dílem zastaralá a minus by se
+            // tiše propásl (obě by viděly „ještě to bylo skladem").
             $before = (int)$item['stock'];
-            if ($before < $need) {
-                $chybi = $need - max(0, $before);
-                $warnings[] = 'Díl „' . $name . '" nebyl celý skladem (chybí ' . $chybi
+            $after = null;
+            try {
+                $qs = $pdo->prepare("SELECT quantity FROM inventory WHERE id = ?");
+                $qs->execute([(int)$item['inventory_id']]);
+                $qv = $qs->fetchColumn();
+                if ($qv !== false) { $after = (int)$qv; }
+            } catch (Throwable $e) { /* zůstane odhad podle $before */ }
+            if ($after !== null && $after < 0) {
+                $chibi_real = -$after;
+                $warnings[] = 'Díl „' . $name . '" nebyl celý skladem (chybí ' . $chibi_real
+                    . ' ks) — zakázka je uložená, sklad doplň naskladněním.';
+                crmAuditLog('inventory.shortage', [
+                    'entity_type' => 'order', 'entity_id' => (int)$order_id,
+                    'summary' => 'Zakázka dokončena bez zásoby: ' . $name . ' — odepsáno ' . $need
+                        . ' ks, stav skladu po odpisu ' . $after . ' ks.',
+                ]);
+            } elseif ($after === null && $before < $need) {
+                $chibi = $need - max(0, $before);
+                $warnings[] = 'Díl „' . $name . '" nebyl celý skladem (chybí ' . $chibi
                     . ' ks) — zakázka je uložená, sklad doplň naskladněním.';
                 crmAuditLog('inventory.shortage', [
                     'entity_type' => 'order', 'entity_id' => (int)$order_id,

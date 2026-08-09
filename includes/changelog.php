@@ -11,6 +11,22 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.29',
+        'date' => '2026-08-01',
+        'time' => '23:30',
+        'title' => 'Dotažení zbytku po kontrole — hlášky, sklad, směny, podpisy',
+        'items' => [
+            '<b>Upozornění se přestala ztrácet.</b> Když se zakázka uložila s dílem, který nebyl skladem, systém to sice věděl, ale hlášku zahodil — sklad tiše seděl v minusu. Nově se ukáže i po překreslení stránky, stejně jako varování o platbě.',
+            '<b>Na kase je vidět, že zboží leží na druhé pobočce.</b> Dřív se ukázalo jen „Nic skladem nenalezeno" u kusu, který obsluha v systému normálně vidí. Platí i pro sken kódu a pro přiřazování dílů do umístění.',
+            '<b>Nedostatek zásoby se pozná i při souběhu.</b> Když dva lidé naráz dokončili zakázku se stejným dílem, minus se propásl — stav se teď čte až po odpisu.',
+            '<b>Podpis na iPadu vydrží, dokud zákazník stojí u pultu.</b> Půlhodinová platnost se počítala od odeslání, takže při delší frontě doklad zmizel klientovi pod rukama; teď se počítá od chvíle, kdy se na tabletu objeví. Detail zakázky navíc pozná prošlý požadavek i bez zapnuté stanice (dřív čekal donekonečna).',
+            '<b>Ve frontě podpisů nejde omylem otevřít doklad cizího zákazníka</b> — seznam se po přestavění na okamžik zamkne, ať prst netrefí kartu, která se posunula.',
+            '<b>Zapomenutá směna bez pobočky už neblokuje obě kasy</b> — manažer ji zavře.',
+            '<b>Smazaný administrátorský účet přijde o přístup okamžitě</b> (dřív mohl pracovat ještě celou směnu).',
+            'Technické: číslo faktury se přiděluje bez zamykání celé letošní řady, odhlášení uprostřed ukládání vrátí srozumitelnou odpověď místo rozsypané stránky, a živé vyhledávání nekontroluje strukturu databáze při každém úhozu.',
+        ],
+    ],
+    [
         'version' => '3.42.28',
         'date' => '2026-08-01',
         'time' => '21:15',

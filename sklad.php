@@ -206,7 +206,10 @@ if ($inv) {
                             '<span class="flex-grow-1 small text-white">' + String(it.text).replace(/</g, '&lt;') + '</span>' +
                             '<button type="button" class="btn btn-sm btn-success" data-assign="' + it.id + '">Sem</button></div>';
                     });
-                    document.getElementById('locAssignResults').innerHTML = out || '<div class="small text-white-75">Nic nenalezeno.</div>';
+                    document.getElementById('locAssignResults').innerHTML = out
+                        || ('<div class="small text-white-75">'
+                            + (d.message ? String(d.message).replace(/</g, '&lt;') : 'Nic nenalezeno.')
+                            + '</div>');
                 })
                 .catch(function () {});
         }, 300);

@@ -1314,6 +1314,14 @@ $(document).ready(function() {
         $.post('api/update_order_full.php', $(this).serialize(), function(res) {
             if(res.success) {
                 if (window.afxDraft) afxDraft.clearKey('order-<?php echo (int)$order['id']; ?>-full');
+                // Upozornění (např. „díl nebyl skladem") přežije reload přes
+                // sessionStorage — jinak by zmizelo dřív, než ho někdo přečte.
+                if (res.message) {
+                    try {
+                        sessionStorage.setItem('afx_payment_note', res.message);
+                        sessionStorage.setItem('afx_payment_warn', '1');
+                    } catch (e) {}
+                }
                 location.reload();
             } else {
                 btn.prop('disabled', false).html(oldHtml);

@@ -13,7 +13,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 ensureProcurementSchema();
 ensureStockLocationsSchema();
-ensureSkladBranchSchema();   // sloupec branch_id (nasazení kódu předbíhá migrace)
+
 
 $q = trim((string)($_GET['q'] ?? $_GET['term'] ?? ''));
 $supplier = trim((string)($_GET['supplier'] ?? ''));
@@ -32,6 +32,7 @@ $catalogMode = array_key_exists('supplier', $_GET);
 // pobočce přihlášeného (api/add_order_item.php → crmCanModifyBranchStock), a technik
 // může být na zakázku přiřazený i z druhé pobočky. Admin a Boss vidí obojí.
 $branchScoped = !$catalogMode && !isBranchGlobalViewer();
+if ($branchScoped) { ensureSkladBranchSchema(); }   // jen když filtr opravdu použijeme
 $myBranch = (int)getCurrentStaffBranchId();
 // Díly bez pobočky (0 z doby před rozdělením skladů) patří Karlínu — stejně je
 // dopočítává crmInventoryBranchId, podle kterého se pak povoluje zápis.
