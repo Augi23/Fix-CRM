@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.43.3',
+        'date' => '2026-08-09',
+        'time' => date('H:i'),
+        'title' => 'Chat bez „okna v okně" — prostě rovnou chat',
+        'items' => [
+            'Zprávy už nejsou zavřené v orámovaném panelu s vlastním rámečkem — bubliny leží přímo na stránce přes celou šířku a dole je jen plovoucí pole pro psaní s kulatým odesílacím tlačítkem (messenger styl). Zmizel i nadbytečný popisek pod nadpisem, takže je na zprávy víc místa — hlavně v mobilní appce.',
+        ],
+    ],
+    [
         'version' => '3.43.2',
         'date' => '2026-08-09',
         'time' => '18:25',

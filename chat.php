@@ -10,27 +10,46 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 ?>
 
 <div class="container-fluid" style="max-width: 900px;">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h4 class="mb-0 text-white"><i class="fas fa-comments me-2 text-info"></i>Týmový chat</h4>
-            <div class="small text-white-75">Společná místnost pro všechny zaměstnance — nové zprávy se ohlásí zvukem kdekoliv v CRM.</div>
-        </div>
-    </div>
+    <h4 class="mb-2 text-white"><i class="fas fa-comments me-2 text-info"></i>Týmový chat</h4>
 
     <?php /* dvh: na iOS Safari je 100vh větší než viditelný viewport (adresní řádek)
-             → vstup chatu by byl schovaný; dvh sleduje skutečnou výšku. */ ?>
-    <div class="glass-panel border-secondary d-flex flex-column afx-chat-box" style="height: calc(100vh - 240px); height: calc(100dvh - 240px); min-height: 380px;">
-        <div id="chatMessages" class="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-2"></div>
-        <div class="border-top border-secondary p-2">
-            <form id="chatForm" class="d-flex gap-2" autocomplete="off">
-                <input type="text" id="chatInput" class="form-control" placeholder="Napiš zprávu týmu…" maxlength="2000" autofocus>
-                <button type="submit" class="btn btn-primary px-4"><i class="fas fa-paper-plane"></i></button>
-            </form>
-        </div>
+             → vstup chatu by byl schovaný; dvh sleduje skutečnou výšku.
+             Žádný panel „okno v okně" — bubliny leží přímo na stránce a dole je
+             jen plovoucí pole pro psaní (messenger styl, přání Jana 9. 8.). */ ?>
+    <div class="d-flex flex-column afx-chat-box" style="height: calc(100vh - 200px); height: calc(100dvh - 200px); min-height: 380px;">
+        <div id="chatMessages" class="flex-grow-1 overflow-auto d-flex flex-column gap-2"></div>
+        <form id="chatForm" class="afx-chat-inputbar" autocomplete="off">
+            <input type="text" id="chatInput" placeholder="Napiš zprávu týmu…" maxlength="2000" autofocus>
+            <button type="submit" aria-label="Odeslat zprávu"><i class="fas fa-paper-plane"></i></button>
+        </form>
     </div>
 </div>
 
 <style>
+/* Chat bez panelu: průhledné pozadí, žádný rámeček — jen bubliny na stránce. */
+.afx-chat-box { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; }
+#chatMessages { padding: 6px 2px; }
+/* Popisek zmizel → box začíná výš; kompenzace výšky (desktop 240→200 v inline
+   stylu výše, mobil 330→290 tady — stejný breakpoint jako fix-crm-v2.css). */
+@media (max-width: 1080px) {
+  .afx-chat-box { height: calc(100dvh - 290px) !important; }
+}
+/* Plovoucí psací lišta — pilulka + kulaté odesílací tlačítko (messenger styl). */
+.afx-chat-inputbar { display: flex; gap: 8px; align-items: center; padding: 10px 2px 4px; }
+.afx-chat-inputbar input {
+  flex: 1; min-width: 0; color: #fff; font-size: .95rem;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14);
+  border-radius: 22px; padding: 10px 16px; outline: none;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+.afx-chat-inputbar input::placeholder { color: rgba(255,255,255,.45); }
+.afx-chat-inputbar input:focus { border-color: rgba(10,132,255,.65); box-shadow: 0 0 0 3px rgba(10,132,255,.18); }
+.afx-chat-inputbar button {
+  flex: 0 0 auto; width: 42px; height: 42px; border: 0; border-radius: 50%; color: #fff;
+  background: linear-gradient(180deg, #52A0FF, #0A6BFF); box-shadow: 0 4px 14px rgba(10,107,255,.4);
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+}
+.afx-chat-inputbar button:active { transform: scale(.94); }
 .chat-msg { max-width: 72%; }
 /* Něco globálního nastavuje kontejneru flex-wrap:wrap — sloupec se pak na mobilu
    zalamoval do dalších sloupců DOPRAVA (vodorovný chat). Nowrap = klasická svislá
