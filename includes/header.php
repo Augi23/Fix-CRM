@@ -177,9 +177,9 @@ try {
              s dynamic island / home indicatorem (spodní lišta, sheet) */ ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?php echo e(get_setting('company_name', 'Repair CRM')); ?> - <?php echo e(__('dashboard')); ?></title>
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
-    <link rel="icon" type="image/png" href="/assets/img/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png?v=2">
+    <link rel="icon" type="image/png" href="/assets/img/favicon.png?v=2">
+    <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png?v=2">
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#0d1512">
     <meta name="apple-mobile-web-app-capable" content="yes">

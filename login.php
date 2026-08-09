@@ -287,9 +287,9 @@ if (!empty($_POST['ajax'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo e(__('login_title')); ?> - Repair CRM</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
-    <link rel="icon" type="image/png" href="/assets/img/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png?v=2">
+    <link rel="icon" type="image/png" href="/assets/img/favicon.png?v=2">
+    <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png?v=2">
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#0d1512">
     <meta name="apple-mobile-web-app-capable" content="yes">

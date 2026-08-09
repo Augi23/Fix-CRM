@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.33',
+        'date' => '2026-08-09',
+        'time' => date('H:i'),
+        'title' => 'Nová ikonka AppleFix CRM i na webu',
+        'items' => [
+            'Web měl starou ikonku (zelený kříž) — teď všude používá stejnou jako mobilní aplikace: favicon v záložce prohlížeče, ikonka po přidání na plochu iPhonu/iPadu i ikony PWA. Malý favicon je výřez jablka, aby byl na 32 px čitelný.',
+        ],
+    ],
+    [
         'version' => '3.42.32',
         'date' => '2026-08-09',
         'time' => '10:05',
