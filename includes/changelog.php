@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.43.2',
+        'date' => '2026-08-09',
+        'time' => '18:25',
+        'title' => 'Oprava: uložení dílu s prázdnou cenou',
+        'items' => [
+            'Editace skladového dílu padala na chybě databáze („Incorrect decimal value"), když zůstala <b>prázdná prodejní či nákupní cena</b>. Prázdné číselné pole se nově uloží jako 0 a formulář projde. Snese i cenu napsanou s desetinnou čárkou.',
+        ],
+    ],
+    [
         'version' => '3.43.1',
         'date' => '2026-08-09',
         'time' => date('H:i'),

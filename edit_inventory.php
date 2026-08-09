@@ -29,10 +29,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$canEditBranch) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canEditBranch) {
     $part_name = $_POST['part_name'];
     $sku = $_POST['sku'];
-    $quantity = $_POST['quantity'];
-    $cost_price = $_POST['cost_price'];
-    $sale_price = $_POST['sale_price'];
-    $min_stock = $_POST['min_stock'];
+    // číselné vstupy normalizovat: prázdné pole = 0 (prázdný string '' by ve strict
+    // MySQL shodil UPDATE na DECIMAL sloupci — SQLSTATE 22007/1366); čárku vzít jako
+    // desetinnou tečku, kdyby ji prohlížeč poslal lokalizovaně
+    $quantity = (int)($_POST['quantity'] ?? 0);
+    $cost_price = (float)str_replace(',', '.', (string)($_POST['cost_price'] ?? '0'));
+    $sale_price = (float)str_replace(',', '.', (string)($_POST['sale_price'] ?? '0'));
+    $min_stock = (int)($_POST['min_stock'] ?? 0);
     $device_model = mb_substr(trim((string)($_POST['device_model'] ?? '')), 0, 64);
     $location_id = (int)($_POST['location_id'] ?? 0);
     // umístění musí patřit stejné pobočce jako díl (jinak by díl „ležel" jinde);
