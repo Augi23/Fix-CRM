@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.34',
+        'date' => '2026-08-09',
+        'time' => date('H:i'),
+        'title' => 'Objednávky z applefix.online (Upgates) chodí do upozornění + push do appky',
+        'items' => [
+            'Nový webhook <b>api/upgates_webhook.php</b>: když někdo nakoupí na applefix.online, Upgates pošle objednávku do CRM — objeví se v sekci upozornění (zvoneček) jako „E-shop objednávka" a všem telefonům s mobilní appkou přijde push notifikace. Sklad se neodečítá (ten si Upgates vede sám); opakované doručení téže objednávky push nepošle podruhé. Objednávky z vlastního e-shopu applefix.click tohle všechno uměly už dřív.',
+        ],
+    ],
+    [
         'version' => '3.42.33',
         'date' => '2026-08-09',
         'time' => '10:40',
