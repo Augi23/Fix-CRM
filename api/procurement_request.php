@@ -224,6 +224,15 @@ try {
             throw new Exception('Part was not found in stock.');
         }
 
+        // POBOČKA DÍLU: bez téhle kontroly šlo přes Nákupy (kde se katalog záměrně
+        // nefiltruje) navěsit na zakázku díl DRUHÉ pobočky — a u dokončené zakázky
+        // se rovnou odepsal z jejího skladu, aniž o tom kdokoli tam věděl.
+        // Stejné pravidlo jako v api/add_order_item.php.
+        if (function_exists('crmCanModifyBranchStock') && function_exists('crmInventoryBranchId')
+            && !crmCanModifyBranchStock(crmInventoryBranchId($inventoryId))) {
+            throw new Exception('Tenhle díl je skladem na druhé pobočce — objednej ho na svoji, nebo si ho nech převést.');
+        }
+
         $stockQty = (int)($inventory['quantity'] ?? 0);
         $requestStatus = (string)($request['status'] ?? 'pending');
         if (in_array(getCurrentStaffRole(), ['engineer', 'brigadnik'], true) && $stockQty <= 0 && !in_array($requestStatus, ['ordered', 'received'], true)) {

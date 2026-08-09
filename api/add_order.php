@@ -184,7 +184,8 @@ if (!$customer_id || !$device_model || $pin_code === '') {
 }
 
 if (!$intake_upload_attempt && !$intake_photo_waiver) {
-    die($intake_photo_required_msg);
+    // die() by ztratilo celý vyplněný formulář i s podpisem — afxOrderFail data zachová
+    afxOrderFail('Chybí fotky zařízení při příjmu', (string)$intake_photo_required_msg);
 }
 
 if ($intake_photo_waiver && !$intake_upload_attempt) {
@@ -358,7 +359,7 @@ try {
 
     if (!$intake_photo_waiver && $intake_attachment_count < 1) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        die($intake_photo_failed_msg);
+        afxOrderFail('Fotky se nepodařilo uložit', (string)$intake_photo_failed_msg);
     }
 
     $pdo->commit();

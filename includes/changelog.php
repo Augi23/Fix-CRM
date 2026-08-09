@@ -12,6 +12,22 @@ return (static function (): array {
 $entries = [
     [
         'version' => '3.42.28',
+        'date' => '2026-08-01',
+        'time' => '21:15',
+        'title' => 'Doopravy po nezávislé kontrole — push, práva, platby',
+        'items' => [
+            '<b>Notifikace na mobil konečně dorazí tomu, komu mají.</b> Cílily se podle čísla uživatele, jenže technik má v systému jiný tvar identity — všechny jejich tokeny skončily v jedné přihrádce. Nově se cílí podle klíče pracovníka, takže technikovi chodí jeho zakázky a nikomu cizímu.',
+            '<b>Administrátor už nepřijde o práva uprostřed práce.</b> Nové automatické srovnávání relace mu při každém kliknutí přepsalo roli podle technického profilu a zavřelo Nastavení.',
+            '<b>Deaktivovaný účet se odhlásí i uprostřed rozdělané stránky</b> (dřív se odhlásil až při dalším kliknutí, na běžných stránkách prakticky nikdy).',
+            '<b>Platba se zaznamená i u zakázky ve stavu „Vydáno – čeká na platbu".</b> Když klient přišel doplatit později, hotovost se nikam nezapsala a faktura nevznikla.',
+            '<b>Číslo faktury se při chybě databáze nepřidělí naslepo</b> — dřív by v takové chvíli vzniklo číslo 0001 podruhé a duplicitu by objevila až účetní.',
+            '<b>Manažer teď opravdu vidí tlačítko</b> pro uzavření zapomenuté směny na své pobočce (server mu to už povoloval, obrazovka ne).',
+            '<b>Díl z druhé pobočky nejde přiřadit na zakázku přes Nákupy</b> — šlo tak odepsat zboží ze skladu kolegů, aniž by o tom věděli.',
+            'Chyba při příjmu zakázky (chybějící nebo neuložené fotky) už nezahodí vyplněný formulář.',
+        ],
+    ],
+    [
+        'version' => '3.42.28',
         'date' => '2026-08-09',
         'time' => date('H:i'),
         'title' => 'Notifikace fungují i pro appku z TestFlightu/App Storu',

@@ -187,8 +187,14 @@ function crmRefreshStaffSession(): void {
             // stejné odvození jako při přihlášení (login.php) — jinak by
             // zaměstnanci odebraná administrátorská práva zůstala v relaci
             $dbRole = (string)($row['role'] ?: 'engineer');
-            $_SESSION['role'] = ($dbRole === 'admin') ? 'admin' : 'technician';
-            $_SESSION['internal_role'] = $dbRole;
+            // POZOR: účet z tabulky `users` (numerické user_id) je admin bez ohledu na
+            // to, jaký technický profil má navázaný — přepsat mu roli podle technicians
+            // by ho uprostřed práce degradovalo na technika a zavřelo mu Nastavení.
+            $isUsersAdmin = is_numeric($_SESSION['user_id'] ?? null) && ($_SESSION['role'] ?? '') === 'admin';
+            if (!$isUsersAdmin) {
+                $_SESSION['role'] = ($dbRole === 'admin') ? 'admin' : 'technician';
+                $_SESSION['internal_role'] = $dbRole;
+            }
             $ps = $pdo->prepare('SELECT permission FROM tech_permissions WHERE technician_id = ?');
             $ps->execute([$tid]);
             $_SESSION['_perms'] = $ps->fetchAll(PDO::FETCH_COLUMN);
@@ -207,16 +213,25 @@ function crmRefreshStaffSession(): void {
  * pracovat. Relaci proto rovnou vyprázdníme a pošleme ho na přihlášení — kde ho
  * login stejně nepustí dál (přihlásit se smí jen aktivní účet).
  *
- * Jen dokud se neodeslalo tělo odpovědi: uprostřed už vykreslené stránky
- * přesměrovat nejde a rozbitá půlka relace by nadělala víc škody než užitku —
- * tam zůstane jen odepření práv a odhlásí se při dalším kliknutí.
+ * Když hlavičky už odešly, relace se stejně zahodí a prohlížeč se pošle na
+ * přihlášení skriptem — jinak by se deaktivovaný člověk na běžné stránce
+ * (kde se výstup posílá průběžně) neodhlásil prakticky nikdy.
  */
 function crmKickRevokedStaff(): void {
-    if (PHP_SAPI === 'cli' || headers_sent()) {
+    if (PHP_SAPI === 'cli') {
         return;
     }
     $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $_SESSION = [];
+
+    // Hlavičky už odešly (stránka se rozkresluje) — přesměrovat serverem nejde.
+    // Relaci jsme ale zahodili, takže stačí poslat prohlížeč pryč skriptem;
+    // bez toho by deaktivovaný člověk dokoukal rozdělanou stránku a odhlásil se
+    // až při dalším kliknutí (a na hlavních stránkách prakticky nikdy).
+    if (headers_sent()) {
+        echo '<script>window.location.replace("login.php");</script>';
+        exit;
+    }
     if (strpos($script, '/api/') !== false) {
         if (ob_get_length()) { ob_clean(); }   // ať se k odpovědi nepřilepí rozepsaný výstup
         http_response_code(403);
@@ -2274,7 +2289,10 @@ function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false): 
         $st->execute([$like]);
         $seq = (int)$st->fetchColumn();
     } catch (Throwable $e) {
+        // Tiché spadnutí na 0001 by vyrobilo DUPLICITNÍ číslo faktury — a to je horší
+        // než chyba, protože se pozná až účetní. Radši ať volající operaci neprovede.
         error_log('afxNextInvoiceNumber: ' . $e->getMessage());
+        throw new RuntimeException('Číslo faktury se nepodařilo přidělit — zkus to prosím znovu.');
     }
     return $prefix . str_pad((string)($seq + 1), 4, '0', STR_PAD_LEFT);
 }

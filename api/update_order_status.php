@@ -52,7 +52,8 @@ if (!in_array($payment_method, ['cash', 'card', 'transfer'], true)) { $payment_m
 try {
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, repair_solution, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
+    ensureOrderPaymentMethodColumn();
+    $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, repair_solution, payment_method, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $order_data = $stmt->fetch();
 
@@ -257,7 +258,12 @@ try {
     $payment_note = '';
     $payment_warning = false;
     $entering_collected = isOrderStatusIn($new_status, 'collected') && !isOrderStatusIn($current_status, 'collected');
-    if ($payment_method !== '' && $entering_collected) {
+    // Platbu je potřeba zaznamenat i tehdy, když zakázka UŽ ve skupině „vydáno" je —
+    // typicky stav „Vydáno – čeká na platbu": klient přijde doplatit později a bez
+    // tohohle by se hotovost nikam nezapsala a faktura nevznikla (tichá ztráta).
+    $collectedNow = isOrderStatusIn($new_status, 'collected');
+    $hadPayment = trim((string)($order_data['payment_method'] ?? '')) !== '';
+    if ($payment_method !== '' && $collectedNow && ($entering_collected || !$hadPayment)) {
         try {
             $__oc = trim((string)($order_data['order_code'] ?? '')) !== '' ? (string)$order_data['order_code'] : ('#' . (int)$order_id);
             $amount = (float)($final_cost ?? 0);

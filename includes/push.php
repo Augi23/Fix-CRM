@@ -11,7 +11,7 @@
  *
  * Použití:
  *   require_once includes/push.php;
- *   pushToUser($pdo, $userId, 'Nová zakázka', 'APFAZ2600990 – iPhone 15', ['data'=>['url'=>'view_order.php?id=123']]);
+ *   pushToStaff($pdo, crmStaffKey(), "Nová zakázka", "APFAZ2600990 – iPhone 15");
  *   pushToAll($pdo, 'Nová zpráva', '...', ['sound'=>'chat.caf'], [$excludeUserId]);
  */
 
@@ -236,30 +236,41 @@ function pushToTokens(array $tokens, string $title, string $body, array $opts = 
     apnsSend($tokens, $aps, $opts['data'] ?? [], $opts['collapse'] ?? null);
 }
 
-/** Push konkrétnímu uživateli (na všechna jeho zařízení). */
-function pushToUser(PDO $pdo, int $userId, string $title, string $body, array $opts = []): void {
-    if (!apnsConfigured() || $userId <= 0) return;
+/** Push konkrétnímu PRACOVNÍKOVI podle jeho klíče z crmStaffKey() („tech:15" / „user:3").
+ *
+ *  PROČ NE user_id: technik má v session user_id ve tvaru „t15", takže (int) z něj
+ *  udělá 0 — tokeny všech techniků skončily ve společné přihrádce 0 a notifikace
+ *  chodily komukoli, jen ne jim. Tokeny se proto ukládají pod staff_key
+ *  (api/register_push_token.php) a cílí se výhradně podle něj. */
+function pushToStaff(PDO $pdo, string $staffKey, string $title, string $body, array $opts = []): void {
+    if (!apnsConfigured() || trim($staffKey) === '') return;
     ensurePushTokensTable($pdo);
     try {
-        $stmt = $pdo->prepare("SELECT device_token FROM push_tokens WHERE user_id = ? AND platform = 'ios'");
-        $stmt->execute([$userId]);
+        $stmt = $pdo->prepare("SELECT device_token FROM push_tokens WHERE staff_key = ? AND platform = 'ios'");
+        $stmt->execute([$staffKey]);
         $tokens = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    } catch (Throwable $e) { return; }
+    } catch (Throwable $e) { return; }   // sloupec ještě neexistuje → radši neposlat nic než všem
     pushToTokens($tokens, $title, $body, $opts);
 }
 
-/** Push všem přihlášeným zařízením (volitelně kromě uvedených uživatelů). */
-function pushToAll(PDO $pdo, string $title, string $body, array $opts = [], array $excludeUserIds = []): void {
+/** Push technikovi podle jeho id v tabulce technicians. */
+function pushToTechnician(PDO $pdo, int $techId, string $title, string $body, array $opts = []): void {
+    if ($techId > 0) { pushToStaff($pdo, 'tech:' . $techId, $title, $body, $opts); }
+}
+
+/** Push všem přihlášeným zařízením; $excludeStaffKeys = klíče z crmStaffKey()
+ *  (typicky ten, kdo akci právě udělal — ať si nepípne vlastní zakázka). */
+function pushToAll(PDO $pdo, string $title, string $body, array $opts = [], array $excludeStaffKeys = []): void {
     if (!apnsConfigured()) return;
     ensurePushTokensTable($pdo);
     try {
-        $rows = $pdo->query("SELECT device_token, user_id FROM push_tokens WHERE platform = 'ios'")
+        $rows = $pdo->query("SELECT device_token, staff_key FROM push_tokens WHERE platform = 'ios'")
                     ->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) { return; }
-    $exclude = array_map('intval', $excludeUserIds);
+    $exclude = array_values(array_filter(array_map('strval', $excludeStaffKeys), static fn($v) => $v !== ''));
     $tokens = [];
     foreach ($rows as $r) {
-        if (!in_array((int)$r['user_id'], $exclude, true)) $tokens[] = $r['device_token'];
+        if (!in_array((string)($r['staff_key'] ?? ''), $exclude, true)) { $tokens[] = $r['device_token']; }
     }
     pushToTokens($tokens, $title, $body, $opts);
 }

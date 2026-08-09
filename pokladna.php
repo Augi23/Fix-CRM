@@ -23,7 +23,11 @@ afxEnsurePosShiftTable();
 $shift = afxPosShiftCurrent((int)getCurrentStaffBranchId());
 $shiftMine = afxPosShiftIsMine($shift);
 $shiftLast = $shift ? null : afxPosShiftLastClosed((int)getCurrentStaffBranchId());
-$shiftCanForce = function_exists('crmCanDeleteOrders') && crmCanDeleteOrders();
+// Stejné pravidlo jako na serveru (afxPosShiftCanForceClose) — jinak by manažer
+// nové právo uzavřít zapomenutou směnu nikdy neuviděl a kasa by dál stála.
+$shiftCanForce = $shift && function_exists('afxPosShiftCanForceClose')
+    ? afxPosShiftCanForceClose($shift)
+    : (function_exists('crmCanDeleteOrders') && crmCanDeleteOrders());
 
 // denní součty do hlavičky (uzávěrka na první pohled); historie prodejů
 // je záměrně JEN v Historie → Kasa prodejna, kasa je čistě prodejní plocha

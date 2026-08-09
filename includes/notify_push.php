@@ -38,7 +38,9 @@ function crmPushOrderInfo(PDO $pdo, int $orderId): array {
 /** Dispatcher volaný z crmAuditLog() — podle akce pošle push. */
 function crmPushDispatch(PDO $pdo, string $action, array $opts): void {
     if (!apnsConfigured()) return;
-    $actor = (int)($_SESSION['user_id'] ?? 0);
+    // klíč toho, kdo akci udělal — (int)$_SESSION['user_id'] by u technika („t15")
+    // dalo 0 a vyloučení autora by tiše přestalo fungovat
+    $actorKey = function_exists('crmStaffKey') ? crmStaffKey() : '';
     try {
         if ($action === 'order.create') {
             $id   = (int)($opts['entity_id'] ?? 0);
@@ -46,15 +48,15 @@ function crmPushDispatch(PDO $pdo, string $action, array $opts): void {
             $code = (string)($opts['entity_label'] ?? ($info['code'] ?? ('#' . $id)));
             $body = trim(($info['device'] ?? '') . (!empty($info['customer']) ? ' — ' . $info['customer'] : ''));
             pushToAll($pdo, 'Nová zakázka ' . $code, $body !== '' ? $body : 'Byla založena nová zakázka.',
-                ['data' => ['url' => 'view_order.php?id=' . $id], 'collapse' => 'order-' . $id], [$actor]);
+                ['data' => ['url' => 'view_order.php?id=' . $id], 'collapse' => 'order-' . $id], [$actorKey]);
 
         } elseif ($action === 'order.status_change') {
             $id   = (int)($opts['entity_id'] ?? 0);
             $info = crmPushOrderInfo($pdo, $id);
             $tech = (int)($info['technician_id'] ?? 0);
             $code = (string)($opts['entity_label'] ?? ($info['code'] ?? ('#' . $id)));
-            if ($tech > 0 && $tech !== $actor) {
-                pushToUser($pdo, $tech, 'Zakázka ' . $code,
+            if ($tech > 0 && ('tech:' . $tech) !== $actorKey) {
+                pushToTechnician($pdo, $tech, 'Zakázka ' . $code,
                     !empty($info['status']) ? ('Stav: ' . $info['status']) : 'Změna stavu zakázky',
                     ['data' => ['url' => 'view_order.php?id=' . $id], 'collapse' => 'order-' . $id]);
             }
@@ -62,7 +64,7 @@ function crmPushDispatch(PDO $pdo, string $action, array $opts): void {
         } elseif ($action === 'complaint.create') {
             $label = (string)($opts['entity_label'] ?? '');
             pushToAll($pdo, 'Nová reklamace', trim('Reklamace ' . $label),
-                ['data' => ['url' => 'reklamace.php'], 'collapse' => 'complaint'], [$actor]);
+                ['data' => ['url' => 'reklamace.php'], 'collapse' => 'complaint'], [$actorKey]);
         }
     } catch (Throwable $e) { /* push nikdy neshodí CRM */ }
 }
