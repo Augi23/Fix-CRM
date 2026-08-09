@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.28',
+        'date' => '2026-08-09',
+        'time' => date('H:i'),
+        'title' => 'Notifikace fungují i pro appku z TestFlightu/App Storu',
+        'items' => [
+            'Připravujeme distribuci mobilní appky přes App Store, aby si ji tým instaloval sám (bez kabelu). Takové buildy používají <b>produkční</b> Apple push prostředí, zatímco dosavadní kabelové buildy <b>vývojové</b> — server si teď u každého zařízení sám zjistí a zapamatuje, kam mu posílat oznámení. Nic se nenastavuje, funguje mix obojího.',
+        ],
+    ],
+    [
         'version' => '3.42.27',
         'date' => '2026-08-01',
         'time' => '18:30',

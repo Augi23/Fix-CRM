@@ -45,12 +45,17 @@ function ensurePushTokensTable(PDO $pdo): void {
             `user_id` INT UNSIGNED NOT NULL,
             `device_token` VARCHAR(200) NOT NULL,
             `platform` VARCHAR(20) NOT NULL DEFAULT 'ios',
+            `apns_env` VARCHAR(10) NULL,
             `app_version` VARCHAR(40) NULL,
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY `uniq_device_token` (`device_token`),
             KEY `idx_user` (`user_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // Migrace stávající tabulky: naučené APNs prostředí per token
+        // (kabelové dev buildy = sandbox, TestFlight/App Store = production).
+        $col = $pdo->query("SHOW COLUMNS FROM `push_tokens` LIKE 'apns_env'")->fetch();
+        if (!$col) $pdo->exec("ALTER TABLE `push_tokens` ADD COLUMN `apns_env` VARCHAR(10) NULL AFTER `platform`");
         $done = true;
     } catch (Throwable $e) { /* ignore */ }
 }
@@ -108,54 +113,113 @@ function apnsDerToRaw(string $der): ?string {
     return $r . $s;
 }
 
-/** Nízkoúrovňové odeslání na dané tokeny. Vrací [token => http_code]. */
+/** APNs host pro dané prostředí. */
+function apnsHostFor(string $env): string {
+    return $env === 'production' ? 'https://api.push.apple.com' : 'https://api.sandbox.push.apple.com';
+}
+
+/** Jeden HTTP/2 request na APNs. Vrací [http_code, reason] (reason z JSON těla, např. BadDeviceToken). */
+function apnsCurlOne(string $env, string $token, string $payload, array $headers): array {
+    $ch = curl_init(apnsHostFor($env) . "/3/device/$token");
+    curl_setopt_array($ch, [
+        CURLOPT_HTTP_VERSION  => CURL_HTTP_VERSION_2_0,
+        CURLOPT_POST          => true,
+        CURLOPT_POSTFIELDS    => $payload,
+        CURLOPT_HTTPHEADER    => $headers,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT       => 10,
+    ]);
+    $body = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $reason = '';
+    if (is_string($body) && $body !== '') {
+        $j = json_decode($body, true);
+        if (is_array($j) && isset($j['reason'])) $reason = (string)$j['reason'];
+    }
+    return [$code, $reason];
+}
+
+/**
+ * Nízkoúrovňové odeslání na dané tokeny. Vrací [token => http_code].
+ *
+ * Prostředí per token: kabelové dev buildy mají sandbox tokeny, TestFlight/App
+ * Store buildy produkční. Server zkusí naučené prostředí tokenu (sloupec
+ * apns_env), při BadDeviceToken zkusí druhé a výsledek si k tokenu uloží —
+ * flotila s mixem buildů tak funguje bez ručního přepínání APNS_ENV.
+ */
 function apnsSend(array $tokens, array $aps, array $custom = [], ?string $collapseId = null): array {
     if (!apnsConfigured()) return [];
     $jwt = apnsJwt();
     if (!$jwt) return [];
 
     $bundle = apnsCfg('apns_bundle_id', 'APNS_BUNDLE_ID', 'cloud.applefix.crm');
-    $host = (apnsCfg('apns_env', 'APNS_ENV', 'sandbox') === 'production')
-        ? 'https://api.push.apple.com'
-        : 'https://api.sandbox.push.apple.com';
+    $defaultEnv = apnsCfg('apns_env', 'APNS_ENV', 'sandbox') === 'production' ? 'production' : 'sandbox';
     $payload = json_encode(array_merge(['aps' => $aps], $custom));
+    $tokens = array_values(array_unique($tokens));
+
+    global $pdo;
+    $db = ($pdo instanceof PDO) ? $pdo : null;
+
+    // Naučená prostředí tokenů jedním dotazem.
+    $envMap = [];
+    if ($db && $tokens) {
+        try {
+            $ph = implode(',', array_fill(0, count($tokens), '?'));
+            $stmt = $db->prepare("SELECT device_token, apns_env FROM push_tokens WHERE device_token IN ($ph)");
+            $stmt->execute($tokens);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                if (in_array($r['apns_env'], ['production', 'sandbox'], true)) $envMap[$r['device_token']] = $r['apns_env'];
+            }
+        } catch (Throwable $e) { /* ignore */ }
+    }
+
+    $headers = [
+        'authorization: bearer ' . $jwt,
+        'apns-topic: ' . $bundle,
+        'apns-push-type: alert',
+        'content-type: application/json',
+    ];
+    if ($collapseId) $headers[] = 'apns-collapse-id: ' . substr($collapseId, 0, 64);
 
     $results = [];
     $invalid = [];
-    foreach (array_values(array_unique($tokens)) as $tok) {
-        $headers = [
-            'authorization: bearer ' . $jwt,
-            'apns-topic: ' . $bundle,
-            'apns-push-type: alert',
-            'content-type: application/json',
-        ];
-        if ($collapseId) $headers[] = 'apns-collapse-id: ' . substr($collapseId, 0, 64);
+    foreach ($tokens as $tok) {
+        $primary = $envMap[$tok] ?? $defaultEnv;
+        [$code, $reason] = apnsCurlOne($primary, $tok, $payload, $headers);
 
-        $ch = curl_init("$host/3/device/$tok");
-        curl_setopt_array($ch, [
-            CURLOPT_HTTP_VERSION  => CURL_HTTP_VERSION_2_0,
-            CURLOPT_POST          => true,
-            CURLOPT_POSTFIELDS    => $payload,
-            CURLOPT_HTTPHEADER    => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT       => 10,
-        ]);
-        curl_exec($ch);
-        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        $results[$tok] = $code;
-        if ($code === 410 || $code === 400) $invalid[] = $tok;   // Unregistered / BadDeviceToken
-    }
-
-    // Úklid neplatných tokenů.
-    if ($invalid) {
-        global $pdo;
-        if ($pdo instanceof PDO) {
+        // Token patří do druhého prostředí? Zkus ho tam a nauč se výsledek.
+        if ($code === 400 && $reason === 'BadDeviceToken') {
+            $other = $primary === 'production' ? 'sandbox' : 'production';
+            [$code2, $reason2] = apnsCurlOne($other, $tok, $payload, $headers);
+            if ($code2 === 200 || $code2 === 410 || $reason2 !== 'BadDeviceToken') {
+                $code = $code2;
+                $reason = $reason2;
+                if ($code2 === 200 && $db) {
+                    try {
+                        $db->prepare("UPDATE push_tokens SET apns_env = ? WHERE device_token = ?")
+                           ->execute([$other, $tok]);
+                    } catch (Throwable $e) { /* ignore */ }
+                }
+            }
+        } elseif ($code === 200 && $db && !isset($envMap[$tok])) {
+            // První úspěch bez naučeného prostředí → zapamatuj primární.
             try {
-                $ph = implode(',', array_fill(0, count($invalid), '?'));
-                $pdo->prepare("DELETE FROM push_tokens WHERE device_token IN ($ph)")->execute($invalid);
+                $db->prepare("UPDATE push_tokens SET apns_env = ? WHERE device_token = ?")
+                   ->execute([$primary, $tok]);
             } catch (Throwable $e) { /* ignore */ }
         }
+
+        $results[$tok] = $code;
+        // Smaž jen skutečně mrtvé tokeny: odregistrované (410), nebo neplatné v obou prostředích.
+        if ($code === 410 || ($code === 400 && $reason === 'BadDeviceToken')) $invalid[] = $tok;
+    }
+
+    if ($invalid && $db) {
+        try {
+            $ph = implode(',', array_fill(0, count($invalid), '?'));
+            $db->prepare("DELETE FROM push_tokens WHERE device_token IN ($ph)")->execute($invalid);
+        } catch (Throwable $e) { /* ignore */ }
     }
     return $results;
 }
