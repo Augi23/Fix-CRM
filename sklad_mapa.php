@@ -20,7 +20,8 @@ if (!empty($_GET['raw'])) {
     if (!hasPermission('manage_inventory')) { http_response_code(403); die('Bez oprávnění.'); }
     header('Content-Type: text/html; charset=utf-8');
     if (is_file($mapFile)) {
-        readfile($mapFile);
+        // mapa je mimo CRM šablonu → CSRF token pro ukládání rozmístění se vstřikuje sem
+        echo str_replace('__CSRF_TOKEN__', e((string)($_SESSION['csrf_token'] ?? '')), (string)file_get_contents($mapFile));
     } else {
         echo '<!doctype html><html lang="cs"><head><meta charset="utf-8"><title>3D mapa skladu</title></head>'
            . '<body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;'

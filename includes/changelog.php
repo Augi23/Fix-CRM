@@ -13,12 +13,13 @@ $entries = [
     [
         'version' => '3.43.0',
         'date' => '2026-08-09',
-        'time' => '15:40',
-        'title' => '3D mapa skladu — příprava napojení vizualizace',
+        'time' => '17:10',
+        'title' => '3D mapa skladu — interaktivní vizualizace, kde co leží',
         'items' => [
-            '<b>Nová stránka Sklad → 3D mapa</b> (tlačítko v Umístěních): zobrazí interaktivní 3D vizualizaci skladu vyrobenou v Claude Design. Mapa se do CRM nahrává jako jeden HTML soubor (<code>secure/warehouse3d.html</code>) — dokud tam není, stránka ukáže návod, jak ji z Claude Design dostat.',
-            '<b>Živá data pro mapu:</b> nový endpoint <code>api/warehouse_map_data.php</code> — vrací regály/police/krabičky vybrané pobočky včetně obsazenosti (počet dílů a kusů, volitelně i seznam dílů v každém umístění). Mapa se tak nikdy nerozjede se skutečným skladem: co je v CRM, to je v mapě.',
-            'Vše jen pro přihlášené se skladovým oprávněním — rozvržení skladu je provozní informace (stejné pravidlo jako štítky umístění).',
+            '<b>Sklad → Umístění → 3D mapa:</b> interaktivní 3D pohled na sklad pobočky (návrh vznikl v Claude Design). Regály stojí tak, jak stojí doopravdy; klik na regál ukáže jeho <b>police a krabičky</b> (vpravo i otočný 3D náhled regálu), klik na krabičku otevře její obsah v CRM.',
+            '<b>Hledání dílu:</b> našeptávač (název / SKU / model / kód umístění) — vybraný díl <b>rozsvítí regál s majákem</b> a zvýrazní konkrétní krabičku, odkud ho vzít. Karta dílu je na jeden klik. Umí i přímý odkaz <code>sklad_mapa.php?focus=&lt;id dílu&gt;</code>.',
+            '<b>Živá data:</b> mapa si strukturu a obsazenost tahá z <code>api/warehouse_map_data.php</code> — co je v CRM, to je v mapě, nic se neudržuje dvakrát. Vše jen pro přihlášené se skladovým oprávněním.',
+            '<b>Režim úprav:</b> tažením přeskládáš regály podle skutečnosti (dvojklik = otočení o 90°), rozmístění se ukládá <b>na server per pobočka</b> — všichni pak vidí stejnou mapu. Struktura skladu se tím nemění; police a krabičky se dál spravují v Umístěních.',
         ],
     ],
     [

@@ -84,8 +84,16 @@ try {
     $uq->execute([$branchId]);
     $unplaced = (int)$uq->fetchColumn();
 
+    // uložené rozmístění regálů v mapě (ukládá op=map_layout ve stock_locations API)
+    $layout = null;
+    try {
+        $lr = json_decode((string)get_setting('warehouse3d_layout_' . $branchId, ''), true);
+        if (is_array($lr) && isset($lr['racks']) && is_array($lr['racks'])) { $layout = $lr; }
+    } catch (Throwable $e) {}
+
     echo json_encode([
         'success' => true,
+        'layout' => $layout,
         'branch' => [
             'id' => $branchId,
             'label' => skladBranchLabel($branchId),

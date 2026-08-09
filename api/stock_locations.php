@@ -6,6 +6,7 @@
  *   op=delete    — smazání prázdného umístění (jinak poradí deaktivaci)
  *   op=assign    — hromadné přiřazení dílů do umístění (location_id=0 → odebrat umístění)
  *   op=set_model — hromadné nastavení modelu zařízení u dílů (prázdný model → smazat)
+ *   op=map_layout — uložení rozmístění regálů v 3D mapě skladu (jen souřadnice, per pobočka)
  * Práva: manage_inventory (jako zbytek správy skladu).
  */
 ob_start();
@@ -371,6 +372,35 @@ try {
         ]);
         echo json_encode(['success' => true, 'count' => count($ids),
             'message' => $model !== '' ? ('Model „' . $model . '" nastaven u ' . count($ids) . ' dílů.') : ('Model odebrán u ' . count($ids) . ' dílů.')], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($op === 'map_layout') {
+        // Rozmístění regálů v 3D mapě (secure/warehouse3d.html) — jen souřadnice/rotace
+        // pro vykreslení, strukturu skladu NEmění. Klíčované číslem regálu z kódu (RegK1 → 1).
+        _locRequireBranch($branchId);
+        $data = json_decode((string)($_POST['layout'] ?? ''), true);
+        if (!is_array($data) || !isset($data['racks']) || !is_array($data['racks'])) {
+            throw new Exception('Neplatná data rozmístění.');
+        }
+        $clean = [];
+        $i = 0;
+        foreach ($data['racks'] as $n => $r) {
+            if (++$i > 100 || !is_array($r)) { continue; }
+            $n = (int)$n;
+            if ($n <= 0) { continue; }
+            $clean[$n] = [
+                'x' => max(0, min(740, (int)($r['x'] ?? 0))),
+                'y' => max(0, min(560, (int)($r['y'] ?? 0))),
+                'rot' => !empty($r['rot']) ? 1 : 0,
+            ];
+        }
+        set_setting('warehouse3d_layout_' . $branchId, json_encode(['racks' => $clean], JSON_UNESCAPED_UNICODE));
+        crmAuditLog('location.update', [
+            'entity_type' => 'stock_location', 'entity_id' => 0, 'entity_label' => '3D mapa',
+            'summary' => 'Uloženo rozmístění 3D mapy skladu (' . skladBranchLabel($branchId) . ', ' . count($clean) . ' regálů)',
+        ]);
+        echo json_encode(['success' => true, 'message' => 'Rozmístění mapy uloženo.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
