@@ -47,8 +47,10 @@ function crmPushDispatch(PDO $pdo, string $action, array $opts): void {
             $info = crmPushOrderInfo($pdo, $id);
             $code = (string)($opts['entity_label'] ?? ($info['code'] ?? ('#' . $id)));
             $body = trim(($info['device'] ?? '') . (!empty($info['customer']) ? ' — ' . $info['customer'] : ''));
+            // Důraznější tón než běžná chat zpráva (order.caf v bundlu appky;
+            // starší buildy bez souboru přehrají systémový default).
             pushToAll($pdo, 'Nová zakázka ' . $code, $body !== '' ? $body : 'Byla založena nová zakázka.',
-                ['data' => ['url' => 'view_order.php?id=' . $id], 'collapse' => 'order-' . $id], [$actorKey]);
+                ['sound' => 'order.caf', 'data' => ['url' => 'view_order.php?id=' . $id], 'collapse' => 'order-' . $id], [$actorKey]);
 
         } elseif ($action === 'order.status_change') {
             $id   = (int)($opts['entity_id'] ?? 0);
@@ -96,6 +98,6 @@ function crmPushEshopOrder(PDO $pdo, int $orderId, string $orderRef, $total, str
     $body = trim(($customer !== '' ? $customer : ('Objednávka ' . $orderRef)) . $amount);
     try {
         pushToAll($pdo, 'Nová e-shop objednávka', $body !== '' ? $body : ('Objednávka ' . $orderRef),
-            ['data' => ['url' => 'orders.php'], 'collapse' => 'eshop']);
+            ['sound' => 'order.caf', 'data' => ['url' => 'orders.php'], 'collapse' => 'eshop']);
     } catch (Throwable $e) {}
 }

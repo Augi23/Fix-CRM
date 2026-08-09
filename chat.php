@@ -32,6 +32,10 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 
 <style>
 .chat-msg { max-width: 72%; }
+/* Něco globálního nastavuje kontejneru flex-wrap:wrap — sloupec se pak na mobilu
+   zalamoval do dalších sloupců DOPRAVA (vodorovný chat). Nowrap = klasická svislá
+   historie; přetečení řeší overflow-auto na výšku. */
+#chatMessages { flex-wrap: nowrap !important; }
 .chat-msg .bubble { padding: 8px 14px; border-radius: 16px; font-size: .95rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
 .chat-msg.other { align-self: flex-start; }
 .chat-msg.other .bubble { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.10); color: #fff; border-bottom-left-radius: 5px; }

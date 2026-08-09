@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.43.1',
+        'date' => '2026-08-09',
+        'time' => date('H:i'),
+        'title' => 'Týmový chat zase svisle + důraznější tón pro nové zakázky',
+        'items' => [
+            '<b>Chat:</b> na mobilu (i v appce) se historie zpráv lámala do sloupců vedle sebe a rolovala doleva-doprava. Příčinou bylo zalamování flex sloupce — vypnuto, chat je zase klasicky odshora dolů.',
+            '<b>Notifikace:</b> push na novou zakázku a e-shop objednávku má nově důraznější tón (order.caf) — odlišíte ho po sluchu od pípnutí chatu. Vyžaduje aktualizaci mobilní appky; starší buildy hrají dál běžný zvuk.',
+        ],
+    ],
+    [
         'version' => '3.43.0',
         'date' => '2026-08-09',
         'time' => '17:10',
