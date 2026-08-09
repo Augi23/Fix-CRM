@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.43.0',
+        'date' => '2026-08-09',
+        'time' => '17:10',
+        'title' => '3D mapa skladu — interaktivní vizualizace, kde co leží',
+        'items' => [
+            '<b>Sklad → Umístění → 3D mapa:</b> interaktivní 3D pohled na sklad pobočky (návrh vznikl v Claude Design). Regály stojí tak, jak stojí doopravdy; klik na regál ukáže jeho <b>police a krabičky</b> (vpravo i otočný 3D náhled regálu), klik na krabičku otevře její obsah v CRM.',
+            '<b>Hledání dílu:</b> našeptávač (název / SKU / model / kód umístění) — vybraný díl <b>rozsvítí regál s majákem</b> a zvýrazní konkrétní krabičku, odkud ho vzít. Karta dílu je na jeden klik. Umí i přímý odkaz <code>sklad_mapa.php?focus=&lt;id dílu&gt;</code>.',
+            '<b>Živá data:</b> mapa si strukturu a obsazenost tahá z <code>api/warehouse_map_data.php</code> — co je v CRM, to je v mapě, nic se neudržuje dvakrát. Vše jen pro přihlášené se skladovým oprávněním.',
+            '<b>Režim úprav:</b> tažením přeskládáš regály podle skutečnosti (dvojklik = otočení o 90°), rozmístění se ukládá <b>na server per pobočka</b> — všichni pak vidí stejnou mapu. Struktura skladu se tím nemění; police a krabičky se dál spravují v Umístěních.',
+        ],
+    ],
+    [
         'version' => '3.42.34',
         'date' => '2026-08-09',
         'time' => date('H:i'),

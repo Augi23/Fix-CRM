@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D mapa skladu</title>
+<!--
+  3D mapa skladu — vizualizace z Claude Design (handoff „Vizualizace pozic v skladě")
+  napojená na živá data CRM. Servíruje ji sklad_mapa.php?raw=1 (vstřikuje CSRF token
+  místo __CSRF_TOKEN__); data: api/warehouse_map_data.php?with_parts=1 (same-origin).
+  Párování: regál v mapě ↔ číslo v kódu (RegK1 → 1). Struktura (police, krabičky,
+  díly) je VŽDY z API; mapa drží jen souřadnice regálů (op=map_layout, per pobočka).
+  Komponenty <warehouse-3d> a <rack-3d> jsou z handoffu (three.js z CDN); jediná
+  úprava: popisek regálu zobrazuje celý kód umístění (r.label), ne jen R+id.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: #000; color: #fff; overflow: hidden;
+    font-family: 'SF Pro Display', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  }
+  code, .mono { font-family: 'SF Mono', Menlo, monospace; }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ── horní lišta ── */
+  #topbar {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px; flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,.06); background: rgba(0,0,0,.25);
+  }
+  #topbar .ttl { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+  #branchLbl { font-size: 12px; color: rgba(255,255,255,.45); white-space: nowrap; }
+  #unplaced {
+    font-size: 11px; color: #FFD60A; background: rgba(255,214,10,.08);
+    border: 1px solid rgba(255,214,10,.25); border-radius: 9999px; padding: 4px 10px;
+    cursor: pointer; white-space: nowrap;
+  }
+  #searchWrap { position: relative; width: min(280px, 34vw); margin-left: auto; }
+  #searchBox {
+    display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.10); border-radius: 9999px;
+  }
+  #searchBox:focus-within { border-color: rgba(110,58,250,.5); }
+  #q { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: #fff; font-size: 12px; font-family: inherit; }
+  #results {
+    position: absolute; top: 38px; left: 0; right: 0; z-index: 30; display: none;
+    background: #0D0B1F; border: 1px solid rgba(255,255,255,.10); border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0,0,0,.5); padding: 5px; flex-direction: column; gap: 1px;
+    max-height: 320px; overflow: auto;
+  }
+  #results .row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; color: rgba(255,255,255,.75); }
+  #results .row:hover { background: rgba(110,58,250,.15); color: #fff; }
+  #results .row .nm { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #results .row .ps { font-size: 10px; color: #BF5AF2; flex-shrink: 0; }
+  #results .none { padding: 8px 10px; font-size: 12px; color: rgba(255,255,255,.4); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px;
+    border-radius: 9999px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+    background: rgba(255,255,255,.05); color: rgba(255,255,255,.7); border: 1px solid rgba(255,255,255,.14);
+    transition: all 150ms; white-space: nowrap;
+  }
+  .btn:hover { background: rgba(110,58,250,.15); color: #fff; }
+  .btn.grad { background: linear-gradient(135deg,#0A84FF 0%,#5E5CE6 45%,#BF5AF2 100%); color: #fff; border-color: transparent; box-shadow: 0 0 12px rgba(110,58,250,.25); }
+  .btn.grad:hover { opacity: .85; }
+
+  /* ── obsah ── */
+  #main { display: flex; flex: 1; min-height: 0; }
+  #left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px; overflow: hidden; }
+  #editBar {
+    display: none; align-items: center; gap: 10px; flex-shrink: 0;
+    background: rgba(110,58,250,.10); border: 1px solid rgba(110,58,250,.3); border-radius: 9999px;
+    padding: 6px 14px; font-size: 12px; color: rgba(255,255,255,.75);
+  }
+  #editBar .dot { width: 7px; height: 7px; border-radius: 50%; background: #BF5AF2; box-shadow: 0 0 6px rgba(191,90,242,.7); flex-shrink: 0; }
+  #editBar .lnk { background: transparent; border: none; color: #BF5AF2; font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; }
+  #editBar .lnk:hover { text-decoration: underline; }
+  #saveBtn { display: none; }
+  #mapBox {
+    position: relative; flex: 1; min-height: 300px;
+    background: radial-gradient(ellipse at 50% 40%, rgba(110,58,250,.10), #07061A 75%);
+    border: 1px solid rgba(255,255,255,.10); border-radius: 12px; overflow: hidden;
+  }
+  #mapBox .hint { position: absolute; left: 12px; bottom: 10px; font-size: 10px; color: rgba(255,255,255,.35); pointer-events: none; }
+  #legend { display: flex; gap: 18px; font-size: 11px; color: rgba(255,255,255,.55); flex-shrink: 0; flex-wrap: wrap; }
+  #legend span { display: inline-flex; align-items: center; gap: 6px; }
+  #legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* ── pravý panel ── */
+  #panel { width: 340px; flex-shrink: 0; border-left: 1px solid rgba(255,255,255,.06); overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  #panel .empty { font-size: 12px; color: rgba(255,255,255,.4); line-height: 1.6; padding-top: 8px; }
+  #panel h3 { margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  #panel h3 .sp { flex: 1; }
+  #panel .sub { font-size: 12px; color: rgba(255,255,255,.45); margin-top: -6px; }
+  .targetBox { background: rgba(110,58,250,.12); border: 1px solid rgba(110,58,250,.35); border-radius: 8px; padding: 9px 12px; font-size: 12px; line-height: 1.5; }
+  .targetBox .ps { font-size: 11px; color: #BF5AF2; }
+  .cap { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.28); }
+  #rackView { height: 300px; flex-shrink: 0; border-radius: 12px; background: radial-gradient(ellipse at 50% 42%, rgba(110,58,250,.12), transparent 72%); overflow: hidden; }
+  .shelfRow { border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .shelfRow.hotShelf { border-color: rgba(191,90,242,.5); background: rgba(110,58,250,.06); }
+  .shelfHead { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .shelfHead .cd { font-size: 11px; font-weight: 600; color: #5E9BFF; }
+  .shelfHead .nm { color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+    background: rgba(10,132,255,.10); border: 1px solid rgba(10,132,255,.3); border-radius: 7px;
+    padding: 3px 8px; font-size: 11px; color: rgba(255,255,255,.85); cursor: pointer;
+  }
+  .chip:hover { background: rgba(110,58,250,.2); }
+  .chip .cd { font-size: 10px; font-weight: 600; color: #5E9BFF; }
+  .chip.hot { background: rgba(110,58,250,.3); border-color: #BF5AF2; animation: afCell 1.4s ease-in-out infinite; }
+  .chip.hot .cd { color: #BF5AF2; }
+  .chip.loose { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.12); color: rgba(255,255,255,.6); }
+  .chip .n { color: rgba(255,255,255,.45); }
+  #toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 100;
+    background: #0D0B1F; border: 1px solid rgba(255,255,255,.14); border-radius: 10px;
+    padding: 9px 16px; font-size: 12px; display: none; box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  }
+  #fatal { display: none; align-items: center; justify-content: center; height: 100vh; padding: 24px; text-align: center; color: rgba(255,255,255,.6); font-size: 14px; line-height: 1.7; }
+  @keyframes afCell { 0%,100% { box-shadow: 0 0 0 0 rgba(191,90,242,.6); } 50% { box-shadow: 0 0 0 7px rgba(191,90,242,0); } }
+  @media (max-width: 900px) {
+    #main { flex-direction: column; overflow: auto; }
+    #left { flex: none; }
+    #mapBox { min-height: 46vh; }
+    #panel { width: auto; border-left: none; border-top: 1px solid rgba(255,255,255,.06); }
+    #searchWrap { width: 200px; }
+  }
+</style>
+</head>
+<body>
+<div id="fatal"></div>
+<div id="app" style="display:none">
+  <div id="topbar">
+    <span class="ttl">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BF5AF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+      Pozice na skladě
+    </span>
+    <span id="branchLbl"></span>
+    <span id="unplaced" style="display:none" title="Otevře sklad s filtrem na neumístěné díly"></span>
+    <div id="searchWrap">
+      <div id="searchBox">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        <input id="q" placeholder="Hledat díl (název / SKU / model)…" autocomplete="off">
+      </div>
+      <div id="results"></div>
+    </div>
+    <button id="editBtn" class="btn">Upravit rozmístění</button>
+  </div>
+  <div id="main">
+    <div id="left">
+      <div id="editBar">
+        <span class="dot"></span>
+        <span>Režim úprav — táhni regál pro přesun · dvojklik = otočení o 90°</span>
+        <span style="flex:1"></span>
+        <button id="saveBtn" class="lnk">💾 Uložit rozmístění</button>
+        <button id="resetBtn" class="lnk">Obnovit výchozí</button>
+      </div>
+      <div id="mapBox">
+        <warehouse-3d id="map" model="{}"></warehouse-3d>
+        <span class="hint">Tažením otáčíš pohled · kolečko přibližuje · klik na regál zobrazí police</span>
+      </div>
+      <div id="legend">
+        <span><i style="background:rgba(110,58,250,.35);border:1.5px solid #BF5AF2"></i>Regál s hledaným dílem</span>
+        <span><i style="background:rgba(255,255,255,.10);border:1.5px solid rgba(110,58,250,.6)"></i>Vybraný regál</span>
+        <span><i style="background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.14)"></i>Ostatní regály</span>
+      </div>
+    </div>
+    <div id="panel"><div class="empty">Klikni na regál v mapě pro zobrazení polic a krabiček.</div></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ═══ <warehouse-3d> — z handoffu Claude Design; úprava: popisek = r.label (kód RegK…) ═══ */
+(function () {
+  const THREE_URL = 'https://unpkg.com/three@0.184.0/build/three.module.js';
+  const MAPW = 740, MAPH = 560, SC = 1 / 100;
+  class Warehouse3D extends HTMLElement {
+    static get observedAttributes() { return ['model']; }
+    connectedCallback() {
+      if (this._init) return; this._init = true;
+      this.style.display = 'block'; this.style.width = '100%'; this.style.height = '100%';
+      this._boot();
+    }
+    async _boot() {
+      const THREE = await import(THREE_URL); this.T = THREE;
+      const w = this.clientWidth || 900, h = this.clientHeight || 560;
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.setSize(w, h);
+      this.appendChild(renderer.domElement);
+      renderer.domElement.style.touchAction = 'none';
+      const onResize = () => {
+        const nw = this.clientWidth || w, nh = this.clientHeight || h;
+        renderer.setSize(nw, nh);
+        cam.aspect = nw / nh; cam.updateProjectionMatrix();
+        if (!this._userZoomed) this._fit();
+      };
+      if (window.ResizeObserver) { this._ro = new ResizeObserver(onResize); this._ro.observe(this); }
+      window.addEventListener('resize', onResize);
+      const scene = new THREE.Scene();
+      const cam = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
+      this._cam = cam; this._orbit = { theta: -0.35, phi: 0.85, r: 11 };
+      this._fit = () => {
+        const o = this._orbit, gw = MAPW * SC / 2, gh = MAPH * SC / 2;
+        const corners = [];
+        [[-gw, -gh], [gw, -gh], [-gw, gh], [gw, gh]].forEach(([x, z]) => {
+          corners.push(new THREE.Vector3(x, 0, z), new THREE.Vector3(x, 1.8, z));
+        });
+        const fits = (r) => {
+          const cx = Math.sin(o.theta) * Math.sin(o.phi) * r, cy = Math.cos(o.phi) * r, cz = Math.cos(o.theta) * Math.sin(o.phi) * r;
+          const c = cam.clone(); c.position.set(cx, cy, cz); c.lookAt(0, 0.4, 0); c.updateMatrixWorld();
+          return corners.every((p) => { const v = p.clone().project(c); return Math.abs(v.x) < 0.93 && Math.abs(v.y) < 0.93; });
+        };
+        let lo = 4, hi = 30;
+        for (let i = 0; i < 22; i++) { const mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; }
+        o.r = Math.min(30, hi + 0.2);
+      };
+      scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+      const key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(4, 8, 5); scene.add(key);
+      const fill = new THREE.DirectionalLight(0x8877ff, 0.4); fill.position.set(-5, 4, -4); scene.add(fill);
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(MAPW * SC, MAPH * SC), new THREE.MeshStandardMaterial({ color: 0x0b0a1e, roughness: 0.95 }));
+      floor.rotation.x = -Math.PI / 2; floor.name = 'floor'; scene.add(floor);
+      {
+        const pts = [], gw = MAPW * SC / 2, gh = MAPH * SC / 2, st = 0.4;
+        for (let x = -gw; x <= gw + 0.001; x += st) pts.push(new THREE.Vector3(x, 0.002, -gh), new THREE.Vector3(x, 0.002, gh));
+        for (let z = -gh; z <= gh + 0.001; z += st) pts.push(new THREE.Vector3(-gw, 0.002, z), new THREE.Vector3(gw, 0.002, z));
+        const geo = new THREE.BufferGeometry().setFromPoints(pts);
+        scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x221d45 })));
+      }
+      {
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x14122c, roughness: 0.9 });
+        const wh = 0.5, wt = 0.05, gw = MAPW * SC, gh = MAPH * SC;
+        const back = new THREE.Mesh(new THREE.BoxGeometry(gw, wh, wt), wallMat);
+        back.position.set(0, wh / 2, -gh / 2 - wt / 2); scene.add(back);
+        const front = new THREE.Mesh(new THREE.BoxGeometry(gw, wh, wt), wallMat);
+        front.position.set(0, wh / 2, gh / 2 + wt / 2); scene.add(front);
+        const right = new THREE.Mesh(new THREE.BoxGeometry(wt, wh, gh + wt * 2), wallMat);
+        right.position.set(gw / 2 + wt / 2, wh / 2, 0); scene.add(right);
+        const doorW = 1.2, seg = gh - doorW;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(wt, wh, seg), wallMat);
+        m.position.set(-gw / 2 - wt / 2, wh / 2, gh / 2 - seg / 2); scene.add(m);
+        const partLen = (560 - 222) * SC, partH = 2.3;
+        const part = new THREE.Mesh(new THREE.BoxGeometry(wt, partH, partLen), wallMat);
+        part.position.set((282 - MAPW / 2) * SC, partH / 2, ((222 + 560) / 2 - MAPH / 2) * SC);
+        scene.add(part);
+        {
+          const frame = new THREE.MeshStandardMaterial({ color: 0xB02430, roughness: 0.5, metalness: 0.15 });
+          const drawer = new THREE.MeshPhysicalMaterial({ color: 0xd8dbe2, roughness: 0.25, metalness: 0, transparent: true, opacity: 0.5 });
+          const BW = 0.30, BH = 0.50, BD = 0.16, gapZ = 0.05, gapY = 0.08;
+          const wallX = (282 - MAPW / 2) * SC + wt / 2;
+          const z0 = (222 - MAPH / 2) * SC + BW / 2;
+          for (let row = 0; row < 2; row++) {
+            const cy = 0.95 + BH / 2 + row * (BH + gapY);
+            for (let col = 0; col < 3; col++) {
+              const cz = z0 + col * (BW + gapZ);
+              const box = new THREE.Mesh(new THREE.BoxGeometry(BD, BH, BW), frame);
+              box.position.set(wallX + BD / 2, cy, cz);
+              scene.add(box);
+              for (let dIdx = 0; dIdx < 8; dIdx++) {
+                const dh = (BH - 0.02) / 8 - 0.012;
+                const d = new THREE.Mesh(new THREE.BoxGeometry(0.015, dh, BW - 0.05), drawer);
+                d.position.set(wallX + BD + 0.008, cy - BH / 2 + 0.01 + (dIdx + 0.5) * ((BH - 0.02) / 8), cz);
+                scene.add(d);
+              }
+            }
+          }
+        }
+      }
+      const dock = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshBasicMaterial({ color: 0x0A84FF, transparent: true, opacity: 0.10 }));
+      dock.rotation.x = -Math.PI / 2;
+      const dockZ = -MAPH * SC / 2 + 0.75;
+      dock.position.set(-MAPW * SC / 2 + 0.8, 0.004, dockZ);
+      scene.add(dock);
+      scene.add(this._label('VSTUP', dock.position.x + 0.1, 0.25, dockZ, 0x5E9BFF, 0.15, true));
+      this._racks = new THREE.Group(); scene.add(this._racks);
+      this._scene = scene; this._renderer = renderer;
+      this._pulse = [];
+      const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+      const toPtr = (e) => { const r = renderer.domElement.getBoundingClientRect(); ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); };
+      const pickRack = (e) => {
+        toPtr(e); ray.setFromCamera(ptr, cam);
+        const hits = ray.intersectObjects(this._racks.children, true);
+        let o = hits[0] && hits[0].object;
+        while (o && o.parent !== this._racks) o = o.parent;
+        return o || null;
+      };
+      const floorPt = (e) => {
+        toPtr(e); ray.setFromCamera(ptr, cam);
+        const p = new THREE.Vector3();
+        ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), p);
+        return p;
+      };
+      let drag = null, orb = null, moved = false;
+      renderer.domElement.addEventListener('pointerdown', (e) => {
+        moved = false;
+        const g = pickRack(e);
+        renderer.domElement.setPointerCapture(e.pointerId);
+        if (g && this._model.edit) {
+          const p = floorPt(e);
+          drag = { g, ox: g.position.x - p.x, oz: g.position.z - p.z };
+          renderer.domElement.style.cursor = 'grabbing';
+        } else {
+          orb = { x: e.clientX, y: e.clientY, t: this._orbit.theta, p: this._orbit.phi, g: g };
+        }
+      });
+      renderer.domElement.addEventListener('pointermove', (e) => {
+        if (drag) {
+          moved = true;
+          const p = floorPt(e); if (!p) return;
+          const d = drag.g.userData;
+          const half = { x: d.wpx / 2, z: d.hpx / 2 };
+          let mx = (p.x + drag.ox) / SC + MAPW / 2, mz = (p.z + drag.oz) / SC + MAPH / 2;
+          mx = Math.max(half.x + 4, Math.min(MAPW - half.x - 4, Math.round(mx / 4) * 4));
+          mz = Math.max(half.z + 4, Math.min(MAPH - half.z - 4, Math.round(mz / 4) * 4));
+          drag.g.position.set((mx - MAPW / 2) * SC, 0, (mz - MAPH / 2) * SC);
+          drag.mx = mx; drag.mz = mz;
+        } else if (orb) {
+          if (Math.abs(e.clientX - orb.x) + Math.abs(e.clientY - orb.y) > 4) moved = true;
+          this._orbit.theta = orb.t + (e.clientX - orb.x) * 0.005;
+          this._orbit.phi = Math.max(0.25, Math.min(1.35, orb.p + (e.clientY - orb.y) * 0.004));
+        } else {
+          renderer.domElement.style.cursor = pickRack(e) ? (this._model.edit ? 'grab' : 'pointer') : 'default';
+        }
+      });
+      renderer.domElement.addEventListener('pointerup', (e) => {
+        if (drag) {
+          if (drag.mx != null) this.dispatchEvent(new CustomEvent('wh-rack-move', { bubbles: true, detail: { id: drag.g.userData.id, x: Math.round(drag.mx - drag.g.userData.wpx / 2), y: Math.round(drag.mz - drag.g.userData.hpx / 2) } }));
+          drag = null; renderer.domElement.style.cursor = 'grab';
+        } else if (orb) {
+          if (!moved && orb.g) this.dispatchEvent(new CustomEvent('wh-rack-click', { bubbles: true, detail: { id: orb.g.userData.id } }));
+          orb = null;
+        }
+      });
+      renderer.domElement.addEventListener('dblclick', (e) => {
+        const g = pickRack(e);
+        if (g) this.dispatchEvent(new CustomEvent('wh-rack-rotate', { bubbles: true, detail: { id: g.userData.id } }));
+      });
+      renderer.domElement.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        this._userZoomed = true;
+        this._orbit.r = Math.max(4, Math.min(30, this._orbit.r + e.deltaY * 0.004));
+      }, { passive: false });
+      const clock = new THREE.Clock();
+      const loop = () => {
+        if (!this.isConnected) return;
+        requestAnimationFrame(loop);
+        const t = clock.getElapsedTime();
+        const o = this._orbit;
+        cam.position.set(Math.sin(o.theta) * Math.sin(o.phi) * o.r, Math.cos(o.phi) * o.r, Math.cos(o.theta) * Math.sin(o.phi) * o.r);
+        cam.lookAt(0, 0.4, 0);
+        this._pulse.forEach((m) => { m.emissiveIntensity = 0.55 + 0.45 * Math.sin(t * 4); });
+        if (this._beacon) { this._beacon.position.y = this._beaconY + 0.06 * Math.sin(t * 3); this._beacon.scale.setScalar(1 + 0.2 * Math.sin(t * 4)); }
+        renderer.render(scene, cam);
+      };
+      this._fit();
+      loop();
+      this._build();
+    }
+    attributeChangedCallback() { if (this.T) this._build(); }
+    _label(text, x, y, z, color, size, flat) {
+      const THREE = this.T;
+      const c = document.createElement('canvas'); c.width = 320; c.height = 64;
+      const ctx = c.getContext('2d');
+      ctx.font = '700 34px -apple-system, Helvetica, Arial';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+      ctx.fillText(text, 160, 34);
+      const tex = new THREE.CanvasTexture(c);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+      const s = new THREE.Sprite(mat);
+      s.scale.set(size * 5, size, 1); s.position.set(x, y, z);
+      return s;
+    }
+    _build() {
+      const THREE = this.T; if (!THREE) return;
+      let m; try { m = JSON.parse(this.getAttribute('model') || '{}'); } catch (e) { m = {}; }
+      this._model = m;
+      const g = this._racks;
+      while (g.children.length) { const c = g.children[0]; g.remove(c); }
+      this._pulse = []; this._beacon = null;
+      const SH = m.shelves || 5;
+      const metal = new THREE.MeshStandardMaterial({ color: 0x17171c, roughness: 0.55, metalness: 0.6 });
+      const wood = new THREE.MeshStandardMaterial({ color: 0xC9A876, roughness: 0.85 });
+      (m.racks || []).forEach((r) => {
+        const grp = new THREE.Group();
+        const wpx = r.rot ? 44 : 140, hpx = r.rot ? 140 : 44;
+        grp.userData = { id: r.id, wpx, hpx };
+        const rSH = r.sh || SH;
+        const W = 1.4, D = 0.42, H = rSH <= 2 ? 0.75 : 1.5, T = 0.03;
+        const inner = new THREE.Group();
+        if (r.rot) inner.rotation.y = Math.PI / 2;
+        const pg = new THREE.BoxGeometry(0.045, H, 0.045);
+        [[-W / 2 + 0.03, D / 2 - 0.03], [W / 2 - 0.03, D / 2 - 0.03], [-W / 2 + 0.03, -D / 2 + 0.03], [W / 2 - 0.03, -D / 2 + 0.03]].forEach(([x, z]) => {
+          const p = new THREE.Mesh(pg, metal); p.position.set(x, H / 2, z); inner.add(p);
+        });
+        const gap = (H - T) / (rSH - 1);
+        for (let i = 0; i < rSH; i++) {
+          const b = new THREE.Mesh(new THREE.BoxGeometry(W - 0.02, T, D - 0.02), wood);
+          b.position.set(0, T / 2 + i * gap, 0); inner.add(b);
+        }
+        const isT = r.id === m.target, isSel = r.id === m.selected;
+        if (isT || isSel) {
+          const hueMat = new THREE.MeshStandardMaterial({
+            color: isT ? 0x6E3AFA : 0xffffff, transparent: true, opacity: isT ? 0.22 : 0.10,
+            emissive: isT ? 0xBF5AF2 : 0xffffff, emissiveIntensity: isT ? 0.6 : 0.15, depthWrite: false
+          });
+          const glow = new THREE.Mesh(new THREE.BoxGeometry(W + 0.08, H + 0.06, D + 0.08), hueMat);
+          glow.position.y = H / 2; inner.add(glow);
+          if (isT) this._pulse.push(hueMat);
+        }
+        if (isT) {
+          const bMat = new THREE.MeshStandardMaterial({ color: 0xBF5AF2, emissive: 0xBF5AF2, emissiveIntensity: 1.2 });
+          const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 16), bMat);
+          this._beaconY = H + 0.28; beacon.position.set(0, this._beaconY, 0); grp.add(beacon); this._beacon = beacon;
+          const l = new THREE.PointLight(0xBF5AF2, 2.2, 2.5); l.position.set(0, H + 0.4, 0); grp.add(l);
+        }
+        grp.add(inner);
+        grp.add(this._label(r.label || ('R' + r.id), 0, H + (isT ? 0.55 : 0.16), 0, isT ? 0xBF5AF2 : 0x9a96b8, 0.16));
+        grp.position.set((r.x + wpx / 2 - MAPW / 2) * SC, 0, (r.y + hpx / 2 - MAPH / 2) * SC);
+        g.add(grp);
+      });
+    }
+  }
+  if (!customElements.get('warehouse-3d')) customElements.define('warehouse-3d', Warehouse3D);
+})();
+</script>
+
+<script>
+/* ═══ <rack-3d> — z handoffu Claude Design, beze změn ═══ */
+(function () {
+  const THREE_URL = 'https://unpkg.com/three@0.184.0/build/three.module.js';
+  class Rack3D extends HTMLElement {
+    static get observedAttributes() { return ['model']; }
+    connectedCallback() {
+      if (this._init) return; this._init = true;
+      this.style.display = 'block'; this.style.width = '100%'; this.style.height = '100%';
+      this._boot();
+    }
+    async _boot() {
+      const THREE = await import(THREE_URL); this.T = THREE;
+      const w = this.clientWidth || 300, h = this.clientHeight || 430;
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.setSize(w, h);
+      this.appendChild(renderer.domElement);
+      renderer.domElement.style.cursor = 'grab';
+      renderer.domElement.style.touchAction = 'none';
+      const scene = new THREE.Scene();
+      const cam = new THREE.PerspectiveCamera(35, w / h, 0.1, 50);
+      this._cam = cam;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+      const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(2, 4, 3); scene.add(key);
+      const fill = new THREE.DirectionalLight(0x8877ff, 0.45); fill.position.set(-3, 2, -2); scene.add(fill);
+      const group = new THREE.Group(); scene.add(group);
+      this._group = group; this._rotY = -0.5; this._hotMats = []; this._pin = null;
+      let sx = 0, base = 0, drag = false;
+      renderer.domElement.addEventListener('pointerdown', (e) => {
+        drag = true; sx = e.clientX; base = this._rotY;
+        renderer.domElement.setPointerCapture(e.pointerId);
+        renderer.domElement.style.cursor = 'grabbing';
+      });
+      renderer.domElement.addEventListener('pointermove', (e) => { if (drag) this._rotY = base + (e.clientX - sx) * 0.01; });
+      renderer.domElement.addEventListener('pointerup', () => { drag = false; renderer.domElement.style.cursor = 'grab'; });
+      const clock = new THREE.Clock();
+      const loop = () => {
+        if (!this.isConnected) return;
+        requestAnimationFrame(loop);
+        const t = clock.getElapsedTime();
+        group.rotation.y += (this._rotY - group.rotation.y) * 0.15;
+        this._hotMats.forEach((m) => { m.emissiveIntensity = 0.6 + 0.45 * Math.sin(t * 4); });
+        if (this._pin) {
+          this._pin.position.y = this._pinY + 0.035 * Math.sin(t * 3);
+          this._pin.scale.setScalar(1 + 0.18 * Math.sin(t * 4));
+        }
+        renderer.render(scene, cam);
+      };
+      loop();
+      this._build();
+      this._frame();
+    }
+    attributeChangedCallback() { if (this.T) { this._build(); this._frame(); } }
+    _frame() {
+      let m; try { m = JSON.parse(this.getAttribute('model') || '{}'); } catch (e) { m = {}; }
+      const half = (m.shelves || 5) <= 2;
+      const cy = half ? 0.5 : 0.85;
+      this._cam.position.set(1.7, half ? 1.1 : 1.6, half ? 2.4 : 3.4);
+      this._cam.lookAt(0, cy, 0);
+    }
+    _build() {
+      const THREE = this.T; if (!THREE) return;
+      let m; try { m = JSON.parse(this.getAttribute('model') || '{}'); } catch (e) { m = {}; }
+      const SH = m.shelves || 5, CE = m.cells || 4, boxes = m.boxes || [];
+      const g = this._group;
+      while (g.children.length) g.remove(g.children[0]);
+      this._hotMats = []; this._pin = null;
+      const W = 1.4, D = 0.5, H = SH <= 2 ? 0.9 : 1.8, T = 0.035;
+      const metal = new THREE.MeshStandardMaterial({ color: 0x17171c, roughness: 0.55, metalness: 0.6 });
+      const wood = new THREE.MeshStandardMaterial({ color: 0xC9A876, roughness: 0.85 });
+      const boxMat = new THREE.MeshStandardMaterial({ color: 0x2e2e36, roughness: 0.8 });
+      const pg = new THREE.BoxGeometry(0.05, H, 0.05);
+      [[-W / 2 + 0.025, D / 2 - 0.025], [W / 2 - 0.025, D / 2 - 0.025], [-W / 2 + 0.025, -D / 2 + 0.025], [W / 2 - 0.025, -D / 2 + 0.025]].forEach(([x, z]) => {
+        const p = new THREE.Mesh(pg, metal); p.name = 'post'; p.position.set(x, H / 2, z); g.add(p);
+      });
+      const gap = (H - T) / (SH - 1);
+      const cellW = (W - 0.1) / CE;
+      for (let i = 1; i <= SH; i++) {
+        const y = T / 2 + (i - 1) * gap;
+        const board = new THREE.Mesh(new THREE.BoxGeometry(W - 0.02, T, D - 0.02), wood);
+        board.name = 'shelf'; board.position.set(0, y, 0); g.add(board);
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(W, T + 0.012, 0.022), metal);
+        edge.position.set(0, y, D / 2); g.add(edge);
+        const edge2 = new THREE.Mesh(new THREE.BoxGeometry(W, T + 0.012, 0.022), metal);
+        edge2.position.set(0, y, -D / 2); g.add(edge2);
+      }
+      boxes.forEach((b) => {
+        const y = T / 2 + (b.p - 1) * gap;
+        const x = -W / 2 + 0.05 + (b.b - 0.5) * cellW;
+        const bw = cellW * 0.72, bh = 0.22, bd = D * 0.7;
+        let mat = boxMat;
+        if (b.hot) {
+          mat = new THREE.MeshStandardMaterial({ color: 0x6E3AFA, emissive: 0x8b5cf6, emissiveIntensity: 0.8, roughness: 0.4 });
+          this._hotMats.push(mat);
+        }
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), mat);
+        mesh.name = 'box'; mesh.position.set(x, y + T / 2 + bh / 2, 0); g.add(mesh);
+        if (b.hot) {
+          const pin = new THREE.Mesh(new THREE.SphereGeometry(0.038, 16, 16), new THREE.MeshStandardMaterial({ color: 0xBF5AF2, emissive: 0xBF5AF2, emissiveIntensity: 1.2 }));
+          this._pinY = y + T / 2 + bh + 0.13;
+          pin.position.set(x, this._pinY, 0); g.add(pin); this._pin = pin;
+          const l = new THREE.PointLight(0xBF5AF2, 1.4, 1.4);
+          l.position.set(x, this._pinY + 0.05, 0.25); g.add(l);
+        }
+      });
+    }
+  }
+  if (!customElements.get('rack-3d')) customElements.define('rack-3d', Rack3D);
+})();
+</script>
+
+<script>
+/* ═══ Aplikace: živá data z CRM (api/warehouse_map_data.php) ═══ */
+(function () {
+  const CSRF = '__CSRF_TOKEN__';
+  const qsp = new URLSearchParams(location.search);
+  const BRANCH = qsp.get('branch') || '';
+  const FOCUS = parseInt(qsp.get('focus') || '0', 10);
+
+  // výchozí rozmístění z návrhu (Jan, Claude Design) — čísla = pořadí regálu v kódu (RegK1 → 1)
+  const DEFAULT_LAYOUT = {
+    1: { x: 690, y: 226, rot: 1 }, 2: { x: 692, y: 370, rot: 1 }, 3: { x: 596, y: 512, rot: 0 },
+    4: { x: 570, y: 374, rot: 1 }, 5: { x: 570, y: 230, rot: 1 }, 6: { x: 450, y: 512, rot: 0 },
+    7: { x: 422, y: 370, rot: 1 }, 8: { x: 422, y: 226, rot: 1 }, 9: { x: 242, y: 4, rot: 0 }
+  };
+
+  let D = null, racks = [], byLoc = {}, partsIdx = [];
+  let sel = null, target = null, edit = false, dirty = false;
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const num = (code) => { const m = /(\d+)$/.exec(code || ''); return m ? parseInt(m[1], 10) : null; };
+
+  function nav(url) {
+    try { if (window.parent && window.parent !== window) { window.parent.location.href = url; return; } } catch (e) {}
+    window.location.href = url;
+  }
+  function toast(msg, ok) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.style.borderColor = ok ? 'rgba(48,209,88,.5)' : 'rgba(255,255,255,.14)';
+    t.style.display = 'block';
+    clearTimeout(t._h); t._h = setTimeout(() => { t.style.display = 'none'; }, 3200);
+  }
+  function fatal(msg) {
+    $('app').style.display = 'none';
+    const f = $('fatal'); f.style.display = 'flex'; f.innerHTML = '<div>🗺️<br><br>' + esc(msg) + '</div>';
+  }
+
+  async function load() {
+    let r;
+    try {
+      r = await fetch('api/warehouse_map_data.php?with_parts=1' + (BRANCH ? '&branch=' + encodeURIComponent(BRANCH) : ''), { credentials: 'same-origin' });
+    } catch (e) { fatal('Data mapy se nepodařilo stáhnout — zkontroluj připojení.'); return; }
+    if (r.status === 401) { fatal('Nepřihlášeno — otevři mapu z CRM (Sklad → Umístění → 3D mapa).'); return; }
+    let j;
+    try { j = await r.json(); } catch (e) { fatal('Server nevrátil platná data mapy.'); return; }
+    if (!j.success) { fatal(j.message || 'Data mapy se nepodařilo načíst.'); return; }
+    D = j;
+    build();
+    $('app').style.display = '';
+    $('branchLbl').textContent = D.branch && D.branch.label ? D.branch.label : '';
+    if (D.unplaced_parts > 0) {
+      const u = $('unplaced');
+      u.style.display = '';
+      u.textContent = D.unplaced_parts + ' dílů bez umístění';
+      u.onclick = () => nav('inventory.php?branch=' + D.branch.id + '&location=none');
+    }
+    if (!racks.length) {
+      fatal('Sklad „' + (D.branch ? D.branch.label : '') + '" zatím nemá žádné regály. Založ je v CRM: Sklad → Umístění.');
+      return;
+    }
+    render(); renderPanel();
+    if (FOCUS > 0) {
+      const p = partsIdx.find((x) => x.id === FOCUS);
+      if (p) setTarget(p);
+    }
+  }
+
+  function build() {
+    byLoc = {}; partsIdx = [];
+    (D.locations || []).forEach((l) => { byLoc[l.id] = l; });
+    (D.locations || []).forEach((l) => (l.parts || []).forEach((p) => partsIdx.push(Object.assign({ loc: l }, p))));
+    const regals = (D.locations || []).filter((l) => l.type === 'regal');
+    const police = (D.locations || []).filter((l) => l.type === 'police');
+    const boxes = (D.locations || []).filter((l) => l.type === 'krabicka');
+    const srv = D.layout && D.layout.racks ? D.layout.racks : null;
+    let auto = 0;
+    racks = regals.map((rg) => {
+      let n = num(rg.code); if (n == null) { n = 900 + (auto++); }
+      const pol = police.filter((p) => p.parent_id === rg.id)
+        .map((p) => ({ loc: p, no: num(p.code) || 0, boxes: boxes.filter((b) => b.parent_id === p.id), loose: (p.parts || []).length }))
+        .sort((a, b) => a.no - b.no);
+      const lay = (srv && srv[n]) || DEFAULT_LAYOUT[n];
+      const pos = lay || { x: 8 + (auto++) * 152, y: 8, rot: 0 };
+      return {
+        n: n, code: rg.code, name: rg.name || '', locId: rg.id, police: pol,
+        directBoxes: boxes.filter((b) => b.parent_id === rg.id),
+        x: pos.x, y: pos.y, rot: pos.rot ? 1 : 0,
+        sh: Math.max(2, pol.length || 5)
+      };
+    });
+  }
+
+  function rackByN(n) { return racks.find((r) => r.n === n) || null; }
+
+  function render() {
+    const model = {
+      racks: racks.map((r) => ({ id: r.n, label: r.code, x: r.x, y: r.y, rot: r.rot, sh: r.sh })),
+      shelves: 5,
+      target: target ? target.rackN : null,
+      selected: sel,
+      edit: edit
+    };
+    $('map').setAttribute('model', JSON.stringify(model));
+  }
+
+  function setTarget(p) {
+    const l = p.loc;
+    let boxLoc = null, policeLoc = null, rackLoc = null;
+    if (l.type === 'krabicka') {
+      boxLoc = l;
+      const par = byLoc[l.parent_id];
+      if (par && par.type === 'police') { policeLoc = par; rackLoc = byLoc[par.parent_id] || null; }
+      else { rackLoc = par || null; }
+    } else if (l.type === 'police') {
+      policeLoc = l; rackLoc = byLoc[l.parent_id] || null;
+    } else { rackLoc = l; }
+    target = { part: p, boxLoc: boxLoc, policeLoc: policeLoc, rackLoc: rackLoc, rackN: rackLoc ? num(rackLoc.code) : null };
+    if (target.rackN != null) { sel = target.rackN; }
+    render(); renderPanel();
+  }
+
+  function posLabel(t) {
+    const bits = [];
+    if (t.boxLoc) bits.push(t.boxLoc.code);
+    if (t.policeLoc) bits.push(t.policeLoc.code);
+    else if (t.rackLoc && !t.boxLoc) bits.push(t.rackLoc.code);
+    return bits.join(' · ');
+  }
+
+  function renderPanel() {
+    const P = $('panel');
+    const r = sel != null ? rackByN(sel) : null;
+    if (!r) { P.innerHTML = '<div class="empty">Klikni na regál v mapě pro zobrazení polic a krabiček.</div>'; return; }
+
+    let html = '<h3>' + esc(r.code) + (r.name ? ' <span style="font-weight:400;font-size:13px;color:rgba(255,255,255,.5)">' + esc(r.name) + '</span>' : '') + '<span class="sp"></span></h3>';
+    html += '<div class="sub"><a href="#" id="openInv" style="color:#5E9BFF;text-decoration:none">Otevřít obsah ve skladu →</a></div>';
+
+    if (target && target.rackN === r.n) {
+      html += '<div class="targetBox"><span>' + esc(target.part.name) + '</span> <span style="color:rgba(255,255,255,.5)">· ' + target.part.qty + ' ks</span><br>'
+        + '<span class="ps mono">' + esc(posLabel(target)) + '</span>'
+        + ' &nbsp;<a href="#" id="openPart" style="color:#BF5AF2;font-size:11px;text-decoration:none">karta dílu →</a></div>';
+    }
+
+    html += '<div class="cap">3D náhled regálu · táhni pro otočení</div>';
+    html += '<div id="rackView"><rack-3d id="rack" model="{}"></rack-3d></div>';
+
+    // police shora dolů
+    const rows = r.police.slice().sort((a, b) => b.no - a.no);
+    rows.forEach((po) => {
+      const hotShelf = !!(target && target.policeLoc && target.policeLoc.id === po.loc.id);
+      html += '<div class="shelfRow' + (hotShelf ? ' hotShelf' : '') + '">';
+      html += '<div class="shelfHead"><span class="cd mono">' + esc(po.loc.code) + '</span><span class="nm">' + esc(po.loc.name || '') + '</span></div>';
+      html += '<div class="chips">';
+      po.boxes.forEach((b) => {
+        const hot = !!(target && target.boxLoc && target.boxLoc.id === b.id);
+        html += '<span class="chip' + (hot ? ' hot' : '') + '" data-loc="' + b.id + '" title="Otevřít obsah krabičky">'
+          + '<span class="cd mono">' + esc(b.code) + '</span>' + (b.name ? '<span>' + esc(b.name) + '</span>' : '')
+          + '<span class="n">' + (b.parts_count || 0) + '</span></span>';
+      });
+      if (po.loose > 0) {
+        html += '<span class="chip loose" data-locinv="' + po.loc.id + '" title="Díly volně na polici — otevřít ve skladu">volně: ' + po.loose + ' dílů</span>';
+      }
+      if (!po.boxes.length && !po.loose) { html += '<span style="font-size:11px;color:rgba(255,255,255,.3)">prázdná police</span>'; }
+      html += '</div></div>';
+    });
+    if (r.directBoxes.length) {
+      html += '<div class="shelfRow"><div class="shelfHead"><span class="nm">Přímo na regálu</span></div><div class="chips">';
+      r.directBoxes.forEach((b) => {
+        const hot = !!(target && target.boxLoc && target.boxLoc.id === b.id);
+        html += '<span class="chip' + (hot ? ' hot' : '') + '" data-loc="' + b.id + '"><span class="cd mono">' + esc(b.code) + '</span>' + (b.name ? '<span>' + esc(b.name) + '</span>' : '') + '<span class="n">' + (b.parts_count || 0) + '</span></span>';
+      });
+      html += '</div></div>';
+    }
+    if (!r.police.length && !r.directBoxes.length) {
+      html += '<div class="empty">Regál zatím nemá v CRM police ani krabičky — založ je v Umístěních.</div>';
+    }
+    html += '<div style="font-size:10px;color:rgba(255,255,255,.3);line-height:1.6">Názvy a struktura polic/krabiček se spravují v CRM (Sklad → Umístění); mapa je jen zobrazuje.</div>';
+    P.innerHTML = html;
+
+    // rack-3d model: police → patra, krabičky → boxy (b = pořadí), „volně" = box navíc
+    let maxCells = 2;
+    r.police.forEach((po) => { maxCells = Math.max(maxCells, po.boxes.length + (po.loose > 0 ? 1 : 0)); });
+    const boxes3d = [];
+    r.police.forEach((po) => {
+      const p = Math.max(1, Math.min(r.sh, po.no || 1));
+      po.boxes.forEach((b, i) => {
+        boxes3d.push({ p: p, b: i + 1, hot: !!(target && target.boxLoc && target.boxLoc.id === b.id) });
+      });
+      if (po.loose > 0) {
+        boxes3d.push({ p: p, b: po.boxes.length + 1, hot: !!(target && target.policeLoc && target.policeLoc.id === po.loc.id && !target.boxLoc) });
+      }
+    });
+    const rackEl = P.querySelector('#rack');
+    if (rackEl) rackEl.setAttribute('model', JSON.stringify({ shelves: r.sh, cells: Math.min(8, maxCells), boxes: boxes3d }));
+
+    const inv = P.querySelector('#openInv');
+    if (inv) inv.onclick = (e) => { e.preventDefault(); nav('inventory.php?branch=' + D.branch.id + '&location=' + r.locId); };
+    const op = P.querySelector('#openPart');
+    if (op) op.onclick = (e) => { e.preventDefault(); nav('sklad.php?qr=' + target.part.id); };
+    P.querySelectorAll('.chip[data-loc]').forEach((ch) => {
+      ch.onclick = () => nav('sklad.php?loc=' + ch.dataset.loc);
+    });
+    P.querySelectorAll('.chip[data-locinv]').forEach((ch) => {
+      ch.onclick = () => nav('inventory.php?branch=' + D.branch.id + '&location=' + ch.dataset.locinv);
+    });
+  }
+
+  /* ── vyhledávání ── */
+  const q = $('q'), res = $('results');
+  q.addEventListener('input', () => {
+    const v = q.value.trim().toLowerCase();
+    if (v.length < 2) { res.style.display = 'none'; return; }
+    const m = partsIdx.filter((p) =>
+      (p.name || '').toLowerCase().includes(v) || (p.sku || '').toLowerCase().includes(v)
+      || (p.model || '').toLowerCase().includes(v) || (p.loc.code || '').toLowerCase().includes(v)
+    ).slice(0, 8);
+    res.innerHTML = m.length
+      ? m.map((p, i) => '<div class="row" data-i="' + i + '"><span class="nm">' + esc(p.name) + '</span><span class="ps mono">' + esc(p.loc.code) + '</span></div>').join('')
+      : '<div class="none">Nic nenalezeno.</div>';
+    res.style.display = 'flex';
+    res.querySelectorAll('.row').forEach((row) => {
+      row.onclick = () => { setTarget(m[parseInt(row.dataset.i, 10)]); q.value = ''; res.style.display = 'none'; };
+    });
+  });
+  document.addEventListener('click', (e) => { if (!$('searchWrap').contains(e.target)) res.style.display = 'none'; });
+
+  /* ── výběr / úpravy rozmístění ── */
+  document.addEventListener('wh-rack-click', (e) => { sel = e.detail.id; render(); renderPanel(); });
+  document.addEventListener('wh-rack-move', (e) => {
+    const r = rackByN(e.detail.id); if (!r || !edit) return;
+    r.x = e.detail.x; r.y = e.detail.y; dirty = true; updateSave();
+  });
+  document.addEventListener('wh-rack-rotate', (e) => {
+    if (!edit) return;
+    const r = rackByN(e.detail.id); if (!r) return;
+    const d = r.rot ? { w: 44, h: 140 } : { w: 140, h: 44 };
+    const rot = r.rot ? 0 : 1;
+    const nd = rot ? { w: 44, h: 140 } : { w: 140, h: 44 };
+    r.x = Math.max(4, Math.min(740 - 4 - nd.w, Math.round(r.x + d.w / 2 - nd.w / 2)));
+    r.y = Math.max(4, Math.min(560 - 4 - nd.h, Math.round(r.y + d.h / 2 - nd.h / 2)));
+    r.rot = rot; dirty = true; updateSave(); render();
+  });
+
+  function updateSave() { $('saveBtn').style.display = dirty ? '' : 'none'; }
+
+  $('editBtn').onclick = () => {
+    edit = !edit;
+    $('editBtn').textContent = edit ? 'Hotovo' : 'Upravit rozmístění';
+    $('editBtn').classList.toggle('grad', edit);
+    $('editBar').style.display = edit ? 'flex' : 'none';
+    if (!edit && dirty) { saveLayout(); }
+    render();
+  };
+  $('saveBtn').onclick = saveLayout;
+  $('resetBtn').onclick = () => {
+    let auto = 0;
+    racks.forEach((r) => {
+      const d = DEFAULT_LAYOUT[r.n] || { x: 8 + (auto++) * 152, y: 8, rot: 0 };
+      r.x = d.x; r.y = d.y; r.rot = d.rot ? 1 : 0;
+    });
+    dirty = true; updateSave(); render();
+  };
+
+  function saveLayout() {
+    const layout = { racks: {} };
+    racks.forEach((r) => { layout.racks[r.n] = { x: r.x, y: r.y, rot: r.rot }; });
+    const fd = new FormData();
+    fd.append('op', 'map_layout');
+    fd.append('branch_id', D.branch.id);
+    fd.append('layout', JSON.stringify(layout));
+    fd.append('csrf_token', CSRF);
+    fetch('api/stock_locations.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) { dirty = false; updateSave(); toast('Rozmístění mapy uloženo.', true); }
+        else { toast(d.message || 'Uložení se nepovedlo.', false); }
+      })
+      .catch(() => toast('Síťová chyba při ukládání.', false));
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
