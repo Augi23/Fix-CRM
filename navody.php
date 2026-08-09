@@ -288,6 +288,22 @@ $guides['crm'] = [
         ],
     ],
     [
+        'id' => 'soucastky-dilu', 'icon' => 'fa-puzzle-piece', 'color' => '#5E9BFF',
+        'title' => 'Součástky uvnitř dílu (zařízení-dárce)',
+        'intro' => 'Díl může být celé zařízení — dárce (např. iPhone 15 Pro Max). U něj vypiš, co použitelného v něm je: displej, baterie, kamera… Hledání pak dárce najde i podle součástky.',
+        'steps' => [
+            'Otevři <b>editaci dílu</b> (Sklad → tužtička u dílu) — hned pod názvem je sekce <b>Součástky uvnitř dílu</b>.',
+            'Tlačítkem <b>+ Přidat součástku</b> přidávej řádky. Názvy našeptává jednotný seznam (Displej, Baterie, Zadní sklo…), ale napsat jde cokoli; řádek odebereš košem. Změny platí po <b>Uložit</b>.',
+            'Pak klidně hledej podle součástky: <b>„displej" najde i dárce</b>, který ho má uvnitř — ve Skladu, ve výběru dílu k zakázce (v nabídce se ukáže „uvnitř: …") i v hledání <b>3D mapy</b>, která tě k němu navede majákem.',
+            'Když součástku z dárce vyndáš a použiješ, odškrtni u ní <b>použito</b> — přeškrtne se a hledání ji přestane nabízet. Na první pohled tak vidíš, co z dárce ještě zbývá.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => 'Součástky jsou vidět i po skenu <b>QR kódu dílu</b> — na kartě jako štítky (použité přeškrtnuté) — a ve Skladu v řádku pod názvem dílu.'],
+            ['typ' => 'info', 'text' => 'Chceš-li vyjmutou součástku vést samostatně (vlastní cena, QR štítek, prodej), založ jí normální <b>skladovou kartu</b> — tahle evidence říká, co v dárci je; nerozpadá ho na kusy.'],
+            ['typ' => 'role', 'text' => 'Součástky upravuje, kdo smí editovat díl (správa skladu, díl vlastní pobočky). Počet součástek se zapisuje do auditní historie dílu.'],
+        ],
+    ],
+    [
         'id' => 'nakupy', 'icon' => 'fa-cart-shopping', 'color' => '#FF9500',
         'title' => 'Nákupy — objednání a příjem dílů',
         'intro' => 'Fronta dílů k objednání: co chybí skladem, objednává se tady.',

@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.44.1',
+        'date' => '2026-08-09',
+        'time' => '19:10',
+        'title' => 'Návody: jak na součástky uvnitř dílu',
+        'items' => [
+            'Do <b>Návodů</b> přibyla sekce <b>„Součástky uvnitř dílu (zařízení-dárce)"</b> — jak je zapsat, jak je hledání najde a k čemu je odškrtnutí „použito".',
+        ],
+    ],
+    [
         'version' => '3.44.0',
         'date' => '2026-08-09',
         'time' => '18:55',
