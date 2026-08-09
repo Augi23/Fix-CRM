@@ -29,7 +29,13 @@ try {
     $lastOrder = (int)($pdo->query("SELECT MAX(id) FROM orders" . ($scope !== '' ? ' WHERE ' . substr($scope, 5) : ''))->fetchColumn() ?: 0);
 } catch (Throwable $e) { $lastOrder = 0; }
 try { $lastLog = (int)($pdo->query("SELECT MAX(id) FROM order_status_log")->fetchColumn() ?: 0); } catch (Throwable $e) { $lastLog = 0; }
-try { $ordersBadge = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE status IN (" . orderStatusSqlIn($pdo, 'active') . ")" . orderBranchScopeSql('branch_id', 'technician_id'))->fetchColumn() ?: 0); } catch (Throwable $e) { $ordersBadge = 0; }
+// STEJNÝ dotaz jako v hlavičce (includes/header.php) — bez `source <> 'legacy'`
+// poller odznak po pár vteřinách přepisoval z 68 na 637: hlavička importované
+// zakázky ze starého systému nepočítá, poller je počítal.
+try {
+    ensureOrdersSourceColumn();
+    $ordersBadge = (int)($pdo->query("SELECT COUNT(*) FROM orders WHERE source <> 'legacy' AND status IN (" . orderStatusSqlIn($pdo, 'active') . ")" . orderBranchScopeSql('branch_id', 'technician_id'))->fetchColumn() ?: 0);
+} catch (Throwable $e) { $ordersBadge = 0; }
 try { $complaintsBadge = (int)($pdo->query("SELECT COUNT(*) FROM complaints WHERE complaint_status NOT IN ('Vyřízeno','Zamítnuto')")->fetchColumn() ?: 0); } catch (Throwable $e) { $complaintsBadge = 0; }
 try { $procurementBadge = (int)($pdo->query("SELECT COUNT(*) FROM purchase_requests WHERE status IN ('pending','ordered')")->fetchColumn() ?: 0); } catch (Throwable $e) { $procurementBadge = 0; }
 // nová e-shop objednávka (applefix.click) → zvuk + odznak jako u zakázek

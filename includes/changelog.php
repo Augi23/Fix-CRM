@@ -13,6 +13,15 @@ $entries = [
     [
         'version' => '3.42.33',
         'date' => '2026-08-09',
+        'time' => '10:40',
+        'title' => 'Odznak u Zakázek už neskáče mezi dvěma čísly',
+        'items' => [
+            'Počet u Zakázek v menu se chvíli po načtení stránky měnil (např. 68 → 637). Číslo počítala dvě různá místa: stránka při načtení <b>bez</b> zakázek importovaných ze starého systému, ale živé obnovování <b>s nimi</b> — a po pár vteřinách to větší číslo vyhrálo. Teď obě místa počítají stejně: jen skutečné zakázky z CRM, bez staré historie.',
+        ],
+    ],
+    [
+        'version' => '3.42.33',
+        'date' => '2026-08-09',
         'time' => date('H:i'),
         'title' => 'Nová ikonka AppleFix CRM i na webu',
         'items' => [
