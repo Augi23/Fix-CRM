@@ -11,9 +11,9 @@
 return (static function (): array {
 $entries = [
     [
-        'version' => '3.42.29',
-        'date' => '2026-08-01',
-        'time' => '23:30',
+        'version' => '3.42.31',
+        'date' => '2026-08-09',
+        'time' => '09:30',
         'title' => 'Dotažení zbytku po kontrole — hlášky, sklad, směny, podpisy',
         'items' => [
             '<b>Upozornění se přestala ztrácet.</b> Když se zakázka uložila s dílem, který nebyl skladem, systém to sice věděl, ale hlášku zahodil — sklad tiše seděl v minusu. Nově se ukáže i po překreslení stránky, stejně jako varování o platbě.',
@@ -27,9 +27,9 @@ $entries = [
         ],
     ],
     [
-        'version' => '3.42.28',
-        'date' => '2026-08-01',
-        'time' => '21:15',
+        'version' => '3.42.30',
+        'date' => '2026-08-09',
+        'time' => '09:20',
         'title' => 'Doopravy po nezávislé kontrole — push, práva, platby',
         'items' => [
             '<b>Notifikace na mobil konečně dorazí tomu, komu mají.</b> Cílily se podle čísla uživatele, jenže technik má v systému jiný tvar identity — všechny jejich tokeny skončily v jedné přihrádce. Nově se cílí podle klíče pracovníka, takže technikovi chodí jeho zakázky a nikomu cizímu.',
@@ -52,9 +52,9 @@ $entries = [
         ],
     ],
     [
-        'version' => '3.42.27',
-        'date' => '2026-08-01',
-        'time' => '18:30',
+        'version' => '3.42.29',
+        'date' => '2026-08-09',
+        'time' => '09:10',
         'title' => 'Dvanáct překážek z auditu — Na Příkopě se konečně dá normálně pracovat',
         'items' => [
             '<b>Kasa Na Příkopě prodá.</b> Vyhledávání nabízelo zboží obou poboček, ale dokončení prodeje položku z druhé pobočky odmítlo — technik, manažer ani brigádník tam neprodal vůbec nic. Nově se nabízí jen zboží té pobočky, na které se prodává, a když hledané zboží leží na druhé, systém to rovnou napíše.',
