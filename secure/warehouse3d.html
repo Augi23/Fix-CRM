@@ -756,6 +756,7 @@
     const m = partsIdx.filter((p) =>
       (p.name || '').toLowerCase().includes(v) || (p.sku || '').toLowerCase().includes(v)
       || (p.model || '').toLowerCase().includes(v) || (p.loc.code || '').toLowerCase().includes(v)
+      || (p.components || '').toLowerCase().includes(v)
     ).slice(0, 8);
     res.innerHTML = m.length
       ? m.map((p, i) => '<div class="row" data-i="' + i + '"><span class="nm">' + esc(p.name) + '</span><span class="ps mono">' + esc(p.loc.code) + '</span></div>').join('')

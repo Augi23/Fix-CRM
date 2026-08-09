@@ -52,8 +52,11 @@ try {
     }
 
     if ($q !== '') {
-        $sql .= " AND (part_name LIKE ? OR sku LIKE ?)";
+        // hledá i v součástkách uvnitř dílů-dárců (jen nevyjmuté)
+        ensureInventoryComponentsTable();
+        $sql .= " AND (part_name LIKE ? OR sku LIKE ? OR EXISTS (SELECT 1 FROM inventory_components ic WHERE ic.inventory_id = inventory.id AND ic.is_used = 0 AND ic.name LIKE ?))";
         $like = '%' . $q . '%';
+        $params[] = $like;
         $params[] = $like;
         $params[] = $like;
     }
@@ -70,6 +73,18 @@ try {
     $stmt->execute($params);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // součástky uvnitř nalezených dílů (dárci) — do popisku, ať je jasné,
+    // proč se „displej" našel v celém iPhonu
+    $compByInv = [];
+    try {
+        $__ids = array_map('intval', array_column($items, 'id'));
+        if ($__ids) {
+            $__cq = $pdo->prepare("SELECT inventory_id, name FROM inventory_components WHERE is_used = 0 AND inventory_id IN (" . implode(',', array_fill(0, count($__ids), '?')) . ") ORDER BY id ASC");
+            $__cq->execute($__ids);
+            foreach ($__cq as $__c) { $compByInv[(int)$__c['inventory_id']][] = (string)$__c['name']; }
+        }
+    } catch (Throwable $e) {}
+
     $results = [];
     foreach ($items as $item) {
         $label = $item['part_name'];
@@ -82,6 +97,10 @@ try {
         if (!empty($item['loc_code'])) {
             $label .= ' · 📍 ' . $item['loc_code'];   // kde díl fyzicky leží
         }
+        $__comps = $compByInv[(int)$item['id']] ?? [];
+        if ($__comps) {
+            $label .= ' · uvnitř: ' . implode(', ', array_slice($__comps, 0, 3)) . (count($__comps) > 3 ? ' +' . (count($__comps) - 3) : '');
+        }
 
         $results[] = [
             'id' => (int)$item['id'],
@@ -92,6 +111,7 @@ try {
             'sale_price' => (float)($item['sale_price'] ?? 0),
             'supplier_key' => $item['source_supplier'] ?? '',
             'loc_code' => $item['loc_code'] ?? '',
+            'components' => $__comps,
         ];
     }
 

@@ -35,6 +35,17 @@ if ($qrId > 0) {
     }
 }
 
+// součástky uvnitř dílu (zařízení-dárce) — na kartě jako štítky
+$invComps = [];
+if ($inv) {
+    try {
+        ensureInventoryComponentsTable();
+        $cq = $pdo->prepare("SELECT name, is_used FROM inventory_components WHERE inventory_id = ? ORDER BY is_used ASC, id ASC");
+        $cq->execute([(int)$inv['id']]);
+        $invComps = $cq->fetchAll();
+    } catch (Throwable $e) {}
+}
+
 // ── režim UMÍSTĚNÍ (QR na krabičce/polici): sklad.php?loc=<id> ──
 $loc = null; $locParts = []; $locChildren = [];
 if (!$inv && (int)($_GET['loc'] ?? 0) > 0) {
@@ -250,6 +261,9 @@ if ($inv) {
                     <a href="sklad.php?loc=<?php echo (int)$invLoc['id']; ?>" class="badge bg-info text-dark text-decoration-none" title="Otevřít obsah umístění"><i class="fas fa-location-dot me-1"></i><?php echo e($invLoc['code']); ?><?php echo trim((string)($invLoc['parent_code'] ?? '')) !== '' ? ' (' . e($invLoc['parent_code']) . ')' : ''; ?></a>
                 <?php endif; ?>
             </div>
+            <?php if ($invComps): ?>
+                <div class="small mt-1" title="Součástky uvnitř dílu (přeškrtnuté už jsou vyjmuté)"><i class="fas fa-puzzle-piece me-1 text-white-50"></i><?php foreach ($invComps as $c): ?><span class="badge bg-secondary<?php echo (int)$c['is_used'] ? ' opacity-50 text-decoration-line-through' : ''; ?> me-1"><?php echo e($c['name']); ?></span><?php endforeach; ?></div>
+            <?php endif; ?>
         </div>
     </div>
 

@@ -36,7 +36,11 @@ $where_clauses[] = "inventory.branch_id = ?";
 $params[] = $skladBranch;
 
 if (!empty($search)) {
-    $where_clauses[] = "(part_name LIKE ? OR sku LIKE ?)";
+    // hledá i v součástkách uvnitř dílů-dárců (jen nevyjmuté) — „displej" najde
+    // i celý iPhone, ve kterém použitelný displej je
+    ensureInventoryComponentsTable();
+    $where_clauses[] = "(part_name LIKE ? OR sku LIKE ? OR EXISTS (SELECT 1 FROM inventory_components ic WHERE ic.inventory_id = inventory.id AND ic.is_used = 0 AND ic.name LIKE ?))";
+    $params[] = "%$search%";
     $params[] = "%$search%";
     $params[] = "%$search%";
 }
@@ -75,6 +79,18 @@ $total_pages = ceil($total_count / $limit);
 $stmt = $pdo->prepare("SELECT inventory.*, sl.code AS loc_code, sl.name AS loc_name FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id" . $where_sql . " ORDER BY part_name ASC LIMIT $limit OFFSET $offset");
 $stmt->execute($params);
 $inventory = $stmt->fetchAll();
+
+// součástky uvnitř dílů na stránce (dárci) — ukazují se pod názvem
+$componentsByItem = [];
+try {
+    ensureInventoryComponentsTable();
+    $__ids = array_map('intval', array_column($inventory, 'id'));
+    if ($__ids) {
+        $__cq = $pdo->prepare("SELECT inventory_id, name FROM inventory_components WHERE is_used = 0 AND inventory_id IN (" . implode(',', array_fill(0, count($__ids), '?')) . ") ORDER BY id ASC");
+        $__cq->execute($__ids);
+        foreach ($__cq as $__c) { $componentsByItem[(int)$__c['inventory_id']][] = (string)$__c['name']; }
+    }
+} catch (Throwable $e) {}
 
 $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity <= min_stock THEN 1 ELSE 0 END) as low_stock FROM inventory WHERE branch_id = " . (int)$skladBranch . " AND " . inventoryStockedWhereSql())->fetch();
 
@@ -222,6 +238,11 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                                         <div class="fw-bold"><?php echo htmlspecialchars($item['part_name']); ?></div>
                                         <?php if (trim((string)($item['device_model'] ?? '')) !== ''): ?>
                                             <div class="small text-white-75"><?php echo htmlspecialchars($item['device_model']); ?></div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($componentsByItem[(int)$item['id']])): $__cl = $componentsByItem[(int)$item['id']]; ?>
+                                            <div class="small text-white-75" title="Použitelné součástky uvnitř: <?php echo htmlspecialchars(implode(', ', $__cl)); ?>">
+                                                <i class="fas fa-puzzle-piece me-1 opacity-50"></i><?php echo htmlspecialchars(implode(', ', array_slice($__cl, 0, 3))); ?><?php echo count($__cl) > 3 ? ' +' . (count($__cl) - 3) : ''; ?>
+                                            </div>
                                         <?php endif; ?>
                                     </td>
                                     <td><code><?php echo htmlspecialchars($item['sku']); ?></code></td>

@@ -3728,6 +3728,25 @@ function ensureStockLocationsSchema(): void {
     } catch (Throwable $e) { error_log('ensureStockLocationsSchema: ' . $e->getMessage()); }
 }
 
+/** Součástky uvnitř skladového dílu (zařízení-dárce): co použitelného v něm je.
+ *  is_used=1 → už vyjmutá/použitá, hledání ji nenabízí. */
+function ensureInventoryComponentsTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS inventory_components (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            inventory_id INT NOT NULL,
+            name VARCHAR(120) NOT NULL,
+            is_used TINYINT(1) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_inv_components (inventory_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureInventoryComponentsTable: ' . $e->getMessage()); }
+}
+
 /** Lidský název typu umístění. */
 function stockLocationTypeLabel(string $type): string {
     return ['regal' => 'Regál', 'police' => 'Police', 'krabicka' => 'Krabička'][$type] ?? $type;

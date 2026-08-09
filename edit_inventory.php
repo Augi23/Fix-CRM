@@ -6,6 +6,7 @@ require_once 'includes/header.php';
 ensureStockLocationsSchema();
 ensureInventoryMovesTable();
 ensureSkladBranchSchema();
+ensureInventoryComponentsTable();
 
 $id = $_GET['id'] ?? null;
 if (!$id) die(__("inventory_id_missing"));
@@ -76,9 +77,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canEditBranch) {
         if ((int)$quantity !== (int)$item['quantity']) {
             crmLogInventoryMove((int)$id, (int)$quantity - (int)$item['quantity'], 'correction', null, 'Úprava počtu v editaci dílu');
         }
+        // ── součástky uvnitř dílu (zařízení-dárce): upravit / smazat / přidat ──
+        // prázdný název = řádek smazat; smazaný řádek ve formuláři se nepošle → smazat
+        $postedComps = is_array($_POST['components'] ?? null) ? $_POST['components'] : [];
+        $newComps = is_array($_POST['components_new'] ?? null) ? $_POST['components_new'] : [];
+        $curC = $pdo->prepare("SELECT id FROM inventory_components WHERE inventory_id = ?");
+        $curC->execute([(int)$id]);
+        $curCompIds = array_map('intval', $curC->fetchAll(PDO::FETCH_COLUMN));
+        $keepComp = [];
+        foreach ($postedComps as $cid => $row) {
+            $cid = (int)$cid;
+            if (!in_array($cid, $curCompIds, true) || !is_array($row)) { continue; }
+            $cn = mb_substr(trim((string)($row['name'] ?? '')), 0, 120);
+            if ($cn === '') { continue; }
+            $keepComp[] = $cid;
+            $pdo->prepare("UPDATE inventory_components SET name = ?, is_used = ? WHERE id = ? AND inventory_id = ?")
+                ->execute([$cn, !empty($row['used']) ? 1 : 0, $cid, (int)$id]);
+        }
+        $delComp = array_diff($curCompIds, $keepComp);
+        if ($delComp) {
+            $pdo->prepare("DELETE FROM inventory_components WHERE inventory_id = ? AND id IN (" . implode(',', array_fill(0, count($delComp), '?')) . ")")
+                ->execute(array_merge([(int)$id], array_values($delComp)));
+        }
+        foreach ($newComps as $cn) {
+            $cn = mb_substr(trim((string)$cn), 0, 120);
+            if ($cn === '') { continue; }
+            $pdo->prepare("INSERT INTO inventory_components (inventory_id, name) VALUES (?, ?)")->execute([(int)$id, $cn]);
+        }
+        $compCount = 0;
+        try { $ccq = $pdo->prepare("SELECT COUNT(*) FROM inventory_components WHERE inventory_id = ?"); $ccq->execute([(int)$id]); $compCount = (int)$ccq->fetchColumn(); } catch (Throwable $e) {}
         crmAuditLog('inventory.update', [
             'entity_type' => 'inventory', 'entity_id' => (int)$id, 'entity_label' => (string)$part_name,
-            'summary' => 'Upraven skladový díl „' . $part_name . '" (ks: ' . $quantity . ', nákup: ' . $cost_price . ', prodej: ' . $sale_price . ')',
+            'summary' => 'Upraven skladový díl „' . $part_name . '" (ks: ' . $quantity . ', nákup: ' . $cost_price . ', prodej: ' . $sale_price . ($compCount > 0 ? ', součástek uvnitř: ' . $compCount : '') . ')',
         ]);
         $success = __("inventory_updated");
         // Refresh
@@ -94,6 +124,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canEditBranch) {
 $allLocations = stockLocationsAll($pdo, true, (int)($item['branch_id'] ?? 0) ?: getDefaultBranchId());
 $modelOptions = [];
 try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
+
+// součástky uvnitř dílu (použité až na konec, ať je vidět, co v dárci zbývá)
+$components = [];
+try {
+    $cq = $pdo->prepare("SELECT id, name, is_used FROM inventory_components WHERE inventory_id = ? ORDER BY is_used ASC, id ASC");
+    $cq->execute([(int)$id]);
+    $components = $cq->fetchAll();
+} catch (Throwable $e) {}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -129,6 +167,25 @@ try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory W
                 <div class="col-12">
                     <label class="form-label"><?php echo __('part_name'); ?></label>
                     <input type="text" name="part_name" class="form-control" value="<?php echo htmlspecialchars($item['part_name']); ?>" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Součástky uvnitř dílu <span class="text-white-75 small fw-normal">— u zařízení-dárce vypiš, co použitelného v něm je; najde se pak i hledáním („displej" najde tenhle iPhone)</span></label>
+                    <div id="compRows" class="d-flex flex-column gap-2">
+                        <?php foreach ($components as $c): ?>
+                        <div class="input-group comp-row">
+                            <span class="input-group-text"><i class="fas fa-puzzle-piece"></i></span>
+                            <input type="text" name="components[<?php echo (int)$c['id']; ?>][name]" list="compList" class="form-control<?php echo (int)$c['is_used'] ? ' text-decoration-line-through' : ''; ?>" value="<?php echo htmlspecialchars($c['name']); ?>" maxlength="120">
+                            <label class="input-group-text" title="Součástka už je vyjmutá / použitá — hledání ji přestane nabízet">
+                                <input type="checkbox" class="form-check-input mt-0 me-2" name="components[<?php echo (int)$c['id']; ?>][used]" value="1" <?php echo (int)$c['is_used'] ? 'checked' : ''; ?>> použito
+                            </label>
+                            <button type="button" class="btn btn-outline-danger comp-del" title="Odebrat řádek (smaže se uložením)"><i class="fas fa-trash"></i></button>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="compAdd"><i class="fas fa-plus me-1"></i> Přidat součástku</button>
+                    <datalist id="compList">
+                        <?php foreach (['Displej', 'Baterie', 'Zadní sklo', 'Zadní kryt (housing)', 'Rámeček', 'Základní deska', 'Přední kamera', 'Zadní kamera', 'Face ID modul', 'Touch ID čtečka', 'Nabíjecí konektor', 'Reproduktor', 'Sluchátko', 'Taptic Engine', 'Flex tlačítek hlasitosti', 'Flex zapínacího tlačítka', 'SIM slot', 'Cívka bezdrátového nabíjení'] as $__cn): ?><option value="<?php echo $__cn; ?>"></option><?php endforeach; ?>
+                    </datalist>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label"><?php echo __('sku'); ?></label>
@@ -199,5 +256,27 @@ try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory W
         </form>
     </div>
 </div>
+
+<script>
+// řádky součástek: + přidá prázdný, koš odebere (smazání proběhne uložením formuláře)
+(function () {
+    var rows = document.getElementById('compRows');
+    var add = document.getElementById('compAdd');
+    if (!rows || !add) return;
+    add.addEventListener('click', function () {
+        var d = document.createElement('div');
+        d.className = 'input-group comp-row';
+        d.innerHTML = '<span class="input-group-text"><i class="fas fa-puzzle-piece"></i></span>'
+            + '<input type="text" name="components_new[]" list="compList" class="form-control" maxlength="120" placeholder="např. Displej">'
+            + '<button type="button" class="btn btn-outline-danger comp-del" title="Odebrat řádek"><i class="fas fa-trash"></i></button>';
+        rows.appendChild(d);
+        d.querySelector('input').focus();
+    });
+    document.addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('.comp-del') : null;
+        if (b) { b.closest('.comp-row').remove(); }
+    });
+}());
+</script>
 
 <?php require_once 'includes/footer.php'; ?>

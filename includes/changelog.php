@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.44.0',
+        'date' => '2026-08-09',
+        'time' => '18:55',
+        'title' => 'Součástky uvnitř dílu — dárce vydá i svůj displej',
+        'items' => [
+            '<b>Editace dílu → Součástky uvnitř dílu:</b> u dílu, který je celým zařízením (dárce — např. iPhone 15 Pro Max), jde po řádcích vypsat, co použitelného v něm je (displej, baterie, kamera…). Řádky se přidávají tlačítkem <b>+</b>, názvy našeptává jednotný seznam, řádek jde odebrat.',
+            '<b>Najde se to hledáním:</b> „displej" nově najde i dárce, který ho má uvnitř — ve Skladu, ve výběru dílu k zakázce (s poznámkou „uvnitř: displej…") i v hledání <b>3D mapy</b>. Sken QR dílu ukáže součástky jako štítky na kartě.',
+            '<b>Odškrtnutí „použito":</b> vyjmutou/použitou součástku odškrtneš — přestane se nabízet v hledání a na kartě je přeškrtnutá. Je tak vidět, co z dárce ještě zbývá.',
+            'Počet součástek se zapisuje do auditní historie úprav dílu.',
+        ],
+    ],
+    [
         'version' => '3.43.3',
         'date' => '2026-08-09',
         'time' => date('H:i'),

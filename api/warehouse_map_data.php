@@ -45,6 +45,16 @@ try {
     // volitelně díly per umístění (boční panel: co v krabičce je)
     $partsByLoc = [];
     if ($withParts) {
+        // součástky uvnitř dílů-dárců (nevyjmuté) — hledání v mapě je pak najde
+        $compByInv = [];
+        try {
+            ensureInventoryComponentsTable();
+            $cc = $pdo->prepare("SELECT ic.inventory_id, GROUP_CONCAT(ic.name ORDER BY ic.id SEPARATOR ', ') names
+                                 FROM inventory_components ic JOIN inventory i ON i.id = ic.inventory_id
+                                 WHERE ic.is_used = 0 AND i.branch_id = ? GROUP BY ic.inventory_id");
+            $cc->execute([$branchId]);
+            foreach ($cc as $r) { $compByInv[(int)$r['inventory_id']] = (string)$r['names']; }
+        } catch (Throwable $e) {}
         $pq = $pdo->prepare("SELECT id, location_id, part_name, sku, quantity, sale_price, device_model, image_path
                              FROM inventory WHERE location_id IS NOT NULL AND branch_id = ? ORDER BY part_name ASC");
         $pq->execute([$branchId]);
@@ -57,6 +67,7 @@ try {
                 'price' => (float)$p['sale_price'],
                 'model' => (string)($p['device_model'] ?? ''),
                 'image' => (string)($p['image_path'] ?? ''),
+                'components' => $compByInv[(int)$p['id']] ?? '',
             ];
         }
     }
