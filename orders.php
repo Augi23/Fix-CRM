@@ -319,7 +319,18 @@ $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
 $status_qs   = $filter_status ? '&filter=' . urlencode($filter_status) : '';
 $__techs     = getActiveTechnicians(true);
 ?>
-<div class="orders-status-filter d-flex flex-wrap gap-2 mb-3 align-items-center">
+<?php /* Jedna řada: vlevo „Nová zakázka", vpravo filtry (prohozeno na přání 9.8.2026 —
+         dřív filtry vlevo a tlačítko o řádek níž vpravo). */ ?>
+<div class="d-flex flex-wrap gap-2 mb-3 align-items-center justify-content-between">
+    <div class="d-flex gap-2 align-items-center">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newOrderModal">
+            <i class="fas fa-plus me-2"></i> <?php echo __('new_order'); ?>
+        </button>
+        <?php if(!empty($_GET['search'])): ?>
+            <a href="orders.php" class="btn btn-outline-secondary"><?php echo __('cancel'); ?></a>
+        <?php endif; ?>
+    </div>
+    <div class="orders-status-filter d-flex flex-wrap gap-2 align-items-center">
     <span class="text-white-75 fw-semibold me-1" style="font-size:13.5px;"><i class="fas fa-filter me-2"></i>Filtrování</span>
     <?php $__curBadge = ($filter_status && isset($status_defs[$filter_status])) ? $status_defs[$filter_status]['badge'] : ''; ?>
     <div class="dropdown">
@@ -368,16 +379,7 @@ $__techs     = getActiveTechnicians(true);
         </ul>
     </div>
     <?php endif; ?>
-</div>
-
-<?php /* „Nová zakázka" — prohozeno s filtry: dřív v hlavičce vpravo, teď pod filtry */ ?>
-<div class="d-flex justify-content-end mb-3">
-    <?php if(!empty($_GET['search'])): ?>
-        <a href="orders.php" class="btn btn-outline-secondary me-2"><?php echo __('cancel'); ?></a>
-    <?php endif; ?>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newOrderModal">
-        <i class="fas fa-plus me-2"></i> <?php echo __('new_order'); ?>
-    </button>
+    </div>
 </div>
 
 <div class="card glass-card shadow-sm border-0">

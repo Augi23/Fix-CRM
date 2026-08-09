@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.42.32',
+        'date' => '2026-08-09',
+        'time' => '10:05',
+        'title' => 'Zakázky: čitelné filtry a tlačítko Nová zakázka vedle nich',
+        'items' => [
+            '<b>Tlačítko „Nová zakázka" a filtry jsou v jedné řadě</b> — tlačítko vlevo, filtry vpravo. Dřív byly filtry nahoře vlevo a tlačítko o řádek níž vpravo, takže zabíraly dva řádky a oko muselo skákat.',
+            '<b>Filtry mají plné pozadí.</b> Byly skoro průhledné a přes animované pozadí CRM se špatně četly. Když je stav vybraný, tlačítko se obarví jeho barvou naplno (v rozbalené nabídce zůstává jemný průsvit, aby byl text čitelný).',
+        ],
+    ],
+    [
         'version' => '3.42.31',
         'date' => '2026-08-09',
         'time' => '09:30',

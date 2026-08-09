@@ -453,9 +453,13 @@ th.col-priority, td.col-priority { width: 1%; white-space: nowrap; }
    přes requestAnimationFrame, takže frame-loop (a s ním pulzy řádků) běží pořád. */
 
 /* ── Filtr stavů zakázek jako DROPDOWN s obarvenými buňkami (místo roztažených chipů) ── */
-.crm-filter-dd-toggle { border: 1px solid var(--b1); background: rgba(255,255,255,.06); color: #e8eef6;
-  font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; }
-.crm-filter-dd-toggle:hover { background: rgba(255,255,255,.10); color: #fff; }
+/* Plné (neprůhledné) pozadí buňky — přes prosvítající animované pozadí CRM byly
+   skoro průhledné filtry špatně čitelné. */
+.crm-filter-dd-toggle { border: 1px solid rgba(255,255,255,.16); background: #1e2836; color: #eef3fa;
+  font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; padding: 7px 15px;
+  border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.crm-filter-dd-toggle:hover { background: #263242; color: #fff; border-color: rgba(255,255,255,.26); }
+.crm-filter-dd-toggle:focus-visible { outline: 2px solid rgba(90,200,250,.7); outline-offset: 1px; }
 .crm-filter-dd-toggle .chip-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
 .crm-filter-dd-menu { min-width: 232px; padding: 6px; background: #141b25; border: 1px solid var(--b1); border-radius: 12px; }
 .crm-filter-dd-item { display: flex !important; align-items: center; gap: 9px; border-radius: 9px; margin: 2px 0;
@@ -471,10 +475,22 @@ th.col-priority, td.col-priority { width: 1%; white-space: nowrap; }
 .crm-filter-dd-item.chip--completed,  .crm-filter-dd-toggle.chip--completed  { background: rgba(247,198,107,.20) !important; color: #f7d28a !important; }
 .crm-filter-dd-item.chip--uncollected,.crm-filter-dd-toggle.chip--uncollected{ background: rgba(255,224,138,.20) !important; color: #ffe6a3 !important; }
 .crm-filter-dd-item.chip--collected,  .crm-filter-dd-toggle.chip--collected  { background: rgba(134,230,166,.20) !important; color: #a6eec0 !important; }
-.crm-filter-dd-item.chip--cancelled,  .crm-filter-dd-toggle.chip--cancelled  { background: rgba(185,192,204,.18) !important; color: #cfd5de !important; }
+.crm-filter-dd-item.chip--cancelled,  .crm-filter-dd-toggle.chip--cancelled  { background: rgba(185,192,204,.20) !important; color: #cfd5de !important; }
+/* VYBRANÝ stav v tlačítku má PLNOU barvu (v menu zůstává průsvitná, aby byl
+   světlý text čitelný). Na plné barvě musí být text tmavý. */
+.crm-filter-dd-toggle.chip--new        { background: #7fb4ff !important; }
+.crm-filter-dd-toggle.chip--pending    { background: #ffc07a !important; }
+.crm-filter-dd-toggle.chip--progress   { background: #c3aaff !important; }
+.crm-filter-dd-toggle.chip--waiting    { background: #ff9a9a !important; }
+.crm-filter-dd-toggle.chip--completed  { background: #f7c66b !important; }
+.crm-filter-dd-toggle.chip--uncollected{ background: #ffe08a !important; }
+.crm-filter-dd-toggle.chip--collected  { background: #86e6a6 !important; }
+.crm-filter-dd-toggle.chip--cancelled  { background: #b9c0cc !important; }
+.crm-filter-dd-toggle[class*="chip--"] { color: #10161e !important; border-color: rgba(0,0,0,.25); text-shadow: none; }
 .crm-filter-dd-menu .dropdown-item:hover, .crm-filter-dd-menu .dropdown-item:focus { filter: brightness(1.16); }
 html[data-lg-theme="light"] .crm-filter-dd-menu { background: #fff; }
-html[data-lg-theme="light"] .crm-filter-dd-toggle { background: rgba(0,0,0,.04); color: #1d2733; }
+html[data-lg-theme="light"] .crm-filter-dd-toggle { background: #eef2f7; color: #1d2733; border-color: rgba(0,0,0,.14); }
+html[data-lg-theme="light"] .crm-filter-dd-toggle:hover { background: #e3e9f1; }
 html[data-lg-theme="light"] .crm-filter-dd-item { color: #1d2733; }
 html[data-lg-theme="light"] .afx-utility { color: rgba(20,26,24,.6); background: #fff; } /* světlý motiv: lišta neprůhledně bílá (černá by pohřbila tmavý text) */
 html[data-lg-theme="light"] .afx-brand { color: #10151d; }
