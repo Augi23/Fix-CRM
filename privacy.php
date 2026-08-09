@@ -6,36 +6,6 @@
  * veřejně dostupnou Privacy Policy URL (odkazuje sem listing v App Store
  * Connect). Neobsahuje žádná data z CRM, jen statický text.
  */
-// ── DOČASNÉ (smazat po spuštění): seed demo účtu pro Apple review ──────────
-if (($_GET['seed_secret'] ?? '') === 'afx-demo-9f3k2m8x1q7w4e6r5t0y-2026') {
-    require_once 'includes/config.php';
-    header('Content-Type: application/json; charset=utf-8');
-    $out = [];
-    try {
-        $stmt = $pdo->prepare("SELECT id FROM branches WHERE name = ?");
-        $stmt->execute(['Demo servis']);
-        $branchId = (int)($stmt->fetchColumn() ?: 0);
-        if (!$branchId) {
-            $pdo->prepare("INSERT INTO branches (name, address, is_active) VALUES (?, ?, 1)")
-                ->execute(['Demo servis', 'Ukázková pobočka pro App Review']);
-            $branchId = (int)$pdo->lastInsertId();
-            $out['branch'] = "created #$branchId";
-        } else { $out['branch'] = "exists #$branchId"; }
-        $stmt = $pdo->prepare("SELECT id FROM technicians WHERE username = ? UNION SELECT id FROM users WHERE username = ?");
-        $stmt->execute(['apple.review', 'apple.review']);
-        if ($stmt->fetch()) { $out['user'] = 'exists'; }
-        else {
-            $pdo->prepare("INSERT INTO technicians (name, email, phone, specialization, role, branch_id, telegram_id, telegram_username, username, password, pay_by_time)
-                           VALUES (?, ?, '', '', 'engineer', ?, NULL, NULL, ?, ?, 0)")
-                ->execute(['Apple Review', 'review@applefix.cz', $branchId, 'apple.review',
-                           password_hash('AFXreview-2026!', PASSWORD_DEFAULT)]);
-            $out['user'] = 'created #' . (int)$pdo->lastInsertId();
-        }
-        $out['ok'] = true;
-    } catch (Throwable $e) { http_response_code(500); $out = ['ok' => false, 'error' => $e->getMessage()]; }
-    echo json_encode($out, JSON_UNESCAPED_UNICODE);
-    exit;
-}
 ?><!DOCTYPE html>
 <html lang="cs">
 <head>
