@@ -12,9 +12,12 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) { die(__('unauthori
     if (!isset($_GET['id'])) die("Complaint ID is not specified");
 
     $cid = (int)$_GET['id'];
-    $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, cu.phone AS cust_phone, cu.email, cu.address, cu.preferred_language
+    if (function_exists('ensureComplaintsLegalColumns')) { ensureComplaintsLegalColumns($pdo); }
+    $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, cu.phone AS cust_phone, cu.email, cu.address, cu.preferred_language,
+                                  o.problem_description AS ord_problem, o.repair_solution AS ord_solution
                            FROM complaints c
                            LEFT JOIN customers cu ON cu.id = c.customer_id
+                           LEFT JOIN orders o ON o.id = c.order_id
                            WHERE c.id = ?");
     $stmt->execute([$cid]);
     $complaint = $stmt->fetch();
@@ -151,15 +154,46 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
             </div>
         </div>
 
-        <div class="block">
-            <h3><?php echo htmlspecialchars(_l('cmpl_status')); ?></h3>
-            <span class="status-chip"><?php echo htmlspecialchars((string)($complaint['complaint_status'] ?? 'Přijato') ?: 'Přijato'); ?></span>
+        <?php
+            // Zákonné náležitosti potvrzení o přijetí (§ 19 z. č. 634/1992 Sb.):
+            // datum uplatnění, obsah reklamace, požadovaný způsob vyřízení, kontakt,
+            // + lhůta vyřízení. Vše viditelně na protokolu.
+            $__req  = trim((string)($complaint['requested_resolution'] ?? ''));
+            $__rcvd = trim((string)($complaint['received_by'] ?? ''));
+            $__pd   = !empty($complaint['purchase_date']) ? date('d.m.Y', strtotime((string)$complaint['purchase_date'])) : '';
+            $__dl   = !empty($complaint['created_at']) ? date('d.m.Y', strtotime('+30 days', strtotime((string)$complaint['created_at']))) : '';
+        ?>
+        <div class="grid2">
+            <div class="panel">
+                <h3>Uplatnění reklamace</h3>
+                <div class="row"><span class="k">Datum uplatnění:</span> <strong><?php echo htmlspecialchars($__created); ?></strong></div>
+                <?php if ($__rcvd !== ''): ?><div class="row"><span class="k">Přijal(a):</span> <?php echo htmlspecialchars($__rcvd); ?></div><?php endif; ?>
+                <?php if ($__pd !== ''): ?><div class="row"><span class="k">Datum zakoupení / opravy:</span> <?php echo htmlspecialchars($__pd); ?></div><?php endif; ?>
+                <?php if ($__dl !== ''): ?><div class="row"><span class="k">Vyřídíme nejpozději do:</span> <strong><?php echo htmlspecialchars($__dl); ?></strong> (zákonná lhůta 30 dnů)</div><?php endif; ?>
+            </div>
+            <div class="panel">
+                <h3>Požadovaný způsob vyřízení</h3>
+                <div class="big"><?php echo htmlspecialchars($__req !== '' ? $__req : 'Posouzení technikem'); ?></div>
+                <div class="row"><span class="k">Stav:</span> <?php echo htmlspecialchars((string)($complaint['complaint_status'] ?? 'Přijato') ?: 'Přijato'); ?></div>
+            </div>
         </div>
 
         <div class="block">
-            <h3><?php echo htmlspecialchars(_l('cmpl_subject')); ?></h3>
+            <h3><?php echo htmlspecialchars(_l('cmpl_subject')); ?> (popis vady)</h3>
             <div class="reason"><?php echo htmlspecialchars((string)($complaint['complaint_reason'] ?? '')); ?></div>
         </div>
+
+        <?php if (!empty($complaint['ord_problem']) || !empty($complaint['ord_solution'])): ?>
+        <div class="block">
+            <h3>Původní zakázka <?php echo htmlspecialchars((string)($complaint['order_code'] ?? '')); ?></h3>
+            <div class="reason"><?php
+                $__orig = [];
+                if (!empty($complaint['ord_problem']))  $__orig[] = 'Původní závada: ' . (string)$complaint['ord_problem'];
+                if (!empty($complaint['ord_solution'])) $__orig[] = 'Provedená oprava: ' . (string)$complaint['ord_solution'];
+                echo htmlspecialchars(implode("\n", $__orig));
+            ?></div>
+        </div>
+        <?php endif; ?>
 
         <?php if (!empty($complaintPhotos)): ?>
         <div class="block">
@@ -177,9 +211,15 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
         <?php endif; ?>
 
         <div class="fineprint">
-            Reklamace byla přijata k posouzení. O způsobu a termínu vyřízení bude zákazník informován v souladu s platnými
-            obchodními podmínkami a příslušnými ustanoveními občanského zákoníku. Tento protokol slouží jako potvrzení
-            o převzetí reklamace.
+            Toto potvrzení se vydává při uplatnění reklamace dle § 19 zákona č. 634/1992 Sb., o ochraně spotřebitele,
+            a obsahuje datum uplatnění reklamace, její obsah (popis vytýkané vady), požadovaný způsob vyřízení
+            a kontaktní údaje spotřebitele pro účely poskytnutí informace o vyřízení. Reklamace včetně odstranění vady
+            bude vyřízena bez zbytečného odkladu, nejpozději do 30 dnů ode dne uplatnění, pokud se strany nedohodnou
+            na lhůtě delší. O vyřízení reklamace bude spotřebitel v této lhůtě informován na uvedené kontaktní údaje
+            a obdrží potvrzení o datu a způsobu vyřízení reklamace, včetně případného potvrzení o provedení opravy
+            a době jejího trvání, případně písemné odůvodnění zamítnutí reklamace. Marné uplynutí lhůty zakládá
+            právo spotřebitele od smlouvy odstoupit nebo požadovat přiměřenou slevu. Zákazník svým podpisem stvrzuje
+            správnost uvedených údajů a předání zařízení ve stavu popsaném výše.
         </div>
 
         <div class="sign">

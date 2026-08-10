@@ -21,6 +21,7 @@ $hasClientCols = false;
 if (isset($pdo)) {
     ensureComplaintsClientColumns($pdo);
     ensureComplaintsWorkflowColumns($pdo);   // technik + řešení (v2.10.0)
+    ensureComplaintsLegalColumns($pdo);      // zákonné náležitosti + backfill (v3.44.4)
     try {
         $cc = $pdo->query("SHOW COLUMNS FROM complaints")->fetchAll(PDO::FETCH_COLUMN);
         $hasClientCols = in_array('source', $cc, true) && in_array('staff_ack_at', $cc, true);
@@ -56,7 +57,7 @@ if (isset($pdo)) {
             $count->execute(array_merge($searchParams, $cmplBranchParams));
             $total = (int)$count->fetchColumn();
 
-            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . " WHERE " . $searchWhere . $cmplBranch . " ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name, o.problem_description AS ord_problem, o.repair_solution AS ord_solution FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . " WHERE " . $searchWhere . $cmplBranch . " ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
             $stmt->execute(array_merge($searchParams, $cmplBranchParams));
         } else {
             $whereBranch = $cmplBranch !== '' ? (' WHERE 1=1' . $cmplBranch) : '';
@@ -64,7 +65,7 @@ if (isset($pdo)) {
             $count->execute($cmplBranchParams);
             $total = (int)$count->fetchColumn();
 
-            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . $whereBranch . " ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name, o.problem_description AS ord_problem, o.repair_solution AS ord_solution FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . $whereBranch . " ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
             $stmt->execute($cmplBranchParams);
         }
 
@@ -115,12 +116,13 @@ if (!empty($rows) && isset($pdo)) {
                 <thead>
                     <tr>
                         <th><?php echo __('code_col'); ?></th>
+                        <th class="text-nowrap">Přijato</th>
                         <th><?php echo __('customer_col'); ?></th>
-                        <th><?php echo __('phone'); ?></th>
                         <th><?php echo __('device'); ?></th>
-                        <th style="width:1%;">IMEI/SN</th>
+                        <th>Původní zakázka / oprava</th>
                         <th><?php echo __('complaint_reason_col'); ?></th>
-                        <th><?php echo __('source_order_col'); ?></th>
+                        <th class="text-nowrap">Požadavek</th>
+                        <th class="text-nowrap">Lhůta (30 dní)</th>
                         <th><?php echo __('technician'); ?></th>
                         <th><?php echo __('status_col'); ?></th>
                         <th></th>
@@ -152,26 +154,66 @@ if (!empty($rows) && isset($pdo)) {
                                 </a>
                             <?php endif; ?>
                         </td>
-                        <td><?php echo e(trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''))); ?></td>
-                        <td><?php echo e($r['phone'] ?? ''); ?></td>
-                        <td><?php echo e($r['device'] ?? ''); ?></td>
-                        <?php /* width:1% v hlavičce + nowrap = sloupec přesně na šířku čísla, bez hluchého místa */ ?>
-                        <td class="text-nowrap font-monospace small"><?php echo e($r['serial_number'] ?? ''); ?></td>
-                        <td style="min-width:280px;"><?php echo nl2br(e($r['complaint_reason'] ?? '')); ?></td>
-                        <td class="text-nowrap">
+                        <?php /* Přijato: datum + kdo reklamaci převzal (zákonná evidence) */ ?>
+                        <td class="text-nowrap small">
+                            <?php echo !empty($r['created_at']) ? e(date('d.m.Y', strtotime((string)$r['created_at']))) : '—'; ?>
+                            <div class="text-white-50"><?php echo !empty($r['received_by']) ? e((string)$r['received_by']) : (($r['source'] ?? '') === 'client' ? 'klientský portál' : '—'); ?></div>
+                        </td>
+                        <td class="small">
+                            <?php echo e(trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''))); ?>
+                            <?php if (!empty($r['phone'])): ?><div class="text-white-50 text-nowrap"><?php echo e($r['phone']); ?></div><?php endif; ?>
+                        </td>
+                        <td class="small">
+                            <?php echo e($r['device'] ?? ''); ?>
+                            <?php if (!empty($r['serial_number'])): ?><div class="text-white-50 font-monospace" style="font-size:.72rem;"><?php echo e($r['serial_number']); ?></div><?php endif; ?>
+                        </td>
+                        <?php /* Původní zakázka: proklik + propsaná závada a provedená oprava */ ?>
+                        <td class="small" style="min-width:220px;max-width:300px;">
                             <?php if (($r['source'] ?? '') === 'client'): ?>
-                                <span class="badge" style="background:#f97316;color:#fff">Klient</span><br>
+                                <span class="badge mb-1" style="background:#f97316;color:#fff">Klient</span>
                             <?php endif; ?>
-                            <?php /* Zdroj/zakázka: vždy proklik na původní zakázku (dohledání detailů) */ ?>
                             <?php if (!empty($r['order_id'])): ?>
-                                <a class="small fw-semibold text-decoration-none" href="view_order.php?id=<?php echo (int)$r['order_id']; ?>" title="Otevřít zakázku">
+                                <a class="fw-semibold text-decoration-none" href="view_order.php?id=<?php echo (int)$r['order_id']; ?>" title="Otevřít zakázku">
                                     <i class="fas fa-arrow-up-right-from-square me-1" style="font-size:.65rem;"></i><?php echo e($r['order_code'] ?: ('#' . (int)$r['order_id'])); ?>
                                 </a>
+                                <?php if (!empty($r['ord_problem'])): ?>
+                                    <div class="text-white-50" title="<?php echo e((string)$r['ord_problem']); ?>">Závada: <?php echo e(mb_strimwidth((string)$r['ord_problem'], 0, 90, '…')); ?></div>
+                                <?php endif; ?>
+                                <?php if (!empty($r['ord_solution'])): ?>
+                                    <div class="text-white-50" title="<?php echo e((string)$r['ord_solution']); ?>">Oprava: <?php echo e(mb_strimwidth((string)$r['ord_solution'], 0, 90, '…')); ?></div>
+                                <?php endif; ?>
                             <?php elseif (!empty($r['order_code'])): ?>
-                                <a class="small fw-semibold text-decoration-none" href="orders.php?search=<?php echo urlencode($r['order_code']); ?>" title="Vyhledat zakázku">
+                                <a class="fw-semibold text-decoration-none" href="orders.php?search=<?php echo urlencode($r['order_code']); ?>" title="Vyhledat zakázku">
                                     <i class="fas fa-magnifying-glass me-1" style="font-size:.65rem;"></i><?php echo e($r['order_code']); ?>
                                 </a>
+                            <?php else: ?>
+                                <span class="text-white-50">bez zakázky</span>
                             <?php endif; ?>
+                        </td>
+                        <td style="min-width:240px;"><?php echo nl2br(e($r['complaint_reason'] ?? '')); ?></td>
+                        <td class="small text-nowrap">
+                            <?php echo !empty($r['requested_resolution']) ? '<span class="badge bg-secondary">' . e((string)$r['requested_resolution']) . '</span>' : '<span class="text-white-50">—</span>'; ?>
+                            <?php if (!empty($r['purchase_date'])): ?><div class="text-white-50 mt-1">kou&shy;peno <?php echo e(date('d.m.Y', strtotime((string)$r['purchase_date']))); ?></div><?php endif; ?>
+                        </td>
+                        <?php
+                            /* Lhůta: 30 dní od uplatnění. Vyřízené = zelené datum vyřízení;
+                               běžící = do kdy (žlutě pod 7 dní, červeně po lhůtě). */
+                            $isClosed = in_array(mb_strtolower((string)($r['complaint_status'] ?? '')), ['vyřízeno', 'zamítnuto'], true) || !empty($r['resolved_at']);
+                            $dl = function_exists('complaintDeadline') ? complaintDeadline($r) : null;
+                        ?>
+                        <td class="small text-nowrap">
+                            <?php if ($isClosed): ?>
+                                <span class="text-success"><i class="fas fa-check me-1"></i><?php echo !empty($r['resolved_at']) ? e(date('d.m.Y', strtotime((string)$r['resolved_at']))) : 'vyřízeno'; ?></span>
+                            <?php elseif ($dl): ?>
+                                <?php $days = (int)floor(($dl->getTimestamp() - time()) / 86400); ?>
+                                <?php if ($days < 0): ?>
+                                    <span class="text-danger fw-bold" title="Zákonná lhůta 30 dnů uplynula"><i class="fas fa-triangle-exclamation me-1"></i>po lhůtě <?php echo abs($days); ?> d</span>
+                                <?php elseif ($days <= 7): ?>
+                                    <span class="text-warning fw-semibold">do <?php echo e($dl->format('d.m.')); ?> (<?php echo $days; ?> d)</span>
+                                <?php else: ?>
+                                    <span class="text-white-50">do <?php echo e($dl->format('d.m.')); ?> (<?php echo $days; ?> d)</span>
+                                <?php endif; ?>
+                            <?php else: ?>—<?php endif; ?>
                         </td>
                         <td class="text-nowrap small"><?php echo !empty($r['tech_name']) ? e((string)$r['tech_name']) : '<span class="text-white-50">' . __('cmpl_unassigned') . '</span>'; ?></td>
                         <td style="min-width:170px;">
@@ -185,8 +227,11 @@ if (!empty($rows) && isset($pdo)) {
                             <a class="btn btn-sm btn-outline-info" href="view_complaint.php?id=<?php echo (int)$r['id']; ?>" title="<?php echo e(__('cmpl_detail')); ?>">
                                 <i class="fas fa-folder-open"></i>
                             </a>
-                            <a class="btn btn-sm btn-outline-secondary" href="print_complaint.php?id=<?php echo (int)$r['id']; ?>" target="_blank" rel="noopener" title="<?php echo e(__('complaint_protocol')); ?>">
+                            <a class="btn btn-sm btn-outline-secondary" href="print_complaint.php?id=<?php echo (int)$r['id']; ?>" target="_blank" rel="noopener" title="Potvrzení o přijetí reklamace (protokol)">
                                 <i class="fas fa-print"></i>
+                            </a>
+                            <a class="btn btn-sm btn-outline-success" href="print_complaint_result.php?id=<?php echo (int)$r['id']; ?>" target="_blank" rel="noopener" title="Potvrzení o vyřízení reklamace">
+                                <i class="fas fa-file-circle-check"></i>
                             </a>
                         </td>
                     </tr>

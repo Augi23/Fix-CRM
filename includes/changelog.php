@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.44.4',
+        'date' => '2026-08-09',
+        'time' => date('H:i'),
+        'title' => 'Reklamace předělané: přehledná tabulka + zákonné protokoly',
+        'items' => [
+            '<b>Nová tabulka reklamací:</b> sloupce Přijato (datum + kdo reklamaci převzal), zákazník s telefonem, zařízení se SN, <b>původní zakázka s propsanou závadou i provedenou opravou</b>, čistý důvod reklamace, požadovaný způsob vyřízení, <b>hlídání zákonné lhůty 30 dnů</b> (žlutě pod 7 dní, červeně po lhůtě, zeleně vyřízeno), technik a stav. Staré záznamy, které měly „Požadavek/Doklad" nalepené v textu důvodu, se automaticky roztřídí do správných sloupců.',
+            '<b>Potvrzení o přijetí reklamace</b> nově obsahuje všechny náležitosti dle § 19 zákona o ochraně spotřebitele: datum uplatnění, kdo přijal, popis vady, požadovaný způsob vyřízení, datum zakoupení, lhůtu „vyřídíme do", původní zakázku s popisem opravy a řádné poučení — s podpisy obou stran.',
+            '<b>Potvrzení o vyřízení reklamace</b> doplněno o datum a způsob vyřízení, dobu vyřizování, u zamítnutí o označené odůvodnění, zákonné poučení a podpisová pole (klient stvrzuje převzetí). Tisk je i v seznamu reklamací (zelená ikonka).',
+            'V detailu reklamace se nově vybírá <b>způsob vyřízení</b> (oprava / výměna / vrácení peněz / sleva / zamítnutí) — propíše se do dokladu pro klienta. Nové reklamace si samy dohledají zakázku podle čísla dokladu.',
+        ],
+    ],
+    [
         'version' => '3.44.3',
         'date' => '2026-08-09',
         'time' => '19:55',

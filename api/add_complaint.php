@@ -60,19 +60,30 @@ try {
     $max  = (int)$pdo->query("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(complaint_code,'-',-1) AS UNSIGNED)),0) FROM complaints")->fetchColumn();
     $code = sprintf('RK-%03d', $max + 1);
 
-    // strukturovaný důvod (list reklamací zobrazuje jediné textové pole)
-    $extras = [];
-    if ($resolution    !== '') $extras[] = 'Požadavek: ' . $resolution;
-    if ($purchase_date !== '') {
-        $ts = strtotime($purchase_date);
-        $extras[] = 'Zakoupeno: ' . ($ts ? date('d.m.Y', $ts) : $purchase_date);
+    // Zákonné náležitosti (§ 19 z. 634/1992 Sb.) žijí ve vlastních sloupcích —
+    // důvod reklamace zůstává ČISTÝ popis vady (dřív se sem lepilo všechno).
+    ensureComplaintsLegalColumns($pdo);
+    $received_by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
+    $pd = null;
+    if ($purchase_date !== '') { $ts = strtotime($purchase_date); if ($ts) $pd = date('Y-m-d', $ts); }
+    // „Doklad/zakázka" → zkusit dohledat skutečnou zakázku (propíše původní opravu)
+    $order_id = null; $order_code = ($orig_ref !== '' ? $orig_ref : null);
+    if ($orig_ref !== '') {
+        try {
+            $oq = $pdo->prepare("SELECT id, order_code FROM orders WHERE order_code = ? LIMIT 1");
+            $oq->execute([$orig_ref]);
+            if ($or = $oq->fetch(PDO::FETCH_ASSOC)) { $order_id = (int)$or['id']; $order_code = (string)$or['order_code']; }
+        } catch (Throwable $e) {}
     }
-    if ($orig_ref !== '') $extras[] = 'Doklad/zakázka: ' . $orig_ref;
-    $full_reason = $reason . ($extras ? "\n" . implode(' · ', $extras) : '');
 
     $device = trim($device_type . ' ' . $device_model);
-    $stmt = $pdo->prepare("INSERT INTO complaints (complaint_code, customer_id, phone, device, serial_number, complaint_reason, complaint_status) VALUES (?, ?, ?, ?, ?, ?, 'Přijato')");
-    $stmt->execute([$code, $customer_id, $phone, $device, $serial, $full_reason]);
+    $stmt = $pdo->prepare("INSERT INTO complaints
+        (complaint_code, customer_id, phone, device, serial_number, complaint_reason, complaint_status,
+         requested_resolution, received_by, purchase_date, order_id, order_code)
+        VALUES (?, ?, ?, ?, ?, ?, 'Přijato', ?, ?, ?, ?, ?)");
+    $stmt->execute([$code, $customer_id, $phone, $device, $serial, $reason,
+                    ($resolution !== '' ? $resolution : null), ($received_by !== '' ? $received_by : null),
+                    $pd, $order_id, $order_code]);
     $complaint_id = (int)$pdo->lastInsertId();
     crmAuditLog('complaint.create', [
         'entity_type' => 'complaint', 'entity_id' => $complaint_id, 'entity_label' => (string)$code,

@@ -4162,6 +4162,67 @@ function ensureComplaintsWorkflowColumns(PDO $pdo): void
     }
 }
 
+/** Sloupce pro zákonné náležitosti reklamace (§ 19 zák. č. 634/1992 Sb.):
+ *  - requested_resolution : požadovaný způsob vyřízení (oprava/výměna/vrácení peněz…)
+ *  - received_by          : kdo reklamaci přijal (jméno natvrdo — přežije smazání účtu)
+ *  - purchase_date        : datum zakoupení/původní opravy dle dokladu
+ *  - resolution_method    : skutečný způsob vyřízení (tiskne se v potvrzení o vyřízení)
+ *  Při PRVNÍM přidání sloupců proběhne backfill: starší záznamy měly „Požadavek: …",
+ *  „Zakoupeno: …" a „Doklad/zakázka: …" nalepené v textu důvodu — vytáhnou se do
+ *  sloupců a důvod se vyčistí (přesně to, co v seznamu vypadalo jako guláš). */
+function ensureComplaintsLegalColumns(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $cols = $pdo->query("SHOW COLUMNS FROM complaints")->fetchAll(PDO::FETCH_COLUMN);
+        if (!$cols) return;
+        $add = [];
+        $needBackfill = !in_array('requested_resolution', $cols, true);
+        if ($needBackfill)                                    $add[] = "ADD COLUMN `requested_resolution` VARCHAR(60) NULL";
+        if (!in_array('received_by', $cols, true))            $add[] = "ADD COLUMN `received_by` VARCHAR(100) NULL";
+        if (!in_array('purchase_date', $cols, true))          $add[] = "ADD COLUMN `purchase_date` DATE NULL";
+        if (!in_array('resolution_method', $cols, true))      $add[] = "ADD COLUMN `resolution_method` VARCHAR(60) NULL";
+        if ($add) $pdo->exec("ALTER TABLE `complaints` " . implode(', ', $add));
+
+        if ($needBackfill) {
+            $rows = $pdo->query("SELECT id, complaint_reason, order_code, order_id, purchase_date FROM complaints
+                                  WHERE complaint_reason LIKE '%Požadavek:%' OR complaint_reason LIKE '%Doklad/zakázka:%' OR complaint_reason LIKE '%Zakoupeno:%'")
+                        ->fetchAll(PDO::FETCH_ASSOC);
+            $upd = $pdo->prepare("UPDATE complaints SET complaint_reason = ?, requested_resolution = COALESCE(requested_resolution, ?),
+                                      purchase_date = COALESCE(purchase_date, ?), order_code = COALESCE(order_code, ?), order_id = COALESCE(order_id, ?)
+                                  WHERE id = ?");
+            $findOrder = $pdo->prepare("SELECT id FROM orders WHERE order_code = ? LIMIT 1");
+            foreach ($rows as $r) {
+                $reason = (string)$r['complaint_reason'];
+                $req = $pd = $oc = null;
+                if (preg_match('/Požadavek:\s*([^·\n]+)/u', $reason, $m))       $req = trim($m[1]);
+                if (preg_match('/Zakoupeno:\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/u', $reason, $m)) $pd = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+                if (preg_match('/Doklad\/zakázka:\s*(?:Zakázka\s*)?([A-Za-z0-9-]+)/u', $reason, $m)) $oc = trim($m[1]);
+                // odřízni řádek s extras (začíná „Požadavek:" / „Zakoupeno:" / „Doklad/zakázka:")
+                $clean = preg_replace('/\n?(Požadavek|Zakoupeno|Doklad\/zakázka):.*$/usD', '', $reason);
+                $clean = trim((string)$clean) !== '' ? trim((string)$clean) : $reason;
+                $oid = null;
+                if ($oc !== null && empty($r['order_id'])) {
+                    try { $findOrder->execute([$oc]); $oid = (int)$findOrder->fetchColumn() ?: null; } catch (Throwable $e) {}
+                }
+                $upd->execute([$clean, $req, $pd, $oc, $oid, (int)$r['id']]);
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('ensureComplaintsLegalColumns: ' . $e->getMessage());
+    }
+}
+
+/** Zákonná lhůta vyřízení reklamace: 30 dnů od uplatnění (spotřebitel). */
+function complaintDeadline(array $c): ?DateTimeImmutable
+{
+    if (empty($c['created_at'])) return null;
+    try { return (new DateTimeImmutable((string)$c['created_at']))->modify('+30 days'); }
+    catch (Throwable $e) { return null; }
+}
+
 /** Tabulka příloh reklamace nahrávaných z detailu (fotky/PDF) — analogie
  *  order_attachments u zakázek. Starší fotky z založení žijí v complaint_attachments;
  *  obě sady slévá crmGetComplaintMedia(). Soubory: uploads/complaints/<id>/. */

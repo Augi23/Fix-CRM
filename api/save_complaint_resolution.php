@@ -19,10 +19,12 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) cr_fail(__('csrf_token_inval
 
 $id = (int)($_POST['id'] ?? 0);
 $text = trim((string)($_POST['resolution_text'] ?? ''));
+$method = mb_substr(trim((string)($_POST['resolution_method'] ?? '')), 0, 60);
 if ($id <= 0) cr_fail(__('missing_id'));
 
 ensureComplaintsClientColumns($pdo);
 ensureComplaintsWorkflowColumns($pdo);
+if (function_exists('ensureComplaintsLegalColumns')) { ensureComplaintsLegalColumns($pdo); }
 
 $st = $pdo->prepare("SELECT id, complaint_code FROM complaints WHERE id = ? LIMIT 1");
 $st->execute([$id]);
@@ -34,9 +36,10 @@ try {
         $by = mb_substr(crmStaffDisplayName(), 0, 100);
         $up = $pdo->prepare("UPDATE complaints
                              SET resolution_text = ?, resolved_at = NOW(), resolved_by = ?,
+                                 resolution_method = ?,
                                  staff_ack_at = COALESCE(staff_ack_at, NOW())
                              WHERE id = ?");
-        $up->execute([$text, $by, $id]);
+        $up->execute([$text, $by, ($method !== '' ? $method : null), $id]);
         $resolvedAtH = date('d.m.Y H:i');
     } else {
         $by = null;

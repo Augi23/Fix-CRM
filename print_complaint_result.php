@@ -16,6 +16,7 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) { die(__('unauthori
 
     ensureComplaintsClientColumns($pdo);
     ensureComplaintsWorkflowColumns($pdo);
+    if (function_exists('ensureComplaintsLegalColumns')) { ensureComplaintsLegalColumns($pdo); }
 
     $cid = (int)$_GET['id'];
     $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, cu.phone AS cust_phone, cu.email, cu.address, cu.preferred_language
@@ -219,8 +220,31 @@ foreach ($complaintMedia as $__m) {
             <div class="reason"><?php echo htmlspecialchars((string)($complaint['complaint_reason'] ?? '')); ?></div>
         </div>
 
+        <?php
+            // Zákonné údaje o vyřízení (§ 19 z. č. 634/1992 Sb.): datum a způsob
+            // vyřízení + doba trvání; u zamítnutí je resolution_text odůvodněním.
+            $__status_l = mb_strtolower((string)($complaint['complaint_status'] ?? ''));
+            $__is_rejected = str_contains($__status_l, 'zamít');
+            $__method = trim((string)($complaint['resolution_method'] ?? ''));
+            if ($__method === '') $__method = $__is_rejected ? 'Zamítnutí reklamace' : trim((string)($complaint['requested_resolution'] ?? ''));
+            $__dur_days = '';
+            if (!empty($complaint['created_at']) && !empty($complaint['resolved_at'])) {
+                $__dd = (int)floor((strtotime((string)$complaint['resolved_at']) - strtotime((string)$complaint['created_at'])) / 86400);
+                if ($__dd >= 0) $__dur_days = $__dd . ' ' . ($__dd === 1 ? 'den' : ($__dd >= 2 && $__dd <= 4 ? 'dny' : 'dnů'));
+            }
+        ?>
         <div class="block">
-            <h3><?php echo htmlspecialchars(_l('cmpl_resolution_doc')); ?></h3>
+            <h3>Vyřízení reklamace</h3>
+            <table width="100%" cellspacing="0" cellpadding="3">
+                <?php if ($__created !== ''): ?><tr><td class="k">Datum uplatnění</td><td class="v" align="right"><?php echo htmlspecialchars($__created); ?></td></tr><?php endif; ?>
+                <tr><td class="k">Datum vyřízení</td><td class="v" align="right"><?php echo htmlspecialchars($__resolved); ?></td></tr>
+                <?php if ($__method !== ''): ?><tr><td class="k">Způsob vyřízení</td><td class="v" align="right"><?php echo htmlspecialchars($__method); ?></td></tr><?php endif; ?>
+                <?php if ($__dur_days !== ''): ?><tr><td class="k">Doba vyřizování (vč. opravy)</td><td class="v" align="right"><?php echo htmlspecialchars($__dur_days); ?></td></tr><?php endif; ?>
+            </table>
+        </div>
+
+        <div class="block">
+            <h3><?php echo $__is_rejected ? 'Odůvodnění zamítnutí reklamace' : htmlspecialchars(_l('cmpl_resolution_doc')); ?></h3>
             <div class="resolution"><?php echo $__resolution !== '' ? htmlspecialchars($__resolution) : htmlspecialchars(_l('cmpl_no_resolution_yet')); ?></div>
             <?php if ($__resolution !== '' && ($__resolved_by !== '' || $__resolved !== '')): ?>
                 <div class="resolution-meta">
@@ -256,7 +280,17 @@ foreach ($complaintMedia as $__m) {
         </div>
         <?php endif; ?>
 
-        <div class="fineprint"><?php echo htmlspecialchars(_l('cmpl_result_fineprint')); ?></div>
+        <div class="fineprint"><?php echo htmlspecialchars(_l('cmpl_result_fineprint')); ?>
+            Toto potvrzení o datu a způsobu vyřízení reklamace, včetně potvrzení o provedení opravy a době jejího
+            trvání<?php echo $__is_rejected ? ', resp. písemné odůvodnění zamítnutí reklamace,' : ','; ?> se vydává
+            dle § 19 zákona č. 634/1992 Sb., o ochraně spotřebitele.</div>
+
+        <?php if (!$__EMAIL_MODE): ?>
+        <div class="sign" style="display:flex;gap:40px;margin-top:38px;">
+            <div style="flex:1;border-top:1.4px solid #111318;padding-top:7px;font-size:10.5px;color:#949aa4;text-align:center;">Zákazník — převzetí zařízení a vyrozumění</div>
+            <div style="flex:1;border-top:1.4px solid #111318;padding-top:7px;font-size:10.5px;color:#949aa4;text-align:center;">Za servis <?php echo htmlspecialchars($__company); ?></div>
+        </div>
+        <?php endif; ?>
 
         <div class="foot">
             <div class="foot-name"><?php echo htmlspecialchars($__company); ?></div>

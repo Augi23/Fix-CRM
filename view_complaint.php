@@ -108,6 +108,16 @@ require_once 'includes/header.php';
                         <?php echo __('cmpl_resolved_at'); ?>: <?php echo e(date('d.m.Y H:i', strtotime((string)$c['resolved_at']))); ?><?php if (!empty($c['resolved_by'])): ?> · <?php echo e((string)$c['resolved_by']); ?><?php endif; ?>
                     <?php endif; ?>
                 </div>
+                <div class="mb-2">
+                    <label class="form-label small text-white-75 mb-1">Způsob vyřízení (tiskne se v potvrzení pro klienta)</label>
+                    <select id="cmplMethod" class="form-select form-select-sm bg-dark text-white border-secondary" style="max-width:280px;">
+                        <?php $mopts = ['', 'Oprava', 'Výměna zařízení', 'Vrácení peněz', 'Sleva z ceny', 'Zamítnutí reklamace'];
+                              $mcur = (string)($c['resolution_method'] ?? ''); ?>
+                        <?php foreach ($mopts as $mo): ?>
+                            <option value="<?php echo e($mo); ?>" <?php echo $mcur === $mo ? 'selected' : ''; ?>><?php echo $mo === '' ? '— zvolit —' : e($mo); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
                 <textarea id="cmplResolution" class="form-control mb-3" rows="6" placeholder="<?php echo e(__('cmpl_resolution_ph')); ?>"><?php echo e((string)($c['resolution_text'] ?? '')); ?></textarea>
                 <button type="button" id="cmplResolutionSave" class="btn btn-success"><i class="fas fa-save me-2"></i><?php echo __('cmpl_resolution_save'); ?></button>
                 <span id="cmplResolutionMsg" class="small ms-2"></span>
@@ -235,7 +245,7 @@ require_once 'includes/header.php';
     if (saveBtn) saveBtn.addEventListener('click', function(){
         var msg = document.getElementById('cmplResolutionMsg');
         saveBtn.disabled = true; msg.textContent = '';
-        post('api/save_complaint_resolution.php', { id: CID, resolution_text: document.getElementById('cmplResolution').value })
+        post('api/save_complaint_resolution.php', { id: CID, resolution_text: document.getElementById('cmplResolution').value, resolution_method: (document.getElementById('cmplMethod') ? document.getElementById('cmplMethod').value : '') })
             .then(function(d){
                 saveBtn.disabled = false;
                 if (d.ok) {
