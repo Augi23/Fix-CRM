@@ -159,7 +159,8 @@
       </div>
       <div id="mapBox">
         <warehouse-3d id="map" model="{}"></warehouse-3d>
-        <span class="hint">Tažením otáčíš pohled · kolečko přibližuje · klik na regál zobrazí police</span>
+        <button id="homeBtn" title="Výchozí pohled (od vchodu u RegK9)" style="position:absolute; right:10px; top:10px; z-index:5; width:32px; height:32px; border-radius:8px; border:1px solid rgba(255,255,255,.14); background:rgba(13,11,31,.85); color:rgba(255,255,255,.8); cursor:pointer; font-size:15px;">⌂</button>
+        <span class="hint">Levým tažením se posouváš po skladě (na trackpadu dva prsty) · pravým tlačítkem otáčíš pohled · kolečko/pinch přibližuje · klik na regál ukáže police</span>
       </div>
       <div id="legend">
         <span><i style="background:rgba(110,58,250,.35);border:1.5px solid #BF5AF2"></i>Regál s hledaným dílem</span>
@@ -177,6 +178,7 @@
 (function () {
   const THREE_URL = 'https://unpkg.com/three@0.184.0/build/three.module.js';
   const MAPW = 740, MAPH = 560, SC = 1 / 100;
+  const HALLX0 = 282;   // levá hranice haly = stěna se šuplíkovými boxy (za ní už sklad není)
   class Warehouse3D extends HTMLElement {
     static get observedAttributes() { return ['model']; }
     connectedCallback() {
@@ -202,16 +204,27 @@
       window.addEventListener('resize', onResize);
       const scene = new THREE.Scene();
       const cam = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
-      this._cam = cam; this._orbit = { theta: -0.35, phi: 0.85, r: 11 };
+      // výchozí pohled: zpoza RegK9 (od vchodu) směrem na regály 1–8;
+      // azimut drží kameru UVNITŘ zorného pole haly (ne za stěnou se šuplíky)
+      const HOME = { theta: -2.95, phi: 0.92, r: 11 };
+      this._cam = cam; this._orbit = { theta: HOME.theta, phi: HOME.phi, r: HOME.r };
+      this._center = { x: ((HALLX0 + MAPW) / 2 - MAPW / 2) * SC, z: 0 };
+      this._home = () => {
+        this._orbit.theta = HOME.theta; this._orbit.phi = HOME.phi;
+        this._center = { x: ((HALLX0 + MAPW) / 2 - MAPW / 2) * SC, z: 0 };
+        this._userZoomed = false;
+        this._fit();
+      };
       this._fit = () => {
-        const o = this._orbit, gw = MAPW * SC / 2, gh = MAPH * SC / 2;
+        const o = this._orbit, x0 = (HALLX0 - MAPW / 2) * SC, x1 = MAPW * SC / 2, gh = MAPH * SC / 2;
+        const c0 = this._center;
         const corners = [];
-        [[-gw, -gh], [gw, -gh], [-gw, gh], [gw, gh]].forEach(([x, z]) => {
-          corners.push(new THREE.Vector3(x, 0, z), new THREE.Vector3(x, 1.8, z));
+        [[x0, -gh], [x1, -gh], [x0, gh], [x1, gh]].forEach(([x, z]) => {
+          corners.push(new THREE.Vector3(x, 0, z), new THREE.Vector3(x, 2.3, z));
         });
         const fits = (r) => {
-          const cx = Math.sin(o.theta) * Math.sin(o.phi) * r, cy = Math.cos(o.phi) * r, cz = Math.cos(o.theta) * Math.sin(o.phi) * r;
-          const c = cam.clone(); c.position.set(cx, cy, cz); c.lookAt(0, 0.4, 0); c.updateMatrixWorld();
+          const cx = c0.x + Math.sin(o.theta) * Math.sin(o.phi) * r, cy = Math.cos(o.phi) * r, cz = c0.z + Math.cos(o.theta) * Math.sin(o.phi) * r;
+          const c = cam.clone(); c.position.set(cx, cy, cz); c.lookAt(c0.x, 0.4, c0.z); c.updateMatrixWorld();
           return corners.every((p) => { const v = p.clone().project(c); return Math.abs(v.x) < 0.93 && Math.abs(v.y) < 0.93; });
         };
         let lo = 4, hi = 30;
@@ -221,60 +234,70 @@
       scene.add(new THREE.AmbientLight(0xffffff, 0.5));
       const key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(4, 8, 5); scene.add(key);
       const fill = new THREE.DirectionalLight(0x8877ff, 0.4); fill.position.set(-5, 4, -4); scene.add(fill);
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(MAPW * SC, MAPH * SC), new THREE.MeshStandardMaterial({ color: 0x0b0a1e, roughness: 0.95 }));
-      floor.rotation.x = -Math.PI / 2; floor.name = 'floor'; scene.add(floor);
+      // ── hala: jen část PŘED stěnou se šuplíky; vchod nahoře u RegK9 ──
+      const X0 = (HALLX0 - MAPW / 2) * SC, X1 = MAPW * SC / 2, GH = MAPH * SC / 2;
+      const hallW = X1 - X0;
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(hallW, MAPH * SC), new THREE.MeshStandardMaterial({ color: 0x0b0a1e, roughness: 0.95 }));
+      floor.rotation.x = -Math.PI / 2; floor.position.x = X0 + hallW / 2; floor.name = 'floor'; scene.add(floor);
       {
-        const pts = [], gw = MAPW * SC / 2, gh = MAPH * SC / 2, st = 0.4;
-        for (let x = -gw; x <= gw + 0.001; x += st) pts.push(new THREE.Vector3(x, 0.002, -gh), new THREE.Vector3(x, 0.002, gh));
-        for (let z = -gh; z <= gh + 0.001; z += st) pts.push(new THREE.Vector3(-gw, 0.002, z), new THREE.Vector3(gw, 0.002, z));
+        const pts = [], st = 0.4;
+        for (let x = X0; x <= X1 + 0.001; x += st) pts.push(new THREE.Vector3(x, 0.002, -GH), new THREE.Vector3(x, 0.002, GH));
+        for (let z = -GH; z <= GH + 0.001; z += st) pts.push(new THREE.Vector3(X0, 0.002, z), new THREE.Vector3(X1, 0.002, z));
         const geo = new THREE.BufferGeometry().setFromPoints(pts);
         scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x221d45 })));
       }
+      // šuplíkové boxy jsou klikatelné (vazba na regál „Šuplíkové boxy" v CRM)
+      this._drawers = new THREE.Group(); scene.add(this._drawers);
+      this._drawerMeshes = []; this._unitFrames = []; this._unitPos = [];
       {
         const wallMat = new THREE.MeshStandardMaterial({ color: 0x14122c, roughness: 0.9 });
-        const wh = 0.5, wt = 0.05, gw = MAPW * SC, gh = MAPH * SC;
-        const back = new THREE.Mesh(new THREE.BoxGeometry(gw, wh, wt), wallMat);
-        back.position.set(0, wh / 2, -gh / 2 - wt / 2); scene.add(back);
-        const front = new THREE.Mesh(new THREE.BoxGeometry(gw, wh, wt), wallMat);
-        front.position.set(0, wh / 2, gh / 2 + wt / 2); scene.add(front);
-        const right = new THREE.Mesh(new THREE.BoxGeometry(wt, wh, gh + wt * 2), wallMat);
-        right.position.set(gw / 2 + wt / 2, wh / 2, 0); scene.add(right);
-        const doorW = 1.2, seg = gh - doorW;
-        const m = new THREE.Mesh(new THREE.BoxGeometry(wt, wh, seg), wallMat);
-        m.position.set(-gw / 2 - wt / 2, wh / 2, gh / 2 - seg / 2); scene.add(m);
-        const partLen = (560 - 222) * SC, partH = 2.3;
-        const part = new THREE.Mesh(new THREE.BoxGeometry(wt, partH, partLen), wallMat);
-        part.position.set((282 - MAPW / 2) * SC, partH / 2, ((222 + 560) / 2 - MAPH / 2) * SC);
-        scene.add(part);
+        const wh = 0.5, wt = 0.05;
+        const back = new THREE.Mesh(new THREE.BoxGeometry(hallW, wh, wt), wallMat);
+        back.position.set(X0 + hallW / 2, wh / 2, -GH - wt / 2); scene.add(back);
+        const front = new THREE.Mesh(new THREE.BoxGeometry(hallW, wh, wt), wallMat);
+        front.position.set(X0 + hallW / 2, wh / 2, GH + wt / 2); scene.add(front);
+        const right = new THREE.Mesh(new THREE.BoxGeometry(wt, wh, MAPH * SC + wt * 2), wallMat);
+        right.position.set(X1 + wt / 2, wh / 2, 0); scene.add(right);
+        // levá stěna = stěna se šuplíkovými boxy; nahoře (u RegK9) je VCHOD
+        const doorW = 1.2, wallH = 2.3, seg = MAPH * SC - doorW;
+        const left = new THREE.Mesh(new THREE.BoxGeometry(wt, wallH, seg), wallMat);
+        left.position.set(X0 - wt / 2, wallH / 2, GH - seg / 2); scene.add(left);
+        const dock = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), new THREE.MeshBasicMaterial({ color: 0x0A84FF, transparent: true, opacity: 0.10 }));
+        dock.rotation.x = -Math.PI / 2;
+        dock.position.set(X0 + 0.7, 0.004, -GH + 0.65);
+        scene.add(dock);
+        scene.add(this._label('VSTUP', X0 + 0.75, 0.25, -GH + 0.65, 0x5E9BFF, 0.15, true));
+        // ── šuplíkové boxy 6 × 8 (o 10 % větší): každý šuplík = umístění v CRM ──
         {
           const frame = new THREE.MeshStandardMaterial({ color: 0xB02430, roughness: 0.5, metalness: 0.15 });
-          const drawer = new THREE.MeshPhysicalMaterial({ color: 0xd8dbe2, roughness: 0.25, metalness: 0, transparent: true, opacity: 0.5 });
-          const BW = 0.30, BH = 0.50, BD = 0.16, gapZ = 0.05, gapY = 0.08;
-          const wallX = (282 - MAPW / 2) * SC + wt / 2;
-          const z0 = (222 - MAPH / 2) * SC + BW / 2;
-          for (let row = 0; row < 2; row++) {
-            const cy = 0.95 + BH / 2 + row * (BH + gapY);
-            for (let col = 0; col < 3; col++) {
-              const cz = z0 + col * (BW + gapZ);
-              const box = new THREE.Mesh(new THREE.BoxGeometry(BD, BH, BW), frame);
-              box.position.set(wallX + BD / 2, cy, cz);
-              scene.add(box);
-              for (let dIdx = 0; dIdx < 8; dIdx++) {
-                const dh = (BH - 0.02) / 8 - 0.012;
-                const d = new THREE.Mesh(new THREE.BoxGeometry(0.015, dh, BW - 0.05), drawer);
-                d.position.set(wallX + BD + 0.008, cy - BH / 2 + 0.01 + (dIdx + 0.5) * ((BH - 0.02) / 8), cz);
-                scene.add(d);
-              }
+          const BW = 0.33, BH = 0.55, BD = 0.176, gapZ = 0.06;
+          const wallX = X0 + wt / 2;
+          const z0 = -GH + doorW + 0.35 + BW / 2;
+          this._drawerGeom = { BW: BW, BH: BH, BD: BD };
+          for (let u = 0; u < 6; u++) {
+            const row = Math.floor(u / 3), col = u % 3;          // řada 0 = HORNÍ (Box 1–3)
+            const cy = row === 0 ? 1.62 : 0.92;
+            const cz = z0 + col * (BW + gapZ);
+            const box = new THREE.Mesh(new THREE.BoxGeometry(BD, BH, BW), frame);
+            box.position.set(wallX + BD / 2, cy, cz);
+            box.userData = { unit: u + 1 };
+            this._drawers.add(box);
+            this._unitFrames[u] = box;
+            this._unitPos[u] = { x: wallX + BD / 2, y: cy, z: cz };
+            this._drawerMeshes[u] = [];
+            for (let dIdx = 0; dIdx < 8; dIdx++) {
+              const dh = (BH - 0.02) / 8 - 0.012;
+              const dMat = new THREE.MeshPhysicalMaterial({ color: 0xd8dbe2, roughness: 0.25, metalness: 0, transparent: true, opacity: 0.5 });
+              const d = new THREE.Mesh(new THREE.BoxGeometry(0.02, dh, BW - 0.05), dMat);
+              d.position.set(wallX + BD + 0.01, cy - BH / 2 + 0.01 + (dIdx + 0.5) * ((BH - 0.02) / 8), cz);
+              const num = 8 - dIdx;                              // Šuplík 1 = NAHOŘE
+              d.userData = { unit: u + 1, drawer: num };
+              this._drawers.add(d);
+              this._drawerMeshes[u][num - 1] = d;
             }
           }
         }
       }
-      const dock = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshBasicMaterial({ color: 0x0A84FF, transparent: true, opacity: 0.10 }));
-      dock.rotation.x = -Math.PI / 2;
-      const dockZ = -MAPH * SC / 2 + 0.75;
-      dock.position.set(-MAPW * SC / 2 + 0.8, 0.004, dockZ);
-      scene.add(dock);
-      scene.add(this._label('VSTUP', dock.position.x + 0.1, 0.25, dockZ, 0x5E9BFF, 0.15, true));
       this._racks = new THREE.Group(); scene.add(this._racks);
       this._scene = scene; this._renderer = renderer;
       this._pulse = [];
@@ -293,17 +316,42 @@
         ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), p);
         return p;
       };
-      let drag = null, orb = null, moved = false;
+      const pickDrawer = (e) => {
+        toPtr(e); ray.setFromCamera(ptr, cam);
+        const hits = ray.intersectObjects(this._drawers.children, false);
+        return hits[0] ? hits[0].object : null;
+      };
+      const X0c = (HALLX0 - MAPW / 2) * SC, X1c = MAPW * SC / 2, GHc = MAPH * SC / 2;
+      const clampCenter = () => {
+        this._center.x = Math.max(X0c, Math.min(X1c, this._center.x));
+        this._center.z = Math.max(-GHc, Math.min(GHc, this._center.z));
+      };
+      // posun po skladě vůči natočení kamery (levé tažení / dva prsty na trackpadu)
+      this._panBy = (dx, dy) => {
+        const k = this._orbit.r * 0.0011;
+        const th = this._orbit.theta;
+        const rX = Math.cos(th), rZ = -Math.sin(th);
+        const fX = -Math.sin(th), fZ = -Math.cos(th);
+        this._center.x += (-rX * dx + fX * dy) * k;
+        this._center.z += (-rZ * dx + fZ * dy) * k;
+        clampCenter();
+      };
+      renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+      let drag = null, orb = null, pan = null, moved = false;
       renderer.domElement.addEventListener('pointerdown', (e) => {
         moved = false;
         const g = pickRack(e);
+        const dr = g ? null : pickDrawer(e);
         renderer.domElement.setPointerCapture(e.pointerId);
-        if (g && this._model.edit) {
+        if (g && this._model.edit && e.button === 0) {
           const p = floorPt(e);
           drag = { g, ox: g.position.x - p.x, oz: g.position.z - p.z };
           renderer.domElement.style.cursor = 'grabbing';
+        } else if (e.button === 2) {
+          orb = { x: e.clientX, y: e.clientY, t: this._orbit.theta, p: this._orbit.phi };
         } else {
-          orb = { x: e.clientX, y: e.clientY, t: this._orbit.theta, p: this._orbit.phi, g: g };
+          pan = { x: e.clientX, y: e.clientY, g: g, dr: dr, lx: 0, ly: 0 };
+          renderer.domElement.style.cursor = 'grabbing';
         }
       });
       renderer.domElement.addEventListener('pointermove', (e) => {
@@ -313,7 +361,7 @@
           const d = drag.g.userData;
           const half = { x: d.wpx / 2, z: d.hpx / 2 };
           let mx = (p.x + drag.ox) / SC + MAPW / 2, mz = (p.z + drag.oz) / SC + MAPH / 2;
-          mx = Math.max(half.x + 4, Math.min(MAPW - half.x - 4, Math.round(mx / 4) * 4));
+          mx = Math.max(HALLX0 + half.x + 4, Math.min(MAPW - half.x - 4, Math.round(mx / 4) * 4));
           mz = Math.max(half.z + 4, Math.min(MAPH - half.z - 4, Math.round(mz / 4) * 4));
           drag.g.position.set((mx - MAPW / 2) * SC, 0, (mz - MAPH / 2) * SC);
           drag.mx = mx; drag.mz = mz;
@@ -321,8 +369,13 @@
           if (Math.abs(e.clientX - orb.x) + Math.abs(e.clientY - orb.y) > 4) moved = true;
           this._orbit.theta = orb.t + (e.clientX - orb.x) * 0.005;
           this._orbit.phi = Math.max(0.25, Math.min(1.35, orb.p + (e.clientY - orb.y) * 0.004));
+        } else if (pan) {
+          const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
+          if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+          this._panBy(dx - pan.lx, dy - pan.ly);
+          pan.lx = dx; pan.ly = dy;
         } else {
-          renderer.domElement.style.cursor = pickRack(e) ? (this._model.edit ? 'grab' : 'pointer') : 'default';
+          renderer.domElement.style.cursor = (pickRack(e) || pickDrawer(e)) ? (this._model.edit ? 'grab' : 'pointer') : 'default';
         }
       });
       renderer.domElement.addEventListener('pointerup', (e) => {
@@ -330,8 +383,13 @@
           if (drag.mx != null) this.dispatchEvent(new CustomEvent('wh-rack-move', { bubbles: true, detail: { id: drag.g.userData.id, x: Math.round(drag.mx - drag.g.userData.wpx / 2), y: Math.round(drag.mz - drag.g.userData.hpx / 2) } }));
           drag = null; renderer.domElement.style.cursor = 'grab';
         } else if (orb) {
-          if (!moved && orb.g) this.dispatchEvent(new CustomEvent('wh-rack-click', { bubbles: true, detail: { id: orb.g.userData.id } }));
           orb = null;
+        } else if (pan) {
+          if (!moved) {
+            if (pan.g) { this.dispatchEvent(new CustomEvent('wh-rack-click', { bubbles: true, detail: { id: pan.g.userData.id } })); }
+            else if (pan.dr && this._model.drawerRack) { this.dispatchEvent(new CustomEvent('wh-rack-click', { bubbles: true, detail: { id: this._model.drawerRack.n } })); }
+          }
+          pan = null; renderer.domElement.style.cursor = 'default';
         }
       });
       renderer.domElement.addEventListener('dblclick', (e) => {
@@ -340,19 +398,30 @@
       });
       renderer.domElement.addEventListener('wheel', (e) => {
         e.preventDefault();
-        this._userZoomed = true;
-        this._orbit.r = Math.max(4, Math.min(30, this._orbit.r + e.deltaY * 0.004));
+        if (e.ctrlKey) {
+          // pinch na trackpadu = přiblížení
+          this._userZoomed = true;
+          this._orbit.r = Math.max(4, Math.min(30, this._orbit.r + e.deltaY * 0.02));
+        } else if (e.deltaMode === 0 && (Math.abs(e.deltaX) > 0 || Math.abs(e.deltaY) < 40)) {
+          // dva prsty na trackpadu = POSUN po skladě
+          this._panBy(-e.deltaX, -e.deltaY);
+        } else {
+          // klasické kolečko myši = přiblížení
+          this._userZoomed = true;
+          this._orbit.r = Math.max(4, Math.min(30, this._orbit.r + e.deltaY * 0.004));
+        }
       }, { passive: false });
       const clock = new THREE.Clock();
       const loop = () => {
         if (!this.isConnected) return;
         requestAnimationFrame(loop);
         const t = clock.getElapsedTime();
-        const o = this._orbit;
-        cam.position.set(Math.sin(o.theta) * Math.sin(o.phi) * o.r, Math.cos(o.phi) * o.r, Math.cos(o.theta) * Math.sin(o.phi) * o.r);
-        cam.lookAt(0, 0.4, 0);
+        const o = this._orbit, c0 = this._center;
+        cam.position.set(c0.x + Math.sin(o.theta) * Math.sin(o.phi) * o.r, Math.cos(o.phi) * o.r, c0.z + Math.cos(o.theta) * Math.sin(o.phi) * o.r);
+        cam.lookAt(c0.x, 0.4, c0.z);
         this._pulse.forEach((m) => { m.emissiveIntensity = 0.55 + 0.45 * Math.sin(t * 4); });
         if (this._beacon) { this._beacon.position.y = this._beaconY + 0.06 * Math.sin(t * 3); this._beacon.scale.setScalar(1 + 0.2 * Math.sin(t * 4)); }
+        if (this._dBeacon) { this._dBeacon.scale.setScalar(1 + 0.2 * Math.sin(t * 4)); }
         renderer.render(scene, cam);
       };
       this._fit();
@@ -360,6 +429,7 @@
       this._build();
     }
     attributeChangedCallback() { if (this.T) this._build(); }
+    resetView() { if (this._home) this._home(); }
     _label(text, x, y, z, color, size, flat) {
       const THREE = this.T;
       const c = document.createElement('canvas'); c.width = 320; c.height = 64;
@@ -422,6 +492,37 @@
         grp.position.set((r.x + wpx / 2 - MAPW / 2) * SC, 0, (r.y + hpx / 2 - MAPH / 2) * SC);
         g.add(grp);
       });
+
+      // ── šuplíková stěna: popisek + zvýraznění cílového šuplíku ──
+      if (this._drawerHi) { this._drawerHi.mesh.material = this._drawerHi.mat; this._drawerHi = null; }
+      if (this._dBeacon) { this._scene.remove(this._dBeacon); this._dBeacon = null; }
+      if (this._dLight) { this._scene.remove(this._dLight); this._dLight = null; }
+      if (this._dLabel) { this._scene.remove(this._dLabel); this._dLabel = null; }
+      const dw = m.drawerRack;
+      if (dw && this._unitPos && this._unitPos[0]) {
+        const p0 = this._unitPos[0], p2 = this._unitPos[2];
+        const hi = (m.selected === dw.n || m.target === dw.n);
+        this._dLabel = this._label(dw.label || 'Šuplíky', p0.x + 0.15, 2.45, (p0.z + p2.z) / 2, hi ? 0xBF5AF2 : 0x9a96b8, 0.16);
+        this._scene.add(this._dLabel);
+        const t = m.drawerTarget;
+        if (t && t.u >= 1 && t.u <= 6) {
+          const hotMat = new THREE.MeshStandardMaterial({ color: 0x6E3AFA, emissive: 0xBF5AF2, emissiveIntensity: 0.9, transparent: true, opacity: 0.95 });
+          const mesh = (t.d > 0 && this._drawerMeshes[t.u - 1]) ? this._drawerMeshes[t.u - 1][t.d - 1] : this._unitFrames[t.u - 1];
+          if (mesh) {
+            this._drawerHi = { mesh: mesh, mat: mesh.material };
+            mesh.material = hotMat;
+            this._pulse.push(hotMat);
+            const up = this._unitPos[t.u - 1];
+            const bMat = new THREE.MeshStandardMaterial({ color: 0xBF5AF2, emissive: 0xBF5AF2, emissiveIntensity: 1.2 });
+            this._dBeacon = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 16), bMat);
+            this._dBeacon.position.set(up.x + 0.18, up.y + this._drawerGeom.BH / 2 + 0.22, up.z);
+            this._scene.add(this._dBeacon);
+            this._dLight = new THREE.PointLight(0xBF5AF2, 2.0, 2.2);
+            this._dLight.position.set(up.x + 0.35, up.y + 0.5, up.z);
+            this._scene.add(this._dLight);
+          }
+        }
+      }
     }
   }
   if (!customElements.get('warehouse-3d')) customElements.define('warehouse-3d', Warehouse3D);
@@ -552,7 +653,7 @@
   const DEFAULT_LAYOUT = {
     1: { x: 690, y: 226, rot: 1 }, 2: { x: 692, y: 370, rot: 1 }, 3: { x: 596, y: 512, rot: 0 },
     4: { x: 570, y: 374, rot: 1 }, 5: { x: 570, y: 230, rot: 1 }, 6: { x: 450, y: 512, rot: 0 },
-    7: { x: 422, y: 370, rot: 1 }, 8: { x: 422, y: 226, rot: 1 }, 9: { x: 242, y: 4, rot: 0 }
+    7: { x: 422, y: 370, rot: 1 }, 8: { x: 422, y: 226, rot: 1 }, 9: { x: 300, y: 8, rot: 0 }
   };
 
   let D = null, racks = [], byLoc = {}, partsIdx = [];
@@ -623,12 +724,13 @@
         .map((p) => ({ loc: p, no: num(p.code) || 0, boxes: boxes.filter((b) => b.parent_id === p.id), loose: (p.parts || []).length }))
         .sort((a, b) => a.no - b.no);
       const lay = (srv && srv[n]) || DEFAULT_LAYOUT[n];
-      const pos = lay || { x: 8 + (auto++) * 152, y: 8, rot: 0 };
+      const pos = lay || { x: 300 + (auto++) * 152, y: 8, rot: 0 };
       return {
         n: n, code: rg.code, name: rg.name || '', locId: rg.id, police: pol,
         directBoxes: boxes.filter((b) => b.parent_id === rg.id),
-        x: pos.x, y: pos.y, rot: pos.rot ? 1 : 0,
-        sh: Math.max(2, pol.length || 5)
+        x: Math.max(290, pos.x), y: pos.y, rot: pos.rot ? 1 : 0,
+        sh: Math.max(2, pol.length || 5),
+        drawer: /šuplík|suplik/i.test(rg.name || '')   // regál „Šuplíkové boxy" = stěna šuplíků
       };
     });
   }
@@ -662,12 +764,23 @@
   }
 
   function render() {
+    const drawer = racks.find((r) => r.drawer) || null;
+    let drawerTarget = null;
+    if (drawer && target && target.rackN === drawer.n) {
+      const asc = drawer.police.slice().sort((a, b) => a.no - b.no);
+      const ui = target.policeLoc ? asc.findIndex((po) => po.loc.id === target.policeLoc.id) : -1;
+      let d = 0;
+      if (ui >= 0 && target.boxLoc) { d = asc[ui].boxes.findIndex((b) => b.id === target.boxLoc.id) + 1; }
+      if (ui >= 0) { drawerTarget = { u: ui + 1, d: d }; }
+    }
     const model = {
-      racks: racks.map((r) => ({ id: r.n, label: r.code, x: r.x, y: r.y, rot: r.rot, sh: r.sh })),
+      racks: racks.filter((r) => !r.drawer).map((r) => ({ id: r.n, label: r.code, x: r.x, y: r.y, rot: r.rot, sh: r.sh })),
       shelves: 5,
       target: target ? target.rackN : null,
       selected: sel,
-      edit: edit
+      edit: edit,
+      drawerRack: drawer ? { n: drawer.n, label: drawer.code } : null,
+      drawerTarget: drawerTarget
     };
     $('map').setAttribute('model', JSON.stringify(model));
   }
@@ -707,8 +820,12 @@
         + ' &nbsp;<a href="#" id="openPart" style="color:#BF5AF2;font-size:11px;text-decoration:none">karta dílu →</a></div>';
     }
 
-    html += '<div class="cap">3D náhled regálu · táhni pro otočení</div>';
-    html += '<div id="rackView"><rack-3d id="rack" model="{}"></rack-3d></div>';
+    if (!r.drawer) {
+      html += '<div class="cap">3D náhled regálu · táhni pro otočení</div>';
+      html += '<div id="rackView"><rack-3d id="rack" model="{}"></rack-3d></div>';
+    } else {
+      html += '<div class="cap">Šuplíkové boxy · 6 boxů × 8 šuplíků — vybraný šuplík svítí přímo ve scéně</div>';
+    }
 
     // police SHORA: P1 = nejvrchnější (konvence štítků), v seznamu tedy P1 první
     const rows = r.police.slice().sort((a, b) => a.no - b.no);
@@ -743,23 +860,25 @@
     html += '<div style="font-size:10px;color:rgba(255,255,255,.3);line-height:1.6">Názvy a struktura polic/krabiček se spravují v CRM (Sklad → Umístění); mapa je jen zobrazuje.</div>';
     P.innerHTML = html;
 
-    // rack-3d model: police → patra (P1 NAHOŘE → pořadí obrátit: první police
-    // v seznamu dostane nejvyšší patro), krabičky → boxy zleva (b = pořadí), „volně" = box navíc
-    let maxCells = 2;
-    r.police.forEach((po) => { maxCells = Math.max(maxCells, po.boxes.length + (po.loose > 0 ? 1 : 0)); });
-    const boxes3d = [];
-    const asc = r.police.slice().sort((a, b) => a.no - b.no);   // P1, P2, …
-    asc.forEach((po, idx) => {
-      const p = Math.max(1, r.sh - idx);   // P1 → horní patro
-      po.boxes.forEach((b, i) => {
-        boxes3d.push({ p: p, b: i + 1, hot: !!(target && target.boxLoc && target.boxLoc.id === b.id) });
+    if (!r.drawer) {
+      // rack-3d model: police → patra (P1 NAHOŘE → pořadí obrátit: první police
+      // v seznamu dostane nejvyšší patro), krabičky → boxy zleva (b = pořadí), „volně" = box navíc
+      let maxCells = 2;
+      r.police.forEach((po) => { maxCells = Math.max(maxCells, po.boxes.length + (po.loose > 0 ? 1 : 0)); });
+      const boxes3d = [];
+      const asc = r.police.slice().sort((a, b) => a.no - b.no);   // P1, P2, …
+      asc.forEach((po, idx) => {
+        const p = Math.max(1, r.sh - idx);   // P1 → horní patro
+        po.boxes.forEach((b, i) => {
+          boxes3d.push({ p: p, b: i + 1, hot: !!(target && target.boxLoc && target.boxLoc.id === b.id) });
+        });
+        if (po.loose > 0) {
+          boxes3d.push({ p: p, b: po.boxes.length + 1, hot: !!(target && target.policeLoc && target.policeLoc.id === po.loc.id && !target.boxLoc) });
+        }
       });
-      if (po.loose > 0) {
-        boxes3d.push({ p: p, b: po.boxes.length + 1, hot: !!(target && target.policeLoc && target.policeLoc.id === po.loc.id && !target.boxLoc) });
-      }
-    });
-    const rackEl = P.querySelector('#rack');
-    if (rackEl) rackEl.setAttribute('model', JSON.stringify({ shelves: r.sh, cells: Math.min(8, maxCells), boxes: boxes3d }));
+      const rackEl = P.querySelector('#rack');
+      if (rackEl) rackEl.setAttribute('model', JSON.stringify({ shelves: r.sh, cells: Math.min(8, maxCells), boxes: boxes3d }));
+    }
 
     const inv = P.querySelector('#openInv');
     if (inv) inv.onclick = (e) => { e.preventDefault(); nav('inventory.php?branch=' + D.branch.id + '&location=' + r.locId); };
@@ -821,6 +940,7 @@
     render();
   };
   $('saveBtn').onclick = saveLayout;
+  $('homeBtn').onclick = () => { const m = $('map'); if (m.resetView) { m.resetView(); } };
   $('resetBtn').onclick = () => {
     let auto = 0;
     racks.forEach((r) => {

@@ -84,6 +84,16 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
         <a href="sklad_mapa.php?branch=<?php echo (int)$branchId; ?>" class="btn btn-outline-info" title="3D vizualizace rozložení skladu"><i class="fas fa-cube me-2"></i> 3D mapa</a>
         <a href="location_labels.php?all=1&amp;branch=<?php echo (int)$branchId; ?>" target="_blank" class="btn btn-outline-info"><i class="fas fa-qrcode me-2"></i> Arch štítků</a>
         <?php if ($canEdit): ?>
+        <?php
+        // šuplíkové boxy (stěna u vchodu) — nabízet založení, jen dokud neexistují
+        $__hasDrawers = false;
+        foreach ($locs as $__dl) {
+            if ($__dl['type'] === 'regal' && (int)$__dl['is_active'] && mb_stripos((string)$__dl['name'], 'uplík') !== false) { $__hasDrawers = true; break; }
+        }
+        ?>
+        <?php if (!$__hasDrawers): ?>
+        <button class="btn btn-outline-danger" id="setupDrawersBtn" title="Založí stěnu šuplíkových boxů u vchodu: 6 boxů × 8 šuplíků (regál „Šuplíkové boxy")"><i class="fas fa-inbox me-2"></i> Založit šuplíkové boxy</button>
+        <?php endif; ?>
         <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#setupLocModal"><i class="fas fa-wand-magic-sparkles me-2"></i> Rychlé nastavení skladu</button>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newLocModal"><i class="fas fa-plus me-2"></i> Přidat umístění</button>
         <?php endif; ?>
@@ -410,6 +420,19 @@ function parentOptions(type, selected) {
         },
         function (d) { showAlert(d.message || 'Hotovo'); setTimeout(() => location.reload(), 700); },
         function () { $btn.innerHTML = '<i class="fas fa-check me-1"></i>Založit'; preview(); });
+    });
+})();
+
+// ── šuplíkové boxy (6 × 8) jedním klikem ──
+(function () {
+    const b = document.getElementById('setupDrawersBtn');
+    if (!b) { return; }
+    b.addEventListener('click', function () {
+        showConfirm('Založit stěnu šuplíkových boxů? Vznikne regál „Šuplíkové boxy" se 6 boxy (police) po 8 šuplících (krabičky) — celkem 55 umístění s QR štítky.', function () {
+            b.disabled = true;
+            b.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>Zakládám…';
+            locPost({op: 'setup_drawers', branch_id: BRANCH_ID});
+        });
     });
 })();
 

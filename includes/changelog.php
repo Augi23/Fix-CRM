@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.45.0',
+        'date' => '2026-08-09',
+        'time' => '20:45',
+        'title' => '3D mapa: pohyb po skladě, šuplíkové boxy a nový vchod',
+        'items' => [
+            '<b>Pohyb po skladě:</b> levým tažením (na trackpadu dvěma prsty) se po skladě posouváš, <b>pravým tlačítkem otáčíš pohled</b>, kolečko myši či pinch přibližuje. Tlačítko <b>⌂</b> vrátí výchozí pohled.',
+            '<b>Šuplíkové boxy jako umístění:</b> v Umístěních přibylo tlačítko <b>„Založit šuplíkové boxy"</b> — jedním klikem vznikne stěna 6 boxů × 8 šuplíků (regál „Šuplíkové boxy", police Box 1–6, šuplíky s QR štítky a pozicemi R–P–B). Mapa je kreslí na stěně u vchodu (o 10 % větší) a hledaný díl <b>rozsvítí konkrétní šuplík</b> přímo ve scéně.',
+            '<b>Nová podoba haly:</b> část místnosti za stěnou se šuplíky je pryč, <b>vchod je u RegK9</b> a výchozí pohled se dívá od vchodu na regály 1–8.',
+        ],
+    ],
+    [
         'version' => '3.44.4',
         'date' => '2026-08-09',
         'time' => date('H:i'),

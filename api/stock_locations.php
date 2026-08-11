@@ -375,6 +375,39 @@ try {
         exit;
     }
 
+    if ($op === 'setup_drawers') {
+        // ŠUPLÍKOVÉ BOXY na stěně u vchodu (6 boxů × 8 šuplíků) jako regál
+        // „Šuplíkové boxy" + police „Box 1–6" + krabičky „Šuplík 1–8".
+        // 3D mapa regál s tímhle názvem kreslí jako červenou stěnu šuplíků.
+        _locRequireBranch($branchId);
+        $chk = $pdo->prepare("SELECT id FROM stock_locations WHERE type = 'regal' AND branch_id = ? AND is_active = 1 AND name LIKE '%uplík%'");
+        $chk->execute([$branchId]);
+        if ($chk->fetch()) { throw new Exception('Šuplíkové boxy už na téhle pobočce založené jsou.'); }
+        _locLock($pdo);
+        $rack = null;
+        try {
+            $pdo->beginTransaction();
+            $rack = _locInsert($pdo, 'regal', 'Šuplíkové boxy', 0, $branchId);
+            for ($u = 1; $u <= 6; $u++) {
+                $po = _locInsert($pdo, 'police', 'Box ' . $u, (int)$rack['id'], $branchId);
+                for ($d = 1; $d <= 8; $d++) {
+                    _locInsert($pdo, 'krabicka', 'Šuplík ' . $d, (int)$po['id'], $branchId);
+                }
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) { $pdo->rollBack(); }
+            throw $e;
+        } finally { _locUnlock($pdo); }
+        crmAuditLog('location.create', [
+            'entity_type' => 'stock_location', 'entity_id' => (int)$rack['id'], 'entity_label' => (string)$rack['code'],
+            'summary' => 'Založeny šuplíkové boxy (' . $rack['code'] . ' „Šuplíkové boxy": 6 boxů × 8 šuplíků)',
+        ]);
+        echo json_encode(['success' => true, 'created_rack' => $rack,
+            'message' => 'Šuplíkové boxy založeny (' . $rack['code'] . ' — 6 boxů × 8 šuplíků, 55 umístění).'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     if ($op === 'map_layout') {
         // Rozmístění regálů v 3D mapě (secure/warehouse3d.html) — jen souřadnice/rotace
         // pro vykreslení, strukturu skladu NEmění. Klíčované číslem regálu z kódu (RegK1 → 1).
