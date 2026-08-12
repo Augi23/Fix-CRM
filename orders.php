@@ -356,7 +356,7 @@ $__techs     = getActiveTechnicians(true);
     <?php $__curTech = null; foreach ($__techs as $__t) { if ($tech_filter === (int)$__t['id']) { $__curTech = $__t; break; } } ?>
     <div class="dropdown">
         <button class="btn btn-sm dropdown-toggle crm-filter-dd-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
-            <i class="fas fa-user-gear"></i> <?php echo $__curTech ? e((string)$__curTech['name']) : 'Zaměstnanci'; ?>
+            <i class="fas fa-users"></i> <?php echo $__curTech ? e((string)$__curTech['name']) : 'Zaměstnanci'; ?>
         </button>
         <ul class="dropdown-menu crm-filter-dd-menu shadow">
             <li><a class="dropdown-item crm-filter-dd-item<?php echo $tech_filter === 0 ? ' active' : ''; ?>" href="orders.php?<?php echo ltrim($status_qs . $branch_qs . $search_qs, '&'); ?>"><i class="fas fa-users"></i> Všichni zaměstnanci</a></li>

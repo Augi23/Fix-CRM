@@ -208,7 +208,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <?php $dash_tech_filter = (int)($_GET['tech'] ?? 0); ?>
                     <form method="GET" class="d-flex align-items-center gap-1">
                         <?php if ($filter_status): ?><input type="hidden" name="filter" value="<?php echo e($filter_status); ?>"><?php endif; ?>
-                        <i class="fas fa-user-gear text-white-75 me-1"></i>
+                        <i class="fas fa-users text-white-75 me-1"></i>
                         <select name="tech" class="form-select form-select-sm" style="width:auto;min-width:160px;" onchange="this.form.submit()">
                             <option value="0">Všichni technici</option>
                             <?php foreach (getActiveTechnicians(true) as $__t): ?>

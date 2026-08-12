@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.44.4',
+        'date' => '2026-08-10',
+        'time' => '17:10',
+        'title' => 'Nástěnka: čitelná ikona u filtru techniků',
+        'items' => [
+            'U výběru „Všichni technici" na Nástěnce (a stejného filtru u Zakázek) byla ikona „člověk s ozubeným kolečkem", která na některých zařízeních vypadala jako neznámý čtvereček. Nahrazena jednoduchou ikonou skupiny lidí.',
+        ],
+    ],
+    [
         'version' => '3.45.0',
         'date' => '2026-08-09',
         'time' => '20:45',
