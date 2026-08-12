@@ -860,6 +860,11 @@ function copyTextToClipboard(text) {
 }
 
 $(function() {
+    // Reload po akci (přidání/změna stavu/smazání): potlačí automatické otevření
+    // formuláře přidání, aby po odeslání „vyskočilo znovu" (jinak se ?order_id
+    // v URL zachová a auto-open modal otevře podruhé).
+    function procReload() { try { sessionStorage.setItem('procSkipAutoOpen', '1'); } catch (e) {} window.location.reload(); }
+
     const modalEl = document.getElementById('requestModal');
     const requestModal = modalEl ? new bootstrap.Modal(modalEl) : null;
     const assignModalEl = document.getElementById('assignProcurementModal');
@@ -922,7 +927,7 @@ $(function() {
         }).done(function(res) {
             if (res && res.success) {
                 if (window.afxLabelToast) window.afxLabelToast("🛒 <?php echo __('part_added_to_orders'); ?>", true);
-                location.reload();
+                procReload();
             } else {
                 $btn.prop('disabled', false);
                 showAlert('<?php echo __('order_save_failed'); ?>' + ((res && res.message) || '<?php echo __('unknown_error'); ?>'));
@@ -1057,7 +1062,7 @@ $(function() {
         e.preventDefault();
         $.post('api/procurement_request.php', $(this).serialize(), function(res) {
             if (res.success) {
-                location.reload();
+                procReload();
             } else {
                 showAlert("<?php echo __('error_label'); ?>: " + res.message);
             }
@@ -1068,7 +1073,7 @@ $(function() {
         e.preventDefault();
         $.post('api/procurement_request.php', $(this).serialize(), function(res) {
             if (res.success) {
-                location.reload();
+                procReload();
             } else {
                 showAlert("<?php echo __('error_label'); ?>: " + res.message);
             }
@@ -1080,7 +1085,7 @@ $(function() {
         const status = $(this).data('status');
         $.post('api/procurement_request.php', {action: 'update', id: id, status: status}, function(res) {
             if (res.success) {
-                location.reload();
+                procReload();
             } else {
                 showAlert("<?php echo __('error_label'); ?>: " + res.message);
             }
@@ -1140,7 +1145,12 @@ $(function() {
         });
     });
 
-    if (<?php echo ($selectedOrderId > 0 && $can_add_procurement) ? 'true' : 'false'; ?> && requestModal) {
+    // Auto-otevření formuláře přidání při příchodu z odkazu u zakázky. Ale NE po
+    // reloadu způsobeném akcí (procReload nastaví procSkipAutoOpen) — jinak se
+    // formulář „vyskočí znovu" hned po odeslání. Flag hned spotřebujeme.
+    var procSkip = false;
+    try { procSkip = sessionStorage.getItem('procSkipAutoOpen') === '1'; sessionStorage.removeItem('procSkipAutoOpen'); } catch (e) {}
+    if (!procSkip && <?php echo ($selectedOrderId > 0 && $can_add_procurement) ? 'true' : 'false'; ?> && requestModal) {
         requestModal.show();
     }
 });

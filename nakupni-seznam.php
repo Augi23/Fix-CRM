@@ -103,7 +103,7 @@ function slRenderItem(array $r, bool $can_manage, bool $can_request = false, str
         <?php if ($can_manage): ?>
         <div class="sl-item-actions">
             <?php if ($status === 'pending'): ?>
-                <button class="sl-btn sl-btn-success" data-sl-action="ordered" data-sl-id="<?php echo $id; ?>"><i class="fas fa-check me-1"></i><?php echo __('approve_and_order'); ?></button>
+                <button class="sl-btn sl-btn-primary" data-sl-action="ordered" data-sl-id="<?php echo $id; ?>"><i class="fas fa-check me-1"></i><?php echo __('approve_and_order'); ?></button>
                 <button class="sl-btn sl-btn-ghost" data-sl-action="cancelled" data-sl-id="<?php echo $id; ?>" title="<?php echo e(__('reject')); ?>"><i class="fas fa-ban"></i></button>
             <?php elseif ($status === 'ordered'): ?>
                 <button class="sl-btn sl-btn-success" data-sl-action="received" data-sl-id="<?php echo $id; ?>"><i class="fas fa-box-open me-1"></i><?php echo __('received_to_stock'); ?></button>
@@ -262,6 +262,8 @@ function slRenderItem(array $r, bool $can_manage, bool $can_request = false, str
 .sl-btn:disabled { opacity: .55; cursor: default; }
 .sl-btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; box-shadow: 0 2px 10px rgba(34,197,94,.28); }
 .sl-btn-success:hover { filter: brightness(1.08); box-shadow: 0 4px 16px rgba(34,197,94,.4); color:#fff; }
+.sl-btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; box-shadow: 0 2px 10px rgba(37,99,235,.28); }
+.sl-btn-primary:hover { filter: brightness(1.08); box-shadow: 0 4px 16px rgba(37,99,235,.4); color:#fff; }
 .sl-btn-danger { background: rgba(239,68,68,.12); color: #ff8f8f; border-color: rgba(239,68,68,.32); }
 .sl-btn-danger:hover { background: rgba(239,68,68,.24); color: #fff; }
 .sl-btn-ghost { background: rgba(255,255,255,.06); color: #cfd6e0; border-color: rgba(255,255,255,.12); }

@@ -11,6 +11,26 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.46.2',
+        'date' => '2026-08-12',
+        'time' => date('H:i'),
+        'title' => 'Nákupy: díl se po naskladnění navěsí na zakázku + drobnosti',
+        'items' => [
+            'Když technik u zakázky dá <b>„Přidat do nákupu"</b> a vybere díl, po jeho <b>naskladnění</b> (stav „Přijato na sklad") se díl teď <b>automaticky objeví na zakázce</b> — dřív zůstal jen v nákupním seznamu a na zakázku se nikdy nedostal. Při vrácení příjmu se zase odpojí a sklad sedí.',
+            'Tlačítko <b>„Schválit a objednat"</b> v nákupním seznamu má nově modrou barvu, aby se nepletlo se zeleným <b>„Přijato na sklad"</b>.',
+            'Po přidání dílu se už <b>znovu neotevře</b> formulář přidání (dřív po odeslání „vyskočil" nanovo).',
+        ],
+    ],
+    [
+        'version' => '3.46.1',
+        'date' => '2026-08-12',
+        'time' => date('H:i'),
+        'title' => 'Nástěnka: drobná optimalizace načítání',
+        'items' => [
+            'Nástěnka při každém načtení nedělá jeden zbytečný dotaz do databáze navíc — odstraněno redundantní načítání seznamu techniků, které se nikde nepoužívalo (modal nové zakázky si ho načítá vlastní). Rychlost o kousek lepší, chování beze změny.',
+        ],
+    ],
+    [
         'version' => '3.46.0',
         'date' => '2026-08-12',
         'time' => date('H:i'),

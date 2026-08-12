@@ -135,7 +135,7 @@ try {
 
         $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare("SELECT id, status, inventory_id, quantity, item_name FROM purchase_requests WHERE id = ? LIMIT 1 FOR UPDATE");
+        $stmt = $pdo->prepare("SELECT id, status, inventory_id, quantity, item_name, order_id, order_item_id FROM purchase_requests WHERE id = ? LIMIT 1 FOR UPDATE");
         $stmt->execute([$id]);
         $request = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -163,6 +163,10 @@ try {
             throw new Exception('Tento díl je skladem na jiné pobočce — příjem na sklad smí potvrdit jen její zaměstnanci.');
         }
 
+        $reqOrderId  = (int)($request['order_id'] ?? 0);
+        $linkedItem  = (int)($request['order_item_id'] ?? 0);
+        $assignNote  = '';
+
         if (!$wasReceived && $isNowReceived && $inventoryId > 0) {
             changeInventoryQuantity($inventoryId, $quantity);
             // Received parts become real warehouse stock → show in Sklad even after they run out.
@@ -170,12 +174,74 @@ try {
             if (function_exists('crmLogInventoryMove')) {
                 crmLogInventoryMove($inventoryId, $quantity, 'restock', null, 'Příjem z nákupu #' . (int)$id);
             }
+
+            // Byl-li díl objednán PRO konkrétní zakázku, po naskladnění ho na tu
+            // zakázku rovnou navěsíme (order_item) — jinak technik přidal díl
+            // „do nákupu u zakázky", ale na zakázce se nikdy neobjevil. Jen JEDNOU
+            // (order_item_id) a jen když zakázka existuje a je otevřená.
+            if ($reqOrderId > 0 && $linkedItem <= 0) {
+                $os = $pdo->prepare("SELECT id, status, branch_id, technician_id FROM orders WHERE id = ? LIMIT 1");
+                $os->execute([$reqOrderId]);
+                $ord = $os->fetch(PDO::FETCH_ASSOC);
+                $assignable = $ord
+                    && !isOrderStatusIn((string)($ord['status'] ?? ''), 'collected')
+                    && !isOrderStatusIn((string)($ord['status'] ?? ''), 'cancelled')
+                    && (!function_exists('canAccessOrderBranch') || canAccessOrderBranch($ord));
+                if ($assignable) {
+                    $invp = $pdo->prepare("SELECT sale_price FROM inventory WHERE id = ? LIMIT 1");
+                    $invp->execute([$inventoryId]);
+                    $salePrice = (float)($invp->fetchColumn() ?: 0);
+                    $orderDone = in_array((string)($ord['status'] ?? ''), getOrderStatusList('done'), true);
+                    // Dokončená zakázka: odečet se při dokončení už NEspustí, proto
+                    // odečíst hned a označit stock_deducted=1 (viz assign_order).
+                    if ($orderDone) {
+                        changeInventoryQuantity($inventoryId, -$quantity);
+                        if (function_exists('crmLogInventoryMove')) {
+                            crmLogInventoryMove($inventoryId, -$quantity, 'issue', $reqOrderId, 'Díl z nákupu navěšen na dokončenou zakázku (příjem)');
+                        }
+                    }
+                    $oi = $pdo->prepare("INSERT INTO order_items (order_id, inventory_id, quantity, price, stock_deducted) VALUES (?, ?, ?, ?, ?)");
+                    $oi->execute([$reqOrderId, $inventoryId, $quantity, $salePrice, $orderDone ? 1 : 0]);
+                    $pdo->prepare("UPDATE purchase_requests SET order_item_id = ? WHERE id = ?")
+                        ->execute([(int)$pdo->lastInsertId(), $id]);
+                    $assignNote = ', navěšeno na zakázku #' . $reqOrderId;
+                }
+            }
         } elseif ($wasReceived && !$isNowReceived && $inventoryId > 0) {
-            // Zrcadlo: omylem označené „přijato" vrácené zpět MUSÍ kusy zase odečíst —
-            // jinak každé received↔ordered kolečko přičte zásobu znovu (fantomové kusy).
-            changeInventoryQuantity($inventoryId, -$quantity);
-            if (function_exists('crmLogInventoryMove')) {
-                crmLogInventoryMove($inventoryId, -$quantity, 'adjust', null, 'Zrušení příjmu z nákupu #' . (int)$id);
+            // Vrácení příjmu = undo naskladnění (−qty). Byl-li díl navěšený na
+            // zakázku, taky ho odpojíme — a pokud jeho odečet UŽ proběhl, kusy
+            // zase vrátíme (+qty). Odečet je proveden, když:
+            //   • stock_deducted=1 (dokončená zakázka při příjmu — viz forward),
+            //   • NEBO je zakázka PRÁVĚ dokončená (odečetla ho processOrderInventoryChange;
+            //     ta při odpisu sd NEpřepíná, takže se pozná jen podle stavu zakázky).
+            // Skladovou změnu spočítáme NETTO a provedeme JEDNÍM voláním: u dílu,
+            // který skladem nebyl (S<qty), by mezikrok −qty podtekl a spadl by
+            // falešnou hláškou „Not enough stock"; netto −qty+qty=0 to obejde.
+            $netStock = -$quantity;
+            if ($linkedItem > 0) {
+                $li = $pdo->prepare("SELECT quantity, COALESCE(stock_deducted,0) AS sd FROM order_items WHERE id = ? LIMIT 1");
+                $li->execute([$linkedItem]);
+                if ($lrow = $li->fetch(PDO::FETCH_ASSOC)) {
+                    $ordDone = false;
+                    if ($reqOrderId > 0) {
+                        $osr = $pdo->prepare("SELECT status FROM orders WHERE id = ? LIMIT 1");
+                        $osr->execute([$reqOrderId]);
+                        $ordDone = in_array((string)$osr->fetchColumn(), getOrderStatusList('done'), true);
+                    }
+                    if ((int)$lrow['sd'] === 1 || $ordDone) {
+                        $netStock += (int)$lrow['quantity'];
+                    }
+                    $pdo->prepare("DELETE FROM order_items WHERE id = ?")->execute([$linkedItem]);
+                }
+                $pdo->prepare("UPDATE purchase_requests SET order_item_id = NULL WHERE id = ?")->execute([$id]);
+                $assignNote = ', odpojeno ze zakázky #' . $reqOrderId;
+            }
+            if ($netStock !== 0) {
+                changeInventoryQuantity($inventoryId, $netStock);
+                if (function_exists('crmLogInventoryMove')) {
+                    crmLogInventoryMove($inventoryId, $netStock, 'adjust', ($reqOrderId > 0 ? $reqOrderId : null),
+                        'Zrušení příjmu z nákupu #' . (int)$id . ($linkedItem > 0 ? ' (odpojeno ze zakázky)' : ''));
+                }
             }
         }
 
@@ -184,7 +250,7 @@ try {
         crmAuditLog('procurement.status_change', [
             'entity_type' => 'procurement', 'entity_id' => $id, 'entity_label' => (string)($request['item_name'] ?? ''),
             'summary' => 'Díl „' . (string)($request['item_name'] ?? ('#' . $id)) . '" — stav nákupu: ' . (string)($request['status'] ?? '') . ' → ' . $status
-                . ((!$wasReceived && $isNowReceived && $inventoryId > 0) ? ' (naskladněno ' . $quantity . ' ks)' : ''),
+                . ((!$wasReceived && $isNowReceived && $inventoryId > 0) ? ' (naskladněno ' . $quantity . ' ks)' : '') . $assignNote,
         ]);
         echo json_encode(['success' => true, 'message' => 'Status updated.']);
         exit;
@@ -267,8 +333,10 @@ try {
         $stmt = $pdo->prepare("INSERT INTO order_items (order_id, inventory_id, quantity, price, stock_deducted) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$orderId, $inventoryId, $qty, (float)($inventory['sale_price'] ?? 0), $__orderDone ? 1 : 0]);
 
-        $stmt = $pdo->prepare("UPDATE purchase_requests SET order_id = ? WHERE id = ?");
-        $stmt->execute([$orderId, $requestId]);
+        // order_item_id si drží požadavek, ať ho příjem (received) nenavěsí na
+        // zakázku PODRUHÉ a ať jde při případném vrácení příjmu zase odpojit.
+        $stmt = $pdo->prepare("UPDATE purchase_requests SET order_id = ?, order_item_id = ? WHERE id = ?");
+        $stmt->execute([$orderId, (int)$pdo->lastInsertId(), $requestId]);
 
         $pdo->commit();
 

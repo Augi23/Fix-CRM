@@ -1491,6 +1491,7 @@ function ensureProcurementSchema(): bool {
             notes TEXT NULL,
             requested_by INT NULL,
             requested_by_key VARCHAR(32) NULL,
+            order_item_id INT NULL,
             ordered_by INT NULL,
             ordered_at TIMESTAMP NULL DEFAULT NULL,
             received_at TIMESTAMP NULL DEFAULT NULL,
@@ -1512,6 +1513,11 @@ function ensureProcurementSchema(): bool {
     // takže „smaž jen svoje" by nešlo rozlišit. Klíč to řeší spolehlivě.
     try { $pdo->exec("ALTER TABLE `purchase_requests` ADD COLUMN `requested_by_key` VARCHAR(32) NULL"); } catch (Throwable $e) {}
     try { $pdo->exec("ALTER TABLE `purchase_requests` ADD INDEX idx_reqkey (requested_by_key)"); } catch (Throwable $e) {}
+    // order_item_id = položka zakázky vytvořená při navěšení dílu na zakázku (po
+    // naskladnění nebo ručním přiřazení). Drží ji, aby se díl navěsil jen JEDNOU
+    // a šel při vrácení příjmu zase odpojit. Bez toho technik přidal díl „do
+    // nákupu u zakázky", ale na zakázce se nikdy neobjevil.
+    try { $pdo->exec("ALTER TABLE `purchase_requests` ADD COLUMN `order_item_id` INT NULL"); } catch (Throwable $e) {}
 
     try {
         $pdo->exec("ALTER TABLE `inventory` ADD COLUMN `source_url` VARCHAR(255) DEFAULT NULL");
