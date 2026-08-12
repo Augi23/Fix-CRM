@@ -437,6 +437,11 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
     <button class="btn btn-sm crm-v2-icon-btn" type="button" id="scanOrderBtn" title="<?php echo e(__('scan_order_title')); ?>" aria-label="<?php echo e(__('scan_order_title')); ?>">
         <i class="fas fa-qrcode"></i>
     </button>
+    <?php /* Režim recepce: zařízení poslouchá skeny poslané z mobilní appky (api/station_scan.php)
+             a samo otevírá naskenované zakázky — pro MacBook/PC na recepci. Desktop only. */ ?>
+    <button class="btn btn-sm crm-v2-icon-btn afx-hide-m" type="button" id="receptionModeBtn" title="Režim recepce — otevírat skeny z telefonů" aria-label="Režim recepce">
+        <i class="fas fa-tower-broadcast"></i>
+    </button>
     <button class="btn btn-sm crm-v2-icon-btn" type="button" id="notificationsToggle" aria-label="<?php echo e(__('notifications')); ?>">
         <i class="fas fa-bell"></i>
         <span class="crm-v2-alert-dot"></span>

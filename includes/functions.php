@@ -4223,6 +4223,29 @@ function complaintDeadline(array $c): ?DateTimeImmutable
     catch (Throwable $e) { return null; }
 }
 
+/** Skeny poslané z mobilní appky na „recepci" (MacBook/PC s režimem recepce).
+ *  iPhone naskenuje kód → POST api/station_scan.php → zařízení stejné pobočky
+ *  v režimu recepce si sken vyzvedne pollingem a samo otevře zakázku/hledání.
+ *  delivered_at = claim (vyzvedne jen první posluchač, ať se neotvírá dvakrát). */
+function ensureStationScansTable(PDO $pdo): void
+{
+    static $done = false;
+    if ($done || $pdo->inTransaction()) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `station_scans` (
+            `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `branch_id`    INT(11)      NOT NULL,
+            `code`         VARCHAR(120) NOT NULL,
+            `sent_by`      VARCHAR(100) NULL DEFAULT NULL,
+            `created_at`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `delivered_at` TIMESTAMP    NULL DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_branch_id` (`branch_id`, `id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('ensureStationScansTable: ' . $e->getMessage()); }
+}
+
 /** Tabulka příloh reklamace nahrávaných z detailu (fotky/PDF) — analogie
  *  order_attachments u zakázek. Starší fotky z založení žijí v complaint_attachments;
  *  obě sady slévá crmGetComplaintMedia(). Soubory: uploads/complaints/<id>/. */

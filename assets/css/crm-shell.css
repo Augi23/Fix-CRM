@@ -839,3 +839,8 @@ select optgroup,
 
 /* Podpisovy overlay: na nizsich viewportech (landscape/split view) musi jit scrollovat */
 .afx-signpad-overlay { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* Režim recepce: zapnutý vysílač svítí a jemně pulzuje */
+#receptionModeBtn.afx-reception-on { color: #35d07f !important; border-color: rgba(53,208,127,.5) !important; }
+#receptionModeBtn.afx-reception-on i { animation: afxReceptionPulse 1.8s ease-in-out infinite; }
+@keyframes afxReceptionPulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }

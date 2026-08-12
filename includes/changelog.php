@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.45.0',
+        'date' => '2026-08-12',
+        'time' => date('H:i'),
+        'title' => 'Režim recepce — sken z telefonu otevře zakázku na MacBooku',
+        'items' => [
+            'V hlavičce přibyla ikona vysílače: <b>režim recepce</b>. Počítač (typicky MacBook na recepci) s zapnutým režimem sám otevře zakázku, kterou někdo naskenuje mobilní appkou — v appce má sken nové tlačítko <b>„Poslat na recepci"</b>. Skeny se párují přes pobočku a vyzvedne je jen jedno zařízení (nic se neotevírá dvakrát).',
+            'Stolní čtečka (keyboard-wedge) na MacBooku/PC fungovala už dřív — pípnutí kódu kdekoli mimo textové pole otevře zakázku; režim recepce ji doplňuje o skeny z telefonů.',
+        ],
+    ],
+    [
         'version' => '3.44.5',
         'date' => '2026-08-10',
         'time' => '17:40',

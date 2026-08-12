@@ -2210,3 +2210,56 @@ window.afxSignaturePad = function (opts) {
     tick();
   } catch (e) { /* Režim recepce nesmí nikdy shodit zbytek UI (horní lišta apod.) */ }
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REŽIM RECEPCE — most „sken z telefonu → tento počítač".
+   Zapíná se ikonou vysílače v hlavičce (persistuje v localStorage). Aktivní
+   zařízení polluje api/station_scan.php a příchozí sken otevře jako zakázku
+   (view_order.php?scan=…, stejná cesta jako hardware čtečka). Poll běží jen
+   na viditelné kartě; skeny si claimuje první posluchač (neotevře se 2×).
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function() {
+    var KEY = 'afx_reception_mode';
+    var btn = document.getElementById('receptionModeBtn');
+    if (!btn) return;
+    var after = null, timer = null, busy = false;
+
+    function active() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
+    function paint() {
+        btn.classList.toggle('afx-reception-on', active());
+        btn.title = active() ? 'Režim recepce ZAPNUTÝ — skeny z telefonů se otevírají tady'
+                             : 'Režim recepce — otevírat skeny z telefonů';
+    }
+    function tick() {
+        if (!active() || document.hidden || busy) return;
+        busy = true;
+        var url = 'api/station_scan.php?' + (after === null ? 'after=0&baseline=1' : 'after=' + after);
+        fetch(url, { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                busy = false;
+                if (!d || !d.ok) return;
+                if (typeof d.baseline === 'number') { after = d.baseline; return; }
+                var scans = d.scans || [];
+                if (!scans.length) return;
+                var last = scans[scans.length - 1];
+                after = last.id;
+                window.location.href = 'view_order.php?scan=' + encodeURIComponent(last.code);
+            })
+            .catch(function() { busy = false; });
+    }
+    function loop() {
+        if (timer) clearInterval(timer);
+        timer = setInterval(tick, 2500);
+        tick();
+    }
+    btn.addEventListener('click', function() {
+        try { localStorage.setItem(KEY, active() ? '0' : '1'); } catch (e) {}
+        after = null;
+        paint();
+        if (active()) loop();
+    });
+    document.addEventListener('visibilitychange', function() { if (!document.hidden) tick(); });
+    paint();
+    if (active()) loop();
+}());
