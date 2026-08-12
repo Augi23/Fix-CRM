@@ -144,10 +144,15 @@ try {
         }
 
         $stmt = $pdo->prepare("UPDATE purchase_requests SET status = ?, ordered_by = CASE WHEN ? = 'ordered' THEN ? ELSE ordered_by END, ordered_at = CASE WHEN ? = 'ordered' AND ordered_at IS NULL THEN NOW() ELSE ordered_at END, received_at = CASE WHEN ? = 'received' AND received_at IS NULL THEN NOW() ELSE received_at END WHERE id = ?");
+        // ordered_by je INT (users.id) → technikovo/manažerovo „t5" tam nepatří
+        // (dual-login past: (int)"t5"=0, resp. tady chyba „Incorrect integer value").
+        // Vedení přihlášené přes tabulku technicians uloží NULL; kdo objednal drží
+        // audit log (crmStaffKey). Bez toho manažerovo „Schválit a objednat" padalo.
+        $__orderedBy = (isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id'])) ? (int)$_SESSION['user_id'] : null;
         $stmt->execute([
             $status,
             $status,
-            $_SESSION['user_id'] ?? ($_SESSION['tech_id'] ?? null),
+            $__orderedBy,
             $status,
             $status,
             $id,

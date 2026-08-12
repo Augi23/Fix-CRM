@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.46.3',
+        'date' => '2026-08-12',
+        'time' => date('H:i'),
+        'title' => 'Nákupy: oprava — manažerovi šlo „Schválit a objednat"',
+        'items' => [
+            'Označení dílu jako <b>objednaný</b> mohlo u vedení přihlášeného přes zaměstnanecký účet skončit chybou a neuložit se. Opraveno — schválení a objednání teď projde vždy.',
+        ],
+    ],
+    [
         'version' => '3.46.2',
         'date' => '2026-08-12',
         'time' => date('H:i'),
