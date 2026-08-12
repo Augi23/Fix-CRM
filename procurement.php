@@ -30,9 +30,6 @@ if ($presetOrderId > 0 && isset($pdo)) {
     } catch (Throwable $e) { $presetOrderId = 0; }
 }
 
-// Manager/admin gate for ordering parts (the add action requires it on the server).
-$can_order = hasPermission('procurement_manage') || hasPermission('admin_access');
-
 // ── Catalog (orderable supplier parts) — paginated, styled like Sklad ──────────
 $catalogLimit = 50;
 $catalogPage = isset($_GET['p']) && is_numeric($_GET['p']) ? (int)$_GET['p'] : 1;
@@ -79,7 +76,11 @@ try {
     $requestWhere = '';
     $requestParams = [];
     if (!isBranchGlobalViewer()) {
-        $requestWhere = ' WHERE o.branch_id = ?';
+        // Požadavky navázané na zakázku filtrujeme podle pobočky zakázky, ALE
+        // požadavky bez zakázky (technik jen hlásí „chybí díl") nemají o.branch_id
+        // (LEFT JOIN → NULL). Bez druhé podmínky by přidaná položka hned zmizela
+        // z fronty a technik by ji přidal znovu (duplikáty). Ty ukazujeme všem.
+        $requestWhere = ' WHERE (o.branch_id = ? OR pr.order_id IS NULL)';
         $requestParams[] = getCurrentStaffBranchId();
     }
     $stmt = $pdo->prepare(
@@ -183,9 +184,10 @@ function procurementPriorityBadge(string $priority): string {
 
 $requestsJson = json_encode($openRequests, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 $can_manage_procurement = hasPermission('procurement_manage') || hasPermission('admin_access');
-// Manually queuing/ordering a part is a manager/admin action (server enforces it too).
-// Technicians never order manually — out-of-stock parts are auto-queued when used in a repair.
-$can_add_procurement = $can_order;
+// PŘIDAT díl na nákupní seznam smí každý provozní zaměstnanec (technik hlásí, co chybí).
+// Potvrzení a objednání (mark ordered/received, mazání) zůstává vedení = $can_manage_procurement.
+$can_add_procurement = crmCanRequestProcurement();
+$my_key = function_exists('crmStaffKey') ? crmStaffKey() : '';
 ?>
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
@@ -372,7 +374,7 @@ if (isset($_GET['catalog_imported'])):
                             <td><?php echo formatMoney($item['cost_price'] ?? 0); ?></td>
                             <td class="fw-bold text-primary"><?php echo formatMoney($item['sale_price'] ?? 0); ?></td>
                             <td class="text-end pe-2">
-                                <?php if ($can_order): ?>
+                                <?php if ($can_add_procurement): ?>
                                     <button type="button"
                                         class="btn btn-sm btn-success order-part-btn"
                                         data-inventory-id="<?php echo (int)$item['id']; ?>"
@@ -515,7 +517,7 @@ if (isset($_GET['catalog_imported'])):
                             </td>
                             <td>
                                 <div class="fw-semibold"><?php echo e($request['item_name']); ?></div>
-                                <?php if (!empty($request['sku'])): ?><div class="small text-white-75"><code><?php echo e($request['sku']); ?></code></div><?php endif; ?>
+                                <?php if (!empty($request['sku'])): ?><div class="small text-white-75"><code><?php echo e($request['sku']); ?></code> <button type="button" class="btn btn-link btn-sm p-0 align-baseline copy-sku-btn" data-sku="<?php echo e($request['sku']); ?>" title="<?php echo e(__('copy_sku')); ?>"><i class="fas fa-copy"></i></button></div><?php endif; ?>
                             </td>
                             <td class="text-center fw-bold"><?php echo (int)$request['quantity']; ?></td>
                             <td><span class="badge <?php echo procurementPriorityBadge($priority); ?>"><?php echo procurementPriorityLabel($priority); ?></span></td>
@@ -525,7 +527,9 @@ if (isset($_GET['catalog_imported'])):
                             <td class="text-end">
                                 <?php if ($can_manage_procurement || $can_add_procurement): ?>
                                 <div class="btn-group btn-group-sm afx-row-actions">
-                                    <?php if ($can_add_procurement && (int)($request['inventory_id'] ?? 0) > 0 && $status !== 'cancelled'): ?>
+                                    <?php /* Přiřazení dílu k zakázce je součást objednávání → jen vedení.
+                                             Technik na seznam díl jen přidá (a smaže svůj), zbytek řeší vedení. */ ?>
+                                    <?php if ($can_manage_procurement && (int)($request['inventory_id'] ?? 0) > 0 && $status !== 'cancelled'): ?>
                                         <button
                                             class="btn btn-outline-info assign-procurement-btn"
                                             data-id="<?php echo (int)$request['id']; ?>"
@@ -549,6 +553,12 @@ if (isset($_GET['catalog_imported'])):
                                         <button class="btn btn-outline-secondary procurement-status-btn" data-id="<?php echo (int)$request['id']; ?>" data-status="cancelled" title="<?php echo e(__('cancel')); ?>"><i class="fas fa-ban"></i></button>
                                     <?php endif; ?>
                                     <button class="btn btn-outline-danger procurement-delete-btn" data-id="<?php echo (int)$request['id']; ?>" title="<?php echo e(__('delete')); ?>"><i class="fas fa-trash"></i></button>
+                                    <?php elseif ($can_add_procurement
+                                            && $my_key !== ''
+                                            && (string)($request['requested_by_key'] ?? '') === $my_key
+                                            && $status === 'pending'): ?>
+                                        <?php /* Technik smaže jen SVOJI dosud nepotvrzenou položku. */ ?>
+                                        <button class="btn btn-outline-danger procurement-delete-btn" data-id="<?php echo (int)$request['id']; ?>" title="<?php echo e(__('delete')); ?>"><i class="fas fa-trash"></i></button>
                                     <?php endif; ?>
                                 </div>
                                 <?php else: ?>
@@ -933,6 +943,19 @@ $(function() {
         const supplierKey = $(this).data('supplier');
         copyTextToClipboard(procurementCopyText(supplierKey)).then(function() {
             showAlert("<?php echo __('list_copied'); ?>");
+        });
+    });
+
+    // Kopírování SKU jednoho dílu — usnadní objednávání u dodavatele.
+    $(document).on('click', '.copy-sku-btn', function() {
+        const sku = String($(this).data('sku') || '');
+        if (!sku) return;
+        const $b = $(this);
+        copyTextToClipboard(sku).then(function() {
+            const $i = $b.find('i');
+            $i.removeClass('fa-copy').addClass('fa-check text-success');
+            showAlert("<?php echo __('sku_copied'); ?>");
+            setTimeout(function() { $i.removeClass('fa-check text-success').addClass('fa-copy'); }, 1200);
         });
     });
 

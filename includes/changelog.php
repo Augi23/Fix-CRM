@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.46.0',
+        'date' => '2026-08-12',
+        'time' => date('H:i'),
+        'title' => 'Nákupy: technik hlásí chybějící díly, kopírování SKU',
+        'items' => [
+            'Díl na <b>nákupní seznam</b> teď může přidat každý provozní zaměstnanec, včetně technika — nahlásí, co při opravě chybí. Schvaluje a objednává dál jen vedení (manažer / Boss / admin).',
+            'Technik smí ze seznamu <b>smazat jen svoji dosud nepotvrzenou položku</b> — cizí ani už objednané díly nesmaže (nemůže tak omylem shodit nákup ostatním).',
+            'U každé položky přibylo tlačítko <b>kopírovat SKU</b> (v nákupním seznamu i v Nákupech) — objednávání u dodavatele je rychlejší.',
+            'Přiřazení dílu k zakázce zůstává na vedení; požadavky bez zakázky se teď správně zobrazují ve frontě všem pobočkám (dřív se schovaly).',
+        ],
+    ],
+    [
         'version' => '3.45.1',
         'date' => '2026-08-12',
         'time' => date('H:i'),

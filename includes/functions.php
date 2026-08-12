@@ -1490,6 +1490,7 @@ function ensureProcurementSchema(): bool {
             status ENUM('pending','ordered','received','cancelled') NOT NULL DEFAULT 'pending',
             notes TEXT NULL,
             requested_by INT NULL,
+            requested_by_key VARCHAR(32) NULL,
             ordered_by INT NULL,
             ordered_at TIMESTAMP NULL DEFAULT NULL,
             received_at TIMESTAMP NULL DEFAULT NULL,
@@ -1505,6 +1506,12 @@ function ensureProcurementSchema(): bool {
     } catch (Throwable $e) {
         // ignore duplicate column/table errors below
     }
+
+    // requested_by_key = crmStaffKey() autora („tech:15" / „user:3"). Sloupec
+    // requested_by je INT a technikovo user_id „t15" by do něj spadlo jako 0,
+    // takže „smaž jen svoje" by nešlo rozlišit. Klíč to řeší spolehlivě.
+    try { $pdo->exec("ALTER TABLE `purchase_requests` ADD COLUMN `requested_by_key` VARCHAR(32) NULL"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE `purchase_requests` ADD INDEX idx_reqkey (requested_by_key)"); } catch (Throwable $e) {}
 
     try {
         $pdo->exec("ALTER TABLE `inventory` ADD COLUMN `source_url` VARCHAR(255) DEFAULT NULL");
@@ -1655,6 +1662,20 @@ function ensureProductsTable(): void {
  *  pokrývá i admina a Bosse (vrací true globálně) a manažera (implicitní právo). */
 function crmCanManageProducts(): bool {
     return hasPermission('manage_inventory');
+}
+
+/** Smí PŘIDAT díl na nákupní seznam (vytvořit požadavek). Každý provozní zaměstnanec —
+ *  technik jen hlásí, co při opravě chybí. Účetní ne (neprovozní role).
+ *  Samotné OBJEDNÁNÍ / příjem / mazání zůstává na vedení (procurement_manage). */
+function crmCanRequestProcurement(): bool {
+    if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) { return false; }
+    if (function_exists('crmIsAccountant') && crmIsAccountant()) { return false; }
+    return true;
+}
+
+/** Smí SPRAVOVAT nákupy — potvrdit/objednat, označit přijaté, mazat. Jen vedení. */
+function crmCanManageProcurement(): bool {
+    return hasPermission('procurement_manage') || hasPermission('admin_access');
 }
 
 /** Fotku produktu renderovat jen z našeho úložiště — [IMAGES] v CSV je text
@@ -2602,7 +2623,7 @@ function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $q
         return true;
     }
 
-    $stmt = $pdo->prepare("INSERT INTO purchase_requests (order_id, supplier_key, inventory_id, item_name, sku, quantity, priority, status, notes, requested_by) VALUES (?, ?, ?, ?, ?, ?, 'this_week', 'pending', ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO purchase_requests (order_id, supplier_key, inventory_id, item_name, sku, quantity, priority, status, notes, requested_by, requested_by_key) VALUES (?, ?, ?, ?, ?, ?, 'this_week', 'pending', ?, ?, ?)");
     $stmt->execute([
         $orderId,
         $supplierKey,
@@ -2611,7 +2632,8 @@ function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $q
         $sku !== '' ? $sku : null,
         $quantity,
         $notes !== '' ? $notes : null,
-        $requestedBy,
+        is_numeric($requestedBy) ? (int)$requestedBy : null,
+        function_exists('crmStaffKey') ? crmStaffKey() : null,
     ]);
 
     return true;

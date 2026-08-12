@@ -5,7 +5,10 @@ require_once 'includes/header.php';
 
 ensureProcurementSchema();
 
-$can_manage = hasPermission('procurement_manage') || hasPermission('admin_access');
+$can_manage  = hasPermission('procurement_manage') || hasPermission('admin_access');
+// Technik smí přidávat na seznam a mazat POUZE svoje čekající položky.
+$can_request = function_exists('crmCanRequestProcurement') && crmCanRequestProcurement();
+$my_key      = function_exists('crmStaffKey') ? crmStaffKey() : '';
 
 // ── Lokální popisky/badge (aby nekolidovaly s procurement.php) ───────────────
 function slPriorityLabel(string $p): string {
@@ -59,7 +62,7 @@ $countCancelled = count($groups['cancelled']);
 /**
  * Vykreslí jednu položku seznamu jako kartu-řádek.
  */
-function slRenderItem(array $r, bool $can_manage): void {
+function slRenderItem(array $r, bool $can_manage, bool $can_request = false, string $my_key = ''): void {
     $id        = (int)($r['id'] ?? 0);
     $status    = (string)($r['status'] ?? 'pending');
     $priority  = (string)($r['priority'] ?? 'this_week');
@@ -83,7 +86,7 @@ function slRenderItem(array $r, bool $can_manage): void {
             <div class="sl-item-body">
                 <div class="sl-item-name"><?php echo e($itemName); ?></div>
                 <div class="sl-item-meta">
-                    <?php if ($sku !== ''): ?><span class="sl-chip"><i class="fas fa-barcode"></i> <?php echo e($sku); ?></span><?php endif; ?>
+                    <?php if ($sku !== ''): ?><button type="button" class="sl-chip sl-chip-copy" data-sl-copy="<?php echo e($sku); ?>" title="<?php echo e(__('copy_sku')); ?>"><i class="fas fa-barcode"></i> <?php echo e($sku); ?> <i class="fas fa-copy sl-copy-ic"></i></button><?php endif; ?>
                     <span class="sl-chip"><i class="fas fa-store"></i> <?php echo e($supplier); ?></span>
                     <span class="<?php echo slPriorityBadge($priority); ?>"><?php echo slPriorityLabel($priority); ?></span>
                     <?php if ($orderId > 0): ?>
@@ -110,7 +113,16 @@ function slRenderItem(array $r, bool $can_manage): void {
             <?php endif; ?>
             <button class="sl-btn sl-btn-danger" data-sl-action="delete" data-sl-id="<?php echo $id; ?>" title="<?php echo e(__('delete')); ?>"><i class="fas fa-trash"></i></button>
         </div>
-        <?php endif; ?>
+        <?php else:
+            // Technik (bez správy nákupů) smí smazat JEN svoji čekající položku,
+            // aby omylem nemazal díly nahlášené ostatními.
+            $mine = $my_key !== '' && (string)($r['requested_by_key'] ?? '') === $my_key;
+            if ($can_request && $mine && $status === 'pending'): ?>
+        <div class="sl-item-actions">
+            <button class="sl-btn sl-btn-danger" data-sl-action="delete" data-sl-id="<?php echo $id; ?>" title="<?php echo e(__('delete')); ?>"><i class="fas fa-trash"></i></button>
+        </div>
+        <?php endif;
+        endif; ?>
     </div>
     <?php
 }
@@ -142,7 +154,7 @@ function slRenderItem(array $r, bool $can_manage): void {
     </div>
 
     <?php if (!$can_manage): ?>
-        <div class="sl-note"><i class="fas fa-circle-info me-2"></i><?php echo __('shopping_list_viewer_note'); ?></div>
+        <div class="sl-note"><i class="fas fa-circle-info me-2"></i><?php echo $can_request ? __('shopping_list_tech_note') : __('shopping_list_viewer_note'); ?></div>
     <?php endif; ?>
 
     <?php
@@ -165,7 +177,7 @@ function slRenderItem(array $r, bool $can_manage): void {
                 <span class="sl-section-count"><?php echo count($items); ?></span>
             </div>
             <div class="sl-section-body">
-                <?php foreach ($items as $r) { slRenderItem($r, $can_manage); } ?>
+                <?php foreach ($items as $r) { slRenderItem($r, $can_manage, $can_request, $my_key); } ?>
             </div>
         </section>
     <?php endforeach; ?>
@@ -233,6 +245,11 @@ function slRenderItem(array $r, bool $can_manage): void {
 .sl-chip-soft { background: transparent; border-color: transparent; color: #8b93a1; padding-left: 2px; }
 .sl-chip-link { color: #7DBEFF; text-decoration: none; }
 .sl-chip-link:hover { color: #fff; border-color: rgba(125,190,255,.5); }
+.sl-chip-copy { cursor: pointer; font: inherit; line-height: 1.2; }
+.sl-chip-copy:hover { color: #fff; border-color: rgba(125,190,255,.5); }
+.sl-copy-ic { opacity: .5; margin-left: 2px; }
+.sl-chip-copy.copied { background: rgba(34,197,94,.18); border-color: rgba(34,197,94,.4); color: #7ee2a8; }
+.sl-chip-copy.copied .sl-copy-ic { opacity: 1; }
 
 .sl-badge { display: inline-flex; align-items: center; font-size: .74rem; font-weight: 700; border-radius: 8px; padding: 3px 9px; text-transform: uppercase; letter-spacing: .02em; }
 .sl-badge-danger { background: rgba(239,68,68,.18); color: #ff9a9a; border: 1px solid rgba(239,68,68,.35); }
@@ -277,6 +294,34 @@ $(function () {
         pending:   { confirm: null, busy: '…' },
         'delete':  { confirm: '<?php echo __('confirm_remove_item'); ?>', busy: '…' }
     };
+
+    // Kopírování SKU do schránky — usnadní objednávání u dodavatele.
+    $('.sl-page').on('click', '[data-sl-copy]', function () {
+        var $c = $(this);
+        var sku = String($c.data('sl-copy') || '');
+        if (!sku) return;
+        var flash = function () {
+            var ic = $c.find('.sl-copy-ic');
+            var oldTitle = $c.attr('title');
+            $c.addClass('copied').attr('title', '<?php echo e(__('sku_copied')); ?>');
+            ic.removeClass('fa-copy').addClass('fa-check');
+            setTimeout(function () {
+                $c.removeClass('copied').attr('title', oldTitle);
+                ic.removeClass('fa-check').addClass('fa-copy');
+            }, 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(sku).then(flash).catch(function () {
+                window.prompt('<?php echo e(__('copy_sku')); ?>', sku);
+            });
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = sku; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.focus(); ta.select();
+            try { document.execCommand('copy'); flash(); } catch (e) { window.prompt('<?php echo e(__('copy_sku')); ?>', sku); }
+            document.body.removeChild(ta);
+        }
+    });
 
     $('.sl-page').on('click', '[data-sl-action]', function () {
         var $btn = $(this);

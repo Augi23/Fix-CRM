@@ -30,11 +30,22 @@ $action = trim((string)($_POST['action'] ?? 'add'));
 
 try {
     if ($action === 'add') {
-        // Ordering parts is a manager/admin action.
-        if (!hasPermission('procurement_manage') && !hasPermission('admin_access')) {
-            throw new Exception('Objednávat díly smí pouze manažer.');
+        // PŘIDAT na nákupní seznam smí každý provozní zaměstnanec (technik hlásí, co
+        // chybí). Objednání/příjem/mazání dál řeší vedení (viz gaty níže).
+        if (!crmCanRequestProcurement()) {
+            throw new Exception('Na nákupní seznam nemáš oprávnění přidávat.');
         }
         $orderId = (int)($_POST['order_id'] ?? 0);
+        // Když je požadavek navázaný na zakázku, technik ji musí smět vidět —
+        // ať nepřipíchne díl na cizí zakázku jiné pobočky.
+        if ($orderId > 0) {
+            $__o = $pdo->prepare("SELECT id, branch_id, technician_id FROM orders WHERE id = ? LIMIT 1");
+            $__o->execute([$orderId]);
+            $__ord = $__o->fetch(PDO::FETCH_ASSOC);
+            if (!$__ord || !canAccessOrderBranch($__ord)) {
+                throw new Exception('K téhle zakázce nemáš přístup.');
+            }
+        }
         $supplierKey = trim((string)($_POST['supplier_key'] ?? ''));
         $inventoryId = (int)($_POST['inventory_id'] ?? 0);
         $itemName = trim((string)($_POST['item_name'] ?? ''));
@@ -84,7 +95,11 @@ try {
             $priority = 'this_week';
         }
 
-        $stmt = $pdo->prepare("INSERT INTO purchase_requests (order_id, supplier_key, inventory_id, item_name, sku, quantity, priority, status, notes, requested_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)");
+        // requested_by je INT (users.id) → technikovo „t15" tam nepatří, uložíme NULL;
+        // spolehlivého autora drží requested_by_key = crmStaffKey().
+        $__uid = isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+        $__key = function_exists('crmStaffKey') ? crmStaffKey() : null;
+        $stmt = $pdo->prepare("INSERT INTO purchase_requests (order_id, supplier_key, inventory_id, item_name, sku, quantity, priority, status, notes, requested_by, requested_by_key) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)");
         $stmt->execute([
             $orderId > 0 ? $orderId : null,
             $supplierKey,
@@ -94,7 +109,8 @@ try {
             $quantity,
             $priority,
             $notes !== '' ? $notes : null,
-            $_SESSION['user_id'] ?? ($_SESSION['tech_id'] ?? null),
+            $__uid,
+            $__key,
         ]);
 
         crmAuditLog('procurement.create', [
@@ -265,15 +281,33 @@ try {
     }
 
     if ($action === 'delete') {
-        if (!hasPermission('procurement_manage')) {
-            throw new Exception('You do not have permission to delete requests in procurement queue.');
-        }
-
         $id = (int)($_POST['id'] ?? 0);
-        $__pn = '';
-        try { $ns = $pdo->prepare("SELECT item_name FROM purchase_requests WHERE id = ?"); $ns->execute([$id]); $__pn = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
-        $stmt = $pdo->prepare("DELETE FROM purchase_requests WHERE id = ?");
-        $stmt->execute([$id]);
+        // Vedení smaže cokoliv; technik jen SVŮJ požadavek a jen dokud čeká
+        // ('pending') — objednaný díl už řeší vedení a nesmí zmizet pod rukama.
+        $dr = $pdo->prepare("SELECT item_name, requested_by_key, status FROM purchase_requests WHERE id = ?");
+        $dr->execute([$id]);
+        $__row = $dr->fetch(PDO::FETCH_ASSOC);
+        if (!$__row) { throw new Exception('Požadavek nenalezen.'); }
+        $__isManager = crmCanManageProcurement();
+        $__mine = crmCanRequestProcurement()
+                  && function_exists('crmStaffKey') && (string)($__row['requested_by_key'] ?? '') !== ''
+                  && (string)$__row['requested_by_key'] === crmStaffKey();
+        if (!$__isManager && !($__mine && (string)$__row['status'] === 'pending')) {
+            throw new Exception('Smazat můžeš jen díl, který jsi přidal a ještě není objednaný.');
+        }
+        $__pn = (string)($__row['item_name'] ?? '');
+        if ($__isManager) {
+            $stmt = $pdo->prepare("DELETE FROM purchase_requests WHERE id = ?");
+            $stmt->execute([$id]);
+        } else {
+            // Atomicky (predikát ve WHERE) — uzavře závod mezi kontrolou výše a
+            // mazáním: kdyby vedení mezitím přepnulo na 'ordered', smaže se 0 řádků.
+            $stmt = $pdo->prepare("DELETE FROM purchase_requests WHERE id = ? AND requested_by_key = ? AND status = 'pending'");
+            $stmt->execute([$id, crmStaffKey()]);
+            if ($stmt->rowCount() < 1) {
+                throw new Exception('Položku už nelze smazat — mezitím ji převzalo vedení.');
+            }
+        }
         crmAuditLog('procurement.delete', [
             'entity_type' => 'procurement', 'entity_id' => $id, 'entity_label' => $__pn,
             'summary' => 'Smazán požadavek na díl ' . ($__pn !== '' ? '„' . $__pn . '"' : ('#' . $id)),
