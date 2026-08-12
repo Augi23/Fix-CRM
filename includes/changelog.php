@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.45.1',
+        'date' => '2026-08-12',
+        'time' => date('H:i'),
+        'title' => 'Nástěnka: odebráno filtrování podle technika',
+        'items' => [
+            'Z <b>Nástěnky</b> zmizel filtr „Všichni technici" — přehled teď ukazuje zakázky bez filtru. Filtrování podle technika i ostatní filtry zůstávají beze změny v <b>Seznamu zakázek</b> (Zakázky) a všude jinde.',
+        ],
+    ],
+    [
         'version' => '3.45.0',
         'date' => '2026-08-12',
         'time' => date('H:i'),
