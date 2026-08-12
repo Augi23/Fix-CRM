@@ -151,14 +151,6 @@ if (hasPermission('admin_access')) {
     $online_count = $pdo->query("SELECT COUNT(*) FROM technicians WHERE last_seen > (NOW() - INTERVAL 5 MINUTE) AND is_active = 1")->fetchColumn();
 }
 
-// Load technicians list once for new order modal
-$techs_list = [];
-try {
-    $techs_list = getActiveTechnicians();
-} catch (PDOException $e) {
-    $techs_list = [];
-}
-
 $order_templates_raw = trim((string)get_setting('order_templates', ''));
 $order_templates = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $order_templates_raw))));
 
@@ -316,7 +308,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                                     <?php if (($__legacyCode = trim((string)($r['legacy_code'] ?? ''))) !== ''): ?>
                                         <div class="order-code-prev">(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
                                     <?php endif; ?>
-                                    <div class="text-white-75" style="font-size:12px;line-height:1.4;"><?php echo crmDateTime($r['created_at'], true); ?></div>
+                                    <div class="text-white-75" style="font-size:10.5px;line-height:1.3;white-space:nowrap;"><?php echo crmDateTime($r['created_at'], false); ?></div>
                                     <?php if (trim((string)($r['created_by_name'] ?? '')) !== ''): ?>
                                         <div class="text-white-50" style="font-size:.72rem;" title="Zakázku vytvořil(a)"><i class="fas fa-user-pen me-1" style="font-size:.65rem;"></i><?php echo e($r['created_by_name']); ?></div>
                                     <?php endif; ?>

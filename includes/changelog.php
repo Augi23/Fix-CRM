@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.46.5',
+        'date' => '2026-08-12',
+        'time' => date('H:i'),
+        'title' => 'Seznam zakázek a Nástěnka: menší datum a užší levý sloupec',
+        'items' => [
+            'Datum a čas vytvoření v seznamu zakázek i na Nástěnce jsou menší a bez sekund (12.8.2026 18:17) — levý sloupec „Č. zakázky / Vytvořeno" se díky tomu zúžil a na řádek zbývá víc místa.',
+        ],
+    ],
+    [
         'version' => '3.46.4',
         'date' => '2026-08-12',
         'time' => date('H:i'),
