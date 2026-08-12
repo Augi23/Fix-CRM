@@ -356,7 +356,7 @@ $__techs     = getActiveTechnicians(true);
     <?php $__curTech = null; foreach ($__techs as $__t) { if ($tech_filter === (int)$__t['id']) { $__curTech = $__t; break; } } ?>
     <div class="dropdown">
         <button class="btn btn-sm dropdown-toggle crm-filter-dd-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
-            <i class="fas fa-users"></i> <?php echo $__curTech ? e((string)$__curTech['name']) : 'Zaměstnanci'; ?>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-2px;"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/></svg> <?php echo $__curTech ? e((string)$__curTech['name']) : 'Zaměstnanci'; ?>
         </button>
         <ul class="dropdown-menu crm-filter-dd-menu shadow">
             <li><a class="dropdown-item crm-filter-dd-item<?php echo $tech_filter === 0 ? ' active' : ''; ?>" href="orders.php?<?php echo ltrim($status_qs . $branch_qs . $search_qs, '&'); ?>"><i class="fas fa-users"></i> Všichni zaměstnanci</a></li>

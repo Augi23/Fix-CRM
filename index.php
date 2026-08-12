@@ -208,7 +208,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     <?php $dash_tech_filter = (int)($_GET['tech'] ?? 0); ?>
                     <form method="GET" class="d-flex align-items-center gap-1">
                         <?php if ($filter_status): ?><input type="hidden" name="filter" value="<?php echo e($filter_status); ?>"><?php endif; ?>
-                        <i class="fas fa-users text-white-75 me-1"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" class="text-white-75 me-1" style="vertical-align:-2px;"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/></svg>
                         <select name="tech" class="form-select form-select-sm" style="width:auto;min-width:160px;" onchange="this.form.submit()">
                             <option value="0">Všichni technici</option>
                             <?php foreach (getActiveTechnicians(true) as $__t): ?>

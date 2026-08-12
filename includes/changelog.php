@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.44.5',
+        'date' => '2026-08-10',
+        'time' => '17:40',
+        'title' => 'Nástěnka: ikona techniků jako obrázek, ne z fontu',
+        'items' => [
+            'Ikona u výběru „Všichni technici" se na některých zařízeních pořád zobrazovala jako čtvereček, protože font s ikonami (FontAwesome) se u toho prvku nenačetl. Nahradili jsme ji <b>přímo vloženou grafikou</b>, která se vykreslí vždy, nezávisle na fontu, síti ani mezipaměti. (Kdyby stará podoba přesto zůstala, načtěte stránku znovu s vyprázdněním cache — Ctrl+Shift+R / Cmd+Shift+R.)',
+        ],
+    ],
+    [
         'version' => '3.44.4',
         'date' => '2026-08-10',
         'time' => '17:10',
