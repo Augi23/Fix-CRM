@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.46.4',
+        'date' => '2026-08-12',
+        'time' => date('H:i'),
+        'title' => 'Nová zakázka: tlačítko Storno, oprava vyhledávání a méně průhledná okna',
+        'items' => [
+            'Ve formuláři <b>nové zakázky</b> přibylo dole vlevo tlačítko <b>Storno</b> — zavře formulář a zahodí rozepsané údaje, takže se <b>nepropíšou do dalšího otevření</b>. Záchrana proti náhodnému vyklikání (auto-uložení rozepsaného) zůstává; maže se jen tímhle tlačítkem.',
+            'Rozepsaný formulář se teď po <b>úspěšném založení</b> zakázky/reklamace správně zahodí a nepropisuje se do dalšího.',
+            'Opraveno <b>vyhledávání</b> v horní liště: hledaný výraz se už nekomolí (dřív se u slov bez mezer prohodilo Y↔Z, „ecoenergy" → „econergz", a jména s diakritikou se měnila na čísla). Skenování štítků čtečkou funguje dál.',
+            'Vyskakovací okna (např. nová zakázka) jsou <b>méně průhledná</b> — lépe čitelná.',
+        ],
+    ],
+    [
         'version' => '3.46.3',
         'date' => '2026-08-12',
         'time' => date('H:i'),

@@ -298,7 +298,7 @@ html[data-lg-theme="light"] .afx-search .form-control::placeholder { color: rgba
    7) MODÁLY = skleněná okna (engine attach v liquid-glass-engine.js)
    ============================================================ */
 .modal-content.glass-card {
-  background: rgba(10, 14, 19, 0.42) !important;
+  background: rgba(10, 14, 19, 0.70) !important;
   border: 1px solid rgba(255,255,255,.10) !important;
   border-radius: 18px !important;
   overflow: hidden;

@@ -55,8 +55,17 @@ if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '' && function_exi
             header("Location: view_order.php?id=" . (int)$_oid);
             exit;
         }
-        // kód nenalezen -> aspoň nejlépe demanglovaný výraz do výpisu (místo patlaniny s háčky)
-        $_cands = scanNormalizeCandidates($_scan);
-        if (!empty($_cands)) { $_GET['search'] = end($_cands); }
+        // Kód nenalezen. Přepis hledaného výrazu na demanglovanou variantu (Y↔Z,
+        // háčky→číslice) děláme JEN u vstupu, který OPRAVDU vypadá jako naskenovaný
+        // KÓD ZAKÁZKY přepsaný českou klávesnicí, tj. SOUČASNĚ:
+        //   1) obsahuje háčky (HW čtečka na CZ layoutu mění číslice na +ěščřžýáíé), A
+        //   2) po demanglu vznikne souvislý běh 4+ číslic (kódy jsou PREFIX+číslo, 6-7 číslic).
+        // Bez téhle pojistky se běžné hledání komolilo: „ecoenergy" → Y↔Z → „econergz",
+        // a jméno s diakritikou „Novák" → á→8 → „NOV8K" (á/ě/ž… jsou v demangl mapě).
+        if (preg_match('/[+ěščřžýáíéĚŠČŘŽÝÁÍÉ]/u', $_scan)) {
+            $_cands = scanNormalizeCandidates($_scan);
+            $_best  = !empty($_cands) ? (string)end($_cands) : '';
+            if ($_best !== '' && preg_match('/\d{4,}/', $_best)) { $_GET['search'] = $_best; }
+        }
     }
 }

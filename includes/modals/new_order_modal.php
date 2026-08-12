@@ -410,6 +410,10 @@ $crm_order_model_catalog = crmNewOrderModelCatalog();
                 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
                 </script>
                 <div class="modal-footer bg-transparent border-secondary crm-wizard-footer">
+                    <?php /* Storno: záměrné zrušení = zavřít A zahodit rozepsané údaje, ať se
+                             nepropíšou do dalšího otevření. Ochrana proti NÁHODNÉMU vyklikání
+                             (auto-uložení draftu) zůstává — ta se maže jen tímhle tlačítkem. */ ?>
+                    <button type="button" class="btn btn-outline-danger" data-wizard-cancel><?php echo __('storno_discard'); ?></button>
                     <button type="button" class="btn btn-secondary" data-wizard-prev hidden>← <?php echo __('back'); ?></button>
                     <button type="button" class="btn btn-primary" data-wizard-next><?php echo __('wizard_next_btn'); ?> →</button>
                     <button type="submit" class="btn btn-success" data-wizard-submit hidden><?php echo __('wizard_finish_btn'); ?></button>

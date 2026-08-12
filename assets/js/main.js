@@ -1592,6 +1592,11 @@ window.openOrderDocChoice = function (orderId, code) {
     var params = new URLSearchParams(window.location.search);
     var createdId = params.get('created_order');
     if (!createdId) { return; }
+    // Zakázka založena → zahodit rozepsaný draft nové zakázky, ať se stará data
+    // nepropíšou do dalšího formuláře. (Děláme to TADY, protože tenhle blok níž
+    // hned smaže ?created_order z URL — dřív, než by draft.js autoClearByUrl
+    // parametr stihl přečíst; jinak by se draft nikdy nesmazal.)
+    try { if (window.afxDraft) afxDraft.clearKey('new-order'); else localStorage.removeItem('afx_draft:new-order'); } catch (e) {}
     params.delete('created_order');
     var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
     window.history.replaceState({}, '', clean);
@@ -1675,6 +1680,8 @@ window.openComplaintDocChoice = function (complaintId, code) {
     var createdId = params.get('created_id');
     var createdCode = params.get('created') || '';
     if (!createdId || !/reklamace\.php$/.test(window.location.pathname)) { return; }
+    // Reklamace založena → zahodit draft nové reklamace (viz new-order výše).
+    try { if (window.afxDraft) afxDraft.clearKey('new-complaint'); else localStorage.removeItem('afx_draft:new-complaint'); } catch (e) {}
     params.delete('created_id');
     var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
     window.history.replaceState({}, '', clean);
@@ -1875,6 +1882,39 @@ function afxRenderPricelistItems() {
 $(document).on('hidden.bs.modal', '#newOrderModal', function () {
     window.afxPricelistItems = [];
     afxRenderPricelistItems();
+});
+
+/* Storno ve wizardu nové zakázky: ZÁMĚRNÉ zrušení = zavřít A zahodit rozepsané
+   údaje (draft i hodnoty polí), aby se nepropsaly do dalšího otevření formuláře.
+   Ochrana proti NÁHODNÉMU vyklikání (auto-uložení draftu) tím není dotčená —
+   draft se maže jedině tímhle tlačítkem, běžné zavření/vyklikání ho zachová. */
+$(document).on('click', '[data-wizard-cancel]', function () {
+    var modal = document.getElementById('newOrderModal');
+    if (!modal) return;
+    var form = modal.querySelector('form');
+    if (form) {
+        try { form.reset(); } catch (e) {}
+        try {
+            $(form).find('select').each(function () {
+                if ($(this).data('select2')) { $(this).val(null).trigger('change'); }
+            });
+        } catch (e) {}
+    }
+    // sbalit inline panel nového klienta + skrýt firemní pole (kosmetický reset)
+    try {
+        var panel = document.getElementById('inlineNewCustomerPanel');
+        if (panel && window.bootstrap) bootstrap.Collapse.getOrCreateInstance(panel, { toggle: false }).hide();
+        var comp = document.getElementById('inline_company_fields');
+        if (comp) comp.classList.add('d-none');
+    } catch (e) {}
+    // vyčistit ceníkové položky
+    try { window.afxPricelistItems = []; if (window.afxRenderPricelistItems) afxRenderPricelistItems(); } catch (e) {}
+    // zavřít modal (wizard se přes hidden.bs.modal sám vrátí na krok 1)
+    try { bootstrap.Modal.getOrCreateInstance(modal).hide(); } catch (e) {}
+    // draft zahodit AŽ po případných save() vyvolaných změnami výše (ty běží synchronně)
+    setTimeout(function () {
+        try { if (window.afxDraft) { afxDraft.clearKey('new-order'); } else { localStorage.removeItem('afx_draft:new-order'); } } catch (e) {}
+    }, 80);
 });
 $(document).on('change', '#pricelistRepair', function () {
     var o = this.options[this.selectedIndex];
