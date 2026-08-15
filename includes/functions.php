@@ -3973,6 +3973,45 @@ function stockLocationPosCode(PDO $pdo, int $locationId): string {
 }
 
 /**
+ * PRŮCHOD SKLADEM (naskladňovací kolečko): pořadí, ve kterém se obchází
+ * umístění při zapisování obsahu — regál za regálem (R1, R2…), v regálu
+ * police SHORA (P1 první), hned za policí její krabičky zleva (dle kódu),
+ * pak krabičky visící přímo na regálu; nezařazené krabičky úplně nakonec.
+ * Vrací pole id umístění (police + krabičky) dané pobočky.
+ */
+function skladWalkSequence(PDO $pdo, int $branchId): array {
+    ensureStockLocationsSchema();
+    ensureSkladBranchSchema();
+    try {
+        $st = $pdo->prepare("SELECT l.id, l.code, l.type, p.code AS pcode, p.type AS ptype
+            FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id
+            WHERE l.branch_id = ? AND l.is_active = 1 AND l.type IN ('police','krabicka')");
+        $st->execute([$branchId]);
+        $seq = [];
+        foreach ($st as $r) {
+            $rack = 9998; $pol = 997;
+            $isBox = $r['type'] === 'krabicka' ? 1 : 0;
+            if ($r['type'] === 'police') {
+                if (preg_match('/(\d+)-P(\d+)$/i', (string)$r['code'], $m)) { $rack = (int)$m[1]; $pol = (int)$m[2]; }
+            } elseif (($r['ptype'] ?? '') === 'police' && preg_match('/(\d+)-P(\d+)$/i', (string)$r['pcode'], $m)) {
+                $rack = (int)$m[1]; $pol = (int)$m[2];
+            } elseif (($r['ptype'] ?? '') === 'regal' && preg_match('/(\d+)$/', (string)$r['pcode'], $m)) {
+                $rack = (int)$m[1]; $pol = 998;   // krabičky přímo na regálu — za všemi policemi
+            } else {
+                $rack = 9999; $pol = 999;         // bez pozice — nakonec
+            }
+            $seq[] = ['id' => (int)$r['id'],
+                'k' => sprintf('%04d-%03d-%d-%03d-%s', $rack, $pol, $isBox, strlen((string)$r['code']), (string)$r['code'])];
+        }
+        usort($seq, fn($a, $b) => strcmp($a['k'], $b['k']));
+        return array_column($seq, 'id');
+    } catch (Throwable $e) {
+        error_log('skladWalkSequence: ' . $e->getMessage());
+        return [];
+    }
+}
+
+/**
  * Sklad při změně stavu zakázky (dokončení = odečíst díly, vrácení = přičíst).
  *
  * NEDOSTATEK ZÁSOBY NESMÍ ZASTAVIT ZMĚNU STAVU. Zařízení je fyzicky opravené a

@@ -56,14 +56,16 @@ try {
     $stmt = $pdo->prepare("INSERT INTO inventory (part_name, sku, quantity, cost_price, sale_price, min_stock, is_stocked, device_model, location_id, branch_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)");
     $stmt->execute([$part_name, $sku, $quantity, $cost_price, $sale_price, $min_stock,
         $device_model !== '' ? $device_model : null, $location_id > 0 ? $location_id : null, $branch_id]);
+    $newId = (int)$pdo->lastInsertId();
     crmAuditLog('inventory.create', [
-        'entity_type' => 'inventory', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => (string)$part_name,
+        'entity_type' => 'inventory', 'entity_id' => $newId, 'entity_label' => (string)$part_name,
         'summary' => 'Naskladněn nový díl „' . $part_name . '" (' . $quantity . ' ks)',
     ]);
-    
+
     // Check if called from form (AJAX) or direct
     if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-        echo json_encode(['success' => true, 'message' => 'Inventory added']);
+        echo json_encode(['success' => true, 'message' => 'Inventory added',
+            'id' => $newId, 'part_name' => $part_name, 'quantity' => (int)$quantity], JSON_UNESCAPED_UNICODE);
     } else {
         header("Location: ../inventory.php?branch=" . (int)$branch_id);
         exit;

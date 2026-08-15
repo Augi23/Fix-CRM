@@ -65,6 +65,17 @@ if (!$inv && (int)($_GET['loc'] ?? 0) > 0) {
     } catch (Throwable $e) {}
 }
 
+// ── průchod skladem (naskladňovací kolečko): Předchozí / pozice X z Y / Další ──
+$walk = ['prev' => null, 'next' => null, 'pos' => 0, 'total' => 0];
+if ($loc) {
+    $__wIds = skladWalkSequence($pdo, (int)($loc['branch_id'] ?? 0) ?: getDefaultBranchId());
+    $__wi = array_search((int)$loc['id'], $__wIds, true);
+    if ($__wi !== false) {
+        $walk = ['prev' => $__wIds[$__wi - 1] ?? null, 'next' => $__wIds[$__wi + 1] ?? null,
+                 'pos' => $__wi + 1, 'total' => count($__wIds)];
+    }
+}
+
 // „ozbrojená" zakázka z detailu (Vzít díl skenem QR) — per-uživatel v DB,
 // takže funguje i klik na počítači + sken telefonem (jiná session)
 $armed = null;
@@ -100,6 +111,14 @@ if ($inv) {
 <div class="container-fluid" style="max-width: 560px;">
 <?php if ($loc): ?>
     <?php $canCorrect = hasPermission('admin_access') || isBranchGlobalViewer(); ?>
+    <?php $canQuickAdd = hasPermission('manage_inventory') && crmCanModifyBranchStock((int)($loc['branch_id'] ?? 0) ?: getDefaultBranchId()); ?>
+    <?php if ($walk['total'] > 0 && $walk['pos'] > 0): ?>
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <a class="btn btn-sm btn-outline-secondary<?php echo $walk['prev'] ? '' : ' disabled'; ?>" href="<?php echo $walk['prev'] ? 'sklad.php?loc=' . (int)$walk['prev'] : '#'; ?>"><i class="fas fa-chevron-left"></i> Předchozí</a>
+        <div class="flex-grow-1 text-center small text-white-75">pozice <?php echo (int)$walk['pos']; ?> z <?php echo (int)$walk['total']; ?></div>
+        <a class="btn btn-sm <?php echo $walk['next'] ? 'btn-success fw-semibold' : 'btn-outline-secondary disabled'; ?>" href="<?php echo $walk['next'] ? 'sklad.php?loc=' . (int)$walk['next'] : '#'; ?>">Další <i class="fas fa-chevron-right"></i></a>
+    </div>
+    <?php endif; ?>
     <div class="glass-panel p-3 border-secondary mb-3">
         <div class="d-flex align-items-center gap-3">
             <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width:64px;height:64px;border-radius:12px;background:rgba(100,210,255,.12);">
@@ -108,7 +127,7 @@ if ($inv) {
             <div class="min-w-0">
                 <div class="fw-bold text-white fs-5"><?php echo e($loc['code']); ?><?php echo trim((string)$loc['name']) !== '' ? ' · ' . e($loc['name']) : ''; ?></div>
                 <div class="small text-white-75"><?php echo stockLocationTypeLabel((string)$loc['type']); ?><?php echo trim((string)($loc['parent_code'] ?? '')) !== '' ? ' · na ' . e($loc['parent_code']) : ''; ?><?php echo !(int)$loc['is_active'] ? ' · deaktivované' : ''; ?></div>
-                <div class="small mt-1"><span class="badge bg-info text-dark"><?php echo count($locParts); ?> dílů · <?php echo array_sum(array_map(fn($p) => (int)$p['quantity'], $locParts)); ?> ks</span></div>
+                <div class="small mt-1"><span class="badge bg-info text-dark" id="locCountBadge" data-c="<?php echo count($locParts); ?>" data-q="<?php echo array_sum(array_map(fn($p) => (int)$p['quantity'], $locParts)); ?>"><?php echo count($locParts); ?> dílů · <?php echo array_sum(array_map(fn($p) => (int)$p['quantity'], $locParts)); ?> ks</span></div>
             </div>
         </div>
     </div>
@@ -130,11 +149,35 @@ if ($inv) {
 
     <div id="qrMsg" class="mb-3" style="display:none;"></div>
 
+    <?php if ($canQuickAdd):
+        // předvyplnění modelu z názvu krabičky („iPhone 12 – drobné díly" → „iPhone 12")
+        $qaModel = '';
+        if (preg_match('/^((?:iPhone|iPad|MacBook|iMac|Mac mini|Apple Watch|Watch|AirPods)[\w\s\.\+]*?)(?=\s*[–\-—,(]|$)/iu', (string)$loc['name'], $qm)) { $qaModel = trim($qm[1]); }
+    ?>
+    <div class="glass-panel p-3 mb-3" style="border: 1px solid rgba(48,209,88,.4);">
+        <div class="fw-semibold text-white mb-2"><i class="fas fa-bolt me-2 text-warning"></i>Rychlé naskladnění do <?php echo e($loc['code']); ?></div>
+        <input type="text" id="qaName" class="form-control mb-2" placeholder="Název dílu (např. Displej iPhone 12)" autocomplete="off">
+        <div class="d-flex gap-2 mb-2">
+            <div class="input-group" style="max-width:150px; flex:0 0 auto;">
+                <button type="button" class="btn btn-outline-secondary" onclick="qrStep('qaQty',-1)">−</button>
+                <input type="number" id="qaQty" class="form-control text-center" value="1" min="1" max="10000">
+                <button type="button" class="btn btn-outline-secondary" onclick="qrStep('qaQty',1)">+</button>
+            </div>
+            <input type="number" id="qaPrice" class="form-control" placeholder="Prodejní Kč" min="0" step="1">
+        </div>
+        <input type="text" id="qaModel" class="form-control mb-2" placeholder="Model (iPhone 12…) — nepovinné" autocomplete="off" value="<?php echo e($qaModel); ?>">
+        <button type="button" id="qaAdd" class="btn btn-success w-100 fw-semibold"><i class="fas fa-plus me-1"></i> Přidat sem</button>
+        <div id="qaMsg" class="small mt-2" style="display:none;"></div>
+        <div class="small text-white-50 mt-2">Vznikne nová karta s umístěním <?php echo e($loc['code']); ?>. Díl, co už v CRM je, radši dohledej dole („Přiřadit díl sem") — a počty existujících opravíš tužtičkou u řádku.</div>
+    </div>
+    <?php endif; ?>
+
     <div class="glass-panel p-3 border-secondary mb-3">
         <div class="fw-semibold text-white mb-2"><i class="fas fa-microchip me-2 text-info"></i>Díly v umístění</div>
         <?php if (!$locParts): ?>
-            <div class="text-white-75 small">Zatím prázdné — přiřaď díly níže, nebo ze Skladu (zaškrtat díly → Přiřadit umístění).</div>
+            <div class="text-white-75 small" id="locEmptyNote">Zatím prázdné — naskladni nahoře, nebo přiřaď existující díl níže.</div>
         <?php endif; ?>
+        <div id="locPartsList">
         <?php foreach ($locParts as $p): ?>
             <div class="d-flex align-items-center gap-2 py-2 border-bottom border-secondary border-opacity-25">
                 <a class="d-flex align-items-center gap-2 flex-grow-1 min-w-0 text-decoration-none" href="sklad.php?qr=<?php echo (int)$p['id']; ?>">
@@ -154,6 +197,7 @@ if ($inv) {
                 <?php endif; ?>
             </div>
         <?php endforeach; ?>
+        </div>
     </div>
 
     <div class="glass-panel p-3 border-secondary mb-3">
@@ -202,6 +246,79 @@ if ($inv) {
                 .catch(function () { show(false, 'Síťová chyba.'); });
         });
     });
+    // stepper +/− (v režimu umístění není definovaný z karty dílu)
+    window.qrStep = window.qrStep || function (id, d) {
+        var el = document.getElementById(id);
+        var v = Math.max(parseInt(el.min || '1', 10), Math.min(parseInt(el.max || '10000', 10), (parseInt(el.value, 10) || 1) + d));
+        el.value = v;
+    };
+
+    // ── rychlé naskladnění nové karty přímo do tohoto umístění ──
+    var qaBtn = document.getElementById('qaAdd');
+    if (qaBtn) {
+        var qaMsg = document.getElementById('qaMsg');
+        var qaSay = function (ok, text) {
+            qaMsg.style.display = '';
+            qaMsg.className = 'small mt-2 ' + (ok ? 'text-success' : 'text-danger');
+            qaMsg.textContent = text;
+            clearTimeout(qaMsg._h);
+            if (ok) { qaMsg._h = setTimeout(function () { qaMsg.style.display = 'none'; }, 2600); }
+        };
+        var qaBusy = false;
+        qaBtn.addEventListener('click', function () {
+            if (qaBusy) { return; }
+            var name = document.getElementById('qaName').value.trim();
+            var qty = parseInt(document.getElementById('qaQty').value, 10) || 1;
+            if (!name) { qaSay(false, 'Zadej název dílu.'); document.getElementById('qaName').focus(); return; }
+            qaBusy = true; qaBtn.disabled = true;
+            var fd = new FormData();
+            fd.append('part_name', name);
+            fd.append('quantity', qty);
+            fd.append('sale_price', document.getElementById('qaPrice').value || 0);
+            fd.append('device_model', document.getElementById('qaModel').value.trim());
+            fd.append('location_id', locId);
+            fd.append('branch_id', '<?php echo (int)($loc['branch_id'] ?? 0) ?: getDefaultBranchId(); ?>');
+            fd.append('min_stock', 0);
+            fd.append('csrf_token', csrf);
+            fetch('api/add_inventory.php', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    qaBusy = false; qaBtn.disabled = false;
+                    if (!d.success) { qaSay(false, d.message || 'Chyba'); return; }
+                    // řádek hned do seznamu — bez reloadu, ať se drží tempo zápisu
+                    var list = document.getElementById('locPartsList');
+                    if (list && d.id) {
+                        var row = document.createElement('div');
+                        row.className = 'd-flex align-items-center gap-2 py-2 border-bottom border-secondary border-opacity-25';
+                        row.innerHTML = '<a class="d-flex align-items-center gap-2 flex-grow-1 min-w-0 text-decoration-none" href="sklad.php?qr=' + d.id + '">'
+                            + '<span class="d-flex align-items-center justify-content-center" style="width:40px;height:40px;border-radius:8px;background:rgba(48,209,88,.15);flex:0 0 auto;"><i class="fas fa-check text-success"></i></span>'
+                            + '<span class="min-w-0"><span class="d-block text-white text-truncate"></span></span></a>'
+                            + '<span class="badge bg-success">' + qty + ' ks</span>';
+                        row.querySelector('.text-truncate').textContent = name;
+                        list.insertBefore(row, list.firstChild);
+                        var empty = document.getElementById('locEmptyNote');
+                        if (empty) { empty.remove(); }
+                    }
+                    var badge = document.getElementById('locCountBadge');
+                    if (badge) {
+                        badge.dataset.c = (parseInt(badge.dataset.c, 10) || 0) + 1;
+                        badge.dataset.q = (parseInt(badge.dataset.q, 10) || 0) + qty;
+                        badge.textContent = badge.dataset.c + ' dílů · ' + badge.dataset.q + ' ks';
+                    }
+                    qaSay(true, '✓ Naskladněno: ' + name + ' — ' + qty + ' ks');
+                    document.getElementById('qaName').value = '';
+                    document.getElementById('qaQty').value = 1;
+                    document.getElementById('qaPrice').value = '';
+                    document.getElementById('qaName').focus();
+                })
+                .catch(function () { qaBusy = false; qaBtn.disabled = false; qaSay(false, 'Síťová chyba — zkus to znovu.'); });
+        });
+        // Enter v názvu = rovnou přidat (rychlé tempo bez sahání na tlačítko)
+        document.getElementById('qaName').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); qaBtn.click(); }
+        });
+    }
+
     // přiřazení dílu do tohoto umístění (hledání ve skladu)
     var t = null;
     document.getElementById('locAssignSearch').addEventListener('input', function () {

@@ -82,6 +82,10 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
             <a href="inventory.php?branch=<?php echo (int)$branchId; ?>&amp;location=none" class="badge bg-warning text-dark text-decoration-none me-2" title="Otevře sklad s filtrem na neumístěné díly"><?php echo $unplaced; ?> dílů bez umístění</a>
         <?php endif; ?>
         <a href="sklad_mapa.php?branch=<?php echo (int)$branchId; ?>" class="btn btn-outline-info" title="3D vizualizace rozložení skladu"><i class="fas fa-cube me-2"></i> 3D mapa</a>
+        <?php $__walkIds = skladWalkSequence($pdo, $branchId); ?>
+        <?php if ($__walkIds): ?>
+        <a href="sklad.php?loc=<?php echo (int)$__walkIds[0]; ?>" class="btn btn-outline-success" title="Naskladňovací kolečko: CRM tě provede police a krabičky jednu po druhé (Předchozí/Další) a v každé rovnou zapíšeš obsah"><i class="fas fa-person-walking me-2"></i> Projít sklad</a>
+        <?php endif; ?>
         <a href="location_labels.php?all=1&amp;branch=<?php echo (int)$branchId; ?>" target="_blank" class="btn btn-outline-info"><i class="fas fa-qrcode me-2"></i> Arch štítků</a>
         <?php if ($canEdit): ?>
         <?php

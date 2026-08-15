@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.47.0',
+        'date' => '2026-08-09',
+        'time' => '21:30',
+        'title' => 'Naskladňovací kolečko — projdi sklad a rovnou zapisuj',
+        'items' => [
+            '<b>Projít sklad:</b> nové tlačítko v Umístěních. CRM tě vede umístění po umístění přesně v pořadí obchůzky — regál za regálem, v něm police shora (P1…), za každou policí její krabičky zleva — s tlačítky <b>Předchozí / Další</b> a ukazatelem „pozice 12 z 55". Kamkoli jde skočit i skenem QR štítku.',
+            '<b>Rychlé naskladnění:</b> na stránce každé krabičky i police (po skenu QR nebo při průchodu) je zelený formulář <b>Název + kusy + cena → Přidat sem</b>. Karta dílu vznikne rovnou se správným umístěním i pobočkou, formulář se vyčistí a píšeš další — Enter v názvu rovnou přidává, model se předvyplní z názvu krabičky („iPhone 12 – drobné" → iPhone 12). Nově přidané se hned ukazují v seznamu, bez načítání stránky.',
+            'U existujících dílů dál platí: <b>tužtička</b> = oprava napočítaného stavu (zapíše korekci do deníku), <b>„Přiřadit díl sem"</b> = nastěhování už založené karty. Ideální kombo na první velké počítání skladu.',
+        ],
+    ],
+    [
         'version' => '3.46.5',
         'date' => '2026-08-12',
         'time' => date('H:i'),
