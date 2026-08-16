@@ -12,8 +12,8 @@ return (static function (): array {
 $entries = [
     [
         'version' => '3.48.0',
-        'date' => '2026-08-09',
-        'time' => '23:20',
+        'date' => '2026-08-16',
+        'time' => '13:40',
         'title' => 'Výkupy: z výkupního listu rovnou na sklad a výplata přes Pokladnu',
         'items' => [
             '<b>Výkupní list → produkt:</b> uložením výkupního listu se vykoupený kus <b>sám naskladní</b> do nové kategorie Sklad → <b>Výkupy</b> (vedle Příslušenství): 1 ks, kód = sériové číslo (jinak VYK-číslo listu), nákupní cena = výkupní částka, pobočka podle listu. Před e-shopem je <b>schovaný</b>, dokud ho sám nepustíš; do Produktů/Příslušenství se výkupy nemíchají. Oprava listu údaje produktu jen aktualizuje.',
@@ -24,8 +24,8 @@ $entries = [
     ],
     [
         'version' => '3.47.1',
-        'date' => '2026-08-09',
-        'time' => '22:15',
+        'date' => '2026-08-16',
+        'time' => '12:50',
         'title' => 'Jednotné značení skladu: všude R–P–B',
         'items' => [
             'Celý sklad teď mluví jedním jazykem — <b>R2-P4-B2</b> (R = regál, P = police shora, B = kolikátá krabička zleva) je vidět v <b>Umístěních</b>, na stránce krabičky po skenu QR, ve <b>výběrech umístění</b> (nově řazených podle pozice), na <b>štítcích</b> (velké R-P-B) i v <b>3D mapě</b> (regály nesou R1–R10, police R1-P2).',
@@ -34,8 +34,8 @@ $entries = [
     ],
     [
         'version' => '3.47.0',
-        'date' => '2026-08-09',
-        'time' => '21:30',
+        'date' => '2026-08-16',
+        'time' => '12:10',
         'title' => 'Naskladňovací kolečko — projdi sklad a rovnou zapisuj',
         'items' => [
             '<b>Projít sklad:</b> nové tlačítko v Umístěních. CRM tě vede umístění po umístění přesně v pořadí obchůzky — regál za regálem, v něm police shora (P1…), za každou policí její krabičky zleva — s tlačítky <b>Předchozí / Další</b> a ukazatelem „pozice 12 z 55". Kamkoli jde skočit i skenem QR štítku.',
