@@ -24,6 +24,12 @@ $canEdit = crmCanModifyBranchStock($branchId);
 
 $locs = stockLocationsAll($pdo, false, $branchId);   // včetně deaktivovaných
 
+// jednotné značení R-P-B (R2, R2-P4, R2-P4-B2) — stejné jako u dílů ve Skladu;
+// kód (RegK2 / KrK028) zůstává jen jako neměnná identita pro QR štítek
+$posMap = [];
+try { $posMap = stockLocationPosCodes($pdo, array_column($locs, 'id')); } catch (Throwable $e) {}
+$GLOBALS['__locPosMap'] = $posMap;
+
 // počty dílů / kusů na umístění (jen díly téhle pobočky)
 $counts = [];
 try {
@@ -52,14 +58,16 @@ foreach ($locs as $l) {
     else { $boxByParent[$pid][] = $l; }
 }
 
-/** řádek krabičky/police v přehledu */
+/** řádek krabičky/police v přehledu — značení R-P-B, kód jen jako drobná identita */
 function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
     $cnt = $counts[(int)$l['id']] ?? ['c' => 0, 'q' => 0];
-    $isBox = $l['type'] === 'krabicka'; ?>
+    $isBox = $l['type'] === 'krabicka';
+    $pos = $GLOBALS['__locPosMap'][(int)$l['id']] ?? (string)$l['code']; ?>
     <div class="d-flex align-items-center gap-2 py-2 border-bottom border-secondary border-opacity-25 loc-row">
-        <span class="badge <?php echo $isBox ? 'bg-info text-dark' : 'bg-secondary'; ?>" style="min-width:56px;"><?php echo e($l['code']); ?></span>
+        <span class="badge <?php echo $isBox ? 'bg-info text-dark' : 'bg-secondary'; ?>" style="min-width:56px;"><?php echo e($pos); ?></span>
         <div class="flex-grow-1 min-w-0">
             <span class="text-white"><?php echo trim((string)$l['name']) !== '' ? e($l['name']) : '<span class="text-white-75">bez názvu</span>'; ?></span>
+            <?php if ($pos !== (string)$l['code']): ?><span class="small text-white-50 ms-1" style="font-family:'SF Mono',Menlo,monospace;" title="Neměnná identita krabičky (je na QR štítku)"><?php echo e($l['code']); ?></span><?php endif; ?>
             <?php if (trim((string)($l['note'] ?? '')) !== ''): ?><div class="small text-white-75 text-truncate"><?php echo e($l['note']); ?></div><?php endif; ?>
         </div>
         <span class="small text-white-75 text-nowrap"><?php echo $cnt['c']; ?> dílů · <?php echo $cnt['q']; ?> ks</span>
@@ -140,7 +148,8 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
     <div class="col-12 col-xl-6">
         <div class="glass-panel p-3 border-secondary h-100">
             <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="badge bg-primary fs-6"><?php echo e($r['code']); ?></span>
+                <span class="badge bg-primary fs-6"><?php echo e($posMap[(int)$r['id']] ?? $r['code']); ?></span>
+                <span class="small text-white-50" style="font-family:'SF Mono',Menlo,monospace;" title="Kód regálu (identita)"><?php echo e($r['code']); ?></span>
                 <div class="fw-bold text-white flex-grow-1"><?php echo trim((string)$r['name']) !== '' ? e($r['name']) : 'Regál'; ?></div>
                 <div class="btn-group btn-group-sm">
                     <a class="btn btn-white border" href="location_labels.php?id=<?php echo $rid; ?>&amp;branch=<?php echo (int)$branchId; ?>" target="_blank" title="Štítek regálu"><i class="fas fa-qrcode text-info"></i></a>
@@ -334,6 +343,7 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
 <script>
 const LOCS = <?php echo json_encode(array_map(fn($l) => [
     'id' => (int)$l['id'], 'code' => (string)$l['code'], 'name' => (string)$l['name'],
+    'pos' => (string)($posMap[(int)$l['id']] ?? $l['code']),
     'type' => (string)$l['type'], 'parent_id' => (int)($l['parent_id'] ?? 0), 'note' => (string)($l['note'] ?? ''),
     'is_active' => (int)$l['is_active'],
 ], $locs), JSON_UNESCAPED_UNICODE); ?>;
@@ -366,7 +376,7 @@ function parentOptions(type, selected) {
         html += '<optgroup label="' + label + '">';
         items.forEach(l => {
             html += '<option value="' + l.id + '"' + (l.id === selected ? ' selected' : '') + '>' +
-                l.code + (l.name ? ' · ' + l.name.replace(/</g, '&lt;') : '') + '</option>';
+                (l.pos || l.code) + (l.name ? ' · ' + l.name.replace(/</g, '&lt;') : '') + '</option>';
         });
         html += '</optgroup>';
     });

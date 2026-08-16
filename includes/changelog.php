@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.47.1',
+        'date' => '2026-08-09',
+        'time' => '22:15',
+        'title' => 'Jednotné značení skladu: všude R–P–B',
+        'items' => [
+            'Celý sklad teď mluví jedním jazykem — <b>R2-P4-B2</b> (R = regál, P = police shora, B = kolikátá krabička zleva) je vidět v <b>Umístěních</b>, na stránce krabičky po skenu QR, ve <b>výběrech umístění</b> (nově řazených podle pozice), na <b>štítcích</b> (velké R-P-B) i v <b>3D mapě</b> (regály nesou R1–R10, police R1-P2).',
+            'Kódy <b>RegK2 / KrK028</b> nezmizely — jsou to <b>neměnné identity</b> pro QR štítky (zůstávají drobně vedle pozice a na štítku). Díky tomu QR platí, i když krabičku přestěhuješ; poziční značení se přepočítá samo.',
+        ],
+    ],
+    [
         'version' => '3.47.0',
         'date' => '2026-08-09',
         'time' => '21:30',

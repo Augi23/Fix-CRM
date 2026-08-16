@@ -103,20 +103,28 @@ $modelOptions = [];
 try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE branch_id = " . (int)$skladBranch . " AND device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
 // jen umístění TÉTO pobočky — díl z Karlína nesmí jít do krabičky Na Příkopě
 $allLocations = stockLocationsAll($pdo, true, (int)$skladBranch);
+$posByLocAll = [];
+try { $posByLocAll = stockLocationPosCodes($pdo, array_column($allLocations, 'id')); } catch (Throwable $e) {}
 $unplacedCount = 0;
 try { $unplacedCount = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE location_id IS NULL AND branch_id = " . (int)$skladBranch . " AND " . inventoryStockedWhereSql())->fetchColumn(); } catch (Throwable $e) {}
 
-/** <option> seznam umístění seskupený podle typu (vybraná hodnota = id) */
-function invLocationOptionsHtml(array $allLocations, string $selected): string {
+/** <option> seznam umístění seskupený podle typu — značení R-P-B, řazené dle pozice */
+function invLocationOptionsHtml(array $allLocations, string $selected, array $posMap = []): string {
     $groups = ['krabicka' => 'Krabičky', 'police' => 'Police', 'regal' => 'Regály'];
     $html = '';
     foreach ($groups as $t => $glabel) {
-        $items = array_filter($allLocations, fn($l) => $l['type'] === $t);
+        $items = array_values(array_filter($allLocations, fn($l) => $l['type'] === $t));
         if (!$items) continue;
+        usort($items, fn($a, $b) => strnatcmp(
+            (string)($posMap[(int)$a['id']] ?? $a['code']),
+            (string)($posMap[(int)$b['id']] ?? $b['code'])
+        ));
         $html .= '<optgroup label="' . e($glabel) . '">';
         foreach ($items as $l) {
+            $pos = (string)($posMap[(int)$l['id']] ?? $l['code']);
+            $txt = $pos . (trim((string)$l['name']) !== '' ? ' · ' . $l['name'] : '');
             $html .= '<option value="' . (int)$l['id'] . '"' . ($selected === (string)(int)$l['id'] ? ' selected' : '') . '>'
-                . e(stockLocationFullLabel($l)) . '</option>';
+                . e($txt) . '</option>';
         }
         $html .= '</optgroup>';
     }
@@ -174,7 +182,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                 <select name="location" class="form-select form-select-sm">
                     <option value="">— vše —</option>
                     <option value="none" <?php echo $f_location === 'none' ? 'selected' : ''; ?>>Bez umístění<?php echo $unplacedCount > 0 ? ' (' . $unplacedCount . ')' : ''; ?></option>
-                    <?php echo invLocationOptionsHtml($allLocations, $f_location); ?>
+                    <?php echo invLocationOptionsHtml($allLocations, $f_location, $posByLocAll); ?>
                 </select>
             </div>
             <div class="col-md-1">
@@ -338,7 +346,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                 <span class="fw-semibold text-nowrap"><span id="bulkCount">0</span> vybráno</span>
                 <select id="bulkLocation" class="form-select form-select-sm" style="width:auto; max-width:280px;">
                     <option value="0">— odebrat umístění —</option>
-                    <?php echo invLocationOptionsHtml($allLocations, ''); ?>
+                    <?php echo invLocationOptionsHtml($allLocations, '', $posByLocAll); ?>
                 </select>
                 <button type="button" id="bulkAssign" class="btn btn-sm btn-primary text-nowrap">Přiřadit umístění</button>
                 <input type="text" id="bulkModel" list="modelList" class="form-control form-control-sm" style="width:160px;" placeholder="Model (iPhone 12…)">
@@ -455,7 +463,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected): string {
                             <label class="form-label">Umístění</label>
                             <select name="location_id" class="form-select">
                                 <option value="">— bez umístění —</option>
-                                <?php echo invLocationOptionsHtml($allLocations, ''); ?>
+                                <?php echo invLocationOptionsHtml($allLocations, '', $posByLocAll); ?>
                             </select>
                         </div>
                     </div>

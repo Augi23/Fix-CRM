@@ -774,12 +774,12 @@
       if (ui >= 0) { drawerTarget = { u: ui + 1, d: d }; }
     }
     const model = {
-      racks: racks.filter((r) => !r.drawer).map((r) => ({ id: r.n, label: r.code, x: r.x, y: r.y, rot: r.rot, sh: r.sh })),
+      racks: racks.filter((r) => !r.drawer).map((r) => ({ id: r.n, label: (r.n < 900 ? 'R' + r.n : r.code), x: r.x, y: r.y, rot: r.rot, sh: r.sh })),
       shelves: 5,
       target: target ? target.rackN : null,
       selected: sel,
       edit: edit,
-      drawerRack: drawer ? { n: drawer.n, label: drawer.code } : null,
+      drawerRack: drawer ? { n: drawer.n, label: (drawer.n < 900 ? 'R' + drawer.n : drawer.code) } : null,
       drawerTarget: drawerTarget
     };
     $('map').setAttribute('model', JSON.stringify(model));
@@ -810,7 +810,8 @@
     const r = sel != null ? rackByN(sel) : null;
     if (!r) { P.innerHTML = '<div class="empty">Klikni na regál v mapě pro zobrazení polic a krabiček.</div>'; return; }
 
-    let html = '<h3>' + esc(r.code) + (r.name ? ' <span style="font-weight:400;font-size:13px;color:rgba(255,255,255,.5)">' + esc(r.name) + '</span>' : '') + '<span class="sp"></span></h3>';
+    const rpos = r.n < 900 ? 'R' + r.n : r.code;
+    let html = '<h3>' + esc(rpos) + (r.name ? ' <span style="font-weight:400;font-size:13px;color:rgba(255,255,255,.5)">' + esc(r.name) + '</span>' : '') + ' <span class="mono" style="font-size:11px;color:rgba(255,255,255,.3)" title="Kód regálu (identita)">' + esc(r.code) + '</span><span class="sp"></span></h3>';
     html += '<div class="sub"><a href="#" id="openInv" style="color:#5E9BFF;text-decoration:none">Otevřít obsah ve skladu →</a></div>';
 
     if (target && target.rackN === r.n) {
@@ -832,7 +833,7 @@
     rows.forEach((po) => {
       const hotShelf = !!(target && target.policeLoc && target.policeLoc.id === po.loc.id);
       html += '<div class="shelfRow' + (hotShelf ? ' hotShelf' : '') + '">';
-      html += '<div class="shelfHead"><span class="cd mono">' + esc(po.loc.code) + '</span><span class="nm">' + esc(po.loc.name || '') + '</span></div>';
+      html += '<div class="shelfHead"><span class="cd mono">' + esc(rpos + '-P' + po.no) + '</span><span class="nm">' + esc(po.loc.name || '') + '</span><span class="mono" style="font-size:10px;color:rgba(255,255,255,.3)">' + esc(po.loc.code) + '</span></div>';
       html += '<div class="chips">';
       po.boxes.forEach((b, bi) => {
         const hot = !!(target && target.boxLoc && target.boxLoc.id === b.id);

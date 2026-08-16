@@ -41,6 +41,11 @@ try {
     }
 } catch (Throwable $e) { $items = []; }
 
+// na štítku je VELKÉ značení R-P-B (jak ho vidí obsluha u dílů) + malá neměnná
+// identita (KrK028) — QR míří na id, takže platí i po přestěhování krabičky
+$labelPos = [];
+try { $labelPos = stockLocationPosCodes($pdo, array_column($items, 'id')); } catch (Throwable $e) {}
+
 $base = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'admin.applefix.cloud') . dirname($_SERVER['PHP_SELF']);
 $base = rtrim(str_replace('\\', '/', $base), '/');
 ?><!doctype html>
@@ -84,9 +89,10 @@ $base = rtrim(str_replace('\\', '/', $base), '/');
     <div class="label">
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&data=<?php echo urlencode($url); ?>" alt="QR">
         <div>
-            <div class="cd"><?php echo e($it['code']); ?></div>
+            <?php $__lp = $labelPos[(int)$it['id']] ?? (string)$it['code']; ?>
+            <div class="cd"><?php echo e($__lp); ?></div>
             <?php if (trim((string)$it['name']) !== ''): ?><div class="nm"><?php echo e($it['name']); ?></div><?php endif; ?>
-            <div class="mt"><?php echo e(stockLocationTypeLabel((string)$it['type'])); ?><?php echo trim((string)($it['parent_code'] ?? '')) !== '' ? ' · na ' . e($it['parent_code']) : ''; ?></div>
+            <div class="mt"><?php echo e(stockLocationTypeLabel((string)$it['type'])); ?><?php echo $__lp !== (string)$it['code'] ? ' · ' . e($it['code']) : ''; ?></div>
         </div>
     </div>
     <?php endforeach; ?>

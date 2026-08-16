@@ -65,6 +65,12 @@ if (!$inv && (int)($_GET['loc'] ?? 0) > 0) {
     } catch (Throwable $e) {}
 }
 
+// R-P-B značení pro hlavičku umístění a krabičky uvnitř (kód zůstává identitou)
+$locPosMap = [];
+if ($loc) {
+    try { $locPosMap = stockLocationPosCodes($pdo, array_merge([(int)$loc['id']], array_map(fn($c) => (int)$c['id'], $locChildren))); } catch (Throwable $e) {}
+}
+
 // ── průchod skladem (naskladňovací kolečko): Předchozí / pozice X z Y / Další ──
 $walk = ['prev' => null, 'next' => null, 'pos' => 0, 'total' => 0];
 if ($loc) {
@@ -125,8 +131,9 @@ if ($inv) {
                 <i class="fas fa-box-open fa-lg text-info"></i>
             </div>
             <div class="min-w-0">
-                <div class="fw-bold text-white fs-5"><?php echo e($loc['code']); ?><?php echo trim((string)$loc['name']) !== '' ? ' · ' . e($loc['name']) : ''; ?></div>
-                <div class="small text-white-75"><?php echo stockLocationTypeLabel((string)$loc['type']); ?><?php echo trim((string)($loc['parent_code'] ?? '')) !== '' ? ' · na ' . e($loc['parent_code']) : ''; ?><?php echo !(int)$loc['is_active'] ? ' · deaktivované' : ''; ?></div>
+                <?php $__locDisp = $locPosMap[(int)$loc['id']] ?? (string)$loc['code']; ?>
+                <div class="fw-bold text-white fs-5"><?php echo e($__locDisp); ?><?php echo trim((string)$loc['name']) !== '' ? ' · ' . e($loc['name']) : ''; ?></div>
+                <div class="small text-white-75"><?php echo stockLocationTypeLabel((string)$loc['type']); ?><?php echo $__locDisp !== (string)$loc['code'] ? ' · ' . e($loc['code']) : ''; ?><?php echo !(int)$loc['is_active'] ? ' · deaktivované' : ''; ?></div>
                 <div class="small mt-1"><span class="badge bg-info text-dark" id="locCountBadge" data-c="<?php echo count($locParts); ?>" data-q="<?php echo array_sum(array_map(fn($p) => (int)$p['quantity'], $locParts)); ?>"><?php echo count($locParts); ?> dílů · <?php echo array_sum(array_map(fn($p) => (int)$p['quantity'], $locParts)); ?> ks</span></div>
             </div>
         </div>
@@ -141,7 +148,7 @@ if ($inv) {
         <div class="fw-semibold text-white mb-2"><i class="fas fa-boxes-stacked me-2 text-info"></i>Uvnitř</div>
         <div class="d-flex flex-wrap gap-2">
             <?php foreach ($locChildren as $ch): ?>
-                <a href="sklad.php?loc=<?php echo (int)$ch['id']; ?>" class="badge bg-secondary text-decoration-none p-2"><?php echo e($ch['code']); ?><?php echo trim((string)$ch['name']) !== '' ? ' · ' . e($ch['name']) : ''; ?> (<?php echo (int)$ch['part_count']; ?>)</a>
+                <a href="sklad.php?loc=<?php echo (int)$ch['id']; ?>" class="badge bg-secondary text-decoration-none p-2"><?php echo e($locPosMap[(int)$ch['id']] ?? $ch['code']); ?><?php echo trim((string)$ch['name']) !== '' ? ' · ' . e($ch['name']) : ''; ?> (<?php echo (int)$ch['part_count']; ?>)</a>
             <?php endforeach; ?>
         </div>
     </div>
@@ -155,7 +162,7 @@ if ($inv) {
         if (preg_match('/^((?:iPhone|iPad|MacBook|iMac|Mac mini|Apple Watch|Watch|AirPods)[\w\s\.\+]*?)(?=\s*[–\-—,(]|$)/iu', (string)$loc['name'], $qm)) { $qaModel = trim($qm[1]); }
     ?>
     <div class="glass-panel p-3 mb-3" style="border: 1px solid rgba(48,209,88,.4);">
-        <div class="fw-semibold text-white mb-2"><i class="fas fa-bolt me-2 text-warning"></i>Rychlé naskladnění do <?php echo e($loc['code']); ?></div>
+        <div class="fw-semibold text-white mb-2"><i class="fas fa-bolt me-2 text-warning"></i>Rychlé naskladnění do <?php echo e($locPosMap[(int)$loc['id']] ?? $loc['code']); ?></div>
         <input type="text" id="qaName" class="form-control mb-2" placeholder="Název dílu (např. Displej iPhone 12)" autocomplete="off">
         <div class="d-flex gap-2 mb-2">
             <div class="input-group" style="max-width:150px; flex:0 0 auto;">
@@ -168,7 +175,7 @@ if ($inv) {
         <input type="text" id="qaModel" class="form-control mb-2" placeholder="Model (iPhone 12…) — nepovinné" autocomplete="off" value="<?php echo e($qaModel); ?>">
         <button type="button" id="qaAdd" class="btn btn-success w-100 fw-semibold"><i class="fas fa-plus me-1"></i> Přidat sem</button>
         <div id="qaMsg" class="small mt-2" style="display:none;"></div>
-        <div class="small text-white-50 mt-2">Vznikne nová karta s umístěním <?php echo e($loc['code']); ?>. Díl, co už v CRM je, radši dohledej dole („Přiřadit díl sem") — a počty existujících opravíš tužtičkou u řádku.</div>
+        <div class="small text-white-50 mt-2">Vznikne nová karta s umístěním <?php echo e($locPosMap[(int)$loc['id']] ?? $loc['code']); ?>. Díl, co už v CRM je, radši dohledej dole („Přiřadit díl sem") — a počty existujících opravíš tužtičkou u řádku.</div>
     </div>
     <?php endif; ?>
 

@@ -122,6 +122,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canEditBranch) {
 
 // umístění pobočky, které díl patří (sklad se mezi provozovnami nemíchá)
 $allLocations = stockLocationsAll($pdo, true, (int)($item['branch_id'] ?? 0) ?: getDefaultBranchId());
+// jednotné značení R-P-B ve výběru umístění
+$posAllLoc = [];
+try { $posAllLoc = stockLocationPosCodes($pdo, array_merge(array_column($allLocations, 'id'), [(int)($item['location_id'] ?? 0)])); } catch (Throwable $e) {}
 $modelOptions = [];
 try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
 
@@ -236,13 +239,17 @@ try {
                             try { $__q = $pdo->prepare("SELECT l.*, p.code parent_code FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id WHERE l.id = ?"); $__q->execute([(int)$curLoc]); $__cl = $__q->fetch(); } catch (Throwable $e) {}
                             if ($__cl): ?>
                             <?php $__sameBranch = (int)($__cl['branch_id'] ?? 0) === ((int)($item['branch_id'] ?? 0) ?: getDefaultBranchId()); ?>
-                            <option value="<?php echo (int)$curLoc; ?>" selected><?php echo htmlspecialchars(stockLocationFullLabel($__cl)); ?> — <?php echo $__sameBranch ? 'deaktivované' : 'jiná pobočka'; ?></option>
+                            <option value="<?php echo (int)$curLoc; ?>" selected><?php echo htmlspecialchars(($posAllLoc[(int)$curLoc] ?? $__cl['code']) . (trim((string)$__cl['name']) !== '' ? ' · ' . $__cl['name'] : '')); ?> — <?php echo $__sameBranch ? 'deaktivované' : 'jiná pobočka'; ?></option>
                         <?php endif; endif; ?>
                         <?php foreach (['krabicka' => 'Krabičky', 'police' => 'Police', 'regal' => 'Regály'] as $t => $glabel): ?>
-                            <?php $grp = array_filter($allLocations, fn($l) => $l['type'] === $t); if (!$grp) continue; ?>
+                            <?php
+                            $grp = array_values(array_filter($allLocations, fn($l) => $l['type'] === $t));
+                            if (!$grp) continue;
+                            usort($grp, fn($a, $b) => strnatcmp((string)($posAllLoc[(int)$a['id']] ?? $a['code']), (string)($posAllLoc[(int)$b['id']] ?? $b['code'])));
+                            ?>
                             <optgroup label="<?php echo $glabel; ?>">
                                 <?php foreach ($grp as $l): ?>
-                                    <option value="<?php echo (int)$l['id']; ?>" <?php echo $curLoc === (string)(int)$l['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars(stockLocationFullLabel($l)); ?></option>
+                                    <option value="<?php echo (int)$l['id']; ?>" <?php echo $curLoc === (string)(int)$l['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars(($posAllLoc[(int)$l['id']] ?? $l['code']) . (trim((string)$l['name']) !== '' ? ' · ' . $l['name'] : '')); ?></option>
                                 <?php endforeach; ?>
                             </optgroup>
                         <?php endforeach; ?>
