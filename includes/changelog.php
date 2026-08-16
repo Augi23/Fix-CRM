@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.48.1',
+        'date' => '2026-08-16',
+        'time' => '14:10',
+        'title' => '3D mapa: stěna se šuplíky přisunutá k R7/R8',
+        'items' => [
+            'Stěna se šuplíkovými boxy (R10) je v 3D mapě nově <b>těsně u regálů R7 a R8</b> — boxy sedí zarovnané nad nízkými regály, hala se o odříznutou uličku zúžila a vchod s regálem R9 se posunul spolu se stěnou. Uložená rozmístění regálů vlevo od nové stěny se přichytí k jejímu okraji (v režimu úprav je případně dotáhneš).',
+        ],
+    ],
+    [
         'version' => '3.48.0',
         'date' => '2026-08-16',
         'time' => '13:40',

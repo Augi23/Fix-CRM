@@ -178,7 +178,7 @@
 (function () {
   const THREE_URL = 'https://unpkg.com/three@0.184.0/build/three.module.js';
   const MAPW = 740, MAPH = 560, SC = 1 / 100;
-  const HALLX0 = 282;   // levá hranice haly = stěna se šuplíkovými boxy (za ní už sklad není)
+  const HALLX0 = 408;   // levá hranice haly = stěna se šuplíkovými boxy, přisunutá TĚSNĚ k R7/R8 (za ní už sklad není)
   class Warehouse3D extends HTMLElement {
     static get observedAttributes() { return ['model']; }
     connectedCallback() {
@@ -272,11 +272,11 @@
           const frame = new THREE.MeshStandardMaterial({ color: 0xB02430, roughness: 0.5, metalness: 0.15 });
           const BW = 0.33, BH = 0.55, BD = 0.176, gapZ = 0.06;
           const wallX = X0 + wt / 2;
-          const z0 = -GH + doorW + 0.35 + BW / 2;
+          const z0 = (226 - MAPH / 2) * SC + BW / 2;   // zarovnáno s R8/R7 (boxy sedí nad nízkými regály)
           this._drawerGeom = { BW: BW, BH: BH, BD: BD };
           for (let u = 0; u < 6; u++) {
             const row = Math.floor(u / 3), col = u % 3;          // řada 0 = HORNÍ (Box 1–3)
-            const cy = row === 0 ? 1.62 : 0.92;
+            const cy = row === 0 ? 1.75 : 1.05;                  // nad úrovní nízkých regálů R7/R8
             const cz = z0 + col * (BW + gapZ);
             const box = new THREE.Mesh(new THREE.BoxGeometry(BD, BH, BW), frame);
             box.position.set(wallX + BD / 2, cy, cz);
@@ -653,7 +653,7 @@
   const DEFAULT_LAYOUT = {
     1: { x: 690, y: 226, rot: 1 }, 2: { x: 692, y: 370, rot: 1 }, 3: { x: 596, y: 512, rot: 0 },
     4: { x: 570, y: 374, rot: 1 }, 5: { x: 570, y: 230, rot: 1 }, 6: { x: 450, y: 512, rot: 0 },
-    7: { x: 422, y: 370, rot: 1 }, 8: { x: 422, y: 226, rot: 1 }, 9: { x: 300, y: 8, rot: 0 }
+    7: { x: 422, y: 370, rot: 1 }, 8: { x: 422, y: 226, rot: 1 }, 9: { x: 428, y: 8, rot: 0 }
   };
 
   let D = null, racks = [], byLoc = {}, partsIdx = [];
@@ -724,11 +724,11 @@
         .map((p) => ({ loc: p, no: num(p.code) || 0, boxes: boxes.filter((b) => b.parent_id === p.id), loose: (p.parts || []).length }))
         .sort((a, b) => a.no - b.no);
       const lay = (srv && srv[n]) || DEFAULT_LAYOUT[n];
-      const pos = lay || { x: 300 + (auto++) * 152, y: 8, rot: 0 };
+      const pos = lay || { x: 430 + (auto++) * 152, y: 8, rot: 0 };
       return {
         n: n, code: rg.code, name: rg.name || '', locId: rg.id, police: pol,
         directBoxes: boxes.filter((b) => b.parent_id === rg.id),
-        x: Math.max(290, pos.x), y: pos.y, rot: pos.rot ? 1 : 0,
+        x: Math.max(414, pos.x), y: pos.y, rot: pos.rot ? 1 : 0,
         sh: Math.max(2, pol.length || 5),
         drawer: /šuplík|suplik/i.test(rg.name || '')   // regál „Šuplíkové boxy" = stěna šuplíků
       };
