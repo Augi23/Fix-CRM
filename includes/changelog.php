@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.48.0',
+        'date' => '2026-08-09',
+        'time' => '23:20',
+        'title' => 'Výkupy: z výkupního listu rovnou na sklad a výplata přes Pokladnu',
+        'items' => [
+            '<b>Výkupní list → produkt:</b> uložením výkupního listu se vykoupený kus <b>sám naskladní</b> do nové kategorie Sklad → <b>Výkupy</b> (vedle Příslušenství): 1 ks, kód = sériové číslo (jinak VYK-číslo listu), nákupní cena = výkupní částka, pobočka podle listu. Před e-shopem je <b>schovaný</b>, dokud ho sám nepustíš; do Produktů/Příslušenství se výkupy nemíchají. Oprava listu údaje produktu jen aktualizuje.',
+            '<b>Výplata výkupu v Pokladně:</b> nové tlačítko <b>„Výplata výkupu"</b> nabídne nevyplacené výkupní listy — výkup se přidá jako <b>záporná položka</b> (částku jde upravit). Samotný výkup = záporný součet → tlačítko se změní na <b>„Vyplatit X Kč"</b> a jde to jen hotově; výdej se propíše do pokladního deníku i na účtenku („Vyplaceno zákazníkovi").',
+            '<b>Protiúčet:</b> do stejného košíku přidej naše zboží — hodnota výkupu se <b>odečte</b> a zákazník doplatí jen rozdíl (hotově i kartou). Každý list jde vyplatit <b>jen jednou</b> (hlídá vazba na prodejku, i proti souběhu dvou kas); storno prodejky výplatu vrátí do kasy a list uvolní.',
+            'Starší automatika „výkup hotově = výdej z kasy" (v3.20.0) zůstává pro listy vyplacené bez Pokladny — jakmile ale výplata proběhne kasou, dokument už vlastní výdej negeneruje (žádné dvojí odepsání).',
+        ],
+    ],
+    [
         'version' => '3.47.1',
         'date' => '2026-08-09',
         'time' => '22:15',

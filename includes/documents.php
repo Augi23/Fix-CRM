@@ -33,6 +33,13 @@ function ensureCrmDocumentsTable(): void {
             UNIQUE KEY uniq_doc_number (doc_type, doc_number),
             KEY idx_doc_type (doc_type, id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // výkup → produkt + výplata kasou (v3.48.0): vazby dokument ↔ produkt ↔ prodejka
+        if (!$pdo->query("SHOW COLUMNS FROM crm_documents LIKE 'vykup_product_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE crm_documents ADD COLUMN vykup_product_id INT NULL DEFAULT NULL");
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM crm_documents LIKE 'payout_sale_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE crm_documents ADD COLUMN payout_sale_id INT NULL DEFAULT NULL");
+        }
     } catch (Throwable $e) { error_log('ensureCrmDocumentsTable: ' . $e->getMessage()); }
 }
 
@@ -309,6 +316,68 @@ function crmGetDocumentIdScans(int $documentId): array {
  * upravit na místě — dnešek ještě uzavřený není a deník zůstane bez balastu
  * při běžném doladění listu před podpisem.
  */
+/**
+ * VÝKUP → PRODUKT NA SKLAD (kategorie „Výkupy"): po uložení výkupního listu se
+ * z jeho údajů rovnou založí produkt — 1 ks, schovaný před e-shopem (hide_eshop),
+ * kód = sériové číslo (jinak VYK-<číslo listu>), nákupní cena = výkupní částka,
+ * pobočka podle dokumentu. Idempotence: crm_documents.vykup_product_id
+ * (další uložení jen aktualizuje název/kód/nákupku, kusů se nedotýká).
+ * Vrací id produktu (0 = nic nevzniklo).
+ */
+function crmSyncVykupProduct(int $docId): int {
+    global $pdo;
+    $doc = crmGetDocument($docId);
+    if (!$doc || (string)$doc['doc_type'] !== 'vykup') return 0;
+    ensureProductsTable();
+    ensureProductsCrmColumns();
+    ensureProductsVykupColumns();
+    ensureProductsHideEshopColumn();
+    ensureSkladBranchSchema();
+
+    $f = is_array($doc['fields'] ?? null) ? $doc['fields'] : [];
+    $model = trim((string)($f['item_model'] ?? ''));
+    $descr = trim((string)($f['item_description'] ?? ''));
+    $serial = trim((string)($f['item_serial'] ?? ''));
+    $title = trim($model . ($descr !== '' ? ' — ' . $descr : ''));
+    if ($title === '') { $title = 'Výkup ' . (string)$doc['doc_number']; }
+    $title = mb_substr($title, 0, 255);
+    $buyPrice = crmParseAmountCzk((string)($doc['price'] ?? ''));
+    $branch = (int)($doc['branch_id'] ?? 0) ?: (int)getDefaultBranchId();
+    $stockKey = skladBranchCode($branch) === 'prikope' ? 'vaclavak' : 'karlin';
+    $code = $serial !== '' ? mb_substr($serial, 0, 64) : ('VYK-' . (string)$doc['doc_number']);
+    $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? 'výkup'));
+
+    try {
+        $existingId = (int)($doc['vykup_product_id'] ?? 0);
+        if ($existingId > 0) {
+            // oprava listu → jen srovnat údaje produktu; počet kusů nechat být
+            $pdo->prepare("UPDATE products SET title = ?, model = ?, product_code = ?, purchase_price = ?, branch_id = ?, stock_key = ? WHERE id = ? AND COALESCE(is_vykup, 0) = 1")
+                ->execute([$title, $model !== '' ? mb_substr($model, 0, 128) : null, $code,
+                    $buyPrice > 0 ? $buyPrice : null, $branch, $stockKey, $existingId]);
+            return $existingId;
+        }
+        // kolize kódu (stejné sériovko už ve skladu) → jen provázat, nezakládat druhý kus
+        $chk = $pdo->prepare("SELECT id FROM products WHERE product_code = ?");
+        $chk->execute([$code]);
+        if ($dupe = $chk->fetch()) {
+            $pid = (int)$dupe['id'];
+            $pdo->prepare("UPDATE crm_documents SET vykup_product_id = ? WHERE id = ?")->execute([$pid, $docId]);
+            return $pid;
+        }
+        $pdo->prepare("INSERT INTO products (product_code, title, model, grade, price, stock_qty, stock_key, branch_id, purchase_price, source, created_by, is_vykup, vykup_document_id, hide_eshop, added_at, first_seen_at, last_seen_at)
+                       VALUES (?, ?, ?, '', 0, 1, ?, ?, ?, 'crm', ?, 1, ?, 1, NOW(), NOW(), NOW())")
+            ->execute([$code, $title, $model !== '' ? mb_substr($model, 0, 128) : null, $stockKey, $branch,
+                $buyPrice > 0 ? $buyPrice : null, $by, $docId]);
+        $pid = (int)$pdo->lastInsertId();
+        $pdo->prepare("UPDATE crm_documents SET vykup_product_id = ? WHERE id = ?")->execute([$pid, $docId]);
+        crmAuditLog('products.create', [
+            'entity_type' => 'product', 'entity_id' => $pid, 'entity_label' => $title,
+            'summary' => 'Výkup → naskladněn produkt „' . $title . '" (kód ' . $code . ', list ' . $doc['doc_number'] . ($buyPrice > 0 ? ', výkupní cena ' . number_format($buyPrice, 0, ',', ' ') . ' Kč' : '') . ')',
+        ]);
+        return $pid;
+    } catch (Throwable $e) { error_log('crmSyncVykupProduct: ' . $e->getMessage()); return 0; }
+}
+
 function crmSyncVykupCashMovement(int $docId): void {
     global $pdo;
     $doc = crmGetDocument($docId);
@@ -325,6 +394,9 @@ function crmSyncVykupCashMovement(int $docId): void {
 
     // Cílový čistý výdej z kasy podle aktuální podoby dokumentu.
     $target = ($isCash && $amount > 0) ? $amount : 0.0;
+    // Výplata přes POKLADNU (payout_sale_id): peníze drží záporná prodejka —
+    // dokument sám už výdej negenerovat, jinak by se výkup odepsal dvakrát.
+    if ((int)($doc['payout_sale_id'] ?? 0) > 0) { $target = 0.0; }
 
     try {
         // Pohybů může být k dokumentu víc (původní + rozdílové opravy) —

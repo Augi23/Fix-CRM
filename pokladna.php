@@ -114,6 +114,7 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
 .pos-type.product { background: rgba(48,209,88,.16); color: #6fe08d; }
 .pos-type.manual { background: rgba(255,159,10,.16); color: #ffc46b; }
 .pos-type.order { background: rgba(191,90,242,.18); color: #d9a7ff; }
+.pos-type.vykup { background: rgba(255,69,58,.16); color: #ff8f88; }
 .pos-manual { padding-bottom: 13px; margin-bottom: 13px; border-bottom: 1px solid rgba(255,255,255,.10); }
 .pos-manual .form-control { font-size: 15.5px; padding: 10px 12px; }
 .pos-manual .btn { font-weight: 700; white-space: nowrap; }
@@ -555,6 +556,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 </div>
             </form>
+            <div class="d-flex align-items-center gap-2 flex-wrap mt-1 mb-2">
+                <button type="button" id="posVykupBtn" class="btn btn-outline-danger btn-sm"><i class="fas fa-hand-holding-dollar me-1"></i>Výplata výkupu</button>
+                <span class="small text-white-50">záporná položka z výkupního listu — čistá výplata, nebo protiúčet za naše zboží</span>
+            </div>
+            <div id="posVykupPanel" class="pos-results mb-2" style="display:none;"></div>
             <label class="form-label small text-white-50 mb-2"><i class="fas fa-search me-1"></i> Najdi produkt, díl nebo hotovou zakázku · <i class="fas fa-barcode me-1"></i>USB čtečka funguje kdykoli — stačí pípnout kód</label>
             <input type="text" id="posSearch" class="form-control pos-search" placeholder="iPhone 13, displej, číslo zakázky…" autocomplete="off">
             <div id="posResults" class="pos-results mt-2"></div>
@@ -880,6 +886,43 @@ document.addEventListener('DOMContentLoaded', function () {
         $manualPrice.value = '';
         $manualName.focus();
     });
+    // ── výplata výkupu: seznam nevyplacených výkupních listů ──
+    var $vykupBtn = document.getElementById('posVykupBtn');
+    var $vykupPanel = document.getElementById('posVykupPanel');
+    if ($vykupBtn) {
+        $vykupBtn.addEventListener('click', function () {
+            if ($vykupPanel.style.display !== 'none') { $vykupPanel.style.display = 'none'; return; }
+            $vykupPanel.style.display = '';
+            $vykupPanel.innerHTML = '<div class="p-2 small text-white-50">Načítám nevyplacené výkupy…</div>';
+            fetch('api/pos_vykup_list.php', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    var rows = d.results || [];
+                    if (!rows.length) {
+                        $vykupPanel.innerHTML = '<div class="p-2 small text-white-50">Žádný nevyplacený výkupní list — nejdřív ho vypiš v Dokumentech (Výkup zařízení).</div>';
+                        return;
+                    }
+                    $vykupPanel.innerHTML = '';
+                    rows.forEach(function (r) {
+                        var el = document.createElement('div');
+                        el.className = 'pos-hit';
+                        el.innerHTML = '<span class="pos-type vykup">VÝKUP</span>'
+                            + '<div><div class="nm">' + esc(r.doc_number + (r.subject ? ' — ' + r.subject : '')) + '</div>'
+                            + '<div class="cd">' + esc((r.customer || '') + (r.date ? ' · ' + r.date : '')) + '</div></div>'
+                            + '<span class="pr">−' + fmt(r.amount || 0) + '</span>';
+                        el.addEventListener('click', function () {
+                            var dupe = cart.some(function (c) { return c.type === 'vykup' && c.id === r.id; });
+                            if (dupe) { alert('Tenhle výkup už v košíku je.'); return; }
+                            addToCart({ type: 'vykup', id: r.id, name: 'Výplata výkupu ' + r.doc_number + (r.subject ? ' — ' + r.subject : ''), code: r.doc_number, price: -(r.amount || 0), qty: 1, stock: 1 });
+                            $vykupPanel.style.display = 'none';
+                        });
+                        $vykupPanel.appendChild(el);
+                    });
+                })
+                .catch(function () { $vykupPanel.innerHTML = '<div class="p-2 small text-danger">Načtení výkupů se nepovedlo.</div>'; });
+        });
+    }
+
     window.posRemove = function (i) { cart.splice(i, 1); render(); };
     window.posQty = function (i, v) {
         v = parseInt(v, 10) || 1;
@@ -890,7 +933,11 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     window.posPrice = function (i, v) {
         v = parseFloat(String(v).replace(',', '.'));
-        if (isNaN(v) || v < 0) v = 0;
+        if (isNaN(v)) v = 0;
+        if (cart[i].type === 'vykup') {
+            // výplatní řádek je vždy ZÁPORNÝ — obsluha smí napsat 3000 i −3000
+            v = -Math.min(1000000, Math.abs(v));
+        } else if (v < 0) { v = 0; }
         cart[i].price = v; render();
     };
 
@@ -901,7 +948,9 @@ document.addEventListener('DOMContentLoaded', function () {
         cart.forEach(function (c, i) {
             var tr = document.createElement('tr');
             var lockedOrder = c.type === 'order';
-            var qtyAttrs = lockedOrder ? ' readonly title="Zakázka se účtuje vždy jako 1 ks"' : '';
+            var lockedVykup = c.type === 'vykup';
+            var qtyAttrs = lockedOrder ? ' readonly title="Zakázka se účtuje vždy jako 1 ks"'
+                : (lockedVykup ? ' readonly title="Výkup se vyplácí vždy jako 1 ks"' : '');
             var priceAttrs = lockedOrder ? ' readonly title="Cena zakázky se bere z detailu zakázky"' : '';
             tr.innerHTML = '<td><div class="pos-item-name">' + esc(c.name) + '</div><div class="pos-item-code">' + esc(c.code || '') + '</div></td>'
                 + '<td><input type="number" class="form-control pos-qty" min="1" max="' + (c.type === 'manual' ? 999 : c.stock) + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"' + qtyAttrs + '></td>'
@@ -923,8 +972,9 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.classList.add('sel-' + payment);
             $custWrap.style.display = payment === 'invoice' ? '' : 'none';
             updateFinish();
-            // hotově → rovnou kalkulačkový displej (K úhradě / Přijato / Vrátit)
-            if (payment === 'cash' && cart.length) { lcdShow(); }
+            // hotově → rovnou kalkulačkový displej (K úhradě / Přijato / Vrátit);
+            // při záporném součtu (vyplácíme MY) displej nemá smysl
+            if (payment === 'cash' && cart.length && total() > 0) { lcdShow(); }
         });
     });
 
@@ -995,15 +1045,21 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     function updateFinish() {
+        var t = total();
         var ok = cart.length > 0 && payment !== '';
         if (payment === 'invoice' && !$('#posCustomer').val()) ok = false;
+        if (t < 0 && payment !== '' && payment !== 'cash') ok = false;   // výplata zákazníkovi jde jen hotově
         $finish.disabled = !ok;
+        $finish.innerHTML = t < 0
+            ? '<i class="fas fa-hand-holding-dollar me-2"></i>Vyplatit ' + fmt(Math.abs(t))
+            : '<i class="fas fa-check me-2"></i>Dokončit prodej';
     }
 
     // ── dokončení ──
     // Hotově jde přes LCD displej (Přijato/Vrátit); karta a faktura rovnou.
+    // Záporný součet (výplata výkupu) jde rovnou — nic se nepřijímá.
     $finish.addEventListener('click', function () {
-        if (payment === 'cash') { lcdShow(); return; }
+        if (payment === 'cash' && total() > 0) { lcdShow(); return; }
         submitSale();
     });
 

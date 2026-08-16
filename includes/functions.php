@@ -1898,7 +1898,7 @@ function ensurePosTables(): void {
         $pdo->exec("CREATE TABLE IF NOT EXISTS pos_sale_items (
             id INT NOT NULL AUTO_INCREMENT,
             sale_id INT NOT NULL,
-            item_type ENUM('part','product','manual','order') NOT NULL,
+            item_type ENUM('part','product','manual','order','vykup') NOT NULL,
             item_id INT NOT NULL,
             item_name VARCHAR(255) NOT NULL,
             item_code VARCHAR(64) NULL DEFAULT NULL,
@@ -1916,8 +1916,8 @@ function ensurePosTables(): void {
             if (!$idx) { $pdo->exec("ALTER TABLE pos_sales ADD KEY idx_pos_order (order_id)"); }
         } catch (Throwable $e) {}
         $col = $pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'item_type'")->fetch(PDO::FETCH_ASSOC);
-        if ($col && !str_contains((string)($col['Type'] ?? ''), "'order'")) {
-            $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order') NOT NULL");
+        if ($col && !str_contains((string)($col['Type'] ?? ''), "'vykup'")) {
+            $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order','vykup') NOT NULL");
         }
         if (!$pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'grade'")->fetch()) {
             $pdo->exec("ALTER TABLE pos_sale_items ADD COLUMN grade VARCHAR(16) NULL DEFAULT NULL");
@@ -1981,6 +1981,23 @@ function ensureProductsCrmColumns(): void {
 /** Zapůjčeno / komisní prodej (29.7.2026): kus fyzicky není u nás, ale ve skladu zůstává.
  *  Dřív se to řešilo nastavením stock_qty=0 → vypadalo to jako vyprodáno a nikdo nevěděl,
  *  že kus existuje a u koho je. loan_at je NULL = kus je normálně u nás. */
+/** products.is_vykup + vykup_document_id — kategorie „Výkupy" (výkupní list → produkt). */
+function ensureProductsVykupColumns(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM products LIKE 'is_vykup'")->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN is_vykup TINYINT(1) NOT NULL DEFAULT 0");
+            try { $pdo->exec("ALTER TABLE products ADD INDEX idx_products_vykup (is_vykup)"); } catch (Throwable $e) {}
+        }
+        if (!$pdo->query("SHOW COLUMNS FROM products LIKE 'vykup_document_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN vykup_document_id INT NULL DEFAULT NULL");
+        }
+    } catch (Throwable $e) { error_log('ensureProductsVykupColumns: ' . $e->getMessage()); }
+}
+
 function ensureProductsLoanColumns(): void {
     global $pdo;
     static $done = false;
@@ -5919,6 +5936,7 @@ function crmAuditActionLabel(string $action): string {
         'products.import' => 'Import produktů (e-shop)', 'products.delete' => 'Smazání produktu (e-shop)',
         'kasa.sale' => 'Prodej na kase', 'kasa.cancel' => 'Storno prodeje na kase',
         'kasa.cash_move' => 'Pohyb hotovosti v kase',
+        'kasa.vykup_payout' => 'Výplata výkupu na kase',
         'order.payment_set' => 'Platba při výdeji',
         'invoice.email' => 'Faktura odeslána e-mailem',
         'banka.sync' => 'Synchronizace banky', 'banka.match' => 'Párování platby s fakturou',

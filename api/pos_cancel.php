@@ -91,6 +91,13 @@ try {
             // vrácení produktu: zpět skladem, flag kasy pryč (kus je zase v appce pravdivě skladem)
             $pdo->prepare("UPDATE products SET stock_qty = stock_qty + ?, pos_sold_at = NULL WHERE id = ?")
                 ->execute([(int)$line['quantity'], (int)$line['item_id']]);
+        } elseif ((string)$line['item_type'] === 'vykup') {
+            // storno výplaty výkupu: odvázat výkupní list (jde pak vyplatit znovu);
+            // vrácenou hotovost řeší kompenzační pohyb níže
+            try {
+                $pdo->prepare("UPDATE crm_documents SET payout_sale_id = NULL WHERE id = ? AND payout_sale_id = ?")
+                    ->execute([(int)$line['item_id'], $id]);
+            } catch (Throwable $e) { error_log('pos_cancel vykup unlink: ' . $e->getMessage()); }
         }
     }
 
@@ -111,15 +118,17 @@ try {
     // (v jedné transakci se stornem — buď se povede obojí, nebo nic). Kniha
     // stornovaný prodej ponechává v příjmech dne prodeje PRÁVĚ podle existence
     // tohoto pohybu (afxCashSums), takže se historie zpětně nemění.
-    if ((string)$sale['payment_method'] === 'cash') {
+    $stornoDir = ((float)$sale['total']) >= 0 ? 'out' : 'in';   // záporná prodejka (výplata výkupu): peníze se vracejí DO kasy
+    $stornoAbs = round(abs((float)$sale['total']), 2);
+    if ((string)$sale['payment_method'] === 'cash' && $stornoAbs > 0.004) {
         $pdo->prepare("INSERT INTO pos_cash_movements
                 (branch_id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by)
-            VALUES (?, 'out', ?, 'storno', 'pos_sale', ?, ?, ?, ?)")
+            VALUES (?, ?, ?, 'storno', 'pos_sale', ?, ?, ?, ?)")
             ->execute([
                 ((int)($sale['branch_id'] ?? 0) > 0 ? (int)$sale['branch_id'] : null),
-                (float)$sale['total'], $id,
+                $stornoDir, $stornoAbs, $id,
                 mb_substr((string)$sale['sale_number'], 0, 40),
-                mb_substr('Vratka hotovosti — storno prodeje ' . (string)$sale['sale_number'], 0, 255),
+                mb_substr(($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata výkupu — storno prodejky ') . (string)$sale['sale_number'], 0, 255),
                 $who !== '' ? mb_substr($who, 0, 100) : null,
             ]);
         $stornoMoveId = (int)$pdo->lastInsertId();
@@ -140,10 +149,10 @@ $stornoDocNumber = '';
 if ($stornoMoveId > 0) {
     $doc = afxCashDocIssue([
         'branch_id' => (int)($sale['branch_id'] ?? 0),
-        'type' => 'expense',
-        'amount' => (float)$sale['total'],
+        'type' => $stornoDir === 'out' ? 'expense' : 'income',
+        'amount' => $stornoAbs,
         'date' => date('Y-m-d'),
-        'purpose' => 'Vratka hotovosti — storno prodeje ' . (string)$sale['sale_number'],
+        'purpose' => ($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata výkupu — storno prodejky ') . (string)$sale['sale_number'],
         'issued_by' => $who,
         'ref_type' => 'cash_movement',
         'ref_id' => $stornoMoveId,

@@ -58,12 +58,21 @@ if ($avail === 'loan') { $where_clauses[] = "loan_at IS NOT NULL"; }
 // (Zrcadlí kategorii „Příslušenství" na e-shopu; „kryt na iPhone" tak spadne mezi doplňky, ne mezi telefony.)
 $cat = (string)($_GET['cat'] ?? '');
 $isAccessoryTab = ($cat === 'prislusenstvi');
+$isVykupTab = ($cat === 'vykupy');
+ensureProductsVykupColumns();
 $catWhere = ''; $catParams = [];
-if ($isAccessoryTab) {
+if ($isVykupTab) {
+    // Výkupy = kusy naskladněné z výkupních listů (products.is_vykup; mají
+    // vlastní záložku a do Produktů/Příslušenství se nemíchají)
+    $where_clauses[] = "COALESCE(is_vykup, 0) = 1";
+} elseif ($isAccessoryTab) {
     $__ac = afxProductAccessoryCond();   // jediný zdroj pravdy (functions.php)
     $catWhere = $__ac['sql'];
     $where_clauses[] = $catWhere;
     foreach ($__ac['params'] as $__p) { $params[] = $__p; $catParams[] = $__p; }
+    $where_clauses[] = "COALESCE(is_vykup, 0) = 0";
+} else {
+    $where_clauses[] = "COALESCE(is_vykup, 0) = 0";
 }
 $where_sql = " WHERE " . implode(" AND ", $where_clauses);
 

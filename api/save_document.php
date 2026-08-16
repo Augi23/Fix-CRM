@@ -97,6 +97,9 @@ try {
     }
     // Výkup hotově = výdej z kasy (pokladní deník) — drží se v souladu s dokumentem.
     if ($type === 'vykup') {
+        // vykoupený kus rovnou do skladu (kategorie Výkupy) — kasa je až za tím
+        try { crmSyncVykupProduct($id); }
+        catch (Throwable $e) { error_log('save_document vykup product: ' . $e->getMessage()); }
         try { crmSyncVykupCashMovement($id); }
         catch (AfxAccountingClosedException $e) {
             // UZÁVĚRKA se nesmí tiše spolknout: klient by dostal peníze na ruku,

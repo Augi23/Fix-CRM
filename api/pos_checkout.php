@@ -42,8 +42,8 @@ if (!function_exists('afxEnsurePosGoodsTaxColumns')) {
                 }
             }
             $col = $pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'item_type'")->fetch(PDO::FETCH_ASSOC);
-            if ($col && !str_contains((string)($col['Type'] ?? ''), "'order'")) {
-                $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order') NOT NULL");
+            if ($col && !str_contains((string)($col['Type'] ?? ''), "'vykup'")) {
+                $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order','vykup') NOT NULL");
             }
         } catch (Throwable $e) { error_log('afxEnsurePosGoodsTaxColumns: ' . $e->getMessage()); }
     }
@@ -120,11 +120,16 @@ foreach ($items as $it) {
         $id = 0;
     }
     // is_finite: JSON 1e999 se dekóduje na INF a prošel by testem < 0
-    if (!in_array($type, ['part', 'product', 'manual', 'order'], true) || ($type !== 'manual' && $id <= 0)
+    // 'vykup' = VÝPLATNÍ řádek (platíme MY zákazníkovi za vykoupený kus):
+    // jediný typ se ZÁPORNOU cenou; qty vždy 1, id = výkupní list (crm_documents).
+    $priceOk = $type === 'vykup'
+        ? (is_finite($price) && $price <= 0 && $price >= -1000000)
+        : (is_finite($price) && $price >= 0 && $price <= 1000000);
+    if (!in_array($type, ['part', 'product', 'manual', 'order', 'vykup'], true) || ($type !== 'manual' && $id <= 0)
         || ($type === 'manual' && ($manualName === '' || mb_strlen($manualName) > 255))
-        || ($type === 'order' && $qty !== 1)
-        || ($type !== 'order' && ($qty < 1 || $qty > 999))
-        || !is_finite($price) || $price < 0 || $price > 1000000) {
+        || (in_array($type, ['order', 'vykup'], true) && $qty !== 1)
+        || (!in_array($type, ['order', 'vykup'], true) && ($qty < 1 || $qty > 999))
+        || !$priceOk) {
         echo json_encode(['success' => false, 'message' => 'Neplatná položka v košíku.']); exit;
     }
     $price = round($price, 2);   // stejné zaokrouhlení v total i v položkách — doklad musí sedět sám se sebou
@@ -154,6 +159,11 @@ if ($orderLines && $payment === 'invoice') {
     echo json_encode(['success' => false, 'message' => 'Zakázku přes Pokladnu uhraď hotově nebo kartou. Převod řeš ve výdeji zakázky přes fakturu s QR platbou.']); exit;
 }
 
+$vykupLines = array_values(array_filter($cart, static fn(array $l): bool => $l['type'] === 'vykup'));
+if ($vykupLines && $payment === 'invoice') {
+    echo json_encode(['success' => false, 'message' => 'Výplata výkupu nejde na fakturu — hotově (u protiúčtu s doplatkem zákazníka jde i karta).']); exit;
+}
+
 if ($payment === 'invoice') {
     if ($customerId <= 0) {
         echo json_encode(['success' => false, 'message' => 'Pro platbu na fakturu vyber zákazníka.']); exit;
@@ -174,6 +184,11 @@ afxEnsurePosGoodsTaxColumns();
 ensureSkladBranchSchema();
 afxEnsurePosCashColumns();
 afxEnsurePosShiftTable();
+if ($vykupLines) {
+    require_once __DIR__ . '/../includes/documents.php';
+    ensureCrmDocumentsTable();
+    ensureProductsVykupColumns();
+}
 
 // názvy/kódy položek VŽDY čerstvě z DB. U dílů/produktů zůstává možnost slevy
 // v košíku; u zakázky je autoritou částka uložená u zakázky.
@@ -248,6 +263,34 @@ try {
             $saleOrderId = (int)$row['id'];
             $orderCustomerId = (int)$row['customer_id'];
             $saleOrderBranchId = (int)($row['branch_id'] ?? 0);
+        } elseif ($line['type'] === 'vykup') {
+            // Výplata výkupu: autoritou je VÝKUPNÍ LIST; vyplácenou částku zadává
+            // obsluha na kase (výchozí = cena z listu). Kus do skladu založil
+            // už dokument (crmSyncVykupProduct) — tady se jen vyplácí.
+            $st = $pdo->prepare("SELECT id, doc_number, subject, price, branch_id, payout_sale_id FROM crm_documents WHERE id = ? AND doc_type = 'vykup'");
+            $st->execute([$line['id']]);
+            $row = $st->fetch();
+            if (!$row) { echo json_encode(['success' => false, 'message' => 'Výkupní list nenalezen.']); exit; }
+            if ((int)($row['payout_sale_id'] ?? 0) > 0) {
+                echo json_encode(['success' => false, 'message' => 'Výkup ' . $row['doc_number'] . ' už je vyplacený prodejkou — podruhé vyplatit nejde.']); exit;
+            }
+            $docBranch = (int)($row['branch_id'] ?? 0) ?: (int)getDefaultBranchId();
+            if (!crmCanModifyBranchStock($docBranch)) {
+                echo json_encode(['success' => false, 'message' => 'Výkup ' . $row['doc_number'] . ' patří jiné pobočce — vyplácí ho její kasa.']); exit;
+            }
+            // starší listy (z doby před funkcí) ještě nemusí mít produkt — doplnit
+            try { crmSyncVykupProduct((int)$row['id']); } catch (Throwable $e) {}
+            if (abs((float)$cart[$i]['price']) < 0.005) {
+                $docAmount = crmParseAmountCzk((string)($row['price'] ?? ''));
+                if ($docAmount > 0) { $cart[$i]['price'] = -round($docAmount, 2); }
+            }
+            $subject = trim((string)($row['subject'] ?? ''));
+            $cart[$i]['name'] = 'Výplata výkupu ' . $row['doc_number'] . ($subject !== '' ? ' — ' . mb_substr($subject, 0, 170) : '');
+            $cart[$i]['code'] = (string)$row['doc_number'];
+            $cart[$i]['qty'] = 1;
+            $cart[$i]['used'] = false;
+            $cart[$i]['grade'] = null;
+            $cart[$i]['purchase_price'] = null;
         } else {
             // Ruční položka mimo sklad: neváže se na inventory/products a nijak nehýbe skladem.
             $cart[$i]['name'] = (string)$line['manual_name'];
@@ -262,8 +305,13 @@ try {
     $total = 0.0;
     foreach ($cart as $line) { $total += $line['price'] * $line['qty']; }
     $total = round($total, 2);
-    if ($total > 9999999) {
+    if ($total > 9999999 || $total < -9999999) {
         echo json_encode(['success' => false, 'message' => 'Částka je mimo rozsah.']); exit;
+    }
+    // Záporný součet = fyzicky VYPLÁCÍME zákazníkovi → jde jen z hotovosti kasy.
+    // (Protiúčet s kladným doplatkem může být klidně kartou.)
+    if ($total < 0 && $payment !== 'cash') {
+        echo json_encode(['success' => false, 'message' => 'Součet je záporný (vyplácíš zákazníkovi ' . formatMoney(abs($total)) . ') — to jde jen hotově.']); exit;
     }
 
     // přijatá hotovost nesmí být nižší než celkem — jinak by „Vráceno" vyšlo záporně
@@ -358,6 +406,17 @@ try {
             $line['grade'], $line['purchase_price']]);
     }
 
+    // ── výplata výkupu: provázat výkupní list s prodejkou (blokuje dvojí
+    // výplatu a vypíná dokumentový výdej z kasy — peníze teď drží prodejka) ──
+    foreach ($cart as $line) {
+        if ($line['type'] !== 'vykup') { continue; }
+        $lk = $pdo->prepare("UPDATE crm_documents SET payout_sale_id = ? WHERE id = ? AND doc_type = 'vykup' AND payout_sale_id IS NULL");
+        $lk->execute([$saleId, $line['id']]);
+        if ($lk->rowCount() === 0) {
+            throw new Exception('Výkup ' . $line['code'] . ' právě vyplatila jiná kasa — prodej neproběhl.');
+        }
+    }
+
     // ── platba na fakturu → rovnou vystavit fakturu (stejná transakce) ──
     $invoiceId = null;
     if ($payment === 'invoice') {
@@ -400,6 +459,19 @@ foreach ($cart as $line) {
     } elseif ($line['type'] === 'product') {
         $hasProduct = true;
     }
+}
+// výplaty výkupů: audit + přepočet dokumentových pohybů kasy (payout_sale_id je
+// nastavené → případný starší „výdej z kasy" od dokumentu se stáhne, peníze
+// teď oficiálně drží tahle prodejka)
+foreach ($cart as $line) {
+    if ($line['type'] !== 'vykup') { continue; }
+    crmAuditLog('kasa.vykup_payout', [
+        'entity_type' => 'pos_sale', 'entity_id' => $saleId, 'entity_label' => $saleNumber,
+        'summary' => 'Vyplacen výkup ' . $line['code'] . ': ' . formatMoney(abs((float)$line['price'])) . ' (doklad ' . $saleNumber . ')',
+        'branch_id' => $branchId,
+    ]);
+    try { crmSyncVykupCashMovement((int)$line['id']); }
+    catch (Throwable $e) { error_log('pos_checkout vykup sync: ' . $e->getMessage()); }
 }
 $payLabel = ['cash' => 'hotově', 'card' => 'kartou', 'invoice' => 'na fakturu'][$payment];
 crmAuditLog('kasa.sale', [

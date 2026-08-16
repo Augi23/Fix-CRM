@@ -322,7 +322,10 @@ function crmRenderReceipt58(array $d): string {
 
     // ---- součet a úhrada
     $h .= '<div class="rule rule--thick" style="margin-top:2mm"></div>';
-    $h .= '<div class="total"><span class="lbl">Celkem</span><span>' . e($money((float)($tot['total'] ?? 0))) . '</span></div>';
+    $__afxTot = (float)($tot['total'] ?? 0);
+    // záporný součet = výplata výkupu (my platíme zákazníkovi) — na dokladu
+    // se ukazuje srozumitelně kladná částka s vysvětlujícím popiskem
+    $h .= '<div class="total"><span class="lbl">' . ($__afxTot < 0 ? 'Vyplaceno zákazníkovi' : 'Celkem') . '</span><span>' . e($money($__afxTot < 0 ? abs($__afxTot) : $__afxTot)) . '</span></div>';
     if (!empty($doc['payment'])) {
         $h .= '<div class="row"><span>Úhrada</span><span>' . e((string)$doc['payment']) . '</span></div>';
     }

@@ -15,7 +15,8 @@ $__invTab = $__invTab === 'products.php' ? 'products'
     : ($__invTab === 'sklad_umisteni.php' ? 'locations' : 'service'))));
 $__invCat = (string)($_GET['cat'] ?? '');
 $__isAccessory = ($__invTab === 'products' && $__invCat === 'prislusenstvi');
-$__isProducts  = ($__invTab === 'products' && !$__isAccessory);
+$__isVykup     = ($__invTab === 'products' && $__invCat === 'vykupy');
+$__isProducts  = ($__invTab === 'products' && !$__isAccessory && !$__isVykup);
 $__skladBranch = function_exists('skladBranchOrOwn') ? skladBranchOrOwn() : (int)($_GET['branch'] ?? 0);
 $__bq = '?branch=' . (int)$__skladBranch;
 $__karlinId = function_exists('getDefaultBranchId') ? getDefaultBranchId() : 1;
@@ -58,6 +59,9 @@ try { $__trDraft = (int)$pdo->query("SELECT COUNT(*) FROM stock_transfer_items t
     </li>
     <li class="nav-item">
         <a class="nav-link <?php echo $__isAccessory ? 'active' : 'text-white-75'; ?>" href="products.php<?php echo $__bq; ?>&amp;cat=prislusenstvi"><i class="fas fa-plug me-2"></i>Příslušenství</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link <?php echo $__isVykup ? 'active' : 'text-white-75'; ?>" href="products.php<?php echo $__bq; ?>&amp;cat=vykupy"><i class="fas fa-hand-holding-dollar me-2"></i>Výkupy</a>
     </li>
     <?php if ($__isKarlin): ?>
     <li class="nav-item ms-auto">
