@@ -108,7 +108,8 @@ function afxEnsurePosCashColumns(): void {
  *
  * Drží VŠECHNA pravidla obsahu dokladu na jednom místě:
  *  - typ dokladu: neplátce „Doklad o prodeji"; plátce do 10 000 Kč vč. DPH
- *    „Zjednodušený daňový doklad" (§ 30 ZDPH), nad to „Daňový doklad",
+ *    „Zjednodušený daňový doklad" (§ 30 ZDPH), nad to „Daňový doklad";
+ *    u platby NA FAKTURU vždy jen „Doklad o prodeji" — daňovým dokladem je faktura,
  *  - DIČ jen u plátce (uvedení daně neplátcem = povinnost ji odvést, § 108 ZDPH),
  *  - rekapitulace DPH ze snapshotu na dokladu (vat_rate/is_vat_payer), § 90 mimo ni,
  *  - záruční věty podle druhů položek (crmReceiptWarrantyLines),
@@ -166,9 +167,15 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
     $baseKc = ($isVat && $vatRate > 0) ? (int)round($stdTotal * 100 / (100 + $vatRate)) : $stdKc;
     $hasUsed = $usedTotal > 0 && $isVat;
 
+    $isInvoicePay = (string)($sale['payment_method'] ?? '') === 'invoice';
     if (!$isVat) {
         $title = 'Doklad o prodeji';
         unset($co['dic']);
+    } elseif ($isInvoicePay) {
+        // Prodej na fakturu: daňovým dokladem je FAKTURA (vystavená současně s prodejem).
+        // Účtenka s titulem „daňový doklad" by byla druhým daňovým dokladem k témuž
+        // plnění — zákazník by si mohl DPH uplatnit dvakrát.
+        $title = 'Doklad o prodeji';
     } elseif ($total <= 10000) {
         $title = 'Zjednodušený daňový doklad';
     } else {
@@ -181,6 +188,11 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
     }
     if (!$isVat) { $legal[] = 'Nejsme plátci DPH.'; }
     foreach (crmReceiptWarrantyLines($warrantyItems) as $w) { $legal[] = $w; }
+    if ($isInvoicePay) {
+        $fak = trim((string)($sale['invoice_number'] ?? ''));
+        $legal[] = 'Úhrada převodem na základě faktury' . ($fak !== '' ? ' č. ' . $fak : '')
+            . ($isVat ? ' — daňovým dokladem je faktura.' : '.');
+    }
     $legal[] = 'Reklamace uplatníte na adrese provozovny výše. Doklad uschovejte.';
 
     $payment = (string)($sale['payment_method'] ?? '');

@@ -189,6 +189,17 @@ if (!function_exists('_l')) {
         </tr>
     </table>
 
+    <?php if (trim((string)get_setting('acc_bank_account', '')) === ''
+        && !in_array((string)$invoice['payment_method'], ['cash', 'card', 'cod'], true)
+        && !defined('INVOICE_DOC_EMBED')): ?>
+    <!-- výstraha jen na obrazovce (netiskne se): převodní faktura bez čísla účtu je nezaplatitelná -->
+    <div class="afx-noacc-warn" style="margin:8px 0;padding:10px 14px;border:2px solid #dc3545;border-radius:8px;background:#fff5f5;color:#b02a37;font-size:13px;font-weight:600;">
+        ⚠ V Účetnictví → Nastavení chybí číslo účtu firmy — faktura nemá platební údaje ani QR platbu.
+        Doplň účet a fakturu vytiskni znovu. (Tato výstraha se na papír netiskne.)
+    </div>
+    <style>@media print { .afx-noacc-warn { display: none; } }</style>
+    <?php endif; ?>
+
     <?php
     // ── QR PLATBA (standard ČBA SPAYD) — jen u nezaplacených převodních faktur,
     //    ne v e-mail embedu (externí skript by mailový klient nenačetl)

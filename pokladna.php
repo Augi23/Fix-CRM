@@ -595,6 +595,13 @@ document.addEventListener('DOMContentLoaded', function () {
             <div id="posCustomerWrap" class="mb-3" style="display:none;">
                 <label class="form-label small text-white-50 mb-1">Zákazník (povinné u faktury)</label>
                 <select id="posCustomer" class="form-select" style="width:100%;"></select>
+                <?php if (trim((string)get_setting('acc_bank_account', '')) === ''): ?>
+                <div class="alert alert-danger border-0 py-2 mt-2 mb-0" style="font-size:.85rem;">
+                    <i class="fas fa-triangle-exclamation me-1"></i>
+                    <strong>Chybí číslo účtu firmy</strong> — faktura se vystaví bez platebních údajů a bez QR platby,
+                    zákazník nebude mít kam zaplatit. Doplň ho v <strong>Účetnictví → Nastavení</strong>.
+                </div>
+                <?php endif; ?>
             </div>
 
             <button type="button" class="pos-finish" id="posFinish" disabled><i class="fas fa-check me-2"></i>Dokončit prodej</button>

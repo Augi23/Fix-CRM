@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.48.2',
+        'date' => '2026-08-17',
+        'time' => '16:50',
+        'title' => 'Pokladna: prodej na fakturu — pojistky a správný doklad',
+        'items' => [
+            '<b>Chybějící číslo účtu už nejde přehlédnout:</b> není-li v Účetnictví vyplněné číslo účtu firmy, Pokladna při volbě „Na fakturu" ukáže červené upozornění a tisk převodní faktury zobrazí výstrahu na obrazovce (na papír se netiskne). Převodní faktura bez účtu totiž nemá platební údaje ani QR platbu — zákazník nemá kam zaplatit.',
+            '<b>Termoúčtenka u prodeje na fakturu</b> má nově vždy titul „Doklad o prodeji" a větu „Úhrada převodem na základě faktury č. …". Daňovým dokladem je faktura — dosud by u plátce DPH k jednomu prodeji vznikly dva daňové doklady (účtenka i faktura) a zákazník by si mohl DPH uplatnit dvakrát.',
+        ],
+    ],
+    [
         'version' => '3.48.1',
         'date' => '2026-08-16',
         'time' => '14:10',
