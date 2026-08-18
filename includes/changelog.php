@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.48.3',
+        'date' => '2026-08-18',
+        'time' => date('H:i'),
+        'title' => 'Sklad: arch štítků regálů a polic (4 přes šířku A4)',
+        'items' => [
+            'Ve Sklad → Umístění přibylo tlačítko <b>„Regály + police (arch)"</b> — vytiskne arch A4 na výšku rozdělený na <b>4 štítky přes celou šířku</b>. Nejdřív regály (velký kód R1, R2… pro čitelnost z dálky), pak police: na jednom štítku jsou vždy <b>všechny police jednoho regálu</b>, každá s vlastním QR (sken ukáže obsah police). Ideální na samolepky.',
+        ],
+    ],
+    [
         'version' => '3.48.2',
         'date' => '2026-08-17',
         'time' => '16:50',

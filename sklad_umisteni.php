@@ -95,6 +95,7 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
         <a href="sklad.php?loc=<?php echo (int)$__walkIds[0]; ?>" class="btn btn-outline-success" title="Naskladňovací kolečko: CRM tě provede police a krabičky jednu po druhé (Předchozí/Další) a v každé rovnou zapíšeš obsah"><i class="fas fa-person-walking me-2"></i> Projít sklad</a>
         <?php endif; ?>
         <a href="location_labels.php?all=1&amp;branch=<?php echo (int)$branchId; ?>" target="_blank" class="btn btn-outline-info"><i class="fas fa-qrcode me-2"></i> Arch štítků</a>
+        <a href="location_labels.php?layout=strip&amp;branch=<?php echo (int)$branchId; ?>" target="_blank" class="btn btn-outline-info" title="Arch A4 na výšku, 4 štítky přes celou šířku: regály (jen velký kód) a police (na 1 štítku všechny police regálu, každá s QR)"><i class="fas fa-table-cells-large me-2"></i> Regály + police (arch)</a>
         <?php if ($canEdit): ?>
         <?php
         // šuplíkové boxy (stěna u vchodu) — nabízet založení, jen dokud neexistují
