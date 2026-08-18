@@ -1,6 +1,7 @@
 <?php
 /**
- * POKLADNA (kasa prodejna) — přímý pultový prodej dílů a produktů bez zakázky.
+ * POKLADNA (kasa prodejna) — pultový prodej dílů a produktů + JEDINÉ místo,
+ * kde se zaznamenává platba zakázek (hotově / kartou / na fakturu, v3.49.0).
  * Vlevo: živé vyhledávání skladem dostupných položek + dnešní prodeje (dotisk).
  * Vpravo: košík (množství i cena upravitelné — sleva na místě), volba platby
  * hotově / kartou / na fakturu (u faktury povinný zákazník), dokončení prodeje.
@@ -593,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
 
             <div id="posCustomerWrap" class="mb-3" style="display:none;">
-                <label class="form-label small text-white-50 mb-1">Zákazník (povinné u faktury)</label>
+                <label class="form-label small text-white-50 mb-1">Zákazník — u faktury povinný; u zakázky můžeš nechat prázdné (faktura půjde na jejího klienta)</label>
                 <select id="posCustomer" class="form-select" style="width:100%;"></select>
                 <?php if (trim((string)get_setting('acc_bank_account', '')) === ''): ?>
                 <div class="alert alert-danger border-0 py-2 mt-2 mb-0" style="font-size:.85rem;">
@@ -865,6 +866,13 @@ document.addEventListener('DOMContentLoaded', function () {
     $search.addEventListener('input', function () { clearTimeout(searchTimer); searchTimer = setTimeout(doSearch, 280); });
     $search.addEventListener('focus', function () { if (!$results.children.length) doSearch(); });
 
+    // ?q=číslo zakázky — tlačítko „Uhradit v Pokladně" z detailu zakázky předvyhledá
+    // zakázku rovnou, obsluha ji jen klikne do košíku a zvolí platbu.
+    (function () {
+        var preQ = new URLSearchParams(window.location.search).get('q');
+        if (preQ) { $search.value = preQ; doSearch(); $search.focus(); }
+    })();
+
     // ── košík ──
     function addToCart(r) {
         var stock = r.type === 'manual' ? 999 : (parseInt(r.stock, 10) || 0);
@@ -1054,7 +1062,10 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateFinish() {
         var t = total();
         var ok = cart.length > 0 && payment !== '';
-        if (payment === 'invoice' && !$('#posCustomer').val()) ok = false;
+        // u zakázky v košíku zákazník nutný není — odběratelem faktury se
+        // automaticky stává klient zakázky (pos_checkout si ho dotáhne sám)
+        var hasOrder = cart.some(function (c) { return c.type === 'order'; });
+        if (payment === 'invoice' && !$('#posCustomer').val() && !hasOrder) ok = false;
         if (t < 0 && payment !== '' && payment !== 'cash') ok = false;   // výplata zákazníkovi jde jen hotově
         $finish.disabled = !ok;
         $finish.innerHTML = t < 0

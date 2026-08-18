@@ -155,8 +155,13 @@ $orderLines = array_values(array_filter($cart, static fn(array $l): bool => $l['
 if (count($orderLines) > 1) {
     echo json_encode(['success' => false, 'message' => 'V jednom prodeji může být jen jedna zakázka.']); exit;
 }
-if ($orderLines && $payment === 'invoice') {
-    echo json_encode(['success' => false, 'message' => 'Zakázku přes Pokladnu uhraď hotově nebo kartou. Převod řeš ve výdeji zakázky přes fakturu s QR platbou.']); exit;
+// Zakázka na fakturu: fakturu vystaví rovnou kasa (od v3.49.0 JEDINÉ místo,
+// kde se platba zakázky zaznamenává). Bez vybraného zákazníka se odběratelem
+// automaticky stává klient zakázky — obsluha nemusí nic dohledávat.
+if ($orderLines && $payment === 'invoice' && $customerId <= 0) {
+    $oc = $pdo->prepare("SELECT customer_id FROM orders WHERE id = ?");
+    $oc->execute([(int)$orderLines[0]['id']]);
+    $customerId = (int)$oc->fetchColumn();
 }
 
 $vykupLines = array_values(array_filter($cart, static fn(array $l): bool => $l['type'] === 'vykup'));
@@ -243,11 +248,20 @@ try {
             if (!canAccessOrderBranch($row)) {
                 echo json_encode(['success' => false, 'message' => 'Zakázka je na jiné pobočce — účtovat ji smí jen její zaměstnanci.']); exit;
             }
-            if (!isOrderStatusIn((string)($row['status'] ?? ''), 'completed') && (string)($row['status'] ?? '') !== 'Vydáno - čeká na platbu') {
-                echo json_encode(['success' => false, 'message' => 'Do Pokladny lze vložit jen zakázku ve stavu Připraveno k převzetí / hotovo.']); exit;
+            $rowStatus = (string)($row['status'] ?? '');
+            if (!isOrderStatusIn($rowStatus, 'completed') && !isOrderStatusIn($rowStatus, 'uncollected')
+                && $rowStatus !== 'Vydáno - čeká na platbu') {
+                echo json_encode(['success' => false, 'message' => 'Do Pokladny lze vložit jen zakázku ve stavu Připraveno k převzetí, Nevyzvednuto nebo Vydáno - čeká na platbu.']); exit;
             }
             if (trim((string)($row['payment_method'] ?? '')) !== '' || crmOrderPosSale((int)$row['id'])) {
                 echo json_encode(['success' => false, 'message' => 'Zakázka už má zaznamenanou platbu nebo účtenku.']); exit;
+            }
+            // existující faktura = pohledávka už běží (vystavená předem z detailu
+            // zakázky) — druhý doklad by tržbu zdvojil; úhrada patří k té faktuře
+            $iv = $pdo->prepare("SELECT invoice_number FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
+            $iv->execute([(int)$row['id']]);
+            if (($ivNum = $iv->fetchColumn()) !== false && $ivNum !== null) {
+                echo json_encode(['success' => false, 'message' => 'K zakázce už existuje faktura ' . $ivNum . ' — úhradu (i hotově/kartou) k ní zapiš v Účetnictví → Banka, nebo fakturu nejdřív stornuj.']); exit;
             }
             $amount = crmOrderPosAmount($row);
             if ($amount <= 0) {
@@ -300,7 +314,10 @@ try {
             $cart[$i]['purchase_price'] = null;
         }
     }
-    if ($orderCustomerId > 0) { $customerId = $orderCustomerId; }
+    // Klient zakázky doplní odběratele JEN když obsluha žádného nevybrala —
+    // výslovně vybraný zákazník (např. firma platící opravu zaměstnance) má
+    // přednost. Bezpodmínečný přepis tu do v3.49.0 tiše měnil odběratele faktury.
+    if ($orderCustomerId > 0 && $customerId <= 0) { $customerId = $orderCustomerId; }
 
     $total = 0.0;
     foreach ($cart as $line) { $total += $line['price'] * $line['qty']; }
@@ -346,6 +363,11 @@ try {
         if (!$lockedOrder) { throw new Exception('Zakázka už neexistuje.'); }
         if (trim((string)($lockedOrder['payment_method'] ?? '')) !== '' || crmOrderPosSale($saleOrderId)) {
             throw new Exception('Zakázka už má zaznamenanou platbu nebo účtenku.');
+        }
+        $ivl = $pdo->prepare("SELECT invoice_number FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
+        $ivl->execute([$saleOrderId]);
+        if (($ivlNum = $ivl->fetchColumn()) !== false && $ivlNum !== null) {
+            throw new Exception('K zakázce mezitím vznikla faktura ' . $ivlNum . ' — úhradu zapiš k ní v Účetnictví.');
         }
     }
 
@@ -422,16 +444,23 @@ try {
     if ($payment === 'invoice') {
         $invItems = array_map(static fn($l) => ['name' => $l['name'], 'qty' => $l['qty'],
             'unit_price' => $l['price'], 'used' => $l['used']], $cart);
-        $invoiceId = crmPosCreateInvoice($pdo, $customerId, $saleNumber, $invItems, $total);
+        $invoiceId = crmPosCreateInvoice($pdo, $customerId, $saleNumber, $invItems, $total, $saleOrderId > 0 ? $saleOrderId : null);
         $pdo->prepare("UPDATE pos_sales SET invoice_id = ? WHERE id = ?")->execute([$invoiceId, $saleId]);
     }
 
     if ($saleOrderId > 0) {
-        $orderPayment = $payment === 'card' ? 'card' : 'cash';
+        $orderPayment = ['card' => 'card', 'invoice' => 'transfer'][$payment] ?? 'cash';
         $up = $pdo->prepare("UPDATE orders SET payment_method = ? WHERE id = ? AND (payment_method IS NULL OR payment_method = '')");
         $up->execute([$orderPayment, $saleOrderId]);
         if ($up->rowCount() === 0) {
             throw new Exception('Zakázka už má mezitím zaznamenanou platbu.');
+        }
+        // doplatek po výdeji: zaplacením se „Vydáno - čeká na platbu" dorovná na plné Vydáno
+        $fin = $pdo->prepare("UPDATE orders SET status = 'Vydáno', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND status = 'Vydáno - čeká na platbu'");
+        $fin->execute([$saleOrderId]);
+        if ($fin->rowCount() > 0) {
+            logOrderStatusChange($saleOrderId, 'Vydáno - čeká na platbu', 'Vydáno');
         }
     }
 

@@ -114,7 +114,13 @@ try {
     // Nabízet až při konkrétním hledání, aby prázdné kliknutí do pole nezahltilo
     // kasu seznamem všech připravených oprav.
     if ($qRaw !== '') {
-        $statusSql = orderStatusSqlIn($pdo, 'completed') . "," . $pdo->quote('Vydáno - čeká na platbu');
+        // completed = připravené k převzetí; uncollected = Nevyzvednuto (klient si
+        // konečně přišel vyzvednout A zaplatit); „Vydáno - čeká na platbu" =
+        // doplatek po výdeji (nezaplacený výdej ho dostává automaticky, v3.49.0).
+        // Plné „Vydáno" se NEnabízí schválně — vytáhlo by stovky historických a
+        // importovaných zakázek bez zapsané platby k druhému účtování.
+        $statusSql = orderStatusSqlIn($pdo, 'completed') . "," . orderStatusSqlIn($pdo, 'uncollected')
+            . "," . $pdo->quote('Vydáno - čeká na platbu');
         $codeParams = [];
         $orderCodeSql = $codeLikeSql('o.order_code', $codeTerms, $codeParams);
         $legacyCodeSql = $codeLikeSql('o.legacy_code', $codeTerms, $codeParams);

@@ -2378,7 +2378,7 @@ function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false): 
  *   použité zboží §90 → cena beze změny, vat_rate 0 + povinná věta v poznámce
  * $items: [['name','qty','unit_price','used']]. Vrací id faktury.
  */
-function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, array $items, float $total): int {
+function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, array $items, float $total, ?int $orderId = null): int {
     $isVat = get_setting('acc_is_vat_payer', '0') == '1';
     $vatRate = (float)get_setting('acc_vat_rate', '21');
     $hasUsed = false;
@@ -2418,7 +2418,7 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
     $ins = $pdo->prepare("INSERT INTO invoices
             (invoice_number, variable_symbol, customer_id, order_id, date_issue, date_tax, date_due,
              total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes)
-        VALUES (?, ?, ?, NULL, CURDATE(), CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY),
+        VALUES (?, ?, ?, ?, CURDATE(), CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY),
                 ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?)");
     $invoiceId = 0;
     // Číslo z MAXIMA řady pod zámkem (stejný vzor jako pokladní doklady):
@@ -2434,7 +2434,7 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
         for ($try = 0; $try < 6; $try++) {
             $number = afxNextInvoiceNumber($pdo, $prefix, true);
             try {
-                $ins->execute([$number, preg_replace('/\D/', '', $number) ?: null, $customerId,
+                $ins->execute([$number, preg_replace('/\D/', '', $number) ?: null, $customerId, $orderId,
                     round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes]);
                 $invoiceId = (int)$pdo->lastInsertId();
                 break;

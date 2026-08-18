@@ -44,10 +44,11 @@ $guides['crm'] = [
     [
         'id' => 'kasa-pokladna', 'icon' => 'fa-cash-register', 'color' => '#30D158',
         'title' => 'Pokladna (kasa) — prodej přes pult',
-        'intro' => 'Přímý prodej produktů (použitá elektronika, příslušenství) a servisních dílů bez zakládání zakázky. Sklad se odečítá automaticky, účtenka se tiskne hned.',
+        'intro' => 'Přímý prodej produktů (použitá elektronika, příslušenství) a servisních dílů — a JEDINÉ místo, kde se zaznamenává platba zakázek. Sklad se odečítá automaticky, účtenka se tiskne hned.',
         'steps' => [
             'Otevři <b>Pokladna</b> v horním menu.',
-            '<b>Najdi zboží:</b> do velkého pole piš název, model nebo sériové číslo. Nabízí se jen to, co je <b>skutečně skladem</b> — zelený štítek PRODUKT (bazarové zboží), modrý DÍL (servisní díl). Klikem se položka přidá do košíku.',
+            '<b>Najdi zboží nebo zakázku:</b> do velkého pole piš název, model, sériové číslo nebo číslo zakázky. Nabízí se jen to, co je <b>skutečně skladem</b> — zelený štítek PRODUKT (bazarové zboží), modrý DÍL (servisní díl), fialový <b>ZAKÁZKA</b> (hotová oprava k úhradě, i vydaná nezaplacená). Klikem se položka přidá do košíku.',
+            '<b>Zakázka v košíku:</b> částka je daná zakázkou a množství je vždy 1. Zaplatit jde <b>hotově, kartou i na fakturu</b> (odběratelem se sám stane klient zakázky). V detailu zakázky je zelené tlačítko <b>„Uhradit v Pokladně"</b>, které zakázku v kase rovnou předvyhledá. Jinde než přes Pokladnu se platba zakázky zaznamenat nedá.',
             '<b>Nebo pípni čtečkou:</b> USB čtečka čárových kódů funguje kdykoli, když je Pokladna otevřená — <b>nemusíš klikat do žádného pole</b>. Načteš kód a položka skočí rovnou do košíku (vysoké pípnutí = přidáno, nízké + hláška = kód nenalezen).',
             '<b>Košík:</b> položek můžeš přidat víc. U každé jde upravit <b>počet kusů</b> i <b>cenu za kus</b> (sleva na místě) — celková částka se přepočítá sama.',
             '<b>Platba:</b> vyber jedno ze tří tlačítek — <b>Hotově</b>, <b>Kartou</b> (terminál jedeš normálně zvlášť, tady se jen eviduje typ platby pro účetnictví) nebo <b>Na fakturu</b> (vyber zákazníka — faktura se vystaví automaticky a objeví se i v Účetnictví).',

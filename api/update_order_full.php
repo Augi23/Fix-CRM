@@ -62,6 +62,46 @@ try {
     }
 
     $new_status = normalizeOrderStatus($_POST['status'] ?? $current['status']);
+
+    // Nezaplacený výdej → „Vydáno - čeká na platbu" (v3.49.0, stejné pravidlo
+    // jako v update_order_status.php): platbu zaznamenává výhradně Pokladna a
+    // k doplatku nabízí právě tenhle stav. Plné „Vydáno" tu projde jen s už
+    // podchycenou platbou nebo u 0 Kč.
+    if ((string)$new_status === 'Vydáno' && !isOrderStatusIn((string)$current['status'], 'collected')) {
+        // Výslovně poslaná 0 = výdej zdarma (goodwill) — na odhad se NEspadá;
+        // stejné pravidlo jako v update_order_status.php. Fallback na odhad je
+        // jen pro zakázky, kde finální cena zatím nebyla vyplněná vůbec.
+        if (isset($_POST['final_cost']) && (string)$_POST['final_cost'] !== '') {
+            $__amountDue = (float)(crmNumOrNull($_POST['final_cost']) ?? 0);
+        } else {
+            $__amountDue = ($current['final_cost'] !== null && $current['final_cost'] !== '')
+                ? (float)$current['final_cost']
+                : (float)($current['estimated_cost'] ?? 0);
+        }
+        if ($__amountDue > 0) {
+            $__paid = trim((string)($current['payment_method'] ?? '')) !== '';
+            try {
+                if (!$__paid) {
+                    $__iv = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
+                    $__iv->execute([(int)$order_id]);
+                    $__paid = (bool)$__iv->fetchColumn();
+                }
+                if (!$__paid && function_exists('crmOrderPosSale')) {
+                    $__paid = (bool)crmOrderPosSale((int)$order_id);
+                }
+                if (!$__paid) {
+                    // žádné ensure* (DDL) — jsme uvnitř transakce; chybu spolkne catch
+                    $__cm = $pdo->prepare("SELECT id FROM pos_cash_movements WHERE ref_type = 'order' AND ref_id = ? LIMIT 1");
+                    $__cm->execute([(int)$order_id]);
+                    $__paid = (bool)$__cm->fetchColumn();
+                }
+            } catch (Throwable $e) {
+                error_log('update_order_full kontrola platby pred vydejem selhala #' . (int)$order_id . ': ' . $e->getMessage());
+            }
+            if (!$__paid) { $new_status = 'Vydáno - čeká na platbu'; }
+        }
+    }
+
     $technician_id = ($_POST['technician_id'] ?? '') !== '' ? (int)$_POST['technician_id'] : (int)$current['technician_id'];
 
     // Od 1.6.1: technika smí přeřadit KAŽDÝ zaměstnanec (shodně s

@@ -29,8 +29,6 @@ $requested_status = $_REQUEST['status'] ?? null;
 $new_status = $requested_status !== null ? normalizeOrderStatus($requested_status) : null;
 $final_cost = $_REQUEST['final_cost'] ?? null;
 $technician_id = $_REQUEST['technician_id'] ?? null;
-$payment_method = (string)($_POST['payment_method'] ?? '');
-if (!in_array($payment_method, ['cash', 'card', 'transfer'], true)) { $payment_method = ''; }
 
 ensureOrderWorkTrackingSchema();
 ensureOrderWorkLogSchema(); // DDL — must run before beginTransaction()
@@ -41,13 +39,11 @@ if (!$order_id || !$new_status) {
     exit;
 }
 
-// Platba při výdeji (hotově / kartou / převodem) — volitelný parametr.
-// Načítá se PŘED transakcí schválně: potřebuje ji jak kontrola uzávěrky níže,
-// tak odpověď „chybí provedená oprava" (vrací platbu zpět frontendu, aby ji
-// neztratil v opakovaném požadavku). Dřív se načítala až uprostřed transakce,
-// takže kontrola uzávěrky pracovala s nedefinovanou proměnnou.
-$payment_method = (string)($_POST['payment_method'] ?? '');
-if (!in_array($payment_method, ['cash', 'card', 'transfer'], true)) { $payment_method = ''; }
+// Platba se zakázce od v3.49.0 NEZAPISUJE tady — jediné místo záznamu platby
+// je Pokladna (pos_checkout: hotově / kartou / na fakturu). Parametr
+// payment_method se záměrně ignoruje, aby starší otevřené záložky nemohly
+// platbu zapsat mimo kasu. Výdej bez zaznamenané platby projde (reklamace,
+// záruka, 0 Kč), ale u nenulové částky vrací viditelné varování níže.
 
 try {
     $pdo->beginTransaction();
@@ -68,19 +64,6 @@ try {
 
     $current_status = $order_data['status'];
     $current_tech_id = $order_data['technician_id'];
-    $has_existing_cash_receipt = $payment_method === 'cash' ? (bool)crmOrderPosReceiptSale((int)$order_id) : false;
-
-    // UZÁVĚRKA — kontrola PŘED zápisem: výdej s platbou hotově zapisuje tržbu
-    // k dnešku. Při zamčeném aktuálním měsíci se odmítne CELÝ výdej (rollback),
-    // ne až zápis hotovosti po commitu — jinak by zakázka zůstala „vydaná" bez
-    // stopy v pokladním deníku a tržba by se už nikdy nedozapsala.
-    if ($payment_method === 'cash'
-        && isOrderStatusIn($new_status, 'collected') && !isOrderStatusIn($current_status, 'collected')
-        && !$has_existing_cash_receipt
-        && function_exists('afxAccountingClosedError')) {
-        $lockErr = afxAccountingClosedError(date('Y-m-d'), 'příjem hotovosti za zakázku');
-        if ($lockErr !== null) { throw new Exception($lockErr); }
-    }
     $current_estimated = $order_data['estimated_cost'];
     $current_final = $order_data['final_cost'];
     // '0' = výslovně „bez technika" (odebrat přiřazení); prázdné = beze změny.
@@ -112,10 +95,6 @@ try {
             'success' => false,
             'code' => 'repair_solution_required',
             'message' => $t('repair_solution_required'),
-            // Zvolenou platbu vracíme zpět, aby ji frontend přibalil do opakovaného
-            // požadavku po doplnění opravy — jinak se výdej dokončil bez platby
-            // (hotovost nedošla do pokladny, faktura s QR se nevystavila).
-            'payment_method' => $payment_method,
         ]);
         exit;
     }
@@ -137,6 +116,40 @@ try {
         }
     }
 
+    // Nezaplacený výdej nesmí skončit v plném „Vydáno" (v3.49.0): platbu
+    // zaznamenává výhradně Pokladna a ta k doplatku nabízí právě zakázky ve
+    // stavu „Vydáno - čeká na platbu". Plné „Vydáno" tu dostane jen výdej,
+    // kde je platba už podchycená (faktura / prodejka z kasy / hotovost) nebo
+    // není co platit (0 Kč — reklamace, záruka); jinak ho doplní kasa po platbě.
+    if ((string)$new_status === 'Vydáno' && !isOrderStatusIn($current_status, 'collected')) {
+        $amountDue = ($final_cost !== null && $final_cost !== '')
+            ? (float)$final_cost
+            : (float)(($current_final !== null && $current_final !== '') ? $current_final : ($current_estimated ?? 0));
+        if ($amountDue > 0) {
+            $paidAlready = trim((string)($order_data['payment_method'] ?? '')) !== '';
+            try {
+                if (!$paidAlready) {
+                    $iv = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
+                    $iv->execute([(int)$order_id]);
+                    $paidAlready = (bool)$iv->fetchColumn();
+                }
+                if (!$paidAlready && function_exists('crmOrderPosSale')) {
+                    $paidAlready = (bool)crmOrderPosSale((int)$order_id);
+                }
+                if (!$paidAlready) {
+                    // POZOR: žádné ensure* (DDL) — jsme uvnitř transakce; chybějící
+                    // tabulku spolkne catch a výdej projde postaru (fail-open)
+                    $cm = $pdo->prepare("SELECT id FROM pos_cash_movements WHERE ref_type = 'order' AND ref_id = ? LIMIT 1");
+                    $cm->execute([(int)$order_id]);
+                    $paidAlready = (bool)$cm->fetchColumn();
+                }
+            } catch (Throwable $e) {
+                error_log('update_order_status kontrola platby pred vydejem selhala #' . (int)$order_id . ': ' . $e->getMessage());
+            }
+            if (!$paidAlready) { $new_status = 'Vydáno - čeká na platbu'; }
+        }
+    }
+
     $sql = 'UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP';
     $params = [$new_status];
 
@@ -155,18 +168,13 @@ try {
         $params[] = $target_tech_id;
     }
 
-    // Akce k platbě (příjem do kasy / faktura s QR e-mailem) běží až po commitu níže.
     if (isOrderStatusIn($new_status, 'collected')) {
         $sql .= ', shipping_date = IFNULL(shipping_date, CURRENT_TIMESTAMP)';
         // Výdej bez zvoleného způsobu předání → automaticky „Osobní odběr" (Self Pickup).
         // Umožní bleskové „Vydáno" z jakéhokoli stavu bez proklikávání dopravy
         // (rozhodnutí majitele: jiná volba stejně nefunguje).
         $sql .= ", shipping_method = IFNULL(NULLIF(shipping_method, ''), 'Self Pickup')";
-        if ($payment_method !== '') {
-            ensureOrderPaymentMethodColumn();
-            $sql .= ', payment_method = ?';
-            $params[] = $payment_method;
-        }
+        // payment_method se tu od v3.49.0 NEzapisuje — zapisuje ho výhradně kasa.
     }
 
     if (isOrderStatusIn($new_status, 'collected') && ($final_cost === null || $final_cost === '')) {
@@ -259,75 +267,16 @@ try {
         error_log('update_order_status post-commit (audit/notify) selhal, zmena #' . (int)$order_id . ' ulozena: ' . $e->getMessage());
     }
 
-    // ── Platba při výdeji: akce podle zvoleného způsobu (best-effort po commitu) ──
+    // ── Platba: od v3.49.0 ji zapisuje VÝHRADNĚ Pokladna (pos_checkout).
+    //    Tady zbývá jen pojistka proti tiché ztrátě platby při výdeji. ──
     $payment_note = '';
     $payment_warning = false;
     $entering_collected = isOrderStatusIn($new_status, 'collected') && !isOrderStatusIn($current_status, 'collected');
-    // Platbu je potřeba zaznamenat i tehdy, když zakázka UŽ ve skupině „vydáno" je —
-    // typicky stav „Vydáno – čeká na platbu": klient přijde doplatit později a bez
-    // tohohle by se hotovost nikam nezapsala a faktura nevznikla (tichá ztráta).
-    $collectedNow = isOrderStatusIn($new_status, 'collected');
-    $hadPayment = trim((string)($order_data['payment_method'] ?? '')) !== '';
-    if ($payment_method !== '' && $collectedNow && ($entering_collected || !$hadPayment)) {
-        try {
-            $__oc = trim((string)($order_data['order_code'] ?? '')) !== '' ? (string)$order_data['order_code'] : ('#' . (int)$order_id);
-            $amount = (float)($final_cost ?? 0);
-            $payLabels = ['cash' => 'hotově', 'card' => 'kartou', 'transfer' => 'převodem'];
-            crmAuditLog('order.payment_set', [
-                'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
-                'summary' => 'Zakázka ' . $__oc . ' — výdej, platba ' . ($payLabels[$payment_method] ?? $payment_method) . ($amount > 0 ? ' (' . formatMoney($amount) . ')' : ''),
-            ]);
-
-            if ($payment_method === 'cash' && $amount > 0
-                && function_exists('afxAccountingClosedError')
-                && afxAccountingClosedError(date('Y-m-d'), 'příjem hotovosti za zakázku') !== null) {
-                // pojistka pro souběh (zámek vznikl během požadavku): stav už je
-                // commitnutý, tak aspoň VIDITELNÁ stopa místo tichého nezapsání
-                $payment_note = 'POZOR: hotovost NEZAPSÁNA do pokladního deníku — období je uzavřené. Po odemčení doplň pohyb ručně.';
-                $payment_warning = true;
-            } elseif ($payment_method === 'cash' && $amount > 0) {
-                // hotovost prošla kasou → normální pokladní účtenka (idempotentně)
-                // místo anonymního pohybu. Díky pos_sales.order_id ji detail zakázky
-                // i Pokladna umí kdykoli dotisknout.
-                $receipt = crmEnsureOrderCashReceipt((int)$order_id);
-                if (!($receipt['ok'] ?? false)) {
-                    $payment_note = (string)($receipt['error'] ?? 'Účtenku k zakázce se nepodařilo vystavit.');
-                } else {
-                    if (empty($receipt['existing'])) {
-                        crmAuditLog('kasa.sale', [
-                            'entity_type' => 'pos_sale', 'entity_id' => (int)$receipt['sale_id'], 'entity_label' => (string)$receipt['sale_number'],
-                            'summary' => 'Pokladní účtenka ' . (string)$receipt['sale_number'] . ' k zakázce ' . $__oc . ' (' . formatMoney($amount) . ', hotově při výdeji)',
-                            'branch_id' => (int)($order_data['branch_id'] ?? 0),
-                        ]);
-                    }
-                    $payment_note = 'Hotovost zapsána do pokladny účtenkou ' . (string)$receipt['sale_number'] . ' (' . formatMoney($amount) . ').';
-                }
-            } elseif ($payment_method === 'transfer') {
-                $invId = crmEnsureOrderInvoice((int)$order_id, 'bank_transfer');
-                if ($invId > 0) {
-                    [$eok, $emsg, $eto] = crmSendInvoiceEmail($invId);
-                    $payment_note = $eok
-                        ? ('Faktura s QR platbou odeslána na ' . $eto . '.')
-                        : ('Faktura vystavena, e-mail se nepodařilo odeslat: ' . $emsg);
-                    $payment_warning = !$eok;
-                } else {
-                    $payment_note = 'Fakturu se nepodařilo vystavit — vystav ji ručně v Účetnictví.';
-                    $payment_warning = true;
-                }
-            } elseif ($payment_method === 'card') {
-                $payment_note = 'Platba kartou zaznamenána — spáruje se s výpisem z účtu.';
-            }
-        } catch (Throwable $e) {
-            error_log('update_order_status payment action selhala, zmena #' . (int)$order_id . ' ulozena: ' . $e->getMessage());
-            $payment_note = 'Stav uložen, ale akce k platbě selhala — zkontroluj ručně.';
-            $payment_warning = true;
-        }
-    } elseif ($payment_method === '' && $entering_collected) {
-        // POJISTKA proti tiché ztrátě platby: výdej BEZ způsobu platby výdej
-        // nezastavuje (vydat se legitimně smí i bez placení — reklamace, záruka,
-        // zakázka za 0 Kč, „Vydat bez záznamu platby"), ale u nenulové částky
-        // nesmí projít potichu se zeleným „Aktualizováno". Proto viditelné
-        // varování obsluze + stopa v auditu, ať se ztráta dá dohledat.
+    if ($entering_collected) {
+        // POJISTKA proti tiché ztrátě platby: výdej BEZ zaznamenané platby
+        // nezastavujeme (vydat se legitimně smí i bez placení — reklamace, záruka,
+        // zakázka za 0 Kč), ale u nenulové částky nesmí projít potichu se zeleným
+        // „Aktualizováno". Proto viditelné varování s odkazem na Pokladnu + audit.
         try {
             $amount = (float)($final_cost ?? 0);
             // Falešně nevaruj tam, kde je platba už podchycená jinde:
@@ -356,7 +305,7 @@ try {
             }
             if ($amount > 0 && !$already_paid) {
                 $__oc = trim((string)($order_data['order_code'] ?? '')) !== '' ? (string)$order_data['order_code'] : ('#' . (int)$order_id);
-                $payment_note = 'POZOR: zakázka vydána BEZ záznamu platby (' . formatMoney($amount) . '). Pokud klient platil, doplň platbu v Účetnictví — do pokladny se nic nezapsalo.';
+                $payment_note = 'Vydáno jako „čeká na platbu" (' . formatMoney($amount) . ' nezaplaceno). Platbu vyřiď v Pokladně — zakázku ' . $__oc . ' tam najdeš vyhledáváním; po zaplacení se sama přepne na Vydáno.';
                 $payment_warning = true;
                 // záměrně stejný typ jako u zaznamenané platby ('order.payment_set') —
                 // jen ten má v přehledu historie český popisek; rozdíl nese souhrn

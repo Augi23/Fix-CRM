@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.49.0',
+        'date' => '2026-08-18',
+        'time' => '17:30',
+        'title' => 'Pokladna je JEDINÉ místo platby zakázek (i na fakturu)',
+        'items' => [
+            '<b>Zakázka se platí výhradně přes Pokladnu:</b> najdeš ji vyhledáváním (číslo, model, jméno klienta) a zaplatíš <b>hotově, kartou i NOVĚ na fakturu</b> — odběratelem faktury se sám stane klient zakázky a faktura se se zakázkou prováže. Kasa nabídne i <b>vydané nezaplacené</b> zakázky („Vydáno — čeká na platbu"), takže doplatek po výdeji projde taky.',
+            '<b>Dřívější možnosti platby mimo kasu zrušeny:</b> v detailu zakázky select „Platba při výdeji" nahradilo zelené tlačítko <b>„Uhradit v Pokladně"</b> (zakázku v kase rovnou předvyhledá), v seznamu zakázek zmizelo okno „Jak klient platí?" u bleskového výdeje a API změny stavu platbu už nepřijímá — starší otevřené záložky ji nemohou zapsat bokem.',
+            '<b>Nezaplacený výdej se hlídá sám:</b> výdej zakázky s nenulovou částkou bez podchycené platby dostane automaticky stav <b>„Vydáno - čeká na platbu"</b> (obsluha vidí červené upozornění s pokynem) a po zaplacení v Pokladně se sám přepne na plné Vydáno. Výdej zdarma (reklamace, záruka, 0 Kč) projde postaru. Zakázku s už existující fakturou kasa odmítne (úhrada patří k faktuře v Účetnictví → Banka) — proto je nově vypnuté i automatické vystavování faktur při dokončení zakázky.',
+        ],
+    ],
+    [
         'version' => '3.48.3',
         'date' => '2026-08-18',
         'time' => date('H:i'),

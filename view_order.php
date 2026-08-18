@@ -554,18 +554,51 @@ function localizedOrderStatusLabel(string $status): string {
                         </div>
                         <button type="submit" class="btn btn-outline-primary btn-sm w-100"><?php echo __('save'); ?></button>
                     </form>
-                    <?php /* Platba při výdeji: hotově → příjem do pokladny; převodem →
-                             faktura s QR platbou na e-mail; kartou → záznam pro párování
-                             s výpisem z účtu. Odesílá se spolu se změnou stavu na Vydáno. */ ?>
-                    <?php ensureOrderPaymentMethodColumn(); $__pm = (string)($order['payment_method'] ?? ''); ?>
+                    <?php /* Od v3.49.0 se platba zakázky zaznamenává VÝHRADNĚ přes
+                             Pokladnu (hotově / kartou / na fakturu) — dřívější select
+                             „Platba při výdeji" zrušen na přání majitele. Tlačítko se
+                             ukazuje JEN u zakázek, které kasa opravdu najde (stavy z
+                             pos_search) — jinde by vedlo na „nic nenalezeno". */ ?>
+                    <?php
+                    ensureOrderPaymentMethodColumn();
+                    $__pm = (string)($order['payment_method'] ?? '');
+                    $__st = (string)($order['status'] ?? '');
+                    $__amt = (float)(($order['final_cost'] ?? 0) ?: ($order['estimated_cost'] ?? 0));
+                    $__posNajde = isOrderStatusIn($__st, 'completed') || isOrderStatusIn($__st, 'uncollected') || $__st === 'Vydáno - čeká na platbu';
+                    $__invNum = '';
+                    if ($__pm === '') {
+                        try {
+                            $__ivq = $pdo->prepare("SELECT invoice_number FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
+                            $__ivq->execute([(int)$order['id']]);
+                            $__invNum = (string)($__ivq->fetchColumn() ?: '');
+                        } catch (Throwable $e) { $__invNum = ''; }
+                    }
+                    ?>
                     <div class="mb-2 mt-2">
-                        <label class="form-label mb-1"><i class="fas fa-money-bill-wave me-1 text-success"></i>Platba při výdeji</label>
-                        <select id="paymentMethodSelect" class="form-select">
-                            <option value="" <?php echo $__pm === '' ? 'selected' : ''; ?>>-- zvol při výdeji --</option>
-                            <option value="cash" <?php echo $__pm === 'cash' ? 'selected' : ''; ?>>💵 Hotově (zapíše se do pokladny)</option>
-                            <option value="card" <?php echo $__pm === 'card' ? 'selected' : ''; ?>>💳 Kartou (spáruje se s účtem)</option>
-                            <option value="transfer" <?php echo $__pm === 'transfer' ? 'selected' : ''; ?>>🏦 Převodem (faktura s QR na e-mail)</option>
-                        </select>
+                        <label class="form-label mb-1"><i class="fas fa-money-bill-wave me-1 text-success"></i>Platba</label>
+                        <?php if ($__pm !== ''): ?>
+                            <div class="text-white-75 small py-1">
+                                <i class="fas fa-check-circle text-success me-1"></i>
+                                Zaznamenáno: <strong><?php echo ['cash' => 'hotově', 'card' => 'kartou', 'transfer' => 'převodem'][$__pm] ?? e($__pm); ?></strong>
+                            </div>
+                        <?php elseif ($__invNum !== ''): ?>
+                            <div class="text-white-75 small py-1">
+                                <i class="fas fa-file-invoice me-1 text-info"></i>
+                                Vystavena faktura <strong><?php echo e($__invNum); ?></strong> — úhradu (i hotově/kartou) zapiš k faktuře v <strong>Účetnictví → Banka</strong>.
+                            </div>
+                        <?php elseif ($__amt <= 0): ?>
+                            <div class="text-white-50 small py-1">Bez částky k úhradě (0 Kč) — reklamace/záruka se neplatí.</div>
+                        <?php elseif ($__posNajde): ?>
+                            <a class="btn btn-success btn-sm w-100" href="pokladna.php?q=<?php echo urlencode(orderDisplayCode($order)); ?>">
+                                <i class="fas fa-cash-register me-2"></i>Uhradit v Pokladně
+                            </a>
+                            <div class="text-white-50 mt-1" style="font-size:.72rem;">Hotově, kartou i na fakturu — zakázka bude v Pokladně rovnou vyhledaná.</div>
+                        <?php else: ?>
+                            <div class="text-white-50 small py-1">
+                                Bez záznamu platby. Pro dodatečnou úhradu přepni stav na
+                                <strong>„Vydáno - čeká na platbu"</strong> — pak zakázku najde Pokladna.
+                            </div>
+                        <?php endif; ?>
                     </div>
                     <hr class="border-secondary my-3">
                 </div>
@@ -1460,10 +1493,7 @@ function showStatusConfirmModal(form) {
         const btn = $(this);
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ...');
 
-        // Platba při výdeji (select mimo #statusForm) — přibalit ke změně stavu.
         let __data = form.serialize();
-        const __pm = $('#paymentMethodSelect').val();
-        if (__pm) { __data += '&payment_method=' + encodeURIComponent(__pm); }
 
         $.post('api/update_order_status.php', __data, function(raw) {
             let res = null;
@@ -1489,11 +1519,8 @@ function showStatusConfirmModal(form) {
             btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
             if (res && res.code === 'repair_solution_required') {
                 // Chybí „Provedená oprava" → rovnou nabídnout doplnění a přechod dokončit.
-                // Zvolenou platbu předáme dál (přednostně tu, kterou vrátil server), jinak
-                // by se výdej dokončil bez ní — hotovost by nedošla do pokladny a faktura
-                // s QR by se nevystavila, přitom obsluha vidí jen „uloženo".
                 modal.modal('hide');
-                showRepairSolutionModal(form, (res.payment_method || __pm || ''));
+                showRepairSolutionModal(form);
                 return;
             }
             if (res && res.message) {
@@ -1513,7 +1540,7 @@ function showStatusConfirmModal(form) {
 
 // „Provedená oprava" chybí → modal s textareou; po vyplnění se stavový přechod
 // pošle znovu i s repair_solution (API ho uloží a stav změní v jednom kroku).
-function showRepairSolutionModal(form, paymentMethod) {
+function showRepairSolutionModal(form) {
     const m = $('#repairSolutionModal');
     m.modal('show');
     setTimeout(function() { $('#repairSolutionInput').trigger('focus'); }, 300);
@@ -1523,11 +1550,7 @@ function showRepairSolutionModal(form, paymentMethod) {
         if (!val) { $('#repairSolutionInput').addClass('is-invalid').trigger('focus'); return; }
         const btn = $(this);
         btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ...');
-        // Platební select stojí mimo #statusForm, takže v form.serialize() NENÍ —
-        // musí se přibalit ručně, jinak by opakovaný požadavek platbu zahodil.
         let __data = form.serialize() + '&repair_solution=' + encodeURIComponent(val);
-        const __pm2 = paymentMethod || $('#paymentMethodSelect').val() || '';
-        if (__pm2) { __data += '&payment_method=' + encodeURIComponent(__pm2); }
         $.post('api/update_order_status.php', __data, function(raw) {
             let res = null;
             try { res = (typeof raw === 'string') ? JSON.parse(raw) : raw; } catch (e) { res = null; }
