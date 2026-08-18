@@ -30,6 +30,9 @@ if (!defined('INVOICE_DOC_EMBED')) {
     // bez ?lang → doklad v jazyce KLIENTA (customers.preferred_language); uk → en
     $target_lang = $_GET['lang'] ?? crmCustomerDocLang($invoice['preferred_language'] ?? 'cs');
 }
+// V embed režimu (e-mail, klientský portál) $target_lang nikdo nenastavil —
+// bez pojistky každý vložený doklad sypal warning „Undefined variable".
+$target_lang = $target_lang ?? crmCustomerDocLang((string)($invoice['preferred_language'] ?? 'cs'));
 if (!function_exists('_l')) {
     function _l($key) { global $target_lang; return __($key, $target_lang); }
 }

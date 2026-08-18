@@ -84,6 +84,9 @@ $pageTitle = __($cfg['title_key'], $lang);
         <button type="button" class="tb-btn" id="btnSave"><i class="fas fa-floppy-disk me-1"></i> Uložit</button>
         <button type="button" class="tb-btn" id="btnPrint"><i class="fas fa-print me-1"></i> Tisk</button>
         <button type="button" class="tb-btn" id="btnEmail"><i class="fas fa-envelope me-1"></i> Odeslat e-mailem</button>
+        <?php if ($type === 'vykup'): ?>
+        <button type="button" class="tb-btn" id="btnOnlineLink" title="Zkopíruje odkaz, přes který klient list vyplní online (stejný je i v e-mailu)"><i class="fas fa-link me-1"></i> Odkaz k vyplnění</button>
+        <?php endif; ?>
         <button type="button" class="tb-btn tb-btn--primary" id="btnSign"><i class="fas fa-pen-nib me-1"></i> Podepsat na tabletu</button>
     </div>
 </div>
@@ -191,6 +194,28 @@ $pageTitle = __($cfg['title_key'], $lang);
         save().then(function () { window.print(); })
               .catch(function (e) { toast('⚠️ ' + e.message, false); })
               .finally(function () { b.disabled = false; });
+    };
+
+    var btnLink = document.getElementById('btnOnlineLink');
+    if (btnLink) btnLink.onclick = function () {
+        var b = this; b.disabled = true;
+        save().then(function () {
+            var fd = new FormData();
+            fd.append('id', docId);
+            fd.append('csrf_token', CSRF);
+            return fetch('api/document_online_link.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); });
+        }).then(function (j) {
+            if (!j.ok) { throw new Error(j.error || 'Odkaz se nepodařilo získat'); }
+            // zkopírovat do schránky; když prohlížeč nedovolí, ukázat k ručnímu zkopírování
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(j.url)
+                    .then(function () { toast('🔗 Odkaz pro klienta zkopírován — pošli ho SMS/WhatsAppem.', true); })
+                    .catch(function () { window.prompt('Zkopíruj odkaz pro klienta:', j.url); });
+            }
+            window.prompt('Zkopíruj odkaz pro klienta:', j.url);
+        }).catch(function (e) { toast('⚠️ ' + e.message, false); })
+          .finally(function () { b.disabled = false; });
     };
 
     document.getElementById('btnEmail').onclick = function () {

@@ -2418,7 +2418,7 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
     $ins = $pdo->prepare("INSERT INTO invoices
             (invoice_number, variable_symbol, customer_id, order_id, date_issue, date_tax, date_due,
              total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes)
-        VALUES (?, ?, ?, ?, CURDATE(), CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY),
+        VALUES (?, ?, ?, ?, CURDATE(), CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY),
                 ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?)");
     $invoiceId = 0;
     // Číslo z MAXIMA řady pod zámkem (stejný vzor jako pokladní doklady):
@@ -4952,7 +4952,7 @@ function crmEnsureOrderInvoice(int $orderId, string $paymentMethod = 'bank_trans
                     'order_id' => $orderId,
                     'date_issue' => date('Y-m-d'),
                     'date_tax' => date('Y-m-d'),
-                    'date_due' => date('Y-m-d', strtotime('+14 days')),
+                    'date_due' => date('Y-m-d', strtotime('+2 days')),   // krátká splatnost (přání majitele 18.8.2026)
                     'status' => 'issued',
                     'payment_method' => $paymentMethod,
                     'currency' => get_setting('currency', 'Kč'),

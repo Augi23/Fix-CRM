@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.49.3',
+        'date' => '2026-08-18',
+        'time' => '17:40',
+        'title' => 'QR platba živá (účet KB), splatnost 2 dny, odkaz k vyplnění výkupu',
+        'items' => [
+            '<b>QR platba na fakturách FUNGUJE:</b> do Účetnictví doplněn firemní účet KB 131-4361890297/0100 (+ IBAN a SWIFT) — každá převodní faktura má od teď platební údaje i QR kód pro banku v telefonu. Šest starších faktur z éry bez účtu (37 650 Kč) přeposláno klientům znovu, tentokrát zaplatitelných.',
+            '<b>Splatnost nových faktur zkrácena na 2 dny</b> (kasa i faktura k zakázce) — dřívějších 14 dní nedávalo u pultového prodeje smysl.',
+            '<b>Výkupní list: tlačítko „Odkaz k vyplnění"</b> v editoru zkopíruje zabezpečený odkaz pro klienta do schránky — hodí se pro SMS/WhatsApp, do e-mailu se přikládá sám. Opraven i warning „Undefined variable" u faktur vkládaných do e-mailu.',
+        ],
+    ],
+    [
         'version' => '3.49.2',
         'date' => '2026-08-18',
         'time' => '17:05',
