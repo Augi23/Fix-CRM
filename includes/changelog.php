@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.49.1',
+        'date' => '2026-08-18',
+        'time' => '16:40',
+        'title' => 'Faktura z kasy e-mailem s QR platbou; výkupní list na mail',
+        'items' => [
+            '<b>Pokladna → „Fakturu e-mailem (QR platba)":</b> po prodeji na fakturu přibylo na obrazovce „hotovo" modré tlačítko — faktura odejde klientovi e-mailem i s blokem <b>Platba převodem</b> (číslo účtu, částka, variabilní symbol, splatnost a <b>QR kód</b>, který banka v telefonu rovnou načte). Když klient nemá uložený e-mail, kasa se na adresu zeptá. Tištěná/obrazovková faktura má QR platbu dál taky.',
+            '<b>Výkupní list e-mailem:</b> v editoru dokumentu (Sklad → Dokumenty → výkupní list) je tlačítko <b>„Odeslat e-mailem"</b> — pošle klientovi kopii listu (i s podpisem) na e-mail vyplněný v dokumentu. Připomínka: funguje od 3.44, teď prověřeno na ostrých datech.',
+            '<i>Poznámka: QR platba se na dokladech objeví v okamžiku, kdy bude v Účetnictví vyplněné číslo firemního účtu — bez něj nemá QR kam mířit.</i>',
+        ],
+    ],
+    [
         'version' => '3.49.0',
         'date' => '2026-08-18',
         'time' => '17:30',

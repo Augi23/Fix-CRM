@@ -622,6 +622,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-info" id="posDoneReceipt"><i class="fas fa-print me-1"></i> Účtenka</button>
                 <button type="button" class="btn btn-warning" id="posDoneInvoice" style="display:none;"><i class="fas fa-file-invoice me-1"></i> Faktura</button>
+                <button type="button" class="btn btn-info" id="posDoneInvoiceMail" style="display:none;"><i class="fas fa-envelope me-1"></i> Fakturu e-mailem (QR platba)</button>
                 <button type="button" class="btn btn-outline-light ms-auto" id="posDoneNew"><i class="fas fa-plus me-1"></i> Nový prodej</button>
             </div>
         </div>
@@ -1142,6 +1143,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('posDoneNumber').textContent = d.sale_number;
             document.getElementById('posDoneProductNote').style.display = d.has_product ? '' : 'none';
             document.getElementById('posDoneInvoice').style.display = d.invoice_id ? '' : 'none';
+            document.getElementById('posDoneInvoiceMail').style.display = d.invoice_id ? '' : 'none';
             // velké „Vrátit zákazníkovi" — obsluha to potřebuje vidět hned, ne až na účtence
             var chg = (d.cash_change !== null && d.cash_change !== undefined && d.cash_change > 0);
             document.getElementById('posDoneChange').style.display = chg ? '' : 'none';
@@ -1169,6 +1171,31 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('posDoneInvoice').addEventListener('click', function () {
         if (lastSale && lastSale.invoice_id) window.open('print_invoice.php?id=' + lastSale.invoice_id, '_blank');
     });
+    // faktura e-mailem s QR platbou — klient zaplatí online z telefonu.
+    // Bez uloženého e-mailu klienta si adresu vyžádá (need_email) a pošle znovu.
+    function sendInvoiceMail(to) {
+        if (!lastSale || !lastSale.invoice_id) return;
+        var b = document.getElementById('posDoneInvoiceMail');
+        b.disabled = true;
+        fetch('api/invoice_email.php', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csrf_token: CSRF, invoice_id: lastSale.invoice_id, to: to || '' })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+            b.disabled = false;
+            if (j.ok) { posToast(true, '✉️ Faktura odeslána na ' + j.to); return; }
+            if (j.need_email) {
+                var mail = prompt('Klient nemá uložený e-mail. Kam fakturu poslat?');
+                if (mail) { sendInvoiceMail(mail.trim()); }
+                return;
+            }
+            posToast(false, j.error || 'Odeslání selhalo.');
+        })
+        .catch(function () { b.disabled = false; posToast(false, 'Síťová chyba — e-mail neodešel.'); });
+    }
+    document.getElementById('posDoneInvoiceMail').addEventListener('click', function () { sendInvoiceMail(''); });
     document.getElementById('posDoneNew').addEventListener('click', function () {
         document.getElementById('posDone').style.display = 'none';
         location.reload();
