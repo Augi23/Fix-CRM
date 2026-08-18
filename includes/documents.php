@@ -746,3 +746,40 @@ function crmRenderDocumentEmailHtml(array $doc): string {
         . 'body { margin:0; padding:24px 12px; background:#eceff3; }' . $css
         . '</style></head><body>' . $sheet . '</body></html>';
 }
+
+/* ── ONLINE VYPLNĚNÍ VÝKUPNÍHO LISTU KLIENTEM (v3.49.2) ─────────────────────
+   E-mail s výkupním listem nese odkaz s tajným tokenem (vykup_online.php?t=…).
+   Klient doma doplní své údaje a sériové číslo, odesláním se dokument uloží
+   a crmSyncVykupProduct založí/doplní vykoupený produkt — stejně jako při
+   vyplnění na prodejně. Cena a služební pole jsou klientovi zamčená. */
+
+function ensureDocPublicTokenColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    ensureCrmDocumentsTable();
+    try { $pdo->exec("ALTER TABLE crm_documents ADD COLUMN public_token VARCHAR(64) NULL"); } catch (Throwable $e) { /* už existuje */ }
+    try { $pdo->exec("ALTER TABLE crm_documents ADD INDEX idx_doc_token (public_token)"); } catch (Throwable $e) { /* už existuje */ }
+}
+
+/** Vrátí (a při prvním použití vygeneruje) tajný token dokumentu pro online vyplnění. */
+function crmDocPublicToken(int $docId): string {
+    global $pdo;
+    ensureDocPublicTokenColumn();
+    $st = $pdo->prepare("SELECT public_token FROM crm_documents WHERE id = ? LIMIT 1");
+    $st->execute([$docId]);
+    $t = (string)($st->fetchColumn() ?: '');
+    if ($t !== '') { return $t; }
+    $t = bin2hex(random_bytes(24));
+    $pdo->prepare("UPDATE crm_documents SET public_token = ? WHERE id = ? AND (public_token IS NULL OR public_token = '')")
+        ->execute([$t, $docId]);
+    // souběh dvou odeslání: platí ten, kdo zapsal první
+    $st->execute([$docId]);
+    return (string)($st->fetchColumn() ?: $t);
+}
+
+/** Pole, která klient při online vyplnění NESMÍ měnit (cena a služební údaje). */
+function crmDocOnlineLockedFields(): array {
+    return ['item_price', 'customer_id_verified', 'sign_place_date', 'sign_payment', 'doc_date'];
+}

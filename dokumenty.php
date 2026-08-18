@@ -124,7 +124,13 @@ $newLabels = ['vykup' => 'Nový výkupní list', 'zastava' => 'Nový zástavní 
                             <?php endif; ?>
                         </td>
                         <td class="text-white-75"><?php echo !empty($d['doc_date']) ? e(date('d.m.Y', strtotime((string)$d['doc_date']))) : '—'; ?></td>
-                        <td><strong><?php echo e((string)($d['customer_name'] ?: '—')); ?></strong></td>
+                        <td><strong><?php echo e((string)($d['customer_name'] ?: '—')); ?></strong>
+                            <?php // klient dokument doplnil online (odkaz z e-mailu) — poznat na první pohled
+                            $__of = '';
+                            try { $__of = (string)((json_decode((string)($d['payload'] ?? ''), true) ?: [])['online_filled_at'] ?? ''); } catch (Throwable $e) {}
+                            if ($__of !== ''): ?>
+                                <span class="badge rounded-pill" style="background:rgba(11,87,208,.2);color:#7db2ff;font-size:.66rem;" title="Klient vyplnil online <?php echo e(date('d.m.Y H:i', strtotime($__of))); ?>"><i class="fas fa-globe me-1"></i>online</span>
+                            <?php endif; ?></td>
                         <td>
                             <?php if (!empty($d['customer_phone'])): ?>
                                 <a href="tel:<?php echo e(preg_replace('/[^0-9+]/', '', (string)$d['customer_phone'])); ?>" class="text-reset text-decoration-none" onclick="event.stopPropagation();">

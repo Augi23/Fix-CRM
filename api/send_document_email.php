@@ -33,6 +33,22 @@ $company = get_setting('company_name', 'AppleFix');
 $subject = $company . ' — ' . __($cfg['title_key'], $lang) . ' ' . (string)$doc['doc_number'];
 $html = crmRenderDocumentEmailHtml($doc);
 
+// Výkupní list navíc nese tlačítko „Vyplnit online": klient si doma doplní své
+// údaje a sériové číslo — odesláním se dokument uloží do CRM a vykoupený produkt
+// se založí/doplní sám (jako by list vyplnila prodejna). Cena zůstává zamčená.
+if ((string)$doc['doc_type'] === 'vykup') {
+    $onlineUrl = 'https://admin.applefix.cloud/vykup_online.php?t=' . rawurlencode(crmDocPublicToken((int)$doc['id']));
+    $fillBlock = '<div style="max-width:840px;margin:18px auto 0;background:#fff;border:1px solid #e8ebf0;border-radius:14px;padding:20px 22px;text-align:center;font-family:-apple-system,Segoe UI,Arial,sans-serif;">'
+        . '<div style="font-size:14px;color:#1d1d1f;padding-bottom:14px;"><strong>Chybí ve formuláři některé údaje?</strong><br>'
+        . 'Vyplňte je pohodlně online — po odeslání se rovnou propíšou k nám do systému.</div>'
+        . '<a href="' . e($onlineUrl) . '" style="display:inline-block;background:#0b57d0;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 30px;border-radius:12px;">✍️ Vyplnit výkupní list online</a>'
+        . '<div style="font-size:11px;color:#86868b;padding-top:12px;">Odkaz je určen jen vám — prosíme, nepřeposílejte ho.</div>'
+        . '</div>';
+    $html = (stripos($html, '</body>') !== false)
+        ? str_ireplace('</body>', $fillBlock . '</body>', $html)
+        : $html . $fillBlock;
+}
+
 if (!function_exists('smtpSendMail')) { sde_fail('Odesílání e-mailů není nastaveno.'); }
 [$ok, $err] = smtpSendMail($to, $subject, $html);
 if (!$ok) { sde_fail('E-mail se nepodařilo odeslat: ' . $err, 500); }

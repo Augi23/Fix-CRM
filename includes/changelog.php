@@ -11,9 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.49.2',
+        'date' => '2026-08-18',
+        'time' => '17:05',
+        'title' => 'Výkupní list vyplní klient online; oprava skákajících verzí',
+        'items' => [
+            '<b>Výkupní list online:</b> e-mail s výkupním listem nově nese tlačítko <b>„Vyplnit výkupní list online"</b> — klient doma přes zabezpečený odkaz doplní své údaje i sériové číslo a odesláním se vše <b>samo propíše do CRM</b>: dokument se uloží a vykoupený produkt se založí/doplní ve Skladu → Výkupy, jako by list vyplnila prodejna. Výkupní cenu a služební pole (ověření totožnosti, datum) klient měnit nemůže — jsou jen pro čtení.',
+            'Takto vyplněný dokument má v seznamu Dokumentů modrý štítek <b>„online"</b> (s časem vyplnění) a záznam v historii. Při předání zařízení zbývá zkontrolovat doklad a podepsat.',
+            '<b>Oprava „přeskakujících" verzí v Historii úprav:</b> 15 starších záznamů mělo místo pevného času živou funkci (čas se měnil při každém načtení) a jeden záznam čas z budoucnosti — pořadí verzí pak skákalo a hlavička ukazovala jinou verzi než seznam. Všechny časy zafixovány podle skutečných časů nasazení.',
+        ],
+    ],
+    [
         'version' => '3.49.1',
         'date' => '2026-08-18',
-        'time' => '16:40',
+        'time' => '16:38',
         'title' => 'Faktura z kasy e-mailem s QR platbou; výkupní list na mail',
         'items' => [
             '<b>Pokladna → „Fakturu e-mailem (QR platba)":</b> po prodeji na fakturu přibylo na obrazovce „hotovo" modré tlačítko — faktura odejde klientovi e-mailem i s blokem <b>Platba převodem</b> (číslo účtu, částka, variabilní symbol, splatnost a <b>QR kód</b>, který banka v telefonu rovnou načte). Když klient nemá uložený e-mail, kasa se na adresu zeptá. Tištěná/obrazovková faktura má QR platbu dál taky.',
@@ -24,7 +35,7 @@ $entries = [
     [
         'version' => '3.49.0',
         'date' => '2026-08-18',
-        'time' => '17:30',
+        'time' => '16:27',
         'title' => 'Pokladna je JEDINÉ místo platby zakázek (i na fakturu)',
         'items' => [
             '<b>Zakázka se platí výhradně přes Pokladnu:</b> najdeš ji vyhledáváním (číslo, model, jméno klienta) a zaplatíš <b>hotově, kartou i NOVĚ na fakturu</b> — odběratelem faktury se sám stane klient zakázky a faktura se se zakázkou prováže. Kasa nabídne i <b>vydané nezaplacené</b> zakázky („Vydáno — čeká na platbu"), takže doplatek po výdeji projde taky.',
@@ -35,7 +46,7 @@ $entries = [
     [
         'version' => '3.48.3',
         'date' => '2026-08-18',
-        'time' => date('H:i'),
+        'time' => '15:57',
         'title' => 'Sklad: arch štítků regálů a polic (4 přes šířku A4)',
         'items' => [
             'Ve Sklad → Umístění přibylo tlačítko <b>„Regály + police (arch)"</b> — vytiskne arch A4 na výšku rozdělený na <b>4 štítky přes celou šířku</b>. Nejdřív regály (velký kód R1, R2… pro čitelnost z dálky), pak police: na jednom štítku jsou vždy <b>všechny police jednoho regálu</b>, každá s vlastním QR (sken ukáže obsah police). Ideální na samolepky.',
@@ -96,7 +107,7 @@ $entries = [
     [
         'version' => '3.46.5',
         'date' => '2026-08-12',
-        'time' => date('H:i'),
+        'time' => '19:39',
         'title' => 'Seznam zakázek a Nástěnka: menší datum a užší levý sloupec',
         'items' => [
             'Datum a čas vytvoření v seznamu zakázek i na Nástěnce jsou menší a bez sekund (12.8.2026 18:17) — levý sloupec „Č. zakázky / Vytvořeno" se díky tomu zúžil a na řádek zbývá víc místa.',
@@ -105,7 +116,7 @@ $entries = [
     [
         'version' => '3.46.4',
         'date' => '2026-08-12',
-        'time' => date('H:i'),
+        'time' => '14:57',
         'title' => 'Nová zakázka: tlačítko Storno, oprava vyhledávání a méně průhledná okna',
         'items' => [
             'Ve formuláři <b>nové zakázky</b> přibylo dole vlevo tlačítko <b>Storno</b> — zavře formulář a zahodí rozepsané údaje, takže se <b>nepropíšou do dalšího otevření</b>. Záchrana proti náhodnému vyklikání (auto-uložení rozepsaného) zůstává; maže se jen tímhle tlačítkem.',
@@ -117,7 +128,7 @@ $entries = [
     [
         'version' => '3.46.3',
         'date' => '2026-08-12',
-        'time' => date('H:i'),
+        'time' => '14:13',
         'title' => 'Nákupy: oprava — manažerovi šlo „Schválit a objednat"',
         'items' => [
             'Označení dílu jako <b>objednaný</b> mohlo u vedení přihlášeného přes zaměstnanecký účet skončit chybou a neuložit se. Opraveno — schválení a objednání teď projde vždy.',
@@ -126,7 +137,7 @@ $entries = [
     [
         'version' => '3.46.2',
         'date' => '2026-08-12',
-        'time' => date('H:i'),
+        'time' => '14:01',
         'title' => 'Nákupy: díl se po naskladnění navěsí na zakázku + drobnosti',
         'items' => [
             'Když technik u zakázky dá <b>„Přidat do nákupu"</b> a vybere díl, po jeho <b>naskladnění</b> (stav „Přijato na sklad") se díl teď <b>automaticky objeví na zakázce</b> — dřív zůstal jen v nákupním seznamu a na zakázku se nikdy nedostal. Při vrácení příjmu se zase odpojí a sklad sedí.',
@@ -137,7 +148,7 @@ $entries = [
     [
         'version' => '3.46.1',
         'date' => '2026-08-12',
-        'time' => date('H:i'),
+        'time' => '13:10',
         'title' => 'Nástěnka: drobná optimalizace načítání',
         'items' => [
             'Nástěnka při každém načtení nedělá jeden zbytečný dotaz do databáze navíc — odstraněno redundantní načítání seznamu techniků, které se nikde nepoužívalo (modal nové zakázky si ho načítá vlastní). Rychlost o kousek lepší, chování beze změny.',
@@ -146,7 +157,7 @@ $entries = [
     [
         'version' => '3.46.0',
         'date' => '2026-08-12',
-        'time' => date('H:i'),
+        'time' => '12:23',
         'title' => 'Nákupy: technik hlásí chybějící díly, kopírování SKU',
         'items' => [
             'Díl na <b>nákupní seznam</b> teď může přidat každý provozní zaměstnanec, včetně technika — nahlásí, co při opravě chybí. Schvaluje a objednává dál jen vedení (manažer / Boss / admin).',
@@ -158,7 +169,7 @@ $entries = [
     [
         'version' => '3.45.1',
         'date' => '2026-08-12',
-        'time' => date('H:i'),
+        'time' => '12:22',
         'title' => 'Nástěnka: odebráno filtrování podle technika',
         'items' => [
             'Z <b>Nástěnky</b> zmizel filtr „Všichni technici" — přehled teď ukazuje zakázky bez filtru. Filtrování podle technika i ostatní filtry zůstávají beze změny v <b>Seznamu zakázek</b> (Zakázky) a všude jinde.',
@@ -167,7 +178,7 @@ $entries = [
     [
         'version' => '3.45.0',
         'date' => '2026-08-12',
-        'time' => date('H:i'),
+        'time' => '12:07',
         'title' => 'Režim recepce — sken z telefonu otevře zakázku na MacBooku',
         'items' => [
             'V hlavičce přibyla ikona vysílače: <b>režim recepce</b>. Počítač (typicky MacBook na recepci) s zapnutým režimem sám otevře zakázku, kterou někdo naskenuje mobilní appkou — v appce má sken nové tlačítko <b>„Poslat na recepci"</b>. Skeny se párují přes pobočku a vyzvedne je jen jedno zařízení (nic se neotevírá dvakrát).',
@@ -206,7 +217,7 @@ $entries = [
     [
         'version' => '3.44.4',
         'date' => '2026-08-09',
-        'time' => date('H:i'),
+        'time' => '10:20',
         'title' => 'Reklamace předělané: přehledná tabulka + zákonné protokoly',
         'items' => [
             '<b>Nová tabulka reklamací:</b> sloupce Přijato (datum + kdo reklamaci převzal), zákazník s telefonem, zařízení se SN, <b>původní zakázka s propsanou závadou i provedenou opravou</b>, čistý důvod reklamace, požadovaný způsob vyřízení, <b>hlídání zákonné lhůty 30 dnů</b> (žlutě pod 7 dní, červeně po lhůtě, zeleně vyřízeno), technik a stav. Staré záznamy, které měly „Požadavek/Doklad" nalepené v textu důvodu, se automaticky roztřídí do správných sloupců.',
@@ -259,7 +270,7 @@ $entries = [
     [
         'version' => '3.43.3',
         'date' => '2026-08-09',
-        'time' => date('H:i'),
+        'time' => '18:25',
         'title' => 'Chat bez „okna v okně" — prostě rovnou chat',
         'items' => [
             'Zprávy už nejsou zavřené v orámovaném panelu s vlastním rámečkem — bubliny leží přímo na stránce přes celou šířku a dole je jen plovoucí pole pro psaní s kulatým odesílacím tlačítkem (messenger styl). Zmizel i nadbytečný popisek pod nadpisem, takže je na zprávy víc místa — hlavně v mobilní appce.',
@@ -277,7 +288,7 @@ $entries = [
     [
         'version' => '3.43.1',
         'date' => '2026-08-09',
-        'time' => date('H:i'),
+        'time' => '11:30',
         'title' => 'Týmový chat zase svisle + důraznější tón pro nové zakázky',
         'items' => [
             '<b>Chat:</b> na mobilu (i v appce) se historie zpráv lámala do sloupců vedle sebe a rolovala doleva-doprava. Příčinou bylo zalamování flex sloupce — vypnuto, chat je zase klasicky odshora dolů.',
@@ -299,7 +310,7 @@ $entries = [
     [
         'version' => '3.42.34',
         'date' => '2026-08-09',
-        'time' => date('H:i'),
+        'time' => '15:06',
         'title' => 'Ověřeno: objednávky z e-shopu applefix.click chodí do upozornění i do appky',
         'items' => [
             'Prověřili jsme celý řetězec: e-shop applefix.click posílá každou objednávku do CRM (od července jich dorazilo 5), v sekci upozornění (zvoneček) se ukazují jako „E-shop objednávka" a od v3.10.0 se ke každé posílá push notifikace do mobilní appky. Teď, když má tým appku v telefonech (TestFlight), budou objednávky z e-shopu pípat všem — není potřeba nic nastavovat.',
@@ -317,7 +328,7 @@ $entries = [
     [
         'version' => '3.42.33',
         'date' => '2026-08-09',
-        'time' => date('H:i'),
+        'time' => '09:47',
         'title' => 'Nová ikonka AppleFix CRM i na webu',
         'items' => [
             'Web měl starou ikonku (zelený kříž) — teď všude používá stejnou jako mobilní aplikace: favicon v záložce prohlížeče, ikonka po přidání na plochu iPhonu/iPadu i ikony PWA. Malý favicon je výřez jablka, aby byl na 32 px čitelný.',
@@ -368,7 +379,7 @@ $entries = [
     [
         'version' => '3.42.28',
         'date' => '2026-08-09',
-        'time' => date('H:i'),
+        'time' => '08:30',
         'title' => 'Notifikace fungují i pro appku z TestFlightu/App Storu',
         'items' => [
             'Připravujeme distribuci mobilní appky přes App Store, aby si ji tým instaloval sám (bez kabelu). Takové buildy používají <b>produkční</b> Apple push prostředí, zatímco dosavadní kabelové buildy <b>vývojové</b> — server si teď u každého zařízení sám zjistí a zapamatuje, kam mu posílat oznámení. Nic se nenastavuje, funguje mix obojího.',
