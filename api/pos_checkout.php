@@ -236,6 +236,17 @@ try {
             if (!crmCanModifyBranchStock(crmProductBranchId((int)$line['id']))) {
                 echo json_encode(['success' => false, 'message' => 'Produkt „' . $row['title'] . '" je skladem na jiné pobočce — prodat ho smí jen její zaměstnanci.']); exit;
             }
+            // kus z NEVYPLACENÉHO výkupu se nesmí prodat jako běžný produkt —
+            // nejdřív výplata výkupu (jinak by klient „platil" za vlastní zařízení)
+            try {
+                $vd = $pdo->prepare("SELECT doc_number FROM crm_documents
+                    WHERE doc_type = 'vykup' AND vykup_product_id = ? AND payout_sale_id IS NULL LIMIT 1");
+                $vd->execute([(int)$line['id']]);
+                $vdn = $vd->fetchColumn();
+                if ($vdn !== false && $vdn !== null) {
+                    echo json_encode(['success' => false, 'message' => 'Kus pochází z nevyplaceného výkupu ' . $vdn . ' — nejdřív výkup vyplať (najdi ho vyhledáváním nebo přes „Výplata výkupu"), pak teprve jde prodávat.']); exit;
+                }
+            } catch (Throwable $e) { /* bez tabulky dokumentů se kontrola přeskočí */ }
             $grade = trim((string)($row['grade'] ?? ''));
             $cart[$i]['name'] = (string)$row['title'] . ($grade !== '' ? ' (stav ' . $grade . ')' : '');
             $cart[$i]['code'] = (string)$row['product_code'];
@@ -340,6 +351,9 @@ try {
     }
 
     // přijatá hotovost nesmí být nižší než celkem — jinak by „Vráceno" vyšlo záporně
+    // výplata / vyrovnaný protiúčet: „přijato" nedává smysl — zbytek z opuštěného
+    // LCD by nafoukl Vráceno (přijato − záporný total) a obsluha by vydala víc
+    if ($total <= 0) { $cashReceived = null; }
     $cashChange = null;
     if ($cashReceived !== null) {
         if ($cashReceived + 0.005 < $total) {

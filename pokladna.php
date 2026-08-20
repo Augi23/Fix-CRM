@@ -867,8 +867,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 d.results.forEach(function (r) {
                     var el = document.createElement('div');
-                    var typeLabel = { part: 'DÍL', product: 'PRODUKT', order: 'ZAKÁZKA' }[r.type] || 'POLOŽKA';
-                    var detail = r.type === 'order' ? 'připraveno k úhradě' : ('skladem ' + r.stock + ' ks');
+                    var typeLabel = { part: 'DÍL', product: 'PRODUKT', order: 'ZAKÁZKA', vykup: 'VÝKUP' }[r.type] || 'POLOŽKA';
+                    var detail = r.type === 'order' ? 'připraveno k úhradě'
+                        : (r.type === 'vykup' ? 'nevyplacený výkup — VYPLÁCÍME MY' : ('skladem ' + r.stock + ' ks'));
                     el.className = 'pos-hit';
                     el.innerHTML = '<span class="pos-type ' + r.type + '">' + typeLabel + '</span>'
                         + '<div><div class="nm">' + esc(r.name) + '</div><div class="cd">' + esc(r.code || '') + ' · ' + detail + '</div></div>'
@@ -896,6 +897,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (addQty < 1) addQty = 1;
         var found = cart.find(function (c) { return cartKey(c) === cartKey(r); });
         if (found) {
+            if (found.type === 'vykup') { alert('Tenhle výkup už v košíku je — vyplácí se jen jednou.'); return; }
             if (found.qty + addQty > stock) { alert(r.type === 'manual' ? 'Maximum pro ruční položku je 999 ks.' : 'Skladem je jen ' + stock + ' ks.'); return; }
             found.qty += addQty;
         } else {
@@ -1057,9 +1059,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     $cashReceived.addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter' && !$lcdFinish.disabled) { $lcdFinish.click(); }
-        if (ev.key === 'Escape') { lcdHide(); }
+        if (ev.key === 'Escape') { $cashReceived.value = ''; lcdHide(); }   // zrušeno = zahodit rozepsanou hotovost
     });
-    document.getElementById('lcdClose').addEventListener('click', lcdHide);
+    document.getElementById('lcdClose').addEventListener('click', function () { $cashReceived.value = ''; lcdHide(); });
     document.getElementById('lcdFinish').addEventListener('click', function () { lcdHide(); submitSale(); });
     document.getElementById('lcdSkip').addEventListener('click', function () {
         $cashReceived.value = '';   // bez evidence — doklad nebude mít Placeno/Vráceno
@@ -1150,7 +1152,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>',
                 payment: payment,
                 customer_id: parseInt($('#posCustomer').val() || 0, 10),
-                cash_received: payment === 'cash' ? (cashVal() === null ? null : cashVal()) : null,
+                cash_received: (payment === 'cash' && total() > 0) ? (cashVal() === null ? null : cashVal()) : null,
                 items: cart.map(function (c) {
                     var item = { type: c.type, id: c.type === 'manual' ? 0 : c.id, qty: c.qty, price: c.price };
                     if (c.type === 'manual') { item.name = c.name; }

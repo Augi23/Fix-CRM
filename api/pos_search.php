@@ -87,18 +87,63 @@ try {
     }
 
     // ── produkty (použitá elektronika + příslušenství) ──
-    if ($qRaw === '') {
-        $st = $pdo->prepare("SELECT id, title, product_code, stock_qty, price, grade FROM products
-            WHERE stock_qty > 0" . $branchSql . " ORDER BY added_at DESC, id DESC LIMIT 8");
-        $st->execute($branchArgs);
-    } else {
-        $params = [$like, $like];
-        $productCodeSql = $codeLikeSql('product_code', $codeTerms, $params);
-        $st = $pdo->prepare("SELECT id, title, product_code, stock_qty, price, grade FROM products
-            WHERE stock_qty > 0 AND (title LIKE ? OR model LIKE ? OR $productCodeSql)" . $branchSql . " ORDER BY title ASC LIMIT 15");
-        $st->execute(array_merge($params, $branchArgs));
+    // kus z NEVYPLACENÉHO výkupu (payout_sale_id IS NULL) se nesmí nabízet jako
+    // prodej — obsluha ho vyhledáváním najde jako VÝPLATU se zápornou částkou,
+    // stejnou jako přes tlačítko „Výplata výkupu". Po vyplacení = běžný produkt.
+    // Agregovaný poddotaz: víc nevyplacených listů na týž kus = JEDEN hit
+    // (nejstarší list); vlastní try/catch = instalace bez crm_documents padá
+    // zpět na dotaz bez JOINu (stejná pojistka jako guard v pos_checkout).
+    $vykupJoin = " LEFT JOIN (SELECT vykup_product_id, MIN(id) AS doc_id FROM crm_documents
+                WHERE doc_type = 'vykup' AND payout_sale_id IS NULL AND vykup_product_id IS NOT NULL
+                GROUP BY vykup_product_id) vdx ON vdx.vykup_product_id = p.id
+            LEFT JOIN crm_documents vd ON vd.id = vdx.doc_id";
+    $branchSqlP = str_replace('branch_id', 'p.branch_id', $branchSql);
+    $prodCols = "p.id, p.title, p.product_code, p.stock_qty, p.price, p.grade";
+    $vykupCols = ", vd.id AS vykup_doc_id, vd.doc_number AS vykup_doc_number, vd.price AS vykup_price, vd.branch_id AS vykup_branch_id";
+    $prodRows = [];
+    foreach ([true, false] as $withVykup) {
+        try {
+            if ($qRaw === '') {
+                $st = $pdo->prepare("SELECT " . $prodCols . ($withVykup ? $vykupCols : '') . "
+                    FROM products p" . ($withVykup ? $vykupJoin : '') . "
+                    WHERE p.stock_qty > 0" . $branchSqlP . " ORDER BY p.added_at DESC, p.id DESC LIMIT 8");
+                $st->execute($branchArgs);
+            } else {
+                $params = [$like, $like];
+                $productCodeSql = $codeLikeSql('p.product_code', $codeTerms, $params);
+                $st = $pdo->prepare("SELECT " . $prodCols . ($withVykup ? $vykupCols : '') . "
+                    FROM products p" . ($withVykup ? $vykupJoin : '') . "
+                    WHERE p.stock_qty > 0 AND (p.title LIKE ? OR p.model LIKE ? OR $productCodeSql)" . $branchSqlP . " ORDER BY p.title ASC LIMIT 15");
+                $st->execute(array_merge($params, $branchArgs));
+            }
+            $prodRows = $st->fetchAll();
+            break;
+        } catch (Throwable $e) {
+            if (!$withVykup) { throw $e; }   // ani bez JOINu — skutečná chyba
+            error_log('pos_search: JOIN na crm_documents selhal, jedu bez výkupů — ' . $e->getMessage());
+        }
     }
-    foreach ($st->fetchAll() as $r) {
+    foreach ($prodRows as $r) {
+        if (!empty($r['vykup_doc_id'])) {
+            // výplatu smí kasa nabídnout jen pro list SVÉ pobočky (checkout to
+            // vynucuje) — kus převedený jinam se nenabízí vůbec (nejde tu prodat
+            // ani vyplatit, nabídka by byla past na naskládaný košík)
+            if ($branchScoped) {
+                $docBranch = (int)($r['vykup_branch_id'] ?? 0) ?: $defBranch;
+                if ($docBranch !== $myBranch) { continue; }
+            }
+            $amount = function_exists('crmParseAmountCzk') ? crmParseAmountCzk((string)($r['vykup_price'] ?? '')) : 0.0;
+            $results[] = [
+                'type' => 'vykup',
+                'id' => (int)$r['vykup_doc_id'],   // id VÝKUPNÍHO LISTU (jako tlačítko Výplata výkupu)
+                'name' => 'Výplata výkupu ' . (string)$r['vykup_doc_number'] . ' — ' . (string)$r['title'],
+                'code' => (string)$r['product_code'],   // sériové číslo — ať sedí i sken čtečkou
+                'stock' => 1,
+                'price' => -round(max($amount, 0), 2),
+                'used' => false,
+            ];
+            continue;
+        }
         $results[] = [
             'type' => 'product',
             'id' => (int)$r['id'],

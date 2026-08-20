@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.51.3',
+        'date' => '2026-08-20',
+        'time' => '14:45',
+        'title' => 'Kasa: výkup nalezený vyhledáváním je VÝPLATA, ne prodej',
+        'items' => [
+            '<b>Konec obráceného znaménka u výkupů:</b> kus z <b>nevyplaceného</b> výkupního listu se ve vyhledávání kasy nabízí jako červený <b>VÝKUP („nevyplacený výkup — VYPLÁCÍME MY")</b> se zápornou částkou z listu — stejně jako přes tlačítko „Výplata výkupu". Dřív vyhledávání nabídlo automaticky založený produkt s prodejní cenou, kasa pak chtěla „přijaté bankovky" od klienta, kterému se mělo platit. Funguje i sken sériového čísla čtečkou.',
+            '<b>Protiúčet beze změny:</b> do košíku s výplatou jde přidat naše zboží — částky se rovnou odečtou; záporný zbytek se vyplácí hotově, kladný doplatek jde hotově i kartou. Kalkulačkový displej „Přijato/Vrátit" se u výplaty neotvírá.',
+            '<b>Pojistka v prodeji:</b> kus z nevyplaceného výkupu nejde prodat jako běžný produkt ani obejitím (server ho odmítne s pokynem výkup nejdřív vyplatit). Po vyplacení se kus nabízí normálně k prodeji.',
+        ],
+    ],
+    [
         'version' => '3.51.2',
         'date' => '2026-08-20',
         'time' => '11:55',
