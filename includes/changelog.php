@@ -11,9 +11,59 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.51.1',
+        'date' => '2026-08-20',
+        'time' => '11:33',
+        'title' => 'Aktualizace ukazují novinky ještě před instalací',
+        'items' => [
+            'Seznam změn v Nastavení → Aktualizace nově zobrazuje i verze, které <b>na instalaci teprve čekají</b> — dřív bylo vidět jen to, co už na serveru běželo, takže „co přinese aktualizace" nešlo zjistit.',
+            'Doplněny chybějící záznamy historie k verzím 3.49.0–3.49.3 a opravena data u verzí z 20. 8.',
+        ],
+    ],
+    [
+        'version' => '3.49.3',
+        'date' => '2026-08-18',
+        'time' => '18:36',
+        'title' => 'QR platba naostro + splatnost faktur 2 dny',
+        'items' => [
+            'QR platba na fakturách je <b>živá</b> — platební údaje se berou z účtu KB v Nastavení.',
+            'Splatnost faktur zkrácena na <b>2 dny</b>; do e-mailu výkupu přibyl odkaz k online vyplnění.',
+        ],
+    ],
+    [
+        'version' => '3.49.2',
+        'date' => '2026-08-18',
+        'time' => '17:50',
+        'title' => 'Výkupní list vyplní klient online',
+        'items' => [
+            'Klientovi jde poslat <b>zabezpečený odkaz e-mailem</b> — výkupní list si vyplní sám a produkt se v CRM založí automaticky.',
+            'Opraveno přeskakování časů v tomto přehledu při souběžné práci více relací.',
+        ],
+    ],
+    [
+        'version' => '3.49.1',
+        'date' => '2026-08-18',
+        'time' => '16:38',
+        'title' => 'Faktura z kasy e-mailem s QR platbou',
+        'items' => [
+            'Na kase jde po dokončení prodeje poslat <b>faktura e-mailem</b> včetně QR kódu k platbě (tlačítko na obrazovce „hotovo").',
+            'E-mail u výkupního listu se před odesláním ověřuje.',
+        ],
+    ],
+    [
+        'version' => '3.49.0',
+        'date' => '2026-08-18',
+        'time' => '16:27',
+        'title' => 'Pokladna je jediné místo platby zakázek',
+        'items' => [
+            'Platby zakázek se nově odbavují <b>výhradně přes Pokladnu</b> — faktura vzniká z kasy, zakázka po fakturaci sama přejde do „čeká na platbu".',
+            'Při výdeji se případné zrušené platby korektně vypořádají.',
+        ],
+    ],
+    [
         'version' => '3.51.0',
-        'date' => '2026-08-16',
-        'time' => '16:30',
+        'date' => '2026-08-20',
+        'time' => '10:35',
         'title' => 'Dokumenty: všechny listy pohromadě — i zakázkové a reklamační',
         'items' => [
             'Záložka <b>Dokumenty</b> má nově čtyři podzáložky: <b>Výkupní listy</b>, <b>Zástavní formuláře</b>, <b>Zakázkové listy</b> a <b>Reklamační protokoly</b>. Všechno vyplněné je na jednom místě k <b>zobrazení i tisku</b> (oko = tiskový náhled), s hledáním podle čísla, jména, telefonu či zařízení.',
@@ -23,8 +73,8 @@ $entries = [
     ],
     [
         'version' => '3.50.1',
-        'date' => '2026-08-16',
-        'time' => '15:50',
+        'date' => '2026-08-20',
+        'time' => '10:30',
         'title' => 'Náhled položky ukazuje úplně všechno',
         'items' => [
             '<b>Náhled dílu</b> navíc ukazuje: číslo a stáří karty, stav skladem (skladem/dochází/vyprodáno), hodnotu zásoby v nákupní i prodejní ceně, dostupnost a kusy u dodavatele a <b>kolikrát se díl použil na zakázkách</b>; historie pohybů se prodloužila na 12 záznamů.',
@@ -33,8 +83,8 @@ $entries = [
     ],
     [
         'version' => '3.50.0',
-        'date' => '2026-08-16',
-        'time' => '15:20',
+        'date' => '2026-08-20',
+        'time' => '10:25',
         'title' => 'Výkup jde poslat na díly či do prodeje + náhled položek ve Skladu',
         'items' => [
             '<b>Výkupy → náhradní díly:</b> u vykoupeného kusu je nová akce (ikona čipu) — kus se převede na sklad <b>Servis — náhradní díly</b>: vznikne karta dílu se sériovkem, modelem a výkupní cenou jako nákupní. Ideální pro dárce — na kartě mu pak vypíšeš součástky. Kus ve Výkupech zůstane provázaný (0 ks, proklik na kartu dílu), takže ho nejde převést dvakrát.',

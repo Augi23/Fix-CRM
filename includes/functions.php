@@ -3008,7 +3008,15 @@ function getGitRepoInfo(string $repoRoot): array {
             $info['update_available'] = ((int)$m[2]) > 0;
         }
 
-        $log = runGitCommand($repoRoot, "log --format='%H|%h|%cI|%an|%s' -n 50 HEAD", $code);
+        // Changelog stavíme z REMOTE větve (po fetchi): novinky čekající v aktualizaci
+        // jsou vidět JEŠTĚ PŘED instalací — HEAD by ukázal jen to, co už na serveru je.
+        $log = runGitCommand($repoRoot, "log --format='%H|%h|%cI|%an|%s' -n 50 " . escapeshellarg($remoteRef), $code);
+        if ($code !== 0 || trim($log) === '') {
+            $log = runGitCommand($repoRoot, "log --format='%H|%h|%cI|%an|%s' -n 50 FETCH_HEAD", $code);
+        }
+        if ($code !== 0 || trim($log) === '') {
+            $log = runGitCommand($repoRoot, "log --format='%H|%h|%cI|%an|%s' -n 50 HEAD", $code);
+        }
         if ($code === 0 && $log !== '') {
             foreach (explode("\n", $log) as $row) {
                 $parts = explode('|', $row, 5);
