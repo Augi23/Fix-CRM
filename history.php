@@ -55,24 +55,36 @@ if ($activeTab === 'kasa') {
 
 // ── Filtry (Historie úprav) ───────────────────────────────────────────────
 $fAction = trim((string)($_GET['action'] ?? ''));
-$fActor  = trim((string)($_GET['actor'] ?? ''));
+$fActor  = trim((string)($_GET['actor'] ?? ''));   // starý textový filtr — drží staré odkazy
+$fEmp    = trim((string)($_GET['emp'] ?? ''));     // zaměstnanec: "typ|id" z rozbalovací nabídky
 $fQ      = trim((string)($_GET['q'] ?? ''));
 $fFrom   = trim((string)($_GET['from'] ?? ''));
 $fTo     = trim((string)($_GET['to'] ?? ''));
 $page    = max(1, (int)($_GET['p'] ?? 1));
-$per     = 60;
+// počet na stránku volitelný — s velkým krokem a skoky na konec jsou dostupné VŠECHNY záznamy
+$per     = (int)($_GET['per'] ?? 60);
+if (!in_array($per, [60, 200, 500], true)) { $per = 60; }
 $off     = ($page - 1) * $per;
 
 $where = [];
 $params = [];
 if ($fAction !== '') { $where[] = 'action = ?';       $params[] = $fAction; }
-if ($fActor !== '')  { $where[] = 'actor_name LIKE ?'; $params[] = '%' . $fActor . '%'; }
+if ($fEmp !== '' && strpos($fEmp, '|') !== false) {
+    // filtr dle IDENTITY zaměstnance (typ + id) — přejmenování účtu záznamy nerozdělí
+    [$__et, $__eid] = explode('|', $fEmp, 2);
+    $where[] = 'actor_type = ? AND actor_id = ?';
+    $params[] = $__et;
+    $params[] = $__eid;
+} elseif ($fActor !== '') {
+    $where[] = 'actor_name LIKE ?';
+    $params[] = '%' . $fActor . '%';
+}
 if ($fQ !== '')      { $where[] = '(summary LIKE ? OR entity_label LIKE ? OR details LIKE ?)'; $params[] = '%' . $fQ . '%'; $params[] = '%' . $fQ . '%'; $params[] = '%' . $fQ . '%'; }
 if ($fFrom !== '')   { $where[] = 'created_at >= ?';  $params[] = $fFrom . ' 00:00:00'; }
 if ($fTo !== '')     { $where[] = 'created_at <= ?';  $params[] = $fTo . ' 23:59:59'; }
 $wsql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
-$total = 0; $rows = []; $actionOptions = [];
+$total = 0; $rows = []; $actionOptions = []; $empOptions = [];
 if ($activeTab === 'audit') {
     try {
         $cs = $pdo->prepare("SELECT COUNT(*) FROM audit_log $wsql");
@@ -84,6 +96,14 @@ if ($activeTab === 'audit') {
         $rows = $q->fetchAll();
 
         $actionOptions = array_column($pdo->query("SELECT DISTINCT action FROM audit_log ORDER BY action")->fetchAll(), 'action');
+        // nabídka zaměstnanců = každý, kdo má v historii aspoň jeden záznam
+        // (vč. bývalých účtů); klíčem identita typ+id, jméno to nejnovější
+        $empOptions = $pdo->query("SELECT actor_type, actor_id,
+                SUBSTRING_INDEX(GROUP_CONCAT(actor_name ORDER BY id DESC SEPARATOR '||'), '||', 1) AS actor_name,
+                COUNT(*) AS cnt
+            FROM audit_log
+            WHERE actor_name IS NOT NULL AND actor_name <> ''
+            GROUP BY actor_type, actor_id ORDER BY actor_name ASC")->fetchAll();
     } catch (Throwable $e) { $rows = []; }
 }
 $pages = max(1, (int)ceil($total / max(1, $per)));
@@ -275,11 +295,18 @@ $(document).on('click', '.kasa-cancel-btn', function () {
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-md-2 col-6">
-            <label class="form-label small mb-1">Kdo</label>
-            <input type="text" name="actor" value="<?php echo htmlspecialchars($fActor); ?>" class="form-control form-control-sm" placeholder="jméno">
+        <div class="col-md-3 col-6">
+            <label class="form-label small mb-1">Zaměstnanec</label>
+            <select name="emp" class="form-select form-select-sm">
+                <option value="">— všichni —</option>
+                <?php foreach ($empOptions as $eo): $ev = (string)$eo['actor_type'] . '|' . (string)$eo['actor_id']; ?>
+                    <option value="<?php echo htmlspecialchars($ev); ?>" <?php echo $fEmp === $ev ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars((string)$eo['actor_name']); ?> (<?php echo (int)$eo['cnt']; ?>)
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
-        <div class="col-md-3 col-12">
+        <div class="col-md-2 col-12">
             <label class="form-label small mb-1">Hledat</label>
             <input type="text" name="q" value="<?php echo htmlspecialchars($fQ); ?>" class="form-control form-control-sm" placeholder="zakázka, klient, detail…">
         </div>
@@ -291,9 +318,15 @@ $(document).on('click', '.kasa-cancel-btn', function () {
             <label class="form-label small mb-1">Do</label>
             <input type="date" name="to" value="<?php echo htmlspecialchars($fTo); ?>" class="form-control form-control-sm">
         </div>
-        <div class="col-12 d-flex gap-2 mt-2">
+        <div class="col-12 d-flex gap-2 mt-2 align-items-center flex-wrap">
             <button class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Filtrovat</button>
             <a href="history.php" class="btn btn-sm btn-outline-secondary">Zrušit filtr</a>
+            <span class="ms-auto small text-white-50">Na stránku:</span>
+            <select name="per" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                <?php foreach ([60, 200, 500] as $pp): ?>
+                    <option value="<?php echo $pp; ?>" <?php echo $per === $pp ? 'selected' : ''; ?>><?php echo $pp; ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
     </div>
 </form>
@@ -352,16 +385,18 @@ $(document).on('click', '.kasa-cancel-btn', function () {
 <nav class="mt-3">
     <ul class="pagination pagination-sm justify-content-center">
         <?php
-        $qs = function ($p) use ($fAction, $fActor, $fQ, $fFrom, $fTo) {
-            return 'history.php?' . http_build_query(array_filter(['action' => $fAction, 'actor' => $fActor, 'q' => $fQ, 'from' => $fFrom, 'to' => $fTo, 'p' => $p], fn($v) => $v !== '' && $v !== null));
+        $qs = function ($p) use ($fAction, $fActor, $fEmp, $fQ, $fFrom, $fTo, $per) {
+            return 'history.php?' . http_build_query(array_filter(['action' => $fAction, 'actor' => $fActor, 'emp' => $fEmp, 'q' => $fQ, 'from' => $fFrom, 'to' => $fTo, 'per' => $per !== 60 ? $per : '', 'p' => $p], fn($v) => $v !== '' && $v !== null));
         };
         $start = max(1, $page - 3); $end = min($pages, $page + 3);
         ?>
+        <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>"><a class="page-link" href="<?php echo htmlspecialchars($qs(1)); ?>" title="První stránka">«</a></li>
         <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>"><a class="page-link" href="<?php echo htmlspecialchars($qs(max(1, $page - 1))); ?>">‹</a></li>
         <?php for ($i = $start; $i <= $end; $i++): ?>
             <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>"><a class="page-link" href="<?php echo htmlspecialchars($qs($i)); ?>"><?php echo $i; ?></a></li>
         <?php endfor; ?>
         <li class="page-item <?php echo $page >= $pages ? 'disabled' : ''; ?>"><a class="page-link" href="<?php echo htmlspecialchars($qs(min($pages, $page + 1))); ?>">›</a></li>
+        <li class="page-item <?php echo $page >= $pages ? 'disabled' : ''; ?>"><a class="page-link" href="<?php echo htmlspecialchars($qs($pages)); ?>" title="Poslední stránka (nejstarší záznamy)">»</a></li>
     </ul>
 </nav>
 <?php endif; ?>

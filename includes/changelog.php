@@ -12,6 +12,16 @@ return (static function (): array {
 $entries = [
     [
         'version' => '3.51.1',
+        'date' => '2026-08-16',
+        'time' => '17:00',
+        'title' => 'Historie: filtr dle zaměstnance a dostupnost všech záznamů',
+        'items' => [
+            '<b>Filtr „Zaměstnanec":</b> místo psaní jména si v Historii vybereš zaměstnance z nabídky (u každého je vidět počet záznamů). Filtruje se podle <b>identity účtu</b>, takže případné přejmenování historii nerozdělí; nabídka obsahuje i bývalé účty, které mají záznamy.',
+            '<b>Dostupné úplně všechno:</b> stránkování dostalo skoky na <b>první «</b> a <b>poslední »</b> stránku (nejstarší záznamy) a volbu <b>počtu na stránku (60 / 200 / 500)</b> — ke každému úkonu v historii se teď dá pohodlně doklikat, případně dohledat filtrem období + zaměstnanec.',
+        ],
+    ],
+    [
+        'version' => '3.51.1',
         'date' => '2026-08-20',
         'time' => '11:33',
         'title' => 'Aktualizace ukazují novinky ještě před instalací',
