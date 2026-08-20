@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.50.0',
+        'date' => '2026-08-16',
+        'time' => '15:20',
+        'title' => 'Výkup jde poslat na díly či do prodeje + náhled položek ve Skladu',
+        'items' => [
+            '<b>Výkupy → náhradní díly:</b> u vykoupeného kusu je nová akce (ikona čipu) — kus se převede na sklad <b>Servis — náhradní díly</b>: vznikne karta dílu se sériovkem, modelem a výkupní cenou jako nákupní. Ideální pro dárce — na kartě mu pak vypíšeš součástky. Kus ve Výkupech zůstane provázaný (0 ks, proklik na kartu dílu), takže ho nejde převést dvakrát.',
+            '<b>Výkupy → do prodeje:</b> druhá akce (ikona obchodu) zadá prodejní cenu a kus přesune do záložky <b>Produkty</b>; volitelně se rovnou odkryje na e-shopu. Fotky a popis doplníš v Produktech jako u každého zboží.',
+            '<b>Náhled položky kliknutím:</b> ve všech záložkách Skladu (Servis, Produkty, Příslušenství, Výkupy) se řádek dá rozkliknout na <b>read-only náhled</b> — u dílu s umístěním R–P–B, součástkami uvnitř a posledními pohyby; u produktu s cenami, zápůjčkou, původem z výkupu i viditelností na e-shopu. Úprava je z náhledu na jedno kliknutí, ale už není potřeba ji otvírat jen kvůli podívání.',
+            'Deník pohybů dílu nově česky popisuje i prodej na kase, příjem ze zakázky a příjem z výkupu.',
+        ],
+    ],
+    [
         'version' => '3.49.3',
         'date' => '2026-08-18',
         'time' => '17:40',

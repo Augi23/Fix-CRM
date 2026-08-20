@@ -450,7 +450,8 @@ if ($inv) {
             <div class="d-flex justify-content-between small text-white-75 py-1 border-bottom border-secondary border-opacity-25">
                 <span><?php echo $m['delta'] > 0 ? '<span class="text-success">+' . (int)$m['delta'] . '</span>' : '<span class="text-warning">' . (int)$m['delta'] . '</span>'; ?> ks
                     · <?php
-                        $__rl = ['restock' => 'naskladnění', 'issue' => 'výdej', 'return' => 'vráceno', 'adjust' => 'úprava počtu', 'correction' => 'korekce'];
+                        $__rl = ['restock' => 'naskladnění', 'issue' => 'výdej', 'return' => 'vráceno', 'adjust' => 'úprava počtu', 'correction' => 'korekce',
+                            'sale' => 'prodej (kasa)', 'sale_cancel' => 'storno prodeje', 'stock_from_order' => 'ze zakázky', 'vykup_to_part' => 'z výkupu'];
                         echo $__rl[$m['reason']] ?? e($m['reason']);
                         if ($m['order_id']) { echo ' → <a href="view_order.php?id=' . (int)$m['order_id'] . '">zakázka</a>'; }
                     ?></span>

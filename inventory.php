@@ -246,7 +246,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected, array $po
                                             </div>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td class="inv-preview" data-id="<?php echo (int)$item['id']; ?>" style="cursor:pointer;" title="Kliknutím zobrazíš náhled dílu">
                                         <div class="fw-bold"><?php echo htmlspecialchars($item['part_name']); ?></div>
                                         <?php if (trim((string)($item['device_model'] ?? '')) !== ''): ?>
                                             <div class="small text-white-75"><?php echo htmlspecialchars($item['device_model']); ?></div>
@@ -648,6 +648,99 @@ $(document).on('click', '.tr-add-btn', function () {
 </script>
 
 
+
+<!-- Náhled dílu (read-only) — klik na název řádku -->
+<div class="modal fade" id="invPreviewModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-truncate"><i class="fas fa-microchip me-2 text-info"></i><span id="ipName">Náhled dílu</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="ipBody"><div class="text-center py-4 text-white-75"><i class="fas fa-circle-notch fa-spin me-2"></i>Načítám…</div></div>
+            <div class="modal-footer flex-wrap">
+                <a id="ipMap" class="btn btn-sm btn-outline-info" href="#" style="display:none;"><i class="fas fa-cube me-1"></i>Na mapě</a>
+                <a id="ipQr" class="btn btn-sm btn-outline-info" href="#"><i class="fas fa-qrcode me-1"></i>QR karta</a>
+                <a id="ipLabel" class="btn btn-sm btn-outline-secondary" target="_blank" href="#"><i class="fas fa-tag me-1"></i>Štítek</a>
+                <span class="flex-grow-1"></span>
+                <a id="ipEdit" class="btn btn-sm btn-warning" href="#"><i class="fas fa-edit me-1"></i>Upravit</a>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+// ── náhled dílu: klik na řádek → read-only detail (bez editace) ──
+(function () {
+    var modalEl = document.getElementById('invPreviewModal');
+    var modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); };
+    var kc = function (v) { return v == null ? '—' : (Number(v).toLocaleString('cs-CZ') + ' Kč'); };
+
+    $(document).on('click', '.inv-preview', function () {
+        var id = this.dataset.id;
+        if (!id || !modal) { return; }
+        document.getElementById('ipName').textContent = 'Náhled dílu';
+        document.getElementById('ipBody').innerHTML = '<div class="text-center py-4 text-white-75"><i class="fas fa-circle-notch fa-spin me-2"></i>Načítám…</div>';
+        document.getElementById('ipQr').href = 'sklad.php?qr=' + id;
+        document.getElementById('ipLabel').href = 'inventory_qr_label.php?id=' + id;
+        document.getElementById('ipEdit').href = 'edit_inventory.php?id=' + id;
+        modal.show();
+        fetch('api/inventory_detail.php?id=' + id, {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.success) { document.getElementById('ipBody').innerHTML = '<div class="alert alert-danger mb-0">' + esc(d.message || 'Chyba') + '</div>'; return; }
+                var it = d.item;
+                document.getElementById('ipName').textContent = it.part_name;
+                var mapBtn = document.getElementById('ipMap');
+                if (it.location_id > 0) {
+                    mapBtn.style.display = '';
+                    mapBtn.href = 'sklad_mapa.php?branch=<?php echo (int)$skladBranch; ?>&focus=' + it.id;
+                } else { mapBtn.style.display = 'none'; }
+
+                var h = '<div class="row g-3">';
+                h += '<div class="col-auto">';
+                h += it.image
+                    ? '<a href="' + esc(it.image) + '" data-fancybox="invprev"><img src="' + esc(it.image) + '" class="rounded shadow-sm" style="width:96px;height:96px;object-fit:cover;"></a>'
+                    : '<div class="bg-dark bg-opacity-25 rounded d-flex align-items-center justify-content-center border border-secondary" style="width:96px;height:96px;"><i class="fas fa-microchip fa-2x text-muted opacity-25"></i></div>';
+                h += '</div><div class="col"><div class="row g-2 small">';
+                var rows = [
+                    ['SKU / sériovko', it.sku ? '<code>' + esc(it.sku) + '</code>' : '—'],
+                    ['Model zařízení', it.device_model ? esc(it.device_model) : '—'],
+                    ['Skladem', '<b>' + it.quantity + ' ks</b>' + (it.min_stock > 0 ? ' <span class="text-white-75">(hlídat od ' + it.min_stock + ')</span>' : '')],
+                    ['Pobočka', esc(it.branch)],
+                    ['Nákupní cena', kc(it.cost_price)],
+                    ['Prodejní cena', kc(it.sale_price)],
+                    ['Umístění', it.location_id > 0 ? ('<span class="badge bg-info text-dark">' + esc(it.pos || it.loc_code) + '</span> <span class="text-white-75">' + esc(it.loc_code) + (it.loc_name ? ' · ' + esc(it.loc_name) : '') + '</span>') : '—'],
+                    ['Dodavatel', it.supplier ? (esc(it.supplier) + (it.supplier_url ? ' · <a href="' + esc(it.supplier_url) + '" target="_blank" rel="noopener">katalog</a>' : '') + (it.availability ? ' · ' + esc(it.availability) : '')) : '—']
+                ];
+                rows.forEach(function (r2) {
+                    h += '<div class="col-5 col-md-3 text-white-75">' + r2[0] + '</div><div class="col-7 col-md-9">' + r2[1] + '</div>';
+                });
+                h += '</div></div></div>';
+
+                if (d.components && d.components.length) {
+                    h += '<hr class="border-secondary my-3"><div class="small text-white-75 mb-1"><i class="fas fa-puzzle-piece me-1"></i>Součástky uvnitř</div><div>';
+                    d.components.forEach(function (c) {
+                        h += '<span class="badge bg-secondary' + (c.used ? ' opacity-50 text-decoration-line-through' : '') + ' me-1 mb-1">' + esc(c.name) + '</span>';
+                    });
+                    h += '</div>';
+                }
+                if (d.moves && d.moves.length) {
+                    h += '<hr class="border-secondary my-3"><div class="small text-white-75 mb-1"><i class="fas fa-clock-rotate-left me-1"></i>Poslední pohyby</div>';
+                    d.moves.forEach(function (m) {
+                        h += '<div class="d-flex justify-content-between small py-1 border-bottom border-secondary border-opacity-25">'
+                            + '<span>' + (m.delta > 0 ? '<span class="text-success">+' + m.delta + '</span>' : '<span class="text-warning">' + m.delta + '</span>') + ' ks · ' + esc(m.label)
+                            + (m.order_id ? ' → <a href="view_order.php?id=' + m.order_id + '">zakázka</a>' : '')
+                            + (m.note ? ' <span class="text-white-50">(' + esc(m.note) + ')</span>' : '') + '</span>'
+                            + '<span class="text-white-75">' + esc(m.actor) + ' · ' + esc(m.at) + '</span></div>';
+                    });
+                }
+                document.getElementById('ipBody').innerHTML = h;
+            })
+            .catch(function () { document.getElementById('ipBody').innerHTML = '<div class="alert alert-danger mb-0">Síťová chyba.</div>'; });
+    });
+}());
+</script>
 
 <?php require_once 'includes/footer.php'; ?>
 

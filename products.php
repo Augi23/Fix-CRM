@@ -280,7 +280,7 @@ try {
                                             </div>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td class="prod-preview" data-id="<?php echo (int)$p['id']; ?>" style="cursor:pointer;" title="Kliknutím zobrazíš náhled položky">
                                         <div class="fw-bold"><?php echo e($p['title']); ?></div>
                                         <div class="small text-white-75">
                                             <?php echo e(trim(($p['manufacturer'] ?? '') . ' ' . ($p['model'] ?? ''))); ?>
@@ -340,6 +340,14 @@ try {
                                     <?php if ($canManageBranch): ?>
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm afx-row-actions">
+                                            <?php if ($isVykupTab): ?>
+                                                <?php if ((int)($p['moved_to_inventory_id'] ?? 0) > 0): ?>
+                                                    <a class="btn btn-white border" href="edit_inventory.php?id=<?php echo (int)$p['moved_to_inventory_id']; ?>" title="Už převedeno na sklad dílů — otevřít kartu dílu"><i class="fas fa-microchip text-success"></i></a>
+                                                <?php else: ?>
+                                                    <button type="button" class="btn btn-white border vykup-to-parts-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-cost="<?php echo $p['purchase_price'] !== null && $p['purchase_price'] !== '' ? (float)$p['purchase_price'] : ''; ?>" title="Převést na sklad náhradních dílů (dárce na díly)"><i class="fas fa-microchip text-info"></i></button>
+                                                    <button type="button" class="btn btn-white border vykup-to-sale-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-price="<?php echo (float)($p['price'] ?? 0); ?>" title="Zařadit do prodeje (záložka Produkty / e-shop)"><i class="fas fa-store text-success"></i></button>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-8xx)"><i class="fas fa-tag"></i></button>
                                             <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vrátit do skladu' : 'Zapůjčeno / komisní prodej'; ?>"><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i></button>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>
@@ -1709,5 +1717,181 @@ $(document).on('click', '.tr-add-btn', function () {
         .catch(function () { alert('Síťová chyba.'); });
 });
 </script>
+
+<!-- Náhled položky (read-only) — klik na název řádku; funguje ve všech záložkách produktů -->
+<div class="modal fade" id="prodPreviewModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-truncate"><i class="fas fa-mobile-alt me-2 text-info"></i><span id="ppName">Náhled položky</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="ppBody"><div class="text-center py-4 text-white-75"><i class="fas fa-circle-notch fa-spin me-2"></i>Načítám…</div></div>
+            <div class="modal-footer">
+                <button type="button" id="ppLabel" class="btn btn-sm btn-outline-info"><i class="fas fa-tag me-1"></i>Cenový štítek</button>
+                <span class="flex-grow-1"></span>
+                <button type="button" id="ppEdit" class="btn btn-sm btn-warning" style="display:none;"><i class="fas fa-edit me-1"></i>Upravit</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+// ── náhled položky: klik na řádek → read-only detail (data z action=get) ──
+(function () {
+    var modalEl = document.getElementById('prodPreviewModal');
+    var modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); };
+    var kc = function (v) { return (v == null || v === '') ? '—' : (Number(v).toLocaleString('cs-CZ') + ' Kč'); };
+    var ppId = 0;
+
+    $(document).on('click', '.prod-preview', function () {
+        var id = this.dataset.id;
+        if (!id || !modal) { return; }
+        ppId = id;
+        document.getElementById('ppName').textContent = 'Náhled položky';
+        document.getElementById('ppBody').innerHTML = '<div class="text-center py-4 text-white-75"><i class="fas fa-circle-notch fa-spin me-2"></i>Načítám…</div>';
+        var editRowBtn = document.querySelector('.product-edit-btn[data-id="' + id + '"]');
+        document.getElementById('ppEdit').style.display = editRowBtn ? '' : 'none';
+        modal.show();
+        fetch('api/product_create.php?action=get&id=' + id, {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.success) { document.getElementById('ppBody').innerHTML = '<div class="alert alert-danger mb-0">' + esc(d.message || 'Chyba') + '</div>'; return; }
+                var p = d.product;
+                document.getElementById('ppName').textContent = p.title || 'Náhled položky';
+                var img = p.image_path || p.image_url || '';
+                var h = '<div class="row g-3"><div class="col-auto">';
+                h += img
+                    ? '<a href="' + esc(img) + '" data-fancybox="prodprev"><img src="' + esc(img) + '" class="rounded shadow-sm" style="width:96px;height:96px;object-fit:cover;"></a>'
+                    : '<div class="bg-dark bg-opacity-25 rounded d-flex align-items-center justify-content-center border border-secondary" style="width:96px;height:96px;"><i class="fas fa-image fa-2x text-muted opacity-25"></i></div>';
+                h += '</div><div class="col"><div class="row g-2 small">';
+                var device = [p.manufacturer, p.model, p.capacity, p.color].filter(Boolean).join(' · ');
+                var loaned = !!p.loan_at;
+                var rows = [
+                    ['Kód / sériovko', p.product_code ? '<code>' + esc(p.product_code) + '</code>' : '—'],
+                    ['Zařízení', device ? esc(device) : '—'],
+                    ['Stav (grade)', p.grade ? esc(p.grade) : '—'],
+                    ['Skladem', '<b>' + (p.stock_qty != null ? p.stock_qty : '—') + ' ks</b>' + (loaned ? ' · <span class="text-warning">zapůjčeno' + (p.loan_to ? ': ' + esc(p.loan_to) : '') + '</span>' : '')],
+                    ['Prodejní cena', kc(p.price)],
+                    ['Nákupní / výkupní cena', kc(p.purchase_price)],
+                    ['Prodejna', p.stock_key === 'vaclavak' ? 'Václavák' : (p.stock_key === 'karlin' ? 'Karlín' : '—')],
+                    ['E-shop', Number(p.hide_eshop) ? '<span class="badge bg-secondary">skrytý</span>' : '<span class="badge bg-success">zobrazuje se</span>'],
+                    ['Naskladněno', (p.added_at ? esc(p.added_at) : '—') + (p.created_by ? ' · ' + esc(p.created_by) : '')],
+                ];
+                if (Number(p.is_vykup)) {
+                    rows.push(['Původ', 'Výkup' + (p.vykup_document_id ? ' · <a href="dokument.php?id=' + Number(p.vykup_document_id) + '">výkupní list</a>' : '')]);
+                }
+                if (p.moved_to_inventory_id) {
+                    rows.push(['Převedeno', '<a href="edit_inventory.php?id=' + Number(p.moved_to_inventory_id) + '">na sklad náhradních dílů (karta #' + Number(p.moved_to_inventory_id) + ')</a>']);
+                }
+                if (p.last_sold_at) { rows.push(['Prodáno', esc(p.last_sold_at)]); }
+                rows.forEach(function (r2) {
+                    h += '<div class="col-5 col-md-4 text-white-75">' + r2[0] + '</div><div class="col-7 col-md-8">' + r2[1] + '</div>';
+                });
+                h += '</div></div></div>';
+                if (p.description) {
+                    h += '<hr class="border-secondary my-3"><div class="small text-white-75 mb-1">Popis</div><div class="small">' + esc(p.description).replace(/\n/g, '<br>') + '</div>';
+                }
+                document.getElementById('ppBody').innerHTML = h;
+            })
+            .catch(function () { document.getElementById('ppBody').innerHTML = '<div class="alert alert-danger mb-0">Síťová chyba.</div>'; });
+    });
+
+    document.getElementById('ppEdit').addEventListener('click', function () {
+        var btn = document.querySelector('.product-edit-btn[data-id="' + ppId + '"]');
+        if (modal) { modal.hide(); }
+        if (btn) { setTimeout(function () { btn.click(); }, 250); }
+    });
+    document.getElementById('ppLabel').addEventListener('click', function () {
+        var btn = document.querySelector('.product-label-btn[data-id="' + ppId + '"]');
+        if (btn) { if (modal) { modal.hide(); } setTimeout(function () { btn.click(); }, 250); }
+    });
+}());
+</script>
+
+<?php if ($isVykupTab && $canManageBranch): ?>
+<!-- Výkup → prodej: prodejní cena + viditelnost na e-shopu -->
+<div class="modal fade" id="vykupSaleModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-store me-2 text-success"></i>Zařadit do prodeje</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="vsProductId">
+                <div class="alert alert-info border-0 mb-3">
+                    <div class="small text-muted mb-1">Vykoupený kus</div>
+                    <div class="fw-semibold" id="vsTitle"></div>
+                </div>
+                <label class="form-label">Prodejní cena</label>
+                <div class="input-group mb-3">
+                    <input type="number" id="vsPrice" class="form-control" min="1" step="1" placeholder="např. 4990">
+                    <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="vsEshop" checked>
+                    <label class="form-check-label" for="vsEshop">Rovnou zobrazit na e-shopu</label>
+                </div>
+                <div class="small text-white-50 mt-2">Kus se přesune ze záložky Výkupy do <b>Produktů</b>; fotky a popis mu případně doplníš tam.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zavřít</button>
+                <button type="button" class="btn btn-success" id="vsSave"><i class="fas fa-check me-1"></i>Zařadit do prodeje</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+// Výkupy → převody: na sklad dílů (dárce) / do prodeje
+(function () {
+    var saleModalEl = document.getElementById('vykupSaleModal');
+    var saleModal = saleModalEl ? new bootstrap.Modal(saleModalEl) : null;
+
+    function vykupPost(data, btn) {
+        if (btn) { btn.disabled = true; }
+        var fd = new FormData();
+        Object.keys(data).forEach(function (k) { fd.append(k, data[k]); });
+        fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+        fetch('api/vykup_transfer.php', {method: 'POST', body: fd, credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.success) { showAlert(d.message); setTimeout(function () { location.reload(); }, 900); }
+                else { if (btn) { btn.disabled = false; } showAlert(d.message || 'Nepovedlo se'); }
+            })
+            .catch(function () { if (btn) { btn.disabled = false; } showAlert('Síťová chyba.'); });
+    }
+
+    $(document).on('click', '.vykup-to-parts-btn', function () {
+        var id = this.dataset.id, title = this.dataset.title || '', cost = this.dataset.cost, btn = this;
+        showConfirm('Převést „' + title + '" na sklad náhradních dílů (dárce na díly)? Vznikne karta dílu'
+            + (cost ? ' s nákupní cenou ' + cost + ' Kč' : '') + '; kus ve Výkupech zůstane provázaný s 0 ks.', function () {
+            vykupPost({op: 'to_parts', product_id: id}, btn);
+        });
+    });
+
+    $(document).on('click', '.vykup-to-sale-btn', function () {
+        document.getElementById('vsProductId').value = this.dataset.id;
+        document.getElementById('vsTitle').textContent = this.dataset.title || '';
+        var pr = parseFloat(this.dataset.price || '0');
+        document.getElementById('vsPrice').value = pr > 0 ? pr : '';
+        document.getElementById('vsEshop').checked = true;
+        if (saleModal) { saleModal.show(); }
+        setTimeout(function () { document.getElementById('vsPrice').focus(); }, 350);
+    });
+
+    document.getElementById('vsSave').addEventListener('click', function () {
+        var price = document.getElementById('vsPrice').value;
+        if (!price || parseFloat(price) <= 0) { showAlert('Zadej prodejní cenu.'); return; }
+        vykupPost({
+            op: 'to_sale',
+            product_id: document.getElementById('vsProductId').value,
+            price: price,
+            show_eshop: document.getElementById('vsEshop').checked ? 1 : 0
+        }, this);
+    });
+}());
+</script>
+<?php endif; ?>
 
 <?php require_once 'includes/footer.php'; ?>

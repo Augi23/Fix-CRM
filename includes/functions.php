@@ -1995,6 +1995,10 @@ function ensureProductsVykupColumns(): void {
         if (!$pdo->query("SHOW COLUMNS FROM products LIKE 'vykup_document_id'")->fetch()) {
             $pdo->exec("ALTER TABLE products ADD COLUMN vykup_document_id INT NULL DEFAULT NULL");
         }
+        if (!$pdo->query("SHOW COLUMNS FROM products LIKE 'moved_to_inventory_id'")->fetch()) {
+            // výkup převedený na sklad náhradních dílů → id karty dílu (dvakrát nejde)
+            $pdo->exec("ALTER TABLE products ADD COLUMN moved_to_inventory_id INT NULL DEFAULT NULL");
+        }
     } catch (Throwable $e) { error_log('ensureProductsVykupColumns: ' . $e->getMessage()); }
 }
 
