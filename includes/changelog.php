@@ -11,9 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.51.2',
+        'date' => '2026-08-20',
+        'time' => '11:55',
+        'title' => 'Kasa: dvě fakturační identity — „Faktura s.r.o." a „Faktura IČO"',
+        'items' => [
+            '<b>Nový typ platby „Faktura IČO":</b> doklad vystaví OSVČ majitele místo AppleFix s.r.o. — vlastní hlavička faktury (jméno, IČO, sídlo), <b>vlastní číselná řada</b> (výchozí 9RRRR…, číslice VS se s řadou s.r.o. nikdy nepotkají) a <b>vlastní bankovní účet pro QR platbu</b>. Dosavadní tlačítko přejmenováno na <b>„Faktura s.r.o."</b> a funguje beze změny.',
+            'Výstavce si faktura nese v sobě (sloupec supplier) — tisk, e-mail i QR se řídí dokladem, ne aktuálním nastavením. Termoúčtenka u prodeje „na fakturu IČO" nese v hlavičce jméno a IČO OSVČ (provozovna zůstává). Denní přehled kasy ukazuje „fakturou s.r.o." a „fakturou IČO" zvlášť.',
+            '<b>Nastavení: Účetnictví → Nastavení → blok „Druhá fakturační identita"</b> — jméno, IČO, sídlo, účet (IBAN se dopočítá sám), číselná řada, plátcovství DPH a hlavní vypínač. Dokud není blok vyplněný a zapnutý, kasa „Fakturu IČO" nepustí (hlídá obrazovka i server).',
+        ],
+    ],
+    [
         'version' => '3.51.1',
-        'date' => '2026-08-16',
-        'time' => '17:00',
+        'date' => '2026-08-20',
+        'time' => '11:39',
         'title' => 'Historie: filtr dle zaměstnance a dostupnost všech záznamů',
         'items' => [
             '<b>Filtr „Zaměstnanec":</b> místo psaní jména si v Historii vybereš zaměstnance z nabídky (u každého je vidět počet záznamů). Filtruje se podle <b>identity účtu</b>, takže případné přejmenování historii nerozdělí; nabídka obsahuje i bývalé účty, které mají záznamy.',

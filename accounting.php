@@ -34,6 +34,27 @@ if (isset($_POST['save_acc_settings'])) {
     set_setting('acc_auto_create_invoice', isset($_POST['acc_auto_create_invoice']) ? 1 : 0);
     set_setting('acc_is_vat_payer', isset($_POST['acc_is_vat_payer']) ? 1 : 0);
     set_setting('acc_vat_rate', $_POST['acc_vat_rate']);
+    // druhá fakturační identita — „Faktura IČO" na kase (OSVČ majitele)
+    // staré hodnoty PŘED uložením — kvůli dopočtu IBAN při změně účtu níže
+    $__oldIcoAcc = trim((string)get_setting('ico_supplier_bank_account', ''));
+    $__oldIcoIban = trim((string)get_setting('ico_supplier_iban', ''));
+    set_setting('ico_supplier_enabled', isset($_POST['ico_supplier_enabled']) ? 1 : 0);
+    foreach (['ico_supplier_name', 'ico_supplier_ico', 'ico_supplier_dic', 'ico_supplier_address',
+              'ico_supplier_bank_name', 'ico_supplier_bank_account', 'ico_supplier_iban',
+              'ico_supplier_swift', 'ico_supplier_invoice_prefix'] as $__k) {
+        set_setting($__k, trim((string)($_POST[$__k] ?? '')));
+    }
+    set_setting('ico_supplier_is_vat', isset($_POST['ico_supplier_is_vat']) ? 1 : 0);
+    // IBAN dopočítat z čísla účtu: (a) když je IBAN prázdný, (b) když se ZMĚNILO
+    // číslo účtu a IBAN zůstal ten starý (předvyplněný formulářem) — jinak by na
+    // faktuře byl nový účet a IBAN starého účtu (dvě různá čísla na jednom dokladu)
+    $__newIcoAcc = trim((string)($_POST['ico_supplier_bank_account'] ?? ''));
+    $__postIcoIban = trim((string)($_POST['ico_supplier_iban'] ?? ''));
+    if ($__newIcoAcc !== '' && ($__postIcoIban === '' || ($__newIcoAcc !== $__oldIcoAcc && $__postIcoIban === $__oldIcoIban))) {
+        require_once __DIR__ . '/includes/kb_api.php';
+        $__ib = crmCzAccountToIban($__newIcoAcc);
+        if ($__ib !== '') { set_setting('ico_supplier_iban', $__ib); }
+    }
     echo '<div class="alert alert-success">' . __('settings_saved') . '</div>';
 }
 
@@ -374,6 +395,60 @@ $customers = $stmt->fetchAll();
                                 </label>
                             </div>
                         </div>
+
+                        <?php /* Druhá fakturační identita — „Faktura IČO" na kase (v3.50.0):
+                                 doklady vystavené OSVČ majitele vedle AppleFix s.r.o.
+                                 Vlastní číselná řada (výchozí 9RRRR…) a vlastní účet pro QR. */ ?>
+                        <div class="col-12"><hr>
+                            <h6 class="mb-1"><i class="fas fa-file-signature me-2 text-info"></i>Druhá fakturační identita — „Faktura IČO" (OSVČ)</h6>
+                            <div class="form-text text-muted small mb-2">Kasa nabízí platbu „Faktura IČO" — doklad vystaví OSVČ níže místo s.r.o. Vlastní číselná řada i účet pro QR platbu. Dokud není blok vyplněný a zapnutý, kasa tento typ platby nepustí.</div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="ico_supplier_enabled" value="1" id="icoSupEnabled" <?php echo get_setting('ico_supplier_enabled', '0') == '1' ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="icoSupEnabled"><strong>Zapnout „Faktura IČO" na kase</strong></label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Jméno / název (OSVČ)</label>
+                            <input type="text" name="ico_supplier_name" class="form-control" value="<?php echo htmlspecialchars(get_setting('ico_supplier_name')); ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">IČO</label>
+                            <input type="text" name="ico_supplier_ico" class="form-control" value="<?php echo htmlspecialchars(get_setting('ico_supplier_ico')); ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">DIČ (jen plátce)</label>
+                            <input type="text" name="ico_supplier_dic" class="form-control" value="<?php echo htmlspecialchars(get_setting('ico_supplier_dic')); ?>">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Sídlo</label>
+                            <textarea name="ico_supplier_address" class="form-control" rows="2"><?php echo htmlspecialchars(get_setting('ico_supplier_address')); ?></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Banka</label>
+                            <input type="text" name="ico_supplier_bank_name" class="form-control" value="<?php echo htmlspecialchars(get_setting('ico_supplier_bank_name')); ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Číslo účtu (pro QR platby OSVČ)</label>
+                            <input type="text" name="ico_supplier_bank_account" class="form-control" value="<?php echo htmlspecialchars(get_setting('ico_supplier_bank_account')); ?>" placeholder="123456789/0100">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">IBAN</label>
+                            <input type="text" name="ico_supplier_iban" class="form-control" value="<?php echo htmlspecialchars(get_setting('ico_supplier_iban')); ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">SWIFT</label>
+                            <input type="text" name="ico_supplier_swift" class="form-control" value="<?php echo htmlspecialchars(get_setting('ico_supplier_swift')); ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Prefix číselné řady</label>
+                            <input type="text" name="ico_supplier_invoice_prefix" class="form-control" value="<?php echo htmlspecialchars(get_setting('ico_supplier_invoice_prefix', '9' . date('Y'))); ?>">
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="ico_supplier_is_vat" value="1" id="icoSupVat" <?php echo get_setting('ico_supplier_is_vat', '0') == '1' ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="icoSupVat">OSVČ je plátce DPH</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -478,10 +553,12 @@ function showNewInvoiceModal() {
     document.getElementById('invModalTitle').innerText = "<?php echo __('new_invoice'); ?>";
     document.querySelector('#itemsTable tbody').innerHTML = '';
     
-    // Auto-generate number
-    const prefix = "<?php echo get_setting('acc_invoice_prefix', date('Y')); ?>";
-    const nextNum = "<?php echo str_pad((count($invoices) + 1), 4, '0', STR_PAD_LEFT); ?>";
-    document.getElementById('inv_number').value = prefix + nextNum;
+    // Návrh čísla z MAXIMA řady s.r.o. (afxNextInvoiceNumber) — dřívější count()+1
+    // počítalo VŠECHNY faktury (vč. řady OSVČ a storen) a dělalo díry v řadě
+    document.getElementById('inv_number').value = "<?php
+        try { echo e(afxNextInvoiceNumber($pdo, (string)get_setting('acc_invoice_prefix', date('Y')))); }
+        catch (Throwable $e) { echo e(get_setting('acc_invoice_prefix', date('Y')) . str_pad((string)(count($invoices) + 1), 4, '0', STR_PAD_LEFT)); }
+    ?>";
     
     addInvItem();
     invModal.show();

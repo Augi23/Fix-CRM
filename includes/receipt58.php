@@ -167,7 +167,7 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
     $baseKc = ($isVat && $vatRate > 0) ? (int)round($stdTotal * 100 / (100 + $vatRate)) : $stdKc;
     $hasUsed = $usedTotal > 0 && $isVat;
 
-    $isInvoicePay = (string)($sale['payment_method'] ?? '') === 'invoice';
+    $isInvoicePay = in_array((string)($sale['payment_method'] ?? ''), ['invoice', 'invoice_ico'], true);
     if (!$isVat) {
         $title = 'Doklad o prodeji';
         unset($co['dic']);
@@ -196,7 +196,7 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
     $legal[] = 'Reklamace uplatníte na adrese provozovny výše. Doklad uschovejte.';
 
     $payment = (string)($sale['payment_method'] ?? '');
-    $payLabel = $labels[$payment] ?? ['cash' => 'Hotově', 'card' => 'Kartou', 'invoice' => 'Na fakturu'][$payment] ?? $payment;
+    $payLabel = $labels[$payment] ?? ['cash' => 'Hotově', 'card' => 'Kartou', 'invoice' => 'Na fakturu (s.r.o.)', 'invoice_ico' => 'Na fakturu (IČO)'][$payment] ?? $payment;
 
     $received = isset($sale['cash_received']) && $sale['cash_received'] !== null ? (float)$sale['cash_received'] : null;
     $change   = isset($sale['cash_change'])   && $sale['cash_change']   !== null ? (float)$sale['cash_change']   : null;

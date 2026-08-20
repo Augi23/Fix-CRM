@@ -368,6 +368,7 @@ function afxUcetniDataKniha(string $from, string $to, int $branchId): array {
     $rows = afxUcetniQuery(
         "SELECT i.id, i.invoice_number, i.date_issue, i.date_tax, i.date_due, i.status,
                 i.total_amount, i.currency, i.order_id, i.payment_date, o.branch_id,
+                COALESCE(i.supplier, 'sro') AS supplier,
                 $paid AS paid_amount,
                 $payRows AS pay_rows,
                 $name AS cust_name,
@@ -676,7 +677,7 @@ function afxUcetniDataDobropisy(string $from, string $to, int $branchId): array 
 /** 5) Tržby z pokladny po dnech. */
 function afxUcetniDataKasa(string $from, string $to, int $branchId): array {
     $out = ['rows' => [], 'soucty' => ['hotovost' => 0.0, 'karta' => 0.0, 'faktura' => 0.0,
-        'celkem' => 0.0, 'doklady' => 0, 'storno_pocet' => 0, 'storno_castka' => 0.0], 'pozn' => []];
+        'faktura_ico' => 0.0, 'celkem' => 0.0, 'doklady' => 0, 'storno_pocet' => 0, 'storno_castka' => 0.0], 'pozn' => []];
     if (!afxUcetniTableExists('pos_sales')) {
         $out['pozn'][] = 'Pokladna (pos_sales) v databázi zatím není — sestava je prázdná.';
         return $out;
@@ -693,6 +694,7 @@ function afxUcetniDataKasa(string $from, string $to, int $branchId): array {
                 SUM(CASE WHEN s.payment_method = 'cash' THEN s.total ELSE 0 END) AS hotovost,
                 SUM(CASE WHEN s.payment_method = 'card' THEN s.total ELSE 0 END) AS karta,
                 SUM(CASE WHEN s.payment_method = 'invoice' THEN s.total ELSE 0 END) AS faktura,
+                SUM(CASE WHEN s.payment_method = 'invoice_ico' THEN s.total ELSE 0 END) AS faktura_ico,
                 COUNT(*) AS doklady,
                 SUM(s.total) AS celkem,
                 $usedExpr AS pouzite_doklady
@@ -707,6 +709,7 @@ function afxUcetniDataKasa(string $from, string $to, int $branchId): array {
         $out['soucty']['hotovost'] += (float)$r['hotovost'];
         $out['soucty']['karta'] += (float)$r['karta'];
         $out['soucty']['faktura'] += (float)$r['faktura'];
+        $out['soucty']['faktura_ico'] += (float)($r['faktura_ico'] ?? 0);
         $out['soucty']['celkem'] += (float)$r['celkem'];
         $out['soucty']['doklady'] += (int)$r['doklady'];
     }

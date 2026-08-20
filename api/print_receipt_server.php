@@ -44,11 +44,14 @@ function afxReceiptDataForSale(int $id): ?array {
     $sale['customer_label'] = $custName;
     $sale['customer_ico'] = $custName !== '' ? trim((string)($sale['cust_ico'] ?? '')) : '';
     if ((string)$sale['status'] !== 'cancelled') { $sale['cancelled_at'] = null; }
+    // prodej „na fakturu IČO" prodává OSVČ majitele → hlavička účtenky nese JEJÍ
+    // jméno a IČO (adresa provozovny a kontakt zůstávají — prodejna je stejná)
+    $ico = (string)$sale['payment_method'] === 'invoice_ico' ? afxIcoSupplier() : null;
     return crmBuildPosReceipt58($sale, $items, [
-        'name' => get_setting('company_name', 'AppleFix s.r.o.'),
+        'name' => $ico ? ($ico['name'] ?: get_setting('company_name', 'AppleFix s.r.o.')) : get_setting('company_name', 'AppleFix s.r.o.'),
         'address' => trim((string)$bc['address']),
-        'ico' => trim((string)get_setting('company_ico', '')),
-        'dic' => trim((string)get_setting('company_dic', '')),
+        'ico' => $ico ? $ico['ico'] : trim((string)get_setting('company_ico', '')),
+        'dic' => $ico ? $ico['dic'] : trim((string)get_setting('company_dic', '')),
         'phone' => (string)$bc['phone'],
         'web' => trim((string)get_setting('company_web', '')) ?: 'www.applefix.cz',
     ]);

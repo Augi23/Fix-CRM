@@ -287,8 +287,8 @@ private function getInvoiceStatusBadge($status) {
                     invoice_number, customer_id, date_issue, date_tax, date_due, 
                     total_amount, vat_amount, is_vat_payer, status, payment_method, currency, 
                     parent_id, invoice_type, notes,
-                    cust_name_override, cust_address_override, cust_ico_override, cust_dic_override
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'issued', ?, ?, ?, 'credit_note', ?, ?, ?, ?, ?)
+                    cust_name_override, cust_address_override, cust_ico_override, cust_dic_override, supplier
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'issued', ?, ?, ?, 'credit_note', ?, ?, ?, ?, ?, ?)
             ");
             
             $stmt->execute([
@@ -297,7 +297,9 @@ private function getInvoiceStatusBadge($status) {
                 $original['payment_method'], $original['currency'],
                 $original['id'], "Opravný k faktuře " . $original['invoice_number'],
                 $original['cust_name_override'], $original['cust_address_override'], 
-                $original['cust_ico_override'], $original['cust_dic_override']
+                $original['cust_ico_override'], $original['cust_dic_override'],
+                // dobropis musí vystavit TENTÝŽ subjekt jako původní fakturu (sro|ico)
+                (string)($original['supplier'] ?? 'sro') ?: 'sro'
             ]);
             
             $new_id = $this->pdo->lastInsertId();

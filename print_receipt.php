@@ -98,6 +98,13 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
 $co_name  = get_setting('company_name', 'AppleFix s.r.o.');
 $co_ico   = trim((string)get_setting('company_ico', ''));
 $co_dic   = trim((string)get_setting('company_dic', ''));
+// prodej „na fakturu IČO" prodává OSVČ majitele → doklad nese její jméno a IČO
+if ((string)($sale['payment_method'] ?? '') === 'invoice_ico' && function_exists('afxIcoSupplier')) {
+    $__ic = afxIcoSupplier();
+    if ($__ic['name'] !== '') { $co_name = $__ic['name']; }
+    if ($__ic['ico'] !== '')  { $co_ico = $__ic['ico']; }
+    $co_dic = $__ic['dic'];
+}
 $co_web   = trim((string)get_setting('company_web', '')) ?: 'www.applefix.cz';
 $__bc     = crmOrderBranchContact((int)($sale['branch_id'] ?? 0));
 $co_addr  = trim(preg_replace('/\s*[\r\n]+\s*/u', ', ', (string)$__bc['address']));
@@ -121,7 +128,7 @@ $baseKc = ($isVat && $vatRate > 0) ? (int)round($stdTotal * 100 / (100 + $vatRat
 $vatKc  = $stdKc - $baseKc;
 $hasUsed = $usedTotal > 0 && $isVat;   // §90 má smysl jen u plátce DPH
 
-$payLabel = ['cash' => _l('rcpt_pay_cash'), 'card' => _l('rcpt_pay_card'), 'invoice' => _l('rcpt_pay_invoice')][(string)$sale['payment_method']] ?? (string)$sale['payment_method'];
+$payLabel = ['cash' => _l('rcpt_pay_cash'), 'card' => _l('rcpt_pay_card'), 'invoice' => _l('rcpt_pay_invoice'), 'invoice_ico' => _l('rcpt_pay_invoice') . ' (IČO)'][(string)$sale['payment_method']] ?? (string)$sale['payment_method'];
 $custName = trim((string)($sale['company'] ?? '')) ?: trim((string)($sale['first_name'] ?? '') . ' ' . (string)($sale['last_name'] ?? ''));
 $cancelled = (string)$sale['status'] === 'cancelled';
 

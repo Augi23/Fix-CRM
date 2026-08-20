@@ -33,6 +33,21 @@ if (!defined('INVOICE_DOC_EMBED')) {
 // V embed režimu (e-mail, klientský portál) $target_lang nikdo nenastavil —
 // bez pojistky každý vložený doklad sypal warning „Undefined variable".
 $target_lang = $target_lang ?? crmCustomerDocLang((string)($invoice['preferred_language'] ?? 'cs'));
+
+// Dvě fakturační identity (v3.50.0): doklad se supplier='ico' vystavila OSVČ
+// majitele — hlavička, banka i QR se berou z ico_supplier_* místo acc_*.
+// $S() = get_setting s přemapováním podle výstavce TOHOTO dokladu.
+$__supIsIco = (string)($invoice['supplier'] ?? 'sro') === 'ico';
+$S = function (string $key, string $def = '') use ($__supIsIco) {
+    static $map = [
+        'acc_company_name' => 'ico_supplier_name', 'acc_address' => 'ico_supplier_address',
+        'acc_ico' => 'ico_supplier_ico', 'acc_dic' => 'ico_supplier_dic',
+        'acc_trade_register' => 'ico_supplier_register',
+        'acc_bank_name' => 'ico_supplier_bank_name', 'acc_bank_account' => 'ico_supplier_bank_account',
+        'acc_iban' => 'ico_supplier_iban', 'acc_swift' => 'ico_supplier_swift',
+    ];
+    return get_setting($__supIsIco && isset($map[$key]) ? $map[$key] : $key, $def);
+};
 if (!function_exists('_l')) {
     function _l($key) { global $target_lang; return __($key, $target_lang); }
 }
@@ -112,14 +127,14 @@ if (!function_exists('_l')) {
         <tr>
             <td>
                 <div class="addr-title"><?php echo _l('inv_supplier'); ?></div>
-                <div class="addr-name"><?php echo htmlspecialchars(get_setting('acc_company_name')); ?></div>
-                <div><?php echo nl2br(htmlspecialchars(get_setting('acc_address'))); ?></div>
+                <div class="addr-name"><?php echo htmlspecialchars($S('acc_company_name')); ?></div>
+                <div><?php echo nl2br(htmlspecialchars($S('acc_address'))); ?></div>
                 <div style="margin-top: 10px;">
-                    <strong>IČO:</strong> <?php echo htmlspecialchars(get_setting('acc_ico')); ?><br>
-                    <strong>DIČ:</strong> <?php echo htmlspecialchars(get_setting('acc_dic')); ?>
+                    <strong>IČO:</strong> <?php echo htmlspecialchars($S('acc_ico')); ?><br>
+                    <strong>DIČ:</strong> <?php echo htmlspecialchars($S('acc_dic')); ?>
                 </div>
                 <div style="margin-top: 10px; font-size: 9px; color: #666;">
-                    <?php echo htmlspecialchars(get_setting('acc_trade_register')); ?>
+                    <?php echo htmlspecialchars($S('acc_trade_register')); ?>
                 </div>
             </td>
             <td>
@@ -149,11 +164,11 @@ if (!function_exists('_l')) {
         <tr>
             <td>
                 <div class="pay-label"><?php echo _l('inv_bank'); ?></div>
-                <div class="pay-value"><?php echo htmlspecialchars(get_setting('acc_bank_name')); ?></div>
+                <div class="pay-value"><?php echo htmlspecialchars($S('acc_bank_name')); ?></div>
             </td>
             <td>
                 <div class="pay-label"><?php echo _l('account_number'); ?></div>
-                <div class="pay-value"><?php echo htmlspecialchars(get_setting('acc_bank_account')); ?></div>
+                <div class="pay-value"><?php echo htmlspecialchars($S('acc_bank_account')); ?></div>
             </td>
             <td>
                 <div class="pay-label"><?php echo _l('date_issue'); ?></div>
@@ -175,11 +190,11 @@ if (!function_exists('_l')) {
         <tr>
             <td>
                 <div class="pay-label">IBAN</div>
-                <div class="pay-value" style="font-size: 9px;"><?php echo htmlspecialchars(get_setting('acc_iban')); ?></div>
+                <div class="pay-value" style="font-size: 9px;"><?php echo htmlspecialchars($S('acc_iban')); ?></div>
             </td>
             <td>
                 <div class="pay-label">SWIFT</div>
-                <div class="pay-value"><?php echo htmlspecialchars(get_setting('acc_swift')); ?></div>
+                <div class="pay-value"><?php echo htmlspecialchars($S('acc_swift')); ?></div>
             </td>
             <td>
                 <div class="pay-label"><?php echo _l('date_due'); ?></div>
@@ -192,7 +207,7 @@ if (!function_exists('_l')) {
         </tr>
     </table>
 
-    <?php if (trim((string)get_setting('acc_bank_account', '')) === ''
+    <?php if (trim((string)$S('acc_bank_account', '')) === ''
         && !in_array((string)$invoice['payment_method'], ['cash', 'card', 'cod'], true)
         && !defined('INVOICE_DOC_EMBED')): ?>
     <!-- výstraha jen na obrazovce (netiskne se): převodní faktura bez čísla účtu je nezaplatitelná -->

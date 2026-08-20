@@ -913,7 +913,9 @@ function crmCzAccountToIban(string $acc): string {
 
 /** SPAYD řetězec QR platby pro fakturu (standard ČBA; jen ASCII znaky). */
 function afxSpaydForInvoice(array $invoice): string {
-    $iban = crmCzAccountToIban((string)get_setting('acc_bank_account', ''));
+    // QR míří na účet VÝSTAVCE dokladu: 'ico' = OSVČ majitele, jinak s.r.o.
+    $accSetting = (string)($invoice['supplier'] ?? 'sro') === 'ico' ? 'ico_supplier_bank_account' : 'acc_bank_account';
+    $iban = crmCzAccountToIban((string)get_setting($accSetting, ''));
     if ($iban === '') return '';
     // U částečně zaplacené faktury musí QR nabídnout ZBYTEK k úhradě, ne celou částku —
     // jinak by klient na upomínce zaplatil znovu všechno a vznikl přeplatek.

@@ -78,7 +78,7 @@ if ($sestava !== '' && isset($defs[$sestava])) {
                 <tbody>
                 <?php foreach ($d['rows'] as $r): $storno = $r['status'] === 'cancelled'; ?>
                     <tr>
-                        <td class="nowrap<?php echo $storno ? ' rp-strike' : ''; ?>"><b><?php echo e($r['invoice_number']); ?></b></td>
+                        <td class="nowrap<?php echo $storno ? ' rp-strike' : ''; ?>"><b><?php echo e($r['invoice_number']); ?></b><?php if ((string)($r['supplier'] ?? 'sro') === 'ico'): ?> <span style="font-size:9px;font-weight:700;color:#7c3aed;border:1px solid #7c3aed;border-radius:6px;padding:0 4px;vertical-align:middle;" title="Fakturu vystavila OSVČ — do účetnictví s.r.o. nepatří">OSVČ</span><?php endif; ?></td>
                         <td class="nowrap"><?php echo e(afxUcetniDate($r['date_issue'])); ?></td>
                         <td class="nowrap"><?php echo e(afxUcetniDate($r['date_tax'])); ?></td>
                         <td class="nowrap"><?php echo e(afxUcetniDate($r['date_due'])); ?></td>
@@ -301,18 +301,20 @@ if ($sestava !== '' && isset($defs[$sestava])) {
             afxUcetniPrintNotes($d['pozn']);
             if (!$d['rows']) {
                 afxUcetniPrintEmpty('Za zvolené období nebyl na kase vystaven žádný doklad.');
-            } else { ?>
+            } else { $maIco = ((float)($d['soucty']['faktura_ico'] ?? 0)) > 0; ?>
             <div class="report-cards">
                 <div class="report-card"><div class="rp-k">Hotovost</div><div class="rp-v"><?php echo e(afxUcetniMoney($d['soucty']['hotovost'])); ?></div><div class="rp-s">Kč</div></div>
                 <div class="report-card"><div class="rp-k">Karta</div><div class="rp-v"><?php echo e(afxUcetniMoney($d['soucty']['karta'])); ?></div><div class="rp-s">Kč</div></div>
-                <div class="report-card"><div class="rp-k">Na fakturu</div><div class="rp-v"><?php echo e(afxUcetniMoney($d['soucty']['faktura'])); ?></div><div class="rp-s">Kč</div></div>
+                <div class="report-card"><div class="rp-k">Faktura s.r.o.</div><div class="rp-v"><?php echo e(afxUcetniMoney($d['soucty']['faktura'])); ?></div><div class="rp-s">Kč</div></div>
+                <?php if ($maIco): ?><div class="report-card"><div class="rp-k">Faktura IČO (OSVČ)</div><div class="rp-v"><?php echo e(afxUcetniMoney($d['soucty']['faktura_ico'])); ?></div><div class="rp-s">Kč</div></div><?php endif; ?>
                 <div class="report-card"><div class="rp-k">Celkem</div><div class="rp-v"><?php echo e(afxUcetniMoney($d['soucty']['celkem'])); ?></div><div class="rp-s"><?php echo (int)$d['soucty']['doklady']; ?> dokladů</div></div>
             </div>
             <table class="report-table">
                 <thead>
                     <tr>
                         <th>Den</th><th class="num">Dokladů</th>
-                        <th class="num">Hotovost</th><th class="num">Karta</th><th class="num">Na fakturu</th>
+                        <th class="num">Hotovost</th><th class="num">Karta</th><th class="num">Faktura s.r.o.</th>
+                        <?php if ($maIco): ?><th class="num">Faktura IČO</th><?php endif; ?>
                         <th class="num">Celkem</th><th class="num">Z toho s použitým zbožím</th>
                     </tr>
                 </thead>
@@ -324,6 +326,7 @@ if ($sestava !== '' && isset($defs[$sestava])) {
                         <td class="num"><?php echo e(afxUcetniMoney($r['hotovost'])); ?></td>
                         <td class="num"><?php echo e(afxUcetniMoney($r['karta'])); ?></td>
                         <td class="num"><?php echo e(afxUcetniMoney($r['faktura'])); ?></td>
+                        <?php if ($maIco): ?><td class="num"><?php echo e(afxUcetniMoney($r['faktura_ico'] ?? 0)); ?></td><?php endif; ?>
                         <td class="num"><b><?php echo e(afxUcetniMoney($r['celkem'])); ?></b></td>
                         <td class="num"><?php echo (int)$r['pouzite_doklady'] > 0 ? (int)$r['pouzite_doklady'] : '—'; ?></td>
                     </tr>
@@ -336,6 +339,7 @@ if ($sestava !== '' && isset($defs[$sestava])) {
                         <td class="num"><?php echo e(afxUcetniMoney($d['soucty']['hotovost'])); ?></td>
                         <td class="num"><?php echo e(afxUcetniMoney($d['soucty']['karta'])); ?></td>
                         <td class="num"><?php echo e(afxUcetniMoney($d['soucty']['faktura'])); ?></td>
+                        <?php if ($maIco): ?><td class="num"><?php echo e(afxUcetniMoney($d['soucty']['faktura_ico'])); ?></td><?php endif; ?>
                         <td class="num"><?php echo e(afxUcetniMoney($d['soucty']['celkem'])); ?></td>
                         <td></td>
                     </tr>

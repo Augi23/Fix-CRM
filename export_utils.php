@@ -13,6 +13,12 @@ class AccountingExporter {
 
     public function exportToPohoda($id) {
         $invoice = $this->getFullInvoice($id);
+        // Pohoda import páruje dataPack proti IČO účetní jednotky — faktury OSVČ
+        // („Faktura IČO" z kasy) do účetnictví s.r.o. NEPATŘÍ a export by je
+        // orazítkoval cizím IČO. OSVČ si vede evidenci zvlášť.
+        if ((string)($invoice['supplier'] ?? 'sro') === 'ico') {
+            throw new Exception('Faktura ' . $invoice['invoice_number'] . ' je vystavená OSVČ (Faktura IČO) — do Pohoda exportu s.r.o. nepatří.');
+        }
         $company_name = get_setting('acc_company_name');
         $ico = get_setting('acc_ico');
         

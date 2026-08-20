@@ -2373,6 +2373,50 @@ function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false): 
     return $prefix . str_pad((string)($seq + 1), 4, '0', STR_PAD_LEFT);
 }
 
+/* ── DVĚ FAKTURAČNÍ IDENTITY (v3.50.0): 'sro' = AppleFix s.r.o. (acc_*),
+   'ico' = OSVČ majitele (ico_supplier_*). Kasa nabízí „Faktura s.r.o." a
+   „Faktura IČO"; doklad si výstavce nese ve sloupci invoices.supplier. ── */
+
+/** pos_sales.payment_method je ENUM — bez rozšíření by 'invoice_ico' spadl. */
+function afxEnsurePosPaymentEnum(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'payment_method'")->fetch(PDO::FETCH_ASSOC);
+        if ($col && stripos((string)$col['Type'], 'invoice_ico') === false) {
+            $pdo->exec("ALTER TABLE pos_sales MODIFY payment_method ENUM('cash','card','invoice','invoice_ico') NOT NULL DEFAULT 'cash'");
+        }
+    } catch (Throwable $e) { error_log('afxEnsurePosPaymentEnum: ' . $e->getMessage()); }
+}
+
+/** invoices.supplier: kdo doklad vystavil ('sro' výchozí | 'ico'). */
+function afxEnsureInvoiceSupplierColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try { $pdo->exec("ALTER TABLE invoices ADD COLUMN supplier VARCHAR(8) NOT NULL DEFAULT 'sro'"); }
+    catch (Throwable $e) { /* už existuje */ }
+}
+
+/** Druhá fakturační identita (OSVČ) z nastavení + příznak připravenosti. */
+function afxIcoSupplier(): array {
+    $s = [
+        'enabled' => get_setting('ico_supplier_enabled', '0') == '1',
+        'name' => trim((string)get_setting('ico_supplier_name', '')),
+        'ico' => trim((string)get_setting('ico_supplier_ico', '')),
+        'dic' => trim((string)get_setting('ico_supplier_dic', '')),
+        'address' => trim((string)get_setting('ico_supplier_address', '')),
+        'bank_account' => trim((string)get_setting('ico_supplier_bank_account', '')),
+        'is_vat' => get_setting('ico_supplier_is_vat', '0') == '1',
+        'prefix' => trim((string)get_setting('ico_supplier_invoice_prefix', '')) ?: ('9' . date('Y')),
+    ];
+    $s['ready'] = $s['enabled'] && $s['name'] !== '' && $s['ico'] !== '';
+    return $s;
+}
+
 /**
  * Faktura z prodeje na kase — INSERT do stávajících invoices/invoice_items.
  * Volat UVNITŘ běžící transakce checkoutu (proto ne InvoiceManager: ten si otevírá
@@ -2382,8 +2426,12 @@ function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false): 
  *   použité zboží §90 → cena beze změny, vat_rate 0 + povinná věta v poznámce
  * $items: [['name','qty','unit_price','used']]. Vrací id faktury.
  */
-function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, array $items, float $total, ?int $orderId = null): int {
-    $isVat = get_setting('acc_is_vat_payer', '0') == '1';
+function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, array $items, float $total, ?int $orderId = null, string $supplier = 'sro'): int {
+    afxEnsureInvoiceSupplierColumn();
+    // DPH stav podle VÝSTAVCE dokladu — s.r.o. a OSVČ mohou mít jiný režim
+    $isVat = $supplier === 'ico'
+        ? get_setting('ico_supplier_is_vat', '0') == '1'
+        : get_setting('acc_is_vat_payer', '0') == '1';
     $vatRate = (float)get_setting('acc_vat_rate', '21');
     $hasUsed = false;
     $stdBase = 0.0;    // základ DPH (ceny bez DPH po zaokrouhlení na 2 des.)
@@ -2417,13 +2465,16 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
         $notes .= ' Zvláštní režim – použité zboží dle § 90 zákona č. 235/2004 Sb., o DPH.';
     }
 
-    $prefix = (string)get_setting('acc_invoice_prefix', date('Y'));
+    // vlastní číselná řada OSVČ (výchozí 9RRRR…) — číslice VS se s řadou s.r.o. nepotkají
+    $prefix = $supplier === 'ico'
+        ? (trim((string)get_setting('ico_supplier_invoice_prefix', '')) ?: ('9' . date('Y')))
+        : (string)get_setting('acc_invoice_prefix', date('Y'));
     $currency = get_setting('currency', 'Kč');
     $ins = $pdo->prepare("INSERT INTO invoices
             (invoice_number, variable_symbol, customer_id, order_id, date_issue, date_tax, date_due,
-             total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes)
+             total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes, supplier)
         VALUES (?, ?, ?, ?, CURDATE(), CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY),
-                ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?)");
+                ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?, ?)");
     $invoiceId = 0;
     // Číslo z MAXIMA řady pod zámkem (stejný vzor jako pokladní doklady):
     // GET_LOCK proti souběhu dvou kas, UNIQUE klíč + opakování jako pojistka,
@@ -2439,7 +2490,7 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
             $number = afxNextInvoiceNumber($pdo, $prefix, true);
             try {
                 $ins->execute([$number, preg_replace('/\D/', '', $number) ?: null, $customerId, $orderId,
-                    round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes]);
+                    round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes, $supplier]);
                 $invoiceId = (int)$pdo->lastInsertId();
                 break;
             } catch (PDOException $e) {
@@ -5009,6 +5060,7 @@ function crmEnsureOrderInvoice(int $orderId, string $paymentMethod = 'bank_trans
  *  + blok „Platba převodem" s QR platbou (SPAYD) jako v e-shopových e-mailech. */
 function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array {
     global $pdo;
+    afxEnsureInvoiceSupplierColumn();
     $st = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, c.email AS cust_email,
                                 o.device_brand, o.device_model, o.serial_number
                          FROM invoices i
@@ -5040,7 +5092,7 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array 
         require_once __DIR__ . '/kb_api.php';
         $spayd = function_exists('afxSpaydForInvoice') ? afxSpaydForInvoice($invoice) : '';
         if ($spayd !== '') {
-            $acc = (string)get_setting('acc_bank_account', '');
+            $acc = (string)get_setting((string)($invoice['supplier'] ?? 'sro') === 'ico' ? 'ico_supplier_bank_account' : 'acc_bank_account', '');
             $vs = preg_replace('/\D+/', '', (string)($invoice['variable_symbol'] ?: $invoice['invoice_number']));
             $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=324x324&margin=0&data=' . rawurlencode($spayd);
             $qrBlock = '<div style="max-width:840px;margin:18px auto 0;background:#fff;border:1px solid #e8ebf0;border-radius:14px;padding:18px 22px;font-family:-apple-system,Segoe UI,Arial,sans-serif;">'
@@ -5061,7 +5113,11 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array 
         }
     }
 
-    $subject = get_setting('company_name', 'AppleFix') . ' — Faktura ' . (string)$invoice['invoice_number'];
+    // předmět nese jméno VÝSTAVCE — u dokladu OSVČ nesmí mail tvrdit, že fakturuje s.r.o.
+    $supName = (string)($invoice['supplier'] ?? 'sro') === 'ico'
+        ? ((string)get_setting('ico_supplier_name', '') ?: get_setting('company_name', 'AppleFix'))
+        : get_setting('company_name', 'AppleFix');
+    $subject = $supName . ' — Faktura ' . (string)$invoice['invoice_number'];
     [$ok, $msg] = smtpSendMail($to, $subject, $html);
     if ($ok) {
         crmAuditLog('invoice.email', [

@@ -32,7 +32,7 @@ $shiftCanForce = $shift && function_exists('afxPosShiftCanForceClose')
 
 // denní součty do hlavičky (uzávěrka na první pohled); historie prodejů
 // je záměrně JEN v Historie → Kasa prodejna, kasa je čistě prodejní plocha
-$todaySums = ['cash' => 0.0, 'card' => 0.0, 'invoice' => 0.0];
+$todaySums = ['cash' => 0.0, 'card' => 0.0, 'invoice' => 0.0, 'invoice_ico' => 0.0];
 try {
     // Denní uzávěrka jen za SVOU pobočku (admin/Boss vidí celofiremní součet).
     $__posBranch = orderBranchScopeSql('branch_id');
@@ -138,6 +138,7 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
 .pos-pay.sel-cash { color: #6fe08d; background: rgba(48,209,88,.16); box-shadow: inset 0 0 0 1px rgba(48,209,88,.4), 0 0 16px rgba(48,209,88,.22); text-shadow: 0 0 12px rgba(48,209,88,.5); }
 .pos-pay.sel-card { color: #5fd2ff; background: rgba(0,163,255,.18); box-shadow: inset 0 0 0 1px rgba(0,163,255,.45), 0 0 16px rgba(0,163,255,.25); text-shadow: 0 0 12px rgba(95,210,255,.5); }
 .pos-pay.sel-invoice { color: #ffc46b; background: rgba(255,159,10,.15); box-shadow: inset 0 0 0 1px rgba(255,159,10,.42), 0 0 16px rgba(255,159,10,.22); text-shadow: 0 0 12px rgba(255,159,10,.5); }
+.pos-pay.sel-invoice_ico { color: #d9a7ff; background: rgba(191,90,242,.15); box-shadow: inset 0 0 0 1px rgba(191,90,242,.42), 0 0 16px rgba(191,90,242,.22); text-shadow: 0 0 12px rgba(191,90,242,.5); }
 .pos-finish { width: 100%; padding: 20px; border: 0; border-radius: 19px; font-size: 19px; font-weight: 700;
   color: #eaf6ff; background: linear-gradient(135deg, rgba(0,163,255,.34), rgba(90,200,250,.22));
   box-shadow: inset 0 0 0 1px rgba(0,163,255,.5), 0 8px 26px rgba(0,120,210,.28); cursor: pointer; transition: filter .15s, transform .12s; }
@@ -218,7 +219,8 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
     <h2 class="mb-0"><i class="fas fa-cash-register me-2 text-info"></i>Pokladna</h2>
     <span class="text-white-50 small">Dnes: hotově <strong><?php echo formatMoney($todaySums['cash']); ?></strong>
         · kartou <strong><?php echo formatMoney($todaySums['card']); ?></strong>
-        · fakturou <strong><?php echo formatMoney($todaySums['invoice']); ?></strong>
+        · fakturou s.r.o. <strong><?php echo formatMoney($todaySums['invoice']); ?></strong>
+        <?php if ($todaySums['invoice_ico'] > 0 || afxIcoSupplier()['ready']): ?> · fakturou IČO <strong><?php echo formatMoney($todaySums['invoice_ico']); ?></strong><?php endif; ?>
         <?php if ($cashIn > 0): ?> · vklady <strong class="text-success"><?php echo formatMoney($cashIn); ?></strong><?php endif; ?>
         <?php if ($cashOut > 0): ?> · výdaje <strong class="text-warning">−<?php echo formatMoney($cashOut); ?></strong><?php endif; ?>
         · <span title="Počáteční zůstatek pokladny (<?php echo e(formatMoney((float)$cbRegister['opening_balance'])); ?> k <?php echo e(date('j. n. Y', strtotime((string)$cbRegister['opening_date']))); ?>) + všechny příjmy − výdaje. Dnešní pohyb: <?php echo e(formatMoney($cashToday)); ?>">stav hotovosti <strong class="<?php echo $cashState < 0 ? 'text-danger' : 'text-success'; ?>"><?php echo formatMoney($cashState); ?></strong></span>
@@ -590,19 +592,20 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="d-flex gap-2 mb-3">
                 <button type="button" class="pos-pay" data-pay="cash"><i class="fas fa-money-bill-wave"></i>Hotově</button>
                 <button type="button" class="pos-pay" data-pay="card"><i class="fas fa-credit-card"></i>Kartou<span class="small" style="font-size:10px;opacity:.7;">terminál zvlášť</span></button>
-                <button type="button" class="pos-pay" data-pay="invoice"><i class="fas fa-file-invoice"></i>Na fakturu</button>
+                <button type="button" class="pos-pay" data-pay="invoice"><i class="fas fa-file-invoice"></i>Faktura s.r.o.</button>
+                <button type="button" class="pos-pay" data-pay="invoice_ico"><i class="fas fa-file-signature"></i>Faktura IČO</button>
             </div>
 
             <div id="posCustomerWrap" class="mb-3" style="display:none;">
                 <label class="form-label small text-white-50 mb-1">Zákazník — u faktury povinný; u zakázky můžeš nechat prázdné (faktura půjde na jejího klienta)</label>
                 <select id="posCustomer" class="form-select" style="width:100%;"></select>
-                <?php if (trim((string)get_setting('acc_bank_account', '')) === ''): ?>
-                <div class="alert alert-danger border-0 py-2 mt-2 mb-0" style="font-size:.85rem;">
+                <?php /* varování o chybějícím účtu dle VÝSTAVCE zvolené faktury —
+                         text plní JS podle payment (invoice → s.r.o., invoice_ico → OSVČ) */ ?>
+                <div class="alert alert-danger border-0 py-2 mt-2 mb-0" id="posAccWarn" style="font-size:.85rem;display:none;">
                     <i class="fas fa-triangle-exclamation me-1"></i>
-                    <strong>Chybí číslo účtu firmy</strong> — faktura se vystaví bez platebních údajů a bez QR platby,
-                    zákazník nebude mít kam zaplatit. Doplň ho v <strong>Účetnictví → Nastavení</strong>.
+                    <strong>Chybí číslo účtu <span id="posAccWarnWho"></span></strong> — faktura se vystaví bez platebních
+                    údajů a bez QR platby, zákazník nebude mít kam zaplatit. Doplň ho v <strong>Účetnictví → Nastavení</strong>.
                 </div>
-                <?php endif; ?>
             </div>
 
             <button type="button" class="pos-finish" id="posFinish" disabled><i class="fas fa-check me-2"></i>Dokončit prodej</button>
@@ -811,6 +814,18 @@ document.addEventListener('DOMContentLoaded', function () {
     var cart = [];          // {type, id, name, code, price, qty, stock}
     var payment = '';
     var lastSale = null;
+    // druhá fakturační identita (OSVČ) — dokud není v Účetnictví vyplněná a zapnutá,
+    // „Faktura IČO" prodej nepustí (server to hlídá taky)
+    var ICO_SUPPLIER_READY = <?php echo afxIcoSupplier()['ready'] ? 'true' : 'false'; ?>;
+    var SRO_ACC_MISSING = <?php echo trim((string)get_setting('acc_bank_account', '')) === '' ? 'true' : 'false'; ?>;
+    var ICO_ACC_MISSING = <?php echo afxIcoSupplier()['bank_account'] === '' ? 'true' : 'false'; ?>;
+    function updateAccWarn() {
+        var w = document.getElementById('posAccWarn');
+        if (!w) return;
+        var show = (payment === 'invoice' && SRO_ACC_MISSING) || (payment === 'invoice_ico' && ICO_ACC_MISSING);
+        w.style.display = show ? '' : 'none';
+        if (show) document.getElementById('posAccWarnWho').textContent = payment === 'invoice_ico' ? 'OSVČ (Faktura IČO)' : 'firmy (s.r.o.)';
+    }
 
     var $body = document.getElementById('posCartBody');
     var $empty = document.getElementById('posCartEmpty');
@@ -986,7 +1001,13 @@ document.addEventListener('DOMContentLoaded', function () {
             payment = btn.dataset.pay;
             document.querySelectorAll('.pos-pay').forEach(function (b) { b.className = 'pos-pay'; });
             btn.classList.add('sel-' + payment);
-            $custWrap.style.display = payment === 'invoice' ? '' : 'none';
+            var isInvPay = payment === 'invoice' || payment === 'invoice_ico';
+            $custWrap.style.display = isInvPay ? '' : 'none';
+            updateAccWarn();
+            // „Faktura IČO" jde použít až po vyplnění a zapnutí identity OSVČ v Účetnictví
+            if (payment === 'invoice_ico' && !ICO_SUPPLIER_READY) {
+                alert('Faktura IČO zatím není aktivní — vyplň a zapni identitu OSVČ v Účetnictví → Nastavení (blok „Druhá fakturační identita").');
+            }
             updateFinish();
             // hotově → rovnou kalkulačkový displej (K úhradě / Přijato / Vrátit);
             // při záporném součtu (vyplácíme MY) displej nemá smysl
@@ -1065,8 +1086,10 @@ document.addEventListener('DOMContentLoaded', function () {
         var ok = cart.length > 0 && payment !== '';
         // u zakázky v košíku zákazník nutný není — odběratelem faktury se
         // automaticky stává klient zakázky (pos_checkout si ho dotáhne sám)
+        var isInvPay = payment === 'invoice' || payment === 'invoice_ico';
         var hasOrder = cart.some(function (c) { return c.type === 'order'; });
-        if (payment === 'invoice' && !$('#posCustomer').val() && !hasOrder) ok = false;
+        if (isInvPay && !$('#posCustomer').val() && !hasOrder) ok = false;
+        if (payment === 'invoice_ico' && !ICO_SUPPLIER_READY) ok = false;
         if (t < 0 && payment !== '' && payment !== 'cash') ok = false;   // výplata zákazníkovi jde jen hotově
         $finish.disabled = !ok;
         $finish.innerHTML = t < 0

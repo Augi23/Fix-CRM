@@ -27,7 +27,7 @@ if ($activeTab === 'kasa') {
     $kw = []; $kp = [];
     if ($kFrom !== '') { $kw[] = 's.created_at >= ?'; $kp[] = $kFrom . ' 00:00:00'; }
     if ($kTo !== '')   { $kw[] = 's.created_at <= ?'; $kp[] = $kTo . ' 23:59:59'; }
-    if (in_array($kPay, ['cash', 'card', 'invoice'], true)) { $kw[] = 's.payment_method = ?'; $kp[] = $kPay; }
+    if (in_array($kPay, ['cash', 'card', 'invoice', 'invoice_ico'], true)) { $kw[] = 's.payment_method = ?'; $kp[] = $kPay; }
     $kws = $kw ? ('WHERE ' . implode(' AND ', $kw)) : '';
     try {
         $c = $pdo->prepare("SELECT COUNT(*) FROM pos_sales s $kws");
@@ -157,7 +157,8 @@ require_once 'includes/header.php';
                 <option value="">— všechny —</option>
                 <option value="cash" <?php echo $kPay === 'cash' ? 'selected' : ''; ?>>Hotově</option>
                 <option value="card" <?php echo $kPay === 'card' ? 'selected' : ''; ?>>Kartou</option>
-                <option value="invoice" <?php echo $kPay === 'invoice' ? 'selected' : ''; ?>>Na fakturu</option>
+                <option value="invoice" <?php echo $kPay === 'invoice' ? 'selected' : ''; ?>>Faktura s.r.o.</option>
+                <option value="invoice_ico" <?php echo $kPay === 'invoice_ico' ? 'selected' : ''; ?>>Faktura IČO</option>
             </select>
         </div>
         <div class="col-md-3 col-6">
@@ -176,7 +177,10 @@ require_once 'includes/header.php';
 </form>
 
 <div class="row g-3 mb-3">
-    <?php foreach ([['cash', 'Hotově', 'money-bill-wave', 'success'], ['card', 'Kartou', 'credit-card', 'info'], ['invoice', 'Na fakturu', 'file-invoice', 'warning']] as [$pm, $lbl, $ico, $clr]): ?>
+    <?php $kTiles = [['cash', 'Hotově', 'money-bill-wave', 'success'], ['card', 'Kartou', 'credit-card', 'info'], ['invoice', 'Faktura s.r.o.', 'file-invoice', 'warning']];
+    // dlaždice Faktura IČO jen když takové prodeje existují — jinak by 4+1 rozbíjelo mřížku zbytečně
+    if ((int)($kSums['invoice_ico']['n'] ?? 0) > 0) { $kTiles[] = ['invoice_ico', 'Faktura IČO', 'file-signature', 'primary']; }
+    foreach ($kTiles as [$pm, $lbl, $ico, $clr]): ?>
     <div class="col-md-3 col-6">
         <div class="glass-panel p-3 border-secondary">
             <div class="small text-white-50"><i class="fas fa-<?php echo $ico; ?> me-1 text-<?php echo $clr; ?>"></i><?php echo $lbl; ?> (<?php echo (int)($kSums[$pm]['n'] ?? 0); ?>×)</div>
@@ -222,7 +226,7 @@ require_once 'includes/header.php';
                 <td class="small"><?php echo htmlspecialchars(mb_substr((string)($s['items_txt'] ?? ''), 0, 90)); ?><?php echo mb_strlen((string)($s['items_txt'] ?? '')) > 90 ? '…' : ''; ?></td>
                 <td class="small"><?php echo $custName !== '' ? htmlspecialchars($custName) : '<span class="text-white-50">—</span>'; ?></td>
                 <td>
-                    <span class="badge <?php echo ['cash' => 'bg-success', 'card' => 'bg-info text-dark', 'invoice' => 'bg-warning text-dark'][(string)$s['payment_method']] ?? 'bg-secondary'; ?>"><?php echo ['cash' => 'Hotově', 'card' => 'Kartou', 'invoice' => 'Faktura'][(string)$s['payment_method']] ?? ''; ?></span>
+                    <span class="badge <?php echo ['cash' => 'bg-success', 'card' => 'bg-info text-dark', 'invoice' => 'bg-warning text-dark', 'invoice_ico' => 'bg-primary'][(string)$s['payment_method']] ?? 'bg-secondary'; ?>"><?php echo ['cash' => 'Hotově', 'card' => 'Kartou', 'invoice' => 'Faktura s.r.o.', 'invoice_ico' => 'Faktura IČO'][(string)$s['payment_method']] ?? (string)$s['payment_method']; ?></span>
                     <?php if (!empty($s['invoice_number'])): ?><div class="small text-white-50 mt-1"><?php echo htmlspecialchars($s['invoice_number']); ?></div><?php endif; ?>
                 </td>
                 <td class="text-end fw-bold<?php echo $cn ? ' text-decoration-line-through' : ''; ?>"><?php echo formatMoney((float)$s['total']); ?></td>

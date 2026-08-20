@@ -83,8 +83,14 @@ if (!validateCsrfToken((string)($in['csrf_token'] ?? ''))) {
 }
 
 $payment = (string)($in['payment'] ?? '');
-if (!in_array($payment, ['cash', 'card', 'invoice'], true)) {
+if (!in_array($payment, ['cash', 'card', 'invoice', 'invoice_ico'], true)) {
     echo json_encode(['success' => false, 'message' => 'Vyber způsob platby.']); exit;
+}
+// „Faktura IČO" = doklad vystaví OSVČ majitele — jde to až po vyplnění a zapnutí
+// identity v Účetnictví → Nastavení (jinak by vznikl doklad s prázdným výstavcem)
+$isInvoicePay = in_array($payment, ['invoice', 'invoice_ico'], true);
+if ($payment === 'invoice_ico' && !afxIcoSupplier()['ready']) {
+    echo json_encode(['success' => false, 'message' => 'Faktura IČO zatím není aktivní — vyplň a zapni identitu OSVČ v Účetnictví → Nastavení.']); exit;
 }
 $customerId = (int)($in['customer_id'] ?? 0);
 $note = mb_substr(trim((string)($in['note'] ?? '')), 0, 255);
@@ -158,18 +164,18 @@ if (count($orderLines) > 1) {
 // Zakázka na fakturu: fakturu vystaví rovnou kasa (od v3.49.0 JEDINÉ místo,
 // kde se platba zakázky zaznamenává). Bez vybraného zákazníka se odběratelem
 // automaticky stává klient zakázky — obsluha nemusí nic dohledávat.
-if ($orderLines && $payment === 'invoice' && $customerId <= 0) {
+if ($orderLines && $isInvoicePay && $customerId <= 0) {
     $oc = $pdo->prepare("SELECT customer_id FROM orders WHERE id = ?");
     $oc->execute([(int)$orderLines[0]['id']]);
     $customerId = (int)$oc->fetchColumn();
 }
 
 $vykupLines = array_values(array_filter($cart, static fn(array $l): bool => $l['type'] === 'vykup'));
-if ($vykupLines && $payment === 'invoice') {
+if ($vykupLines && $isInvoicePay) {
     echo json_encode(['success' => false, 'message' => 'Výplata výkupu nejde na fakturu — hotově (u protiúčtu s doplatkem zákazníka jde i karta).']); exit;
 }
 
-if ($payment === 'invoice') {
+if ($isInvoicePay) {
     if ($customerId <= 0) {
         echo json_encode(['success' => false, 'message' => 'Pro platbu na fakturu vyber zákazníka.']); exit;
     }
@@ -189,6 +195,8 @@ afxEnsurePosGoodsTaxColumns();
 ensureSkladBranchSchema();
 afxEnsurePosCashColumns();
 afxEnsurePosShiftTable();
+afxEnsurePosPaymentEnum();       // ENUM payment_method musí znát 'invoice_ico'
+afxEnsureInvoiceSupplierColumn(); // faktura nese výstavce (sro|ico)
 if ($vykupLines) {
     require_once __DIR__ . '/../includes/documents.php';
     ensureCrmDocumentsTable();
@@ -396,7 +404,11 @@ try {
     // tentýž snapshot, samotné opakování by vracelo identické (kolidující) číslo.
     $branchId = $saleOrderBranchId > 0 ? $saleOrderBranchId : (int)getCurrentStaffBranchId();
     $seller = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
-    $isVat = get_setting('acc_is_vat_payer', '0') == '1';
+    // DPH snapshot dle VÝSTAVCE prodeje: „Faktura IČO" prodává OSVČ — účtenka
+    // musí nést STEJNÝ režim jako faktura vystavená v téže transakci
+    $isVat = $payment === 'invoice_ico'
+        ? get_setting('ico_supplier_is_vat', '0') == '1'
+        : get_setting('acc_is_vat_payer', '0') == '1';
     $vatRate = (float)get_setting('acc_vat_rate', '21');
     $insSale = $pdo->prepare("INSERT INTO pos_sales
             (sale_number, branch_id, seller_name, customer_id, order_id, payment_method, total, vat_rate, is_vat_payer, note,
@@ -441,15 +453,15 @@ try {
 
     // ── platba na fakturu → rovnou vystavit fakturu (stejná transakce) ──
     $invoiceId = null;
-    if ($payment === 'invoice') {
+    if ($isInvoicePay) {
         $invItems = array_map(static fn($l) => ['name' => $l['name'], 'qty' => $l['qty'],
             'unit_price' => $l['price'], 'used' => $l['used']], $cart);
-        $invoiceId = crmPosCreateInvoice($pdo, $customerId, $saleNumber, $invItems, $total, $saleOrderId > 0 ? $saleOrderId : null);
+        $invoiceId = crmPosCreateInvoice($pdo, $customerId, $saleNumber, $invItems, $total, $saleOrderId > 0 ? $saleOrderId : null, $payment === 'invoice_ico' ? 'ico' : 'sro');
         $pdo->prepare("UPDATE pos_sales SET invoice_id = ? WHERE id = ?")->execute([$invoiceId, $saleId]);
     }
 
     if ($saleOrderId > 0) {
-        $orderPayment = ['card' => 'card', 'invoice' => 'transfer'][$payment] ?? 'cash';
+        $orderPayment = ['card' => 'card', 'invoice' => 'transfer', 'invoice_ico' => 'transfer'][$payment] ?? 'cash';
         $up = $pdo->prepare("UPDATE orders SET payment_method = ? WHERE id = ? AND (payment_method IS NULL OR payment_method = '')");
         $up->execute([$orderPayment, $saleOrderId]);
         if ($up->rowCount() === 0) {
@@ -502,7 +514,7 @@ foreach ($cart as $line) {
     try { crmSyncVykupCashMovement((int)$line['id']); }
     catch (Throwable $e) { error_log('pos_checkout vykup sync: ' . $e->getMessage()); }
 }
-$payLabel = ['cash' => 'hotově', 'card' => 'kartou', 'invoice' => 'na fakturu'][$payment];
+$payLabel = ['cash' => 'hotově', 'card' => 'kartou', 'invoice' => 'na fakturu (s.r.o.)', 'invoice_ico' => 'na fakturu (IČO)'][$payment];
 crmAuditLog('kasa.sale', [
     'entity_type' => 'pos_sale', 'entity_id' => $saleId, 'entity_label' => $saleNumber,
     'summary' => 'Prodej ' . count($cart) . ' pol. za ' . formatMoney($total) . ' (' . $payLabel . ')',
