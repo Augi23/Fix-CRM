@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.51.0',
+        'date' => '2026-08-16',
+        'time' => '16:30',
+        'title' => 'Dokumenty: všechny listy pohromadě — i zakázkové a reklamační',
+        'items' => [
+            'Záložka <b>Dokumenty</b> má nově čtyři podzáložky: <b>Výkupní listy</b>, <b>Zástavní formuláře</b>, <b>Zakázkové listy</b> a <b>Reklamační protokoly</b>. Všechno vyplněné je na jednom místě k <b>zobrazení i tisku</b> (oko = tiskový náhled), s hledáním podle čísla, jména, telefonu či zařízení.',
+            'Zakázkové listy ukazují posledních 300 zakázek v rozsahu tvé pobočky — klik na řádek otevře zakázku, oko vytiskne zakázkový list. Reklamační protokoly stejně (proklik do reklamace, tisk protokolu).',
+            'Výkupní a zástavní dokumenty fungují jako dřív (úprava, podpisy, online vyplnění) — jen k nim přibyly ostatní listy, ať se nic nehledá po různých místech.',
+        ],
+    ],
+    [
         'version' => '3.50.1',
         'date' => '2026-08-16',
         'time' => '15:50',
