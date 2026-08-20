@@ -43,7 +43,7 @@ try {
         $labels = ['restock' => 'naskladnění', 'issue' => 'výdej', 'return' => 'vráceno', 'adjust' => 'úprava počtu',
             'correction' => 'korekce', 'sale' => 'prodej (kasa)', 'sale_cancel' => 'storno prodeje',
             'stock_from_order' => 'ze zakázky', 'vykup_to_part' => 'z výkupu'];
-        $mq = $pdo->prepare("SELECT delta, reason, order_id, actor_name, note, created_at FROM inventory_moves WHERE inventory_id = ? ORDER BY id DESC LIMIT 8");
+        $mq = $pdo->prepare("SELECT delta, reason, order_id, actor_name, note, created_at FROM inventory_moves WHERE inventory_id = ? ORDER BY id DESC LIMIT 12");
         $mq->execute([$id]);
         foreach ($mq as $m) {
             $moves[] = [
@@ -55,6 +55,14 @@ try {
                 'at' => date('j.n.Y H:i', strtotime((string)$m['created_at'])),
             ];
         }
+    } catch (Throwable $e) {}
+
+    // použití na zakázkách (kolikrát, na kolika zakázkách, kolik kusů celkem)
+    $useCnt = 0; $useOrders = 0; $useQty = 0;
+    try {
+        $uq = $pdo->prepare("SELECT COUNT(*) c, COUNT(DISTINCT order_id) o, COALESCE(SUM(quantity),0) q FROM order_items WHERE inventory_id = ?");
+        $uq->execute([$id]);
+        if ($u = $uq->fetch()) { $useCnt = (int)$u['c']; $useOrders = (int)$u['o']; $useQty = (int)$u['q']; }
     } catch (Throwable $e) {}
 
     echo json_encode(['success' => true, 'item' => [
@@ -75,6 +83,10 @@ try {
         'supplier' => trim((string)($it['source_supplier'] ?? '')) !== '' ? supplierLabel((string)$it['source_supplier']) : '',
         'supplier_url' => (string)($it['source_url'] ?? ''),
         'availability' => (string)($it['supplier_availability'] ?? ''),
+        'supplier_stock_qty' => ($it['supplier_stock_qty'] !== null && $it['supplier_stock_qty'] !== '') ? (int)$it['supplier_stock_qty'] : null,
+        'is_stocked' => (int)($it['is_stocked'] ?? 0),
+        'created_at' => !empty($it['created_at']) ? date('j.n.Y H:i', strtotime((string)$it['created_at'])) : '',
+        'used_times' => $useCnt, 'used_orders' => $useOrders, 'used_qty' => $useQty,
     ], 'components' => $comps, 'moves' => $moves], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     http_response_code(500);

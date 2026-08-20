@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.50.1',
+        'date' => '2026-08-16',
+        'time' => '15:50',
+        'title' => 'Náhled položky ukazuje úplně všechno',
+        'items' => [
+            '<b>Náhled dílu</b> navíc ukazuje: číslo a stáří karty, stav skladem (skladem/dochází/vyprodáno), hodnotu zásoby v nákupní i prodejní ceně, dostupnost a kusy u dodavatele a <b>kolikrát se díl použil na zakázkách</b>; historie pohybů se prodloužila na 12 záznamů.',
+            '<b>Náhled produktu</b> navíc ukazuje: číslo kusu a původ založení, hodnotu zásoby a <b>marži</b>, kompletní detail zápůjčky/komise (komu, od kdy, kdo zapsal, poznámka), poslední změnu — a sekci <b>Další údaje</b>, která automaticky vypíše i všechna ostatní vyplněná pole, takže se v náhledu nic neskryje.',
+        ],
+    ],
+    [
         'version' => '3.50.0',
         'date' => '2026-08-16',
         'time' => '15:20',

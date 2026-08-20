@@ -703,15 +703,20 @@ $(document).on('click', '.tr-add-btn', function () {
                     ? '<a href="' + esc(it.image) + '" data-fancybox="invprev"><img src="' + esc(it.image) + '" class="rounded shadow-sm" style="width:96px;height:96px;object-fit:cover;"></a>'
                     : '<div class="bg-dark bg-opacity-25 rounded d-flex align-items-center justify-content-center border border-secondary" style="width:96px;height:96px;"><i class="fas fa-microchip fa-2x text-muted opacity-25"></i></div>';
                 h += '</div><div class="col"><div class="row g-2 small">';
+                var stavBadge = it.quantity <= 0 ? '<span class="badge bg-danger">vyprodáno</span>'
+                    : (it.quantity <= it.min_stock ? '<span class="badge bg-warning text-dark">dochází</span>' : '<span class="badge bg-success">skladem</span>');
                 var rows = [
+                    ['Karta dílu', '#' + it.id + (it.created_at ? ' <span class="text-white-75">· založena ' + esc(it.created_at) + '</span>' : '') + (it.is_stocked ? '' : ' <span class="text-white-75">· jen katalogová</span>')],
                     ['SKU / sériovko', it.sku ? '<code>' + esc(it.sku) + '</code>' : '—'],
                     ['Model zařízení', it.device_model ? esc(it.device_model) : '—'],
-                    ['Skladem', '<b>' + it.quantity + ' ks</b>' + (it.min_stock > 0 ? ' <span class="text-white-75">(hlídat od ' + it.min_stock + ')</span>' : '')],
+                    ['Skladem', '<b>' + it.quantity + ' ks</b> ' + stavBadge + (it.min_stock > 0 ? ' <span class="text-white-75">(hlídat od ' + it.min_stock + ')</span>' : '')],
                     ['Pobočka', esc(it.branch)],
-                    ['Nákupní cena', kc(it.cost_price)],
-                    ['Prodejní cena', kc(it.sale_price)],
+                    ['Nákupní cena', kc(it.cost_price) + (it.cost_price != null && it.quantity > 0 ? ' <span class="text-white-75">· hodnota skladem ' + kc(it.cost_price * it.quantity) + '</span>' : '')],
+                    ['Prodejní cena', kc(it.sale_price) + (it.sale_price != null && it.quantity > 0 ? ' <span class="text-white-75">· prodejní hodnota ' + kc(it.sale_price * it.quantity) + '</span>' : '')],
                     ['Umístění', it.location_id > 0 ? ('<span class="badge bg-info text-dark">' + esc(it.pos || it.loc_code) + '</span> <span class="text-white-75">' + esc(it.loc_code) + (it.loc_name ? ' · ' + esc(it.loc_name) : '') + '</span>') : '—'],
-                    ['Dodavatel', it.supplier ? (esc(it.supplier) + (it.supplier_url ? ' · <a href="' + esc(it.supplier_url) + '" target="_blank" rel="noopener">katalog</a>' : '') + (it.availability ? ' · ' + esc(it.availability) : '')) : '—']
+                    ['Dodavatel', it.supplier ? (esc(it.supplier) + (it.supplier_url ? ' · <a href="' + esc(it.supplier_url) + '" target="_blank" rel="noopener">katalog</a>' : '')) : '—'],
+                    ['U dodavatele', (it.availability || it.supplier_stock_qty != null) ? (esc(it.availability || '') + (it.supplier_stock_qty != null ? (it.availability ? ' · ' : '') + it.supplier_stock_qty + ' ks' : '')) : '—'],
+                    ['Použití na zakázkách', it.used_times > 0 ? (it.used_times + '× na ' + it.used_orders + ' zakázkách · celkem ' + it.used_qty + ' ks') : 'zatím nepoužito']
                 ];
                 rows.forEach(function (r2) {
                     h += '<div class="col-5 col-md-3 text-white-75">' + r2[0] + '</div><div class="col-7 col-md-9">' + r2[1] + '</div>';

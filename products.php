@@ -1768,16 +1768,23 @@ $(document).on('click', '.tr-add-btn', function () {
                 var device = [p.manufacturer, p.model, p.capacity, p.color].filter(Boolean).join(' · ');
                 var loaned = !!p.loan_at;
                 var rows = [
+                    ['Kus', '#' + p.id + (p.source ? ' <span class="text-white-75">· založeno: ' + (p.source === 'crm' ? 'v CRM' : esc(p.source)) + '</span>' : '')],
                     ['Kód / sériovko', p.product_code ? '<code>' + esc(p.product_code) + '</code>' : '—'],
                     ['Zařízení', device ? esc(device) : '—'],
                     ['Stav (grade)', p.grade ? esc(p.grade) : '—'],
-                    ['Skladem', '<b>' + (p.stock_qty != null ? p.stock_qty : '—') + ' ks</b>' + (loaned ? ' · <span class="text-warning">zapůjčeno' + (p.loan_to ? ': ' + esc(p.loan_to) : '') + '</span>' : '')],
-                    ['Prodejní cena', kc(p.price)],
-                    ['Nákupní / výkupní cena', kc(p.purchase_price)],
+                    ['Skladem', '<b>' + (p.stock_qty != null ? p.stock_qty : '—') + ' ks</b>' + (Number(p.stock_qty) > 0 ? ' <span class="badge bg-success">skladem</span>' : ' <span class="badge bg-secondary">vyprodáno</span>')],
+                    ['Prodejní cena', kc(p.price) + (p.price > 0 && Number(p.stock_qty) > 0 ? ' <span class="text-white-75">· hodnota ' + kc(p.price * p.stock_qty) + '</span>' : '')],
+                    ['Nákupní / výkupní cena', kc(p.purchase_price) + (p.price > 0 && p.purchase_price > 0 ? ' <span class="text-white-75">· marže ' + kc(p.price - p.purchase_price) + '</span>' : '')],
                     ['Prodejna', p.stock_key === 'vaclavak' ? 'Václavák' : (p.stock_key === 'karlin' ? 'Karlín' : '—')],
                     ['E-shop', Number(p.hide_eshop) ? '<span class="badge bg-secondary">skrytý</span>' : '<span class="badge bg-success">zobrazuje se</span>'],
                     ['Naskladněno', (p.added_at ? esc(p.added_at) : '—') + (p.created_by ? ' · ' + esc(p.created_by) : '')],
                 ];
+                if (loaned) {
+                    rows.push(['Zapůjčeno / komise', '<span class="text-warning">' + (p.loan_to ? esc(p.loan_to) : 'ano') + '</span>'
+                        + (p.loan_at ? ' <span class="text-white-75">· od ' + esc(p.loan_at) + '</span>' : '')
+                        + (p.loan_by ? ' <span class="text-white-75">· zapsal(a) ' + esc(p.loan_by) + '</span>' : '')
+                        + (p.loan_note ? '<div class="text-white-75">' + esc(p.loan_note) + '</div>' : '')]);
+                }
                 if (Number(p.is_vykup)) {
                     rows.push(['Původ', 'Výkup' + (p.vykup_document_id ? ' · <a href="dokument.php?id=' + Number(p.vykup_document_id) + '">výkupní list</a>' : '')]);
                 }
@@ -1785,12 +1792,33 @@ $(document).on('click', '.tr-add-btn', function () {
                     rows.push(['Převedeno', '<a href="edit_inventory.php?id=' + Number(p.moved_to_inventory_id) + '">na sklad náhradních dílů (karta #' + Number(p.moved_to_inventory_id) + ')</a>']);
                 }
                 if (p.last_sold_at) { rows.push(['Prodáno', esc(p.last_sold_at)]); }
+                if (p.updated_at) { rows.push(['Poslední změna', esc(p.updated_at)]); }
                 rows.forEach(function (r2) {
                     h += '<div class="col-5 col-md-4 text-white-75">' + r2[0] + '</div><div class="col-7 col-md-8">' + r2[1] + '</div>';
                 });
                 h += '</div></div></div>';
                 if (p.description) {
                     h += '<hr class="border-secondary my-3"><div class="small text-white-75 mb-1">Popis</div><div class="small">' + esc(p.description).replace(/\n/g, '<br>') + '</div>';
+                }
+                // ── „vše, co o kusu víme": zbylá neprázdná pole, která nemají vlastní řádek ──
+                var shown = ['id', 'title', 'product_code', 'model', 'manufacturer', 'capacity', 'color', 'grade', 'price',
+                    'purchase_price', 'stock_qty', 'stock_key', 'branch_id', 'hide_eshop', 'added_at', 'created_by',
+                    'last_sold_at', 'updated_at', 'is_vykup', 'vykup_document_id', 'moved_to_inventory_id',
+                    'loan_to', 'loan_at', 'loan_note', 'loan_by', 'description', 'image_path', 'image_url', 'source',
+                    'first_seen_at', 'last_seen_at', 'sold'];
+                var extra = '';
+                Object.keys(p).forEach(function (k) {
+                    if (shown.indexOf(k) >= 0) { return; }
+                    if (/raw|_json|csv|html/i.test(k)) { return; }
+                    var v = p[k];
+                    if (v === null || v === '' || v === undefined || v === 0 || v === '0') { return; }
+                    if (typeof v === 'object') { return; }
+                    v = String(v);
+                    if (v.length > 160) { v = v.slice(0, 160) + '…'; }
+                    extra += '<div class="col-5 col-md-4 text-white-75"><code class="small">' + esc(k) + '</code></div><div class="col-7 col-md-8">' + esc(v) + '</div>';
+                });
+                if (extra) {
+                    h += '<hr class="border-secondary my-3"><div class="small text-white-75 mb-1">Další údaje</div><div class="row g-2 small">' + extra + '</div>';
                 }
                 document.getElementById('ppBody').innerHTML = h;
             })
