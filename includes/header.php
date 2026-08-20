@@ -442,6 +442,13 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
     <button class="btn btn-sm crm-v2-icon-btn afx-hide-m" type="button" id="receptionModeBtn" title="Režim recepce — otevírat skeny z telefonů" aria-label="Režim recepce">
         <i class="fas fa-tower-broadcast"></i>
     </button>
+    <?php /* Zákaznický displej: druhý monitor na recepci (display.php?token=...) —
+             obsluha na něj posílá formulář klienta / košík pokladny; jinak reklama. */ ?>
+    <button class="btn btn-sm crm-v2-icon-btn afx-hide-m" type="button" id="customerDisplayBtn"
+            data-bs-toggle="modal" data-bs-target="#customerDisplayModal"
+            title="Zákaznický displej — druhý monitor" aria-label="Zákaznický displej">
+        <i class="fas fa-desktop"></i>
+    </button>
     <button class="btn btn-sm crm-v2-icon-btn" type="button" id="notificationsToggle" aria-label="<?php echo e(__('notifications')); ?>">
         <i class="fas fa-bell"></i>
         <span class="crm-v2-alert-dot"></span>

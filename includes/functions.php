@@ -1625,6 +1625,33 @@ function inventoryStockedWhereSql(): string {
  * se produktů nesmí ani dotknout. Zdroj pravdy je soubor z naskladňovací
  * appky (Upgates CSV); tabulka je jeho zrcadlo, import = upsert podle kódu.
  */
+/**
+ * Zákaznický displej (druhý monitor na recepci): jeden řádek na pobočku.
+ * state_id/mode/payload = co obsluha poslala na displej (idle | client_form |
+ * cart | receipt), reply_id/reply = co klient vyplnil na displeji (JSON).
+ * Displej se autentizuje tokenem (bez zaměstnanecké session).
+ */
+function ensureCustomerDisplayTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS customer_display (
+            branch_id INT NOT NULL,
+            token VARCHAR(64) NOT NULL,
+            state_id INT NOT NULL DEFAULT 0,
+            mode VARCHAR(20) NOT NULL DEFAULT 'idle',
+            payload MEDIUMTEXT DEFAULT NULL,
+            reply_id INT NOT NULL DEFAULT 0,
+            reply MEDIUMTEXT DEFAULT NULL,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (branch_id),
+            UNIQUE KEY uniq_customer_display_token (token)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('ensureCustomerDisplayTable: ' . $e->getMessage()); }
+}
+
 function ensureProductsTable(): void {
     global $pdo;
     static $done = false;

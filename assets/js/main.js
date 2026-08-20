@@ -2259,6 +2259,14 @@ window.afxSignaturePad = function (opts) {
    na viditelné kartě; skeny si claimuje první posluchač (neotevře se 2×).
    ═══════════════════════════════════════════════════════════════════════════ */
 (function() {
+    // main.js běží v <head> — tlačítko hlavičky v tu chvíli ještě neexistuje,
+    // bez čekání na DOMContentLoaded se celý režim recepce nikdy nenabindoval.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+    function init() {
     var KEY = 'afx_reception_mode';
     var btn = document.getElementById('receptionModeBtn');
     if (!btn) return;
@@ -2302,4 +2310,165 @@ window.afxSignaturePad = function (opts) {
     document.addEventListener('visibilitychange', function() { if (!document.hidden) tick(); });
     paint();
     if (active()) loop();
+    }   // konec init()
+}());
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Zákaznický displej (druhý monitor na recepci) — api/customer_display.php
+   ─ modal #customerDisplayModal: URL displeje + „uvolnit" / „klient vyplní"
+   ─ #cdAskClientBtn v modalu nové zakázky: pošle formulář na displej a
+     odpověď klienta propíše do inline polí nového klienta
+   ─ window.afxDisplayPush(mode, payload): používá i pokladna (košík/účtenka)
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+    var API = 'api/customer_display.php';
+
+    // main.js se načítá v <head> — DOM (modaly z footeru) v době běhu ještě
+    // neexistuje, všechny lookupy musí počkat na DOMContentLoaded.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    function push(mode, payload, cb) {
+        fetch(API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ action: 'push', mode: mode, payload: payload || null,
+                                   csrf_token: (window.afxCsrf ? window.afxCsrf() : '') })
+        }).then(function (r) { return r.json(); })
+          .then(function (d) { if (cb) cb(d && d.ok); })
+          .catch(function () { if (cb) cb(false); });
+    }
+    window.afxDisplayPush = push;
+
+    function init() {
+
+    /* ── ovládací modal ── */
+    var modal = document.getElementById('customerDisplayModal');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', function () {
+            var st = document.getElementById('cdStatus');
+            fetch(API + '?action=info', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d || !d.ok) { st.textContent = 'Displej se nepodařilo načíst.'; return; }
+                    var abs = new URL(d.url, window.location.href).href;
+                    document.getElementById('cdUrlInput').value = abs;
+                    document.getElementById('cdOpenBtn').href = abs;
+                    st.textContent = 'Aktuální stav displeje: ' +
+                        ({ idle: 'reklama', client_form: 'formulář klienta', cart: 'košík pokladny', receipt: 'účtenka' }[d.mode] || d.mode);
+                })
+                .catch(function () { st.textContent = 'Displej se nepodařilo načíst.'; });
+        });
+        document.getElementById('cdCopyBtn').addEventListener('click', function () {
+            var inp = document.getElementById('cdUrlInput');
+            inp.select(); try { navigator.clipboard.writeText(inp.value); } catch (e) { document.execCommand('copy'); }
+        });
+        document.getElementById('cdIdleBtn').addEventListener('click', function () {
+            push('idle', null, function (ok) {
+                document.getElementById('cdStatus').textContent = ok ? 'Displej uvolněn — běží reklama.' : 'Nepodařilo se odeslat.';
+            });
+        });
+        document.getElementById('cdFormBtn').addEventListener('click', function () {
+            // otevřít rovnou novou zakázku s rozbaleným panelem klienta a poslat formulář
+            if (window.bootstrap) bootstrap.Modal.getOrCreateInstance(modal).hide();
+            var om = document.getElementById('newOrderModal');
+            if (om && window.bootstrap) {
+                bootstrap.Modal.getOrCreateInstance(om).show();
+                var panel = document.getElementById('inlineNewCustomerPanel');
+                if (panel && !panel.classList.contains('show') && window.bootstrap.Collapse) {
+                    bootstrap.Collapse.getOrCreateInstance(panel).show();
+                }
+            }
+            var ask = document.getElementById('cdAskClientBtn');
+            if (ask) ask.click();
+        });
+    }
+
+    /* ── „Klient vyplní na displeji" v nové zakázce ── */
+    var askBtn = document.getElementById('cdAskClientBtn');
+    if (!askBtn) return;
+    var watchTimer = null, replyAfter = 0;
+
+    function stopWatch() { if (watchTimer) { clearInterval(watchTimer); watchTimer = null; } }
+
+    function importReply(rep) {
+        function set(id, v) { var el = document.getElementById(id); if (el) { el.value = v || ''; el.dispatchEvent(new Event('input', { bubbles: true })); } }
+        function pick(id) { var r = document.getElementById(id); if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); } }
+        if (rep.customer_type === 'company') {
+            pick('inline_type_company');
+            set('inline_ico_input', rep.ico); set('inline_ares_name', rep.company_name); set('inline_ares_dic', rep.dic);
+        } else {
+            // soukromá osoba: vrátit přepínač a vyčistit případná stará firemní pole
+            pick('inline_type_private');
+            set('inline_ico_input', ''); set('inline_ares_name', ''); set('inline_ares_dic', '');
+        }
+        set('inline_first_name', rep.first_name); set('inline_last_name', rep.last_name);
+        set('inline_phone', rep.phone); set('inline_email', rep.email); set('inline_address', rep.address);
+        askBtn.disabled = false;
+        askBtn.classList.remove('btn-outline-info'); askBtn.classList.add('btn-success');
+        askBtn.innerHTML = '<i class="fas fa-check me-1"></i>Údaje od klienta přijaty';
+        setTimeout(function () {
+            askBtn.classList.add('btn-outline-info'); askBtn.classList.remove('btn-success');
+            askBtn.innerHTML = '<i class="fas fa-desktop me-1"></i>Klient vyplní na displeji';
+        }, 6000);
+    }
+
+    function watch() {
+        stopWatch();
+        watchTimer = setInterval(function () {
+            if (document.hidden) return;
+            fetch(API + '?action=reply&after=' + replyAfter, { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d || !d.ok) return;
+                    if (d.reply && d.reply_id > replyAfter) {
+                        replyAfter = d.reply_id;
+                        stopWatch();
+                        importReply(d.reply);
+                    } else if (typeof d.reply_id === 'number') { replyAfter = Math.max(replyAfter, d.reply_id); }
+                })
+                .catch(function () {});
+        }, 2000);
+    }
+
+    function askFailed(msg) {
+        askBtn.disabled = false;
+        askBtn.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' + msg;
+        setTimeout(function () {
+            askBtn.innerHTML = '<i class="fas fa-desktop me-1"></i>Klient vyplní na displeji';
+        }, 5000);
+    }
+
+    askBtn.addEventListener('click', function () {
+        if (askBtn.disabled) return;
+        askBtn.disabled = true;   // proti druhému kliknutí (mazalo by klientovi formulář)
+        // baseline reply_id: bez něj by se mohla načíst STARÁ odpověď
+        // předchozího klienta — když baseline selže, radši nic neposílat
+        fetch(API + '?action=info', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.ok) { askFailed('Displej nedostupný'); return; }
+                replyAfter = d.reply_id || 0;
+                push('client_form', null, function (ok) {
+                    if (!ok) { askFailed('Displej nedostupný'); return; }
+                    askBtn.innerHTML = '<i class="fas fa-hourglass-half me-1"></i>Klient vyplňuje…';
+                    watch();
+                });
+            })
+            .catch(function () { askFailed('Displej nedostupný'); });
+    });
+
+    // zavření modalu zakázky = konec hlídání
+    var om = document.getElementById('newOrderModal');
+    if (om) om.addEventListener('hidden.bs.modal', function () {
+        stopWatch();
+        askBtn.disabled = false;
+        askBtn.innerHTML = '<i class="fas fa-desktop me-1"></i>Klient vyplní na displeji';
+    });
+
+    }   // konec init()
 }());

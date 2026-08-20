@@ -98,6 +98,12 @@ $crm_order_model_catalog = crmNewOrderModelCatalog();
                                             <div class="card-body">
                                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                                     <h6 class="mb-0 text-white"><i class="fas fa-user-plus me-2 text-primary"></i><?php echo __('add_customer'); ?></h6>
+                                                    <?php /* Zákaznický displej: pošle na druhý monitor formulář, klient
+                                                             vyplní sám a údaje se sem propíší (main.js, blok displeje). */ ?>
+                                                    <button type="button" class="btn btn-sm btn-outline-info" id="cdAskClientBtn"
+                                                            title="Poslat formulář na zákaznický displej">
+                                                        <i class="fas fa-desktop me-1"></i>Klient vyplní na displeji
+                                                    </button>
                                                     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#inlineNewCustomerPanel">
                                                         <i class="fas fa-times"></i>
                                                     </button>

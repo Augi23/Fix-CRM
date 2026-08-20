@@ -107,6 +107,7 @@
 
 <?php require_once __DIR__ . '/modals/new_order_modal.php'; ?>
 <?php require_once __DIR__ . '/modals/new_complaint_modal.php'; ?>
+<?php require_once __DIR__ . '/modals/customer_display_modal.php'; ?>
 
 <!-- Zakázkový list: volba tisk / e-mail (po vytvoření zakázky i z menu) -->
 <div class="modal fade" id="orderDocModal" tabindex="-1" aria-hidden="true">

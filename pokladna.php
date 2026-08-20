@@ -995,7 +995,47 @@ document.addEventListener('DOMContentLoaded', function () {
         $empty.style.display = cart.length ? 'none' : '';
         $total.textContent = fmt(total());
         updateFinish();
+        afxCdMirror();
     }
+
+    /* ── Zákaznický displej: zrcadlení košíku na druhý monitor ──
+       Debounce 400 ms (render běží při každé změně množství/ceny). Prázdný
+       košík vrací displej na reklamu; po účtence se 12 s nic neposílá, ať
+       klientovi nezmizí „zaplaceno" (displej se pak na reklamu vrátí sám). */
+    var cdTimer = null, cdMirrored = false, cdQuietUntil = 0;
+    function afxCdSend() {
+        // Během „ticha" po účtence se push jen ODLOŽÍ (ne zahodí) — jinak by
+        // rychle načatý další prodej na displeji vůbec nebyl vidět.
+        var quiet = cdQuietUntil - Date.now();
+        if (quiet > 0) { cdTimer = setTimeout(afxCdSend, quiet + 100); return; }
+        if (!cart.length) {
+            if (cdMirrored) { cdMirrored = false; window.afxDisplayPush('idle'); }
+            return;
+        }
+        cdMirrored = true;
+        window.afxDisplayPush('cart', {
+            items: cart.map(function (c) {
+                return { name: c.name, qty: c.qty, line_total: c.price * c.qty };
+            }),
+            total: total()
+        });
+    }
+    function afxCdMirror() {
+        if (!window.afxDisplayPush) return;
+        clearTimeout(cdTimer);
+        cdTimer = setTimeout(afxCdSend, 400);
+    }
+    function afxCdReceipt(d) {
+        if (!window.afxDisplayPush) return;
+        clearTimeout(cdTimer);          // zrušit odložený push košíku/idle
+        cdMirrored = false;
+        cdQuietUntil = Date.now() + 12000;
+        window.afxDisplayPush('receipt', {
+            total: (d && typeof d.total === 'number') ? d.total : totalBeforeClear,
+            change: (d && d.cash_change > 0) ? d.cash_change : 0
+        });
+    }
+    var totalBeforeClear = 0;
 
     // ── platba ──
     document.querySelectorAll('.pos-pay').forEach(function (btn) {
@@ -1165,6 +1205,7 @@ document.addEventListener('DOMContentLoaded', function () {
             $finish.innerHTML = '<i class="fas fa-check me-2"></i>Dokončit prodej';
             if (!d.success) { alert(d.message || 'Prodej se nepodařil.'); updateFinish(); return; }
             lastSale = d;
+            totalBeforeClear = total();   // pro zákaznický displej (než se košík smaže)
             document.getElementById('posDoneNumber').textContent = d.sale_number;
             document.getElementById('posDoneProductNote').style.display = d.has_product ? '' : 'none';
             document.getElementById('posDoneInvoice').style.display = d.invoice_id ? '' : 'none';
@@ -1180,6 +1221,8 @@ document.addEventListener('DOMContentLoaded', function () {
             $cashReceived.value = '';
             $('#posCustomer').val(null).trigger('change');
             render();
+            // zákaznický displej: „zaplaceno" + vráceno (sám se vrátí na reklamu)
+            afxCdReceipt(d);
             // účtenka na termotiskárnu (hotově s otevřením šuplíku), fallback = prohlížeč
             serverPrintReceipt(d.sale_id, wasCash);
         })

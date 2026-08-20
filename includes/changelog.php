@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.52.0',
+        'date' => '2026-08-20',
+        'time' => '16:30',
+        'title' => 'Zákaznický displej — druhý monitor na recepci',
+        'items' => [
+            '<b>Nová stránka displeje:</b> tlačítko 🖥️ v horní liště dá odkaz <code>display.php?token=…</code> — otevři ho v prohlížeči na druhém monitoru (celá obrazovka). Displej běží bez přihlášení do CRM, jen na bezpečnostní token pobočky — klient se z něj do systému nedostane.',
+            '<b>Klient si sám vyplní údaje:</b> v nové zakázce (panel „Přidat klienta") je tlačítko <b>„Klient vyplní na displeji"</b> — na druhém monitoru naskočí velký formulář (osoba/firma, jméno, telefon, e-mail, adresa, IČO…). Co klient odešle, se obsluze rovnou předvyplní do polí nového klienta — zkontroluješ a uložíš. Žádné opisování a překlepy.',
+            '<b>Pokladna klientovi na oči:</b> jakmile se v kase plní košík, na displeji se živě ukazují položky a velký součet; po zaplacení „Zaplaceno — děkujeme!" s případným „Vráceno". Pak se displej sám vrátí k reklamě.',
+            '<b>Reklama, když se nic neděje:</b> v klidu displej střídá produkty z e-shopu (živě ze skladu — jen viditelné a skladem, s fotkou a cenou) pod logem AppleFix.',
+            '<b>Ovládání:</b> tlačítko 🖥️ nahoře → odkaz pro druhý monitor (kopírovat/otevřít), „Uvolnit displej (reklama)" a „Klient vyplní údaje". Vše jede přes <code>api/customer_display.php</code>, stav se na displeji obnovuje do 1,5 s.',
+        ],
+    ],
+    [
         'version' => '3.51.4',
         'date' => '2026-08-20',
         'time' => '15:10',
