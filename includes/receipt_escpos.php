@@ -277,13 +277,15 @@ function crmEscposReceipt(\GdImage $im): string {
  * Hlavní informace VELKÝM písmem: kolik má být v kase. U přepočtu/uzávěrky
  * navíc napočítaná částka a rozdíl. $typ = 'open' | 'close'.
  */
-function crmShiftSlipRaster(array $shift, string $typ, ?array $prev = null): \GdImage {
+function crmShiftSlipRaster(array $shift, string $typ, ?array $prev = null, ?array $moves = null): \GdImage {
     $W = CRM_RCPT_DOTS; $M = 6;
     $fontR = crmRcptFont(false); $fontB = crmRcptFont(true);
-    $img = imagecreatetruecolor($W, 1200);
+    // výpis pohybů směny natahuje lístek — plátno podle počtu řádků, ořez dole
+    $H = 1200 + ($moves !== null ? count($moves) * 26 + 260 : 0);
+    $img = imagecreatetruecolor($W, $H);
     $bila = imagecolorallocate($img, 255, 255, 255);
     $cerna = imagecolorallocate($img, 0, 0, 0);
-    imagefilledrectangle($img, 0, 0, $W, 1200, $bila);
+    imagefilledrectangle($img, 0, 0, $W, $H, $bila);
     $y = 14;
     $sirka = function (float $size, string $t, bool $bold) use ($fontR, $fontB): int {
         $b = imagettfbbox($size, 0, $bold ? $fontB : $fontR, $t);
@@ -344,6 +346,50 @@ function crmShiftSlipRaster(array $shift, string $typ, ?array $prev = null): \Gd
         $y += 4;
         $text(13, 'Směnu otevřel(a): ' . (string)($shift['opened_by'] ?? ''), false);
         $text(12, 'převzato ' . $cas($shift['opened_at'] ?? null), false, 1.25);
+    }
+
+    // ── POHYBY BĚHEM SMĚNY (jen pro info, uzávěrka) — pravidla pokladní knihy ──
+    if (!$open && $moves !== null) {
+        // řádek popisek vlevo / částka vpravo (na rozdíl od $text, který centruje)
+        $row = function (float $size, string $lbl, string $val, bool $boldVal = true) use (&$img, &$y, $cerna, $fontR, $fontB, $sirka, $W, $M) {
+            $bl = (int)($y + $size * 1.05);
+            imagettftext($img, $size, 0, $M, $bl, $cerna, $fontR, $lbl);
+            imagettftext($img, $size, 0, $W - $M - $sirka($size, $val, $boldVal), $bl, $cerna, $boldVal ? $fontB : $fontR, $val);
+            $y += (int)ceil($size * 1.5) + 3;
+        };
+        $cara(2);
+        $text(15, 'POHYBY BĚHEM SMĚNY', true);
+        $text(11, 'jen pro informaci — plný detail v pokladní knize', false, 1.2);
+        $y += 4;
+        if (!$moves) {
+            $text(12, 'Žádné hotovostní pohyby.', false);
+        } else {
+            $prijmy = 0.0; $vydaje = 0.0; $nIn = 0; $nOut = 0; $max = 60; $i = 0;
+            foreach ($moves as $mv) {
+                $amt = abs((float)($mv['amount'] ?? 0));
+                $dirIn = (string)($mv['dir'] ?? '') === 'in';
+                if ($dirIn) { $prijmy += $amt; $nIn++; } else { $vydaje += $amt; $nOut++; }
+                if (++$i > $max) { continue; }   // sečíst vše, vypsat jen prvních 60
+                $lbl = trim((string)($mv['time'] ?? ''));
+                // popisek: číslo dokladu; u prodejů je číslo v detailu (KP26…), jinak titulek
+                $co = trim((string)($mv['doc_number'] ?? ''));
+                if ($co === '') {
+                    $det = trim((string)($mv['detail'] ?? ''));
+                    $tok = $det !== '' ? (string)(preg_split('/[\s·]+/u', $det)[0] ?? '') : '';
+                    $co = ($tok !== '' && preg_match('/\d/', $tok)) ? $tok : trim((string)($mv['title'] ?? ''));
+                }
+                $lbl .= '  ' . mb_substr($co, 0, 24) . (mb_strlen($co) > 24 ? '…' : '');
+                if (!empty($mv['is_storno'])) { $lbl .= ' (storno)'; }
+                $row(11, $lbl, ($dirIn ? '+' : '-') . $kc($amt));
+            }
+            if (count($moves) > $max) {
+                $text(11, '… a dalších ' . (count($moves) - $max) . ' pohybů', false, 1.2);
+            }
+            $y += 4;
+            $cara(2);
+            $row(13, 'Příjmy (' . $nIn . '×)', '+' . $kc($prijmy));
+            $row(13, 'Výdaje (' . $nOut . '×)', '-' . $kc($vydaje));
+        }
     }
     $y += 20;
 

@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.51.4',
+        'date' => '2026-08-20',
+        'time' => '15:10',
+        'title' => 'Výkupní částka povinná; uzávěrka s výpisem pohybů směny',
+        'items' => [
+            '<b>Výkupní částka je povinná:</b> výkupní list nejde uložit (ani vytisknout, poslat e-mailem či podepsat) bez vyplněné částky — formulář na to upozorní hned červeným rámečkem, server to hlídá taky. Kasa navíc odmítne výplatu výkupu s nulovou částkou u starších listů bez ceny (řekne si o doplnění).',
+            '<b>Uzávěrka pokladny s výpisem pohybů:</b> na uzávěrkovém lístku se nově tiskne seznam <b>všech hotovostních pohybů za dobu držení kasy</b> (čas, doklad, ±částka; storna označena) plus souhrn Příjmy/Výdaje — jen pro informaci, pravidla stejná jako pokladní kniha. U víc než 60 pohybů se tiskne prvních 60 a součty za všechno.',
+        ],
+    ],
+    [
         'version' => '3.51.3',
         'date' => '2026-08-20',
         'time' => '14:45',

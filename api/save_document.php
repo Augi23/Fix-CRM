@@ -46,6 +46,13 @@ foreach ($cfg['subject_fields'] as $sf) {
 $subject = mb_substr($subject, 0, 255);
 $price = mb_substr((string)($clean[$cfg['price_field']] ?? ''), 0, 60);
 
+// Výkupní částka je POVINNÁ (přání majitele 20.8.2026): list bez částky založí
+// produkt bez nákupní ceny a kasa by nabídla výplatu 0 Kč.
+if ($type === 'vykup') {
+    $__amt = function_exists('crmParseAmountCzk') ? crmParseAmountCzk($price) : (float)$price;
+    if ($__amt <= 0) { sd_fail('Vyplň výkupní částku — bez ní nejde výkupní list uložit.'); }
+}
+
 // datum dokumentu (z pole doc_date d.m.Y, jinak dnešek)
 $docDate = date('Y-m-d');
 if (!empty($clean['doc_date'])) {

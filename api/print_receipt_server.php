@@ -97,7 +97,25 @@ try {
         if (!$shift) { echo json_encode(['ok' => false, 'error' => 'Směna nenalezena.']); exit; }
         // u převzetí patří na lístek i předchozí držitel kasy (poslední uzavřená směna)
         $prev = $slip === 'shift_open' ? afxPosShiftLastClosed($branch) : null;
-        $bytes = crmEscposReceipt(crmShiftSlipRaster($shift, $slip === 'shift_open' ? 'open' : 'close', $prev));
+        // uzávěrka: výpis pohybů za dobu držení kasy (jen pro info) — stejná
+        // pravidla jako pokladní kniha, oříznuté na okno směny
+        $moves = null;
+        if ($slip === 'shift_close') {
+            try {
+                require_once '../includes/cash_book.php';
+                $fromTs = strtotime((string)$shift['opened_at']);
+                $toTs = strtotime((string)($shift['closed_at'] ?: date('Y-m-d H:i:s')));
+                if ($fromTs && $toTs) {
+                    $rows = afxCashBookRows($branch, date('Y-m-d', $fromTs), date('Y-m-d', $toTs));
+                    $moves = array_values(array_filter($rows, static function ($r) use ($fromTs, $toTs) {
+                        if (empty($r['counts'])) { return false; }
+                        $ts = strtotime(trim((string)($r['date'] ?? '') . ' ' . (string)($r['time'] ?? '')));
+                        return $ts !== false && $ts >= $fromTs && $ts <= $toTs + 59;
+                    }));
+                }
+            } catch (Throwable $e) { error_log('slip shift_close pohyby: ' . $e->getMessage()); $moves = null; }
+        }
+        $bytes = crmEscposReceipt(crmShiftSlipRaster($shift, $slip === 'shift_open' ? 'open' : 'close', $prev, $moves));
         echo json_encode(['ok' => true, 'b64' => base64_encode($bytes)]); exit;
     }
 

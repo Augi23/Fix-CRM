@@ -317,6 +317,11 @@ try {
                 $docAmount = crmParseAmountCzk((string)($row['price'] ?? ''));
                 if ($docAmount > 0) { $cart[$i]['price'] = -round($docAmount, 2); }
             }
+            // nulová výplata = zapomenutá částka (starší list bez ceny) — nesmí projít,
+            // list by se označil za vyplacený a klient by nedostal nic
+            if (abs((float)$cart[$i]['price']) < 0.005) {
+                echo json_encode(['success' => false, 'message' => 'Výkup ' . $row['doc_number'] . ' má nulovou částku — uprav cenu v košíku, nebo doplň výkupní částku do listu.']); exit;
+            }
             $subject = trim((string)($row['subject'] ?? ''));
             $cart[$i]['name'] = 'Výplata výkupu ' . $row['doc_number'] . ($subject !== '' ? ' — ' . mb_substr($subject, 0, 170) : '');
             $cart[$i]['code'] = (string)$row['doc_number'];

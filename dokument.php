@@ -150,6 +150,17 @@ $pageTitle = __($cfg['title_key'], $lang);
     function clearDraft() { try { localStorage.removeItem(draftKey()); } catch (e) {} }
 
     function save() {
+        // výkupní částka je povinná — okamžitá kontrola už tady, server ji vynucuje taky
+        if (DOC_TYPE === 'vykup') {
+            var priceEl = document.querySelector('#docForm .dinput[name="item_price"]');
+            if (priceEl && !priceEl.value.trim()) {
+                priceEl.style.outline = '2px solid #ff375f';
+                priceEl.addEventListener('input', function h() { priceEl.style.outline = ''; priceEl.removeEventListener('input', h); });
+                priceEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                priceEl.focus();
+                return Promise.reject(new Error('Vyplň výkupní částku — bez ní nejde list uložit.'));
+            }
+        }
         var fd = new FormData();
         fd.append('type', DOC_TYPE);
         fd.append('id', docId);
