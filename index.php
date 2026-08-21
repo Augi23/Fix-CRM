@@ -124,7 +124,14 @@ try {
     $received_today = $advance_today = $received_month = $advance_month = 0.0;
 }
 
-$month_labels = explode(',', __('month_initials'));
+// Popisky grafu „Tržby po měsících": sloupce jsou KLOUZAVÉ okno (před 11 měsíci
+// … aktuální měsíc), iniciály se proto rotují stejně. Dřív byly napevno
+// leden…prosinec — aktuální (zvýrazněný) sloupec pak nesl v srpnu popisek „P".
+$__inic = explode(',', __('month_initials'));   // 12 kalendářních iniciál (leden…prosinec)
+$month_labels = [];
+for ($__i = 11; $__i >= 0; $__i--) {
+    $month_labels[] = trim((string)($__inic[((int)date('n') - 1 - $__i + 24) % 12] ?? ''));
+}
 $rev_max = max(1, max($revenue_12m));
 
 $branch_overview = [];

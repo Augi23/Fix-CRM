@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.52.1',
+        'date' => '2026-08-21',
+        'time' => '10:20',
+        'title' => 'Nástěnka: graf Tržby po měsících má správné popisky měsíců',
+        'items' => [
+            'Sloupce grafu jsou klouzavé okno (před 11 měsíci až aktuální měsíc), ale popisky pod nimi byly napevno leden…prosinec — zvýrazněný aktuální sloupec tak v srpnu nesl písmeno „P" (prosinec) a celá řada byla posunutá. Popisky se teď <b>rotují spolu s oknem</b>: poslední sloupec je vždy aktuální měsíc (dnes „S" jako srpen), první je stejný měsíc loni. Opravena i pokažená česká řada iniciál v překladech (začínala dubnem).',
+        ],
+    ],
+    [
         'version' => '3.52.0',
         'date' => '2026-08-20',
         'time' => '16:30',
