@@ -1392,10 +1392,15 @@ $(document).on('click', '.product-label-btn', function () {
             if (el('pcQty')) { el('pcQty').focus(); }
             return;
         }
-        if (saving) return;
-        if (pending > 0) { $msg.textContent = 'Počkej — média se ještě nahrávají…'; return; }
-        if (!modelVal()) { $msg.textContent = ACCESSORY_MODE ? 'Vyber typ příslušenství.' : 'Vyplň model.'; return; }
-        if (!$price.value.trim()) { $msg.textContent = 'Vyplň cenu.'; return; }
+        if (saving) { showAlert('Ukládání už běží — vydrž vteřinku.'); return; }
+        if (pending > 0) {
+            // zaseknuté nahrávání fotky umí naskladnění blokovat donekonečna — řekni to nahlas
+            $msg.innerHTML = '<span class="text-warning fw-bold">Počkej — média se ještě nahrávají… (' + pending + ')</span>';
+            showAlert('Ještě se nahrávají fotky (' + pending + '). Počkej pár vteřin, nebo obnov stránku (F5) — rozepsaný produkt zůstane jako koncept.');
+            return;
+        }
+        if (!modelVal()) { $msg.innerHTML = '<span class="text-danger fw-bold">' + (ACCESSORY_MODE ? 'Vyber typ příslušenství.' : 'Vyplň model.') + '</span>'; showAlert(ACCESSORY_MODE ? 'Vyber typ příslušenství.' : 'Vyplň model.'); return; }
+        if (!$price.value.trim()) { $msg.innerHTML = '<span class="text-danger fw-bold">Vyplň cenu.</span>'; showAlert('Vyplň cenu.'); return; }
         saving = true;
         $msg.textContent = 'Ukládám…';
         var fd = new FormData();
