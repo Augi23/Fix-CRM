@@ -2444,25 +2444,30 @@ window.afxSignaturePad = function (opts) {
         }, 5000);
     }
 
-    askBtn.addEventListener('click', function () {
-        if (askBtn.disabled) return;
-        askBtn.disabled = true;   // proti druhému kliknutí (mazalo by klientovi formulář)
+    function requestClientForm(silent) {
+        if (askBtn.disabled || formRequested) return;
+        askBtn.disabled = true;   // proti druhému spuštění (mazalo by klientovi formulář)
         // baseline reply_id: bez něj by se mohla načíst STARÁ odpověď
         // předchozího klienta — když baseline selže, radši nic neposílat
         fetch(API + '?action=info', { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                if (!d || !d.ok) { askFailed('Displej nedostupný'); return; }
+                if (!d || !d.ok) { if (silent) { askBtn.disabled = false; } else { askFailed('Displej nedostupný'); } return; }
                 replyAfter = d.reply_id || 0;
                 push('client_form', null, function (ok) {
-                    if (!ok) { askFailed('Displej nedostupný'); return; }
-                    formRequested = true;   // při stornu se musí displej uklidit
+                    if (!ok) { if (silent) { askBtn.disabled = false; } else { askFailed('Displej nedostupný'); } return; }
+                    formRequested = true;   // při stornu/zavření se musí displej uklidit
                     askBtn.innerHTML = '<i class="fas fa-hourglass-half me-1"></i>Klient vyplňuje…';
                     watch();
                 });
             })
-            .catch(function () { askFailed('Displej nedostupný'); });
-    });
+            .catch(function () { if (silent) { askBtn.disabled = false; } else { askFailed('Displej nedostupný'); } });
+    }
+    askBtn.addEventListener('click', function () { requestClientForm(false); });
+    // AUTOMATIKA (přání majitele): otevření panelu „Přidat klienta" rovnou
+    // pošle formulář na displej — žádné ruční přepínání; zavření ho uklidí.
+    var icpAuto = document.getElementById('inlineNewCustomerPanel');
+    if (icpAuto) icpAuto.addEventListener('shown.bs.collapse', function () { requestClientForm(true); });
 
     // zavření/storno = konec hlídání + ÚKLID DISPLEJE: bez push('idle') by na
     // druhém monitoru navěky svítil formulář klienta. Uklízí se u zavření celého
