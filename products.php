@@ -349,6 +349,7 @@ try {
                                                 <?php endif; ?>
                                             <?php endif; ?>
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-8xx)"><i class="fas fa-tag"></i></button>
+                                            <button type="button" class="btn btn-white border text-danger product-label-btn" data-id="<?php echo (int)$p['id']; ?>" data-akce="1" title="Štítek AKCE — cenovka červeně (jen s černo-červenou rolí DK-22251!)"><i class="fas fa-fire"></i></button>
                                             <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vrátit do skladu' : 'Zapůjčeno / komisní prodej'; ?>"><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i></button>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>
                                             <button type="button" class="btn btn-white border tr-add-btn" data-type="product" data-id="<?php echo (int)$p['id']; ?>" data-name="<?php echo e($p['title']); ?>" title="Přesun na druhou pobočku"><i class="fas fa-right-left text-info"></i></button>
@@ -358,6 +359,7 @@ try {
                                     <?php else: ?>
                                     <td class="text-end pe-4">
                                         <button type="button" class="btn btn-sm btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek"><i class="fas fa-tag"></i></button>
+                                        <button type="button" class="btn btn-sm btn-white border text-danger product-label-btn" data-id="<?php echo (int)$p['id']; ?>" data-akce="1" title="Štítek AKCE — cenovka červeně (jen s černo-červenou rolí DK-22251!)"><i class="fas fa-fire"></i></button>
                                     </td>
                                     <?php endif; ?>
                                 </tr>
@@ -671,12 +673,13 @@ try {
 <?php endif; ?>
 
 <script>
-function printProductLabel(productId, copies) {
+function printProductLabel(productId, copies, akce) {
     copies = Math.max(1, Math.min(20, parseInt(copies || 1, 10) || 1));
     var fd = new FormData();
     fd.append('action', 'print_product');
     fd.append('id', productId);
     fd.append('copies', String(copies));
+    if (akce) { fd.append('akce', '1'); }
     fd.append('csrf_token', '<?php echo $_SESSION['csrf_token'] ?? ''; ?>');
     return fetch('api/print_label_server.php', { method: 'POST', body: fd, credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
@@ -699,12 +702,14 @@ $(document).on('click', '.product-label-btn', function () {
     if (btn.disabled) return;
     btn.disabled = true;
     ic.className = 'fas fa-spinner fa-spin';
-    printProductLabel(btn.dataset.id, 1)
+    var akce = btn.dataset.akce === '1';
+    var icDefault = akce ? 'fas fa-fire' : 'fas fa-tag';
+    printProductLabel(btn.dataset.id, 1, akce)
         .then(function (d) {
-            btn.disabled = false; ic.className = 'fas fa-tag';
-            showAlert(d.via_bridge ? 'Štítek vytištěn přes tenhle počítač.' : 'Štítek odeslán na tiskárnu.');
+            btn.disabled = false; ic.className = icDefault;
+            showAlert((akce ? 'AKČNÍ štítek (červený) ' : 'Štítek ') + (d.via_bridge ? 'vytištěn přes tenhle počítač.' : 'odeslán na tiskárnu.'));
         })
-        .catch(function (err) { btn.disabled = false; ic.className = 'fas fa-tag'; showAlert('Tisk selhal: ' + escHtml(err.message || '')); });
+        .catch(function (err) { btn.disabled = false; ic.className = icDefault; showAlert('Tisk selhal: ' + escHtml(err.message || '')); });
 });
 
 <?php if ($canManage): ?>

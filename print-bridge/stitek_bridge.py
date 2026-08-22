@@ -150,8 +150,10 @@ def render_label(code: str, defect: str, date: str, client: str = "") -> Image.I
     return img.convert("RGB")
 
 
-def print_image(img: Image.Image, model: str = "") -> tuple[bool, str]:
-    """Tisk shodný s naskladňovací appkou (brother_ql, tcp://ip, network backend)."""
+def print_image(img: Image.Image, model: str = "", red: bool = False) -> tuple[bool, str]:
+    """Tisk shodný s naskladňovací appkou (brother_ql, tcp://ip, network backend).
+    red=True = dvoubarevný rastr (62red) pro černo-červenou roli DK-22251 —
+    čistě červené pixely obrázku jedou do červené vrstvy pásky (štítek AKCE)."""
     ip = printer_ip()
     if not ip:
         return False, "chybí printer_ip (~/.naskladneni_produktu.json)"
@@ -165,8 +167,8 @@ def print_image(img: Image.Image, model: str = "") -> tuple[bool, str]:
         from brother_ql.backends.helpers import send
         qlr = BrotherQLRaster(printer_model(model))
         qlr.exception_on_warning = True
-        instr = convert(qlr=qlr, images=[img], label="62", rotate="auto",
-                        threshold=70, dither=False, cut=True)
+        instr = convert(qlr=qlr, images=[img], label="62red" if red else "62", rotate="auto",
+                        threshold=70, dither=False, cut=True, red=red)
         send(instructions=instr, printer_identifier=f"tcp://{ip}",
              backend_identifier="network", blocking=True)
         return True, ""
@@ -235,16 +237,18 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
             data = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
             model = str(data.get("printer_model") or "")
+            red = False
             if isinstance(data.get("product"), dict):
                 from stitek_product import render_product_label
                 img = render_product_label(data["product"])
                 copies = max(1, min(20, int(data.get("copies") or 1)))
+                red = bool(data["product"].get("akce"))   # AKCE = dvoubarevný tisk
             else:
                 img = render_label(str(data.get("code", "")), str(data.get("defect", "")), str(data.get("date", "")), str(data.get("client", "")))
                 copies = 1
             ok, err = True, ""
             for i in range(copies):
-                ok, err = print_image(img, model)
+                ok, err = print_image(img, model, red=red)
                 if not ok:
                     if i > 0:
                         err = f"{err} (vytištěno {i} z {copies})"

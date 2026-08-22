@@ -231,6 +231,9 @@ if ($action === 'print_product') {
     if (empty($productLabel['ok'])) {
         echo json_encode(['ok' => false, 'error' => (string)($productLabel['error'] ?? 'Produkt nenalezen')], JSON_UNESCAPED_UNICODE); exit;
     }
+    // AKCE = cenový pás červeně, dvoubarevný rastr 62red — vyžaduje vloženou
+    // černo-červenou roli DK-22251 (s běžnou černou by tiskárna úlohu odmítla)
+    if (!empty($_POST['akce'])) { $productLabel['data']['akce'] = true; }
 }
 
 /** Zápis neúspěšného tisku do Historie — ať jde po hlášce „netiskne to" dohledat,

@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.52.5',
+        'date' => '2026-08-22',
+        'time' => '21:25',
+        'title' => 'Cenové štítky: AKCE červeně, stav slovem, úspornější layout',
+        'items' => [
+            '<b>Štítek AKCE:</b> u produktu je vedle běžného štítku nové červené tlačítko 🔥 — cenový pás se vytiskne <b>červenou vrstvou</b> černo-červené role (DK-22251), zboží v akci je vidět na první pohled. Pozor: vyžaduje vloženou černo-červenou roli — s běžnou černou tiskárna dvoubarevnou úlohu odmítne. Funguje serverovou cestou i přes záložní můstek.',
+            '<b>Stav slovem:</b> na štítku se k písmenu stavu tiskne i slovo — <b>A — Zánovní, B — Použitý, C — Opotřebený</b> (Nový/Zánovní beze změny).',
+            '<b>Úspornější layout:</b> jádra procesoru a grafiky jsou na jednom řádku (<b>CoreCPU/GPU: 8/20</b>) a cenovka je asi o 15 % menší — u malých štítků (iPhone/iPad) i velkých (MacBook).',
+        ],
+    ],
+    [
         'version' => '3.52.4',
         'date' => '2026-08-22',
         'time' => '20:05',

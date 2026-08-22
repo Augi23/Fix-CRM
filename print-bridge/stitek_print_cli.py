@@ -29,16 +29,18 @@ def main() -> int:
 
     os.environ["STITEK_PRINTER_IP"] = a.ip
     os.environ["STITEK_PRINTER_MODEL"] = a.model
+    red = False
     try:
         if a.product_json:
             from stitek_product import render_product_label  # noqa: E402
             data = json.loads(base64.b64decode(a.product_json).decode("utf-8"))
             img = render_product_label(data)
+            red = bool(data.get("akce"))   # AKCE = dvoubarevný tisk (role DK-22251)
         else:
             if not a.code:
                 raise ValueError("chybí --code (štítek zakázky) nebo --product-json (produkt)")
             img = render_label(a.code, a.defect, a.date, a.client)
-        ok, err = print_image(img)
+        ok, err = print_image(img, red=red)
     except Exception as e:  # render/knihovny
         ok, err = False, str(e)
 
