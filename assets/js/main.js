@@ -2464,10 +2464,10 @@ window.afxSignaturePad = function (opts) {
             .catch(function () { askFailed('Displej nedostupný'); });
     });
 
-    // zavření/storno modalu zakázky = konec hlídání + ÚKLID DISPLEJE:
-    // bez push('idle') by na druhém monitoru navěky svítil formulář klienta
-    var om = document.getElementById('newOrderModal');
-    if (om) om.addEventListener('hidden.bs.modal', function () {
+    // zavření/storno = konec hlídání + ÚKLID DISPLEJE: bez push('idle') by na
+    // druhém monitoru navěky svítil formulář klienta. Uklízí se u zavření celého
+    // okna zakázky I u sbalení samotného panelu klienta (křížek u panelu).
+    function cleanupDisplayForm() {
         stopWatch();
         if (formRequested) {
             formRequested = false;
@@ -2475,7 +2475,11 @@ window.afxSignaturePad = function (opts) {
         }
         askBtn.disabled = false;
         askBtn.innerHTML = '<i class="fas fa-desktop me-1"></i>Klient vyplní na displeji';
-    });
+    }
+    var om = document.getElementById('newOrderModal');
+    if (om) om.addEventListener('hidden.bs.modal', cleanupDisplayForm);
+    var icp = document.getElementById('inlineNewCustomerPanel');
+    if (icp) icp.addEventListener('hidden.bs.collapse', cleanupDisplayForm);
 
     }   // konec init()
 }());
