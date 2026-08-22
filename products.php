@@ -1446,7 +1446,16 @@ $(document).on('click', '.product-label-btn', function () {
                     else { $msg.textContent = 'Neuloženo (odcizené zařízení).'; }
                     return;
                 }
-                if (!d.success) { $msg.textContent = d.message || 'Uložení selhalo.'; return; }
+                if (!d.success) {
+                    var m = d.message || 'Uložení selhalo.';
+                    $msg.innerHTML = '<span class="text-danger fw-bold">' + escHtml(m) + '</span>';
+                    // neplatný token = mezitím proběhlo (od)přihlášení jinde a tahle
+                    // záložka je zastaralá — bez jasné hlášky to vypadá jako mrtvé tlačítko
+                    if (/token|přihlá/i.test(m)) {
+                        showAlert('Přihlášení se mezitím změnilo — obnov stránku (F5). Rozepsaný produkt zůstane uložený jako koncept.');
+                    }
+                    return;
+                }
                 savedSomething = true;
                 try { if (window.__clearProductDraft) window.__clearProductDraft(); } catch (e) {}   // úspěšně uloženo → koncept pryč
                 el('pcTodayCount').textContent = d.today_count;
