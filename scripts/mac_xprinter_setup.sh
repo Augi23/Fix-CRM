@@ -1,30 +1,49 @@
 #!/bin/zsh
-# Nastavení termotiskárny Xprinter XP58-IIN na Macu u pokladny — verze 3.
+# Nastavení termotiskárny Xprinter XP58-IIN na Macu u pokladny — verze 4.
 #
 # Architektura (přání majitele): tiskne VŽDY jen počítač, který má tiskárnu v USB.
 # CRM v prohlížeči tohoto Macu si od serveru vezme hotové bajty účtenky a pošle je
 # na lokální můstek http://127.0.0.1:9101/print → lp -o raw → USB. Nic nechodí
 # přes síť z jiných počítačů, sdílení tiskárny je vypnuté.
 #
-# Skript je idempotentní — klidně ho spusť opakovaně.
+# v4: můstek běží jako LaunchAgent PŘIHLÁŠENÉHO UŽIVATELE (gui doména) místo
+# systémového daemona — macOS po aktualizacích umí systémové daemony potichu
+# vypnout v „Background items" a tisk pak záhadně přestane. Starší systémové
+# varianty (9100 i 9101) skript uklidí. Je idempotentní — spouštěj klidně opakovaně.
 set -e
 
 echo "── Mažu čekající úlohy fronty xprinter…"
-sudo cancel -a xprinter 2>/dev/null || true
+cancel -a xprinter 2>/dev/null || sudo cancel -a xprinter 2>/dev/null || true
 
 echo "── Fronta xprinter (RAW, chybnou úlohu zahodit, sdílení vypnout)…"
 if ! lpstat -p xprinter >/dev/null 2>&1; then
     URI=$(lpinfo -v 2>/dev/null | awk '/usb:\/\// {print $2}' | head -1)
-    [ -z "$URI" ] && { echo "❌ USB tiskárna nenalezena — je zapojená a zapnutá?"; exit 1; }
-    sudo lpadmin -p xprinter -E -v "$URI" -m raw 2>/dev/null || sudo lpadmin -p xprinter -E -v "$URI"
+    if [ -z "$URI" ]; then
+        echo "❌ USB tiskárna nenalezena — je zapojená do TOHOTO počítače a zapnutá?"
+        exit 1
+    fi
+    lpadmin -p xprinter -E -v "$URI" -m raw 2>/dev/null \
+        || sudo lpadmin -p xprinter -E -v "$URI" -m raw \
+        || { echo "❌ Frontu se nepodařilo založit."; exit 1; }
 fi
-sudo lpadmin -p xprinter -o printer-error-policy=abort-job -o printer-is-shared=false
-sudo cupsenable xprinter 2>/dev/null || true
-sudo cupsaccept xprinter 2>/dev/null || true
+lpadmin -p xprinter -o printer-error-policy=abort-job -o printer-is-shared=false 2>/dev/null \
+    || sudo lpadmin -p xprinter -o printer-error-policy=abort-job -o printer-is-shared=false \
+    || true
+cupsenable xprinter 2>/dev/null || sudo cupsenable xprinter 2>/dev/null || true
+cupsaccept xprinter 2>/dev/null || sudo cupsaccept xprinter 2>/dev/null || true
 
-echo "── Můstek: HTTP 127.0.0.1:9101 → lokální tisk…"
-sudo mkdir -p /usr/local/lib
-sudo tee /usr/local/lib/xprinter9101.sh >/dev/null << 'EOS'
+echo "── Uklízím starší SYSTÉMOVÉ můstky (vyžaduje heslo; přeskočí se, když nejsou)…"
+if [ -f /Library/LaunchDaemons/cz.applefix.xprinter9101.plist ] || [ -f /Library/LaunchDaemons/cz.applefix.xprinter9100.plist ]; then
+    sudo launchctl bootout system/cz.applefix.xprinter9101 2>/dev/null || true
+    sudo launchctl bootout system/cz.applefix.xprinter9100 2>/dev/null || true
+    sudo rm -f /Library/LaunchDaemons/cz.applefix.xprinter9101.plist \
+               /Library/LaunchDaemons/cz.applefix.xprinter9100.plist \
+               /usr/local/lib/xprinter9101.sh /usr/local/lib/xprinter9100.sh
+fi
+
+echo "── Můstek: HTTP 127.0.0.1:9101 jako agent přihlášeného uživatele…"
+mkdir -p "$HOME/Library/AppleFix" "$HOME/Library/LaunchAgents"
+cat > "$HOME/Library/AppleFix/xprinter9101.sh" << 'EOS'
 #!/bin/zsh
 # launchd (inetd režim): stdin/stdout = TCP spojení. Minimalistické HTTP:
 # OPTIONS = CORS preflight (Chrome vyžaduje i Allow-Private-Network),
@@ -52,15 +71,15 @@ fi
 head -c "$clen" | /usr/bin/lp -d xprinter -o raw -s - >/dev/null 2>&1
 printf 'HTTP/1.1 200 OK\r\n%sContent-Type: application/json\r\nConnection: close\r\n\r\n{"ok":true}' "$cors"
 EOS
-sudo chmod 755 /usr/local/lib/xprinter9101.sh
+chmod 755 "$HOME/Library/AppleFix/xprinter9101.sh"
 
-sudo tee /Library/LaunchDaemons/cz.applefix.xprinter9101.plist >/dev/null << 'EOP'
+cat > "$HOME/Library/LaunchAgents/cz.applefix.xprinter9101.plist" << EOP
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key><string>cz.applefix.xprinter9101</string>
-    <key>ProgramArguments</key><array><string>/usr/local/lib/xprinter9101.sh</string></array>
+    <key>ProgramArguments</key><array><string>${HOME}/Library/AppleFix/xprinter9101.sh</string></array>
     <key>inetdCompatibility</key><dict><key>Wait</key><false/></dict>
     <key>Sockets</key>
     <dict>
@@ -74,21 +93,19 @@ sudo tee /Library/LaunchDaemons/cz.applefix.xprinter9101.plist >/dev/null << 'EO
 </dict>
 </plist>
 EOP
-sudo chown root:wheel /Library/LaunchDaemons/cz.applefix.xprinter9101.plist
-sudo chmod 644 /Library/LaunchDaemons/cz.applefix.xprinter9101.plist
-sudo launchctl bootout system/cz.applefix.xprinter9101 2>/dev/null || true
-BOOT_ERR=$(sudo launchctl bootstrap system /Library/LaunchDaemons/cz.applefix.xprinter9101.plist 2>&1) || echo "⚠️ bootstrap: $BOOT_ERR" 
-
-# starý kanál 9100 (verze 2) už není potřeba — tiskne jen tento počítač
-sudo launchctl bootout system/cz.applefix.xprinter9100 2>/dev/null || true
-sudo rm -f /Library/LaunchDaemons/cz.applefix.xprinter9100.plist /usr/local/lib/xprinter9100.sh
+launchctl bootout gui/$UID/cz.applefix.xprinter9101 2>/dev/null || true
+launchctl bootstrap gui/$UID "$HOME/Library/LaunchAgents/cz.applefix.xprinter9101.plist" \
+    || echo "⚠️ Agenta se nepodařilo spustit — diagnostika níže."
 
 sleep 1
 echo "── Ověření můstku (nic se netiskne):"
-RESP=$(curl -s -X OPTIONS http://127.0.0.1:9101/print -o /dev/null -w "%{http_code}")
+RESP=$(curl -s -X OPTIONS http://127.0.0.1:9101/print -o /dev/null -w '%{http_code}' || echo 000)
 if [ "$RESP" = "204" ]; then
     echo "✅ Můstek 9101 běží. V CRM na TOMTO počítači otevři Pokladnu a klikni na Test účtenky."
 else
-    echo "❌ Můstek neodpovídá (HTTP $RESP). Diagnostika (pošli Claudovi):"
-    sudo launchctl print system/cz.applefix.xprinter9101 2>&1 | head -15
+    echo "❌ Můstek neodpovídá (HTTP $RESP). Vyfoť následující diagnostiku a pošli ji:"
+    echo "· stav agenta:"
+    launchctl print gui/$UID/cz.applefix.xprinter9101 2>&1 | head -12
+    echo "· kdo drží port 9101:"
+    lsof -nP -iTCP:9101 2>/dev/null | head -5 || true
 fi
