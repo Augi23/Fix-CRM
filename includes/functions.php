@@ -8002,3 +8002,67 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
         return null;   // rezervace zůstane v panelu → ruční převzetí
     }
 }
+
+/* ── TISKOVÁ FRONTA ÚČTENEK (v3.52.2) ──────────────────────────────────────
+   Appka z TestFlightu (WKWebView) ani Safari nepustí HTTPS stránku na místní
+   můstek 127.0.0.1:9101 (smíšený obsah). Kasa proto úlohu ULOŽÍ na server
+   a poller na pokladním Macu si ji do ~2 s stáhne a pošle do USB tiskárny.
+   Pravidlo „tiskne jen počítač s tiskárnou" platí dál — bajty vydá server
+   jen držiteli tajného tokenu pobočky (agent na tom jednom počítači). */
+
+function afxEnsurePrintJobsTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS pos_print_jobs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            branch_id INT NOT NULL,
+            payload MEDIUMTEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            taken_at TIMESTAMP NULL DEFAULT NULL,
+            INDEX idx_ppj (branch_id, taken_at, id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('afxEnsurePrintJobsTable: ' . $e->getMessage()); }
+}
+
+/** Token pobočky pro stahování tiskových úloh (agent na pokladním počítači). */
+function afxPrintPollToken(int $branchId, bool $create = false): string {
+    $key = 'print_poll_token_' . $branchId;
+    $t = trim((string)get_setting($key, ''));
+    if ($t === '' && $create) {
+        $t = bin2hex(random_bytes(24));
+        set_setting($key, $t);
+    }
+    return $t;
+}
+
+/** Pobočka podle tokenu polleru (0 = neplatný token). */
+function afxPrintPollBranchByToken(string $token): int {
+    global $pdo;
+    if (!preg_match('/^[a-f0-9]{40,64}$/', $token)) return 0;
+    try {
+        foreach ($pdo->query("SELECT id FROM branches") as $b) {
+            $bt = trim((string)get_setting('print_poll_token_' . (int)$b['id'], ''));
+            if ($bt !== '' && hash_equals($bt, $token)) return (int)$b['id'];
+        }
+    } catch (Throwable $e) {}
+    return 0;
+}
+
+/** Zařadí hotové ESC/POS bajty do fronty pobočky (poller je vytiskne). */
+function afxPrintJobEnqueue(int $branchId, string $bytes): bool {
+    global $pdo;
+    if ($branchId <= 0 || $bytes === '') return false;
+    afxEnsurePrintJobsTable();
+    try {
+        // úklid: den staré úlohy nikoho nezajímají (a tabulka nenaroste)
+        $pdo->exec("DELETE FROM pos_print_jobs WHERE created_at < NOW() - INTERVAL 1 DAY");
+        $st = $pdo->prepare("INSERT INTO pos_print_jobs (branch_id, payload) VALUES (?, ?)");
+        return $st->execute([$branchId, base64_encode($bytes)]);
+    } catch (Throwable $e) {
+        error_log('afxPrintJobEnqueue: ' . $e->getMessage());
+        return false;
+    }
+}

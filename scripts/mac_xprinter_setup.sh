@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Nastavení termotiskárny Xprinter XP58-IIN na Macu u pokladny — verze 4.
+# Nastavení termotiskárny Xprinter XP58-IIN na Macu u pokladny — verze 5.
 #
 # Architektura (přání majitele): tiskne VŽDY jen počítač, který má tiskárnu v USB.
 # CRM v prohlížeči tohoto Macu si od serveru vezme hotové bajty účtenky a pošle je
@@ -96,6 +96,57 @@ EOP
 launchctl bootout gui/$UID/cz.applefix.xprinter9101 2>/dev/null || true
 launchctl bootstrap gui/$UID "$HOME/Library/LaunchAgents/cz.applefix.xprinter9101.plist" \
     || echo "⚠️ Agenta se nepodařilo spustit — diagnostika níže."
+
+echo "── Poller tiskové fronty (kasa v APPCE z TestFlightu / Safari)…"
+# WKWebView ani Safari nepustí HTTPS stránku na místní můstek — kasa proto úlohu
+# uloží na server a tenhle poller ji každé ~2 s stáhne a pošle do USB tiskárny.
+# Token = tajemství pobočky; předává se argumentem: … | zsh -s -- TOKEN
+TOKEN="${1:-}"
+TOKEN_FILE="$HOME/Library/AppleFix/print_token"
+if [ -n "$TOKEN" ]; then
+    print -r -- "$TOKEN" > "$TOKEN_FILE"
+    chmod 600 "$TOKEN_FILE"
+fi
+if [ -s "$TOKEN_FILE" ]; then
+    cat > "$HOME/Library/AppleFix/xprintpoll.sh" << 'EOS2'
+#!/bin/zsh
+# Poller tiskové fronty: stáhne čekající účtenku své pobočky a pošle ji do USB.
+TOKEN_FILE="$HOME/Library/AppleFix/print_token"
+TMP="$(mktemp /tmp/afxprint.XXXXXX)"
+trap 'rm -f "$TMP"' EXIT
+while true; do
+    TOKEN="$(cat "$TOKEN_FILE" 2>/dev/null)"
+    if [ -n "$TOKEN" ]; then
+        CODE=$(curl -s -o "$TMP" -w '%{http_code}' --max-time 8 "https://admin.applefix.cloud/api/print_poll.php?token=$TOKEN" || echo 000)
+        if [ "$CODE" = "200" ] && [ -s "$TMP" ]; then
+            /usr/bin/lp -d xprinter -o raw -s "$TMP" >/dev/null 2>&1
+            continue   # ve frontě může čekat další úloha — hned se zeptat znovu
+        fi
+    fi
+    sleep 2
+done
+EOS2
+    chmod 755 "$HOME/Library/AppleFix/xprintpoll.sh"
+    cat > "$HOME/Library/LaunchAgents/cz.applefix.xprintpoll.plist" << EOP2
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>cz.applefix.xprintpoll</string>
+    <key>ProgramArguments</key><array><string>${HOME}/Library/AppleFix/xprintpoll.sh</string></array>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key><true/>
+</dict>
+</plist>
+EOP2
+    launchctl bootout gui/$UID/cz.applefix.xprintpoll 2>/dev/null || true
+    launchctl bootstrap gui/$UID "$HOME/Library/LaunchAgents/cz.applefix.xprintpoll.plist" \
+        || echo "⚠️ Poller se nepodařilo spustit."
+    echo "✅ Poller fronty běží — kasa v appce/Safari tiskne přes server (do ~2 s)."
+else
+    echo "ℹ️ Poller PŘESKOČEN (chybí token pobočky). Kasa v appce z TestFlightu pak netiskne!"
+    echo "   Spusť skript takto: curl -fsSL https://admin.applefix.cloud/scripts/mac_xprinter_setup.sh | zsh -s -- TOKEN_POBOCKY"
+fi
 
 sleep 1
 echo "── Ověření můstku (nic se netiskne):"

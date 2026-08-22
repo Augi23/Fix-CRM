@@ -21,7 +21,7 @@ if (!crmCanUsePos()) {
 }
 
 /** Data účtenky pro prodej z kasy — STEJNÁ stavba jako print_receipt.php?format=58. */
-function afxReceiptDataForSale(int $id): ?array {
+function afxReceiptDataForSale(int $id, ?int &$branchOut = null): ?array {
     global $pdo;
     ensurePosTables();
     $st = $pdo->prepare("SELECT s.*, c.first_name, c.last_name, c.company, c.ico AS cust_ico, i.invoice_number
@@ -39,6 +39,7 @@ function afxReceiptDataForSale(int $id): ?array {
     $items = $it->fetchAll(PDO::FETCH_ASSOC);
 
     // POZOR pobočková past: kontakt VŽDY z pobočky DOKLADU, ne ze session
+    $branchOut = (int)($sale['branch_id'] ?? 0);
     $bc = crmOrderBranchContact((int)($sale['branch_id'] ?? 0));
     $custName = trim((string)($sale['company'] ?? '')) ?: trim((string)($sale['first_name'] ?? '') . ' ' . (string)($sale['last_name'] ?? ''));
     $sale['customer_label'] = $custName;
@@ -116,15 +117,35 @@ try {
             } catch (Throwable $e) { error_log('slip shift_close pohyby: ' . $e->getMessage()); $moves = null; }
         }
         $bytes = crmEscposReceipt(crmShiftSlipRaster($shift, $slip === 'shift_open' ? 'open' : 'close', $prev, $moves));
+        // enqueue = tisková fronta (appka z TestFlightu / Safari nedosáhnou na můstek)
+        if (!empty($in['enqueue'])) {
+            $qok = afxPrintJobEnqueue($branch, $bytes);
+            echo json_encode(['ok' => $qok, 'queued' => $qok ? 1 : 0,
+                'error' => $qok ? null : 'Frontu tisku se nepodařilo naplnit.']); exit;
+        }
         echo json_encode(['ok' => true, 'b64' => base64_encode($bytes)]); exit;
     }
 
-    $data = !empty($in['test']) ? afxReceiptTestData() : afxReceiptDataForSale((int)($in['sale_id'] ?? 0));
+    $saleBranch = 0;
+    $data = !empty($in['test']) ? afxReceiptTestData() : afxReceiptDataForSale((int)($in['sale_id'] ?? 0), $saleBranch);
     if (!$data) { echo json_encode(['ok' => false, 'error' => 'Doklad nenalezen.']); exit; }
 
     $bytes = '';
     if (!empty($in['drawer'])) { $bytes .= crmEscposDrawerPulse(); }   // šuplík ještě před tiskem
     $bytes .= crmEscposReceipt(crmReceiptRaster($data));
+
+    // TISKOVÁ FRONTA (enqueue): kasa v appce z TestFlightu (WKWebView) ani Safari
+    // nedosáhnou z HTTPS na místní můstek — úloha se uloží na server a poller na
+    // pokladním Macu ji do ~2 s stáhne a vytiskne. Tiskne pořád jen ten počítač.
+    if (!empty($in['enqueue'])) {
+        // fronta pobočky DOKLADU (u testu pobočka obsluhy) — účtenka jede na kasu,
+        // kde prodej proběhl, ne kde zrovna sedí vedení
+        $qBranch = !empty($in['test']) ? (int)getCurrentStaffBranchId() : $saleBranch;
+        if ($qBranch <= 0) { $qBranch = (int)getCurrentStaffBranchId(); }
+        $qok = afxPrintJobEnqueue($qBranch, $bytes);
+        echo json_encode(['ok' => $qok, 'queued' => $qok ? 1 : 0,
+            'error' => $qok ? null : 'Frontu tisku se nepodařilo naplnit.']); exit;
+    }
 
     // VÝCHOZÍ REŽIM: server NIC netiskne — vrátí hotové bajty a odešle je až
     // prohlížeč POKLADNÍHO počítače na svůj lokální můstek (127.0.0.1:9101).

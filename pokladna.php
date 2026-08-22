@@ -1151,6 +1151,26 @@ document.addEventListener('DOMContentLoaded', function () {
     // a prohlížeč je pošle na lokální můstek (127.0.0.1:9101 → USB tiskárna).
     // Na počítači bez tiskárny můstek neběží → u prodeje se nabídne tisk
     // dialogem prohlížeče, u testu jen hláška. Server sám nikdy netiskne.
+    // Záloha přes TISKOVOU FRONTU: appka z TestFlightu (WKWebView) i Safari blokují
+    // z HTTPS požadavky na http://127.0.0.1 — úloha se proto uloží na server a
+    // poller na pokladním Macu ji do ~2 s stáhne a vytiskne. Chrome jde dál napřímo.
+    function enqueuePrint(payload, onFail, onOk) {
+        fetch('api/print_receipt_server.php', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.assign({ csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>', enqueue: 1 }, payload))
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d.ok && d.queued) {
+                posToast(true, '🖨️ Účtenka odeslána na pokladní tiskárnu (do 2 s).');
+                if (onOk) { onOk(); }
+                return;
+            }
+            onFail((d.error || 'Frontu tisku se nepodařilo naplnit.') + ' Tiskne jen počítač s tiskárnou v USB a spuštěným agentem.');
+        })
+        .catch(function () { onFail('Síťová chyba při zařazení tisku do fronty.'); });
+    }
     function localPrint(payload, onFail, onOk) {
         fetch('api/print_receipt_server.php', {
             method: 'POST', credentials: 'same-origin',
@@ -1163,10 +1183,14 @@ document.addEventListener('DOMContentLoaded', function () {
             var bin = Uint8Array.from(atob(d.b64), function (c) { return c.charCodeAt(0); });
             return fetch('http://127.0.0.1:9101/print', { method: 'POST', mode: 'cors', body: bin })
                 .then(function (r2) {
-                    if (!r2.ok) { onFail('Můstek tiskárny odpověděl chybou.'); }
+                    if (!r2.ok) { enqueuePrint(payload, onFail, onOk); }
                     else if (onOk) { onOk(); }
                 })
-                .catch(function () { onFail('Tiskárna není na tomto počítači (můstek na 127.0.0.1:9101 neběží).'); });
+                .catch(function () {
+                    // WKWebView/Safari sem spadnou VŽDY (blokují localhost z HTTPS) —
+                    // plynule se přejde na frontu, obsluha nic řešit nemusí
+                    enqueuePrint(payload, onFail, onOk);
+                });
         })
         .catch(function () { onFail('Síťová chyba při přípravě dokladu.'); });
     }

@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.52.2',
+        'date' => '2026-08-22',
+        'time' => '18:30',
+        'title' => 'Tisk účtenek: instalace můstku v4 + jasná hláška pro Safari',
+        'items' => [
+            '<b>Instalační skript tiskárny (v4):</b> můstek 127.0.0.1:9101 se nově instaluje jako <b>agent přihlášeného uživatele</b> místo systémové služby — macOS umí systémové služby po aktualizaci potichu vypnout, což byl důvod záhadného „můstek neběží" na prodejně. Skript starý systémový můstek uklidí, při selhání vypíše skutečnou diagnostiku a opravena i chybná uvozovka, kvůli které padal na konci (zsh: unmatched).',
+            '<b>Kasa poradí se Safari:</b> Safari blokuje z HTTPS stránky požadavky na tiskový můstek (localhost) — účtenky proto tisknou jen v <b>Chrome</b>. Když kasa v Safari na tisk nedosáhne, řekne to teď rovnou a srozumitelně místo obecného „můstek neběží".',
+            '<b>Tisková fronta pro APPKU:</b> kasa spuštěná v aplikaci z TestFlightu (WebKit — na můstek nesmí stejně jako Safari) nově tiskne přes <b>serverovou frontu</b>: úloha se uloží na server a agent na pokladním Macu ji do ~2 s stáhne a pošle do USB tiskárny. Kasa si cestu vybere sama (Chrome napřímo, appka/Safari frontou), pravidlo „tiskne jen počítač s tiskárnou" platí dál — úlohy vydá server jen držiteli tajného tokenu pobočky. Agenta instaluje stejný skript, nově s tokenem: <code>… | zsh -s -- TOKEN</code>.',
+        ],
+    ],
+    [
         'version' => '3.52.1',
         'date' => '2026-08-21',
         'time' => '10:20',
