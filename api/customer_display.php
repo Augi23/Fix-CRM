@@ -83,17 +83,18 @@ if ($token !== '') {
         if (function_exists('ensureProductsHideEshopColumn')) ensureProductsHideEshopColumn();
         if (function_exists('ensureProductsLoanColumns')) ensureProductsLoanColumns();
         try {
-            // 10 NEJNOVĚJI přidaných (přání majitele) — fotka s dědičností jako
-            // e-shop: studiová fotka modelu má přednost, jinak vlastní fotka kusu.
-            // Dřívější filtr jen na image_url vyřadil skoro všechno (fotky se
-            // dědí přes model_photos) a kolotoč stál na jediném kusu.
-            $q = $pdo->query("SELECT title, manufacturer, price,
-                                     COALESCE(NULLIF(studio_image_url, ''), NULLIF(image_url, '')) AS img
+            // 10 NEJNOVĚJI přidaných (přání majitele) — fotka s DĚDIČNOSTÍ přesně
+            // jako e-shop feed: vlastní studiovka kusu → vlastní fotka → studiovka
+            // MODELU přes productModelKey(model, color) + crmModelPhotoMap().
+            // (Dřívější SQL filtr jen na sloupce products nechal v kolotoči
+            // jedinou klávesnici — fotky tu dědí skoro všechno.)
+            $q = $pdo->query("SELECT title, manufacturer, model, color, price,
+                                     studio_image_url, image_url
                               FROM products
                               WHERE stock_qty > 0 AND (hide_eshop IS NULL OR hide_eshop = 0)
                                 AND loan_at IS NULL
-                                AND COALESCE(NULLIF(studio_image_url, ''), NULLIF(image_url, '')) IS NOT NULL
-                              ORDER BY added_at DESC, id DESC LIMIT 10");
+                              ORDER BY added_at DESC, id DESC LIMIT 60");
+            $map = function_exists('crmModelPhotoMap') ? crmModelPhotoMap() : [];
             $abs = static function (string $u): string {
                 $u = function_exists('productImageDisplayUrl') ? productImageDisplayUrl($u) : $u;
                 if ($u !== '' && str_starts_with($u, 'media/products/')) { $u = 'https://admin.applefix.cloud/' . ltrim($u, '/'); }
@@ -101,14 +102,20 @@ if ($token !== '') {
             };
             $items = [];
             foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $p) {
-                $img = $abs((string)$p['img']);
-                if ($img === '') continue;
+                $img = trim((string)($p['studio_image_url'] ?? '')) ?: trim((string)($p['image_url'] ?? ''));
+                if ($img === '' && $map && function_exists('productModelKey')) {
+                    $mk = productModelKey($p['model'] ?? '', $p['color'] ?? '');
+                    if ($mk !== '' && !empty($map[$mk])) { $img = (string)$map[$mk]; }
+                }
+                $img = $abs($img);
+                if ($img === '') continue;   // bez fotky se na displeji nedá nic ukázat
                 $items[] = [
                     'title' => (string)$p['title'],
                     'manufacturer' => (string)($p['manufacturer'] ?? ''),
                     'price' => (float)$p['price'],
                     'image' => $img,
                 ];
+                if (count($items) >= 10) break;
             }
         } catch (Throwable $e) { $items = []; }
         echo json_encode(['ok' => true, 'products' => $items], JSON_UNESCAPED_UNICODE);
