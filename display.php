@@ -58,8 +58,9 @@ if ($preview === '') {
   .brand .fx { color: var(--cyan); }
 
   /* ── IDLE: oficiální logo v rohu + velká reklama na středu ── */
+  /* POZOR: žádné position:relative — přepsalo by .view { position:absolute; inset:0 }
+     a sekce by se smrskla na nulovou výšku (karta kotvená dolů pak ulétla nad obrazovku) */
   #vIdle { flex-direction: column; align-items: center; justify-content: center; gap: 4vh;
-           position: relative;
            background: radial-gradient(60% 50% at 50% 42%, rgba(46,208,235,.07), transparent 70%), var(--bg); }
   #idleLogo { position: absolute; top: 4vh; right: 3vw; height: 5.5vh; opacity: .96; }
   #vIdle .brand { font-size: 7vw; }
