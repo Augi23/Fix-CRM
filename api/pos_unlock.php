@@ -44,26 +44,38 @@ if ($password === '') {
     echo json_encode(['ok' => false, 'message' => 'Zadej heslo.']); exit;
 }
 
-$hash = null;
+// Dual-login: admin s navázaným technikem má v session OBOJÍ (user_id i tech_id)
+// a technický řádek nemusí mít vlastní heslo (např. auto-navázaný „Jan Augustin").
+// Ověřuje se proto proti VŠEM heslům té osoby, která existují — jinak by správné
+// admin heslo skončilo na prázdném tech hashi a redirect smyčce kasa→nástěnka.
+$hashes = [];
 try {
     if (!empty($_SESSION['tech_id'])) {
         $st = $pdo->prepare("SELECT password FROM technicians WHERE id = ? AND is_active = 1");
         $st->execute([(int)$_SESSION['tech_id']]);
-        $hash = $st->fetchColumn();
-    } else {
+        $h = (string)$st->fetchColumn();
+        if ($h !== '') { $hashes[] = $h; }
+    }
+    if (is_numeric($_SESSION['user_id'] ?? null)) {
         $st = $pdo->prepare("SELECT password FROM users WHERE id = ?");
         $st->execute([(int)$_SESSION['user_id']]);
-        $hash = $st->fetchColumn();
+        $h = (string)$st->fetchColumn();
+        if ($h !== '') { $hashes[] = $h; }
     }
 } catch (Throwable $e) {
     error_log('pos_unlock: ' . $e->getMessage());
 }
 
-if (!$hash) {   // účet mezitím zmizel/deaktivován → plné přihlášení
+if (!$hashes) {   // osoba nemá žádné použitelné heslo (účet zmizel/deaktivován) → plné přihlášení
     echo json_encode(['ok' => false, 'redirect' => 'login.php']); exit;
 }
 
-if (password_verify($password, (string)$hash)) {
+$passwordOk = false;
+foreach ($hashes as $h) {
+    if (password_verify($password, $h)) { $passwordOk = true; break; }
+}
+
+if ($passwordOk) {
     crmPosUnlockClearFails($accountKey);
     // Značka „člověk právě potvrdil heslem, že je to on" — vyžaduje ji převzetí
     // pokladny (api/pos_shift.php action=open), aby heslo nebylo jen ozdoba.

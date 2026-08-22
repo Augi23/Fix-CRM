@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.52.4',
+        'date' => '2026-08-22',
+        'time' => '20:05',
+        'title' => 'Kasa: oprava smyčky heslo → nástěnka u admin účtů',
+        'items' => [
+            '<b>Kasa zase pustí vedení:</b> admin s navázaným technickým účtem bez vlastního hesla (typicky majitel) zadal u převzetí/odemčení kasy správné heslo, ale server ho porovnával s prázdným heslem technického řádku a místo kasy ho poslal přes login zpět na nástěnku — pořád dokola. Heslo se teď ověřuje proti všem heslům dané osoby (technické i adminské), na login se posílá jen když žádné neexistuje.',
+        ],
+    ],
+    [
         'version' => '3.52.3',
         'date' => '2026-08-22',
         'time' => '19:20',
