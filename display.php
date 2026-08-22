@@ -69,7 +69,7 @@ if ($preview === '') {
      karta sedí NATVRDO v levém spodním rohu (absolutně — nezávisle na flexu) */
   #vIdle.adOn .brand, #vIdle.adOn #idleClaim { display: none; }
   #vIdle.adOn { gap: 0; }
-  #vIdle.adOn #adCard { position: absolute; left: 3vw; bottom: 5vh; margin: 0; max-width: 70vw; }
+  #vIdle.adOn #adCard { position: absolute; left: 3vw; bottom: 5vh; margin: 0; max-width: 46vw; }
   #adCard { display: none; align-items: center; gap: 2.5vw;
             background: var(--panel); border: 1px solid var(--line); border-radius: 28px;
             padding: 4vh 2.5vw; max-width: 56vw;
@@ -290,7 +290,8 @@ if ($preview === '') {
       adMan.textContent = p.manufacturer || '';
       adPrice.textContent = fmt(p.price);
       adCard.style.display = 'flex';
-      requestAnimationFrame(function () { adCard.classList.add('show'); });
+      void adCard.offsetWidth;   // reflow místo requestAnimationFrame — ten v okně
+      adCard.classList.add('show');   // na pozadí nejede a karta by zůstala neviditelná
     }, 600);
   }
   function loadProducts() {
