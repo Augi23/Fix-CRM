@@ -87,7 +87,7 @@ sleep 1
 echo "── Ověření můstku (nic se netiskne):"
 RESP=$(curl -s -X OPTIONS http://127.0.0.1:9101/print -o /dev/null -w "%{http_code}")
 if [ "$RESP" = "204" ]; then
-    echo "✅ Můstek 9101 běží. V CRM na TOMTO počítači otevři Pokladnu a klikni „Test účtenky"."
+    echo "✅ Můstek 9101 běží. V CRM na TOMTO počítači otevři Pokladnu a klikni na Test účtenky."
 else
     echo "❌ Můstek neodpovídá (HTTP $RESP). Diagnostika (pošli Claudovi):"
     sudo launchctl print system/cz.applefix.xprinter9101 2>&1 | head -15
