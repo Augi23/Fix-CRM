@@ -64,11 +64,11 @@ if ($preview === '') {
   #idleLogo { position: absolute; top: 4vh; right: 3vw; height: 5.5vh; opacity: .96; }
   #vIdle .brand { font-size: 7vw; }
   #idleClaim { color: var(--dim); font-size: 1.6vw; letter-spacing: .12em; text-transform: uppercase; }
-  /* běží-li reklama, velký textový nápis uprostřed zmizí — scéna patří produktu,
-     karta sedí přesně na středu obrazovky (vodorovně i výškově) */
+  /* běží-li reklama, velký textový nápis uprostřed zmizí — scéna patří produktu:
+     karta je vodorovně na středu a posazená DOLŮ (6vh od spodního okraje) */
   #vIdle.adOn .brand, #vIdle.adOn #idleClaim { display: none; }
   #vIdle.adOn { gap: 0; }
-  #vIdle.adOn #adCard { margin: auto; }
+  #vIdle.adOn #adCard { margin: auto auto 6vh auto; }
   #adCard { display: none; align-items: center; gap: 4vw;
             background: var(--panel); border: 1px solid var(--line); border-radius: 32px;
             padding: 6vh 5vw; max-width: 86vw; min-height: 56vh;
