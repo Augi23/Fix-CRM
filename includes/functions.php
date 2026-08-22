@@ -8066,3 +8066,94 @@ function afxPrintJobEnqueue(int $branchId, string $bytes): bool {
         return false;
     }
 }
+
+/* ── GLOBÁLNÍ ODHLÁŠENÍ (v3.52.3) ──────────────────────────────────────────
+   Appka z TestFlightu (WKWebView), Chrome i mobil mají ODDĚLENÉ cookies —
+   „odhlásit" v jednom z nich dřív nechalo ostatní sezení žít. Server proto
+   vede u účtu čítač generace přihlášení (auth_epoch_u<id> / auth_epoch_t<id>
+   v system_settings). Sezení si při loginu zapíše aktuální generaci a při
+   KAŽDÉM požadavku se porovná (volání na konci tohoto souboru) — odhlášení
+   generaci zvedne, čímž okamžitě umřou všechna sezení účtu všude. */
+
+/** Klíč účtu aktuálního sezení: 'u<id>' (users) nebo 't<id>' (technicians). */
+function afxAuthAccountKey(): string {
+    $u = (string)($_SESSION['user_id'] ?? '');
+    if ($u === '') return '';
+    return str_starts_with($u, 't') ? $u : 'u' . $u;
+}
+
+/** Aktuální generace přihlášení účtu (0 = nikdy globálně neodhlášen). */
+function afxAuthEpoch(string $accKey): int {
+    return $accKey === '' ? 0 : (int)get_setting('auth_epoch_' . $accKey, '0');
+}
+
+/** Generace přímým dotazem: NULL = čtení selhalo (guard pak NESMÍ odhlašovat).
+ *  get_setting chyby polyká a vrací default — přechodný výpadek DB by se tvářil
+ *  jako epocha 0 a odhlásil by každého, kdo se kdy globálně odhlásil. */
+function afxAuthEpochOrNull(string $accKey): ?int {
+    global $pdo;
+    if ($accKey === '' || !isset($pdo)) return null;
+    try {
+        $st = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ?");
+        $st->execute(['auth_epoch_' . $accKey]);
+        $v = $st->fetchColumn();
+        return $v === false ? 0 : (int)$v;   // řádek chybí = epocha 0 (legitimní)
+    } catch (Throwable $e) {
+        return null;   // dotaz selhal = nevíme → kontrola se přeskočí
+    }
+}
+
+/** Zneplatní VŠECHNA sezení účtu (atomický increment — souběžné odhlášení
+ *  se neztratí). U dual-loginu (admin s navázaným technikem) se odhlašují
+ *  OBA účty téže osoby — „všechna zařízení" má platit na člověka. */
+function afxAuthGlobalLogout(): void {
+    global $pdo;
+    $keys = [];
+    $acc = afxAuthAccountKey();
+    if ($acc !== '') { $keys[] = $acc; }
+    $u = (string)($_SESSION['user_id'] ?? '');
+    $techId = (int)($_SESSION['tech_id'] ?? 0);
+    if ($u !== '' && !str_starts_with($u, 't') && $techId > 0) {
+        $keys[] = 't' . $techId;   // admin → i jeho technický účet
+    } elseif (str_starts_with($u, 't')) {
+        // technik → i případný navázaný admin účet (users.technician_id)
+        try {
+            $st = $pdo->prepare("SELECT id FROM users WHERE technician_id = ? LIMIT 1");
+            $st->execute([(int)substr($u, 1)]);
+            $uid = (int)$st->fetchColumn();
+            if ($uid > 0) { $keys[] = 'u' . $uid; }
+        } catch (Throwable $e) {}
+    }
+    foreach (array_unique($keys) as $k) {
+        try {
+            $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, '1')
+                ON DUPLICATE KEY UPDATE setting_value = setting_value + 1")
+                ->execute(['auth_epoch_' . $k]);
+        } catch (Throwable $e) { error_log('afxAuthGlobalLogout: ' . $e->getMessage()); }
+    }
+}
+
+/** Stráž generace: sezení se starou generací se tiše zahodí (další kontrola
+ *  přihlášení na stránce/API pak korektně pošle na login / vrátí 401). */
+function afxAuthEpochGuard(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    if (empty($_SESSION['user_id']) || session_status() !== PHP_SESSION_ACTIVE) return;
+    try {
+        $dbEpoch = afxAuthEpochOrNull(afxAuthAccountKey());
+        if ($dbEpoch === null) return;   // DB zaškobrtla → NEodhlašovat
+        if ((int)($_SESSION['auth_epoch'] ?? 0) !== $dbEpoch) {
+            // NE session_destroy: zabil by session i pro login.php ve stejném
+            // requestu (regenerate_id by pak neměl s čím pracovat). Vyprázdnit
+            // + nové ID = přihlášení pryč, session dál použitelná pro login.
+            $_SESSION = [];
+            session_regenerate_id(true);
+            // config razí CSRF token PŘED guardem — bez nové ražby by zbytek
+            // requestu (login formulář, AJAX fallback) běžel bez tokenu
+            try { $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); } catch (Throwable $e) {}
+        }
+    } catch (Throwable $e) { /* výpadek DB nesmí odhlašovat */ }
+}
+// stráž běží při každém požadavku — functions.php inkluduje každá stránka i API
+afxAuthEpochGuard();

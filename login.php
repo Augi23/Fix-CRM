@@ -154,6 +154,7 @@ if (isset($_POST['login'])) {
                 $_SESSION['branch_id'] = $linkedTech && !empty($linkedTech['branch_id'])
                     ? (int)$linkedTech['branch_id']
                     : ((int)($user['branch_id'] ?? 0) ?: getDefaultBranchId());
+                $_SESSION['auth_epoch'] = afxAuthEpoch('u' . (int)$user['id']);   // generace pro globální odhlášení
                 invalidatePermissionsCache();
                 recordLoginAttempt($pdo, true);
                 crmAuditLog('auth.login', ['entity_type' => 'auth', 'summary' => 'Přihlášení do systému (administrátor)']);
@@ -196,6 +197,7 @@ if (isset($_POST['login'])) {
                 if ($_SESSION['role'] === 'technician') {
                     $_SESSION['internal_role'] = $tech['role'] ?? 'engineer';
                 }
+                $_SESSION['auth_epoch'] = afxAuthEpoch('t' . (int)$tech['id']);   // generace pro globální odhlášení
                 invalidatePermissionsCache();
                 recordLoginAttempt($pdo, true);
                 crmAuditLog('auth.login', ['entity_type' => 'auth', 'summary' => 'Přihlášení do systému']);

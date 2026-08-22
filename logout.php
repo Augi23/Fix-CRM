@@ -7,7 +7,13 @@ require_once __DIR__ . '/includes/functions.php';
 
 // Zaznamenat odhlášení, dokud je session ještě platná (aktéra bereme z ní).
 if (function_exists('crmAuditLog')) {
-    crmAuditLog('auth.logout', ['entity_type' => 'auth', 'summary' => 'Odhlášení ze systému']);
+    crmAuditLog('auth.logout', ['entity_type' => 'auth', 'summary' => 'Odhlášení ze systému (globálně — všechna zařízení)']);
+}
+
+// GLOBÁLNÍ odhlášení: zvednutím generace účtu umřou i sezení v ostatních
+// prohlížečích a v appce (oddělené cookies dřív nechávaly stará přihlášení žít).
+if (function_exists('afxAuthGlobalLogout')) {
+    afxAuthGlobalLogout();
 }
 
 $_SESSION = [];

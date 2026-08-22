@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.52.3',
+        'date' => '2026-08-22',
+        'time' => '19:20',
+        'title' => 'Odhlášení platí všude — appka, Chrome i mobil najednou',
+        'items' => [
+            '<b>Globální odhlášení:</b> appka z TestFlightu, Chrome a mobil mají oddělená přihlášení (každý vlastní cookies) — odhlášení v jednom dřív nechalo ostatní žít, což mátlo (Lukáš „odhlášen" v appce zůstal přihlášený v Chromu). Server teď vede u účtu generaci přihlášení: <b>„Odhlásit" zneplatní všechna sezení účtu všude</b> — při další akci v kterémkoli prohlížeči sezení skončí na přihlašovací obrazovce. Přihlášení zůstává per zařízení (bezpečnostně správně).',
+            'U dvojitých účtů (admin s navázaným technikem) se odhlašují <b>oba účty téže osoby</b>. Držení kasy (směna) se odhlášením dál NEruší — odpovědnost za hotovost končí až uzávěrkou nebo převzetím kolegou.',
+        ],
+    ],
+    [
         'version' => '3.52.2',
         'date' => '2026-08-22',
         'time' => '18:30',

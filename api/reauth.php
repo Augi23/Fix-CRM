@@ -61,6 +61,9 @@ try {
             'branch_id' => $linkedTech && !empty($linkedTech['branch_id'])
                 ? (int)$linkedTech['branch_id']
                 : ((int)($user['branch_id'] ?? 0) ?: getDefaultBranchId()),
+            // generace pro globální odhlášení — bez ní by guard obnovenou session
+            // hned zase zabil a reauth okno by se točilo donekonečna
+            'auth_epoch' => afxAuthEpoch('u' . (int)$user['id']),
         ];
         $ok = true;
     }
@@ -79,6 +82,7 @@ try {
                 'full_name' => $tech['name'],
                 'tech_id' => $tech['id'],
                 'branch_id' => $tech['branch_id'] ?? null,
+                'auth_epoch' => afxAuthEpoch('t' . (int)$tech['id']),
             ];
             if ($role === 'technician') { $sessionData['internal_role'] = $tech['role'] ?? 'engineer'; }
             $ok = true;
