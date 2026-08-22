@@ -70,15 +70,15 @@ if ($preview === '') {
   #vIdle.adOn .brand, #vIdle.adOn #idleClaim { display: none; }
   #vIdle.adOn { gap: 0; }
   #vIdle.adOn #adCard { position: absolute; left: 3vw; bottom: 5vh; margin: 0; max-width: 70vw; }
-  #adCard { display: none; align-items: center; gap: 4vw;
-            background: var(--panel); border: 1px solid var(--line); border-radius: 32px;
-            padding: 6vh 5vw; max-width: 86vw; min-height: 56vh;
+  #adCard { display: none; align-items: center; gap: 2.5vw;
+            background: var(--panel); border: 1px solid var(--line); border-radius: 28px;
+            padding: 4vh 2.5vw; max-width: 56vw;
             opacity: 0; transition: opacity .6s ease; }
   #adCard.show { opacity: 1; }
-  #adImg { height: 44vh; max-width: 38vw; object-fit: contain; border-radius: 20px; }
-  #adTitle { font-size: 3.4vw; font-weight: 800; line-height: 1.15; }
-  #adMan { color: var(--dim); font-size: 1.8vw; margin-top: .8vh; }
-  #adPrice { color: var(--cyan); font-size: 4.4vw; font-weight: 900; margin-top: 2.2vh; }
+  #adImg { height: 30vh; max-width: 24vw; object-fit: contain; border-radius: 18px; }
+  #adTitle { font-size: 2.2vw; font-weight: 800; line-height: 1.2; }
+  #adMan { color: var(--dim); font-size: 1.3vw; margin-top: .7vh; }
+  #adPrice { color: var(--cyan); font-size: 3.2vw; font-weight: 900; margin-top: 1.6vh; }
 
   /* ── FORMULÁŘ ── */
   #vForm { align-items: center; justify-content: center; }
