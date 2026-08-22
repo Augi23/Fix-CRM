@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.52.6',
+        'date' => '2026-08-22',
+        'time' => '21:40',
+        'title' => 'Zákaznický displej: oficiální logo, velká reklama, 10 novinek',
+        'items' => [
+            '<b>Reklama konečně rotuje:</b> kolotoč dřív bral jen kusy s vlastní nahranou fotkou — a protože fotky se dědí přes Fotky modelů, zbyla v něm jediná klávesnice. Teď se fotka bere <b>stejně jako na e-shopu</b> (studiová fotka modelu, jinak vlastní fotka kusu) a točí se <b>10 nejnověji přidaných produktů</b> skladem.',
+            '<b>Nový vzhled reklamy:</b> oficiální logo AppleFix je v pravém horním rohu a produkt dostal celou scénu — velká fotka i cena uprostřed obrazovky. Velký textový nápis zůstává, jen když zrovna není co promítat.',
+            '<b>Stav displeje už neklame:</b> po zaplacení se „účtenka" na serveru po 30 vteřinách sama překlopí na reklamu — indikátor v CRM tak ukazuje totéž, co skutečně běží na monitoru.',
+        ],
+    ],
+    [
         'version' => '3.52.5',
         'date' => '2026-08-22',
         'time' => '21:25',

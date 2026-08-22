@@ -62,8 +62,10 @@ if ($token !== '') {
         $payload = json_decode((string)($row['payload'] ?? ''), true);
         // Zatuchlý stav (čerstvě zapnutý monitor ráno): starší než 30 minut
         // nemá smysl přehrávat — místo včerejšího košíku rovnou reklama.
-        if ($mode !== 'idle' && !empty($row['updated_at'])
-            && strtotime((string)$row['updated_at']) < time() - 1800) {
+        // Účtenka expiruje po 30 s: displej se sám vrací k reklamě, server
+        // musí stav dorovnat, jinak indikátor v CRM tvrdí „účtenka" donekonečna.
+        $age = !empty($row['updated_at']) ? time() - strtotime((string)$row['updated_at']) : 0;
+        if (($mode !== 'idle' && $age > 1800) || ($mode === 'receipt' && $age > 30)) {
             $mode = 'idle'; $payload = null;
         }
         echo json_encode([
@@ -81,18 +83,33 @@ if ($token !== '') {
         if (function_exists('ensureProductsHideEshopColumn')) ensureProductsHideEshopColumn();
         if (function_exists('ensureProductsLoanColumns')) ensureProductsLoanColumns();
         try {
-            // stejná viditelnost jako e-shop feed: skladem, nezapůjčené, neskryté
-            $q = $pdo->query("SELECT title, manufacturer, price, image_url FROM products
+            // 10 NEJNOVĚJI přidaných (přání majitele) — fotka s dědičností jako
+            // e-shop: studiová fotka modelu má přednost, jinak vlastní fotka kusu.
+            // Dřívější filtr jen na image_url vyřadil skoro všechno (fotky se
+            // dědí přes model_photos) a kolotoč stál na jediném kusu.
+            $q = $pdo->query("SELECT title, manufacturer, price,
+                                     COALESCE(NULLIF(studio_image_url, ''), NULLIF(image_url, '')) AS img
+                              FROM products
                               WHERE stock_qty > 0 AND (hide_eshop IS NULL OR hide_eshop = 0)
                                 AND loan_at IS NULL
-                                AND image_url IS NOT NULL AND image_url <> ''
-                              ORDER BY updated_at DESC LIMIT 40");
-            $items = array_map(fn($p) => [
-                'title' => (string)$p['title'],
-                'manufacturer' => (string)($p['manufacturer'] ?? ''),
-                'price' => (float)$p['price'],
-                'image' => (string)$p['image_url'],
-            ], $q->fetchAll(PDO::FETCH_ASSOC));
+                                AND COALESCE(NULLIF(studio_image_url, ''), NULLIF(image_url, '')) IS NOT NULL
+                              ORDER BY added_at DESC, id DESC LIMIT 10");
+            $abs = static function (string $u): string {
+                $u = function_exists('productImageDisplayUrl') ? productImageDisplayUrl($u) : $u;
+                if ($u !== '' && str_starts_with($u, 'media/products/')) { $u = 'https://admin.applefix.cloud/' . ltrim($u, '/'); }
+                return $u;
+            };
+            $items = [];
+            foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $p) {
+                $img = $abs((string)$p['img']);
+                if ($img === '') continue;
+                $items[] = [
+                    'title' => (string)$p['title'],
+                    'manufacturer' => (string)($p['manufacturer'] ?? ''),
+                    'price' => (float)$p['price'],
+                    'image' => $img,
+                ];
+            }
         } catch (Throwable $e) { $items = []; }
         echo json_encode(['ok' => true, 'products' => $items], JSON_UNESCAPED_UNICODE);
         exit;
@@ -135,7 +152,7 @@ if ($branch <= 0) cdFail(400, 'no_branch');
 if ($method === 'POST' && !validateCsrfToken((string)($body['csrf_token'] ?? ''))) cdFail(403, 'csrf');
 
 if ($action === 'info') {
-    $sel = $pdo->prepare("SELECT token, state_id, mode, reply_id FROM customer_display WHERE branch_id = ?");
+    $sel = $pdo->prepare("SELECT token, state_id, mode, reply_id, updated_at FROM customer_display WHERE branch_id = ?");
     $sel->execute([$branch]);
     $row = $sel->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
@@ -151,10 +168,17 @@ if ($action === 'info') {
             if (!$row) cdFail(500, 'internal_error');
         }
     }
+    // indikátor musí ukazovat totéž co displej: účtenka po 30 s (a cokoli po
+    // 30 min) expiruje na reklamu — displej se k ní sám vrací
+    $infoMode = (string)$row['mode'];
+    $infoAge = !empty($row['updated_at']) ? time() - strtotime((string)$row['updated_at']) : 0;
+    if (($infoMode !== 'idle' && $infoAge > 1800) || ($infoMode === 'receipt' && $infoAge > 30)) {
+        $infoMode = 'idle';
+    }
     echo json_encode([
         'ok' => true,
         'url' => 'display.php?token=' . $row['token'],
-        'mode' => (string)$row['mode'],
+        'mode' => $infoMode,
         'state_id' => (int)$row['state_id'],
         'reply_id' => (int)$row['reply_id'],
     ], JSON_UNESCAPED_UNICODE);

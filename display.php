@@ -57,20 +57,24 @@ if ($preview === '') {
   .brand { font-weight: 900; font-style: italic; letter-spacing: -.02em; }
   .brand .fx { color: var(--cyan); }
 
-  /* ── IDLE: logo + reklama ── */
+  /* ── IDLE: oficiální logo v rohu + velká reklama na středu ── */
   #vIdle { flex-direction: column; align-items: center; justify-content: center; gap: 4vh;
+           position: relative;
            background: radial-gradient(60% 50% at 50% 42%, rgba(46,208,235,.07), transparent 70%), var(--bg); }
+  #idleLogo { position: absolute; top: 4vh; right: 3vw; height: 5.5vh; opacity: .96; }
   #vIdle .brand { font-size: 7vw; }
   #idleClaim { color: var(--dim); font-size: 1.6vw; letter-spacing: .12em; text-transform: uppercase; }
-  #adCard { display: none; align-items: center; gap: 3vw; margin-top: 2vh;
-            background: var(--panel); border: 1px solid var(--line); border-radius: 24px;
-            padding: 3vh 3vw; max-width: 72vw; min-height: 30vh;
+  /* běží-li reklama, velký textový nápis uprostřed zmizí — scéna patří produktu */
+  #vIdle.adOn .brand, #vIdle.adOn #idleClaim { display: none; }
+  #adCard { display: none; align-items: center; gap: 4vw;
+            background: var(--panel); border: 1px solid var(--line); border-radius: 32px;
+            padding: 6vh 5vw; max-width: 86vw; min-height: 56vh;
             opacity: 0; transition: opacity .6s ease; }
   #adCard.show { opacity: 1; }
-  #adImg { height: 26vh; max-width: 26vw; object-fit: contain; border-radius: 16px; }
-  #adTitle { font-size: 2.6vw; font-weight: 800; line-height: 1.15; }
-  #adMan { color: var(--dim); font-size: 1.4vw; margin-top: .6vh; }
-  #adPrice { color: var(--cyan); font-size: 3vw; font-weight: 900; margin-top: 1.6vh; }
+  #adImg { height: 44vh; max-width: 38vw; object-fit: contain; border-radius: 20px; }
+  #adTitle { font-size: 3.4vw; font-weight: 800; line-height: 1.15; }
+  #adMan { color: var(--dim); font-size: 1.8vw; margin-top: .8vh; }
+  #adPrice { color: var(--cyan); font-size: 4.4vw; font-weight: 900; margin-top: 2.2vh; }
 
   /* ── FORMULÁŘ ── */
   #vForm { align-items: center; justify-content: center; }
@@ -124,6 +128,7 @@ if ($preview === '') {
 <body>
 
 <section id="vIdle" class="view on">
+  <img id="idleLogo" src="assets/img/applefix-logo.png" alt="AppleFix">
   <div class="brand">APPLE<span class="fx">⌁</span>FIX</div>
   <div id="idleClaim">servis se vším všudy</div>
   <div id="adCard">
@@ -268,8 +273,13 @@ if ($preview === '') {
   /* ── reklamní kolotoč ── */
   var products = [], adIx = 0, adTimer = null;
   function nextAd() {
-    if (!products.length) { adCard.style.display = 'none'; return; }
+    if (!products.length) {
+      adCard.style.display = 'none';
+      document.getElementById('vIdle').classList.remove('adOn');
+      return;
+    }
     var p = products[adIx % products.length]; adIx++;
+    document.getElementById('vIdle').classList.add('adOn');
     adCard.classList.remove('show');
     setTimeout(function () {
       adImg.src = p.image; adTitle.textContent = p.title;
