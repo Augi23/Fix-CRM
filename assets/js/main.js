@@ -2391,7 +2391,7 @@ window.afxSignaturePad = function (opts) {
     /* ── „Klient vyplní na displeji" v nové zakázce ── */
     var askBtn = document.getElementById('cdAskClientBtn');
     if (!askBtn) return;
-    var watchTimer = null, replyAfter = 0;
+    var watchTimer = null, replyAfter = 0, formRequested = false;
 
     function stopWatch() { if (watchTimer) { clearInterval(watchTimer); watchTimer = null; } }
 
@@ -2408,6 +2408,7 @@ window.afxSignaturePad = function (opts) {
         }
         set('inline_first_name', rep.first_name); set('inline_last_name', rep.last_name);
         set('inline_phone', rep.phone); set('inline_email', rep.email); set('inline_address', rep.address);
+        formRequested = false;   // server formulář „spotřeboval" sám (mode → idle)
         askBtn.disabled = false;
         askBtn.classList.remove('btn-outline-info'); askBtn.classList.add('btn-success');
         askBtn.innerHTML = '<i class="fas fa-check me-1"></i>Údaje od klienta přijaty';
@@ -2455,6 +2456,7 @@ window.afxSignaturePad = function (opts) {
                 replyAfter = d.reply_id || 0;
                 push('client_form', null, function (ok) {
                     if (!ok) { askFailed('Displej nedostupný'); return; }
+                    formRequested = true;   // při stornu se musí displej uklidit
                     askBtn.innerHTML = '<i class="fas fa-hourglass-half me-1"></i>Klient vyplňuje…';
                     watch();
                 });
@@ -2462,10 +2464,15 @@ window.afxSignaturePad = function (opts) {
             .catch(function () { askFailed('Displej nedostupný'); });
     });
 
-    // zavření modalu zakázky = konec hlídání
+    // zavření/storno modalu zakázky = konec hlídání + ÚKLID DISPLEJE:
+    // bez push('idle') by na druhém monitoru navěky svítil formulář klienta
     var om = document.getElementById('newOrderModal');
     if (om) om.addEventListener('hidden.bs.modal', function () {
         stopWatch();
+        if (formRequested) {
+            formRequested = false;
+            push('idle', null, null);
+        }
         askBtn.disabled = false;
         askBtn.innerHTML = '<i class="fas fa-desktop me-1"></i>Klient vyplní na displeji';
     });
