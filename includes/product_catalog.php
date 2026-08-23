@@ -20,6 +20,20 @@ const AFX_GPU_CORES = ['3', '4', '5', '6', '8', '10', '14', '16', '18', '19', '2
 const AFX_GRADE_LABELS = ['Nový', 'Zánovní', 'A – jako nové', 'B – mírné stopy', 'C – viditelné opotřebení', 'D – silné opotřebení'];
 const AFX_PRODEJNY = [['Karlín', 'karlin'], ['Černá Růže', 'vaclavak']];
 const AFX_PROCESSOR_FAMILIES = ['AMD', 'Intel', 'M chip - ARM'];
+// Grafické karty pro běžné (ne-Apple) notebooky a PC — nejčastější kusy z bazaru.
+// Vlastní hodnoty se přes „✏️ Vlastní…" ukládají do product_catalog_custom a příště
+// jsou v nabídce (stejně jako vlastní výrobce/typ/model).
+const AFX_GPU_MODELS = [
+    'Intel HD Graphics (integrovaná)', 'Intel UHD Graphics (integrovaná)', 'Intel Iris Xe (integrovaná)', 'Intel Arc (integrovaná)',
+    'AMD Radeon Graphics (integrovaná)', 'AMD Radeon Vega (integrovaná)',
+    'NVIDIA GeForce MX150', 'NVIDIA GeForce MX250', 'NVIDIA GeForce MX350', 'NVIDIA GeForce MX450',
+    'NVIDIA GeForce GTX 1050', 'NVIDIA GeForce GTX 1050 Ti', 'NVIDIA GeForce GTX 1650', 'NVIDIA GeForce GTX 1660 Ti',
+    'NVIDIA GeForce RTX 2060', 'NVIDIA GeForce RTX 2070', 'NVIDIA GeForce RTX 2080',
+    'NVIDIA GeForce RTX 3050', 'NVIDIA GeForce RTX 3060', 'NVIDIA GeForce RTX 3070', 'NVIDIA GeForce RTX 3080',
+    'NVIDIA GeForce RTX 4050', 'NVIDIA GeForce RTX 4060', 'NVIDIA GeForce RTX 4070', 'NVIDIA GeForce RTX 4080', 'NVIDIA GeForce RTX 4090',
+    'NVIDIA GeForce RTX 5060', 'NVIDIA GeForce RTX 5070', 'NVIDIA GeForce RTX 5080', 'NVIDIA GeForce RTX 5090',
+    'AMD Radeon RX 5500M', 'AMD Radeon RX 6600M', 'AMD Radeon RX 6700M', 'AMD Radeon RX 7600S', 'AMD Radeon RX 7700S',
+];
 
 const AFX_PROCESSORS_AMD = [
     'AMD A4 / A6 / A8 / A10 (2010–2016)',
@@ -429,6 +443,21 @@ function afxProductHasProcessorFields(string $typeId, string $model = ''): bool 
     return false;
 }
 
+/** Kam patří pole jader/grafiky (přání 23.8.2026):
+ *  'apple' = Apple počítač (MacBook, iMac, Mac mini/Studio/Pro) → Jader CPU + Jader GPU,
+ *  'pc'    = běžný notebook/PC (ne-Apple)                       → Jader CPU + Grafická karta,
+ *  ''      = ostatní typy (telefon, tablet, hodinky, konzole…)  → žádné z těchto polí. */
+function afxProductCoreFieldsMode(array $t, string $model): string {
+    if (!empty($t['accessory'])) return '';
+    if (!afxProductHasProcessorFields((string)($t['id'] ?? ''), $model)) return '';
+    if (($t['manuf'] ?? '') === 'Apple') return 'apple';
+    $hay = mb_strtolower(trim((string)($t['id'] ?? '') . ' ' . $model));
+    foreach (['macbook', 'imac', 'mac mini', 'mac studio', 'mac pro'] as $needle) {
+        if (str_contains($hay, $needle)) return 'apple';
+    }
+    return 'pc';
+}
+
 function afxProcessorDisplay(string $family, string $model): string {
     $family = trim($family);
     $model = trim($model);
@@ -581,6 +610,13 @@ function afxProductAssemble(array $in): array {
     $ram = trim((string)($in['ram'] ?? ''));
     $cpu = trim((string)($in['cpu'] ?? ''));
     $gpu = trim((string)($in['gpu'] ?? ''));
+    $gpuModel = trim((string)($in['gpu_model'] ?? ''));
+    // Jádra/grafika jen tam, kam patří: Mac = Jader CPU+GPU, běžný notebook/PC =
+    // Jader CPU + Grafická karta, ostatní typy nic (přání 23.8.2026).
+    $coreMode = afxProductCoreFieldsMode($t, $model);
+    if ($coreMode === '') { $cpu = ''; $gpu = ''; $gpuModel = ''; }
+    elseif ($coreMode === 'apple') { $gpuModel = ''; }
+    else { $gpu = ''; }
     $processorFamily = trim((string)($in['processor_family'] ?? ''));
     if (!in_array($processorFamily, afxProductProcessorFamiliesForType($t), true) || !afxProductHasProcessorFields((string)$t['id'], $model)) {
         $processorFamily = '';
@@ -593,7 +629,7 @@ function afxProductAssemble(array $in): array {
     $rocnik = trim((string)($in['rocnik'] ?? ''));
     $generace = $t['gen'] ? trim((string)($in['generace'] ?? '')) : '';
     if (!empty($t['accessory'])) {
-        $cap = $ram = $cpu = $gpu = $processorFamily = $processorModel = $processorDisplay = $bat = $rocnik = $generace = '';
+        $cap = $ram = $cpu = $gpu = $gpuModel = $processorFamily = $processorModel = $processorDisplay = $bat = $rocnik = $generace = '';
     } else {
         $accessoryForModel = $accessoryProperty = $accessoryNote = '';
     }
@@ -644,6 +680,7 @@ function afxProductAssemble(array $in): array {
     if ($processorDisplay !== '') $sd[] = 'Procesor: ' . $processorDisplay;
     if ($cpu !== '') $sd[] = 'Jader CPU: ' . $cpu;
     if ($gpu !== '') $sd[] = 'Jader GPU: ' . $gpu;
+    if ($gpuModel !== '') $sd[] = 'Grafická karta: ' . $gpuModel;
     if ($ram !== '') $sd[] = 'RAM: ' . $ram;
     if ($cap !== '') $sd[] = 'Úložiště: ' . $cap;
     if ($accessoryForModel !== '') $sd[] = 'Pro model: ' . $accessoryForModel;
@@ -693,6 +730,7 @@ function afxProductAssemble(array $in): array {
         'PRODUKT_TYP' => (string)$t['id'],
         'CPU_JADRA' => $cpu,
         'GPU_JADRA' => $gpu,
+        '[PARAMETER "Grafická karta"]' => $gpuModel,
         'PROCESOR_TYP' => $processorFamily,
         'PROCESOR_MODEL' => $processorModel,
         '[PARAMETER "Ročník"]' => $rocnik,
@@ -714,6 +752,236 @@ function afxProductAssemble(array $in): array {
     ];
 }
 
+/* ── VLASTNÍ HODNOTY KATALOGU (přání 23.8.2026) ────────────────────────────
+   Co se jednou vyplní přes „✏️ Vlastní…" (výrobce, typ, model, barva, vlastnost,
+   model procesoru, grafická karta), uloží se do product_catalog_custom a od té
+   chvíle je to normální položka nabídky — příště se nemusí psát znovu.
+   Kontext drží, kam hodnota patří: typ → výrobce, model/barva → „výrobce|typ",
+   model procesoru → rodina. Duplicitám brání UNIQUE klíč (INSERT IGNORE). */
+
+function afxEnsureCatalogCustomTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS product_catalog_custom (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            kind VARCHAR(32) NOT NULL,
+            context VARCHAR(160) NOT NULL DEFAULT '',
+            value VARCHAR(190) NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_kind_ctx_val (kind, context, value)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_czech_ci");
+    } catch (Throwable $e) { error_log('afxEnsureCatalogCustomTable: ' . $e->getMessage()); }
+}
+
+/** Všechny vlastní hodnoty najednou: ['kind' => ['context' => [hodnoty…]]].
+ *  Při výpadku DB vrací [] — formulář pak jede jen s vestavěnými seznamy. */
+function afxCatalogCustomAll(): array {
+    global $pdo;
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $cache = [];
+    try {
+        afxEnsureCatalogCustomTable();
+        foreach ($pdo->query("SELECT kind, context, value FROM product_catalog_custom ORDER BY value") as $r) {
+            $cache[(string)$r['kind']][(string)$r['context']][] = (string)$r['value'];
+        }
+    } catch (Throwable $e) { error_log('afxCatalogCustomAll: ' . $e->getMessage()); }
+    return $cache;
+}
+
+/** Case-insensitive „hodnota už v seznamu je" — ať se vedle „Black" neregistruje
+ *  „black" (UNIQUE v DB je díky kolaci case-insensitive, PHP in_array není). */
+function afxCatalogListHas(array $list, string $value): bool {
+    $needle = mb_strtolower(trim($value));
+    foreach ($list as $item) {
+        if (mb_strtolower(trim((string)$item)) === $needle) return true;
+    }
+    return false;
+}
+
+function afxCatalogCustomAdd(string $kind, string $context, string $value): void {
+    global $pdo;
+    $value = trim($value);
+    $context = trim($context);
+    // nikdy neuložit placeholder „✏️ Vlastní…" ani nesmyslně dlouhý text
+    if ($value === '' || mb_strlen($value) > 190 || mb_strlen($context) > 160
+        || str_contains($value, 'Vlastní…') || str_contains($value, '✏️')) return;
+    try {
+        afxEnsureCatalogCustomTable();
+        $pdo->prepare("INSERT IGNORE INTO product_catalog_custom (kind, context, value) VALUES (?, ?, ?)")
+            ->execute([$kind, $context, $value]);
+    } catch (Throwable $e) { error_log('afxCatalogCustomAdd: ' . $e->getMessage()); }
+}
+
+/** Po ÚSPĚŠNÉM uložení produktu zapíše všechny použité vlastní hodnoty do nabídky.
+ *  Porovnává jen proti vestavěným seznamům — duplicity vůči dřívějším vlastním
+ *  hodnotám odchytí UNIQUE klíč. */
+function afxCatalogRegisterCustomValues(array $in, string $catalogMode): void {
+    $typ = trim((string)($in['typ'] ?? ''));
+    $color = trim((string)($in['color'] ?? ''));
+    if ($catalogMode === 'accessory') {
+        if ($typ !== '' && !afxCatalogListHas(array_column(afxProductAccessoryTypes(), 'id'), $typ)) {
+            afxCatalogCustomAdd('accessory_type', '', $typ);
+        }
+        $prop = trim((string)($in['accessory_property'] ?? ''));
+        if ($prop !== '' && !afxCatalogListHas(AFX_ACCESSORY_PROPERTIES, $prop)) {
+            afxCatalogCustomAdd('accessory_property', '', $prop);
+        }
+        if ($color !== '' && !afxCatalogListHas(AFX_ACCESSORY_COLORS, $color)) {
+            afxCatalogCustomAdd('accessory_color', '', $color);
+        }
+        return;
+    }
+    $manuf = trim((string)($in['manufacturer'] ?? ''));
+    $model = trim((string)($in['model'] ?? ''));
+    // Kanonizace: „apple"/„iphone" napsané ručně = vestavěné „Apple"/„iPhone".
+    // Bez ní by malá písmena obešla kontrolu vestavěných hodnot a model by se
+    // porovnával proti prázdnému generickému defu (a registroval zbytečně).
+    foreach (afxProductManufacturers() as $bm) {
+        if (mb_strtolower($bm) === mb_strtolower($manuf)) { $manuf = $bm; break; }
+    }
+    foreach (afxProductTypes() as $bt) {
+        if (mb_strtolower((string)$bt['id']) === mb_strtolower($typ)) { $typ = (string)$bt['id']; break; }
+    }
+    if ($manuf !== '' && !afxCatalogListHas(afxProductManufacturers(), $manuf)) {
+        afxCatalogCustomAdd('manufacturer', '', $manuf);
+    }
+    if ($typ !== '') {
+        $known = false;
+        foreach (afxProductTypes() as $t) {
+            if ($t['id'] === $typ && (($t['manuf'] ?? '') === $manuf || ($t['manuf'] ?? '') === '')) { $known = true; break; }
+        }
+        if (!$known) afxCatalogCustomAdd('type', $manuf, $typ);
+    }
+    $t = afxProductTypeById($typ, $manuf);
+    // Model/barva jen s úplným kontextem: bez typu by vznikl sirotčí řádek („Manuf|"),
+    // který merge navždy přeskočí. A „|" odděluje výrobce a typ — hodnota, která ho
+    // obsahuje, by kontext rozbila (prakticky nenastane, radši se přeskočí).
+    if ($typ !== '' && !str_contains($manuf, '|') && !str_contains($typ, '|')) {
+        if ($model !== '' && !afxCatalogListHas($t['models'] ?? [], $model)) {
+            afxCatalogCustomAdd('model', $manuf . '|' . $typ, $model);
+        }
+        if ($color !== '' && !afxCatalogListHas($t['colors'] ?? [], $color)) {
+            afxCatalogCustomAdd('color', $manuf . '|' . $typ, $color);
+        }
+    }
+    $fam = trim((string)($in['processor_family'] ?? ''));
+    $pm = trim((string)($in['processor_model'] ?? ''));
+    if ($fam !== '' && $pm !== '' && !afxCatalogListHas(afxProductProcessors()[$fam] ?? [], $pm)) {
+        afxCatalogCustomAdd('processor_model', $fam, $pm);
+    }
+    // Grafika jen v režimu 'pc' — mimo něj ji afxProductAssemble stejně zahodí,
+    // takže by se registrovalo něco, co se do produktu vůbec nezapsalo (ruční POST).
+    $gm = trim((string)($in['gpu_model'] ?? ''));
+    if ($gm !== '' && afxProductCoreFieldsMode($t, $model) === 'pc' && !afxCatalogListHas(AFX_GPU_MODELS, $gm)) {
+        afxCatalogCustomAdd('gpu_model', '', $gm);
+    }
+}
+
+/** Katalog pro formulář naskladnění = vestavěné seznamy + vlastní hodnoty z DB.
+ *  Vlastní typy dostávají syntetický def (custom:true) a vlastní modely/barvy se
+ *  slévají do defu svého typu; pro „výrobce|typ" bez defu se klonuje generický. */
+function afxProductCatalogMerged(): array {
+    $custom = afxCatalogCustomAll();
+
+    $manufacturers = afxProductManufacturers();
+    foreach (($custom['manufacturer'][''] ?? []) as $v) {
+        if (!afxCatalogListHas($manufacturers, $v)) $manufacturers[] = $v;
+    }
+
+    $types = afxProductTypes();
+    foreach (($custom['type'] ?? []) as $ctx => $vals) {
+        foreach ($vals as $v) {
+            $exists = false;
+            foreach ($types as $t) {
+                if ($t['id'] === $v && ($t['manuf'] ?? '') === $ctx) { $exists = true; break; }
+            }
+            if ($exists) continue;
+            $types[] = ['id' => $v, 'manuf' => $ctx, 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false,
+                'colors' => in_array($v, ['Notebook', 'Počítač'], true) ? AFX_COMPUTER_COLORS : AFX_ANDROID_COLORS,
+                'models' => [], 'custom' => true];
+        }
+    }
+    foreach (['model' => 'models', 'color' => 'colors'] as $kind => $field) {
+        foreach (($custom[$kind] ?? []) as $ctx => $vals) {
+            $parts = explode('|', $ctx, 2);
+            $m = $parts[0] ?? '';
+            $ty = trim($parts[1] ?? '');
+            if ($ty === '') continue;
+            $idx = null; $genericIdx = null;
+            foreach ($types as $i => $t) {
+                if ($t['id'] !== $ty) continue;
+                if (($t['manuf'] ?? '') === $m) { $idx = $i; break; }
+                if (($t['manuf'] ?? '') === '' && $genericIdx === null) $genericIdx = $i;
+            }
+            if ($idx === null && $m !== '' && $genericIdx !== null) {
+                $clone = $types[$genericIdx];
+                $clone['manuf'] = $m;
+                $clone['custom'] = true;
+                $types[] = $clone;
+                $idx = count($types) - 1;
+            } elseif ($idx === null && $genericIdx !== null) {
+                $idx = $genericIdx;
+            } elseif ($idx === null) {
+                $types[] = ['id' => $ty, 'manuf' => $m, 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false,
+                    'colors' => AFX_ANDROID_COLORS, 'models' => [], 'custom' => true];
+                $idx = count($types) - 1;
+            }
+            foreach ($vals as $v) {
+                if (!afxCatalogListHas($types[$idx][$field], $v)) $types[$idx][$field][] = $v;
+            }
+        }
+    }
+
+    $accessoryColors = AFX_ACCESSORY_COLORS;
+    foreach (($custom['accessory_color'][''] ?? []) as $v) {
+        if (!afxCatalogListHas($accessoryColors, $v)) $accessoryColors[] = $v;
+    }
+    $accessoryTypes = afxProductAccessoryTypes();
+    foreach ($accessoryTypes as &$at) { $at['colors'] = $accessoryColors; }
+    unset($at);
+    foreach (($custom['accessory_type'][''] ?? []) as $v) {
+        $exists = false;
+        foreach ($accessoryTypes as $t) {
+            if ($t['id'] === $v) { $exists = true; break; }
+        }
+        if (!$exists) {
+            $accessoryTypes[] = ['id' => $v, 'manuf' => '', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false,
+                'colors' => $accessoryColors, 'models' => [], 'accessory' => true, 'custom' => true];
+        }
+    }
+    $accessoryProperties = AFX_ACCESSORY_PROPERTIES;
+    foreach (($custom['accessory_property'][''] ?? []) as $v) {
+        if (!afxCatalogListHas($accessoryProperties, $v)) $accessoryProperties[] = $v;
+    }
+
+    $processors = afxProductProcessors();
+    foreach (($custom['processor_model'] ?? []) as $fam => $vals) {
+        if (!isset($processors[$fam])) continue;
+        foreach ($vals as $v) {
+            if (!afxCatalogListHas($processors[$fam], $v)) $processors[$fam][] = $v;
+        }
+    }
+
+    $gpuModels = AFX_GPU_MODELS;
+    foreach (($custom['gpu_model'][''] ?? []) as $v) {
+        if (!afxCatalogListHas($gpuModels, $v)) $gpuModels[] = $v;
+    }
+
+    return [
+        'manufacturers' => $manufacturers,
+        'types' => $types,
+        'accessoryTypes' => $accessoryTypes,
+        'accessoryColors' => $accessoryColors,
+        'accessoryProperties' => $accessoryProperties,
+        'processors' => $processors,
+        'gpuModels' => $gpuModels,
+    ];
+}
+
 /** Kanonická hlavička exportu skladu — pro export CSV. */
 function afxProductCsvHeader(): array {
     return ['[PRODUCT_CODE]', '[ACTIVE_YN]', '[TITLE]', '[MANUFACTURER]', '[CATEGORIES]', '[AVAILABILITY]',
@@ -721,6 +989,6 @@ function afxProductCsvHeader(): array {
         '[PARAMETER "Výrobce"]', '[PARAMETER "Typ zařízení"]', '[PARAMETER "Model"]', '[PARAMETER "Kapacita"]', '[PARAMETER "Pro model"]', '[PARAMETER "Vlastnost"]', '[PARAMETER "Vlastní text"]', '[PARAMETER "Barva"]', '[PARAMETER "Stav"]',
         '[PARAMETER "Baterie"]', '[STOCK_STOCK "karlin"]', '[STOCK_STOCK "vaclavak"]', '[PARAMETER "RAM"]',
         '[PARAMETER "Výrobce procesoru"]', '[PARAMETER "Procesor"]',
-        'PRIDANO', 'CPU_JADRA', 'GPU_JADRA', '[PARAMETER "Ročník"]', '[PARAMETER "Generace"]',
+        'PRIDANO', 'CPU_JADRA', 'GPU_JADRA', '[PARAMETER "Grafická karta"]', '[PARAMETER "Ročník"]', '[PARAMETER "Generace"]',
         'PCR_DATUM', 'PCR_VYSLEDEK', '[IMAGES]'];
 }

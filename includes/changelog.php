@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.53.0',
+        'date' => '2026-08-23',
+        'time' => '07:26',
+        'title' => 'Sklad: vlastní hodnoty si CRM pamatuje + pole jader a grafiky podle typu',
+        'items' => [
+            '<b>„Vlastní…" se pamatuje:</b> co jednou vyplníš přes „✏️ Vlastní…" (výrobce, typ zařízení, model, barva, vlastnost příslušenství, model procesoru, grafická karta), je od té chvíle běžnou položkou nabídky — příště už to nemusíš psát znovu. Platí to hned po uložení i pro další naskladňovaný kus bez obnovení stránky.',
+            '<b>Jádra jen kde dávají smysl:</b> pole „Jader CPU/GPU" se ukazují jen u Apple počítačů (MacBook, iMac, Mac mini/Studio/Pro). Běžný notebook nebo PC má jen „Jader CPU" a nový výběr <b>„Grafická karta"</b> s nejčastějšími kartami (Intel/AMD integrované, NVIDIA GTX/RTX, Radeon RX + vlastní). Telefony, tablety, hodinky a konzole tato pole nemají vůbec.',
+            'Grafická karta se propisuje do popisu produktu i na e-shop do tabulky Technické parametry.',
+        ],
+    ],
+    [
         'version' => '3.52.7',
         'date' => '2026-08-23',
         'time' => '00:25',

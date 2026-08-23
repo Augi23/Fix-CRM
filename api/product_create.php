@@ -110,6 +110,7 @@ if ($action === 'get') {
         'processor_model' => $rawProcessorModel,
         'cpu' => (string)($raw['CPU_JADRA'] ?? ''),
         'gpu' => (string)($raw['GPU_JADRA'] ?? ''),
+        'gpu_model' => (string)($raw['[PARAMETER "Grafická karta"]'] ?? ''),
         'rocnik' => (string)($raw['[PARAMETER "Ročník"]'] ?? ''),
         'generace' => (string)($raw['[PARAMETER "Generace"]'] ?? ''),
         'pcr_status' => (string)($p['pcr_status'] ?? ''),
@@ -143,6 +144,7 @@ $in = [
     'processor_model' => trim((string)($_POST['processor_model'] ?? '')),
     'cpu' => trim((string)($_POST['cpu'] ?? '')),
     'gpu' => trim((string)($_POST['gpu'] ?? '')),
+    'gpu_model' => trim((string)($_POST['gpu_model'] ?? '')),
     'rocnik' => trim((string)($_POST['rocnik'] ?? '')),
     'generace' => trim((string)($_POST['generace'] ?? '')),
     'sold' => !empty($_POST['sold']),
@@ -192,6 +194,7 @@ if ($catalogMode === 'accessory') {
     $in['processor_model'] = '';
     $in['cpu'] = '';
     $in['gpu'] = '';
+    $in['gpu_model'] = '';
     $in['rocnik'] = '';
     $in['generace'] = '';
 }
@@ -223,6 +226,9 @@ if (!afxProductHasProcessorFields($in['typ'], $in['model'])) {
     $in['processor_model'] = '';
 } elseif (mb_strlen($in['processor_model']) > 120) {
     echo json_encode(['success' => false, 'message' => 'Model procesoru je moc dlouhý. Zkrať ho prosím na max. 120 znaků.'], JSON_UNESCAPED_UNICODE); exit;
+}
+if (mb_strlen($in['gpu_model']) > 120) {
+    echo json_encode(['success' => false, 'message' => 'Název grafické karty je moc dlouhý. Zkrať ho prosím na max. 120 znaků.'], JSON_UNESCAPED_UNICODE); exit;
 }
 $priceNum = (float)str_replace(',', '.', str_replace(' ', '', $in['price']));
 if ($in['price'] === '' || !is_finite($priceNum) || $priceNum <= 0 || $priceNum > 10000000) {
@@ -401,6 +407,7 @@ try {
             && $in['processor_model'] === trim((string)($exRaw['PROCESOR_MODEL'] ?? $exRaw['[PARAMETER "Procesor"]'] ?? ''))
             && $in['cpu'] === trim((string)($exRaw['CPU_JADRA'] ?? ''))
             && $in['gpu'] === trim((string)($exRaw['GPU_JADRA'] ?? ''))
+            && $in['gpu_model'] === trim((string)($exRaw['[PARAMETER "Grafická karta"]'] ?? ''))
             && $in['rocnik'] === trim((string)($exRaw['[PARAMETER "Ročník"]'] ?? ''))
             && $in['generace'] === trim((string)($exRaw['[PARAMETER "Generace"]'] ?? ''));
 
@@ -518,6 +525,12 @@ try {
         $pdo->prepare("UPDATE products SET eshop_note = ? WHERE id = ?")
             ->execute([$in['eshop_note'] !== '' ? $in['eshop_note'] : null, $productId]);
     }
+
+    // Vlastní hodnoty (výrobce, typ, model, barva, vlastnost, procesor, grafika)
+    // → rovnou do katalogové nabídky, ať se příště nemusí psát přes „✏️ Vlastní…".
+    // Až PO úspěšném uložení — neúspěšný pokus nemá seznamy zanášet.
+    try { afxCatalogRegisterCustomValues($in, $catalogMode); }
+    catch (Throwable $e) { error_log('product_create custom catalog: ' . $e->getMessage()); }
 
     // možný duplikát: stejný název skladem pod AFX- kódem (kus dřív přidaný bez SN)
     $hint = '';

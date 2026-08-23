@@ -500,13 +500,20 @@ try {
                                 <select id="pcProcessorModel" class="form-select"></select>
                                 <input type="text" id="pcProcessorModelCustom" class="form-control mt-1" placeholder="vlastní procesor…" style="display:none;">
                             </div>
-                            <div class="col-md-3">
+                            <?php /* Jádra jen kde dávají smysl: Mac = CPU+GPU jádra, běžný
+                                     notebook/PC = CPU jádra + Grafická karta, ostatní nic. */ ?>
+                            <div class="col-md-3 pc-core-cpu">
                                 <label class="form-label small">Jader CPU</label>
                                 <select id="pcCpu" class="form-select"></select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-3 pc-core-gpu">
                                 <label class="form-label small">Jader GPU</label>
                                 <select id="pcGpu" class="form-select"></select>
+                            </div>
+                            <div class="col-md-6 pc-gpu-model" style="display:none;">
+                                <label class="form-label small">Grafická karta</label>
+                                <select id="pcGpuModel" class="form-select"></select>
+                                <input type="text" id="pcGpuModelCustom" class="form-control mt-1" placeholder="vlastní grafika…" style="display:none;">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small">Ročník</label>
@@ -719,14 +726,18 @@ $(document).on('click', '.product-label-btn', function () {
 <?php if ($canManage): ?>
 // ═══ Naskladnit produkt — port Mac appky ═══
 (function () {
+    <?php /* Seznamy = vestavěný katalog + vlastní hodnoty z product_catalog_custom
+             (co se jednou vyplní přes „✏️ Vlastní…", je příště v nabídce). */
+    $pcMerged = afxProductCatalogMerged(); ?>
     var CATALOG = <?php echo json_encode([
-        'manufacturers' => afxProductManufacturers(),
-        'types' => afxProductTypes(),
-        'accessoryTypes' => afxProductAccessoryTypes(),
-        'accessoryColors' => AFX_ACCESSORY_COLORS,
-        'accessoryProperties' => AFX_ACCESSORY_PROPERTIES,
+        'manufacturers' => $pcMerged['manufacturers'],
+        'types' => $pcMerged['types'],
+        'accessoryTypes' => $pcMerged['accessoryTypes'],
+        'accessoryColors' => $pcMerged['accessoryColors'],
+        'accessoryProperties' => $pcMerged['accessoryProperties'],
         'caps' => AFX_CAPS, 'rams' => AFX_RAMS, 'cpus' => AFX_CPU_CORES, 'gpus' => AFX_GPU_CORES,
-        'processors' => afxProductProcessors(),
+        'gpuModels' => $pcMerged['gpuModels'],
+        'processors' => $pcMerged['processors'],
         'grades' => AFX_GRADE_LABELS,
         'years' => array_map('strval', range(2026, 2010)),
         'gens' => array_map('strval', range(1, 11)),
@@ -745,7 +756,8 @@ $(document).on('click', '.product-label-btn', function () {
         $grade = el('pcGrade'), $stockKey = el('pcStockKey'), $bat = el('pcBattery'),
         $price = el('pcPrice'), $purchase = el('pcPurchasePrice'), $serial = el('pcSerial'), $ram = el('pcRam'),
         $processorFamily = el('pcProcessorFamily'), $processorModel = el('pcProcessorModel'), $processorModelC = el('pcProcessorModelCustom'),
-        $cpu = el('pcCpu'), $gpu = el('pcGpu'), $rocnik = el('pcRocnik'), $gen = el('pcGenerace'),
+        $cpu = el('pcCpu'), $gpu = el('pcGpu'), $gpuModel = el('pcGpuModel'), $gpuModelC = el('pcGpuModelCustom'),
+        $rocnik = el('pcRocnik'), $gen = el('pcGenerace'),
         $sold = el('pcSold'), $photo = el('pcPhoto'), $imageUrl = el('pcImageUrl'),
         $badge = el('pcPcrBadge'), $msg = el('pcMsg'), $hint = el('pcHint'), $editId = el('pcEditId');
 
@@ -765,8 +777,11 @@ $(document).on('click', '.product-label-btn', function () {
     function typeOptionsForManufacturer(manuf) {
         if (ACCESSORY_MODE) return CATALOG.accessoryTypes || [];
         var opts = CATALOG.types.filter(function (t) { return typeMatchesManufacturer(t, manuf); });
-        if (!opts.length || $manuf.value === CUSTOM) {
-            opts = CATALOG.types.filter(function (t) { return !(t.manuf || ''); });
+        // Vlastní výrobce může mít pár VLASTNÍCH typů (custom:true) — ty ale nesmí
+        // vytlačit obecnou nabídku (Telefon, Tablet…), proto se obecné typy PŘIPOJÍ,
+        // dokud výrobce nemá žádný vestavěný typ. Dedup níž nechá vyhrát specifický def.
+        if (!opts.some(function (t) { return !t.custom; }) || $manuf.value === CUSTOM) {
+            opts = opts.concat(CATALOG.types.filter(function (t) { return !(t.manuf || ''); }));
         }
         var seen = {};
         return opts.filter(function (t) {
@@ -815,6 +830,22 @@ $(document).on('click', '.product-label-btn', function () {
         var hay = (typVal() + ' ' + modelVal()).toLowerCase();
         return ['macbook', 'notebook', 'laptop', 'počítač', 'pocitac', 'computer', 'desktop', 'pc', 'imac', 'mac mini', 'mac studio', 'mac pro']
             .some(function (needle) { return hay.indexOf(needle) >= 0; });
+    }
+    function gpuModelVal() { return $gpuModel.value === CUSTOM ? $gpuModelC.value.trim() : $gpuModel.value.trim(); }
+    // JS zrcadlo afxProductCoreFieldsMode(): 'apple' = Jader CPU+GPU (Mac hardware),
+    // 'pc' = Jader CPU + Grafická karta (běžný notebook/PC), '' = nic (telefony…).
+    function coreFieldsMode() {
+        if (ACCESSORY_MODE || !typeHasProcessorFields()) return '';
+        if (typeDef().manuf === 'Apple') return 'apple';
+        var hay = (typVal() + ' ' + modelVal()).toLowerCase();
+        return ['macbook', 'imac', 'mac mini', 'mac studio', 'mac pro']
+            .some(function (needle) { return hay.indexOf(needle) >= 0; }) ? 'apple' : 'pc';
+    }
+    function syncCoreVisibility() {
+        var mode = coreFieldsMode();
+        document.querySelectorAll('.pc-core-cpu').forEach(function (n) { n.style.display = mode !== '' ? '' : 'none'; });
+        document.querySelectorAll('.pc-core-gpu').forEach(function (n) { n.style.display = mode === 'apple' ? '' : 'none'; });
+        document.querySelectorAll('.pc-gpu-model').forEach(function (n) { n.style.display = mode === 'pc' ? '' : 'none'; });
     }
     function processorFamiliesForType() {
         if (!typeHasProcessorFields()) return [];
@@ -903,6 +934,7 @@ $(document).on('click', '.product-label-btn', function () {
         document.querySelectorAll('.pc-processor').forEach(function (n) { n.style.display = show ? '' : 'none'; });
         if (!show) clearProcessor();
         document.querySelectorAll('.pc-processor-model').forEach(function (n) { n.style.display = (show && processorFamilyVal()) ? '' : 'none'; });
+        syncCoreVisibility();
     }
     function onProcessorFamily(clearModel) {
         var fam = processorFamilyVal();
@@ -934,8 +966,10 @@ $(document).on('click', '.product-label-btn', function () {
         var dm = displayModelVal(t, model);
         var titleModel = titleModelVal(t, dm);
         var cap = t.cap ? $cap.value : '';
-        // RAM/jádra bere každý typ; t.ram = jen „macový" formát názvu (X/Y SSD)
-        var ram = $ram.value, cpu = $cpu.value, gpu = $gpu.value;
+        // RAM bere každý typ; t.ram = jen „macový" formát názvu (X/Y SSD).
+        // Jádra jen dle režimu: Mac = CPU+GPU, PC = jen CPU, ostatní nic.
+        var coreMode = coreFieldsMode();
+        var ram = $ram.value, cpu = coreMode !== '' ? $cpu.value : '', gpu = coreMode === 'apple' ? $gpu.value : '';
         var mem = t.ram
             ? ((ram && cap) ? ram + '/' + cap + ' SSD' : (ram ? ram + ' RAM' : cap))
             : [ram ? ram + ' RAM' : '', cap].filter(Boolean).join(' ');
@@ -958,8 +992,10 @@ $(document).on('click', '.product-label-btn', function () {
         if ($bat.value) out.push('Kondice baterie: ' + $bat.value + ' %');
         var processor = processorDisplayVal();
         if (processor) out.push('Procesor: ' + processor);
-        if ($cpu.value) out.push('Jader CPU: ' + $cpu.value);
-        if ($gpu.value) out.push('Jader GPU: ' + $gpu.value);
+        var coreMode = coreFieldsMode();
+        if (coreMode !== '' && $cpu.value) out.push('Jader CPU: ' + $cpu.value);
+        if (coreMode === 'apple' && $gpu.value) out.push('Jader GPU: ' + $gpu.value);
+        if (coreMode === 'pc' && gpuModelVal()) out.push('Grafická karta: ' + gpuModelVal());
         if ($ram.value) out.push('RAM: ' + $ram.value);
         if (t.cap && $cap.value) out.push('Úložiště: ' + $cap.value);
         if (accessoryForModelVal()) out.push('Pro model: ' + accessoryForModelVal());
@@ -995,7 +1031,7 @@ $(document).on('click', '.product-label-btn', function () {
     }
 
     function syncCatalogModeLayout() {
-        var accessoryOnlyIds = ['pcCap', 'pcBattery', 'pcRam', 'pcCpu', 'pcGpu', 'pcRocnik'];
+        var accessoryOnlyIds = ['pcCap', 'pcBattery', 'pcRam', 'pcCpu', 'pcGpu', 'pcGpuModel', 'pcRocnik'];
         var heading = el('pcDeviceHeading'), icon = el('pcDeviceIcon'), typLabel = el('pcTypLabel');
         if (heading) heading.textContent = ACCESSORY_MODE ? 'Příslušenství' : 'Zařízení';
         if (typLabel) typLabel.textContent = ACCESSORY_MODE ? 'Typ příslušenství' : 'Typ zařízení';
@@ -1017,6 +1053,9 @@ $(document).on('click', '.product-label-btn', function () {
             $ram.value = '';
             $cpu.value = '';
             $gpu.value = '';
+            $gpuModel.value = '';
+            $gpuModelC.value = '';
+            $gpuModelC.style.display = 'none';
             $rocnik.value = '';
             $gen.value = '';
             $serial.value = '';
@@ -1032,6 +1071,8 @@ $(document).on('click', '.product-label-btn', function () {
             $accessoryPropertyC.style.display = 'none';
             $accessoryText.value = '';
         }
+        // režim jader/grafiky až PO přepnutí layoutu — smyčka výš boxy plošně odkryla
+        syncCoreVisibility();
     }
 
     // hodnota mimo výčet selectu se nesmí tiše zahodit (starší kusy: 3 TB, rok 2009…)
@@ -1130,6 +1171,7 @@ $(document).on('click', '.product-label-btn', function () {
     fillSelect($accessoryProperty, CATALOG.accessoryProperties || [], true, true);
     fillSelect($cpu, CATALOG.cpus, true, false);
     fillSelect($gpu, CATALOG.gpus, true, false);
+    fillSelect($gpuModel, CATALOG.gpuModels || [], true, true);
     fillSelect($rocnik, CATALOG.years, true, false);
     fillSelect($gen, CATALOG.gens, true, false);
     $grade.value = 'Nový';
@@ -1150,12 +1192,13 @@ $(document).on('click', '.product-label-btn', function () {
     $color.addEventListener('change', function () { $colorC.style.display = $color.value === CUSTOM ? '' : 'none'; refreshPreview(); });
     $processorFamily.addEventListener('change', function () { onProcessorFamily(true); });
     $processorModel.addEventListener('change', function () { $processorModelC.style.display = $processorModel.value === CUSTOM ? '' : 'none'; refreshPreview(); });
+    $gpuModel.addEventListener('change', function () { $gpuModelC.style.display = $gpuModel.value === CUSTOM ? '' : 'none'; refreshPreview(); });
     $accessoryProperty.addEventListener('change', function () { $accessoryPropertyC.style.display = $accessoryProperty.value === CUSTOM ? '' : 'none'; refreshPreview(); });
     [$manufC, $typC, $modelC].forEach(function (n) {
         n.addEventListener('input', function () { syncProcessorVisibility(); refreshPreview(); });
         n.addEventListener('change', function () { syncProcessorVisibility(); refreshPreview(); });
     });
-    [$manufC, $typC, $modelC, $accessoryForModel, $accessoryPropertyC, $accessoryText, $colorC, $cap, $grade, $bat, $ram, $processorModelC, $cpu, $gpu, $rocnik, $gen].forEach(function (n) {
+    [$manufC, $typC, $modelC, $accessoryForModel, $accessoryPropertyC, $accessoryText, $colorC, $cap, $grade, $bat, $ram, $processorModelC, $cpu, $gpu, $gpuModelC, $rocnik, $gen].forEach(function (n) {
         n.addEventListener('input', refreshPreview);
         n.addEventListener('change', refreshPreview);
     });
@@ -1380,6 +1423,104 @@ $(document).on('click', '.product-label-btn', function () {
     var qtyOriginal = '';                   // počet při otevření editace (optimistický zámek)
     var qtyBeforeSold = '1';                // počet před zaškrtnutím „Prodáno" (pro vrácení)
 
+    // ── Vlastní hodnoty po ÚSPĚŠNÉM uložení rovnou do nabídek ──
+    // Server je trvale zapsal do product_catalog_custom (další načtení stránky je má
+    // v CATALOG z DB); tohle je jen zrcadlo do běžící stránky, ať platí hned bez F5.
+    function listHasCI(list, v) {
+        v = String(v).toLowerCase();
+        return (list || []).some(function (x) { return String(x).toLowerCase() === v; });
+    }
+    // vrátí hodnotu tak, jak už v seznamu je („apple" → „Apple"), jinak beze změny
+    function canonicalCI(list, v) {
+        var lv = String(v).toLowerCase();
+        for (var i = 0; i < (list || []).length; i++) {
+            if (String(list[i]).toLowerCase() === lv) return list[i];
+        }
+        return v;
+    }
+    function typeDefRef(id, manuf) {
+        var lid = String(id).toLowerCase(), lm = String(manuf || '').toLowerCase();
+        var list = ACCESSORY_MODE ? (CATALOG.accessoryTypes || []) : CATALOG.types;
+        for (var i = 0; i < list.length; i++) {
+            if (String(list[i].id).toLowerCase() === lid && (ACCESSORY_MODE || String(list[i].manuf || '').toLowerCase() === lm)) return list[i];
+        }
+        return null;
+    }
+    function ensureTypeDefFor(id, manuf) {
+        var d = typeDefRef(id, manuf);
+        if (d) return d;
+        if (ACCESSORY_MODE) {
+            d = { id: id, manuf: '', k: '', cap: false, ram: false, gen: false, colors: (CATALOG.accessoryColors || []).slice(), models: [], accessory: true, custom: true };
+            CATALOG.accessoryTypes.push(d);
+            return d;
+        }
+        var generic = null;
+        for (var g = 0; g < CATALOG.types.length; g++) {
+            if (String(CATALOG.types[g].id).toLowerCase() === String(id).toLowerCase() && !(CATALOG.types[g].manuf || '')) { generic = CATALOG.types[g]; break; }
+        }
+        d = generic
+            ? Object.assign({}, generic, { manuf: manuf, custom: true, models: (generic.models || []).slice(), colors: (generic.colors || []).slice() })
+            : { id: id, manuf: manuf, k: '', cap: true, ram: false, gen: false, colors: [], models: [], custom: true };
+        CATALOG.types.push(d);
+        return d;
+    }
+    function absorbCustomValues() {
+        try {
+            var mv = ACCESSORY_MODE ? '' : manufacturerVal();
+            var tv = typVal();
+            if (!ACCESSORY_MODE && $manuf.value === CUSTOM && mv) {
+                if (!listHasCI(CATALOG.manufacturers, mv)) CATALOG.manufacturers.push(mv);
+                mv = canonicalCI(CATALOG.manufacturers, mv);   // „apple" → „Apple"
+                fillSelect($manuf, CATALOG.manufacturers, false, true);
+                $manuf.value = mv;
+                $manufC.value = '';
+                $manufC.style.display = 'none';
+            }
+            if ($typ.value === CUSTOM && tv) {
+                tv = ensureTypeDefFor(tv, mv).id;   // kanonická podoba („iphone" → „iPhone")
+                fillSelect($typ, typeOptionsForManufacturer(mv).map(function (t) { return t.id; }), false, true);
+                $typ.value = tv;
+                $typC.value = '';
+                $typC.style.display = 'none';
+            }
+            var mdl = modelVal(), col = colorVal();
+            if (!ACCESSORY_MODE && (($model.value === CUSTOM && mdl) || ($color.value === CUSTOM && col))) {
+                var def = ensureTypeDefFor(tv, mv);
+                if ($model.value === CUSTOM && mdl && !listHasCI(def.models, mdl)) def.models.push(mdl);
+                if ($color.value === CUSTOM && col && !listHasCI(def.colors, col)) def.colors.push(col);
+            }
+            if (ACCESSORY_MODE && $color.value === CUSTOM && col) {
+                if (!listHasCI(CATALOG.accessoryColors, col)) CATALOG.accessoryColors.push(col);
+                (CATALOG.accessoryTypes || []).forEach(function (t) {
+                    t.colors = t.colors || [];
+                    if (!listHasCI(t.colors, col)) t.colors.push(col);
+                });
+            }
+            var prop = accessoryPropertyVal();
+            if (ACCESSORY_MODE && $accessoryProperty.value === CUSTOM && prop) {
+                if (!listHasCI(CATALOG.accessoryProperties, prop)) CATALOG.accessoryProperties.push(prop);
+                fillSelect($accessoryProperty, CATALOG.accessoryProperties, true, true);
+                $accessoryProperty.value = canonicalCI(CATALOG.accessoryProperties, prop);
+                $accessoryPropertyC.value = '';
+                $accessoryPropertyC.style.display = 'none';
+            }
+            var fam = processorFamilyVal(), pm = processorModelVal();
+            if (fam && $processorModel.value === CUSTOM && pm && CATALOG.processors[fam] && !listHasCI(CATALOG.processors[fam], pm)) {
+                CATALOG.processors[fam].push(pm);
+            }
+            var gm = gpuModelVal();
+            // stejné hradlo jako v save() — mimo režim 'pc' server grafiku nedostal
+            // a neregistroval, lokální vstřebání by vyrobilo ducha do prvního F5
+            if (coreFieldsMode() === 'pc' && $gpuModel.value === CUSTOM && gm) {
+                if (!listHasCI(CATALOG.gpuModels, gm)) CATALOG.gpuModels.push(gm);
+                fillSelect($gpuModel, CATALOG.gpuModels, true, true);
+                $gpuModel.value = canonicalCI(CATALOG.gpuModels, gm);
+                $gpuModelC.value = '';
+                $gpuModelC.style.display = 'none';
+            }
+        } catch (e) { /* jen kosmetika běžící stránky — uložení už proběhlo */ }
+    }
+
     function save(printAfter, force) {
         // Prázdné pole „Počet kusů" by se odeslalo jako 0 → kus by se naskladnil rovnou
         // jako VYPRODANÝ: v regále leží, na kase ani e-shopu ho nikdo nenajde.
@@ -1428,8 +1569,14 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('ram', $ram.value);
         fd.append('processor_family', typeHasProcessorFields() ? processorFamilyVal() : '');
         fd.append('processor_model', typeHasProcessorFields() ? processorModelVal() : '');
+        // cpu/gpu se posílají VŽDY tak, jak jsou v polích — ořezává je autoritativně
+        // až server (afxProductAssemble podle režimu jader). Kdyby je ořezal už JS,
+        // kus z appky s historickými jádry v raw_csv by při pouhém doplnění nákupní
+        // ceny vypadal „změněný" a import-neutrální mikroúprava by se překlopila na
+        // plný přepis (jádra pryč z názvu + pos_sold_at = NULL). Náhled gatuje sám.
         fd.append('cpu', $cpu.value);
         fd.append('gpu', $gpu.value);
+        fd.append('gpu_model', coreFieldsMode() === 'pc' ? gpuModelVal() : '');
         fd.append('rocnik', $rocnik.value);
         fd.append('generace', typeDef().gen ? $gen.value : '');
         if ($sold.checked) fd.append('sold', '1');
@@ -1467,6 +1614,7 @@ $(document).on('click', '.product-label-btn', function () {
                     return;
                 }
                 savedSomething = true;
+                absorbCustomValues();   // PŘED resetem — čte hodnoty z polí „Vlastní…"
                 try { if (window.__clearProductDraft) window.__clearProductDraft(); } catch (e) {}   // úspěšně uloženo → koncept pryč
                 el('pcTodayCount').textContent = d.today_count;
                 $msg.textContent = ($editId.value ? 'Uloženo: ' : 'Naskladněno: ') + d.title;
@@ -1497,10 +1645,12 @@ $(document).on('click', '.product-label-btn', function () {
                 // vyčistit vše KROMĚ Typ / Stav / Prodejna — sériové naskladňování jako v appce
                 formGen++;
                 [$modelC, $accessoryForModel, $accessoryPropertyC, $accessoryText, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
+                onType();   // Model/Barva se přeplní z katalogu — včetně právě vstřebaných vlastních hodnot
                 $model.value = ''; $color.value = ''; $cap.value = '';
                 $accessoryProperty.value = ''; $accessoryPropertyC.style.display = 'none';
                 clearProcessor(); syncProcessorVisibility();
                 $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
+                $gpuModel.value = ''; $gpuModelC.value = ''; $gpuModelC.style.display = 'none';
                 $modelC.style.display = 'none'; $colorC.style.display = 'none';
                 $sold.checked = false;
         // Počet patří ke KONKRÉTNÍ položce — bez vynulování by další kus (klidně telefon)
@@ -1577,6 +1727,7 @@ $(document).on('click', '.product-label-btn', function () {
         $accessoryProperty.value = ''; $accessoryPropertyC.style.display = 'none';
         clearProcessor(); syncProcessorVisibility();
         $ram.value = ''; $cpu.value = ''; $gpu.value = ''; $rocnik.value = ''; $gen.value = '';
+        $gpuModel.value = ''; $gpuModelC.value = ''; $gpuModelC.style.display = 'none';
         $modelC.style.display = 'none'; $colorC.style.display = 'none';
         $sold.checked = false;
         el('pcHideEshop').checked = false;
@@ -1652,6 +1803,15 @@ $(document).on('click', '.product-label-btn', function () {
                 $serial.value = p.serial || '';
                 setSelectValue($ram, p.ram); setProcessorValues(p.processor_family || '', p.processor_model || '');
                 setSelectValue($cpu, p.cpu); setSelectValue($gpu, p.gpu);
+                if ((p.gpu_model || '') && (CATALOG.gpuModels || []).indexOf(p.gpu_model) < 0) {
+                    $gpuModel.value = CUSTOM;
+                    $gpuModelC.style.display = '';
+                    $gpuModelC.value = p.gpu_model;
+                } else {
+                    $gpuModel.value = p.gpu_model || '';
+                    $gpuModelC.value = '';
+                    $gpuModelC.style.display = 'none';
+                }
                 setSelectValue($rocnik, p.rocnik); setSelectValue($gen, p.generace);
                 $sold.checked = !!p.sold;
                 syncQtyWithSerial();   // AŽ TEĎ — funkce se řídí i stavem „Prodáno"
