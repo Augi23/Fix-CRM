@@ -466,7 +466,8 @@ try {
                                 <select id="pcAccessoryProperty" class="form-select"></select>
                                 <input type="text" id="pcAccessoryPropertyCustom" class="form-control mt-1" placeholder="vlastní vlastnost…" style="display:none;">
                             </div>
-                            <div class="col-md-3">
+                            <?php /* Úložiště/Baterie/RAM jen kde dávají smysl — řídí syncFieldVisibility() */ ?>
+                            <div class="col-md-3 pc-field-cap">
                                 <label class="form-label small">Úložiště</label>
                                 <select id="pcCap" class="form-select"></select>
                             </div>
@@ -479,15 +480,14 @@ try {
                                 <label class="form-label small">Stav</label>
                                 <select id="pcGrade" class="form-select"></select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-3 pc-field-battery">
                                 <label class="form-label small">Baterie</label>
                                 <div class="input-group">
                                     <input type="number" id="pcBattery" class="form-control" min="0" max="100">
                                     <span class="input-group-text">%</span>
                                 </div>
                             </div>
-                            <?php /* RAM/jádra mají i telefony, tablety, konzole → viditelné pro VŠECHNY typy (nepovinné) */ ?>
-                            <div class="col-md-3">
+                            <div class="col-md-3 pc-field-ram">
                                 <label class="form-label small">RAM</label>
                                 <select id="pcRam" class="form-select"></select>
                             </div>
@@ -846,6 +846,26 @@ $(document).on('click', '.product-label-btn', function () {
         document.querySelectorAll('.pc-core-cpu').forEach(function (n) { n.style.display = mode !== '' ? '' : 'none'; });
         document.querySelectorAll('.pc-core-gpu').forEach(function (n) { n.style.display = mode === 'apple' ? '' : 'none'; });
         document.querySelectorAll('.pc-gpu-model').forEach(function (n) { n.style.display = mode === 'pc' ? '' : 'none'; });
+        syncFieldVisibility();
+    }
+    // JS zrcadlo afxProductFieldRelevance(): Úložiště jen kde t.cap, Baterie jen
+    // u zařízení s baterií, RAM jen u telefonů/tabletů/počítačů/konzolí.
+    function fieldRelevance() {
+        if (ACCESSORY_MODE) return { cap: false, battery: false, ram: false };
+        var t = typeDef();
+        var id = String(t.id || '').toLowerCase();
+        var hay = (typVal() + ' ' + modelVal()).toLowerCase();
+        var desktop = id === 'pc' || ['imac', 'mac mini', 'mac studio', 'mac pro', 'počítač', 'pocitac', 'desktop']
+            .some(function (n) { return hay.indexOf(n) >= 0; });
+        var noBattery = desktop || id === 'apple tv' || id === 'homepod';
+        var noRam = ['apple watch', 'hodinky', 'airpods', 'sluchátka', 'apple tv', 'homepod'].indexOf(id) >= 0;
+        return { cap: !!t.cap, battery: !noBattery, ram: !noRam };
+    }
+    function syncFieldVisibility() {
+        var rel = fieldRelevance();
+        document.querySelectorAll('.pc-field-cap').forEach(function (n) { n.style.display = rel.cap ? '' : 'none'; });
+        document.querySelectorAll('.pc-field-battery').forEach(function (n) { n.style.display = rel.battery ? '' : 'none'; });
+        document.querySelectorAll('.pc-field-ram').forEach(function (n) { n.style.display = rel.ram ? '' : 'none'; });
     }
     function processorFamiliesForType() {
         if (!typeHasProcessorFields()) return [];
@@ -966,10 +986,11 @@ $(document).on('click', '.product-label-btn', function () {
         var dm = displayModelVal(t, model);
         var titleModel = titleModelVal(t, dm);
         var cap = t.cap ? $cap.value : '';
-        // RAM bere každý typ; t.ram = jen „macový" formát názvu (X/Y SSD).
-        // Jádra jen dle režimu: Mac = CPU+GPU, PC = jen CPU, ostatní nic.
+        // t.ram = jen „macový" formát názvu (X/Y SSD); RAM a jádra dle relevance typu
+        // (Mac = CPU+GPU, PC = jen CPU, hodinky/sluchátka bez RAM, ostatní nic).
         var coreMode = coreFieldsMode();
-        var ram = $ram.value, cpu = coreMode !== '' ? $cpu.value : '', gpu = coreMode === 'apple' ? $gpu.value : '';
+        var ram = fieldRelevance().ram ? $ram.value : '',
+            cpu = coreMode !== '' ? $cpu.value : '', gpu = coreMode === 'apple' ? $gpu.value : '';
         var mem = t.ram
             ? ((ram && cap) ? ram + '/' + cap + ' SSD' : (ram ? ram + ' RAM' : cap))
             : [ram ? ram + ' RAM' : '', cap].filter(Boolean).join(' ');
@@ -989,14 +1010,15 @@ $(document).on('click', '.product-label-btn', function () {
         var out = [];
         var gr = ($grade.value || '').split(' ')[0] || 'A';
         if (gr) out.push('Stav: ' + gr);
-        if ($bat.value) out.push('Kondice baterie: ' + $bat.value + ' %');
+        var rel = fieldRelevance();
+        if (rel.battery && $bat.value) out.push('Kondice baterie: ' + $bat.value + ' %');
         var processor = processorDisplayVal();
         if (processor) out.push('Procesor: ' + processor);
         var coreMode = coreFieldsMode();
         if (coreMode !== '' && $cpu.value) out.push('Jader CPU: ' + $cpu.value);
         if (coreMode === 'apple' && $gpu.value) out.push('Jader GPU: ' + $gpu.value);
         if (coreMode === 'pc' && gpuModelVal()) out.push('Grafická karta: ' + gpuModelVal());
-        if ($ram.value) out.push('RAM: ' + $ram.value);
+        if (rel.ram && $ram.value) out.push('RAM: ' + $ram.value);
         if (t.cap && $cap.value) out.push('Úložiště: ' + $cap.value);
         if (accessoryForModelVal()) out.push('Pro model: ' + accessoryForModelVal());
         if (accessoryPropertyVal()) out.push('Vlastnost: ' + accessoryPropertyVal());
@@ -1559,7 +1581,10 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('accessory_for_model', accessoryForModelVal());
         fd.append('accessory_property', accessoryPropertyVal());
         fd.append('accessory_note', accessoryTextVal());
-        fd.append('cap', typeDef().cap ? $cap.value : '');
+        // cap se posílá beze změny (stejně jako cpu/gpu/baterie/RAM) — ořez podle typu
+        // dělá autoritativně server; JS ořez by kus z appky posílal jako „změněný"
+        // a mikroúprava (doplnění nákupní ceny) by spadla do plného přepisu.
+        fd.append('cap', $cap.value);
         fd.append('color', colorVal());
         fd.append('grade', $grade.value);
         fd.append('battery', $bat.value);
@@ -1578,7 +1603,7 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('gpu', $gpu.value);
         fd.append('gpu_model', coreFieldsMode() === 'pc' ? gpuModelVal() : '');
         fd.append('rocnik', $rocnik.value);
-        fd.append('generace', typeDef().gen ? $gen.value : '');
+        fd.append('generace', $gen.value);   // ořez podle typu dělá server (viz cap výš)
         if ($sold.checked) fd.append('sold', '1');
         fd.append('stock_qty', String(qty));
         if (qtyOriginal !== '') { fd.append('stock_qty_orig', qtyOriginal); }

@@ -331,6 +331,10 @@ try {
         : date('Y-m-d H:i');
     $asm = afxProductAssemble($in + ['code' => $code, 'added' => $added,
         'pcr_status' => $pcr['status'], 'pcr_text' => $pcr['text']]);
+    // Kapacita do sloupce = hodnota PO ořezu v assemble (typ bez úložiště → NULL).
+    // Formulář posílá pole surová (viz past s mikroúpravou kusů z appky) — autorita
+    // ořezu je server, a sloupec se musí řídit stejným rozhodnutím jako title/raw_csv.
+    $capFinal = trim((string)($asm['assoc']['[PARAMETER "Kapacita"]'] ?? ''));
 
     $who = mb_substr(trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? '')), 0, 64);
     // POČET KUSŮ z formuláře (dřív natvrdo 1 = jeden kus na řádek). Příslušenství se
@@ -390,7 +394,11 @@ try {
             && $in['model'] === (string)($existing['model'] ?? '')
             && $in['cap'] === (string)($existing['capacity'] ?? '')
             && $in['color'] === (string)($existing['color'] ?? '')
-            && $in['grade'] === (string)($existing['grade'] ?? '')
+            // grade: sloupec u kusů z appky nese TOKEN („A"), formulář posílá celý
+            // label („A – jako nové") — porovnávají se první slova obou stran,
+            // jinak každý kus se stavem A–D padal do plného přepisu i při pouhém
+            // doplnění nákupní ceny (nález prověrky 23.8.)
+            && $asm['grade_token'] === trim(explode(' ', trim((string)($existing['grade'] ?? '')))[0])
             && $normBat($in['battery']) === $normBat($existing['battery'] ?? '')
             && (string)($asm['k'] ?: '') === (string)($existing['category_code'] ?? '')
             // prázdné image_url NENÍ změna: cizí (CSV) fotku modal neumí zobrazit
@@ -447,7 +455,7 @@ try {
                 raw_csv = ?, source = 'crm', created_by = COALESCE(created_by, ?), pos_sold_at = NULL, last_seen_at = NOW()
             WHERE id = ?" . $qtyGuardSql);
         $updParams = [$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
-                $asm['display_model'], $in['cap'] ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
+                $asm['display_model'], $capFinal ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
                 $asm['battery_csv'] ?: null, $priceNum, $purchaseNum, $stockQty, $prodBranch,
                 $in['stock_key'], $in['image_url'] ?: null,
                 $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],
@@ -489,7 +497,7 @@ try {
         for ($try = 0; $try < 3; $try++) {
             try {
                 $ins->execute([$code, $asm['title'], $asm['manuf'] ?: null, $asm['k'] ?: null,
-                    $asm['display_model'], $in['cap'] ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
+                    $asm['display_model'], $capFinal ?: null, $in['color'] ?: null, $asm['grade_token'] ?: null,
                     $asm['battery_csv'] ?: null, $priceNum, $purchaseNum, $stockQty, $prodBranch,
                     $in['stock_key'], $in['image_url'] ?: null,
                     $in['studio_image_url'] ?: null, $in['gallery_images'], $in['video_360_url'] ?: null, $in['has_360'],

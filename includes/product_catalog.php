@@ -320,7 +320,9 @@ function afxProductManufacturers(): array {
 function afxBrandProductTypes(string $manufacturer, string $k, array $typeIds, array $colors = AFX_ANDROID_COLORS): array {
     $out = [];
     foreach ($typeIds as $id) {
-        $out[] = ['id' => $id, 'manuf' => $manufacturer, 'k' => $k, 'cap' => true,
+        // hodinky a sluchátka se úložištěm neprodávají (stejně jako Apple Watch/AirPods)
+        $out[] = ['id' => $id, 'manuf' => $manufacturer, 'k' => $k,
+            'cap' => !in_array($id, ['Hodinky', 'Sluchátka'], true),
             'ram' => false, 'gen' => false,
             'colors' => in_array($id, ['Notebook', 'Počítač'], true) ? AFX_COMPUTER_COLORS : $colors,
             'models' => AFX_BRAND_MODELS[$manufacturer][$id] ?? []];
@@ -414,6 +416,10 @@ function afxProductTypes(): array {
             ['id' => 'Notebook', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_COMPUTER_COLORS, 'models' => []],
             ['id' => 'Počítač', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_COMPUTER_COLORS, 'models' => []],
             ['id' => 'Hodinky', 'manuf' => '', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
+            // generický def MUSÍ existovat i pro Sluchátka: bez něj by afxProductTypeById
+            // u vlastního výrobce vrátil PRVNÍ značkový def (Samsung, cap=false) a JS
+            // fallback {cap:true} by se rozešel se serverem (nález prověrky 23.8.)
+            ['id' => 'Sluchátka', 'manuf' => '', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'colors' => AFX_ANDROID_COLORS, 'models' => []],
             ['id' => 'Herní konzole', 'manuf' => '', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_COMPUTER_COLORS, 'models' => []],
         ]);
     }
@@ -441,6 +447,26 @@ function afxProductHasProcessorFields(string $typeId, string $model = ''): bool 
         if (str_contains($hay, $needle)) return true;
     }
     return false;
+}
+
+/** Která pole dávají u typu smysl (pokračování „polí podle typu", 23.8.2026):
+ *  battery = jen zařízení s baterií — stolní počítače (iMac, Mac mini/Studio/Pro,
+ *            Počítač/desktop) a síťové krabičky (Apple TV, HomePod) ji nemají;
+ *  ram     = telefony/tablety/počítače/konzole — hodinky, sluchátka ani TV krabičky
+ *            se podle RAM neprodávají.
+ *  Úložiště řídí stávající příznak $t['cap'] (Apple Watch, AirPods, HomePod,
+ *  Hodinky a Sluchátka ho nemají). Neznámé vlastní typy zůstávají povolné. */
+function afxProductFieldRelevance(array $t, string $model): array {
+    if (!empty($t['accessory'])) return ['battery' => false, 'ram' => false];
+    $id = mb_strtolower(trim((string)($t['id'] ?? '')));
+    $hay = mb_strtolower(trim((string)($t['id'] ?? '') . ' ' . $model));
+    $desktop = $id === 'pc';
+    foreach (['imac', 'mac mini', 'mac studio', 'mac pro', 'počítač', 'pocitac', 'desktop'] as $needle) {
+        if (str_contains($hay, $needle)) { $desktop = true; break; }
+    }
+    $noBattery = $desktop || in_array($id, ['apple tv', 'homepod'], true);
+    $noRam = in_array($id, ['apple watch', 'hodinky', 'airpods', 'sluchátka', 'apple tv', 'homepod'], true);
+    return ['battery' => !$noBattery, 'ram' => !$noRam];
 }
 
 /** Kam patří pole jader/grafiky (přání 23.8.2026):
@@ -626,6 +652,10 @@ function afxProductAssemble(array $in): array {
     $bat = trim((string)($in['battery'] ?? ''));
     $bat = rtrim(str_replace('%', '', $bat));   // ukládá se bez %, do CSV s " %"
     $bat = trim($bat);
+    // Baterie/RAM jen kde dávají smysl (stolní počítače baterii nemají, hodinky RAM…)
+    $fieldRel = afxProductFieldRelevance($t, $model);
+    if (!$fieldRel['battery']) { $bat = ''; }
+    if (!$fieldRel['ram']) { $ram = ''; }
     $rocnik = trim((string)($in['rocnik'] ?? ''));
     $generace = $t['gen'] ? trim((string)($in['generace'] ?? '')) : '';
     if (!empty($t['accessory'])) {

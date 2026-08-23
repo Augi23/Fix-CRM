@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.53.1',
+        'date' => '2026-08-23',
+        'time' => '10:27',
+        'title' => 'Sklad: Úložiště, Baterie a RAM jen kde dávají smysl',
+        'items' => [
+            'Pokračování „polí podle typu": <b>Úložiště</b> se už nenabízí u hodinek, sluchátek, AirPods a HomePodu; <b>Baterie</b> zmizela u stolních počítačů (iMac, Mac mini/Studio/Pro, PC) a u Apple TV/HomePodu; <b>RAM</b> zůstává jen telefonům, tabletům, počítačům a konzolím.',
+            'Server hodnoty pro nesmyslné kombinace sám ořeže (název, popis i sloupec kapacity) — u starých kusů se srovnají při nejbližší úpravě.',
+            'Oprava z prověrky: doplnění nákupní ceny u kusu z appky se stavem A–D už nezpůsobí plné přeskládání karty (porovnání stavu si pletlo token „A" s celým popiskem).',
+        ],
+    ],
+    [
         'version' => '3.53.0',
         'date' => '2026-08-23',
         'time' => '07:26',
