@@ -158,6 +158,7 @@ try {
             'branch_id'            => $branchId,
             'branch_label'         => $branchLabel,   // „Praha 8 - Karlín" / „Praha 1 - Černá Růže"
             'short_description'    => $shortDesc,
+            'eshop_note'           => trim((string)($p['eshop_note'] ?? '')) ?: null,
             'image'                => $img !== '' ? $img : null,
             'studio_image'         => $studio !== '' ? $studio : null,
             'studio_inherited'     => $studioInherited,   // true = zděděná z knihovny modelů (ne per-produkt)

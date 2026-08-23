@@ -8003,6 +8003,16 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
     }
 }
 
+/** Popis produktu pro e-shop (zobrazí se na detailu pod názvem) — v3.52.7. */
+function ensureProductsEshopNoteColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try { $pdo->exec("ALTER TABLE products ADD COLUMN eshop_note TEXT NULL DEFAULT NULL"); }
+    catch (Throwable $e) { /* už existuje */ }
+}
+
 /* ── TISKOVÁ FRONTA ÚČTENEK (v3.52.2) ──────────────────────────────────────
    Appka z TestFlightu (WKWebView) ani Safari nepustí HTTPS stránku na místní
    můstek 127.0.0.1:9101 (smíšený obsah). Kasa proto úlohu ULOŽÍ na server

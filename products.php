@@ -583,6 +583,10 @@ try {
                                     <input class="form-check-input" type="checkbox" id="pcHideEshop">
                                     <label class="form-check-label small" for="pcHideEshop">Nezobrazovat na e-shopu</label>
                                 </div>
+                                <div class="mt-2">
+                                    <label class="form-label small">Popis pro e-shop <span class="text-white-50">(zobrazí se u produktu pod názvem)</span></label>
+                                    <textarea id="pcEshopNote" class="form-control" rows="2" maxlength="2000" placeholder="Např. Kompletní původní balení, nová baterie, faktura s zárukou…"></textarea>
+                                </div>
                             </div>
 
                             <!-- ── 4) FOTKY A MÉDIA ── -->
@@ -1441,6 +1445,7 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('show_gallery', el('pcShowGallery').checked ? '1' : '0');
         fd.append('show_360', el('pcShow360').checked ? '1' : '0');
         fd.append('hide_eshop', el('pcHideEshop').checked ? '1' : '0');
+        fd.append('eshop_note', (el('pcEshopNote') ? el('pcEshopNote').value.trim() : ''));
         if (force) fd.append('force', '1');
         fetch('api/product_create.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
@@ -1575,6 +1580,7 @@ $(document).on('click', '.product-label-btn', function () {
         $modelC.style.display = 'none'; $colorC.style.display = 'none';
         $sold.checked = false;
         el('pcHideEshop').checked = false;
+        if (el('pcEshopNote')) { el('pcEshopNote').value = ''; }
         $photo.value = ''; $imageUrl.value = '';
         resetGalleryAll([], '', '');
         el('pcPreviewImgWrap').style.display = 'none';
@@ -1650,6 +1656,7 @@ $(document).on('click', '.product-label-btn', function () {
                 $sold.checked = !!p.sold;
                 syncQtyWithSerial();   // AŽ TEĎ — funkce se řídí i stavem „Prodáno"
                 el('pcHideEshop').checked = !!parseInt(p.hide_eshop || 0, 10);
+                if (el('pcEshopNote')) { el('pcEshopNote').value = p.eshop_note || ''; }
                 $stockKey.value = p.stock_key || DEFAULT_STOCK;
                 $imageUrl.value = p.image_url || '';
                 if (p.image_url) { el('pcPreviewImg').src = p.image_url; el('pcPreviewImgWrap').style.display = ''; }

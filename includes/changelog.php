@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.52.7',
+        'date' => '2026-08-23',
+        'time' => '00:25',
+        'title' => 'Produkty: vlastní popis pro e-shop',
+        'items' => [
+            '<b>Popis pro e-shop:</b> u produktu (naskladnění i editace) je nové pole „Popis pro e-shop" — co do něj napíšeš, zobrazí se na detailu produktu na applefix.click <b>pod názvem</b> (do 2 minut po uložení). Hodí se na doplňující info: kompletní balení, nová baterie, faktura, drobné kosmetické vady…',
+            '<b>Vlastní značka viditelněji:</b> ne-Apple značka (JVD, Samsung…) se na detailu produktu nově ukazuje i jako parametr „Značka". Připomínka: značku do názvu doplňuje CRM automaticky z pole Výrobce — do modelu ji psát nemusíš (jinak vznikne zdvojení jako „JVD HODINKY JVD").',
+        ],
+    ],
+    [
         'version' => '3.52.6',
         'date' => '2026-08-22',
         'time' => '21:40',

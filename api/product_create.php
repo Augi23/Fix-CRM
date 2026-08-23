@@ -92,6 +92,7 @@ if ($action === 'get') {
         'stock_qty' => (int)$p['stock_qty'],
         'stock_key' => (string)($p['stock_key'] ?? ''),
         'hide_eshop' => (int)($p['hide_eshop'] ?? 0),
+        'eshop_note' => (string)($p['eshop_note'] ?? ''),
         'image_url' => productImageDisplayUrl((string)($p['image_url'] ?? '')),   // jen naše úložiště — cizí URL z CSV nejde do <img>
         'studio_image_url' => productImageDisplayUrl((string)($p['studio_image_url'] ?? '')),
         'gallery_images'   => (string)($p['gallery_images'] ?? ''),   // JSON, UI si rozparsuje
@@ -149,6 +150,7 @@ $in = [
     'stock_qty_raw' => isset($_POST['stock_qty']) ? trim((string)$_POST['stock_qty']) : null,
     'stock_key' => in_array((string)($_POST['stock_key'] ?? ''), ['karlin', 'vaclavak'], true) ? (string)$_POST['stock_key'] : 'karlin',
     'hide_eshop' => ((string)($_POST['hide_eshop'] ?? '0') === '1') ? 1 : 0,
+    'eshop_note' => mb_substr(trim((string)($_POST['eshop_note'] ?? '')), 0, 2000),
     'image_url' => trim((string)($_POST['image_url'] ?? '')),
     // Galerie média (sekce v modalu): studiová fotka, klasické fotky (JSON pole URL), 360° video
     'studio_image_url' => trim((string)($_POST['studio_url'] ?? '')),
@@ -507,6 +509,14 @@ try {
                 . ($stockQty !== 1 ? ', ' . $stockQty . ' ks' : '') . ')'
                 . ($pcr['status'] === 'stolen' ? ' — POZOR: PČR hlásí ODCIZENÉ, přidáno po potvrzení' : ''),
         ]);
+    }
+
+    // Popis pro e-shop — schválně SAMOSTATNÝ UPDATE mimo hlavní INSERT/UPDATE:
+    // jejich parametrové seznamy jsou dlouhé a křehké (viz varování u update výš).
+    if (isset($_POST['eshop_note'])) {
+        ensureProductsEshopNoteColumn();
+        $pdo->prepare("UPDATE products SET eshop_note = ? WHERE id = ?")
+            ->execute([$in['eshop_note'] !== '' ? $in['eshop_note'] : null, $productId]);
     }
 
     // možný duplikát: stejný název skladem pod AFX- kódem (kus dřív přidaný bez SN)
