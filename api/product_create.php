@@ -39,11 +39,16 @@ if (!function_exists('afxEnsurePosGoodsTaxColumns')) {
                 ['pos_sale_items', 'grade', "ALTER TABLE pos_sale_items ADD COLUMN grade VARCHAR(16) NULL DEFAULT NULL"],
                 ['pos_sale_items', 'purchase_price', "ALTER TABLE pos_sale_items ADD COLUMN purchase_price DECIMAL(12,2) NULL DEFAULT NULL"],
                 ['products', 'purchase_price', "ALTER TABLE products ADD COLUMN purchase_price DECIMAL(12,2) NULL DEFAULT NULL"],
+                ['products', 'last_sold_at', "ALTER TABLE products ADD COLUMN last_sold_at DATETIME NULL DEFAULT NULL"],
             ];
             foreach ($add as [$table, $col, $ddl]) {
                 if (!$pdo->query("SHOW COLUMNS FROM `" . $table . "` LIKE '" . $col . "'")->fetch()) {
                     $pdo->exec($ddl);
                 }
+            }
+            $col = $pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'item_type'")->fetch(PDO::FETCH_ASSOC);
+            if ($col && (!str_contains((string)($col['Type'] ?? ''), "'vykup'") || !str_contains((string)($col['Type'] ?? ''), "'expense'"))) {
+                $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order','vykup','expense') NOT NULL");
             }
         } catch (Throwable $e) { error_log('afxEnsurePosGoodsTaxColumns: ' . $e->getMessage()); }
     }

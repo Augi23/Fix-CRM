@@ -699,11 +699,25 @@ function afxUcetniDataKasa(string $from, string $to, int $branchId): array {
                 SUM(s.total) AS celkem,
                 $usedExpr AS pouzite_doklady
          FROM pos_sales s
-         WHERE s.status = 'completed' AND s.created_at BETWEEN ? AND ?" . $bSql . "
+         WHERE s.status = 'completed' AND s.total >= 0 AND s.created_at BETWEEN ? AND ?" . $bSql . "
          GROUP BY DATE(s.created_at)
          ORDER BY den ASC",
         array_merge([$from . ' 00:00:00', $to . ' 23:59:59'], $bPar)
     );
+
+    // Výplatní doklady (výkup zařízení, výdaj z kasy — total < 0) NEJSOU tržba:
+    // záloha zaměstnanci nebo nákup drogerie by tržbu dne tiše snižovaly. Ze
+    // součtů se vyřazují a vykazují se poznámkou; v pokladní knize jsou jako Výdaje.
+    $vp = afxUcetniQuery(
+        "SELECT COUNT(*) c, COALESCE(SUM(-s.total), 0) s FROM pos_sales s
+         WHERE s.status = 'completed' AND s.total < 0 AND s.created_at BETWEEN ? AND ?" . $bSql,
+        array_merge([$from . ' 00:00:00', $to . ' 23:59:59'], $bPar)
+    );
+    if ((int)($vp[0]['c'] ?? 0) > 0) {
+        $out['pozn'][] = 'Výplatní doklady kasy (výkup zařízení / výdaj z kasy) v období: '
+            . (int)$vp[0]['c'] . ' ks v hodnotě ' . afxUcetniMoney((float)$vp[0]['s'])
+            . ' Kč. Nejsou započtené v tržbách — v pokladní knize jsou vedené jako výdaje.';
+    }
 
     foreach ($out['rows'] as $r) {
         $out['soucty']['hotovost'] += (float)$r['hotovost'];

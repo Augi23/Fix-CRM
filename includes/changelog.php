@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.54.0',
+        'date' => '2026-08-23',
+        'time' => '12:38',
+        'title' => 'Pokladna: výdaj z kasy (záporné položky volným textem)',
+        'items' => [
+            'Nové tlačítko <b>„Výdaj z kasy"</b> v Pokladně: napíšeš účel („záloha Khalil", „nákup drogerie") a částku — vznikne záporná položka a kasa ji vyplatí ze zásuvky. Víc výdajů najednou jde na jeden doklad.',
+            'Výdaj jde <b>vždy jen hotově</b> a <b>markuje se samostatně</b> — s prodejem zboží se nemíchá (netto doklad by zákazníkovi „slevil" o interní zálohu a storno by vracelo špatnou částku). Doklad se jmenuje „Doklad o výplatě" a výdaj nikdy nesnižuje základ DPH.',
+            'Pokladní kniha a uzávěrka: výplaty (výkup i výdaj) se nově počítají do <b>Výdajů</b> (dřív se schovávaly jako záporný příjem) a hlídá se u nich i hotovostní limit 270 000 Kč. Každý výdaj se zapisuje do auditu (kdo, kolik, na co). Storno vrací peníze do kasy jako dřív.',
+            'Sestava „Tržby z pokladny" pro účetní výplatní doklady vyřazuje z tržeb a vykazuje je poznámkou (záloha zaměstnanci není záporná tržba). Zákaznický displej interní výdaje neukazuje.',
+            'Z prověrky navíc: limit 10 000 Kč pro zjednodušený daňový doklad se nově měří z hodnoty plnění (ne z netto sníženého o výkup) a posun počátku pokladní knihy už nejde obejít obdobím, které obsahuje jen výplaty.',
+        ],
+    ],
+    [
         'version' => '3.53.1',
         'date' => '2026-08-23',
         'time' => '10:27',

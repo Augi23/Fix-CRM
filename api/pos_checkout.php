@@ -42,8 +42,8 @@ if (!function_exists('afxEnsurePosGoodsTaxColumns')) {
                 }
             }
             $col = $pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'item_type'")->fetch(PDO::FETCH_ASSOC);
-            if ($col && !str_contains((string)($col['Type'] ?? ''), "'vykup'")) {
-                $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order','vykup') NOT NULL");
+            if ($col && (!str_contains((string)($col['Type'] ?? ''), "'vykup'") || !str_contains((string)($col['Type'] ?? ''), "'expense'"))) {
+                $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order','vykup','expense') NOT NULL");
             }
         } catch (Throwable $e) { error_log('afxEnsurePosGoodsTaxColumns: ' . $e->getMessage()); }
     }
@@ -115,33 +115,41 @@ if (count($items) > 100) {
 }
 
 $cart = [];
+$expenseSeq = 0;
 foreach ($items as $it) {
     $type = (string)($it['type'] ?? '');
     $id = (int)($it['id'] ?? 0);
     $qty = (int)($it['qty'] ?? 0);
     $price = (float)($it['price'] ?? -1);
     $manualName = '';
-    if ($type === 'manual') {
+    if ($type === 'manual' || $type === 'expense') {
         $manualName = preg_replace('/\s+/u', ' ', trim((string)($it['name'] ?? ''))) ?? '';
         $id = 0;
     }
     // is_finite: JSON 1e999 se dekóduje na INF a prošel by testem < 0
     // 'vykup' = VÝPLATNÍ řádek (platíme MY zákazníkovi za vykoupený kus):
-    // jediný typ se ZÁPORNOU cenou; qty vždy 1, id = výkupní list (crm_documents).
+    // qty vždy 1, id = výkupní list (crm_documents). 'expense' = VÝDAJ Z KASY
+    // (záloha zaměstnanci, drobný nákup…): volný název jako 'manual', ale cena
+    // PŘÍSNĚ záporná (0 by „označkovala" výdaj, který se nestal) a qty vždy 1.
     $priceOk = $type === 'vykup'
         ? (is_finite($price) && $price <= 0 && $price >= -1000000)
-        : (is_finite($price) && $price >= 0 && $price <= 1000000);
-    if (!in_array($type, ['part', 'product', 'manual', 'order', 'vykup'], true) || ($type !== 'manual' && $id <= 0)
-        || ($type === 'manual' && ($manualName === '' || mb_strlen($manualName) > 255))
-        || (in_array($type, ['order', 'vykup'], true) && $qty !== 1)
-        || (!in_array($type, ['order', 'vykup'], true) && ($qty < 1 || $qty > 999))
+        : ($type === 'expense'
+            ? (is_finite($price) && $price <= -0.01 && $price >= -1000000)
+            : (is_finite($price) && $price >= 0 && $price <= 1000000));
+    if (!in_array($type, ['part', 'product', 'manual', 'order', 'vykup', 'expense'], true)
+        || (!in_array($type, ['manual', 'expense'], true) && $id <= 0)
+        || (in_array($type, ['manual', 'expense'], true) && ($manualName === '' || mb_strlen($manualName) > 255))
+        || (in_array($type, ['order', 'vykup', 'expense'], true) && $qty !== 1)
+        || (!in_array($type, ['order', 'vykup', 'expense'], true) && ($qty < 1 || $qty > 999))
         || !$priceOk) {
         echo json_encode(['success' => false, 'message' => 'Neplatná položka v košíku.']); exit;
     }
     $price = round($price, 2);   // stejné zaokrouhlení v total i v položkách — doklad musí sedět sám se sebou
     $key = $type === 'manual'
         ? 'manual:' . mb_strtolower($manualName) . ':' . number_format($price, 2, '.', '')
-        : $type . ':' . $id;
+        : ($type === 'expense'
+            ? 'expense:' . (++$expenseSeq)   // výdaje se NIKDY neslučují (qty musí zůstat 1)
+            : $type . ':' . $id);
     if (isset($cart[$key])) {   // duplicitní řádek → sloučit (guard skladu musí vidět celkové množství)
         $cart[$key]['qty'] += $qty;
         if ($cart[$key]['qty'] > 999) {
@@ -149,7 +157,7 @@ foreach ($items as $it) {
         }
     } else {
         $cart[$key] = ['type' => $type, 'id' => $id, 'qty' => $qty, 'price' => $price];
-        if ($type === 'manual') { $cart[$key]['manual_name'] = $manualName; }
+        if ($type === 'manual' || $type === 'expense') { $cart[$key]['manual_name'] = $manualName; }
     }
 }
 $cart = array_values($cart);
@@ -173,6 +181,19 @@ if ($orderLines && $isInvoicePay && $customerId <= 0) {
 $vykupLines = array_values(array_filter($cart, static fn(array $l): bool => $l['type'] === 'vykup'));
 if ($vykupLines && $isInvoicePay) {
     echo json_encode(['success' => false, 'message' => 'Výplata výkupu nejde na fakturu — hotově (u protiúčtu s doplatkem zákazníka jde i karta).']); exit;
+}
+// Výdaj z kasy = peníze fyzicky opouštějí zásuvku → VÝHRADNĚ hotově. Karta ani
+// faktura nedávají smysl (nákup drogerie kartou do kasy nepatří) a smíchání
+// s kartovým prodejem by rozhodilo pokladní knihu.
+$expenseLines = array_values(array_filter($cart, static fn(array $l): bool => $l['type'] === 'expense'));
+if ($expenseLines && $payment !== 'cash') {
+    echo json_encode(['success' => false, 'message' => 'Výdaj z kasy (záporná položka) jde jen hotově — peníze se berou ze zásuvky.']); exit;
+}
+// Výdaj se NESMÍ míchat s prodejem zboží (nález prověrky): netto doklad by
+// zákazníkovi „slevil" o zálohu pro zaměstnance a storno by tiše vracelo
+// špatnou částku. Víc výdajů najednou je v pořádku (jeden výplatní doklad).
+if ($expenseLines && count($expenseLines) !== count($cart)) {
+    echo json_encode(['success' => false, 'message' => 'Výdaj z kasy markuj samostatně — do jednoho dokladu nemíchej výdaj a prodej zboží.']); exit;
 }
 
 if ($isInvoicePay) {
@@ -330,7 +351,8 @@ try {
             $cart[$i]['grade'] = null;
             $cart[$i]['purchase_price'] = null;
         } else {
-            // Ruční položka mimo sklad: neváže se na inventory/products a nijak nehýbe skladem.
+            // Ruční položka mimo sklad ('manual') i výdaj z kasy ('expense'):
+            // neváže se na inventory/products a nijak nehýbe skladem.
             $cart[$i]['name'] = (string)$line['manual_name'];
             $cart[$i]['code'] = '';
             $cart[$i]['used'] = false;
@@ -532,6 +554,16 @@ foreach ($cart as $line) {
     ]);
     try { crmSyncVykupCashMovement((int)$line['id']); }
     catch (Throwable $e) { error_log('pos_checkout vykup sync: ' . $e->getMessage()); }
+}
+// výdaje z kasy: každý zvlášť do auditu — u peněz ze zásuvky musí být dohledatelné
+// kdo, kdy, kolik a na co (záloha zaměstnanci, drobný nákup…)
+foreach ($cart as $line) {
+    if ($line['type'] !== 'expense') { continue; }
+    crmAuditLog('kasa.expense', [
+        'entity_type' => 'pos_sale', 'entity_id' => $saleId, 'entity_label' => $saleNumber,
+        'summary' => 'Výdaj z kasy: ' . $line['name'] . ' — ' . formatMoney(abs((float)$line['price'])) . ' (doklad ' . $saleNumber . ')',
+        'branch_id' => $branchId,
+    ]);
 }
 $payLabel = ['cash' => 'hotově', 'card' => 'kartou', 'invoice' => 'na fakturu (s.r.o.)', 'invoice_ico' => 'na fakturu (IČO)'][$payment];
 crmAuditLog('kasa.sale', [

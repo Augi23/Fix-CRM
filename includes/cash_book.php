@@ -180,7 +180,10 @@ function afxCashSetOpeningBalance(int $branchId, float $balance, string $opening
     $curOpen = (string)($reg['opening_date'] ?? '');
     if ((int)($reg['id'] ?? 0) > 0 && $curOpen !== '' && $openingDate < $curOpen) {
         $s = afxCashSums($branchId, $openingDate, date('Y-m-d', strtotime($curOpen . ' -1 day')));
-        if ($s['in'] > 0 || $s['out'] > 0) {
+        // abs(): záporné prodejky (výplata výkupu/výdaj) drží afxCashSums v 'in'
+        // se záporným znaménkem — období jen s výplatami by jinak prošlo jako
+        // „prázdné" a výdaje by se do zůstatku započetly dvakrát
+        if (abs($s['in']) > 0.004 || abs($s['out']) > 0.004) {
             return ['ok' => false, 'error' => 'Mezi ' . date('j. n. Y', strtotime($openingDate))
                 . ' a dosavadním počátkem pokladny (' . date('j. n. Y', strtotime($curOpen)) . ') už existují pohyby'
                 . ' (příjmy ' . formatMoney($s['in']) . ', výdaje ' . formatMoney($s['out']) . ') — započítaly by se dvakrát.'
@@ -589,12 +592,19 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
         $st->execute([$from, $to]);
         foreach ($st as $r) {
             $cancelled = (string)$r['status'] === 'cancelled';
+            // Záporná prodejka = výplata (výkup, výdaj z kasy): v knize je to VÝDAJOVÝ
+            // řádek s kladnou částkou. Dřívější „příjem se zápornou částkou" dával
+            // stejný zůstatek, ale rozbíjel součty Příjmy/Výdaje na uzávěrce a
+            // kontrolu limitu 270 000 Kč (záporná částka nikdy nepřekročí limit).
+            $isPayout = (float)$r['total'] < 0;
             $rows[] = [
                 'sort' => (string)$r['created_at'], 'date' => date('Y-m-d', strtotime((string)$r['created_at'])),
                 'time' => date('H:i', strtotime((string)$r['created_at'])),
-                'dir' => 'in', 'amount' => (float)$r['total'],
-                'title' => (int)($r['order_id'] ?? 0) > 0 ? 'Úhrada zakázky' : 'Prodej na kase',
-                'detail' => (string)$r['sale_number'] . ($cancelled ? ' · stornováno (výdej v den storna)' : ''),
+                'dir' => $isPayout ? 'out' : 'in',
+                'amount' => $isPayout ? abs((float)$r['total']) : (float)$r['total'],
+                'title' => $isPayout ? 'Výplata z kasy (prodejka)'
+                    : ((int)($r['order_id'] ?? 0) > 0 ? 'Úhrada zakázky' : 'Prodej na kase'),
+                'detail' => (string)$r['sale_number'] . ($cancelled ? ' · stornováno (' . ($isPayout ? 'vratka' : 'výdej') . ' v den storna)' : ''),
                 'source' => 'pos_sale', 'ref_id' => (int)$r['id'],
                 'by' => (string)$r['seller_name'], 'doc_number' => '', 'doc_id' => 0,
                 'storno' => false, 'is_storno' => false, 'doc_storno' => false,

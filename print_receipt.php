@@ -117,6 +117,9 @@ $isVat = (int)($sale['is_vat_payer'] ?? 0) === 1;
 $vatRate = (float)($sale['vat_rate'] ?? 0);
 $stdTotal = 0.0; $usedTotal = 0.0;
 foreach ($items as $l) {
+    // výplatní řádky (výkup, výdaj z kasy) nejsou zdanitelné plnění — záporná
+    // částka by v rekapitulaci tiše snižovala základ daně z běžného prodeje
+    if (in_array((string)($l['item_type'] ?? ''), ['vykup', 'expense'], true)) { continue; }
     $line = (float)$l['unit_price'] * (int)$l['quantity'];
     // stejné pravidlo věrohodnosti jako u štítku na řádku — rekapitulace § 90
     // musí sedět s tím, co je na dokladu vyznačené

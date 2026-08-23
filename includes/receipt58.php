@@ -144,11 +144,21 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
         return $saleAfterCut;
     };
 
-    $rows = []; $stdTotal = 0.0; $usedTotal = 0.0; $warrantyItems = [];
+    $rows = []; $stdTotal = 0.0; $usedTotal = 0.0; $warrantyItems = []; $hasExpense = false; $hasVykup = false;
     foreach ($items as $l) {
         $line = (float)$l['unit_price'] * (int)$l['quantity'];
-        $used = $lineIsUsed($l);
-        if ($used) { $usedTotal += $line; } else { $stdTotal += $line; }
+        $itemType = (string)($l['item_type'] ?? '');
+        // Výplatní řádky (výkup, výdaj z kasy) NEJSOU zdanitelné plnění — do
+        // rekapitulace DPH nepatří (záporná částka by tiše snižovala základ
+        // daně z běžného prodeje) a záruční věty se jich netýkají.
+        $isPayoutLine = in_array($itemType, ['vykup', 'expense'], true);
+        if ($itemType === 'expense') { $hasExpense = true; }
+        if ($itemType === 'vykup') { $hasVykup = true; }
+        $used = !$isPayoutLine && $lineIsUsed($l);
+        if (!$isPayoutLine) {
+            if ($used) { $usedTotal += $line; } else { $stdTotal += $line; }
+            $warrantyItems[] = ['used' => $used, 'service' => !empty($l['is_service']) || $itemType === 'order'];
+        }
         $rows[] = [
             'name' => (string)$l['item_name'],
             'code' => (string)($l['item_code'] ?? ''),
@@ -158,7 +168,6 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
             'used' => $used,
             'par90' => $used && $isVat,
         ];
-        $warrantyItems[] = ['used' => $used, 'service' => !empty($l['is_service']) || (string)($l['item_type'] ?? '') === 'order'];
     }
     $total = (float)($sale['total'] ?? 0);
 
@@ -168,15 +177,21 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
     $hasUsed = $usedTotal > 0 && $isVat;
 
     $isInvoicePay = in_array((string)($sale['payment_method'] ?? ''), ['invoice', 'invoice_ico'], true);
-    if (!$isVat) {
+    if (!$isVat) { unset($co['dic']); }
+    if ($total < 0) {
+        // záporný součet = výplata (výkup / výdaj z kasy) — není to zdanitelné
+        // plnění, „daňový doklad" by tu byl nesmysl i u plátce
+        $title = 'Doklad o výplatě';
+    } elseif (!$isVat) {
         $title = 'Doklad o prodeji';
-        unset($co['dic']);
     } elseif ($isInvoicePay) {
         // Prodej na fakturu: daňovým dokladem je FAKTURA (vystavená současně s prodejem).
         // Účtenka s titulem „daňový doklad" by byla druhým daňovým dokladem k témuž
         // plnění — zákazník by si mohl DPH uplatnit dvakrát.
         $title = 'Doklad o prodeji';
-    } elseif ($total <= 10000) {
+    } elseif (($stdTotal + $usedTotal) <= 10000) {
+        // limit § 30 ZDPH se váže na hodnotu PLNĚNÍ — netto dokladu snížené
+        // o výplatní řádky (výkup/výdaj) by limit obcházelo
         $title = 'Zjednodušený daňový doklad';
     } else {
         $title = 'Daňový doklad';
@@ -228,6 +243,8 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
             'total' => $total,
             'paid' => $payment === 'cash' ? $received : null,
             'change' => $payment === 'cash' ? $change : null,
+            // popisek záporného součtu: výkup se vyplácí zákazníkovi, výdaj z kasy ne
+            'payout_label' => ($hasExpense && !$hasVykup) ? 'Vyplaceno z pokladny' : 'Vyplaceno zákazníkovi',
         ],
         'legal' => $legal,
         'money' => static function ($v) {
@@ -237,7 +254,7 @@ function crmBuildPosReceipt58(array $sale, array $items, array $co, string $logo
                 ? number_format($v, 0, ',', ' ') . ' Kč'
                 : number_format($v, 2, ',', ' ') . ' Kč';
         },
-        'thanks' => 'Děkujeme za nákup',
+        'thanks' => $total < 0 ? '' : 'Děkujeme za nákup',   // na výplatním dokladu nedává poděkování za nákup smysl
     ];
 }
 
@@ -335,9 +352,9 @@ function crmRenderReceipt58(array $d): string {
     // ---- součet a úhrada
     $h .= '<div class="rule rule--thick" style="margin-top:2mm"></div>';
     $__afxTot = (float)($tot['total'] ?? 0);
-    // záporný součet = výplata výkupu (my platíme zákazníkovi) — na dokladu
-    // se ukazuje srozumitelně kladná částka s vysvětlujícím popiskem
-    $h .= '<div class="total"><span class="lbl">' . ($__afxTot < 0 ? 'Vyplaceno zákazníkovi' : 'Celkem') . '</span><span>' . e($money($__afxTot < 0 ? abs($__afxTot) : $__afxTot)) . '</span></div>';
+    // záporný součet = výplata (výkup / výdaj z kasy) — na dokladu se ukazuje
+    // srozumitelně kladná částka s vysvětlujícím popiskem z buildu
+    $h .= '<div class="total"><span class="lbl">' . ($__afxTot < 0 ? e((string)($tot['payout_label'] ?? 'Vyplaceno zákazníkovi')) : 'Celkem') . '</span><span>' . e($money($__afxTot < 0 ? abs($__afxTot) : $__afxTot)) . '</span></div>';
     if (!empty($doc['payment'])) {
         $h .= '<div class="row"><span>Úhrada</span><span>' . e((string)$doc['payment']) . '</span></div>';
     }
@@ -346,8 +363,10 @@ function crmRenderReceipt58(array $d): string {
         $h .= '<div class="row sm"><span>Vráceno</span><span>' . e($money((float)($tot['change'] ?? 0))) . '</span></div>';
     }
 
-    // ---- rekapitulace DPH (jen plátce; § 90 se do ní nikdy nepočítá)
-    if (!empty($vat['is_payer'])) {
+    // ---- rekapitulace DPH (jen plátce; § 90 se do ní nikdy nepočítá) —
+    // na čistě výplatním dokladu (vše nulové) se blok vůbec netiskne
+    if (!empty($vat['is_payer'])
+        && ((float)($vat['base'] ?? 0) > 0 || (float)($vat['tax'] ?? 0) > 0 || (float)($vat['used_total'] ?? 0) > 0)) {
         $h .= '<div class="rule rule--dash"></div>';
         $rate = rtrim(rtrim(number_format((float)($vat['rate'] ?? 0), 1, ',', ' '), '0'), ',');
         if ((float)($vat['base'] ?? 0) > 0 || (float)($vat['tax'] ?? 0) > 0) {
@@ -365,7 +384,8 @@ function crmRenderReceipt58(array $d): string {
     $h .= '</div>';
 
     if (!empty($d['qr'])) { $h .= '<img class="qr" src="' . e((string)$d['qr']) . '" alt="QR">'; }
-    $h .= '<div class="thanks">' . e((string)($d['thanks'] ?? 'Děkujeme za nákup')) . '</div>';
+    $__thanks = (string)($d['thanks'] ?? 'Děkujeme za nákup');
+    if ($__thanks !== '') { $h .= '<div class="thanks">' . e($__thanks) . '</div>'; }
     if (!empty($co['web'])) { $h .= '<div class="c xs">' . e((string)$co['web']) . '</div>'; }
     $h .= '<div class="cut"></div>';
 

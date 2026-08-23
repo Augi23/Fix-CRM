@@ -128,7 +128,7 @@ try {
                 ((int)($sale['branch_id'] ?? 0) > 0 ? (int)$sale['branch_id'] : null),
                 $stornoDir, $stornoAbs, $id,
                 mb_substr((string)$sale['sale_number'], 0, 40),
-                mb_substr(($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata výkupu — storno prodejky ') . (string)$sale['sale_number'], 0, 255),
+                mb_substr(($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata (výkup / výdaj z kasy) — storno prodejky ') . (string)$sale['sale_number'], 0, 255),
                 $who !== '' ? mb_substr($who, 0, 100) : null,
             ]);
         $stornoMoveId = (int)$pdo->lastInsertId();
@@ -152,7 +152,7 @@ if ($stornoMoveId > 0) {
         'type' => $stornoDir === 'out' ? 'expense' : 'income',
         'amount' => $stornoAbs,
         'date' => date('Y-m-d'),
-        'purpose' => ($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata výkupu — storno prodejky ') . (string)$sale['sale_number'],
+        'purpose' => ($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata (výkup / výdaj z kasy) — storno prodejky ') . (string)$sale['sale_number'],
         'issued_by' => $who,
         'ref_type' => 'cash_movement',
         'ref_id' => $stornoMoveId,

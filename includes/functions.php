@@ -1925,7 +1925,7 @@ function ensurePosTables(): void {
         $pdo->exec("CREATE TABLE IF NOT EXISTS pos_sale_items (
             id INT NOT NULL AUTO_INCREMENT,
             sale_id INT NOT NULL,
-            item_type ENUM('part','product','manual','order','vykup') NOT NULL,
+            item_type ENUM('part','product','manual','order','vykup','expense') NOT NULL,
             item_id INT NOT NULL,
             item_name VARCHAR(255) NOT NULL,
             item_code VARCHAR(64) NULL DEFAULT NULL,
@@ -1943,8 +1943,8 @@ function ensurePosTables(): void {
             if (!$idx) { $pdo->exec("ALTER TABLE pos_sales ADD KEY idx_pos_order (order_id)"); }
         } catch (Throwable $e) {}
         $col = $pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'item_type'")->fetch(PDO::FETCH_ASSOC);
-        if ($col && !str_contains((string)($col['Type'] ?? ''), "'vykup'")) {
-            $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order','vykup') NOT NULL");
+        if ($col && (!str_contains((string)($col['Type'] ?? ''), "'vykup'") || !str_contains((string)($col['Type'] ?? ''), "'expense'"))) {
+            $pdo->exec("ALTER TABLE pos_sale_items MODIFY COLUMN item_type ENUM('part','product','manual','order','vykup','expense') NOT NULL");
         }
         if (!$pdo->query("SHOW COLUMNS FROM pos_sale_items LIKE 'grade'")->fetch()) {
             $pdo->exec("ALTER TABLE pos_sale_items ADD COLUMN grade VARCHAR(16) NULL DEFAULT NULL");
