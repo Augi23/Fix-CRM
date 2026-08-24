@@ -1283,6 +1283,23 @@ function set_setting($key, $value) {
  * AUTH LOGIN, STARTTLS/SSL). Nastavení z system_settings (smtp_*).
  * Vrací [bool ok, string error]. Volitelně příloha [filename, mime, data].
  */
+/** Prostá textová verze HTML e-mailu (multipart/alternative).
+ *  E-mail bez textové části filtry penalizují (MIME_HTML_ONLY) a čtečky bez HTML
+ *  ho nezobrazí vůbec. Odkazy se vypisují jako „text (adresa)". */
+function crmHtmlToPlainText(string $html): string
+{
+    $t = preg_replace('#<(script|style)\b[^>]*>.*?</\1>#is', '', $html) ?? $html;
+    $t = preg_replace('#<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>#is', '$2 ($1)', $t) ?? $t;
+    $t = preg_replace('#<(br|/p|/div|/tr|/h[1-6]|/li)\s*/?>#i', "\n", $t) ?? $t;
+    $t = preg_replace('#<li\b[^>]*>#i', '- ', $t) ?? $t;
+    $t = strip_tags($t);
+    $t = html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $t = preg_replace('/[ \t]+/u', ' ', $t) ?? $t;
+    $t = preg_replace('/\n{3,}/u', "\n\n", $t) ?? $t;
+    $t = implode("\n", array_map('trim', explode("\n", $t)));
+    return trim($t);
+}
+
 function smtpSendMail(string $to, string $subject, string $htmlBody, ?array $attachment = null): array
 {
     $host = trim((string) get_setting('smtp_host'));
@@ -1340,17 +1357,39 @@ function smtpSendMail(string $to, string $subject, string $htmlBody, ?array $att
         if ($code($cmd('DATA')) !== 354) throw new Exception('DATA odmítnuto.');
 
         $boundary = 'afx_' . bin2hex(random_bytes(8));
+        $altBoundary = 'afxalt_' . bin2hex(random_bytes(8));
+        // DORUČITELNOST (v3.57.1): chybějící Message-ID je jeden z nejsilnějších
+        // spam signálů (filtry ho čekají u každé legitimní zprávy) a HTML bez
+        // textové alternativy taky. Doména Message-ID musí sedět s From kvůli DMARC.
+        $msgDomain = strstr($fromEmail, '@') !== false ? substr(strrchr($fromEmail, '@'), 1) : 'applefix.cz';
+        $textBody = crmHtmlToPlainText($htmlBody);
+        if ($textBody === '') { $textBody = strip_tags($htmlBody); }
+
         $headers  = 'From: ' . mb_encode_mimeheader($fromName) . " <$fromEmail>" . $eol;
         $headers .= "To: <$to>" . $eol;
         $headers .= 'Subject: ' . mb_encode_mimeheader($subject) . $eol;
         $headers .= 'MIME-Version: 1.0' . $eol;
         $headers .= 'Date: ' . date('r') . $eol;
+        $headers .= 'Message-ID: <' . bin2hex(random_bytes(16)) . '@' . $msgDomain . '>' . $eol;
+        $headers .= 'Reply-To: ' . mb_encode_mimeheader($fromName) . " <$fromEmail>" . $eol;
+        $headers .= 'Auto-Submitted: auto-generated' . $eol;   // transakční pošta, ne kampaň
+
+        // tělo = text + HTML v multipart/alternative (u příloh zabalené do multipart/mixed)
+        $alt  = "--$altBoundary" . $eol;
+        $alt .= 'Content-Type: text/plain; charset=UTF-8' . $eol;
+        $alt .= 'Content-Transfer-Encoding: base64' . $eol . $eol;
+        $alt .= chunk_split(base64_encode($textBody)) . $eol;
+        $alt .= "--$altBoundary" . $eol;
+        $alt .= 'Content-Type: text/html; charset=UTF-8' . $eol;
+        $alt .= 'Content-Transfer-Encoding: base64' . $eol . $eol;
+        $alt .= chunk_split(base64_encode($htmlBody)) . $eol;
+        $alt .= "--$altBoundary--" . $eol;
+
         if ($attachment) {
             $headers .= "Content-Type: multipart/mixed; boundary=\"$boundary\"" . $eol . $eol;
             $body  = "--$boundary" . $eol;
-            $body .= 'Content-Type: text/html; charset=UTF-8' . $eol;
-            $body .= 'Content-Transfer-Encoding: base64' . $eol . $eol;
-            $body .= chunk_split(base64_encode($htmlBody)) . $eol;
+            $body .= "Content-Type: multipart/alternative; boundary=\"$altBoundary\"" . $eol . $eol;
+            $body .= $alt;
             $body .= "--$boundary" . $eol;
             $body .= 'Content-Type: ' . $attachment['mime'] . '; name="' . $attachment['filename'] . '"' . $eol;
             $body .= 'Content-Transfer-Encoding: base64' . $eol;
@@ -1358,9 +1397,8 @@ function smtpSendMail(string $to, string $subject, string $htmlBody, ?array $att
             $body .= chunk_split(base64_encode($attachment['data'])) . $eol;
             $body .= "--$boundary--" . $eol;
         } else {
-            $headers .= 'Content-Type: text/html; charset=UTF-8' . $eol;
-            $headers .= 'Content-Transfer-Encoding: base64' . $eol . $eol;
-            $body = chunk_split(base64_encode($htmlBody));
+            $headers .= "Content-Type: multipart/alternative; boundary=\"$altBoundary\"" . $eol . $eol;
+            $body = $alt;
         }
         // tečkování řádků začínajících tečkou (RFC 5321)
         $data = preg_replace('/^\./m', '..', $headers . $body);

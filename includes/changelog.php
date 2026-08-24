@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.57.1',
+        'date' => '2026-08-24',
+        'time' => '21:05',
+        'title' => 'E-maily z CRM: oprava doručitelnosti (padaly do spamu)',
+        'items' => [
+            'Odchozí zprávy neměly <b>Message-ID</b> — jeho chybějící hlavičku berou spamové filtry jako silné podezření (legitimní pošta ho má vždy). Doplněno, doména hlavičky sedí s odesílatelem kvůli DMARC.',
+            'E-maily byly <b>jen v HTML</b>. Nově se posílají jako HTML + prostý text (multipart/alternative) — HTML-only je další bod k horšímu skóre a čtečky bez HTML zprávu vůbec nezobrazily. Přidáno i <b>Reply-To</b> a označení transakční pošty.',
+            'POZOR — zbytek je mimo CRM: doména applefix.cz <b>nemá DKIM podpis</b> a přitom má DMARC nastavené na „quarantine" (= při selhání rovnou do spamu). DKIM se zapíná jedním kliknutím v admin.forpsi.com (Hosting → DKIM → Aktivovat); TXT záznam si Forpsi doplní sám, protože DNS vede u nich.',
+        ],
+    ],
+    [
         'version' => '3.57.0',
         'date' => '2026-08-24',
         'time' => '20:25',
