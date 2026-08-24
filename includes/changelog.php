@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.54.1',
+        'date' => '2026-08-24',
+        'time' => '17:35',
+        'title' => 'Sklad: Inventura A4 — tiskový soupis s odškrtáváním',
+        'items' => [
+            'Ve Skladu → Produkty je nové tlačítko <b>„Inventura A4"</b>: vytiskne soupis všech kusů skladem (= nabídka e-shopu) s pořadovým číslem, kódem/SN, cenou, počtem kusů a <b>prázdným čtverečkem na konci řádku</b> na odškrtnutí propiskou.',
+            'Seskupeno po prodejnách, kusy skryté z e-shopu nesou poznámku; v patičce řádky Zkontroloval(a) / Podpis / Datum. Na obrazovce jde přepnout jen jedna prodejna, tisk se otevře rovnou.',
+        ],
+    ],
+    [
         'version' => '3.54.0',
         'date' => '2026-08-23',
         'time' => '12:38',

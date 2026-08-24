@@ -111,6 +111,20 @@ $stats = $statStmt->fetch();
         <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#stockHistoryModal" title="Posledních 20 naskladněných produktů — kdo je naskladnil a kdy">
             <i class="fas fa-clock-rotate-left me-2"></i> Historie naskladnění
         </button>
+        <?php
+        // předvolená prodejna tisku = právě zobrazená pobočka skladu (na stránce
+        // tisku jde jedním klikem přepnout na Vše nebo druhou prodejnu)
+        $__invSk = 'karlin';
+        try {
+            $__ib = $pdo->prepare("SELECT code FROM branches WHERE id = ?");
+            $__ib->execute([(int)$skladBranch]);
+            if ((string)$__ib->fetchColumn() === 'prikope') { $__invSk = 'vaclavak'; }
+        } catch (Throwable $e) {}
+        ?>
+        <a class="btn btn-outline-secondary" href="print_inventura.php?prodejna=<?php echo e($__invSk); ?>&amp;auto=1" target="_blank"
+           title="Inventurní soupis všech kusů skladem (= nabídka e-shopu) na papír A4 — s odškrtávacím polem na konci každého řádku">
+            <i class="fas fa-print me-2"></i> Inventura A4
+        </a>
         <?php if (!$canModifyStock): ?>
         <span class="badge bg-secondary align-self-center" title="Do skladu jiné pobočky můžeš jen nahlížet"><i class="fas fa-eye me-1"></i>jen prohlížení</span>
         <?php endif; ?>
