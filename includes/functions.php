@@ -2278,6 +2278,41 @@ function ensureEshopOrdersTable(): void {
     } catch (Throwable $e) { error_log('ensureEshopOrdersTable: ' . $e->getMessage()); }
 }
 
+/* ── UPOZORNĚNÍ NA OBJEDNÁVKY Z E-SHOPU (v3.55.0) ──────────────────────────
+   Nová objednávka z applefix.click vyskočí adminům a Bossovi přes celou
+   obrazovku (blok ve footer.php + api/eshop_order_alerts.php) a zmizí až
+   RUČNÍM zavřením — potvrzení je PER ÚČET (každý zavírá své), takže si jí
+   všimne Jan i Tomáš. Aby po nasazení nevyskočila celá historie objednávek,
+   hlásí se jen objednávky od eshop_alerts_since (seje se při prvním ensure). */
+
+function ensureEshopOrderAlertsTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    if ($pdo->inTransaction()) { return; }   // DDL by potvrdil rozdělanou transakci (implicitní COMMIT)
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS eshop_order_alert_acks (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            account_key VARCHAR(16) NOT NULL,
+            acked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_order_account (order_id, account_key)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        if (trim((string)get_setting('eshop_alerts_since', '')) === '') {
+            $pdo->prepare("INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES ('eshop_alerts_since', ?)")
+                ->execute([date('Y-m-d H:i:s')]);
+        }
+    } catch (Throwable $e) { error_log('ensureEshopOrderAlertsTable: ' . $e->getMessage()); }
+}
+
+/** Klíč účtu pro potvrzení upozornění — stejný vzor jako blokace kasy/auth epochy. */
+function afxEshopAlertAccountKey(): string {
+    if (!empty($_SESSION['user_id'])) { return 'u' . (int)$_SESSION['user_id']; }
+    if (!empty($_SESSION['tech_id'])) { return 't' . (int)$_SESSION['tech_id']; }
+    return '';
+}
+
 /** Prodávat na kase smí každý přihlášený zaměstnanec (pultová operace, obě pobočky)
  *  KROMĚ ÚČETNÍ — ta je neprovozní role: nesmí prodávat, odepisovat sklad ani
  *  vystavovat doklady kasy (viz includes/accounting_role.php). Bez téhle výjimky

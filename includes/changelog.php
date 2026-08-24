@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.55.0',
+        'date' => '2026-08-24',
+        'time' => '18:08',
+        'title' => 'E-shop: objednávka vyskočí adminům přes celou obrazovku',
+        'items' => [
+            'Nová objednávka z applefix.click se <b>adminům a Bossovi</b> ukáže přes celou obrazovku CRM — číslo objednávky, částka, zákazník s kontakty, položky a čas. Okno se <b>musí ručně zavřít</b> tlačítkem „Beru na vědomí" (klik mimo ani Escape ho nezavře) a do potvrzení vyskakuje na každé stránce znovu.',
+            'Potvrzení je <b>za každého zvlášť</b> — objednávku odklikne Jan i Tomáš, takže ji nikdo nepřehlédne. Tlačítko „Otevřít administraci e-shopu" vede rovnou na objednávky.',
+            'Funguje i v <b>appce z TestFlightu</b> (stejná obrazovka CRM) a hlásí se jen objednávky od nasazení — historie nevyskočí.',
+        ],
+    ],
+    [
         'version' => '3.54.1',
         'date' => '2026-08-24',
         'time' => '17:35',

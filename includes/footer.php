@@ -231,5 +231,132 @@ window.AFX_AMBIENT_INTERVAL_MIN = 15;
 })();
 </script>
 <?php endif; ?>
+
+<?php if (function_exists('crmCanDeleteOrders') && crmCanDeleteOrders()): ?>
+<?php /* ── NOVÁ OBJEDNÁVKA Z E-SHOPU — celoobrazovkové upozornění pro adminy a Bosse.
+         Zavírá se VÝHRADNĚ tlačítkem (žádný klik mimo) a potvrzení je per účet:
+         objednávka vyskakuje na každé stránce znovu, dokud ji dotyčný nepotvrdí.
+         Funguje i v appce z TestFlightu — je to tatáž webová vrstva CRM. */ ?>
+<div id="eshopAlertOverlay" class="eshop-alert-overlay" role="alertdialog" aria-modal="true" aria-hidden="true">
+    <div class="eshop-alert-card">
+        <div class="eshop-alert-kicker"><i class="fas fa-cart-shopping me-2"></i>Nová objednávka z e-shopu</div>
+        <div class="eshop-alert-ref" id="eshopAlertRef">—</div>
+        <div class="eshop-alert-total" id="eshopAlertTotal">—</div>
+        <div class="eshop-alert-rows">
+            <div class="eshop-alert-row"><span class="k">Zákazník</span><span class="v" id="eshopAlertCustomer">—</span></div>
+            <div class="eshop-alert-row" id="eshopAlertPhoneRow"><span class="k">Telefon</span><span class="v" id="eshopAlertPhone">—</span></div>
+            <div class="eshop-alert-row" id="eshopAlertEmailRow"><span class="k">E-mail</span><span class="v" id="eshopAlertEmail">—</span></div>
+            <div class="eshop-alert-row"><span class="k">Položky</span><span class="v" id="eshopAlertLines">—</span></div>
+            <div class="eshop-alert-row" id="eshopAlertNoteRow"><span class="k">Poznámka</span><span class="v" id="eshopAlertNote">—</span></div>
+            <div class="eshop-alert-row"><span class="k">Čas</span><span class="v" id="eshopAlertTime">—</span></div>
+        </div>
+        <a href="https://applefix.click/admin/objednavky" target="_blank" rel="noopener" class="eshop-alert-link"><i class="fas fa-arrow-up-right-from-square me-2"></i>Otevřít administraci e-shopu</a>
+        <button type="button" id="eshopAlertAck" class="eshop-alert-btn"><i class="fas fa-check me-2"></i>Beru na vědomí — zavřít</button>
+    </div>
+</div>
+<style>
+/* z-index 11800 ZÁMĚRNĚ POD zámkem kasy (12000) i LCD platby (12500) — zamčená
+   kasa nesmí přes zámek ukazovat údaje zákazníka ani dovolit potvrzení bez hesla.
+   Overlay scrolluje (flex-start + margin:auto na kartě) — dlouhá objednávka
+   nesmí odsunout tlačítko Beru na vědomí mimo obrazovku. */
+.eshop-alert-overlay{position:fixed;inset:0;z-index:11800;display:none;align-items:flex-start;justify-content:center;padding:18px;
+    overflow-y:auto;background:rgba(4,6,10,0.62);backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);opacity:0;transition:opacity .2s ease;}
+.eshop-alert-overlay.show{opacity:1;}
+.eshop-alert-card{position:relative;width:min(100%,470px);margin:auto;border-radius:26px;padding:24px 24px 22px;overflow:hidden;
+    background:linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.05));border:1px solid rgba(255,255,255,0.16);
+    box-shadow:0 30px 80px rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.22);
+    transform:translateY(10px) scale(0.98);transition:transform .22s cubic-bezier(.2,.8,.2,1);}
+.eshop-alert-overlay.show .eshop-alert-card{transform:translateY(0) scale(1);}
+.eshop-alert-card::before{content:"";position:absolute;top:-40%;left:-20%;width:140%;height:120px;pointer-events:none;
+    background:radial-gradient(60% 100% at 50% 0%,rgba(48,209,88,0.38),transparent 70%);}
+.eshop-alert-kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:#7ce39a;position:relative;}
+.eshop-alert-ref{margin-top:10px;font-family:ui-monospace,Menlo,monospace;font-size:1.05rem;font-weight:700;color:#9fe7b6;letter-spacing:.03em;position:relative;}
+.eshop-alert-total{font-size:2.1rem;font-weight:800;letter-spacing:-0.02em;color:#fff;line-height:1.15;position:relative;}
+.eshop-alert-rows{margin-top:14px;display:grid;gap:8px;}
+.eshop-alert-row{display:flex;gap:12px;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);}
+.eshop-alert-row .k{flex:0 0 74px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:rgba(233,238,247,0.5);font-weight:700;padding-top:2px;}
+.eshop-alert-row .v{flex:1;min-width:0;color:#eef4ff;font-weight:600;font-size:.95rem;white-space:pre-line;overflow-wrap:anywhere;}
+.eshop-alert-link{display:flex;align-items:center;justify-content:center;margin-top:16px;padding:11px 16px;border-radius:13px;
+    text-decoration:none;font-weight:700;color:#d9e6ff;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.16);}
+.eshop-alert-link:hover{background:rgba(255,255,255,0.12);color:#fff;}
+.eshop-alert-btn{display:flex;align-items:center;justify-content:center;width:100%;margin-top:10px;padding:13px 18px;border-radius:14px;
+    border:none;cursor:pointer;font-weight:800;font-size:1rem;color:#04220e;background:linear-gradient(135deg,#30D158,#1f9e41);
+    box-shadow:0 10px 26px rgba(48,209,88,0.35);transition:filter .15s ease,transform .15s ease;}
+.eshop-alert-btn:hover{filter:brightness(1.07);transform:translateY(-1px);}
+.eshop-alert-btn:disabled{opacity:.6;cursor:wait;transform:none;}
+@media (prefers-reduced-motion:reduce){.eshop-alert-overlay,.eshop-alert-card{transition:none;}}
+</style>
+<script>
+(function(){
+    var overlay = document.getElementById('eshopAlertOverlay');
+    if (!overlay) return;
+    var queue = [], queuedIds = {}, showing = null;
+    var ackBtn = document.getElementById('eshopAlertAck');
+    function money(v){
+        var d = Math.abs(v - Math.round(v)) > 0.004 ? 2 : 0;   // haléře jen když opravdu jsou
+        return new Intl.NumberFormat('cs-CZ', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v) + ' Kč';
+    }
+    function setRow(rowId, valId, text){
+        var row = document.getElementById(rowId);
+        if (row) row.style.display = text ? '' : 'none';
+        if (text) document.getElementById(valId).textContent = text;
+    }
+    function open(it){
+        showing = it;
+        document.getElementById('eshopAlertRef').textContent = it.order_ref || '—';
+        document.getElementById('eshopAlertTotal').textContent = money(it.total || 0);
+        document.getElementById('eshopAlertCustomer').textContent = it.customer || '—';
+        setRow('eshopAlertPhoneRow', 'eshopAlertPhone', it.phone || '');
+        setRow('eshopAlertEmailRow', 'eshopAlertEmail', it.email || '');
+        setRow('eshopAlertNoteRow', 'eshopAlertNote', it.note || '');
+        document.getElementById('eshopAlertLines').textContent = (it.lines && it.lines.length) ? it.lines.join('\n') : '—';
+        document.getElementById('eshopAlertTime').textContent = it.time || '—';
+        overlay.style.display = 'flex';
+        overlay.setAttribute('aria-hidden', 'false');
+        if (window.afxChime) { window.afxChime('assign'); }
+        requestAnimationFrame(function(){ overlay.classList.add('show'); });
+    }
+    function close(){
+        overlay.classList.remove('show');
+        overlay.setAttribute('aria-hidden', 'true');
+        setTimeout(function(){ overlay.style.display = 'none'; showing = null; next(); }, 200);
+    }
+    function next(){ if (showing) return; var it = queue.shift(); if (!it) return; open(it); }
+    // ZÁMĚRNĚ žádné zavírání klikem mimo ani Escape — potvrzuje se jen tlačítkem
+    ackBtn.addEventListener('click', function(){
+        if (!showing) { close(); return; }
+        ackBtn.disabled = true;
+        var fd = new FormData();
+        fd.append('action', 'ack');
+        fd.append('order_id', showing.id);
+        fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+        fetch('api/eshop_order_alerts.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                ackBtn.disabled = false;
+                if (d && d.ok) { close(); }
+                else { alert('Potvrzení se neuložilo — zkus to znovu.' + (d && d.error ? ' (' + d.error + ')' : '')); }
+            })
+            .catch(function(){ ackBtn.disabled = false; alert('Potvrzení se neuložilo (síť) — zkus to znovu.'); });
+    });
+    function poll(){
+        fetch('api/eshop_order_alerts.php', { credentials: 'same-origin', cache: 'no-store' })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if (!d || !d.ok || !d.items) return;
+                d.items.forEach(function(it){
+                    if (queuedIds[it.id]) return;   // objednávka se vrací, dokud není potvrzená — nefrontovat 2×
+                    queuedIds[it.id] = true;
+                    queue.push(it);
+                });
+                next();
+            })
+            .catch(function(){});
+    }
+    setTimeout(poll, 2500);
+    setInterval(poll, 20000);
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>
