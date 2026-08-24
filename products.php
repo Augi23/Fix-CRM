@@ -35,6 +35,7 @@ $avail = (string)($_GET['avail'] ?? '');   // '' = vše, 'in' = skladem, 'out' =
 ensureProductsLoanColumns();
 ensureSkladBranchSchema();
 ensureProductsHideEshopColumn();
+ensureEshopReservationSchema();   // reserved_qty — badge „rezervováno pro e-shop"
 // Pobočka skladu (vybraná ?branch, jinak vlastní). Vidí se obě; MĚNIT jen zaměstnanec pobočky.
 $skladBranch = skladBranchOrOwn();
 $canModifyStock = crmCanModifyBranchStock($skladBranch);
@@ -330,6 +331,11 @@ try {
                                             <span class="badge bg-warning text-dark" title="Prodáno přes Pokladnu — CRM ho automaticky drží vyprodaný, i kdyby ho soubor z appky ještě hlásil skladem">Prodáno na kase</span>
                                         <?php else: ?>
                                             <span class="badge bg-secondary">Vyprodáno</span>
+                                        <?php endif; ?>
+                                        <?php /* rezervace z e-shopu: kus fyzicky leží na prodejně, ale je zamluvený
+                                                 objednávkou s platbou při vyzvednutí — prodat ho smí jen ta objednávka */ ?>
+                                        <?php if ((int)($p['reserved_qty'] ?? 0) > 0): ?>
+                                            <div class="small mt-1" style="color:#ffd479;" title="Objednávka z e-shopu s platbou při vyzvednutí — zaplatí se na kase přes „Rezervace e-shopu“"><i class="fas fa-clock me-1"></i>rezervováno pro e-shop<?php echo (int)$p['reserved_qty'] > 1 ? ' (' . (int)$p['reserved_qty'] . ' ks)' : ''; ?></div>
                                         <?php endif; ?>
                                         <?php if ((int)$p['stock_qty'] <= 0 && !empty($p['last_sold_at']) && !productIsLoaned($p)): ?>
                                             <div class="small text-white-75 mt-1" title="Kdy se kus prodal (kasa i e-shop)"><i class="fas fa-cart-shopping me-1"></i>prodáno <?php echo date('j. n. Y H:i', strtotime((string)$p['last_sold_at'])); ?></div>
@@ -654,9 +660,9 @@ try {
                                     <div class="col-12">
                                         <label class="form-label small mb-1 d-flex align-items-center gap-2">
                                             <input class="form-check-input mt-0" type="checkbox" id="pcShow360" checked>
-                                            <span>3. 360° video <span class="text-white-50">(dvě celé otočky — server vyrobí 360° prohlídku na eshop)</span></span>
+                                            <span>3. 360° prohlídka <span class="text-white-50">(FOTKY z točny — 8 až 48 kolem dokola; nebo video se dvěma otočkami. Server sám odmaže pozadí a vyrobí otáčení na eshop)</span></span>
                                         </label>
-                                        <input type="file" id="pcVideo360" class="form-control form-control-sm" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm">
+                                        <input type="file" id="pcVideo360" class="form-control form-control-sm" multiple accept="image/jpeg,image/png,image/webp,image/heic,.jpg,.jpeg,.png,.webp,.heic,.heif,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm">
                                         <div id="pcVideoStatus" class="small mt-1"></div>
                                         <div id="pcVideo360Proc" class="small mt-1" style="display:none"></div>
                                     </div>
@@ -1095,6 +1101,9 @@ $(document).on('click', '.product-label-btn', function () {
             $rocnik.value = '';
             $gen.value = '';
             $serial.value = '';
+            // POZOR: editProductCode se tu NEmaže — syncCatalogModeLayout() běží i na KONCI
+            // načtení existujícího kusu, takže by právě načtený kód zahodila a 360° by
+            // u příslušenství nešla nahrát nikdy. Reset patří tam, kde začíná nový kus.
             clearProcessor();
             // Při prvotní inicializaci je badgeStyles ještě nedefinované.
             // Nevyhazovat zde JS chybu: jinak se onManufacturer() už nespustí
@@ -1303,6 +1312,21 @@ $(document).on('click', '.product-label-btn', function () {
         $video360 = el('pcVideo360'), $video360Url = el('pcVideo360Url'), $videoStatus = el('pcVideoStatus');
     var galUrls = [];                                        // URL nahraných klasických fotek (dle pořadí slotů)
     function baseCode() { return $serial.value.trim() || ('foto-' + Date.now()); }
+    // Kód editovaného kusu — u příslušenství je SN skryté a kód (AFX-…) generuje server,
+    // takže bez tohohle by 360° u doplňků nešlo navázat vůbec.
+    var editProductCode = '';
+    // 360° se k produktu váže VÝHRADNĚ přes kód (složka produkty-360/<kód>/ na disku, žádné
+    // pole v DB) — fallback 'foto-<timestamp>' z baseCode() by sadu poslal do složky, kterou
+    // eshop nikdy nenajde. Prázdná návratová hodnota = 360° zatím nelze nahrát.
+    function code360() { return $serial.value.trim() || editProductCode; }
+    function require360Code() {
+        var c = code360();
+        if (!c) {
+            showAlert('Nejdřív vyplň sériové číslo kusu — 360° prohlídka se k produktu váže přes něj.'
+                + (ACCESSORY_MODE ? ' U příslušenství produkt nejdřív ulož a pak ho otevři k úpravě.' : ''));
+        }
+        return c;
+    }
 
     // (1) studiová fotka — průhledné PNG (variant=studio, keep_alpha)
     $studioPhoto.addEventListener('change', function () {
@@ -1377,18 +1401,69 @@ $(document).on('click', '.product-label-btn', function () {
     }
     $galleryAdd.addEventListener('click', function () { addGallerySlot(''); });
 
-    // (3) 360° video → vlastní endpoint (obrázkový by ho odmítl)
+    // (3) 360° prohlídka — FOTKY z točny (preferované) NEBO video (starší cesta).
+    //     Rozliší se podle vybraných souborů: obrázky → upload_product_360_photos.php,
+    //     jedno video → upload_product_video.php. Míchat dohromady nejde.
     $video360.addEventListener('change', function () {
         if (!this.files.length) return;
-        var gen = formGen; pending++;
+        var files = Array.prototype.slice.call(this.files);
+        var isImg = function (f) { return /^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name); };
+        var isVid = function (f) { return /^video\//.test(f.type) || /\.(mp4|mov|webm|m4v)$/i.test(f.name); };
+        var imgs = files.filter(isImg), vids = files.filter(isVid);
+        var gen = formGen;
+
+        if (imgs.length && vids.length) {
+            $videoStatus.textContent = 'Vyber buď fotky, nebo jedno video — ne obojí najednou.';
+            $videoStatus.className = 'small mt-1 text-danger'; this.value = ''; return;
+        }
+        // bez kódu produktu nemá 360° kam patřit — odmítnout DŘÍV, než se nahraje ~1 GB fotek
+        if (!require360Code()) {
+            $videoStatus.textContent = 'Nejdřív vyplň sériové číslo — 360° se váže na kód kusu.';
+            $videoStatus.className = 'small mt-1 text-danger'; this.value = ''; return;
+        }
+        if (imgs.length) {
+            if (imgs.length < 8) {
+                $videoStatus.textContent = 'Na 360° je potřeba aspoň 8 fotek dokola (vybráno ' + imgs.length + ').';
+                $videoStatus.className = 'small mt-1 text-danger'; return;
+            }
+            pending++;
+            $videoStatus.textContent = 'Nahrávám ' + imgs.length + ' fotek…'; $videoStatus.className = 'small mt-1 text-white-50';
+            var fdp = new FormData();
+            imgs.forEach(function (f) { fdp.append('photos[]', f); });
+            // kolik fotek KLIENT vybral — PHP nad max_file_uploads soubory tiše zahazuje,
+            // server podle expected_count ořezanou sadu odmítne místo tichého úspěchu
+            fdp.append('expected_count', String(imgs.length));
+            fdp.append('code', code360()); fdp.append('csrf_token', CSRF);
+            fetch('api/upload_product_360_photos.php', { method: 'POST', body: fdp, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    pending--; if (gen !== formGen) return;
+                    // server při uploadu fotek smazal případné starší video (poslední upload vyhrává)
+                    // → nenechat v DB URL na neexistující soubor
+                    if (d.success && d.count === imgs.length) { $video360Url.value = ''; $videoStatus.textContent = '✓ ' + d.count + ' fotek nahráno — server teď odmaže pozadí a vyrobí 360°.'; $videoStatus.className = 'small mt-1 text-success'; poll360(code360(), true); }
+                    else if (d.success) { // pojistka proti TICHÉMU ořezu sady (server bez kontroly expected_count)
+                        $video360Url.value = '';
+                        $videoStatus.textContent = 'Pozor: server přijal jen ' + d.count + ' z ' + imgs.length + ' fotek — sada je neúplná, nahraj ji prosím celou znovu.';
+                        $videoStatus.className = 'small mt-1 text-danger';
+                    }
+                    else { $videoStatus.textContent = 'Fotky se nenahrály: ' + (d.message || ''); $videoStatus.className = 'small mt-1 text-danger'; }
+                })
+                .catch(function () { pending--; if (gen === formGen) { $videoStatus.textContent = 'Fotky se nenahrály (síť).'; $videoStatus.className = 'small mt-1 text-danger'; } });
+            return;
+        }
+        if (vids.length !== 1) {
+            $videoStatus.textContent = 'Vyber fotky z točny (8+), nebo přesně jedno video.';
+            $videoStatus.className = 'small mt-1 text-danger'; return;
+        }
+        pending++;
         $videoStatus.textContent = 'Nahrávám video…'; $videoStatus.className = 'small mt-1 text-white-50';
         var fd = new FormData();
-        fd.append('video', this.files[0]); fd.append('code', baseCode()); fd.append('csrf_token', CSRF);
+        fd.append('video', vids[0]); fd.append('code', code360()); fd.append('csrf_token', CSRF);
         fetch('api/upload_product_video.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 pending--; if (gen !== formGen) return;
-                if (d.success) { $video360Url.value = d.url; $videoStatus.textContent = '✓ Video nahráno — 360° se teď vyrobí na serveru.'; $videoStatus.className = 'small mt-1 text-success'; poll360(baseCode(), true); }
+                if (d.success) { $video360Url.value = d.url; $videoStatus.textContent = '✓ Video nahráno — 360° se teď vyrobí na serveru.'; $videoStatus.className = 'small mt-1 text-success'; poll360(code360(), true); }
                 else { $videoStatus.textContent = 'Video se nenahrálo: ' + (d.message || ''); $videoStatus.className = 'small mt-1 text-danger'; }
             })
             .catch(function () { pending--; if (gen === formGen) { $videoStatus.textContent = 'Video se nenahrálo (síť).'; $videoStatus.className = 'small mt-1 text-danger'; } });
@@ -1404,14 +1479,20 @@ $(document).on('click', '.product-label-btn', function () {
             $video360Proc.innerHTML = '<span class="text-success">✓ 360° prohlídka hotová (' + st.frames + ' snímků)</span>' +
                 (st.preview ? ' <img src="' + st.preview + '" alt="" style="height:34px;vertical-align:middle;border-radius:5px;margin-left:6px;background:#fff">' : '') +
                 ' <button type="button" id="pcRegen360" class="btn btn-outline-secondary btn-sm py-0 ms-1">Přegenerovat</button>';
+        } else if (st.status === 'manual') { // sada *.webp v eshopu bez zdroje v CRM (nahraná ručně) — eshop ji zobrazuje, přegenerovat nejde
+            $video360Proc.innerHTML = '<span class="text-success">✓ 360° prohlídka: ručně nahraná sada (' + st.frames + ' snímků)</span>' +
+                (st.preview ? ' <img src="' + st.preview + '" alt="" style="height:34px;vertical-align:middle;border-radius:5px;margin-left:6px;background:#fff">' : '');
+        } else if (st.status === 'failed') { // dispatcher zdroj odložil (marker .failed) — bez zásahu to znovu nepojede
+            $video360Proc.innerHTML = '<span class="text-danger">✖ 360° zpracování selhalo. Zkontroluj sadu (ostré fotky, celý produkt v záběru) a zkus to znovu, případně nahraj fotky nové.</span>' +
+                ' <button type="button" id="pcRegen360" class="btn btn-outline-secondary btn-sm py-0 ms-1">Zkusit znovu</button>';
         } else { // processing
-            $video360Proc.innerHTML = '<span class="text-info"><span class="spinner-border spinner-border-sm me-1" style="width:.8rem;height:.8rem"></span>360° se zpracovává na serveru… (pár minut)</span>';
+            $video360Proc.innerHTML = '<span class="text-info"><span class="spinner-border spinner-border-sm me-1" style="width:.8rem;height:.8rem"></span>360° se zpracovává na serveru… (pár minut, u větší sady fotek až ~20)</span>';
         }
     }
     function poll360(code, first) {
         if (poll360Timer) { clearTimeout(poll360Timer); poll360Timer = null; }
         if (!code) return;
-        if (first) { poll360Left = 60; }               // ~5 min stropu (60×5 s)
+        if (first) { poll360Left = 300; }              // ~25 min stropu (300×5 s) — birefnet na CPU: ~29 s/fotku, 36 fotek ≈ 18 min
         fetch('api/status_360.php?code=' + encodeURIComponent(code), { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (st) {
@@ -1424,13 +1505,19 @@ $(document).on('click', '.product-label-btn', function () {
     }
     $video360Proc.addEventListener('click', function (e) {
         if (e.target && e.target.id === 'pcRegen360') {
-            var code = baseCode(); if (!code) return;
+            var code = code360(); if (!code) return;   // bez kódu není co přegenerovat
             $video360Proc.innerHTML = '<span class="text-info">Spouštím přegenerování…</span>';
             var fd = new FormData(); fd.append('action', 'regen'); fd.append('code', code); fd.append('csrf_token', CSRF);
             fetch('api/status_360.php', { method: 'POST', body: fd, credentials: 'same-origin' })
                 .then(function (r) { return r.json(); }).then(function () { poll360(code, true); })
                 .catch(function () {});
         }
+    });
+    // dopsané/změněné SN → znovu zjistit 360° stav z disku serveru (znovunaskladnění kusu,
+    // který už 360° má — bez tohohle by se stav ukázal až po zavření a novém otevření modalu)
+    $serial.addEventListener('blur', function () {
+        var sn = code360();
+        if (sn) { poll360(sn, true); } else { render360({ status: 'none' }); }
     });
 
     // reset / naplnění celé Galerie (nový produkt = prázdno, editace = z produktu)
@@ -1448,8 +1535,15 @@ $(document).on('click', '.product-label-btn', function () {
         for (var i = 0; i < n; i++) { if (list[i]) { galUrls[i] = list[i]; } addGallerySlot(list[i] || ''); }
         syncGalleryHidden();
         $video360Url.value = video || ''; $video360.value = '';
-        if (video) { $videoStatus.textContent = '✓ Video nahráno.'; $videoStatus.className = 'small mt-1 text-success'; poll360(baseCode(), true); }
-        else { $videoStatus.textContent = ''; $videoStatus.className = 'small mt-1'; render360({ status: 'none' }); }
+        if (video) { $videoStatus.textContent = '✓ Video nahráno.'; $videoStatus.className = 'small mt-1 text-success'; poll360(code360(), true); }
+        else {
+            $videoStatus.textContent = ''; $videoStatus.className = 'small mt-1';
+            // i bez videa může mít kus 360° z FOTEK (stav žije jen na disku serveru) → zeptat se.
+            // POZOR: ptát se jen se SKUTEČNÝM kódem — baseCode() má fallback 'foto-…' a byl by vždy
+            // truthy (mrtvá else-větev + nesmyslný dotaz při každém otevření prázdného modalu).
+            var sn360 = code360();
+            if (sn360) { poll360(sn360, true); } else { render360({ status: 'none' }); }
+        }
     }
     resetGalleryAll([], '', '');                              // úvodní stav = 3 prázdné sloty
 
@@ -1683,6 +1777,7 @@ $(document).on('click', '.product-label-btn', function () {
                 if ($editId.value) { printPromise.then(function () { location.reload(); }); return; }
                 // vyčistit vše KROMĚ Typ / Stav / Prodejna — sériové naskladňování jako v appce
                 formGen++;
+                editProductCode = '';   // předchozí kus je uložený; 360° dalšího nesmí jít do jeho složky
                 [$modelC, $accessoryForModel, $accessoryPropertyC, $accessoryText, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
                 onType();   // Model/Barva se přeplní z katalogu — včetně právě vstřebaných vlastních hodnot
                 $model.value = ''; $color.value = ''; $cap.value = '';
@@ -1752,6 +1847,7 @@ $(document).on('click', '.product-label-btn', function () {
         // režim NOVÝ produkt — vyčistit VŠE (i pozůstatky předchozí editace)
         formGen++;
         $editId.value = '';
+        editProductCode = '';   // jinak by 360° z nového kusu spadla do složky předchozího
         el('pcTitleMode').textContent = ACCESSORY_MODE ? 'Naskladnit příslušenství' : 'Naskladnit produkt';
         if (el('pcQty')) { el('pcQty').value = '1'; el('pcQty').readOnly = false; el('pcQty').disabled = false; }
         qtyOriginal = ''; qtyBeforeSold = '1';
@@ -1840,6 +1936,7 @@ $(document).on('click', '.product-label-btn', function () {
                 $price.value = p.price || '';
                 $purchase.value = p.purchase_price || '';   // '' = u kusu nikdy nezadaná (nepřepisovat nulou)
                 $serial.value = p.serial || '';
+                editProductCode = p.product_code || '';   // 360° u kusů bez SN (příslušenství)
                 setSelectValue($ram, p.ram); setProcessorValues(p.processor_family || '', p.processor_model || '');
                 setSelectValue($cpu, p.cpu); setSelectValue($gpu, p.gpu);
                 if ((p.gpu_model || '') && (CATALOG.gpuModels || []).indexOf(p.gpu_model) < 0) {

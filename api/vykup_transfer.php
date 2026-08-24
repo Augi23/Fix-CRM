@@ -33,6 +33,12 @@ $pid = (int)($_POST['product_id'] ?? 0);
 
 try {
     if ($pid <= 0) { throw new Exception('Chybí kus.'); }
+    // Kus držený objednávkou z e-shopu se nesmí převést na díl — zákazník by přišel
+    // k prázdnému regálu a objednávku by nešlo vyřídit.
+    if (function_exists('afxProductReservationBlock')) {
+        $resBlock = afxProductReservationBlock($pid);
+        if ($resBlock !== '') { echo json_encode(['success' => false, 'message' => $resBlock], JSON_UNESCAPED_UNICODE); exit; }
+    }
     $st = $pdo->prepare("SELECT * FROM products WHERE id = ?");
     $st->execute([$pid]);
     $p = $st->fetch();

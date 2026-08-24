@@ -94,6 +94,9 @@ if ($payment === 'invoice_ico' && !afxIcoSupplier()['ready']) {
 }
 $customerId = (int)($in['customer_id'] ?? 0);
 $note = mb_substr(trim((string)($in['note'] ?? '')), 0, 255);
+// Rezervace z e-shopu (platba při vyzvednutí): prodejka se sváže s objednávkou,
+// rezervace se uvolní a objednávka se označí za vyzvednutou a zaplacenou.
+$eshopOrderId = (int)($in['eshop_order_id'] ?? 0);
 
 // Přijatá hotovost (nepovinná evidence): obsluha ji zadává u platby hotově,
 // účtenka z ní tiskne Placeno/Vráceno. Prázdná hodnota = nezaznamenáno (NULL).
@@ -196,6 +199,66 @@ if ($expenseLines && count($expenseLines) !== count($cart)) {
     echo json_encode(['success' => false, 'message' => 'Výdaj z kasy markuj samostatně — do jednoho dokladu nemíchej výdaj a prodej zboží.']); exit;
 }
 
+// ── rezervace z e-shopu: co se smí vyzvednout a čím zaplatit ──
+// DDL pojistky MUSÍ být před prvním dotazem na eshop_* (čerstvá DB po deployi,
+// než doběhne run_migrations) — jinak by PDOException vrátila HTML 500 místo JSONu.
+if ($eshopOrderId > 0) { ensureEshopOrdersTable(); ensureEshopReservationSchema(); }
+$eshopOrder = null;
+$eshopRes = [];   // product_id => qty (co objednávka drží rezervované)
+if ($eshopOrderId > 0) {
+    $eo = $pdo->prepare("SELECT id, order_ref, status, customer_name, pay_id, total FROM eshop_orders WHERE id = ?");
+    $eo->execute([$eshopOrderId]);
+    $eshopOrder = $eo->fetch(PDO::FETCH_ASSOC);
+    if ($eshopOrder && $note === '') { $note = mb_substr('Objednávka z e-shopu ' . (string)$eshopOrder['order_ref'], 0, 255); }
+    if (!$eshopOrder) {
+        echo json_encode(['success' => false, 'message' => 'Objednávka z e-shopu nenalezena.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    if ((string)$eshopOrder['status'] !== 'reserved') {
+        echo json_encode(['success' => false, 'message' => 'Objednávka ' . $eshopOrder['order_ref'] . ' už není rezervovaná (stav „' . $eshopOrder['status'] . '") — nejspíš ji právě vyřídila druhá kasa.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    // zboží si zákazník odnáší hned → musí být zaplacené na místě (hotově/kartou)
+    if ($isInvoicePay) {
+        echo json_encode(['success' => false, 'message' => 'Rezervaci z e-shopu zaplať hotově nebo kartou — zboží si zákazník odnáší hned, na fakturu by odešlo nezaplacené.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    $rs = $pdo->prepare("SELECT r.product_id, r.qty, COALESCE(r.unit_price, p.price) AS unit_price
+        FROM eshop_order_reservations r LEFT JOIN products p ON p.id = r.product_id
+        WHERE r.order_id = ? AND r.released_at IS NULL");
+    $rs->execute([$eshopOrderId]);
+    $eshopPrice = 0.0;   // kolik má zákazník podle objednávky zaplatit
+    foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $q = max(1, (int)$r['qty']);
+        $eshopRes[(int)$r['product_id']] = ($eshopRes[(int)$r['product_id']] ?? 0) + $q;
+        $eshopPrice += round((float)$r['unit_price'], 2) * $q;
+    }
+    $eshopPrice = round($eshopPrice, 2);
+    if (!$eshopRes) {
+        echo json_encode(['success' => false, 'message' => 'Objednávka ' . $eshopOrder['order_ref'] . ' nemá žádné rezervované kusy — vyřiď ji v administraci e-shopu.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    // Košík musí sedět s rezervací PŘESNĚ (jinak by zůstala viset polovina
+    // rezervace a kus by nikdo nemohl prodat). Ostatní zboží mimo objednávku
+    // se do stejné prodejky nemíchá — účtenka i vazba mají zůstat jednoznačné.
+    $cartProd = [];
+    foreach ($cart as $l) {
+        if ($l['type'] !== 'product') {
+            echo json_encode(['success' => false, 'message' => 'S rezervací z e-shopu markuj jen její zboží — ostatní položky prodej zvlášť.'], JSON_UNESCAPED_UNICODE); exit;
+        }
+        $cartProd[(int)$l['id']] = ($cartProd[(int)$l['id']] ?? 0) + (int)$l['qty'];
+    }
+    // Cena je autorita OBJEDNÁVKY (zákazník platí, za co objednal). UI má pole
+    // readonly, ale ručně poslaný požadavek by jinak naúčtoval třeba 1 Kč.
+    $cartSum = 0.0;
+    foreach ($cart as $l) { $cartSum += round((float)$l['price'], 2) * (int)$l['qty']; }
+    if (abs(round($cartSum, 2) - $eshopPrice) > 0.5) {
+        echo json_encode(['success' => false, 'message' => 'Účtovaná částka (' . formatMoney($cartSum)
+            . ') neodpovídá objednávce ' . $eshopOrder['order_ref'] . ' (' . formatMoney($eshopPrice)
+            . ') — načti rezervaci znovu tlačítkem „Rezervace e-shopu".'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    ksort($cartProd); ksort($eshopRes);
+    if ($cartProd !== $eshopRes) {
+        echo json_encode(['success' => false, 'message' => 'Košík neodpovídá rezervaci ' . $eshopOrder['order_ref'] . ' — načti ji znovu tlačítkem „Rezervace e-shopu" (vyzvedává se celá).'], JSON_UNESCAPED_UNICODE); exit;
+    }
+}
+
 if ($isInvoicePay) {
     if ($customerId <= 0) {
         echo json_encode(['success' => false, 'message' => 'Pro platbu na fakturu vyber zákazníka.']); exit;
@@ -218,6 +281,8 @@ afxEnsurePosCashColumns();
 afxEnsurePosShiftTable();
 afxEnsurePosPaymentEnum();       // ENUM payment_method musí znát 'invoice_ico'
 afxEnsureInvoiceSupplierColumn(); // faktura nese výstavce (sro|ico)
+ensureEshopOrdersTable();
+ensureEshopReservationSchema();   // reserved_qty čte i běžný prodej (guard rezervací)
 if ($vykupLines) {
     require_once __DIR__ . '/../includes/documents.php';
     ensureCrmDocumentsTable();
@@ -250,10 +315,25 @@ try {
             $cart[$i]['grade'] = null;
             $cart[$i]['purchase_price'] = null;
         } elseif ($line['type'] === 'product') {
-            $st = $pdo->prepare("SELECT title, product_code, grade, purchase_price FROM products WHERE id = ?");
+            $st = $pdo->prepare("SELECT title, product_code, grade, purchase_price, stock_qty, COALESCE(reserved_qty, 0) AS reserved_qty FROM products WHERE id = ?");
             $st->execute([$line['id']]);
             $row = $st->fetch();
             if (!$row) { echo json_encode(['success' => false, 'message' => 'Produkt už neexistuje.']); exit; }
+            // Kus rezervovaný objednávkou z e-shopu (platba při vyzvednutí) se nesmí
+            // prodat někomu jinému — online zákazník by přišel k prázdnému regálu.
+            // Volných kusů je stock_qty − reserved_qty; rezervaci vyzvedne jen prodej
+            // svázaný s TOU objednávkou (tam se počítá celý stav).
+            $resQty = (int)$row['reserved_qty'];
+            if ($resQty > 0) {
+                $freeQty = (int)$row['stock_qty'] - $resQty;
+                $mine = $eshopOrderId > 0 ? (int)($eshopRes[(int)$line['id']] ?? 0) : 0;
+                if ($line['qty'] > $freeQty + $mine) {
+                    $ri = afxProductReservationInfo((int)$line['id']);
+                    $refTxt = $ri ? (' ' . (string)$ri['order_ref'] . ($ri['customer_name'] ? ' (' . $ri['customer_name'] . ')' : '')) : '';
+                    echo json_encode(['success' => false, 'message' => '„' . $row['title'] . '" je rezervovaný objednávkou z e-shopu' . $refTxt
+                        . ' — vyzvedni ji tlačítkem „Rezervace e-shopu", nebo rezervaci nejdřív zruš.'], JSON_UNESCAPED_UNICODE); exit;
+                }
+            }
             if (!crmCanModifyBranchStock(crmProductBranchId((int)$line['id']))) {
                 echo json_encode(['success' => false, 'message' => 'Produkt „' . $row['title'] . '" je skladem na jiné pobočce — prodat ho smí jen její zaměstnanci.']); exit;
             }
@@ -420,6 +500,18 @@ try {
         }
     }
 
+    // ── rezervace z e-shopu: zámek objednávky JAKO PRVNÍ ──
+    // Ruční akce (zrušení/expedice) zamykají eshop_orders → products; kasa musí
+    // držet stejné pořadí, jinak vzniká deadlock 1213 při souběhu.
+    if ($eshopOrderId > 0) {
+        $lk = $pdo->prepare("SELECT id, order_ref, status FROM eshop_orders WHERE id = ? FOR UPDATE");
+        $lk->execute([$eshopOrderId]);
+        $lockedEshop = $lk->fetch(PDO::FETCH_ASSOC);
+        if (!$lockedEshop || (string)$lockedEshop['status'] !== 'reserved') {
+            throw new Exception('Objednávku z e-shopu mezitím vyřídila jiná kasa nebo ji někdo zrušil — prodej neproběhl.');
+        }
+    }
+
     // ── odpis skladu (atomicky, guard proti souběhu/zápornému stavu) ──
     foreach ($cart as $line) {
         if ($line['type'] === 'part') {
@@ -429,13 +521,18 @@ try {
             // klesl na nulu (SET se vyhodnocuje zleva, IF už vidí odečtenou hodnotu).
             // Částečný prodej vícekusového příslušenství flag nesmí zapnout — import
             // by pak zbývající skutečné kusy vynuloval.
+            // Guard počítá DOSTUPNOST (sklad − rezervace) a k ní přičítá jen tu
+            // rezervaci, kterou tenhle prodej vyzvedává ($mine). Bez toho by mezi
+            // předtransakční kontrolou a tímhle odpisem stihla vzniknout objednávka
+            // z e-shopu a kus by se prodal dvakrát (dostupnost by šla do mínusu).
+            $mineQty = $eshopOrderId > 0 ? (int)($eshopRes[(int)$line['id']] ?? 0) : 0;
             $u = $pdo->prepare("UPDATE products
                 SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at),
                     last_sold_at = NOW()
-                WHERE id = ? AND stock_qty >= ?");
-            $u->execute([$line['qty'], $line['id'], $line['qty']]);
+                WHERE id = ? AND stock_qty >= ? AND stock_qty - COALESCE(reserved_qty, 0) + ? >= ?");
+            $u->execute([$line['qty'], $line['id'], $line['qty'], $mineQty, $line['qty']]);
             if ($u->rowCount() === 0) {
-                throw new Exception('„' . $line['name'] . '" už není skladem — nejspíš ho právě prodala druhá kasa.');
+                throw new Exception('„' . $line['name'] . '" už není volný — mezitím ho prodala druhá kasa nebo zarezervoval e-shop.');
             }
         }
     }
@@ -489,6 +586,22 @@ try {
         $lk->execute([$saleId, $line['id']]);
         if ($lk->rowCount() === 0) {
             throw new Exception('Výkup ' . $line['code'] . ' právě vyplatila jiná kasa — prodej neproběhl.');
+        }
+    }
+
+    // ── rezervace z e-shopu je vyzvednutá a zaplacená ──
+    // Sklad odečetl běžný produktový průchod výš; tady se jen uvolní rezervace
+    // (reserved_qty zpět dolů) a objednávka se sváže s prodejkou.
+    if ($eshopOrderId > 0) {
+        $rel = $pdo->prepare("UPDATE products SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - ?, 0) WHERE id = ?");
+        foreach ($eshopRes as $pid => $q) { $rel->execute([$q, $pid]); }
+        $pdo->prepare("UPDATE eshop_order_reservations SET released_at = NOW() WHERE order_id = ? AND released_at IS NULL")
+            ->execute([$eshopOrderId]);
+        $finEshop = $pdo->prepare("UPDATE eshop_orders SET status = 'collected', pos_sale_id = ?, collected_at = NOW()
+            WHERE id = ? AND status = 'reserved'");
+        $finEshop->execute([$saleId, $eshopOrderId]);
+        if ($finEshop->rowCount() === 0) {
+            throw new Exception('Objednávku z e-shopu se nepodařilo označit za vyzvednutou — prodej neproběhl.');
         }
     }
 
@@ -562,6 +675,15 @@ foreach ($cart as $line) {
     crmAuditLog('kasa.expense', [
         'entity_type' => 'pos_sale', 'entity_id' => $saleId, 'entity_label' => $saleNumber,
         'summary' => 'Výdaj z kasy: ' . $line['name'] . ' — ' . formatMoney(abs((float)$line['price'])) . ' (doklad ' . $saleNumber . ')',
+        'branch_id' => $branchId,
+    ]);
+}
+if ($eshopOrderId > 0 && $eshopOrder) {
+    crmAuditLog('kasa.eshop_pickup', [
+        'entity_type' => 'pos_sale', 'entity_id' => $saleId, 'entity_label' => $saleNumber,
+        'summary' => 'Vyzvednuta a zaplacena objednávka z e-shopu ' . $eshopOrder['order_ref']
+            . ' (účtováno ' . formatMoney($total) . ', objednáno ' . formatMoney((float)($eshopOrder['total'] ?? 0))
+            . ', doklad ' . $saleNumber . ')',
         'branch_id' => $branchId,
     ]);
 }

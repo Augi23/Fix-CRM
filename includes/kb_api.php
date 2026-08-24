@@ -473,11 +473,16 @@ function kbSyncTransactions(): array {
     // penězi, které se mezitím vrátily, spadla zpět mezi nezaplacené), teprve pak párování.
     $reverted = kbApplyReversals($env, $accountId);
     [$matched, $review] = kbAutoMatchInvoices($env, $accountId);
+    // E-shop objednávky placené převodem: dokud platba nedorazí, je zboží jen
+    // REZERVOVANÉ. Připsaná platba s VS = číslem objednávky a sedící částkou ji
+    // překlopí na prodej (odečet skladu, zboží k expedici).
+    $eshopPaid = afxEshopAutoMatchTransfers($env, $accountId);
     // při dosažení stropu stránek NEposouvat značku syncu — zbytek okna se
     // dostáhne příště (duplicity ošetří UNIQUE klíč)
     if (!$hitPageCap) { set_setting('kb_last_sync_at', date('Y-m-d H:i:s')); }
     return ['fetched' => $fetched, 'new' => $new, 'matched' => $matched, 'review' => $review,
-        'reverted' => $reverted, 'skipped_storno' => $skippedStorno, 'partial' => $hitPageCap];
+        'reverted' => $reverted, 'skipped_storno' => $skippedStorno, 'partial' => $hitPageCap,
+        'eshop_paid' => $eshopPaid];
 }
 
 /**
@@ -931,4 +936,98 @@ function afxSpaydForInvoice(array $invoice): string {
     if ($vs !== '') { $parts[] = 'X-VS:' . $vs; }
     $parts[] = 'MSG:' . mb_substr($msg, 0, 60);
     return implode('*', $parts);
+}
+
+
+/**
+ * Spárování bankovních plateb s REZERVACEMI z e-shopu (platba převodem).
+ * VS = číslo objednávky (stejné, jaké dostal zákazník v e-mailu i v QR platbě).
+ * Podmínka je PŘÍSNÁ: sedící VS **a** částka na korunu. Když částka nesedí
+ * (doplatek, částečná platba), pohyb se jen označí k ručnímu prověření —
+ * na částečnou platbu se zboží neexpeduje.
+ * Vrací počet objednávek překlopených na zaplacené.
+ */
+function afxEshopAutoMatchTransfers(?string $env = null, ?string $accountId = null): int {
+    global $pdo;
+    if (!function_exists('ensureEshopReservationSchema')) { return 0; }
+    ensureEshopReservationSchema();
+    $env = $env ?? kbApiEnv();
+    $accountId = $accountId ?? (string)get_setting('kb_account_id', '');
+    // SANDBOX NIKDY nesmí odepsat ostrý sklad — testovací pohyb by expedoval
+    // skutečnou objednávku (stejné pravidlo jako u faktur, jen důslednější).
+    if ($env !== 'prod') { return 0; }
+    $done = 0;
+    try {
+        $pending = $pdo->query("SELECT id, order_ref, total FROM eshop_orders
+            WHERE status = 'reserved' AND pay_id = 'prevod'")->fetchAll(PDO::FETCH_ASSOC);
+        if (!$pending) { return 0; }
+
+        // JEN nespárované pohyby: stav 'review' je platba odložená ČLOVĚKU
+        // (párovač faktur ji tam poslal schválně) — tu automat přebírat nesmí.
+        $txq = $pdo->prepare("SELECT id, amount, vs, counterparty_name FROM bank_transactions
+            WHERE direction = 'in' AND currency = 'CZK' AND is_reversal = 0
+              AND match_status = 'none'
+              AND env = ? AND account_id = ?
+              AND (booking_date IS NULL OR booking_date >= DATE_SUB(CURDATE(), INTERVAL 180 DAY))
+            ORDER BY booking_date, id");
+        $txq->execute([$env, $accountId]);
+        $txs = $txq->fetchAll(PDO::FETCH_ASSOC);
+        if (!$txs) { return 0; }
+
+        $byId = [];
+        foreach ($pending as $o) { $byId[(int)$o['id']] = $o; }
+        $review = $pdo->prepare("UPDATE bank_transactions SET match_status = 'review', match_note = ?
+            WHERE id = ? AND match_status = 'none'");
+
+        foreach ($txs as $tx) {
+            $oid = afxEshopOrderIdFromVs((string)($tx['vs'] ?? ''));
+            if ($oid <= 0 || !isset($byId[$oid])) { continue; }
+            $o = $byId[$oid];
+            // Kolize s fakturou: kdyby stejný VS seděl i na fakturu, ať to řeší člověk
+            try {
+                $inv = $pdo->prepare("SELECT invoice_number FROM invoices
+                    WHERE REPLACE(COALESCE(variable_symbol, ''), ' ', '') = ? AND status <> 'cancelled' LIMIT 1");
+                $inv->execute([afxVsDigits((string)($tx['vs'] ?? ''))]);
+                if (($ivn = $inv->fetchColumn()) !== false && $ivn !== null) {
+                    $review->execute([mb_substr('VS sedí na e-shop objednávku ' . $o['order_ref'] . ' i na fakturu ' . $ivn . ' — rozhodni ručně', 0, 255), (int)$tx['id']]);
+                    continue;
+                }
+            } catch (Throwable $e) { /* bez sloupce variable_symbol se kontrola přeskočí */ }
+
+            if (abs((float)$tx['amount'] - (float)$o['total']) > 0.5) {
+                // částka nesedí → zboží NEexpedovat, jen upozornit obsluhu
+                $review->execute([mb_substr('E-shop objednávka ' . $o['order_ref'] . ': částka nesedí ('
+                    . formatMoney((float)$tx['amount']) . ' vs ' . formatMoney((float)$o['total']) . ') — prověřit ručně', 0, 255), (int)$tx['id']]);
+                continue;
+            }
+            $res = afxEshopReleaseAsSale($oid, 'bankovní párování',
+                'platba VS ' . afxVsDigits((string)($tx['vs'] ?? '')) . ' od ' . (trim((string)($tx['counterparty_name'] ?? '')) ?: 'plátce'));
+            if (!empty($res['ok'])) {
+                $pdo->prepare("UPDATE bank_transactions SET match_status = 'auto', matched_at = NOW(),
+                        match_note = ? WHERE id = ?")
+                    ->execute([mb_substr('E-shop objednávka ' . $o['order_ref'] . ' zaplacena', 0, 255), (int)$tx['id']]);
+                unset($byId[$oid]);
+                $done++;
+            } else {
+                // NEZTRATIT: peníze na účtu jsou, ale objednávku nešlo vyřídit
+                $review->execute([mb_substr('E-shop objednávka ' . $o['order_ref'] . ': platba dorazila, ale objednávku nešlo vyřídit — '
+                    . (string)($res['error'] ?? 'neznámá chyba'), 0, 255), (int)$tx['id']]);
+                error_log('afxEshopAutoMatchTransfers: release selhal u objednávky ' . $o['order_ref'] . ' — ' . (string)($res['error'] ?? ''));
+            }
+        }
+
+        // Druhá platba na už vyřízenou objednávku (zákazník zaplatil dvakrát)
+        // nesmí zmizet — člověk musí vrátit přeplatek.
+        foreach ($txs as $tx) {
+            $oid = afxEshopOrderIdFromVs((string)($tx['vs'] ?? ''));
+            if ($oid <= 0 || isset($byId[$oid])) { continue; }
+            $chk = $pdo->prepare("SELECT order_ref, status FROM eshop_orders WHERE id = ?");
+            $chk->execute([$oid]);
+            $row = $chk->fetch(PDO::FETCH_ASSOC);
+            if (!$row) { continue; }
+            $review->execute([mb_substr('E-shop objednávka ' . $row['order_ref'] . ' je už vyřízená (' . $row['status']
+                . ') — platba navíc, prověřit (možný přeplatek k vrácení)', 0, 255), (int)$tx['id']]);
+        }
+    } catch (Throwable $e) { error_log('afxEshopAutoMatchTransfers: ' . $e->getMessage()); }
+    return $done;
 }

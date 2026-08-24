@@ -13,7 +13,7 @@
  * Parametry (GET):
  *   token=<t>            token (jen vzdáleně)
  *   code=<kód>           jeden produkt podle product_code
- *   in_stock=1           jen skladem (stock_qty > 0)
+ *   in_stock=1           jen dostupné (stock_qty − reserved_qty > 0)
  *   updated_since=<ISO>  jen produkty změněné od data (inkrementální sync, sloupec updated_at)
  *   limit=<n>            max 2000 (default 500), offset=<n>
  *
@@ -49,6 +49,8 @@ if (!$isLocal && !$sessionOk && !$tokenOk) {
     exit;
 }
 
+if (function_exists('ensureEshopReservationSchema')) { try { ensureEshopReservationSchema(); } catch (Throwable $e) {} }
+
 // ── parametry ────────────────────────────────────────────────────────────────
 $code         = trim((string)($_GET['code'] ?? ''));
 $inStockOnly  = ($_GET['in_stock'] ?? '') === '1';
@@ -60,7 +62,9 @@ $where = []; $params = [];
 if ($code !== '')       { $where[] = 'product_code = ?'; $params[] = $code; }
 $where[] = 'loan_at IS NULL';   // zapůjčené / v komisi nejsou naše k prodeji
 $where[] = 'hide_eshop = 0';    // checkbox „Nezobrazovat na e-shopu" v naskladnění
-if ($inStockOnly)       { $where[] = 'stock_qty > 0'; }
+// DOSTUPNOST = sklad − rezervace z e-shopu (platba při vyzvednutí): rezervovaný
+// kus na prodejně fyzicky leží, ale nikdo jiný si ho koupit nesmí.
+if ($inStockOnly)       { $where[] = '(stock_qty - COALESCE(reserved_qty, 0)) > 0'; }
 if ($updatedSince !== '') {
     $tsN = strtotime($updatedSince);
     if ($tsN) { $where[] = 'updated_at >= ?'; $params[] = date('Y-m-d H:i:s', $tsN); }
@@ -152,8 +156,10 @@ try {
             'currency'             => 'CZK',
             'prices_include_vat'   => true,
             'vat_margin_scheme_90' => (bool)$margin90,
-            'in_stock'             => ((int)$p['stock_qty']) > 0,
-            'stock_qty'            => (int)$p['stock_qty'],
+            'in_stock'             => ((int)$p['stock_qty'] - (int)($p['reserved_qty'] ?? 0)) > 0,
+            'stock_qty'            => max(0, (int)$p['stock_qty'] - (int)($p['reserved_qty'] ?? 0)),
+            'stock_total'          => (int)$p['stock_qty'],                    // fyzicky na prodejně (vč. rezervovaných)
+            'reserved_qty'         => (int)($p['reserved_qty'] ?? 0),          // čeká na vyzvednutí a zaplacení
             'stock_location'       => (string)($p['stock_key'] ?? ''),
             'branch_id'            => $branchId,
             'branch_label'         => $branchLabel,   // „Praha 8 - Karlín" / „Praha 1 - Černá Růže"

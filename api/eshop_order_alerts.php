@@ -61,7 +61,7 @@ try {
     if ($since === '') { $since = date('Y-m-d H:i:s'); }   // pojistka: bez settingu nic starého nevytahovat
 
     $st = $pdo->prepare("SELECT o.id, o.order_ref, o.total, o.customer_name, o.customer_email,
-            o.customer_phone, o.note, o.items_json, o.created_at
+            o.customer_phone, o.note, o.items_json, o.created_at, o.status, o.pay_id
         FROM eshop_orders o
         WHERE o.created_at >= ?
           AND NOT EXISTS (SELECT 1 FROM eshop_order_alert_acks a WHERE a.order_id = o.id AND a.account_key = ?)
@@ -110,6 +110,10 @@ try {
             'note'      => trim((string)($o['note'] ?? '')),
             'lines'     => $lines,
             'time'      => date('j. n. Y H:i', strtotime((string)$o['created_at'])),
+            // rezervace = platba při vyzvednutí; zboží čeká na prodejně a projde kasou
+            'reserved'  => (string)($o['status'] ?? '') === 'reserved',
+            'reason'    => (string)($o['status'] ?? '') === 'reserved'
+                ? afxEshopReservationReason((string)($o['pay_id'] ?? '')) : '',
         ];
     }
     echo json_encode(['ok' => true, 'items' => $items], JSON_UNESCAPED_UNICODE);

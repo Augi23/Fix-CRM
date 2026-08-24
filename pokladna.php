@@ -117,6 +117,12 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
 .pos-type.order { background: rgba(191,90,242,.18); color: #d9a7ff; }
 .pos-type.vykup { background: rgba(255,69,58,.16); color: #ff8f88; }
 .pos-type.expense { background: rgba(255,159,10,.20); color: #ffb84d; }
+.pos-type.eshop { background: rgba(48,209,88,.18); color: #7ce39a; }
+.pos-eshop-bar { display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding:10px 12px;
+    border-radius:12px; background:rgba(48,209,88,.12); border:1px solid rgba(48,209,88,.35); font-size:13.5px; }
+.pos-eshop-bar b { color:#9fe7b6; }
+.pos-eshop-bar .drop { margin-left:auto; background:none; border:1px solid rgba(255,255,255,.3); color:#ffd1d1;
+    border-radius:8px; padding:3px 10px; font-size:12px; font-weight:700; cursor:pointer; }
 .pos-manual { padding-bottom: 13px; margin-bottom: 13px; border-bottom: 1px solid rgba(255,255,255,.10); }
 .pos-manual .form-control { font-size: 15.5px; padding: 10px 12px; }
 .pos-manual .btn { font-weight: 700; white-space: nowrap; }
@@ -566,6 +572,11 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
             <div id="posVykupPanel" class="pos-results mb-2" style="display:none;"></div>
             <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                <button type="button" id="posEshopBtn" class="btn btn-outline-success btn-sm"><i class="fas fa-cart-shopping me-1"></i>Rezervace e-shopu</button>
+                <span class="small text-white-50">objednávka s platbou při vyzvednutí — teprve tady se prodá a zaplatí</span>
+            </div>
+            <div id="posEshopPanel" class="pos-results mb-2" style="display:none;"></div>
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
                 <button type="button" id="posExpenseBtn" class="btn btn-outline-warning btn-sm"><i class="fas fa-money-bill-transfer me-1"></i>Výdaj z kasy</button>
                 <span class="small text-white-50">záporná položka volným textem — záloha zaměstnanci, drobný nákup (drogerie…); vždy hotově</span>
             </div>
@@ -592,6 +603,11 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="col-lg-6">
         <div class="glass-panel p-3 border-secondary">
             <strong class="d-block mb-2 fs-5"><i class="fas fa-shopping-basket me-2 text-white-50"></i>Košík</strong>
+            <div id="posEshopBar" class="pos-eshop-bar">
+                <i class="fas fa-cart-shopping" style="color:#7ce39a;"></i>
+                <span>Vyzvednutí objednávky <b id="posEshopRef">—</b> <span class="text-white-50" id="posEshopWho"></span></span>
+                <button type="button" class="drop" id="posEshopDrop">Odpojit</button>
+            </div>
             <div class="table-responsive">
                 <table class="table table-dark align-middle mb-2 pos-cart">
                     <thead>
@@ -890,14 +906,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 d.results.forEach(function (r) {
                     var el = document.createElement('div');
-                    var typeLabel = { part: 'DÍL', product: 'PRODUKT', order: 'ZAKÁZKA', vykup: 'VÝKUP' }[r.type] || 'POLOŽKA';
+                    var typeLabel = { part: 'DÍL', product: 'PRODUKT', order: 'ZAKÁZKA', vykup: 'VÝKUP', eshop: 'E-SHOP' }[r.type] || 'POLOŽKA';
                     var detail = r.type === 'order' ? 'připraveno k úhradě'
-                        : (r.type === 'vykup' ? 'nevyplacený výkup — VYPLÁCÍME MY' : ('skladem ' + r.stock + ' ks'));
+                        : (r.type === 'vykup' ? 'nevyplacený výkup — VYPLÁCÍME MY'
+                        : (r.type === 'eshop' ? ((r.eshop && r.eshop.reason) || 'rezervace čeká na zaplacení') : ('skladem ' + r.stock + ' ks')));
                     el.className = 'pos-hit';
                     el.innerHTML = '<span class="pos-type ' + r.type + '">' + typeLabel + '</span>'
                         + '<div><div class="nm">' + esc(r.name) + '</div><div class="cd">' + esc(r.code || '') + ' · ' + detail + '</div></div>'
-                        + '<span class="pr">' + fmt(r.price) + '</span>';
-                    el.addEventListener('click', function () { addToCart(r); });
+                        + '<span class="pr">' + fmt(r.type === 'eshop' && r.eshop ? r.eshop.total : r.price) + '</span>';
+                    el.addEventListener('click', function () {
+                        if (r.type === 'eshop') { if (r.eshop) { window.__afxEshopLoad(r.eshop); } return; }
+                        addToCart(r);
+                    });
                     $results.appendChild(el);
                 });
             })
@@ -915,6 +935,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── košík ──
     function addToCart(r) {
+        // rezervace e-shopu není položka košíku — natáhne se celá objednávka
+        if (r && r.type === 'eshop') { if (r.eshop) { eshopLoad(r.eshop); } return; }
+        // k vyzvedávané objednávce z e-shopu se nic nepřidává — účtenka i vazba
+        // na objednávku musí zůstat jednoznačné (server to stejně odmítne)
+        if (eshopOrderId > 0) {
+            alert('Probíhá vyzvednutí objednávky z e-shopu — ostatní zboží prodej zvlášť (nebo objednávku odpoj).');
+            return;
+        }
         // výdaj z kasy se nemíchá s prodejem (server to stejně odmítne) — netto
         // doklad by zákazníkovi „slevil" o interní zálohu
         if (cart.some(function (c) { return c.type === 'expense'; })) {
@@ -948,6 +976,83 @@ document.addEventListener('DOMContentLoaded', function () {
         $manualPrice.value = '';
         $manualName.focus();
     });
+    // ── rezervace z e-shopu: vyzvednutí a zaplacení objednávky ──
+    // Objednávka s platbou při vyzvednutí není prodej — do kasy se natáhne celá
+    // (všechny kusy) a teprve dokončením prodeje se označí za vyzvednutou.
+    var eshopOrderId = 0;
+    var $eshopBtn = document.getElementById('posEshopBtn');
+    var $eshopPanel = document.getElementById('posEshopPanel');
+    var $eshopBar = document.getElementById('posEshopBar');
+    function eshopBar(h) {
+        eshopOrderId = h ? h.id : 0;
+        $eshopBar.style.display = h ? 'flex' : 'none';
+        if (h) {
+            document.getElementById('posEshopRef').textContent = h.order_ref;
+            document.getElementById('posEshopWho').textContent = (h.customer ? '· ' + h.customer : '')
+                + ' · objednáno za ' + fmt(h.total);
+        }
+        updateFinish();
+    }
+    function eshopLoad(h) {
+        if (h.broken) { alert(h.broken); return; }
+        if (cart.length && !cart.every(function (c) { return c.type === 'product'; })) {
+            alert('Nejdřív dokonči nebo vysyp košík — vyzvednutí objednávky se markuje samostatně.');
+            return;
+        }
+        // rozmarkované zboží se nesmí ztratit potichu
+        if (cart.length && !confirm('V košíku máš ' + cart.length + ' rozmarkovaných položek. Načtením objednávky ' + h.order_ref + ' se košík vysype. Pokračovat?')) { return; }
+        // změna ceníku mezi objednáním a vyzvednutím: účtuje se OBJEDNANÁ cena,
+        // ale obsluha to musí vidět (zákazník má potvrzení s jinou částkou)
+        if (h.total_diff && Math.abs(h.total_diff) > 0.5) {
+            alert('Pozor: součet položek (' + fmt(h.items_total) + ') nesedí s objednávkou (' + fmt(h.total) + ').'
+                + '\nÚčtují se ceny, za které zákazník objednal — rozdíl ' + fmt(Math.abs(h.total_diff)) + ' prověř před dokončením.');
+        }
+        cart = [];
+        h.items.forEach(function (it) {
+            cart.push({ type: 'product', id: it.product_id, name: it.name, code: it.code,
+                price: it.price, qty: it.qty, stock: Math.max(it.stock, it.qty) });
+        });
+        eshopBar(h);
+        render();
+        if ($eshopPanel) { $eshopPanel.style.display = 'none'; }
+    }
+    window.__afxEshopLoad = eshopLoad;
+    if (document.getElementById('posEshopDrop')) {
+        document.getElementById('posEshopDrop').addEventListener('click', function () {
+            eshopBar(null); cart = []; render();
+        });
+    }
+    if ($eshopBtn) {
+        $eshopBtn.addEventListener('click', function () {
+            if ($eshopPanel.style.display !== 'none') { $eshopPanel.style.display = 'none'; return; }
+            $eshopPanel.style.display = '';
+            $eshopPanel.innerHTML = '<div class="p-2 small text-white-50">Načítám rezervace…</div>';
+            fetch('api/pos_eshop_list.php', { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    var rows = d.results || [];
+                    if (!rows.length) {
+                        $eshopPanel.innerHTML = '<div class="p-2 small text-white-50">Žádná čekající objednávka z e-shopu s platbou při vyzvednutí.</div>';
+                        return;
+                    }
+                    $eshopPanel.innerHTML = '';
+                    rows.forEach(function (h) {
+                        var kusy = h.items.reduce(function (n, i) { return n + i.qty; }, 0);
+                        var el = document.createElement('div');
+                        el.className = 'pos-hit';
+                        el.innerHTML = '<span class="pos-type eshop">E-SHOP</span>'
+                            + '<div><div class="nm">' + esc(h.order_ref + ' — ' + h.customer) + '</div>'
+                            + '<div class="cd">' + esc(kusy + ' ks · ' + (h.reason || '') + ' · ' + h.created
+                                + (h.branch ? ' · ' + h.branch : '') + (h.phone ? ' · ' + h.phone : '')) + '</div></div>'
+                            + '<span class="pr">' + fmt(h.total) + '</span>';
+                        el.addEventListener('click', function () { eshopLoad(h); });
+                        $eshopPanel.appendChild(el);
+                    });
+                })
+                .catch(function () { $eshopPanel.innerHTML = '<div class="p-2 small text-danger">Načtení rezervací se nepovedlo.</div>'; });
+        });
+    }
+
     // ── výdaj z kasy: volná ZÁPORNÁ položka (záloha zaměstnanci, drobný nákup…) ──
     var $expenseBtn = document.getElementById('posExpenseBtn');
     var $expenseForm = document.getElementById('posExpenseForm');
@@ -1058,7 +1163,8 @@ document.addEventListener('DOMContentLoaded', function () {
             var qtyAttrs = lockedOrder ? ' readonly title="Zakázka se účtuje vždy jako 1 ks"'
                 : (lockedVykup ? ' readonly title="Výkup se vyplácí vždy jako 1 ks"'
                 : (lockedExpense ? ' readonly title="Výdaj z kasy je vždy jedna položka"' : ''));
-            var priceAttrs = lockedOrder ? ' readonly title="Cena zakázky se bere z detailu zakázky"' : '';
+            var priceAttrs = lockedOrder ? ' readonly title="Cena zakázky se bere z detailu zakázky"'
+                : (eshopOrderId > 0 ? ' readonly title="Cena z objednávky e-shopu — zákazník platí, za co objednal"' : '');
             tr.innerHTML = '<td><div class="pos-item-name">' + esc(c.name) + '</div><div class="pos-item-code">' + esc(c.code || '') + '</div></td>'
                 + '<td><input type="number" class="form-control pos-qty" min="1" max="' + (c.type === 'manual' ? 999 : c.stock) + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"' + qtyAttrs + '></td>'
                 + '<td><input type="text" class="form-control pos-price" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"' + priceAttrs + '></td>'
@@ -1133,6 +1239,9 @@ document.addEventListener('DOMContentLoaded', function () {
             // výdaj z kasy v košíku = jen hotově; tiché zašedlé tlačítko Dokončit je past
             if (payment !== 'cash' && cart.some(function (c) { return c.type === 'expense'; })) {
                 alert('V košíku je výdaj z kasy — ten jde jen hotově.');
+            }
+            if (eshopOrderId > 0 && isInvPay) {
+                alert('Vyzvednutou objednávku z e-shopu zaplať hotově nebo kartou — zboží si zákazník odnáší hned.');
             }
             updateFinish();
             // hotově → rovnou kalkulačkový displej (K úhradě / Přijato / Vrátit);
@@ -1220,6 +1329,8 @@ document.addEventListener('DOMContentLoaded', function () {
         // výdaj z kasy = peníze ze zásuvky → jen hotově, i když je součet kladný
         var hasExpense = cart.some(function (c) { return c.type === 'expense'; });
         if (hasExpense && payment !== '' && payment !== 'cash') ok = false;
+        // vyzvednutí objednávky: zboží odchází hned → zaplatit na místě
+        if (eshopOrderId > 0 && isInvPay) ok = false;
         $finish.disabled = !ok;
         $finish.innerHTML = t < 0
             ? '<i class="fas fa-hand-holding-dollar me-2"></i>Vyplatit ' + fmt(Math.abs(t))
@@ -1302,6 +1413,7 @@ document.addEventListener('DOMContentLoaded', function () {
             body: JSON.stringify({
                 csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>',
                 payment: payment,
+                eshop_order_id: eshopOrderId,
                 customer_id: parseInt($('#posCustomer').val() || 0, 10),
                 cash_received: (payment === 'cash' && total() > 0) ? (cashVal() === null ? null : cashVal()) : null,
                 items: cart.map(function (c) {
@@ -1330,6 +1442,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (chg) document.getElementById('posDoneChangeVal').textContent = fmt(d.cash_change);
             document.getElementById('posDone').style.display = '';
             cart = []; payment = '';
+            if (eshopOrderId > 0) { eshopBar(null); }   // objednávka je vyzvednutá a zaplacená
             document.querySelectorAll('.pos-pay').forEach(function (b) { b.className = 'pos-pay'; });
             $custWrap.style.display = 'none';
             $cashReceived.value = '';
@@ -1610,6 +1723,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 var exact = results.filter(function (r) { return exactCodes.indexOf(String(r.code || '').toLowerCase()) !== -1; });
                 var hit = exact.length === 1 ? exact[0] : (exact.length === 0 && results.length === 1 ? results[0] : null);
                 if (hit) {
+                    // Rezervovaný kus vrací vyhledávání jako REZERVACI (běžný produktový
+                    // hit je skrytý, dokud objednávka drží dostupnost) — sken sériovky
+                    // proto rovnou natáhne celou objednávku k vyzvednutí.
+                    if (hit.type === 'eshop') {
+                        if (hit.eshop) { window.__afxEshopLoad(hit.eshop); beep(true); posToast(true, 'Rezervace ' + hit.eshop.order_ref + ' načtena'); }
+                        else { beep(false); posToast(false, 'Rezervaci se nepodařilo načíst — otevři ji tlačítkem „Rezervace e-shopu".'); }
+                        return;
+                    }
                     addToCart(hit);
                     beep(true);
                     posToast(true, 'Přidáno: ' + hit.name);

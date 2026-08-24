@@ -38,6 +38,7 @@ function eshopSaleFail(int $http, string $error, ?string $code = null): void {
 ensureProductsTable();
 if (function_exists('ensureProductsPosColumn')) { try { ensureProductsPosColumn(); } catch (Throwable $e) {} }
 ensureEshopOrdersTable();
+ensureEshopReservationSchema();
 
 // ── auth (shodně s api/eshop_feed.php) ─────────────────────────────────────────
 $remote    = (string)($_SERVER['REMOTE_ADDR'] ?? '');
@@ -85,6 +86,11 @@ $note    = mb_substr(trim((string)($body['note'] ?? '')), 0, 500) ?: null;
 
 // volitelná metadata z e-shopu (jen pro potvrzovací e-mail) — zpětně kompatibilní
 $payId     = mb_substr(trim((string)($body['pay_id'] ?? '')), 0, 32);
+// „Platba při vyzvednutí" NENÍ prodej — peníze ještě nepřišly a zboží leží na
+// prodejně. Kus se jen REZERVUJE (zmizí z e-shopu, ale zůstává skladem) a kasou
+// projde teprve při skutečném placení. Ostatní metody (karta, převod, dobírka)
+// zůstávají prodejem jako dosud.
+$isReservation = afxEshopPayIsReservation($payId);
 $shipId    = mb_substr(trim((string)($body['ship_id'] ?? '')), 0, 32);
 $shipLabel = mb_substr(trim((string)($body['ship_label'] ?? '')), 0, 120);
 $addrIn    = is_array($body['address'] ?? null) ? $body['address'] : [];
@@ -102,12 +108,13 @@ try {
     //    (opakovaný webhook) → vrať původní výsledek, sklad NEODEČÍTEJ podruhé.
     try {
         $ins = $pdo->prepare("INSERT INTO eshop_orders
-            (order_ref, status, items_json, total, customer_name, customer_email, customer_phone, note)
-            VALUES (?, 'paid', ?, ?, ?, ?, ?, ?)");
+            (order_ref, status, items_json, total, customer_name, customer_email, customer_phone, note, pay_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $ins->execute([
             $orderRef,
+            $isReservation ? 'reserved' : 'paid',
             json_encode(array_map(fn($c, $q) => ['code' => $c, 'qty' => $q], array_keys($items), array_values($items)), JSON_UNESCAPED_UNICODE),
-            $total, $cName, $cEmail, $cPhone, $note,
+            $total, $cName, $cEmail, $cPhone, $note, $payId !== '' ? $payId : null,
         ]);
         $eshopOrderId = (int)$pdo->lastInsertId();
     } catch (PDOException $e) {
@@ -131,11 +138,17 @@ try {
 
     // 2) Atomický odečet každého produktu (guard proti souběhu / zápornému stavu).
     $find = $pdo->prepare("SELECT id, title, price, stock_qty FROM products WHERE product_code = ? LIMIT 1");
+    // PRODEJ: odečte kusy ze skladu. REZERVACE: sklad nechá být a jen zvedne
+    // reserved_qty — guard v obou případech hlídá DOSTUPNOST (stock − rezervace),
+    // takže se stejný kus nemůže dvakrát prodat ani dvakrát rezervovat.
     $dec  = $pdo->prepare("UPDATE products
         SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at),
             last_sold_at = NOW()
-        WHERE id = ? AND stock_qty >= ?");
-    $after = $pdo->prepare("SELECT stock_qty FROM products WHERE id = ?");
+        WHERE id = ? AND stock_qty - reserved_qty >= ?");
+    $res  = $pdo->prepare("UPDATE products SET reserved_qty = reserved_qty + ?
+        WHERE id = ? AND stock_qty - reserved_qty >= ?");
+    $resLog = $pdo->prepare("INSERT INTO eshop_order_reservations (order_id, product_id, qty, unit_price) VALUES (?, ?, ?, ?)");
+    $after = $pdo->prepare("SELECT stock_qty - reserved_qty FROM products WHERE id = ?");
 
     $results = [];
     $emailItems = [];
@@ -146,11 +159,15 @@ try {
             $pdo->rollBack();
             eshopSaleFail(409, 'Produkt „' . $code . '" v CRM neexistuje.', $code);
         }
-        $dec->execute([$qty, (int)$p['id'], $qty]);
-        if ($dec->rowCount() === 0) {
+        $upd = $isReservation ? $res : $dec;
+        $upd->execute([$qty, (int)$p['id'], $qty]);
+        if ($upd->rowCount() === 0) {
             $pdo->rollBack();
             eshopSaleFail(409, '„' . $p['title'] . '" už není skladem v požadovaném počtu.', $code);
         }
+        // cena se zamrazí v okamžiku objednávky — zákazník platí, za co si objednal,
+        // i kdyby se mezitím ceník změnil
+        if ($isReservation) { $resLog->execute([$eshopOrderId, (int)$p['id'], $qty, round((float)$p['price'], 2)]); }
         $after->execute([(int)$p['id']]);
         $results[] = ['code' => $code, 'qty' => $qty, 'stock_after' => (int)$after->fetchColumn()];
         $emailItems[] = ['title' => (string)$p['title'], 'qty' => $qty, 'price' => (float)$p['price']];
@@ -162,7 +179,8 @@ try {
     try { require_once __DIR__ . '/../includes/notify_push.php'; crmPushEshopOrder($pdo, $eshopOrderId ?? 0, $orderRef, $total, $cName); } catch (Throwable $e) {}
 
     echo json_encode([
-        'ok' => true, 'order_ref' => $orderRef, 'status' => 'paid',
+        'ok' => true, 'order_ref' => $orderRef, 'status' => $isReservation ? 'reserved' : 'paid',
+        'reserved' => $isReservation,
         'already_processed' => false, 'items' => $results,
     ], JSON_UNESCAPED_UNICODE);
 

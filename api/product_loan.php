@@ -42,6 +42,12 @@ if (!crmCanModifyBranchStock(crmProductBranchId($id))) {
     echo json_encode(['success' => false, 'message' => 'Tento produkt patří jiné pobočce — zapůjčku smí řešit jen její zaměstnanci.']); exit;
 }
 
+if ($action === 'lend' && function_exists('afxProductReservationBlock')) {
+    // zapůjčení nemění sklad, ale kus fyzicky odchází — rezervovaný kus by pak
+    // u vyzvednutí nebyl k dispozici
+    $resBlock = afxProductReservationBlock($id);
+    if ($resBlock !== '') { echo json_encode(['success' => false, 'message' => $resBlock], JSON_UNESCAPED_UNICODE); exit; }
+}
 if ($action === 'lend') {
     if ($to === '') { echo json_encode(['success' => false, 'message' => 'Vyplň, komu je kus zapůjčen.']); exit; }
     $who = trim((string)($_SESSION['user_name'] ?? $_SESSION['tech_name'] ?? ''));

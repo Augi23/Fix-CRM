@@ -11,6 +11,33 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.56.1',
+        'date' => '2026-08-24',
+        'time' => '20:10',
+        'title' => 'E-shop: nezaplacená objednávka = REZERVACE, prodej až po zaplacení',
+        'items' => [
+            '<b>Objednávka s platbou při vyzvednutí už není prodej.</b> Kus se jen <b>rezervuje</b>: z e-shopu zmizí (nikdo jiný ho nekoupí), ale zůstává skladem — žádná tržba, žádná účtenka, sklad se neodečítá. Zaplatí se a prodá teprve na kase, až si zákazník přijde.',
+            'V Pokladně je nové tlačítko <b>„Rezervace e-shopu"</b> (a rezervace se najdou i vyhledáváním podle čísla objednávky, jména či telefonu): jedním klikem natáhne celou objednávku do košíku, po zaplacení se označí za vyzvednutou a rezervace se uvolní. Platí se hotově nebo kartou; storno prodejky rezervaci zase vrátí.',
+            'Rezervovaný kus <b>nejde prodat někomu jinému</b> — kasa to odmítne s číslem objednávky. Ve skladu Produkty ho poznáš podle poznámky „rezervováno pro e-shop".',
+            'Na Nástěnce je nahoře nová dlaždice <b>„Prodeje z e-shopu"</b> — počet dnes, měsíční počet i tržba a upozornění, kolik rezervací čeká na vyzvednutí. Po rozkliknutí se ukáže <b>seznam prodaných produktů</b> s objednávkami, zákazníky a stavem.',
+            '<b>Platba převodem taky rezervuje.</b> Dokud peníze nedorazí, zboží se neodepisuje. Připsanou platbu <b>páruje CRM samo</b> podle variabilního symbolu (= číslo objednávky, které zákazník dostal v e-mailu i v QR platbě) a sedící částky — teprve pak se objednávka překlopí na zaplacenou a zboží jde k odeslání. Když částka nesedí (částečná platba), pohyb se označí k ručnímu prověření a zboží se nikam neposílá.',
+            'Kdyby platbu párovač nechytil (jiný VS, platba z cizího účtu), je v seznamu na Nástěnce u takové objednávky tlačítko <b>„Platba dorazila — uvolnit k odeslání"</b> (jen vedení). U objednávek na vyzvednutí tlačítko schválně není — ty musí projít kasou, aby vznikl doklad a tržba.',
+            '<b>Dobírka má vlastní stav.</b> Objednávka je nejdřív rezervace; když ji předáš dopravci, klikneš „Předáno dopravci — odesláno" (teď se zboží odepíše ze skladu) a stav je <b>„Odesláno — čeká na platbu"</b> až do chvíle, kdy peníze od dopravce dorazí. Nedoručenou zásilku vrátíš na sklad jedním tlačítkem. Jen karta (zaplaceno online) je prodej hned.',
+            '<b>Zrušení rezervace:</b> u čekající objednávky je tlačítko „Zrušit rezervaci" — zboží se hned vrátí do prodeje (e-shop i kasa). U rezervací starších dvou dnů svítí, kolik dní čekají. Rezervovaný kus navíc nejde smazat ani mu snížit sklad pod rezervovaný počet.',
+        ],
+    ],
+    [
+        'version' => '3.56.0',
+        'date' => '2026-08-24',
+        'time' => '19:05',
+        'title' => '360° prohlídka rovnou z FOTEK — stačí je nahrát v Galerii',
+        'items' => [
+            'Třetí volba Galerie produktu umí místo videa vzít rovnou <b>fotky z točny</b> (8–48 kolem dokola, JPEG/PNG/WebP/HEIC). Server sám <b>odmaže pozadí</b> (AI ořez birefnet), zachová plné rozlišení, správně otočí směr otáčení a vyrobí 360° prohlídku i s přiblížením na produkt — na e-shopu se objeví do pár minut.',
+            'Stav („zpracovává se… / hotovo, N snímků") se ukazuje přímo v Galerii a nově i u kusů, které mají 360° z fotek bez videa. „Přegenerovat" funguje pro obě cesty; nové nahrání fotek nahradí celou předchozí sadu. Sada nahraná na server <b>ručně</b> (bez zdroje v CRM) se ukáže jako „ručně nahraná sada" s náhledem — dřív ji CRM vůbec nevidělo, přestože e-shop 360° zobrazoval.',
+            'Video cesta (dvě otočky) zůstává — když přijdou fotky i video, <b>fotky mají přednost</b>.',
+        ],
+    ],
+    [
         'version' => '3.55.0',
         'date' => '2026-08-24',
         'time' => '18:08',

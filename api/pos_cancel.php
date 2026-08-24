@@ -35,6 +35,8 @@ if ($id <= 0) {
 ensurePosTables();
 ensureInventoryMovesTable();
 ensureProductsPosColumn();
+ensureEshopOrdersTable();
+ensureEshopReservationSchema();
 // DDL pojistky PŘED transakcí — uvnitř by CREATE/ALTER udělal implicitní COMMIT.
 ensurePosCashMovementsTable();
 afxEnsureCashBookTables();
@@ -99,6 +101,28 @@ try {
                     ->execute([(int)$line['item_id'], $id]);
             } catch (Throwable $e) { error_log('pos_cancel vykup unlink: ' . $e->getMessage()); }
         }
+    }
+
+    // Storno prodejky, kterou se vyzvedla objednávka z e-shopu: zboží je zpátky
+    // na skladě (výš), takže se musí vrátit i REZERVACE — jinak by kus visel
+    // volný, ačkoli ho pořád drží nevyřízená online objednávka.
+    // BEZ vlastního try/catch: chyba tady MUSÍ shodit celé storno (vnější catch
+    // rollbackne). Spolknutá výjimka by commitla půlku — prodejka stornovaná,
+    // ale objednávka dál 'collected' a kus zablokovaný napůl vrácenou rezervací.
+    $eshopBack = '';
+    $eo = $pdo->prepare("SELECT id, order_ref FROM eshop_orders WHERE pos_sale_id = ? AND status = 'collected' FOR UPDATE");
+    $eo->execute([$id]);
+    if ($eoRow = $eo->fetch(PDO::FETCH_ASSOC)) {
+        // jen řádky, které tenhle prodej uvolnil (released_at vyplněné) — až přibude
+        // částečné vyzvedávání, nesmí storno navýšit rezervaci dvakrát
+        $rs = $pdo->prepare("SELECT product_id, qty FROM eshop_order_reservations WHERE order_id = ? AND released_at IS NOT NULL");
+        $rs->execute([(int)$eoRow['id']]);
+        $back = $pdo->prepare("UPDATE products SET reserved_qty = COALESCE(reserved_qty, 0) + ? WHERE id = ?");
+        foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) { $back->execute([max(1, (int)$r['qty']), (int)$r['product_id']]); }
+        $pdo->prepare("UPDATE eshop_order_reservations SET released_at = NULL WHERE order_id = ?")->execute([(int)$eoRow['id']]);
+        $pdo->prepare("UPDATE eshop_orders SET status = 'reserved', pos_sale_id = NULL, collected_at = NULL WHERE id = ?")
+            ->execute([(int)$eoRow['id']]);
+        $eshopBack = (string)$eoRow['order_ref'];
     }
 
     $who = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
@@ -170,6 +194,7 @@ foreach ($items as $line) {
 crmAuditLog('kasa.cancel', [
     'entity_type' => 'pos_sale', 'entity_id' => $id, 'entity_label' => (string)$sale['sale_number'],
     'summary' => 'Storno prodeje ' . $sale['sale_number'] . ' za ' . formatMoney((float)$sale['total'])
+        . ($eshopBack !== '' ? ' — objednávka z e-shopu ' . $eshopBack . ' je zase rezervovaná' : '')
         . (!empty($sale['invoice_id']) ? ' (zrušena i faktura)' : '')
         . ($stornoMoveId > 0 ? ' — výdej hotovosti zapsán do pokladního deníku' . ($stornoDocNumber !== '' ? ' (' . $stornoDocNumber . ')' : '') : '')
         . ($missingParts ? ' — díl „' . implode('“, „', $missingParts) . '“ už není ve skladu, kusy se nevrátily' : ''),

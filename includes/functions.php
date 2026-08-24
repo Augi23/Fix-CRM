@@ -2273,7 +2273,8 @@ function ensureEshopOrdersTable(): void {
             note VARCHAR(500) NULL DEFAULT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uq_eshop_order_ref (order_ref),
-            KEY idx_eshop_created (created_at)
+            KEY idx_eshop_created (created_at),
+            KEY idx_eshop_status (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     } catch (Throwable $e) { error_log('ensureEshopOrdersTable: ' . $e->getMessage()); }
 }
@@ -2304,6 +2305,465 @@ function ensureEshopOrderAlertsTable(): void {
                 ->execute([date('Y-m-d H:i:s')]);
         }
     } catch (Throwable $e) { error_log('ensureEshopOrderAlertsTable: ' . $e->getMessage()); }
+}
+
+/* ── REZERVACE Z E-SHOPU (v3.56.0) ─────────────────────────────────────────
+   Objednávka s platbou „při vyzvednutí" (pay_id 'odber') NENÍ prodej: peníze
+   ještě nepřišly a zboží leží na prodejně. Kus se proto jen REZERVUJE —
+   products.reserved_qty drží počet rezervovaných kusů, DOSTUPNOST pro e-shop
+   je stock_qty − reserved_qty. Skutečný prodej (odečet stock_qty, doklad,
+   tržba) proběhne teprve na kase při placení. */
+
+function ensureEshopReservationSchema(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    if ($pdo->inTransaction()) { return; }   // DDL by potvrdil rozdělanou transakci
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM products LIKE 'reserved_qty'")->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN reserved_qty INT NOT NULL DEFAULT 0");
+        }
+        foreach ([
+            ['pay_id', "ALTER TABLE eshop_orders ADD COLUMN pay_id VARCHAR(32) NULL DEFAULT NULL"],
+            ['pos_sale_id', "ALTER TABLE eshop_orders ADD COLUMN pos_sale_id INT NULL DEFAULT NULL"],
+            ['collected_at', "ALTER TABLE eshop_orders ADD COLUMN collected_at DATETIME NULL DEFAULT NULL"],
+            ['paid_at', "ALTER TABLE eshop_orders ADD COLUMN paid_at DATETIME NULL DEFAULT NULL"],
+            ['shipped_at', "ALTER TABLE eshop_orders ADD COLUMN shipped_at DATETIME NULL DEFAULT NULL"],
+        ] as [$col, $ddl]) {
+            if (!$pdo->query("SHOW COLUMNS FROM eshop_orders LIKE '" . $col . "'")->fetch()) { $pdo->exec($ddl); }
+        }
+        try {
+            if (!$pdo->query("SHOW INDEX FROM eshop_orders WHERE Key_name = 'idx_eshop_status'")->fetch()) {
+                $pdo->exec("ALTER TABLE eshop_orders ADD KEY idx_eshop_status (status)");
+            }
+        } catch (Throwable $e) {}
+        $pdo->exec("CREATE TABLE IF NOT EXISTS eshop_order_reservations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            product_id INT NOT NULL,
+            qty INT NOT NULL DEFAULT 1,
+            unit_price DECIMAL(10,2) NULL DEFAULT NULL,
+            released_at DATETIME NULL DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_res_order (order_id),
+            KEY idx_res_product (product_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        if (!$pdo->query("SHOW COLUMNS FROM eshop_order_reservations LIKE 'unit_price'")->fetch()) {
+            $pdo->exec("ALTER TABLE eshop_order_reservations ADD COLUMN unit_price DECIMAL(10,2) NULL DEFAULT NULL");
+        }
+    } catch (Throwable $e) { error_log('ensureEshopReservationSchema: ' . $e->getMessage()); }
+}
+
+/** Platební metody e-shopu, u kterých peníze v okamžiku objednávky JEŠTĚ NEDORAZILY
+ *  → zboží se jen REZERVUJE, prodej vznikne až po zaplacení:
+ *   'odber'  = platba při vyzvednutí → prodá se na kase, až si zákazník přijde,
+ *   'prevod' = bankovní převod → prodá se po připsání a spárování platby (VS = číslo
+ *              objednávky; páruje kbAutoMatch… nebo ručně tlačítkem na Nástěnce).
+ *  Karta (Stripe) je zaplacená online a dobírka odchází dopravci — ty jsou prodej hned. */
+function afxEshopPayIsReservation(string $payId): bool {
+    return in_array($payId, ['odber', 'prevod', 'dobirka'], true);
+}
+
+/** Variabilní symbol e-shopové objednávky pro platbu převodem.
+ *  VLASTNÍ JMENNÝ PROSTOR: 8 + šestimístné id (8000042). Holé id (1–3 číslice)
+ *  by kolidovalo s VS faktur i s překlepy zákazníků a párovač by cizí platbou
+ *  odepsal sklad. Zpět na id se dostane afxEshopOrderIdFromVs(). */
+function afxEshopOrderVs(int $orderId): string {
+    return $orderId > 0 ? '8' . str_pad((string)$orderId, 6, '0', STR_PAD_LEFT) : '';
+}
+
+/** Číslo objednávky z variabilního symbolu; 0 = VS nepatří e-shopu. */
+function afxEshopOrderIdFromVs(string $vs): int {
+    $d = preg_replace('/\D+/', '', $vs) ?? '';
+    if (strlen($d) !== 7 || $d[0] !== '8') { return 0; }
+    return (int)substr($d, 1);
+}
+
+/** Proč objednávka čeká — pro hlášky v CRM (kasa, dlaždice, upozornění). */
+function afxEshopReservationReason(string $payId): string {
+    if ($payId === 'prevod')  { return 'čeká na platbu převodem'; }
+    if ($payId === 'odber')   { return 'čeká na vyzvednutí a zaplacení na prodejně'; }
+    if ($payId === 'dobirka') { return 'čeká na odeslání — platí se dopravci při převzetí'; }
+    return 'čeká na zaplacení';
+}
+
+/** Lidský popis stavu objednávky pro CRM. */
+function afxEshopStatusLabel(string $status, string $payId = ''): string {
+    switch ($status) {
+        case 'reserved':  return 'Rezervace — ' . afxEshopReservationReason($payId);
+        case 'shipped':   return 'Odesláno — čeká na platbu od dopravce';
+        case 'collected': return 'Vyzvednuto a zaplaceno na prodejně';
+        case 'returned':  return 'Nedoručeno — vráceno na sklad';
+        case 'cancelled': return 'Zrušeno — zboží zpět v prodeji';
+        case 'paid':      return 'Zaplaceno';
+    }
+    return $status;
+}
+
+/**
+ * DOBÍRKA — předáno dopravci: zboží fyzicky odchází (odečet skladu, uvolnění
+ * rezervace), ale peníze ještě nedorazily → stav 'shipped'. Zaplaceno se označí
+ * až po připsání od dopravce (afxEshopMarkCodPaid), nedoručenou zásilku vrátí
+ * na sklad afxEshopReturnToStock.
+ */
+function afxEshopMarkShipped(int $orderId, string $by = ''): array {
+    global $pdo;
+    ensureEshopReservationSchema();
+    if ($pdo->inTransaction()) { return ['ok' => false, 'error' => 'Nelze uvnitř jiné transakce.']; }
+    try {
+        $pdo->beginTransaction();
+        $lk = $pdo->prepare("SELECT id, order_ref, status, total FROM eshop_orders WHERE id = ? FOR UPDATE");
+        $lk->execute([$orderId]);
+        $o = $lk->fetch(PDO::FETCH_ASSOC);
+        if (!$o) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávka nenalezena.']; }
+        if ((string)$o['status'] !== 'reserved') {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => 'Objednávka ' . $o['order_ref'] . ' už není rezervovaná (stav „' . $o['status'] . '").'];
+        }
+        $rs = $pdo->prepare("SELECT r.product_id, r.qty, p.title FROM eshop_order_reservations r
+            JOIN products p ON p.id = r.product_id WHERE r.order_id = ? AND r.released_at IS NULL");
+        $rs->execute([$orderId]);
+        $rows = $rs->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávka nemá rezervované kusy.']; }
+        // Guard počítá DOSTUPNOST a přičítá jen vlastní rezervaci (stejně jako kasa) —
+        // cizí rezervace tak nejde odeslat ani omylem.
+        $dec = $pdo->prepare("UPDATE products
+            SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at), last_sold_at = NOW()
+            WHERE id = ? AND stock_qty >= ? AND stock_qty - COALESCE(reserved_qty, 0) + ? >= ?");
+        $rel = $pdo->prepare("UPDATE products SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - ?, 0) WHERE id = ?");
+        foreach ($rows as $r) {
+            $q = max(1, (int)$r['qty']);
+            $dec->execute([$q, (int)$r['product_id'], $q, $q, $q]);
+            if ($dec->rowCount() === 0) { $pdo->rollBack(); return ['ok' => false, 'error' => '„' . $r['title'] . '" už není skladem — zásilku nelze odeslat.']; }
+            $rel->execute([$q, (int)$r['product_id']]);
+        }
+        $pdo->prepare("UPDATE eshop_order_reservations SET released_at = NOW() WHERE order_id = ? AND released_at IS NULL")->execute([$orderId]);
+        $fin = $pdo->prepare("UPDATE eshop_orders SET status = 'shipped', shipped_at = NOW() WHERE id = ? AND status = 'reserved'");
+        $fin->execute([$orderId]);
+        if ($fin->rowCount() === 0) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávku mezitím vyřídil někdo jiný.']; }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        error_log('afxEshopMarkShipped: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'Databázová chyba — objednávka se nezměnila.'];
+    }
+    try {
+        crmAuditLog('eshop.order_shipped', [
+            'entity_type' => 'eshop_order', 'entity_id' => $orderId, 'entity_label' => (string)$o['order_ref'],
+            'summary' => 'Objednávka z e-shopu ' . $o['order_ref'] . ' předána dopravci (dobírka ' . formatMoney((float)$o['total'])
+                . ') — zboží odepsáno ze skladu, čeká se na platbu' . ($by !== '' ? ' · ' . $by : ''),
+        ]);
+    } catch (Throwable $e) {}
+    return ['ok' => true, 'error' => '', 'order_ref' => (string)$o['order_ref']];
+}
+
+/** DOBÍRKA — peníze od dopravce dorazily. Sklad se nemění (zboží už odešlo). */
+function afxEshopMarkCodPaid(int $orderId, string $by = ''): array {
+    global $pdo;
+    ensureEshopReservationSchema();
+    try {
+        $st = $pdo->prepare("SELECT id, order_ref, status, total FROM eshop_orders WHERE id = ?");
+        $st->execute([$orderId]);
+        $o = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$o) { return ['ok' => false, 'error' => 'Objednávka nenalezena.']; }
+        if ((string)$o['status'] !== 'shipped') {
+            return ['ok' => false, 'error' => 'Označit platbu dobírky jde jen u odeslané zásilky (stav je „' . $o['status'] . '").'];
+        }
+        $up = $pdo->prepare("UPDATE eshop_orders SET status = 'paid', paid_at = NOW() WHERE id = ? AND status = 'shipped'");
+        $up->execute([$orderId]);
+        if ($up->rowCount() === 0) { return ['ok' => false, 'error' => 'Objednávku mezitím vyřídil někdo jiný.']; }
+        crmAuditLog('eshop.order_paid', [
+            'entity_type' => 'eshop_order', 'entity_id' => $orderId, 'entity_label' => (string)$o['order_ref'],
+            'summary' => 'Dobírka k objednávce ' . $o['order_ref'] . ' zaplacena (' . formatMoney((float)$o['total'])
+                . ', peníze od dopravce)' . ($by !== '' ? ' · ' . $by : ''),
+        ]);
+        return ['ok' => true, 'error' => '', 'order_ref' => (string)$o['order_ref']];
+    } catch (Throwable $e) {
+        error_log('afxEshopMarkCodPaid: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'Databázová chyba — objednávka se nezměnila.'];
+    }
+}
+
+/**
+ * ZRUŠENÍ REZERVACE (zákazník si nepřišel, objednávku ruší, testovací objednávka…).
+ * Uvolní držené kusy zpět do prodeje — bez toho by rezervovaný kus zůstal zamčený
+ * navždy: z e-shopu zmizí a kasa ho odmítne prodat komukoli jinému.
+ */
+function afxEshopCancelReservation(int $orderId, string $by = '', string $reason = ''): array {
+    global $pdo;
+    ensureEshopReservationSchema();
+    if ($pdo->inTransaction()) { return ['ok' => false, 'error' => 'Nelze uvnitř jiné transakce.']; }
+    try {
+        $pdo->beginTransaction();
+        $lk = $pdo->prepare("SELECT id, order_ref, status FROM eshop_orders WHERE id = ? FOR UPDATE");
+        $lk->execute([$orderId]);
+        $o = $lk->fetch(PDO::FETCH_ASSOC);
+        if (!$o) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávka nenalezena.']; }
+        if ((string)$o['status'] !== 'reserved') {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => 'Zrušit jde jen rezervace (stav je „' . $o['status'] . '").'];
+        }
+        $rs = $pdo->prepare("SELECT product_id, qty FROM eshop_order_reservations WHERE order_id = ? AND released_at IS NULL");
+        $rs->execute([$orderId]);
+        $free = $pdo->prepare("UPDATE products SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - ?, 0) WHERE id = ?");
+        foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) { $free->execute([max(1, (int)$r['qty']), (int)$r['product_id']]); }
+        $pdo->prepare("UPDATE eshop_order_reservations SET released_at = NOW() WHERE order_id = ? AND released_at IS NULL")->execute([$orderId]);
+        $fin = $pdo->prepare("UPDATE eshop_orders SET status = 'cancelled' WHERE id = ? AND status = 'reserved'");
+        $fin->execute([$orderId]);
+        if ($fin->rowCount() === 0) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávku mezitím vyřídil někdo jiný.']; }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        error_log('afxEshopCancelReservation: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'Databázová chyba — rezervace se nezměnila.'];
+    }
+    try {
+        crmAuditLog('eshop.order_cancelled', [
+            'entity_type' => 'eshop_order', 'entity_id' => $orderId, 'entity_label' => (string)$o['order_ref'],
+            'summary' => 'Zrušena rezervace z e-shopu ' . $o['order_ref'] . ' — zboží uvolněno zpět do prodeje'
+                . ($reason !== '' ? ' (' . mb_substr($reason, 0, 120) . ')' : '') . ($by !== '' ? ' · ' . $by : ''),
+        ]);
+    } catch (Throwable $e) {}
+    return ['ok' => true, 'error' => '', 'order_ref' => (string)$o['order_ref']];
+}
+
+/** Drží kus nevyřízená rezervace? Text pro hlášku, prázdno = volný.
+ *  Používá se jako GUARD před smazáním/vynulováním kusu ve skladu. */
+function afxProductReservationBlock(int $productId, int $keepQty = 0): string {
+    global $pdo;
+    try {
+        ensureEshopReservationSchema();
+        $st = $pdo->prepare("SELECT COALESCE(reserved_qty, 0) FROM products WHERE id = ?");
+        $st->execute([$productId]);
+        $res = (int)$st->fetchColumn();
+        if ($res > 0 && $keepQty < $res) {
+            $info = afxProductReservationInfo($productId);
+            return 'Kus drží nevyřízená objednávka z e-shopu'
+                . (!empty($info['order_ref']) ? ' ' . $info['order_ref'] : '')
+                . (!empty($info['customer_name']) ? ' (' . $info['customer_name'] . ')' : '')
+                . ' — nejdřív ji vyřiď nebo rezervaci zruš na Nástěnce (Prodeje z e-shopu).';
+        }
+        // Odeslaná dobírka: rezervace je uvolněná, ale zboží je u dopravce a může
+        // se vrátit — smazání kusu by návrat na sklad tiše zahodilo.
+        $sh = $pdo->prepare("SELECT o.order_ref FROM eshop_order_reservations r
+            JOIN eshop_orders o ON o.id = r.order_id
+            WHERE r.product_id = ? AND o.status = 'shipped' LIMIT 1");
+        $sh->execute([$productId]);
+        $ref = $sh->fetchColumn();
+        if ($ref !== false && $ref !== null) {
+            return 'Kus je u dopravce (objednávka ' . (string)$ref . ' čeká na platbu nebo návrat) — počkej, až se dobírka doplatí nebo vrátí.';
+        }
+        return '';
+    } catch (Throwable $e) {
+        // FAIL-CLOSED: guard chrání zboží zákazníka; při chybě raději nepustit dál
+        error_log('afxProductReservationBlock: ' . $e->getMessage());
+        return 'Nelze ověřit rezervace z e-shopu (chyba databáze) — zkus to prosím znovu.';
+    }
+}
+
+/** Nedoručená zásilka se vrátila — zboží zpět na sklad (stav 'returned'). */
+function afxEshopReturnToStock(int $orderId, string $by = ''): array {
+    global $pdo;
+    ensureEshopReservationSchema();
+    if ($pdo->inTransaction()) { return ['ok' => false, 'error' => 'Nelze uvnitř jiné transakce.']; }
+    try {
+        $pdo->beginTransaction();
+        $lk = $pdo->prepare("SELECT id, order_ref, status FROM eshop_orders WHERE id = ? FOR UPDATE");
+        $lk->execute([$orderId]);
+        $o = $lk->fetch(PDO::FETCH_ASSOC);
+        if (!$o) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávka nenalezena.']; }
+        // Vrátit jde odeslanou zásilku (nedoručeno) i už zaplacenou objednávku
+        // (odstoupení od smlouvy do 14 dnů) — v obou případech zboží fyzicky leží u nás.
+        if (!in_array((string)$o['status'], ['shipped', 'paid'], true)) {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => 'Vrátit na sklad jde jen odeslaná nebo zaplacená objednávka (stav je „' . $o['status'] . '").'];
+        }
+        // jen řádky, které se opravdu odepsaly (released) — jinak by se sklad nafoukl
+        $rs = $pdo->prepare("SELECT product_id, qty FROM eshop_order_reservations WHERE order_id = ? AND released_at IS NOT NULL");
+        $rs->execute([$orderId]);
+        $back = $pdo->prepare("UPDATE products SET stock_qty = stock_qty + ?, pos_sold_at = NULL, last_sold_at = NULL WHERE id = ?");
+        foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) { $back->execute([max(1, (int)$r['qty']), (int)$r['product_id']]); }
+        $fin = $pdo->prepare("UPDATE eshop_orders SET status = 'returned' WHERE id = ? AND status IN ('shipped', 'paid')");
+        $fin->execute([$orderId]);
+        if ($fin->rowCount() === 0) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávku mezitím vyřídil někdo jiný.']; }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        error_log('afxEshopReturnToStock: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'Databázová chyba — objednávka se nezměnila.'];
+    }
+    try {
+        crmAuditLog('eshop.order_returned', [
+            'entity_type' => 'eshop_order', 'entity_id' => $orderId, 'entity_label' => (string)$o['order_ref'],
+            'summary' => 'Zásilka k objednávce ' . $o['order_ref'] . ' se vrátila (nedoručeno) — zboží zpět na sklad'
+                . ($by !== '' ? ' · ' . $by : ''),
+        ]);
+    } catch (Throwable $e) {}
+    return ['ok' => true, 'error' => '', 'order_ref' => (string)$o['order_ref']];
+}
+
+/**
+ * REZERVACE → PRODEJ mimo kasu (zaplaceno převodem: peníze dorazily, zboží se
+ * expeduje). Odečte sklad, uvolní rezervaci a objednávku překlopí na 'paid'.
+ * Vyzvednutí na prodejně tudy NEJDE — to řeší kasa (doklad, tržba, šuplík).
+ * Vrací ['ok' => bool, 'error' => string].
+ */
+function afxEshopReleaseAsSale(int $orderId, string $by = '', string $note = ''): array {
+    global $pdo;
+    ensureEshopReservationSchema();
+    if ($pdo->inTransaction()) { return ['ok' => false, 'error' => 'Nelze uvnitř jiné transakce.']; }
+    try {
+        $pdo->beginTransaction();
+        $lk = $pdo->prepare("SELECT id, order_ref, status, pay_id, total FROM eshop_orders WHERE id = ? FOR UPDATE");
+        $lk->execute([$orderId]);
+        $o = $lk->fetch(PDO::FETCH_ASSOC);
+        if (!$o) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávka nenalezena.']; }
+        if ((string)$o['status'] !== 'reserved') {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => 'Objednávka ' . $o['order_ref'] . ' už není rezervovaná (stav „' . $o['status'] . '").'];
+        }
+        $rs = $pdo->prepare("SELECT r.id, r.product_id, r.qty, p.title FROM eshop_order_reservations r
+            JOIN products p ON p.id = r.product_id
+            WHERE r.order_id = ? AND r.released_at IS NULL");
+        $rs->execute([$orderId]);
+        $rows = $rs->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávka nemá rezervované kusy.']; }
+
+        $dec = $pdo->prepare("UPDATE products
+            SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at), last_sold_at = NOW()
+            WHERE id = ? AND stock_qty >= ? AND stock_qty - COALESCE(reserved_qty, 0) + ? >= ?");
+        $rel = $pdo->prepare("UPDATE products SET reserved_qty = GREATEST(COALESCE(reserved_qty, 0) - ?, 0) WHERE id = ?");
+        foreach ($rows as $r) {
+            $q = max(1, (int)$r['qty']);
+            $dec->execute([$q, (int)$r['product_id'], $q, $q, $q]);
+            if ($dec->rowCount() === 0) {
+                $pdo->rollBack();
+                return ['ok' => false, 'error' => '„' . $r['title'] . '" už není skladem — zboží nejde vydat.'];
+            }
+            $rel->execute([$q, (int)$r['product_id']]);
+        }
+        $pdo->prepare("UPDATE eshop_order_reservations SET released_at = NOW() WHERE order_id = ? AND released_at IS NULL")
+            ->execute([$orderId]);
+        $fin = $pdo->prepare("UPDATE eshop_orders SET status = 'paid', paid_at = NOW() WHERE id = ? AND status = 'reserved'");
+        $fin->execute([$orderId]);
+        if ($fin->rowCount() === 0) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávku mezitím vyřídil někdo jiný.']; }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        error_log('afxEshopReleaseAsSale: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'Databázová chyba — objednávka se nezměnila.'];
+    }
+    try {
+        crmAuditLog('eshop.order_paid', [
+            'entity_type' => 'eshop_order', 'entity_id' => $orderId, 'entity_label' => (string)$o['order_ref'],
+            'summary' => 'Objednávka z e-shopu ' . $o['order_ref'] . ' zaplacena (' . formatMoney((float)$o['total']) . ')'
+                . ($note !== '' ? ' — ' . $note : '') . ' → zboží odepsáno ze skladu k expedici'
+                . ($by !== '' ? ' · ' . $by : ''),
+        ]);
+    } catch (Throwable $e) {}
+    return ['ok' => true, 'error' => '', 'order_ref' => (string)$o['order_ref']];
+}
+
+/** Otevřené (nevyzvednuté) rezervace kusu — pro hlášky v kase i skladu. */
+function afxProductReservationInfo(int $productId): array {
+    global $pdo;
+    try {
+        ensureEshopReservationSchema();
+        $st = $pdo->prepare("SELECT o.id, o.order_ref, o.customer_name, r.qty
+            FROM eshop_order_reservations r JOIN eshop_orders o ON o.id = r.order_id
+            WHERE r.product_id = ? AND r.released_at IS NULL AND o.status = 'reserved'
+            ORDER BY r.id ASC LIMIT 1");
+        $st->execute([$productId]);
+        return $st->fetch(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
+/** Čekající rezervace z e-shopu (pro kasu: tlačítko i vyhledávání).
+ *  Vrací pole hitů s rozepsanými položkami — název, kód, počet, cena z CRM
+ *  (autorita ceny je aktuální ceník skladu; e-shop prodává za stejné ceny). */
+function afxEshopReservationHits(string $q = '', int $limit = 12): array {
+    global $pdo;
+    ensureEshopReservationSchema();
+    // Kasa vyzvedává KAŽDOU čekající objednávku: když si zákazník s objednávkou
+    // na převod či dobírku přijde a zaplatí na pultě, je to řádná tržba s dokladem
+    // (a bankovní párování už objednávku neuvidí — hledá jen stav 'reserved').
+    $sql = "SELECT o.id, o.order_ref, o.total, o.customer_name, o.customer_phone, o.created_at, o.pay_id
+            FROM eshop_orders o WHERE o.status = 'reserved'";
+    $par = [];
+    if ($q !== '' && mb_strlen($q) < 2) { return []; }   // jedno písmeno = full scan přes LIKE
+    if ($q !== '') {
+        $like = '%' . $q . '%';
+        $sql .= " AND (o.order_ref LIKE ? OR o.customer_name LIKE ? OR o.customer_phone LIKE ?
+                   OR EXISTS (SELECT 1 FROM eshop_order_reservations r JOIN products p ON p.id = r.product_id
+                              WHERE r.order_id = o.id AND r.released_at IS NULL
+                                AND (p.title LIKE ? OR p.product_code LIKE ?)))";
+        $par = [$like, $like, $like, $like, $like];
+    }
+    $sql .= " ORDER BY o.id DESC LIMIT " . max(1, min(30, $limit));
+    $st = $pdo->prepare($sql);
+    $st->execute($par);
+    $orders = $st->fetchAll(PDO::FETCH_ASSOC);
+    if (!$orders) { return []; }
+
+    // Cena = ta, za kterou zákazník objednal (unit_price z okamžiku rezervace);
+    // aktuální ceník je jen záloha pro starší řádky bez zapsané ceny.
+    // LEFT JOIN schválně: kdyby kus ze skladu zmizel (smazání/přesun), NESMÍ se
+    // položka tiše ztratit — checkout porovnává košík s rezervací na kus přesně
+    // a nesouhlas by obsluhu zacyklil. Chybějící kus hit označí jako 'broken'.
+    $its = $pdo->prepare("SELECT r.product_id, r.qty, COALESCE(r.unit_price, p.price) AS price,
+            p.id AS pid, p.title, p.product_code, p.grade, p.stock_qty, p.branch_id
+        FROM eshop_order_reservations r LEFT JOIN products p ON p.id = r.product_id
+        WHERE r.order_id = ? AND r.released_at IS NULL ORDER BY r.id ASC");
+    $myBranch = function_exists('getCurrentStaffBranchId') ? (int)getCurrentStaffBranchId() : 0;
+    $globalView = function_exists('isBranchGlobalViewer') ? isBranchGlobalViewer() : true;
+    $out = [];
+    foreach ($orders as $o) {
+        $its->execute([(int)$o['id']]);
+        $items = [];
+        $branchId = 0;
+        $broken = '';
+        $sumItems = 0.0;
+        foreach ($its->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            if (empty($r['pid'])) {   // kus už ve skladu není
+                $broken = 'Kus z objednávky už není ve skladu — rezervaci zruš na Nástěnce.';
+                continue;
+            }
+            if ($branchId === 0) { $branchId = (int)($r['branch_id'] ?? 0); }
+            $qty = max(1, (int)$r['qty']);
+            $sumItems += round((float)$r['price'], 2) * $qty;
+            $items[] = [
+                'product_id' => (int)$r['product_id'],
+                'name' => (string)$r['title'] . (trim((string)($r['grade'] ?? '')) !== '' ? ' (stav ' . trim((string)$r['grade']) . ')' : ''),
+                'code' => (string)($r['product_code'] ?? ''),
+                'qty' => $qty,
+                'price' => round((float)$r['price'], 2),
+                'stock' => (int)$r['stock_qty'],
+            ];
+        }
+        if (!$items && $broken === '') { continue; }   // rezervace bez otevřených řádků (uvolněné)
+        // Zboží cizí pobočky kasa nenabízí — checkout by ho stejně odmítl a obsluze
+        // by se mezitím vysypal košík (stejné pravidlo jako u výkupů).
+        if (!$globalView && $branchId > 0 && $myBranch > 0 && $branchId !== $myBranch) { continue; }
+        $out[] = [
+            'id' => (int)$o['id'],
+            'order_ref' => (string)$o['order_ref'],
+            'customer' => trim((string)($o['customer_name'] ?? '')) ?: '—',
+            'phone' => trim((string)($o['customer_phone'] ?? '')),
+            'total' => (float)$o['total'],
+            'created' => date('j. n. Y H:i', strtotime((string)$o['created_at'])),
+            'branch' => $branchId > 0 && function_exists('skladBranchLabel') ? skladBranchLabel($branchId) : '',
+            'pay_id' => (string)($o['pay_id'] ?? ''),
+            'reason' => afxEshopReservationReason((string)($o['pay_id'] ?? '')),
+            'broken' => $broken,
+            // rozdíl mezi součtem položek a objednávkou (změna ceníku mezi objednáním
+            // a vyzvednutím) — kasa na něj musí obsluhu upozornit, ne ho spolknout
+            'items_total' => round($sumItems, 2),
+            'total_diff' => round($sumItems - (float)$o['total'], 2),
+            'items' => $items,
+        ];
+    }
+    return $out;
 }
 
 /** Klíč účtu pro potvrzení upozornění — stejný vzor jako blokace kasy/auth epochy. */
@@ -6616,7 +7076,7 @@ function crmEshopOrderEmailHtml(array $o): string
         $acc = trim((string)get_setting('acc_bank_account', ''));
         if (!function_exists('crmCzAccountToIban') && is_file(__DIR__ . '/kb_api.php')) { require_once __DIR__ . '/kb_api.php'; }
         $iban   = function_exists('crmCzAccountToIban') ? crmCzAccountToIban($acc) : '';
-        $vs     = (string)(int)($o['eshop_order_id'] ?? 0);
+        $vs     = afxEshopOrderVs((int)($o['eshop_order_id'] ?? 0));
         $amount = number_format((float)($o['total'] ?? 0), 2, '.', '');
         $msgRaw = 'Objednavka ' . $ref;
         $msgAscii = strtoupper(preg_replace('/[^A-Za-z0-9 .,\/-]/', '', iconv('UTF-8', 'ASCII//TRANSLIT', $msgRaw) ?: $msgRaw));
@@ -6626,7 +7086,7 @@ function crmEshopOrderEmailHtml(array $o): string
             . '<td align="right" style="padding:9px 0 9px 16px;border-top:1px solid ' . $hair . ';' . $t(14, 500, '1.3', $ink, 'font-variant-numeric:tabular-nums;') . '">' . $v . '</td></tr>';
         $lines = ($acc !== '' ? $ln('Číslo účtu', $e($acc)) : '')
             . $ln('Částka', $money($o['total'] ?? 0))
-            . ($vs !== '0' ? $ln('Variabilní symbol', $e($vs)) : '')
+            . ($vs !== '' ? $ln('Variabilní symbol', $e($vs)) : '')
             . $ln('Zpráva', $e($msgRaw));
 
         $qrCell = '';

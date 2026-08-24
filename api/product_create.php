@@ -80,6 +80,9 @@ if ($action === 'get') {
         'id' => (int)$p['id'],
         // AFX-/PREVIEW- generované kódy se do pole SN nepropisují (nejsou to sériová čísla)
         'serial' => (str_starts_with($code, 'AFX-') || str_starts_with($code, 'PREVIEW')) ? '' : $code,
+        // Skutečný kód kusu — 360° prohlídka se na produkt váže přes něj (složka na disku),
+        // takže u příslušenství a kusů bez SN je tohle jediná cesta, jak ji vůbec nahrát.
+        'product_code' => $code,
         'title' => (string)$p['title'],
         'model' => (string)($p['model'] ?? ''),
         'manufacturer' => (string)($p['manufacturer'] ?? ''),
@@ -448,6 +451,15 @@ try {
                 'today_count' => (int)$pdo->query("SELECT COUNT(*) FROM products WHERE DATE(added_at) = CURDATE()")->fetchColumn(),
             ], JSON_UNESCAPED_UNICODE);
             exit;
+        }
+    }
+
+    // Editace nesmí snížit sklad pod počet kusů držených objednávkou z e-shopu —
+    // online zákazník by přišel k prázdnému regálu a rezervaci by nešlo vyřídit.
+    if ($action === 'update' && function_exists('afxProductReservationBlock')) {
+        $resBlock = afxProductReservationBlock($editId, $stockQty);
+        if ($resBlock !== '') {
+            echo json_encode(['success' => false, 'message' => $resBlock], JSON_UNESCAPED_UNICODE); exit;
         }
     }
 

@@ -166,6 +166,162 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
 ?>
 
+<?php if (crmCanManageProducts()): ?>
+<?php /* Prodeje z vlastního e-shopu (applefix.click) — počet + rozklikávací seznam.
+         Rezervace („platba při vyzvednutí") se do prodejů NEPOČÍTAJÍ: zboží ještě
+         není zaplacené, čeká na kase. Data: api/eshop_dashboard.php. */ ?>
+<div class="eshop-tile mb-4" id="eshopTile" role="button" tabindex="0" title="Klikni pro seznam prodaných produktů"
+     data-can-manage="<?php echo crmCanDeleteOrders() ? '1' : '0'; ?>">
+    <div class="eshop-tile-ic"><i class="fas fa-cart-shopping"></i></div>
+    <div class="eshop-tile-main">
+        <div class="eshop-tile-label">Prodeje z e-shopu</div>
+        <div class="eshop-tile-value"><span id="eshopTileToday">–</span> <span class="eshop-tile-unit">dnes</span></div>
+    </div>
+    <div class="eshop-tile-side">
+        <div class="eshop-tile-month"><span id="eshopTileMonth">–</span> tento měsíc · <span id="eshopTileSum">–</span></div>
+        <div class="eshop-tile-res" id="eshopTileRes" style="display:none;"></div>
+    </div>
+    <div class="eshop-tile-cta"><i class="fas fa-list me-1"></i>Zobrazit prodané</div>
+</div>
+<style>
+.eshop-tile{display:flex;align-items:center;gap:16px;padding:14px 18px;border-radius:var(--r2,16px);cursor:pointer;
+    background:linear-gradient(135deg,rgba(48,209,88,.14),rgba(48,209,88,.05));border:1px solid rgba(48,209,88,.32);
+    transition:filter .15s ease,transform .15s ease;}
+.eshop-tile:hover{filter:brightness(1.08);transform:translateY(-1px);}
+.eshop-tile-ic{width:42px;height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:center;border-radius:12px;
+    background:rgba(48,209,88,.18);color:#7ce39a;font-size:1.15rem;}
+.eshop-tile-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:rgba(233,238,247,.6);}
+.eshop-tile-value{font-size:1.6rem;font-weight:800;line-height:1.15;color:#fff;}
+.eshop-tile-unit{font-size:.9rem;font-weight:600;color:rgba(233,238,247,.55);}
+.eshop-tile-side{margin-left:auto;text-align:right;}
+.eshop-tile-month{font-size:.9rem;color:rgba(233,238,247,.75);font-weight:600;}
+.eshop-tile-res{margin-top:4px;font-size:.82rem;font-weight:700;color:#ffd479;}
+.eshop-tile-cta{padding:8px 14px;border-radius:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+    font-size:.85rem;font-weight:700;color:#eef4ff;white-space:nowrap;}
+@media (max-width:575.98px){.eshop-tile{flex-wrap:wrap;}.eshop-tile-side{margin-left:0;text-align:left;width:100%;}.eshop-tile-cta{width:100%;text-align:center;}}
+.eshop-modal-row{display:flex;gap:12px;padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.09);margin-bottom:8px;align-items:flex-start;}
+.eshop-modal-row .ref{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#9fe7b6;font-size:.9rem;}
+.eshop-modal-row .who{font-size:.85rem;color:rgba(233,238,247,.7);}
+.eshop-modal-row .items{margin-top:5px;font-size:.9rem;color:#eef4ff;white-space:pre-line;}
+.eshop-modal-row .amt{margin-left:auto;text-align:right;font-weight:800;white-space:nowrap;}
+.eshop-badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:800;letter-spacing:.04em;}
+.eshop-badge.paid{background:rgba(48,209,88,.18);color:#7ce39a;}
+.eshop-badge.reserved{background:rgba(255,214,10,.18);color:#ffd479;}
+.eshop-badge.collected{background:rgba(10,132,255,.18);color:#7ab8ff;}
+</style>
+<div class="modal fade" id="eshopSalesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-cart-shopping me-2 text-success"></i>Prodeje z e-shopu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="eshopSalesBody">
+                <div class="text-white-50 small">Načítám…</div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var tile = document.getElementById('eshopTile');
+    if (!tile) return;
+    var loaded = null;
+    function esc(x) { return String(x == null ? '' : x).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function money(v) { return new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(v) + ' Kč'; }
+    function load() {
+        return fetch('api/eshop_dashboard.php', { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.ok) return null;
+                loaded = d;
+                document.getElementById('eshopTileToday').textContent = d.today;
+                document.getElementById('eshopTileMonth').textContent = d.month;
+                document.getElementById('eshopTileSum').textContent = money(d.month_total || 0);
+                var res = document.getElementById('eshopTileRes');
+                if (d.reserved > 0) {
+                    res.style.display = '';
+                    res.innerHTML = '<i class="fas fa-clock me-1"></i>' + d.reserved + ' rezervac' + (d.reserved === 1 ? 'e čeká' : (d.reserved < 5 ? 'e čekají' : 'í čeká')) + ' na zaplacení'
+                        + (d.shipped > 0 ? ' · ' + d.shipped + ' na cestě (dobírka)' : '');
+                } else if (d.shipped > 0) {
+                    res.style.display = '';
+                    res.innerHTML = '<i class="fas fa-truck me-1"></i>' + d.shipped + ' dobírk' + (d.shipped === 1 ? 'a' : 'y') + ' na cestě — čeká na platbu';
+                } else { res.style.display = 'none'; }
+                return d;
+            })
+            .catch(function () { return null; });
+    }
+    function render(d) {
+        var body = document.getElementById('eshopSalesBody');
+        if (!d || !d.orders || !d.orders.length) {
+            body.innerHTML = '<div class="text-white-50 small">Zatím žádná objednávka z e-shopu.</div>';
+            return;
+        }
+        var labels = { paid: 'paid', reserved: 'reserved', collected: 'collected', shipped: 'reserved', returned: 'reserved', cancelled: 'reserved' };
+        var canManage = tile.dataset.canManage === '1';   // akce smí jen vedení (admin/Boss)
+        var btn = function (act, o, cls, ic, label) {
+            if (!canManage) { return ''; }
+            return '<button type="button" class="btn btn-sm ' + cls + ' eshop-act-btn" data-act="' + act + '" data-id="' + Number(o.id)
+                + '" data-ref="' + esc(o.order_ref) + '"><i class="fas ' + ic + ' me-1"></i>' + esc(label) + '</button>';
+        };
+        body.innerHTML = d.orders.map(function (o) {
+            var lb = [labels[o.status] || 'paid', o.status_label || o.status];
+            var items = (o.items || []).map(function (i) { return i.qty + '× ' + i.name; }).join('\n');
+            return '<div class="eshop-modal-row"><div style="min-width:0;">'
+                + '<span class="ref">' + esc(o.order_ref) + '</span> <span class="eshop-badge ' + lb[0] + '">' + esc(lb[1]) + '</span>'
+
+                + '<div class="who">' + esc(o.customer) + (o.phone ? ' · ' + esc(o.phone) : '') + ' · ' + esc(o.date) + '</div>'
+                + '<div class="items">' + esc(items || '—') + '</div>'
+                + (o.waiting_days > 2 ? '<div class="who" style="color:#ffd479;">čeká už ' + Number(o.waiting_days) + ' dní</div>' : '')
+                + '<div class="d-flex gap-2 flex-wrap mt-2">'
+                + (o.can_ship ? btn('ship', o, 'btn-primary', 'fa-truck', 'Předáno dopravci — odesláno') : '')
+                + (o.can_pay ? btn('paid', o, 'btn-success', 'fa-check', o.status === 'shipped' ? 'Platba od dopravce dorazila' : 'Platba dorazila — uvolnit k odeslání') : '')
+                + (o.can_return ? btn('return', o, 'btn-outline-warning', 'fa-rotate-left', 'Nedoručeno — zpět na sklad') : '')
+                + (o.can_cancel ? btn('cancel', o, 'btn-outline-danger', 'fa-ban', 'Zrušit rezervaci') : '')
+                + '</div></div><div class="amt">' + money(o.total || 0) + '</div></div>';
+        }).join('');
+        // ruční kroky, které nejdou automaticky (platba mimo párování, expedice dobírky,
+        // vrácená zásilka, zrušení rezervace)
+        var asks = {
+            paid: 'Opravdu je objednávka ORDER zaplacená? U převodu se zboží teď odepíše ze skladu k odeslání.',
+            ship: 'Předáváš objednávku ORDER dopravci? Zboží se odepíše ze skladu, platba dorazí od dopravce.',
+            'return': 'Vrátila se zásilka k objednávce ORDER? Zboží se vrátí na sklad.',
+            cancel: 'Zrušit rezervaci ORDER? Zboží se uvolní zpět do prodeje (na e-shop i kasu).'
+        };
+        body.querySelectorAll('.eshop-act-btn').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var act = b.dataset.act;
+                if (!confirm((asks[act] || 'Provést?').replace('ORDER', b.dataset.ref))) { return; }
+                b.disabled = true;
+                var fd = new FormData();
+                fd.append('order_id', b.dataset.id);
+                fd.append('action', act);
+                fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+                fetch('api/eshop_order_paid.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (res) {
+                        if (res && res.ok) { loaded = null; load().then(render); }
+                        else { b.disabled = false; alert((res && res.error) || 'Nepovedlo se.'); }
+                    })
+                    .catch(function () { b.disabled = false; alert('Síťová chyba.'); });
+            });
+        });
+    }
+    function open() {
+        var m = bootstrap.Modal.getOrCreateInstance(document.getElementById('eshopSalesModal'));
+        document.getElementById('eshopSalesBody').innerHTML = '<div class="text-white-50 small">Načítám…</div>';
+        m.show();
+        (loaded ? Promise.resolve(loaded) : load()).then(render);
+    }
+    tile.addEventListener('click', open);
+    tile.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    load();
+})();
+</script>
+<?php endif; ?>
+
 <!-- 4 statistiky + pobočky na jednom řádku (pobočky nad sebou, stejná celková výška) -->
 <div class="crm-stat-row mb-4">
 <?php /* Sdílené dlaždice (stejné na Nástěnce i v Zakázkách) */ include __DIR__ . '/includes/partials/stat_tiles.php'; ?>

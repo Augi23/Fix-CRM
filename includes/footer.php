@@ -303,7 +303,17 @@ window.AFX_AMBIENT_INTERVAL_MIN = 15;
     }
     function open(it){
         showing = it;
-        document.getElementById('eshopAlertRef').textContent = it.order_ref || '—';
+        document.getElementById('eshopAlertRef').textContent = (it.order_ref || '—') + (it.reserved ? ' · REZERVACE' : '');
+        var kick = document.querySelector('#eshopAlertOverlay .eshop-alert-kicker');
+        if (kick) {
+            kick.textContent = '';
+            var ic = document.createElement('i');
+            ic.className = it.reserved ? 'fas fa-clock me-2' : 'fas fa-cart-shopping me-2';
+            kick.appendChild(ic);
+            kick.appendChild(document.createTextNode(it.reserved
+                ? ('Rezervace z e-shopu — ' + (it.reason || 'čeká na zaplacení'))
+                : 'Nová objednávka z e-shopu'));
+        }
         document.getElementById('eshopAlertTotal').textContent = money(it.total || 0);
         document.getElementById('eshopAlertCustomer').textContent = it.customer || '—';
         setRow('eshopAlertPhoneRow', 'eshopAlertPhone', it.phone || '');

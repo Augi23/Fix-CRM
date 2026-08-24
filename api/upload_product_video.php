@@ -29,6 +29,10 @@ $sessionOk = (!empty($_SESSION['user_id']) || !empty($_SESSION['tech_id']))
     && crmCanManageProducts();
 if (!$sessionOk) {
     if ((!empty($_SESSION['user_id']) || !empty($_SESSION['tech_id'])) && isset($_POST['csrf_token'])) {
+        // chybějící oprávnění NEHLÁSIT jako vypršelé přihlášení — obsluha jinak dokola mačká ⌘R
+        if (!crmCanManageProducts()) {
+            afx_vid_fail('Nahrávat 360° video produktů nemáš oprávnění — potřebuješ právo „Sklad – spravovat" (přidá ho vedení v Nastavení).', 403);
+        }
         afx_vid_fail('Přihlášení vypršelo — obnov stránku (⌘R) a zkus video znovu.', 403);
     }
     $token = (string)($_POST['token'] ?? ($_SERVER['HTTP_X_AFX_TOKEN'] ?? ''));
@@ -74,6 +78,18 @@ if (!@move_uploaded_file($tmp, $dest)) { afx_vid_fail('Uložení videa selhalo.'
 // Zápis do vlastní složky CRM (žádný cross-user problém); dispatcher ho jen ČTE.
 @file_put_contents($dir . '/' . $safe . '.code', $code);
 @chmod($dir . '/' . $safe . '.code', 0644);
+
+// POSLEDNÍ UPLOAD VYHRÁVÁ: fotky mají v dispatcheru před videem přednost, takže stará
+// sada fotek by nové video navždy blokovala (status by lhal „processing"). Smazat ji —
+// až PO úspěšném uložení videa, aby neúspěšný upload nezničil funkční zdroj.
+$photosDir = $dir . '/' . $safe . '-photos';
+if (is_dir($photosDir)) {
+    foreach ((array)scandir($photosDir) as $pf) {
+        if ($pf === '.' || $pf === '..') { continue; }
+        if (is_file($photosDir . '/' . $pf)) { @unlink($photosDir . '/' . $pf); }
+    }
+    @rmdir($photosDir);
+}
 
 $host = $_SERVER['HTTP_HOST'] ?? 'admin.applefix.cloud';
 $url = 'https://' . $host . '/media/products/360/' . rawurlencode($safe) . '.' . $ext . '?v=' . (int)@filemtime($dest);

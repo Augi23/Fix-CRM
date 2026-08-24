@@ -19,6 +19,7 @@ ensureProductsTable();
 ensureProductsPosColumn();
 ensurePosTables();
 ensureOrderPaymentMethodColumn();
+ensureEshopReservationSchema();   // reserved_qty se čte v dotazech níž
 
 
 // POBOČKA: kasa smí prodat jen zboží SVÉ pobočky — api/pos_checkout.php položku
@@ -98,7 +99,10 @@ try {
                 GROUP BY vykup_product_id) vdx ON vdx.vykup_product_id = p.id
             LEFT JOIN crm_documents vd ON vd.id = vdx.doc_id";
     $branchSqlP = str_replace('branch_id', 'p.branch_id', $branchSql);
-    $prodCols = "p.id, p.title, p.product_code, p.stock_qty, p.price, p.grade";
+    // 'stock' pro UI = DOSTUPNOST (sklad − rezervace e-shopu): jinak by kasa
+    // nabízela „skladem 14 ks" u zboží, kde je 12 volných, a checkout by to
+    // odmítl až po naskládání košíku.
+    $prodCols = "p.id, p.title, p.product_code, GREATEST(p.stock_qty - COALESCE(p.reserved_qty, 0), 0) AS stock_qty, p.price, p.grade";
     $vykupCols = ", vd.id AS vykup_doc_id, vd.doc_number AS vykup_doc_number, vd.price AS vykup_price, vd.branch_id AS vykup_branch_id";
     $prodRows = [];
     foreach ([true, false] as $withVykup) {
@@ -106,14 +110,14 @@ try {
             if ($qRaw === '') {
                 $st = $pdo->prepare("SELECT " . $prodCols . ($withVykup ? $vykupCols : '') . "
                     FROM products p" . ($withVykup ? $vykupJoin : '') . "
-                    WHERE p.stock_qty > 0" . $branchSqlP . " ORDER BY p.added_at DESC, p.id DESC LIMIT 8");
+                    WHERE p.stock_qty - COALESCE(p.reserved_qty, 0) > 0" . $branchSqlP . " ORDER BY p.added_at DESC, p.id DESC LIMIT 8");
                 $st->execute($branchArgs);
             } else {
                 $params = [$like, $like];
                 $productCodeSql = $codeLikeSql('p.product_code', $codeTerms, $params);
                 $st = $pdo->prepare("SELECT " . $prodCols . ($withVykup ? $vykupCols : '') . "
                     FROM products p" . ($withVykup ? $vykupJoin : '') . "
-                    WHERE p.stock_qty > 0 AND (p.title LIKE ? OR p.model LIKE ? OR $productCodeSql)" . $branchSqlP . " ORDER BY p.title ASC LIMIT 15");
+                    WHERE p.stock_qty - COALESCE(p.reserved_qty, 0) > 0 AND (p.title LIKE ? OR p.model LIKE ? OR $productCodeSql)" . $branchSqlP . " ORDER BY p.title ASC LIMIT 15");
                 $st->execute(array_merge($params, $branchArgs));
             }
             $prodRows = $st->fetchAll();
@@ -195,6 +199,26 @@ try {
             ];
         }
     }
+    // ── rezervace z e-shopu (platba při vyzvednutí) ──
+    // Objednávka čeká na zaplacení: hit vloží do košíku VŠECHNY její kusy naráz
+    // a prodejku sváže s objednávkou (kasa ji pak označí za vyzvednutou).
+    try {
+        foreach (afxEshopReservationHits($qRaw, $qRaw === '' ? 5 : 10) as $h) {
+            $kusy = 0;
+            foreach ($h['items'] as $it) { $kusy += (int)$it['qty']; }
+            $results[] = [
+                'type' => 'eshop',
+                'id' => (int)$h['id'],
+                'name' => 'Rezervace e-shopu ' . $h['order_ref'] . ' — ' . $h['customer']
+                    . ' · ' . $kusy . ' ks',
+                'code' => $h['order_ref'],
+                'stock' => 1,
+                'price' => 0,
+                'used' => false,
+                'eshop' => $h,
+            ];
+        }
+    } catch (Throwable $e) { error_log('pos_search eshop: ' . $e->getMessage()); }
 } catch (Throwable $e) {
     error_log('pos_search: ' . $e->getMessage());
 }
