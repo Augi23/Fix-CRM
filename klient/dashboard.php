@@ -87,6 +87,38 @@ if (isset($pdo) && $selectedOrder) {
     }
 }
 
+/* ---- REKLAMACE KLIENTA (v3.57.0) ----------------------------------------
+   Dřív se reklamace ukazovala JEN jako řádek u vybrané zakázky — a jen tehdy,
+   když k ní byla navázaná (order_id). Reklamace přijaté na prodejně bez vazby
+   na zakázku (většina!) klient nikdy neviděl a fotky z nich vůbec.
+   Teď se načítají VŠECHNY reklamace zákazníka i s přílohami.
+   POZOR: žádné ensure funkce ani DDL — schéma se z veřejného portálu neupravuje. */
+$clientComplaints = [];
+$clientComplaintsMore = 0;
+if (isset($pdo) && $customerId > 0) {
+    try {
+        $cst = $pdo->prepare("SELECT c.*, o.order_code AS linked_order_code
+            FROM complaints c LEFT JOIN orders o ON o.id = c.order_id AND o.customer_id = c.customer_id
+            WHERE c.customer_id = ? ORDER BY c.id DESC LIMIT 31");
+        $cst->execute([$customerId]);
+        $clientComplaints = $cst->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (count($clientComplaints) > 30) {        // 31. řádek je jen signál „je toho víc"
+            $clientComplaintsMore = 1;
+            array_pop($clientComplaints);
+        }
+        if ($clientComplaints && function_exists('crmGetComplaintMediaBatch')) {
+            $media = crmGetComplaintMediaBatch($pdo, array_map(static fn($c) => (int)$c['id'], $clientComplaints));
+            foreach ($clientComplaints as $i => $c) {
+                $clientComplaints[$i]['media'] = $media[(int)$c['id']] ?? [];
+            }
+        }
+    } catch (Throwable $e) {
+        // tichý catch dřív maskoval přesně ten problém, který se tu opravuje
+        error_log('klient dashboard reklamace: ' . $e->getMessage());
+        $clientComplaints = [];
+    }
+}
+
 $clientStatusHistory = [];
 if (!empty($selectedOrder['id'])) {
     try {
@@ -490,6 +522,30 @@ if ($selectedOrder && isset($pdo)) {
             font-weight: 600;
         }
 
+        /* ── reklamace klienta ── */
+        .cmpl-list { display: grid; gap: 12px; }
+        .cmpl-card { border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.03);
+            border-radius: 16px; padding: 14px 16px; }
+        .cmpl-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .cmpl-code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #ffcfa1; letter-spacing: .02em; }
+        .cmpl-badge { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+            background: rgba(249,115,22,0.16); color: #ffcfa1; border: 1px solid rgba(249,115,22,0.30); }
+        .cmpl-badge.done { background: rgba(48,209,88,0.16); color: #7ce39a; border-color: rgba(48,209,88,0.32); }
+        .cmpl-date { margin-left: auto; font-size: 12.5px; color: rgba(255,255,255,0.45); }
+        .cmpl-device { margin-top: 7px; font-weight: 600; font-size: 15px; }
+        .cmpl-order { font-weight: 400; color: rgba(255,255,255,0.5); font-size: 13px; }
+        .cmpl-row { display: flex; gap: 10px; margin-top: 8px; font-size: 14px; }
+        .cmpl-row .k { flex: 0 0 96px; color: rgba(255,255,255,0.45); font-size: 12px; text-transform: uppercase;
+            letter-spacing: .05em; font-weight: 700; padding-top: 2px; }
+        .cmpl-row .v { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+        /* odkazy uvnitř karty se na úzkém displeji nesmí oříznout (.client-card má overflow:hidden) */
+        .cmpl-card .doc-links { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+        .cmpl-card .media-grid { grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); }
+        .cmpl-when { color: rgba(255,255,255,0.45); font-style: normal; font-size: 12.5px; }
+        .cmpl-photos-label { margin-top: 12px; margin-bottom: 6px; font-size: 12px; text-transform: uppercase;
+            letter-spacing: .05em; font-weight: 700; color: rgba(255,255,255,0.45); }
+        @media (max-width: 575.98px) { .cmpl-row { flex-direction: column; gap: 2px; } .cmpl-row .k { flex: none; } }
+
         .media-section {
             margin-top: 18px;
             padding: 16px;
@@ -863,6 +919,98 @@ if ($selectedOrder && isset($pdo)) {
                                 <?php endforeach; ?>
                             </div>
                         </div>
+
+                        <?php if (!empty($clientComplaints)): ?>
+                        <?php /* VŠECHNY reklamace zákazníka i s fotkami — i ty přijaté na
+                                 prodejně bez vazby na konkrétní zakázku (ty klient dřív neviděl).
+                                 Přílohy se servírují přes hlídaný endpoint (klient/api/complaint_file.php),
+                                 ne přímým odkazem do /uploads — bývá mezi nimi i osobní doklad. */ ?>
+                        <div class="media-section">
+                            <div class="media-section-title">
+                                <div>
+                                    <h4><i class="fas fa-rotate-left me-2"></i><?php echo e(__('client_complaints_title')); ?></h4>
+                                    <p><?php echo e(__('client_complaints_desc')); ?></p>
+                                </div>
+                            </div>
+                            <div class="cmpl-list">
+                                <?php foreach ($clientComplaints as $c): ?>
+                                    <?php
+                                        $cStatus = trim((string)($c['complaint_status'] ?? ''));
+                                        // stav je z pevného číselníku (api/update_complaint_status.php) —
+                                        // podřetězec by „Nevyřízeno" označil za vyřízené
+                                        $cDone = in_array($cStatus, ['Vyřízeno', 'Zamítnuto'], true);
+                                        $cStatusLabel = $cStatus !== ''
+                                            ? (function_exists('crmClientComplaintStatusLabel') ? crmClientComplaintStatusLabel($cStatus) : $cStatus)
+                                            : __('client_complaint_status_unknown');
+                                        $cMedia  = $c['media'] ?? [];
+                                        $cPhotos = array_values(array_filter($cMedia, static fn($m) => function_exists('crmComplaintMediaIsViewableImage') && crmComplaintMediaIsViewableImage($m)));
+                                        $cFiles  = array_values(array_filter($cMedia, static fn($m) => !(function_exists('crmComplaintMediaIsViewableImage') && crmComplaintMediaIsViewableImage($m))));
+                                        $cFileUrl = static fn(array $m): string => 'api/complaint_file.php?id=' . (int)($m['id'] ?? 0)
+                                            . '&src=' . rawurlencode((string)($m['src'] ?? 'media'));
+                                        $cWhen = strtotime((string)($c['created_at'] ?? ''));
+                                    ?>
+                                    <div class="cmpl-card">
+                                        <div class="cmpl-head">
+                                            <span class="cmpl-code"><?php echo e((string)($c['complaint_code'] ?? '')); ?></span>
+                                            <span class="cmpl-badge<?php echo $cDone ? ' done' : ''; ?>"><?php echo e($cStatusLabel); ?></span>
+                                            <?php if ($cWhen): ?><span class="cmpl-date"><?php echo e(date('d.m.Y', $cWhen)); ?></span><?php endif; ?>
+                                        </div>
+                                        <div class="cmpl-device"><?php echo e(trim((string)($c['device'] ?? '')) ?: __('client_complaint_device_unknown')); ?>
+                                            <?php if (!empty($c['linked_order_code'])): ?>
+                                                <span class="cmpl-order">· <?php echo e(__('client_complaint_to_order')); ?> <?php echo e((string)$c['linked_order_code']); ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php if (trim((string)($c['complaint_reason'] ?? '')) !== ''): ?>
+                                            <div class="cmpl-row"><span class="k"><?php echo e(__('client_complaint_reason')); ?></span><span class="v"><?php echo e((string)$c['complaint_reason']); ?></span></div>
+                                        <?php endif; ?>
+                                        <?php if (trim((string)($c['requested_resolution'] ?? '')) !== ''): ?>
+                                            <div class="cmpl-row"><span class="k"><?php echo e(__('client_complaint_requested')); ?></span><span class="v"><?php echo e((string)$c['requested_resolution']); ?></span></div>
+                                        <?php endif; ?>
+                                        <?php if (trim((string)($c['resolution_text'] ?? '')) !== ''): ?>
+                                            <div class="cmpl-row"><span class="k"><?php echo e(__('client_complaint_result')); ?></span><span class="v"><?php echo e((string)$c['resolution_text']); ?>
+                                                <?php if (!empty($c['resolved_at']) && strtotime((string)$c['resolved_at'])): ?><em class="cmpl-when">(<?php echo e(date('d.m.Y', strtotime((string)$c['resolved_at']))); ?>)</em><?php endif; ?>
+                                            </span></div>
+                                        <?php endif; ?>
+
+                                        <?php if ($cPhotos): ?>
+                                            <div class="cmpl-photos-label"><i class="fas fa-camera me-1"></i><?php echo e(__('client_complaint_photos')); ?></div>
+                                            <div class="media-grid">
+                                                <?php foreach ($cPhotos as $m): ?>
+                                                    <?php $u = $cFileUrl($m); ?>
+                                                    <a class="media-card" href="<?php echo e($u); ?>" target="_blank" rel="noopener noreferrer">
+                                                        <img src="<?php echo e($u); ?>" alt="<?php echo e(__('client_complaint_photos')); ?>" loading="lazy">
+                                                        <div class="media-card-caption"><?php echo e((string)($m['file_name'] ?: __('client_media_caption_default'))); ?></div>
+                                                    </a>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if ($cFiles): ?>
+                                            <div class="doc-links mt-2">
+                                                <?php foreach ($cFiles as $m): ?>
+                                                    <a class="doc-link" href="<?php echo e($cFileUrl($m)); ?>" target="_blank" rel="noopener noreferrer">
+                                                        <span class="doc-link-ico"><i class="fas fa-file-lines"></i></span>
+                                                        <span class="doc-link-label"><?php echo e((string)($m['file_name'] ?: __('client_complaint_attachment'))); ?></span>
+                                                        <i class="fas fa-arrow-up-right-from-square doc-link-ext"></i>
+                                                    </a>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <div class="doc-links mt-2">
+                                            <a class="doc-link" href="document.php?type=complaint&amp;complaint=<?php echo (int)$c['id']; ?>" target="_blank" rel="noopener noreferrer">
+                                                <span class="doc-link-ico"><i class="fas fa-clipboard-check"></i></span>
+                                                <span class="doc-link-label"><?php echo e(__('client_doc_complaint_protocol')); ?></span>
+                                                <i class="fas fa-arrow-up-right-from-square doc-link-ext"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php if ($clientComplaintsMore): ?>
+                                <p class="mt-2 mb-0" style="font-size:12.5px;color:rgba(255,255,255,.45);"><?php echo e(__('client_complaints_more')); ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
 
                         <?php if ($orderComplaint): ?>
                             <div class="order-notice" style="background: rgba(249,115,22,0.12); border-color: rgba(249,115,22,0.28); color: #ffcfa1;">

@@ -4959,6 +4959,77 @@ function crmStaffDisplayName(): string
     return 'Systém';
 }
 
+/** Stav reklamace v jazyce klienta. Číselník je pevný (api/update_complaint_status.php),
+ *  takže stačí mapa na jazykové klíče; neznámý stav se vrátí, jak je v DB. */
+function crmClientComplaintStatusLabel(string $status): string
+{
+    $map = [
+        'Přijato' => 'cmpl_st_received',
+        'V řešení' => 'cmpl_st_in_progress',
+        'Čeká na zákazníka' => 'cmpl_st_waiting_customer',
+        'Vyřízeno' => 'cmpl_st_resolved',
+        'Zamítnuto' => 'cmpl_st_rejected',
+    ];
+    $key = $map[trim($status)] ?? '';
+    if ($key === '') { return $status; }
+    $t = __($key);
+    return ($t === '' || $t === $key) ? $status : $t;
+}
+
+/** MIME typ přílohy — dopočítá se z přípony, když ho DB nemá.
+ *  HEIC schválně NEplatí za zobrazitelný obrázek: prohlížeče mimo Apple ho neumí
+ *  a v <img> by z něj byl rozbitý rámeček (i na tištěném protokolu). */
+function crmComplaintMediaType(array $row): string
+{
+    $t = strtolower(trim((string)($row['file_type'] ?? '')));
+    if ($t === '') {
+        $ext = strtolower((string)pathinfo((string)($row['file_path'] ?? ''), PATHINFO_EXTENSION));
+        if ($ext === 'jpg') { $ext = 'jpeg'; }
+        if (in_array($ext, ['jpeg', 'png', 'gif', 'webp', 'heic', 'heif'], true)) { $t = 'image/' . $ext; }
+        elseif ($ext === 'pdf') { $t = 'application/pdf'; }
+        elseif (in_array($ext, ['mp4', 'mov', 'webm'], true)) { $t = 'video/' . $ext; }
+    }
+    if ($t === 'image/jpg') { $t = 'image/jpeg'; }
+    return $t;
+}
+
+/** Jde příloha vykreslit jako <img> v prohlížeči i v tisku? (HEIC ne — viz výš) */
+function crmComplaintMediaIsViewableImage(array $row): bool
+{
+    $t = crmComplaintMediaType($row);
+    return in_array($t, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true);
+}
+
+/** Přílohy VÍC reklamací najednou (klientský portál): stejné slévání obou tabulek
+ *  jako crmGetComplaintMedia, ale 2 dotazy celkem místo 2 na každou reklamaci.
+ *  Vrací [complaint_id => [řádky…]] seřazené od nejstarší. */
+function crmGetComplaintMediaBatch(PDO $pdo, array $complaintIds): array
+{
+    $ids = array_values(array_unique(array_map('intval', $complaintIds)));
+    $ids = array_values(array_filter($ids, static fn($i) => $i > 0));
+    if (!$ids) { return []; }
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $out = [];
+    foreach ([['complaint_media', 'media'], ['complaint_attachments', 'attachment']] as [$tbl, $src]) {
+        try {
+            $st = $pdo->prepare("SELECT id, complaint_id, file_path, file_type, file_name, created_at
+                                 FROM `$tbl` WHERE complaint_id IN ($ph) ORDER BY id ASC");
+            $st->execute($ids);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                if (trim((string)($r['file_path'] ?? '')) === '') { continue; }
+                $r['src'] = $src;
+                $r['file_type'] = crmComplaintMediaType($r);
+                $out[(int)$r['complaint_id']][] = $r;
+            }
+        } catch (Throwable $e) { /* starší instalace bez tabulky */ }
+    }
+    foreach ($out as $cid => $rows) {
+        usort($rows, static fn(array $a, array $b): int => strcmp((string)($a['created_at'] ?? ''), (string)($b['created_at'] ?? '')));
+        $out[$cid] = $rows;
+    }
+    return $out;
+}
+
 /** Všechny přílohy reklamace: nové z detailu (complaint_media, src='media')
  *  + fotky z založení (complaint_attachments, src='attachment'), seřazené od nejstarší. */
 function crmGetComplaintMedia(PDO $pdo, int $complaintId): array

@@ -80,11 +80,27 @@ if (isset($pdo)) {
 $complaint_photos = [];
 if (!empty($rows) && isset($pdo)) {
     try {
+        // Fotky žijí ve DVOU tabulkách: complaint_media (dnešní nahrávání) a
+        // historická complaint_attachments — seznam dřív četl jen tu druhou, takže
+        // u reklamací s fotkami ukazoval nulu.
         $ids = array_map('intval', array_column($rows, 'id'));
-        $q = $pdo->query("SELECT complaint_id, COUNT(*) AS n, MIN(file_path) AS first_path
-                          FROM complaint_attachments WHERE complaint_id IN (" . implode(',', $ids) . ")
-                          GROUP BY complaint_id");
-        foreach ($q as $p) { $complaint_photos[(int)$p['complaint_id']] = $p; }
+        $idList = implode(',', $ids);
+        foreach (['complaint_media', 'complaint_attachments'] as $__ct) {
+            try {
+                // jen obrázky: PDF příloha dřív nafoukla počet „fotek" a proklik náhledu
+                // otevřel PDF (MIN() řadí podle náhodného názvu souboru)
+                $q = $pdo->query("SELECT complaint_id,
+                        COUNT(CASE WHEN COALESCE(file_type,'') LIKE 'image/%' OR LOWER(file_path) REGEXP '\\.(jpg|jpeg|png|gif|webp)$' THEN 1 END) AS n,
+                        MIN(CASE WHEN COALESCE(file_type,'') LIKE 'image/%' OR LOWER(file_path) REGEXP '\\.(jpg|jpeg|png|gif|webp)$' THEN file_path END) AS first_path
+                                  FROM `$__ct` WHERE complaint_id IN ($idList) GROUP BY complaint_id");
+                foreach ($q as $p) {
+                    $cid = (int)$p['complaint_id'];
+                    if (!isset($complaint_photos[$cid])) { $complaint_photos[$cid] = ['complaint_id' => $cid, 'n' => 0, 'first_path' => null]; }
+                    $complaint_photos[$cid]['n'] += (int)$p['n'];
+                    if (empty($complaint_photos[$cid]['first_path'])) { $complaint_photos[$cid]['first_path'] = $p['first_path']; }
+                }
+            } catch (Throwable $e) { /* tabulka nemusí existovat */ }
+        }
     } catch (Throwable $e) { /* bez fotek */ }
 }
 ?>

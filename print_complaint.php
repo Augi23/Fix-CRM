@@ -23,12 +23,13 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) { die(__('unauthori
     $complaint = $stmt->fetch();
     if (!$complaint) die(__("print_not_found"));
 
+    // Přílohy přes sdílený helper (slévá complaint_media + complaint_attachments);
+    // do protokolu jen obrázky, které prohlížeč i tiskárna umí vykreslit (HEIC ne).
     $complaintPhotos = [];
-    try {
-        $ps = $pdo->prepare("SELECT file_path, file_name FROM complaint_attachments WHERE complaint_id = ? ORDER BY id ASC");
-        $ps->execute([$cid]);
-        $complaintPhotos = $ps->fetchAll();
-    } catch (Throwable $e) { $complaintPhotos = []; }
+    foreach (crmGetComplaintMedia($pdo, (int)$cid) as $__pr) {
+        if (function_exists('crmComplaintMediaIsViewableImage') && !crmComplaintMediaIsViewableImage($__pr)) { continue; }
+        $complaintPhotos[] = $__pr;
+    }
 
     $target_lang = $_GET['lang'] ?? crmCustomerDocLang($complaint['preferred_language'] ?? 'cs');
 }
@@ -202,6 +203,8 @@ $__logo_data = is_file($__logo_fs) ? 'data:image/png;base64,' . base64_encode((s
                 <?php foreach ($complaintPhotos as $ph):
                     $pp = (string)($ph['file_path'] ?? '');
                     if ($pp === '') continue;
+                    // smazaný soubor = prázdný rámeček na právním dokumentu → radši vynechat
+                    if (!preg_match('#^https?://#i', $pp) && !is_file(__DIR__ . '/' . ltrim($pp, '/'))) { continue; }
                     if (!preg_match('#^https?://#i', $pp)) { $pp = (defined('COMPLAINT_DOC_EMBED') ? '../' : '') . ltrim($pp, '/'); }
                 ?>
                     <img src="<?php echo htmlspecialchars($pp); ?>" alt="foto">

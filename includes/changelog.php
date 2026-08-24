@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.57.0',
+        'date' => '2026-08-24',
+        'time' => '20:25',
+        'title' => 'Klientská sekce: reklamace i s fotkami konečně vidí zákazník',
+        'items' => [
+            '<b>Zákazník teď v portálu vidí VŠECHNY své reklamace</b> — nová sekce „Moje reklamace" s kódem, stavem, datem, zařízením, důvodem, požadovaným způsobem vyřízení i výsledkem. Dřív se reklamace ukázala jen tehdy, když byla navázaná na právě vybranou zakázku: z 82 reklamací jich takových je 28, takže <b>54 reklamací (41 zákazníků) klient nikdy neviděl</b>.',
+            '<b>Fotky z reklamace se konečně zobrazují.</b> Nahrané přílohy se ukládají do nové tabulky, ale portál, reklamační protokol (klientský i tištěný) a počítadlo fotek v seznamu reklamací četly jen tu starou a prázdnou — fotky proto nebyly vidět nikde kromě detailu reklamace v CRM. Teď se čtou z obou.',
+            'V portálu je u každé reklamace galerie fotek, případné PDF přílohy a odkaz na reklamační protokol; funguje i u reklamací bez vazby na zakázku. Česky, anglicky i rusky (včetně stavu reklamace).',
+            'Z prověrky: přílohy se klientovi vydávají přes <b>hlídaný odkaz</b> (ověří se, že reklamace patří jemu) — dřív by účtenka či faktura visela na trvale veřejné adrese. Dál: fotky ve formátu HEIC se místo rozbitého rámečku nabídnou ke stažení, počítadlo fotek v seznamu reklamací už nepočítá PDF a stav „Nevyřízeno" se nezobrazuje zeleně jako vyřízený.',
+        ],
+    ],
+    [
         'version' => '3.56.1',
         'date' => '2026-08-24',
         'time' => '20:10',

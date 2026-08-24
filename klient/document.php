@@ -30,12 +30,13 @@ if ($type === 'complaint') {
     $complaint = $stmt->fetch();
     if (!$complaint) clientDocDeny();
 
+    // Přílohy přes sdílený helper (slévá complaint_media + complaint_attachments);
+    // do protokolu jen obrázky, které prohlížeč i tiskárna umí vykreslit (HEIC ne).
     $complaintPhotos = [];
-    try {
-        $ps = $pdo->prepare("SELECT file_path, file_name FROM complaint_attachments WHERE complaint_id = ? ORDER BY id ASC");
-        $ps->execute([$complaintId]);
-        $complaintPhotos = $ps->fetchAll();
-    } catch (Throwable $e) { $complaintPhotos = []; }
+    foreach (crmGetComplaintMedia($pdo, (int)$complaintId) as $__pr) {
+        if (function_exists('crmComplaintMediaIsViewableImage') && !crmComplaintMediaIsViewableImage($__pr)) { continue; }
+        $complaintPhotos[] = $__pr;
+    }
 
     define('COMPLAINT_DOC_EMBED', true);
     include __DIR__ . '/../print_complaint.php';
