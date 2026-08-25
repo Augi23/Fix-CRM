@@ -135,12 +135,15 @@ if (!empty($__st_with_web) && function_exists('afxWebVisitStats')) {
     <div class="crm-stat-card crm-stat-web crm-stat-web-<?php echo e($__wk); ?>" role="button" tabindex="0"
          data-web-site="<?php echo e($__wk); ?>" title="Denní návštěvnost <?php echo e($__w['label']); ?> — klikni pro posledních 14 dní">
         <div class="crm-stat-label"><i class="fas fa-chart-line me-1" style="font-size:.7rem;"></i><?php echo e($__w['label']); ?></div>
-        <div class="crm-stat-value"><?php echo (int)$__w['visitors']; ?><span class="crm-stat-secondary"> návštěv</span></div>
+        <?php $__wv = (int)$__w['visitors'];
+              $__wl = $__wv === 1 ? 'návštěvník' : ($__wv >= 2 && $__wv <= 4 ? 'návštěvníci' : 'návštěvníků'); ?>
+        <div class="crm-stat-value"><?php echo $__wv; ?><span class="crm-stat-secondary"> <?php echo $__wl; ?></span></div>
         <div class="crm-stat-sub <?php echo $__w['trend'] > 0 ? 'up' : ($__w['trend'] < 0 ? 'down' : ''); ?>">
             <?php if ($__w['yesterday'] > 0 && $__w['trend'] !== 0): ?>
                 <?php echo $__w['trend'] > 0 ? '↑ ' : '↓ '; ?><?php echo abs($__w['trend']); ?> % vs včera
             <?php elseif ($__w['hits'] > 0): ?>
-                <?php echo (int)$__w['hits']; ?> zobrazení stránek
+                <?php $__wh = (int)$__w['hits'];
+                      echo $__wh . ' ' . ($__wh === 1 ? 'zobrazení stránky' : 'zobrazení stránek'); ?>
             <?php else: ?>
                 zatím dnes nikdo
             <?php endif; ?>
