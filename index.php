@@ -268,7 +268,9 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
     }
     document.addEventListener('click', function (e) {
         var t = e.target.closest ? e.target.closest('.crm-stat-web') : null;
-        if (t && t.dataset.webSite) { open(t.dataset.webSite); }
+        // setTimeout: kliknutí ještě bublá k document, kde si ho Bootstrap vyhodnotí
+        // jako „klik mimo okno" a hned by ho zase zavřel
+        if (t && t.dataset.webSite) { var site = t.dataset.webSite; setTimeout(function () { open(site); }, 0); }
     });
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter' && e.key !== ' ') return;
