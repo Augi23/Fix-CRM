@@ -70,8 +70,30 @@ try {
     $__st_unassigned_leg = (int)($__st_pairRow['ua_leg'] ?? 0);
     $__st_unfinished_leg = (int)($__st_pairRow['uf_leg'] ?? 0);
 } catch (Throwable $e) { $__st_unassigned = $__st_unfinished = $__st_unassigned_leg = $__st_unfinished_leg = 0; }
+
+// ── návštěvnost webů (jen Nástěnka; zapíná se $__st_with_web = true před include) ──
+$__st_web = [];
+if (!empty($__st_with_web) && function_exists('afxWebVisitStats')) {
+    try {
+        $__st_wstats = afxWebVisitStats(2);
+        $__st_today = date('Y-m-d');
+        $__st_yest = date('Y-m-d', strtotime('-1 day'));
+        foreach (AFX_WEB_SITES as $__k => $__label) {
+            $t = $__st_wstats[$__k][$__st_today] ?? ['hits' => 0, 'visitors' => 0];
+            $y = $__st_wstats[$__k][$__st_yest] ?? ['hits' => 0, 'visitors' => 0];
+            $__st_web[$__k] = [
+                'label' => $__label,
+                'visitors' => (int)$t['visitors'],
+                'hits' => (int)$t['hits'],
+                'trend' => ((int)$y['visitors'] > 0)
+                    ? (int)round((((int)$t['visitors'] - (int)$y['visitors']) / (int)$y['visitors']) * 100) : 0,
+                'yesterday' => (int)$y['visitors'],
+            ];
+        }
+    } catch (Throwable $e) { $__st_web = []; }
+}
 ?>
-<div class="crm-stat-grid">
+<div class="crm-stat-grid<?php echo $__st_web ? ' crm-stat-grid--8' : ''; ?>">
     <a href="orders.php" class="crm-stat-card crm-stat-1 text-decoration-none">
         <div class="crm-stat-label"><?php echo __('active_orders'); ?></div>
         <div class="crm-stat-value"><?php echo $__st_active_count; ?><?php if ($__st_active_leg > 0): ?> <span class="crm-stat-secondary">(<?php echo $__st_active_leg; ?>)</span><?php endif; ?></div>
@@ -108,4 +130,21 @@ try {
         <div class="crm-stat-value"><?php echo $__st_unfinished; ?><?php if ($__st_unfinished_leg > 0): ?> <span class="crm-stat-secondary">(<?php echo $__st_unfinished_leg; ?>)</span><?php endif; ?></div>
         <div class="crm-stat-sub"><i class="fas fa-store me-1" style="font-size:.7rem;"></i><?php echo e($__st_pair_label); ?></div>
     </a>
+    <?php /* Návštěvnost webů — vlastní počítadlo (bez cookies), po kliknutí přehled 14 dnů */ ?>
+    <?php foreach ($__st_web as $__wk => $__w): ?>
+    <div class="crm-stat-card crm-stat-web crm-stat-web-<?php echo e($__wk); ?>" role="button" tabindex="0"
+         data-web-site="<?php echo e($__wk); ?>" title="Denní návštěvnost <?php echo e($__w['label']); ?> — klikni pro posledních 14 dní">
+        <div class="crm-stat-label"><i class="fas fa-chart-line me-1" style="font-size:.7rem;"></i><?php echo e($__w['label']); ?></div>
+        <div class="crm-stat-value"><?php echo (int)$__w['visitors']; ?><span class="crm-stat-secondary"> návštěv</span></div>
+        <div class="crm-stat-sub <?php echo $__w['trend'] > 0 ? 'up' : ($__w['trend'] < 0 ? 'down' : ''); ?>">
+            <?php if ($__w['yesterday'] > 0 && $__w['trend'] !== 0): ?>
+                <?php echo $__w['trend'] > 0 ? '↑ ' : '↓ '; ?><?php echo abs($__w['trend']); ?> % vs včera
+            <?php elseif ($__w['hits'] > 0): ?>
+                <?php echo (int)$__w['hits']; ?> zobrazení stránek
+            <?php else: ?>
+                zatím dnes nikdo
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endforeach; ?>
 </div>

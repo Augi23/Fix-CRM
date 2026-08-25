@@ -210,6 +210,69 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 .eshop-badge.reserved{background:rgba(255,214,10,.18);color:#ffd479;}
 .eshop-badge.collected{background:rgba(10,132,255,.18);color:#7ab8ff;}
 </style>
+<div class="modal fade" id="webVisitsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-chart-line me-2 text-info"></i>Návštěvnost webů <span id="webVisitsWhich" class="text-white-50 fs-6"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="webVisitsBody">
+                <div class="text-white-50 small">Načítám…</div>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+.crm-stat-web { cursor: pointer; }
+.wv-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.wv-table th { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: rgba(233,238,247,.5);
+    font-weight: 700; text-align: right; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.wv-table th:first-child { text-align: left; }
+.wv-table td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,.06); text-align: right; }
+.wv-table td:first-child { text-align: left; color: rgba(233,238,247,.75); }
+.wv-bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg,#0A84FF,#5AC8FA); min-width: 2px; }
+.wv-sum { margin-top: 10px; font-size: 13px; color: rgba(233,238,247,.6); }
+</style>
+<script>
+(function () {
+    var tiles = document.querySelectorAll('.crm-stat-web');
+    if (!tiles.length) return;
+    function esc(x) { return String(x == null ? '' : x).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function open(site) {
+        var m = bootstrap.Modal.getOrCreateInstance(document.getElementById('webVisitsModal'));
+        var body = document.getElementById('webVisitsBody');
+        body.innerHTML = '<div class="text-white-50 small">Načítám…</div>';
+        m.show();
+        fetch('api/web_visits.php?days=14', { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.ok || !d.sites || !d.sites[site]) {
+                    body.innerHTML = '<div class="text-white-50 small">Data se nepodařilo načíst.</div>';
+                    return;
+                }
+                var s = d.sites[site];
+                document.getElementById('webVisitsWhich').textContent = '· ' + s.label;
+                var max = Math.max.apply(null, s.days.map(function (x) { return x.visitors; }).concat([1]));
+                body.innerHTML = '<table class="wv-table"><thead><tr><th>Den</th><th>Návštěvníci</th><th>Zobrazení</th><th style="width:38%;"></th></tr></thead><tbody>'
+                    + s.days.slice().reverse().map(function (x) {
+                        return '<tr><td>' + esc(x.label) + '</td><td><b>' + x.visitors + '</b></td><td>' + x.hits + '</td>'
+                            + '<td><div class="wv-bar" style="width:' + Math.round((x.visitors / max) * 100) + '%"></div></td></tr>';
+                    }).join('')
+                    + '</tbody></table>'
+                    + '<div class="wv-sum">Za posledních ' + d.days + ' dní celkem <b>' + s.sum_visitors + '</b> návštěvníků. '
+                    + 'Počítá se bez cookies, roboti se nezapočítávají.</div>';
+            })
+            .catch(function () { body.innerHTML = '<div class="text-white-50 small">Chyba spojení.</div>'; });
+    }
+    tiles.forEach(function (t) {
+        t.addEventListener('click', function () { open(t.dataset.webSite); });
+        t.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(t.dataset.webSite); } });
+    });
+})();
+</script>
+
 <div class="modal fade" id="eshopSalesModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content glass-card">
@@ -324,7 +387,9 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
 <!-- 4 statistiky + pobočky na jednom řádku (pobočky nad sebou, stejná celková výška) -->
 <div class="crm-stat-row mb-4">
-<?php /* Sdílené dlaždice (stejné na Nástěnce i v Zakázkách) */ include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
+<?php /* Sdílené dlaždice (stejné na Nástěnce i v Zakázkách) + návštěvnost webů jen tady */
+$__st_with_web = crmCanManageProducts();
+include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
 
 <?php if (!empty($branch_overview)): ?>
 <div class="crm-branch-col">

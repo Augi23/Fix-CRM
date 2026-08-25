@@ -4997,6 +4997,82 @@ function crmStaffDisplayName(): string
     return 'Systém';
 }
 
+/* ── NÁVŠTĚVNOST WEBŮ (v3.58.0) ────────────────────────────────────────────
+   Vlastní počítadlo pro applefix.cz a applefix.click — bez cookies a bez
+   ukládání IP: unikátní návštěvník = otisk (IP+prohlížeč) osolený TAJEMSTVÍM
+   PLATNÝM JEN PRO DANÝ DEN, takže se návštěvy nedají spojovat napříč dny.
+   Sběr: veřejný api/hit.php (1×1 pixel), zobrazení: dlaždice na Nástěnce. */
+
+const AFX_WEB_SITES = ['cz' => 'applefix.cz', 'click' => 'applefix.click'];
+
+function ensureWebVisitsSchema(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    if ($pdo->inTransaction()) { return; }
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS web_visits (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            site VARCHAR(16) NOT NULL,
+            visit_date DATE NOT NULL,
+            hits INT NOT NULL DEFAULT 0,
+            visitors INT NOT NULL DEFAULT 0,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_site_date (site, visit_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // jen pro odlišení unikátních návštěvníků v rámci dne; starší se mažou
+        $pdo->exec("CREATE TABLE IF NOT EXISTS web_visit_uniques (
+            visit_date DATE NOT NULL,
+            site VARCHAR(16) NOT NULL,
+            visitor_hash CHAR(32) NOT NULL,
+            PRIMARY KEY (visit_date, site, visitor_hash)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('ensureWebVisitsSchema: ' . $e->getMessage()); }
+}
+
+/** Denní sůl pro otisk návštěvníka — mění se každý den, nikam se neukládá. */
+function afxWebVisitSalt(string $day): string {
+    $secret = (string)get_setting('web_visit_secret', '');
+    if ($secret === '') {
+        try {
+            $secret = bin2hex(random_bytes(16));
+            set_setting('web_visit_secret', $secret);
+        } catch (Throwable $e) { $secret = 'afx-fallback'; }
+    }
+    return hash('sha256', $secret . '|' . $day);
+}
+
+/** Je to robot? Ty se do návštěvnosti nepočítají. */
+function afxWebVisitIsBot(string $ua): bool {
+    if ($ua === '') { return true; }   // beacon bez prohlížeče = skript
+    $u = strtolower($ua);
+    foreach (['bot', 'crawl', 'spider', 'slurp', 'facebookexternalhit', 'preview', 'monitor',
+              'uptime', 'pingdom', 'headless', 'curl/', 'wget', 'python-requests', 'go-http',
+              'lighthouse', 'ahrefs', 'semrush', 'screaming', 'yandex', 'bingpreview'] as $needle) {
+        if (str_contains($u, $needle)) { return true; }
+    }
+    return false;
+}
+
+/** Denní přehled návštěvnosti pro dlaždice/graf: [site => [datum => [hits, visitors]]]. */
+function afxWebVisitStats(int $days = 14): array {
+    global $pdo;
+    ensureWebVisitsSchema();
+    $out = [];
+    try {
+        $st = $pdo->prepare("SELECT site, visit_date, hits, visitors FROM web_visits
+            WHERE visit_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY) ORDER BY visit_date ASC");
+        $st->execute([max(1, min(120, $days))]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[(string)$r['site']][(string)$r['visit_date']] = [
+                'hits' => (int)$r['hits'], 'visitors' => (int)$r['visitors'],
+            ];
+        }
+    } catch (Throwable $e) { error_log('afxWebVisitStats: ' . $e->getMessage()); }
+    return $out;
+}
+
 /** Stav reklamace v jazyce klienta. Číselník je pevný (api/update_complaint_status.php),
  *  takže stačí mapa na jazykové klíče; neznámý stav se vrátí, jak je v DB. */
 function crmClientComplaintStatusLabel(string $status): string

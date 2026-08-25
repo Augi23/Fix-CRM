@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.58.0',
+        'date' => '2026-08-24',
+        'time' => '22:10',
+        'title' => 'Nástěnka: denní návštěvnost applefix.cz a applefix.click',
+        'items' => [
+            'Nahoře na Nástěnce jsou <b>dvě nové dlaždice</b> vedle stávajících šesti — denní počet návštěvníků webu <b>applefix.cz</b> a e-shopu <b>applefix.click</b>, se srovnáním proti včerejšku. Po kliknutí se otevře přehled <b>posledních 14 dní</b> s návštěvníky, zobrazeními a sloupcovým grafem.',
+            'Počítá se vlastním měřením (1×1 obrázek), <b>bez cookies a bez ukládání IP adres</b>: unikátní návštěvník se pozná podle otisku osoleného tajemstvím platným jen pro daný den, otisky se po 45 dnech mažou. Roboti a náhledy se nepočítají, stejně tak vlastní administrace e-shopu.',
+        ],
+    ],
+    [
         'version' => '3.57.1',
         'date' => '2026-08-24',
         'time' => '21:05',

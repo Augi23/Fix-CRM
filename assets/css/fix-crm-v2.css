@@ -1952,8 +1952,11 @@ html, body { font-size: 14px !important; }
   grid-template-columns: repeat(3, 1fr) !important;
   gap: 14px !important;
 }
+/* 8 dlaždic (+ návštěvnost webů na Nástěnce) → 4 sloupce × 2 řady */
+.crm-stat-grid--8 { grid-template-columns: repeat(4, 1fr) !important; }
 @media (max-width: 1199.98px) {
   .crm-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .crm-stat-grid--8 { grid-template-columns: repeat(2, 1fr) !important; }
 }
 @media (max-width: 575.98px) {
   .crm-stat-grid { grid-template-columns: 1fr !important; }
