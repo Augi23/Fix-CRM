@@ -4997,6 +4997,25 @@ function crmStaffDisplayName(): string
     return 'Systém';
 }
 
+/** Procesor pro CENOVKU — bez ročníku a bez zbytečného „Apple" (přání majitele 25.8.):
+ *  „Apple M1 Pro (2021)" → „M1 Pro", „Intel Core i7 (1. generace / 2010)" →
+ *  „Intel Core i7 (1. generace)". Generace a kódová jména Intelu/AMD zůstávají —
+ *  ta na štítku nesou informaci, ročník ne. */
+function afxLabelProcessorShort(string $processor): string {
+    $p = trim($processor);
+    if ($p === '') { return ''; }
+    // ročník v závorce úplně pryč: „(2021)", „(2025+)", „(2020/2021)"
+    $p = preg_replace('/\s*\((?:19|20)\d{2}(?:\s*[+\/-]\s*(?:19|20)?\d{2,4})?\+?\)/u', '', $p) ?? $p;
+    // ročník uvnitř složené závorky: „(1. generace / 2010)" → „(1. generace)"
+    $p = preg_replace('/\s*[\/,]\s*(?:19|20)\d{2}(?=\s*\))/u', '', $p) ?? $p;
+    // kódové jméno Intelu/AMD („/ Broadwell") se na 62mm cenovku nevejde a jen
+    // by se uřízlo — generace nese tutéž informaci, ta zůstává
+    $p = preg_replace('/\s*\(\s*(\d+\.\s*generace)\s*\/[^)]*\)/u', ' ($1)', $p) ?? $p;
+    // „Apple" před čipem je na štítku Applu nadbytečné (M1 Pro, A18 Pro…)
+    $p = preg_replace('/^Apple\s+(?=[MA]\d)/u', '', $p) ?? $p;
+    return trim(preg_replace('/\s{2,}/u', ' ', $p) ?? $p);
+}
+
 /* ── NÁVŠTĚVNOST WEBŮ (v3.58.0) ────────────────────────────────────────────
    Vlastní počítadlo pro applefix.cz a applefix.click — bez cookies a bez
    ukládání IP: unikátní návštěvník = otisk (IP+prohlížeč) osolený TAJEMSTVÍM

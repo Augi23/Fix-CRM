@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.58.1',
+        'date' => '2026-08-25',
+        'time' => '09:30',
+        'title' => 'Cenovky: procesor bez ročníku',
+        'items' => [
+            'Na tištěném štítku se u procesoru <b>netiskne ročník</b> — místo „Apple M1 Pro (2021)" je jen <b>M1 Pro</b>. U Intelů/AMD zůstává generace, ale bez kódového jména: „Intel Core i5 (5. generace / Broadwell)" → <b>Intel Core i5 (5. generace)</b>. V katalogu i na e-shopu se nic nemění, jde čistě o štítek.',
+            'Opraveno i letité <b>přetékání dlouhých hodnot pod jablkové logo</b> na malém štítku — text se teď zmenší tak, aby skončil před logem (a v krajním případě se ořízne třemi tečkami), místo aby se přes logo přetiskl.',
+        ],
+    ],
+    [
         'version' => '3.58.0',
         'date' => '2026-08-24',
         'time' => '22:10',

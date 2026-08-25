@@ -173,7 +173,10 @@ function afxProductLabelData(PDO $pdo, int $pid): array {
     else { $cena = rtrim(rtrim(number_format($priceF, 2, '.', ''), '0'), '.') . ' Kč'; }
     return ['ok' => true, 'data' => [
         'nazev' => $nazev, 'barva' => $color, 'stav' => $grade, 'uloziste' => $cap,
-        'baterie' => $bat, 'ram' => $ram, 'procesor' => $processor, 'cpu' => $cpu, 'gpu' => $gpu,
+        'baterie' => $bat, 'ram' => $ram,
+        // na cenovce se ročník procesoru netiskne (viz afxLabelProcessorShort)
+        'procesor' => function_exists('afxLabelProcessorShort') ? afxLabelProcessorShort((string)$processor) : $processor,
+        'cpu' => $cpu, 'gpu' => $gpu,
         'sn' => $sn, 'cena' => $cena,
         'mac' => str_contains(mb_strtolower($nazev !== '' ? $nazev : $title), 'macbook'),
     ]];

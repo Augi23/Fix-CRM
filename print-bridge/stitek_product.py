@@ -180,29 +180,41 @@ def render_product_label(data):
         y, step, fs_l, fs_v = 106, 29, 21, 26
     fl, fv = _lblfont(fs_l, False), _lblfont(fs_v, True)
     fv_sn = _lblfont(min(fs_v, 27), True)
+    # logo se počítá dřív než řádky — hodnoty, které mu leží v cestě, se musí
+    # vejít PŘED něj (dlouhé Intely jinak končily nečitelně pod jablkem)
+    lh = 150
+    lr = logo.resize((max(1, int(logo.width * lh / logo.height)), lh))
+    logo_cy = (DIV1 + 344) // 2
+    logo_x = W - PAD - lr.width
+    logo_y0, logo_y1 = logo_cy - lh // 2, logo_cy + lh // 2
     max_vw = W - (PAD + 200) - PAD
-    def value_font(v, base, minimum):
+    max_vw_logo = logo_x - 14 - (PAD + 200)
+    def value_font(v, base, minimum, mw):
         s = base
         while s > minimum:
             f = _lblfont(s, True)
-            if d.textlength(v, font=f) <= max_vw:
+            if d.textlength(v, font=f) <= mw:
                 return f
             s -= 1
         return _lblfont(minimum, True)
+    def clip(v, f, mw):
+        if d.textlength(v, font=f) <= mw:
+            return v
+        while v and d.textlength(v + '…', font=f) > mw:
+            v = v[:-1]
+        return (v.rstrip(' ,/(') + '…') if v else ''
     def fit_lbl(lb, col):
         sz = fs_l
         while sz > 16 and d.textlength(lb, font=_lblfont(sz, False)) > col - 12:
             sz -= 1
         return _lblfont(sz, False)
     for lb, v in rows:
-        vf = fv_sn if lb == "SN/IMEI:" else value_font(v, fs_v, 18)
+        mw = max_vw_logo if (y + fs_v > logo_y0 and y < logo_y1) else max_vw
+        vf = fv_sn if lb == "SN/IMEI:" else value_font(v, fs_v, 18, mw)
         d.text((PAD, y + 5), lb, font=fit_lbl(lb, 200), fill="black")
-        d.text((PAD + 200, y), v, font=vf, fill="black")
+        d.text((PAD + 200, y), clip(v, vf, mw), font=vf, fill="black")
         y += step
-    lh = 150
-    lr = logo.resize((max(1, int(logo.width * lh / logo.height)), lh))
-    cy = (DIV1 + 344) // 2
-    img.paste(lr, (W - PAD - lr.width, cy - lr.height // 2), lr)
+    img.paste(lr, (logo_x, logo_cy - lr.height // 2), lr)
     cena = data.get("cena") or "—"
     fp = _lblfont(52, True)
     cw = d.textlength(cena, font=fp)
