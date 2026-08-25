@@ -236,8 +236,8 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 </style>
 <script>
 (function () {
-    var tiles = document.querySelectorAll('.crm-stat-web');
-    if (!tiles.length) return;
+    // POZOR: tenhle blok je v DOM PŘED dlaždicemi (jsou níž na stránce), takže
+    // querySelectorAll by v tu chvíli nic nenašel — posluchač musí být delegovaný.
     function esc(x) { return String(x == null ? '' : x).replace(/[&<>"']/g, function (c) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function open(site) {
@@ -266,9 +266,14 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             })
             .catch(function () { body.innerHTML = '<div class="text-white-50 small">Chyba spojení.</div>'; });
     }
-    tiles.forEach(function (t) {
-        t.addEventListener('click', function () { open(t.dataset.webSite); });
-        t.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(t.dataset.webSite); } });
+    document.addEventListener('click', function (e) {
+        var t = e.target.closest ? e.target.closest('.crm-stat-web') : null;
+        if (t && t.dataset.webSite) { open(t.dataset.webSite); }
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        var t = e.target.closest ? e.target.closest('.crm-stat-web') : null;
+        if (t && t.dataset.webSite) { e.preventDefault(); open(t.dataset.webSite); }
     });
 })();
 </script>
