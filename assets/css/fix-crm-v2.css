@@ -1952,8 +1952,13 @@ html, body { font-size: 14px !important; }
   grid-template-columns: repeat(3, 1fr) !important;
   gap: 14px !important;
 }
-/* 8 dlaždic (+ návštěvnost webů na Nástěnce) → 4 sloupce × 2 řady */
-.crm-stat-grid--8 { grid-template-columns: repeat(4, 1fr) !important; }
+/* 8 dlaždic (+ návštěvnost webů na Nástěnce): šest původních zůstává 3×2,
+   návštěvnost je ve 4. sloupci POD SEBOU (přání majitele 25.8.) */
+.crm-stat-grid--8 { grid-template-columns: repeat(3, 1fr) 0.8fr !important; }
+@media (min-width: 1200px) {
+  .crm-stat-grid--8 .crm-stat-web-cz    { grid-column: 4; grid-row: 1; }
+  .crm-stat-grid--8 .crm-stat-web-click { grid-column: 4; grid-row: 2; }
+}
 @media (max-width: 1199.98px) {
   .crm-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .crm-stat-grid--8 { grid-template-columns: repeat(2, 1fr) !important; }

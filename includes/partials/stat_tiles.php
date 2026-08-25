@@ -133,7 +133,8 @@ if (!empty($__st_with_web) && function_exists('afxWebVisitStats')) {
     <?php /* Návštěvnost webů — vlastní počítadlo (bez cookies), po kliknutí přehled 14 dnů */ ?>
     <?php foreach ($__st_web as $__wk => $__w): ?>
     <div class="crm-stat-card crm-stat-web crm-stat-web-<?php echo e($__wk); ?>" role="button" tabindex="0"
-         data-web-site="<?php echo e($__wk); ?>" title="Denní návštěvnost <?php echo e($__w['label']); ?> — klikni pro posledních 14 dní">
+         data-web-site="<?php echo e($__wk); ?>"
+         title="Dnešní návštěvnost webu <?php echo e($__w['label']); ?>.&#10;Návštěvník = jeden člověk (i když si otevře víc stránek).&#10;Zobrazení stránek = kolikrát se načetla nějaká stránka.&#10;Klikni pro posledních 14 dní.">
         <div class="crm-stat-label"><i class="fas fa-chart-line me-1" style="font-size:.7rem;"></i><?php echo e($__w['label']); ?></div>
         <?php $__wv = (int)$__w['visitors'];
               $__wl = $__wv === 1 ? 'návštěvník' : ($__wv >= 2 && $__wv <= 4 ? 'návštěvníci' : 'návštěvníků'); ?>
