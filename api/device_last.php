@@ -11,9 +11,11 @@ if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
     http_response_code(401);
     echo json_encode(['ok' => false, 'error' => __('unauthorized')], JSON_UNESCAPED_UNICODE); exit;
 }
-if (!function_exists('crmCanManageProducts') || !crmCanManageProducts()) {
+// Čte i výkupní list (dokument.php), který vypisuje běžná obsluha — proto
+// nestačí právo na naskladnění. Účetní výkupy nedělá, ta sem nepatří.
+if (function_exists('crmIsAccountant') && crmIsAccountant()) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'Nemáš oprávnění naskladňovat produkty.'], JSON_UNESCAPED_UNICODE); exit;
+    echo json_encode(['ok' => false, 'error' => 'Čtení zařízení není pro roli účetní.'], JSON_UNESCAPED_UNICODE); exit;
 }
 
 $latest = afxDeviceBridgeLatest();
@@ -25,4 +27,6 @@ echo json_encode([
     'station' => $latest['station'],
     'age' => $latest['age'],
     'info' => afxDeviceBridgeToForm($latest['device']),
+    // pole pro výkupní list / zástavní formulář (dokument.php)
+    'doc' => afxDeviceBridgeToDocFields($latest['device']),
 ], JSON_UNESCAPED_UNICODE);

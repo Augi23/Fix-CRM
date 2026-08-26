@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.65.0',
+        'date' => '2026-08-27',
+        'time' => '01:20',
+        'title' => 'Výkupní list: načtení věci z připojeného zařízení + kontrola PČR',
+        'items' => [
+            'Ve výkupním listu (i v zástavním formuláři) je nové tlačítko <b>„Načíst zařízení"</b>. Když je telefon připojený kabelem k Macu, doplní se <b>popis věci, model, IMEI</b> a do stavu <b>kondice baterie s počtem cyklů</b> a verze systému — přesně to, co se u výkupu nejvíc dohaduje a co se dosud psalo odhadem.',
+            'Hned potom se IMEI automaticky ověří v <b>databázi odcizených mobilů Policie ČR</b>. Nález se ohlásí červeně ještě <b>před výplatou peněz</b> — u výkupu je odcizený kus to hlavní riziko. Kontrolu proto nově smí spustit i obsluha, která nenaskladňuje (dřív jen vedení).',
+            '<b>Cena se z telefonu nikdy nebere</b> a vyplněná pole se nepřepisují — co jsi upřesnil ručně, zůstane. U iPadů bez mobilního připojení se místo IMEI použije sériové číslo.',
+            'Vyžaduje můstek na Macu (Nastavení → Tisk štítků → „Načítání údajů z připojeného iPhonu/iPadu"), stejný, jaký používá naskladnění.',
+        ],
+    ],
+    [
         'version' => '3.64.0',
         'date' => '2026-08-27',
         'time' => '00:40',

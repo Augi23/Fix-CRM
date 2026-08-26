@@ -63,6 +63,27 @@ ok('model mimo katalog je označený', $f3['model_known'] === false);
 ok('barva mimo katalog je označená', $f3['color_known'] === false);
 ok('prázdný vstup nespadne', is_array(afxDeviceBridgeToForm([])));
 
+// ── 2b) údaje pro VÝKUPNÍ LIST ──
+head('Údaje z telefonu → výkupní list');
+$doc = afxDeviceBridgeToDocFields($iphone12);
+ok('popis věci se složí z modelu, kapacity a barvy',
+    $doc['item_description'] === 'iPhone 12 64 GB White', $doc['item_description']);
+ok('model zvlášť', $doc['item_model'] === 'iPhone 12', $doc['item_model']);
+ok('do pole SN/IMEI jde IMEI (ne sériové číslo)', $doc['item_serial'] === '353036118781852', $doc['item_serial']);
+ok('stav nese kondici baterie i cykly',
+    str_contains($doc['item_state'], '87 %') && str_contains($doc['item_state'], '412 cyklů'), $doc['item_state']);
+ok('stav nese verzi systému', str_contains($doc['item_state'], 'iOS 17.6.1'), $doc['item_state']);
+ok('u aktivovaného kusu se stav aktivace nepřipomíná',
+    !str_contains($doc['item_state'], 'aktivace'), $doc['item_state']);
+ok('cena se z telefonu NIKDY nebere', !isset($doc['item_price']) && !isset($doc['item_estimate']));
+
+$neaktiv = afxDeviceBridgeToDocFields(['model' => 'iPhone 12', 'imei' => '1', 'activation' => 'Unactivated']);
+ok('neaktivovaný kus se ve stavu zvýrazní',
+    str_contains($neaktiv['item_state'], 'Unactivated'), $neaktiv['item_state']);
+$bezImei = afxDeviceBridgeToDocFields(['model' => 'iPad Air', 'serial' => 'DMPX123', 'capacity' => '64 GB']);
+ok('bez IMEI (iPad Wi-Fi) se použije sériové číslo', $bezImei['item_serial'] === 'DMPX123', $bezImei['item_serial']);
+ok('prázdný vstup nespadne', is_array(afxDeviceBridgeToDocFields([])));
+
 // ── 3) uložení hlášení a jeho čtení ──
 head('Hlášení od můstku');
 afxEnsureDeviceBridgeTable();

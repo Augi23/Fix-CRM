@@ -81,6 +81,8 @@ $pageTitle = __($cfg['title_key'], $lang);
         <?php endforeach; ?>
     </div>
     <div class="tb-actions">
+        <?php /* načtení věci z telefonu připojeného k Macu (v3.65.0) */ ?>
+        <button type="button" class="tb-btn" id="btnDevice" title="Načte model, kapacitu, IMEI a kondici baterie z iPhonu/iPadu připojeného kabelem k Macu"><i class="fas fa-mobile-screen me-1"></i> Načíst zařízení</button>
         <?php /* opakovaný výkup od téhož člověka — identifikaci netlouct znovu (v3.63.0) */ ?>
         <button type="button" class="tb-btn" id="btnSeller" title="Doplní údaje o prodávajícím z jeho dřívějšího výkupu nebo zástavy"><i class="fas fa-user-clock me-1"></i> Prodávající z dřívějška</button>
         <button type="button" class="tb-btn" id="btnSave"><i class="fas fa-floppy-disk me-1"></i> Uložit</button>
@@ -255,6 +257,69 @@ $pageTitle = __($cfg['title_key'], $lang);
         }).catch(function (e) { toast('⚠️ ' + e.message, false); })
           .finally(function () { b.disabled = false; });
     };
+
+    // ── načtení vykupované věci z připojeného zařízení (v3.65.0) ─────────
+    // Můstek na Macu (device-bridge) přečte telefon přes USB a pošle údaje do
+    // CRM; tady se z nich vyplní popis věci, IMEI a kondice baterie. Rovnou
+    // se pustí kontrola IMEI v databázi odcizených PČR — u výkupu je odcizený
+    // kus to hlavní riziko a zjistit to PŘED výplatou peněz je celý smysl.
+    (function () {
+        var btn = document.getElementById('btnDevice');
+        if (!btn) return;
+        function esc(t) {
+            return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+            });
+        }
+        function f(name) { return document.querySelector('[name="' + name + '"]'); }
+
+        function pcrCheck(imei) {
+            if (!imei || imei.replace(/\D/g, '').length < 14) return;
+            var fd = new FormData();
+            fd.append('imei', imei); fd.append('csrf_token', CSRF);
+            fetch('api/product_pcr.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d || !d.success) return;
+                    if (d.status === 'stolen') {
+                        toast('🚨 POZOR: IMEI je v databázi odcizených mobilů PČR! ' + (d.text || ''), false);
+                    } else if (d.status === 'clean') {
+                        toast('✅ IMEI není v databázi odcizených mobilů PČR.', true);
+                    }
+                })
+                .catch(function () {});
+        }
+
+        btn.onclick = function () {
+            btn.disabled = true;
+            fetch('api/device_last.php', { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d || !d.ok || !d.doc) {
+                        toast('⚠️ ' + ((d && d.error) || 'Zařízení se nepodařilo přečíst.'), false);
+                        return;
+                    }
+                    var filled = [], skipped = 0;
+                    ['item_description', 'item_model', 'item_serial', 'item_state'].forEach(function (name) {
+                        var el = f(name), val = (d.doc[name] || '').trim();
+                        if (!el || val === '') return;
+                        // co je vyplněné, se nepřepisuje — obsluha to mohla upřesnit
+                        if (String(el.value || '').trim() !== '') { skipped++; return; }
+                        el.value = val;
+                        filled.push(name === 'item_state' ? 'stav' : (name === 'item_serial' ? 'IMEI' : (name === 'item_model' ? 'model' : 'popis')));
+                    });
+                    if (!filled.length) {
+                        toast('Pole o věci už jsou vyplněná — nic se nepřepisovalo.', true);
+                    } else {
+                        toast('📱 Načteno z ' + esc(d.station || 'Macu') + ': ' + filled.join(', ')
+                            + (skipped ? ' (' + skipped + ' polí už bylo vyplněných)' : ''), true);
+                    }
+                    pcrCheck(d.doc.imei || (f('item_serial') ? f('item_serial').value : ''));
+                })
+                .catch(function () { toast('⚠️ Můstek se nepodařilo oslovit.', false); })
+                .then(function () { btn.disabled = false; });
+        };
+    })();
 
     // ── prodávající z dřívějšího dokladu (v3.63.0) ───────────────────────
     // Stálí prodávající chodí opakovaně; přepisovat pokaždé rodné číslo,

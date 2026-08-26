@@ -184,3 +184,36 @@ function afxDeviceBridgeToForm(array $d): array {
         'device_name'    => trim((string)($d['device_name'] ?? '')),
     ];
 }
+
+/**
+ * Údaje z připojeného telefonu → pole VÝKUPNÍHO LISTU / zástavního formuláře.
+ * Vyplňuje jen popis věci — cenu ani stav dohody nikdy (to je věc jednání).
+ * Do „stavu" jde kondice baterie a verze systému: přesně to, co obsluha
+ * dosud odhadovala a co se u výkupu nejvíc hádá.
+ */
+function afxDeviceBridgeToDocFields(array $d): array {
+    $model = trim((string)($d['model'] ?? '')) ?: trim((string)($d['product_type'] ?? ''));
+    $cap = trim((string)($d['capacity'] ?? ''));
+    $color = trim((string)($d['color'] ?? ''));
+    $desc = trim(implode(' ', array_filter([$model, $cap, $color], static fn($x) => $x !== '')));
+
+    $stav = [];
+    $h = $d['battery_health'] ?? null;
+    if (is_numeric($h)) {
+        $cyc = isset($d['battery_cycles']) && is_numeric($d['battery_cycles']) ? (int)$d['battery_cycles'] : null;
+        $stav[] = 'Kondice baterie ' . (int)$h . ' %' . ($cyc !== null ? ' (' . $cyc . ' cyklů)' : '');
+    }
+    if (!empty($d['ios'])) { $stav[] = 'iOS ' . trim((string)$d['ios']); }
+    $act = trim((string)($d['activation'] ?? ''));
+    if ($act !== '' && $act !== 'Activated') { $stav[] = 'Stav aktivace: ' . $act; }
+
+    return [
+        'item_description' => $desc,
+        'item_model'       => $model,
+        'item_serial'      => trim((string)($d['imei'] ?? '')) ?: trim((string)($d['serial'] ?? '')),
+        'item_state'       => implode(' · ', $stav),
+        // jen pro hlášku v UI, do dokladu se nepíše
+        'serial_number'    => trim((string)($d['serial'] ?? '')),
+        'imei'             => trim((string)($d['imei'] ?? '')),
+    ];
+}
