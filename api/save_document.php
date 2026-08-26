@@ -44,6 +44,12 @@ foreach ($cfg['subject_fields'] as $sf) {
     if ($sv !== '') { $subject = trim($subject . ($subject !== '' ? ' — ' : '') . $sv); }
 }
 $subject = mb_substr($subject, 0, 255);
+// částky vždy s měnou („5000" → „5 000 Kč"); text bez čísla se nechává být
+foreach (array_unique([$cfg['price_field'] ?? '', 'item_price', 'item_estimate', 'loan_amount']) as $__pf) {
+    if ($__pf !== '' && isset($clean[$__pf]) && $clean[$__pf] !== '') {
+        $clean[$__pf] = crmDocFormatAmount((string)$clean[$__pf]);
+    }
+}
 $price = mb_substr((string)($clean[$cfg['price_field']] ?? ''), 0, 60);
 
 // Výkupní částka je POVINNÁ (přání majitele 20.8.2026): list bez částky založí

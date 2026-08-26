@@ -779,6 +779,49 @@ function crmDocPublicToken(int $docId): string {
     return (string)($st->fetchColumn() ?: $t);
 }
 
+/**
+ * Předvyplnění nového dokladu (v3.67.0).
+ * Místo a datum podpisu se dosud psalo ručně u každého listu, přestože obojí
+ * CRM ví: místo = provozovna, na které se doklad vystavuje, datum = dnešek.
+ */
+function crmDocDefaultValues(string $type): array {
+    $out = [];
+    $misto = '';
+    try {
+        $bid = function_exists('getCurrentStaffBranchId') ? (int)getCurrentStaffBranchId() : 0;
+        if ($bid > 0) {
+            global $pdo;
+            $st = $pdo->prepare("SELECT name FROM branches WHERE id = ? LIMIT 1");
+            $st->execute([$bid]);
+            $misto = trim((string)($st->fetchColumn() ?: ''));
+        }
+    } catch (Throwable $e) { /* bez pobočky se doplní aspoň datum */ }
+    if ($misto === '') { $misto = trim((string)get_setting('company_city', '')); }
+    $datum = date('j. n. Y');
+    $out['sign_place_date'] = $misto !== '' ? ($misto . ', ' . $datum) : $datum;
+    return $out;
+}
+
+/**
+ * Částka na dokladu vždy s měnou: „5000" → „5 000 Kč".
+ * Text bez čísla (např. „dohodou") se nechává být — dopsat k němu měnu
+ * by vyrobilo nesmysl.
+ */
+function crmDocFormatAmount(string $raw): string {
+    $raw = trim($raw);
+    if ($raw === '') { return ''; }
+    $mena = trim((string)get_setting('currency', 'Kč')) ?: 'Kč';
+    if (!preg_match('/\d/', $raw)) { return $raw; }
+    // už měnu má (v jakémkoli tvaru) → jen ořezat mezery navíc
+    if (mb_stripos($raw, $mena) !== false) { return trim(preg_replace('/\s{2,}/u', ' ', $raw) ?? $raw); }
+    $amount = crmParseAmountCzk($raw);
+    if ($amount <= 0) { return $raw; }
+    $whole = abs($amount - round($amount)) < 0.005;
+    // haléře se nechávají celé („12 490,50 Kč"), ořezaná nula vypadá jako chyba
+    $num = number_format($amount, $whole ? 0 : 2, ',', "\u{00a0}");
+    return $num . ' ' . $mena;
+}
+
 /** Pole, která klient při online vyplnění NESMÍ měnit (cena a služební údaje). */
 function crmDocOnlineLockedFields(): array {
     return ['item_price', 'customer_id_verified', 'sign_place_date', 'sign_payment', 'doc_date'];

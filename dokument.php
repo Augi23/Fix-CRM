@@ -21,6 +21,12 @@ if ($doc && (string)$doc['doc_type'] !== $type) { $type = (string)$doc['doc_type
 
 $lang = crmDocLangOrDefault($_GET['lang'] ?? ($doc['lang'] ?? 'cs'));
 $values = $doc['fields'] ?? [];
+// nový doklad: místo a datum podpisu ví CRM samo (provozovna + dnešek)
+if (!$doc) {
+    foreach (crmDocDefaultValues($type) as $__k => $__v) {
+        if (trim((string)($values[$__k] ?? '')) === '') { $values[$__k] = $__v; }
+    }
+}
 $docNumber = (string)($doc['doc_number'] ?? '');
 $docDate = !empty($doc['doc_date']) ? date('d.m.Y', strtotime((string)$doc['doc_date'])) : date('d.m.Y');
 $docId = (int)($doc['id'] ?? 0);
@@ -257,6 +263,28 @@ $pageTitle = __($cfg['title_key'], $lang);
         }).catch(function (e) { toast('⚠️ ' + e.message, false); })
           .finally(function () { b.disabled = false; });
     };
+
+    // ── částka vždy s měnou (v3.67.0) ────────────────────────────────────
+    // Doplní se hned po opuštění pole, ať obsluha vidí přesně to, co bude
+    // na vytištěném dokladu (server to při uložení stejně srovná znovu).
+    (function () {
+        var MENA = <?php echo json_encode(trim((string)get_setting('currency', 'Kč')) ?: 'Kč'); ?>;
+        ['item_price', 'item_estimate', 'loan_amount'].forEach(function (name) {
+            var el = document.querySelector('[name="' + name + '"]');
+            if (!el) return;
+            el.addEventListener('blur', function () {
+                var v = (el.value || '').trim();
+                if (v === '' || !/\d/.test(v)) return;                 // „dohodou" nechat
+                if (v.toLowerCase().indexOf(MENA.toLowerCase()) !== -1) return;
+                var num = v.replace(/[^\d,.]/g, '').replace(/[.,]$/, '');
+                if (num === '') return;
+                var dec = /^(\d+)[.,](\d{1,2})$/.exec(num);
+                var whole = dec ? dec[1] : num.replace(/[.,]/g, '');
+                var groups = whole.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+                el.value = groups + (dec ? ',' + (dec[2].length === 1 ? dec[2] + '0' : dec[2]) : '') + ' ' + MENA;
+            });
+        });
+    })();
 
     // ── načtení vykupované věci z připojeného zařízení (v3.65.0) ─────────
     // Můstek na Macu (device-bridge) přečte telefon přes USB a pošle údaje do

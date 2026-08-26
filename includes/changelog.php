@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.67.0',
+        'date' => '2026-08-27',
+        'time' => '10:05',
+        'title' => 'Výkupní list: místo a datum samo, částka vždy s měnou',
+        'items' => [
+            '<b>Místo a datum podpisu</b> se u nového dokladu předvyplní samo — místo podle provozovny, na které doklad vzniká, datum dnešní. Přepsat to samozřejmě jde.',
+            '<b>Částka má vždy na konci měnu</b>: „5000" se po opuštění pole srovná na <b>5 000 Kč</b>, a to i s oddělenými tisíci. Platí pro výkupní částku, odhad i výši půjčky u zástavy. Text bez čísla (třeba „dohodou") se nechává být — dopisovat k němu měnu by byl nesmysl.',
+            'Měna se bere z nastavení firmy, takže se nikde nepíše natvrdo. Výplata z kasy si částku z dokladu přečte i s měnou, na tom se nic nemění.',
+        ],
+    ],
+    [
         'version' => '3.66.0',
         'date' => '2026-08-27',
         'time' => '09:15',
