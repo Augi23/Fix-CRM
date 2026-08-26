@@ -572,6 +572,8 @@ try {
                             <div class="col-md-8" id="pcSerialGroup">
                                 <label class="form-label small">SN / IMEI <span class="text-white-50">(naskenuj čtečkou nebo zapiš)</span></label>
                                 <input type="text" id="pcSerial" class="form-control" autocomplete="off">
+                                <?php /* doplnění údajů z IMEI (v3.61.0) — vyplní se sem výsledek z iFreeiCloud */ ?>
+                                <div id="pcImeiInfo" class="small mt-2" style="display:none;"></div>
                             </div>
                             <div class="col-md-4 d-flex align-items-end<?php echo $isAccessoryTab ? ' d-none' : ''; ?>" id="pcPcrGroup">
                                 <div id="pcPcrBadge" class="w-100 text-center small fw-bold rounded py-2" style="background:rgba(255,255,255,.06);color:#9aa3b2;">PČR: nekontrolováno</div>
@@ -1296,6 +1298,167 @@ $(document).on('click', '.product-label-btn', function () {
             .catch(function () { if (gen === formGen) setBadge('error'); });
     });
 
+    // ── doplnění údajů podle IMEI (v3.61.0) ────────────────────────────────
+    // Naskenuje se IMEI a formulář si sám doplní výrobce, typ, model, úložiště
+    // a barvu; navíc ukáže Find My / SIM-lock / záruku, což je při výkupu
+    // použitého kusu to nejdůležitější. Dotaz je PLACENÝ, proto se ptáme až
+    // po opuštění pole, jen jednou na stejné IMEI (server má navíc cache).
+    var $imeiInfo = el('pcImeiInfo');
+    var imeiAsked = '';
+
+    // Nastaví hodnotu POUZE tehdy, když ji katalog zná. Neznámé hodnoty se
+    // schválně NEvyplňují do „✏️ Vlastní…" — po uložení by se natrvalo zapsaly
+    // do číselníku (a s nimi i případný nesmysl z API). Jen se nabídnou v hlášce.
+    function pcSetSelect(sel, custom, value) {
+        if (!sel || !value) return false;
+        var want = String(value).trim().toLowerCase();
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value.trim().toLowerCase() === want) {
+                sel.value = sel.options[i].value;
+                if (custom) { custom.value = ''; custom.style.display = 'none'; }
+                return true;
+            }
+        }
+        return false;
+    }
+    function pcFieldEmpty(sel, custom) {
+        if (!sel) return false;
+        if (sel.value === CUSTOM) { return !custom || custom.value.trim() === ''; }
+        return sel.value.trim() === '';
+    }
+
+    function renderImeiInfo(html, tone) {
+        if (!$imeiInfo) return;
+        if (!html) { $imeiInfo.style.display = 'none'; $imeiInfo.innerHTML = ''; return; }
+        var col = tone === 'bad' ? '#ff6b6b' : (tone === 'warn' ? '#ffc46b' : (tone === 'ok' ? '#7ce39a' : 'rgba(255,255,255,.6)'));
+        $imeiInfo.style.color = col;
+        $imeiInfo.innerHTML = html;
+        $imeiInfo.style.display = '';
+    }
+
+    // Formulář je „čistý", dokud v něm není ručně vyplněný model ani barva.
+    // Jen tehdy se smí sáhnout na výrobce/typ — jejich změna přeplní kaskádou
+    // Model, Barvu i procesor (onManufacturer → onType → clearProcessor),
+    // takže by jinak smazala to, co obsluha právě napsala.
+    function pcFormUntouched() {
+        return pcFieldEmpty($model, $modelC) && pcFieldEmpty($color, $colorC)
+            && (!$cap || $cap.value.trim() === '');
+    }
+
+    function applyImeiInfo(info) {
+        var filled = [], skipped = [];
+        var untouched = pcFormUntouched();
+
+        // typ zařízení: select NEMÁ prázdnou volbu (po otevření svítí „iPhone"),
+        // takže se nesmí testovat na prázdnotu — porovnává se s tím, co říká IMEI
+        if (untouched && info.device_type && typVal() !== info.device_type) {
+            if (info.manufacturer && manufacturerVal() !== info.manufacturer
+                && pcSetSelect($manuf, $manufC, info.manufacturer)) {
+                onManufacturer(); filled.push('výrobce');
+            }
+            if (pcSetSelect($typ, $typC, info.device_type)) { onType(); filled.push('typ'); }
+        }
+
+        if (info.model && pcFieldEmpty($model, $modelC)) {
+            if (pcSetSelect($model, $modelC, info.model)) { filled.push('model'); }
+            else { skipped.push('model „' + info.model + '"'); }
+        }
+        if (info.capacity && $cap && $cap.value.trim() === '') {
+            if (info.capacity_known && pcSetSelect($cap, null, info.capacity)) { filled.push('úložiště'); }
+            else { skipped.push('úložiště „' + info.capacity + '"'); }
+        }
+        if (info.color && pcFieldEmpty($color, $colorC)) {
+            if (info.color_known && pcSetSelect($color, $colorC, info.color)) { filled.push('barva'); }
+            else { skipped.push('barva „' + info.color + '"'); }
+        }
+        syncProcessorVisibility();
+        refreshPreview();
+        return { filled: filled, skipped: skipped };
+    }
+
+    function imeiWarnings(info) {
+        var w = [];
+        if (info.find_my === true) w.push('<b>Find My je ZAPNUTÉ</b> — zařízení je zamčené na iCloud účet');
+        if (info.lost_mode === true) w.push('<b>Režim ztraceno</b>');
+        if (info.sim_lock === true) w.push('<b>SIM-lock</b> (zamčeno na operátora)');
+        if (info.replaced === true) w.push('kus byl vyměněný Applem');
+        return w;
+    }
+
+    var imeiBusy = false;      // běží dotaz → save() na něj počká (jinak by se
+                               // varování „Find My" nikdy neukázalo)
+    function lookupImei(value) {
+        var digits = String(value || '').replace(/\D/g, '');
+        if (ACCESSORY_MODE) { return; }
+        if (digits.length < 14) { renderImeiInfo(''); imeiAsked = ''; return; }
+        // u editace je formulář vyplněný z databáze — dotaz by jen stál kredit
+        if ($editId.value) { return; }
+        if (digits === imeiAsked) { return; }
+        imeiAsked = digits;
+        var gen = formGen;
+        imeiBusy = true;
+        renderImeiInfo('<i class="fas fa-spinner fa-spin me-1"></i>Zjišťuji údaje k IMEI…', '');
+        var fd = new FormData();
+        fd.append('imei', digits); fd.append('csrf_token', CSRF);
+        return fetch('api/imei_lookup.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (gen !== formGen) return;         // mezitím se otevřel jiný kus
+                if (!d || !d.ok || !d.info) {
+                    if (!d || d.source !== 'cache') { imeiAsked = ''; }   // ať jde zkusit znovu
+                    // ne-Apple: výrobce doplnit jen do nerozepsaného formuláře
+                    var note = escapeHtmlSafe((d && d.error) || 'Údaje k IMEI se nepodařilo zjistit.');
+                    if (d && d.brand && pcFormUntouched() && manufacturerVal() !== d.brand
+                        && pcSetSelect($manuf, $manufC, d.brand)) {
+                        onManufacturer(); refreshPreview();
+                        note += ' <span style="color:#7ce39a;">Výrobce doplněn.</span>';
+                    }
+                    renderImeiInfo('<i class="fas fa-circle-info me-1"></i>' + note, 'warn');
+                    return;
+                }
+                var info = d.info;
+                var res = applyImeiInfo(info);
+                var parts = [];
+                if (info.raw_model) parts.push('<b>' + escapeHtmlSafe(info.raw_model) + '</b>');
+                if (info.serial) parts.push('SN ' + escapeHtmlSafe(info.serial));
+                if (info.warranty) parts.push(escapeHtmlSafe(info.warranty));
+                if (info.purchase_date) parts.push('koupeno ' + escapeHtmlSafe(info.purchase_date));
+                var warn = imeiWarnings(info);
+                var line = '<i class="fas fa-wand-magic-sparkles me-1"></i>' + parts.join(' · ');
+                if (res.filled.length) line += '<br><span style="color:#7ce39a;">Doplněno: ' + res.filled.join(', ') + '.</span>';
+                if (res.skipped.length) {
+                    line += '<br><span style="color:#ffc46b;">Katalog nezná ' + escapeHtmlSafe(res.skipped.join(', '))
+                        + ' — vyber ručně (nebo přes „✏️ Vlastní…").</span>';
+                }
+                if (d.source === 'cache') {
+                    line += ' <span style="opacity:.6;">(zjištěno ' + escapeHtmlSafe(String(d.checked_at || '').slice(0, 16)) + ')</span>';
+                }
+                if (warn.length) {
+                    line += '<br><span style="color:#ff6b6b;"><i class="fas fa-triangle-exclamation me-1"></i>'
+                        + warn.join(' · ') + '</span>';
+                }
+                renderImeiInfo(line, warn.length ? 'bad' : 'ok');
+            })
+            .catch(function () {
+                imeiAsked = '';
+                if (gen === formGen) { renderImeiInfo('<i class="fas fa-circle-info me-1"></i>Dotaz na údaje k IMEI se nepodařilo odeslat.', 'warn'); }
+            })
+            .then(function () { imeiBusy = false; });
+    }
+    function escapeHtmlSafe(t) {
+        return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+    }
+    var imeiTimer = null;
+    $serial.addEventListener('input', function () {
+        clearTimeout(imeiTimer);
+        var v = $serial.value;
+        if (String(v).replace(/\D/g, '').length < 14) { renderImeiInfo(''); imeiAsked = ''; return; }
+        imeiTimer = setTimeout(function () { lookupImei(v); }, 700);   // dopsání/doskenování
+    });
+    $serial.addEventListener('blur', function () { clearTimeout(imeiTimer); lookupImei($serial.value); });
+
     // ── foto: upload hned po výběru ──
     $photo.addEventListener('change', function () {
         if (!$photo.files.length) return;
@@ -1685,6 +1848,13 @@ $(document).on('click', '.product-label-btn', function () {
             return;
         }
         if (saving) { showAlert('Ukládání už běží — vydrž vteřinku.'); return; }
+        // běžící dotaz na IMEI musí doběhnout — jinak by se kus uložil dřív,
+        // než se ukáže varování „Find My je zapnuté" (a kredit by přišel vniveč)
+        if (typeof imeiBusy !== 'undefined' && imeiBusy) {
+            $msg.innerHTML = '<span class="text-warning fw-bold">Počkej — zjišťuji údaje k IMEI…</span>';
+            setTimeout(function () { if (!imeiBusy && !saving) { save(printAfter, force); } }, 600);
+            return;
+        }
         if (pending > 0) {
             // zaseknuté nahrávání fotky umí naskladnění blokovat donekonečna — řekni to nahlas
             $msg.innerHTML = '<span class="text-warning fw-bold">Počkej — média se ještě nahrávají… (' + pending + ')</span>';
@@ -1794,6 +1964,7 @@ $(document).on('click', '.product-label-btn', function () {
                 if ($editId.value) { printPromise.then(function () { location.reload(); }); return; }
                 // vyčistit vše KROMĚ Typ / Stav / Prodejna — sériové naskladňování jako v appce
                 formGen++;
+                imeiAsked = ''; renderImeiInfo('');   // výsledek z IMEI patří předchozímu kusu
                 editProductCode = '';   // předchozí kus je uložený; 360° dalšího nesmí jít do jeho složky
                 [$modelC, $accessoryForModel, $accessoryPropertyC, $accessoryText, $colorC, $bat, $price, $purchase, $serial].forEach(function (n) { n.value = ''; });
                 onType();   // Model/Barva se přeplní z katalogu — včetně právě vstřebaných vlastních hodnot
@@ -1863,6 +2034,7 @@ $(document).on('click', '.product-label-btn', function () {
     el('productCreateOpen').addEventListener('click', function () {
         // režim NOVÝ produkt — vyčistit VŠE (i pozůstatky předchozí editace)
         formGen++;
+        imeiAsked = ''; renderImeiInfo('');
         $editId.value = '';
         editProductCode = '';   // jinak by 360° z nového kusu spadla do složky předchozího
         el('pcTitleMode').textContent = ACCESSORY_MODE ? 'Naskladnit příslušenství' : 'Naskladnit produkt';
@@ -1903,6 +2075,7 @@ $(document).on('click', '.product-label-btn', function () {
                 if (!d.success) { showAlert(d.message || 'Načtení selhalo.'); return; }
                 var p = d.product;
                 formGen++;
+                imeiAsked = ''; renderImeiInfo('');   // výsledek z IMEI patří předchozímu kusu
                 $editId.value = p.id;
                 el('pcTitleMode').textContent = 'Upravit produkt';
                 if (el('pcQty')) {

@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.61.0',
+        'date' => '2026-08-26',
+        'time' => '00:20',
+        'title' => 'Naskladnění: údaje se doplní samy podle IMEI',
+        'items' => [
+            'Při naskladnění stačí <b>naskenovat IMEI</b> a formulář si sám doplní <b>výrobce, typ zařízení, model, úložiště a barvu</b>. Vyplňují se jen <b>prázdná</b> políčka — co jsi zadal ručně, se nikdy nepřepíše. Co katalog nezná (nová barva, nový model), se předvyplní jako „✏️ Vlastní…", takže si to CRM rovnou zapamatuje.',
+            'Pod polem se navíc ukáže to nejdůležitější při výkupu: <b>Find My (zámek na iCloud)</b>, <b>SIM-lock</b>, stav záruky, odhad data nákupu a sériové číslo. Zapnuté Find My se hlásí červeně — takový kus je bez odhlášení původního účtu neprodejný.',
+            'Data dává <b>iFreeiCloud</b> (stejný účet, který se používá pro ověření IMEI na Nástěnce). Dotaz je placený, proto se na <b>každé IMEI ptáme jen jednou</b> a odpověď se ukládá — opakované otevření formuláře, oprava překlepu ani znovunaskladnění téhož kusu už nic nestojí. Na kredit se šetří i jinak: IMEI musí mít správnou kontrolní číslici (překlep se neposílá), 14místné se dopočítá na 15 (jinak by se stejný kus platil dvakrát), při <b>editaci</b> už naskladněného kusu se dotaz nepouští vůbec a je nastavený strop dotazů za hodinu.',
+            'Vyplňují se <b>jen hodnoty, které katalog zná</b>. Co nezná (nová barva, nový model), se ukáže jako tip v hlášce, ale samo se nikam nezapíše — jinak by se do číselníků natrvalo dostaly nesmysly z API.',
+            'Podporovaná jsou zařízení Apple. U ostatních značek služba dotaz odmítne, ale prozradí značku — z toho se doplní aspoň <b>výrobce</b> (např. Honor, Samsung).',
+        ],
+    ],
+    [
         'version' => '3.60.1',
         'date' => '2026-08-26',
         'time' => '21:10',
