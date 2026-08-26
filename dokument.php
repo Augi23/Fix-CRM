@@ -81,6 +81,8 @@ $pageTitle = __($cfg['title_key'], $lang);
         <?php endforeach; ?>
     </div>
     <div class="tb-actions">
+        <?php /* opakovaný výkup od téhož člověka — identifikaci netlouct znovu (v3.63.0) */ ?>
+        <button type="button" class="tb-btn" id="btnSeller" title="Doplní údaje o prodávajícím z jeho dřívějšího výkupu nebo zástavy"><i class="fas fa-user-clock me-1"></i> Prodávající z dřívějška</button>
         <button type="button" class="tb-btn" id="btnSave"><i class="fas fa-floppy-disk me-1"></i> Uložit</button>
         <button type="button" class="tb-btn" id="btnPrint"><i class="fas fa-print me-1"></i> Tisk</button>
         <button type="button" class="tb-btn" id="btnEmail"><i class="fas fa-envelope me-1"></i> Odeslat e-mailem</button>
@@ -96,6 +98,27 @@ $pageTitle = __($cfg['title_key'], $lang);
 </form>
 
 <div id="docToast"></div>
+
+<?php /* Vyhledání dřívějšího prodávajícího. Přenáší se JEN údaje o osobě —
+         věc, částka ani ověření totožnosti se nikdy nekopírují. */ ?>
+<div id="sellerBox" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,10,16,.62);align-items:flex-start;justify-content:center;padding:80px 14px;">
+  <div style="background:#fff;border-radius:16px;max-width:560px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden;">
+    <div style="padding:14px 18px;border-bottom:1px solid #e6eaf0;display:flex;align-items:center;gap:10px;">
+      <i class="fas fa-user-clock" style="color:#0a84ff;"></i>
+      <strong style="flex:1;">Prodávající z dřívějšího dokladu</strong>
+      <button type="button" id="sellerClose" style="border:0;background:transparent;font-size:20px;color:#8b95a6;cursor:pointer;">&times;</button>
+    </div>
+    <div style="padding:14px 18px;">
+      <input type="text" id="sellerQuery" placeholder="Jméno, telefon nebo e-mail…" autocomplete="off"
+             style="width:100%;padding:10px 12px;border:1px solid #d6dbe4;border-radius:10px;font-size:15px;">
+      <div style="font-size:12px;color:#8b95a6;margin-top:6px;">
+        Přenesou se jen údaje o osobě (jméno, adresa, doklad totožnosti…). Vykupovanou věc,
+        částku i ověření totožnosti vyplň znovu — patří k tomuhle výkupu.
+      </div>
+      <div id="sellerResults" style="margin-top:12px;max-height:320px;overflow:auto;"></div>
+    </div>
+  </div>
+</div>
 
 <?php /* Na Macu odstraní capture u file inputů — jinak appka „Designed for iPad"
          padá při pokusu otevřít fotoaparát (viz assets/js/capture-fix.js). */ ?>
@@ -232,6 +255,113 @@ $pageTitle = __($cfg['title_key'], $lang);
         }).catch(function (e) { toast('⚠️ ' + e.message, false); })
           .finally(function () { b.disabled = false; });
     };
+
+    // ── prodávající z dřívějšího dokladu (v3.63.0) ───────────────────────
+    // Stálí prodávající chodí opakovaně; přepisovat pokaždé rodné číslo,
+    // adresu a doklad totožnosti je zdržení i zdroj překlepů. Přenáší se
+    // JEN údaje o osobě — věc a částka musí být u každého výkupu vlastní.
+    (function () {
+        var box = document.getElementById('sellerBox');
+        var input = document.getElementById('sellerQuery');
+        var results = document.getElementById('sellerResults');
+        var btn = document.getElementById('btnSeller');
+        if (!box || !btn) return;
+
+        function esc(t) {
+            return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+            });
+        }
+        function fieldEl(name) { return document.querySelector('[name="' + name + '"]'); }
+        function open() {
+            box.style.display = 'flex';
+            // předvyplnit tím, co je v listu už napsané — obsluha většinou začne jménem
+            var n = fieldEl('customer_name'), p = fieldEl('customer_phone');
+            input.value = (n && n.value.trim()) || (p && p.value.trim()) || '';
+            setTimeout(function () { input.focus(); input.select(); }, 40);
+            if (input.value.trim().length >= 2) { search(); }
+            else { results.innerHTML = '<div style="color:#8b95a6;font-size:13px;">Napiš aspoň dva znaky.</div>'; }
+        }
+        function close() { box.style.display = 'none'; }
+
+        var timer = null;
+        function search() {
+            var q = input.value.trim();
+            if (q.length < 2) { results.innerHTML = ''; return; }
+            results.innerHTML = '<div style="color:#8b95a6;font-size:13px;">Hledám…</div>';
+            fetch('api/doc_seller_lookup.php?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d || !d.ok) { results.innerHTML = '<div style="color:#c0392b;font-size:13px;">' + esc((d && d.error) || 'Hledání selhalo.') + '</div>'; return; }
+                    if (!d.people.length) { results.innerHTML = '<div style="color:#8b95a6;font-size:13px;">Nikdo takový u nás zatím nic neprodával.</div>'; return; }
+                    results.innerHTML = d.people.map(function (p) {
+                        var kdy = p.doc_date ? p.doc_date.split('-').reverse().join('. ') : '';
+                        var kolik = p.count > 1 ? ' · ' + p.count + '× u nás' : '';
+                        return '<button type="button" data-doc="' + (p.id | 0) + '" '
+                            + 'style="display:block;width:100%;text-align:left;border:1px solid #e6eaf0;background:#fff;'
+                            + 'border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer;">'
+                            + '<div style="font-weight:700;font-size:14.5px;">' + esc(p.name) + '</div>'
+                            + '<div style="color:#8b95a6;font-size:12.5px;">' + esc(p.phone || p.email || '')
+                            + ' · ' + esc(p.doc_type === 'zastava' ? 'zástava' : 'výkup') + ' ' + esc(p.doc_number)
+                            + (kdy ? ' · ' + esc(kdy) : '') + esc(kolik) + '</div></button>';
+                    }).join('');
+                })
+                .catch(function () { results.innerHTML = '<div style="color:#c0392b;font-size:13px;">Hledání se nepodařilo odeslat.</div>'; });
+        }
+
+        function fillFrom(docIdToUse) {
+            fetch('api/doc_seller_lookup.php?id=' + (docIdToUse | 0), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d || !d.ok) { toast('⚠️ ' + ((d && d.error) || 'Údaje se nepodařilo načíst.'), false); return; }
+                    var filled = 0, skipped = 0;
+                    Object.keys(d.fields || {}).forEach(function (name) {
+                        var el = fieldEl(name);
+                        if (!el) return;
+                        // co je vyplněné, se nepřepisuje — obsluha už to mohla opravit
+                        if (String(el.value || '').trim() !== '') { skipped++; return; }
+                        el.value = d.fields[name];
+                        filled++;
+                    });
+                    close();
+                    if (!filled) { toast('Všechna pole už jsou vyplněná — nic se nepřepisovalo.', true); return; }
+                    toast('✅ Doplněno ' + filled + ' údajů z dokladu ' + d.doc_number
+                        + (skipped ? ' (' + skipped + ' už bylo vyplněných, ty zůstaly)' : '')
+                        + '. Zkontroluj platnost dokladu totožnosti.', true);
+                })
+                .catch(function () { toast('⚠️ Načtení údajů selhalo.', false); });
+        }
+
+        btn.onclick = open;
+        document.getElementById('sellerClose').onclick = close;
+        box.addEventListener('click', function (e) { if (e.target === box) { close(); } });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && box.style.display !== 'none') { close(); } });
+        input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(search, 300); });
+        results.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-doc]');
+            if (b) { fillFrom(parseInt(b.getAttribute('data-doc'), 10) || 0); }
+        });
+
+        // tichá nápověda: po zapsání telefonu/jména se zeptáme, jestli tu už byl
+        ['customer_phone', 'customer_name'].forEach(function (name) {
+            var el = fieldEl(name);
+            if (!el) return;
+            el.addEventListener('blur', function () {
+                var v = el.value.trim();
+                if (v.length < 4) return;
+                var pid = fieldEl('customer_pid');
+                if (pid && pid.value.trim() !== '') return;      // identifikace už je hotová
+                fetch('api/doc_seller_lookup.php?q=' + encodeURIComponent(v), { credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (!d || !d.ok || !d.people.length) return;
+                        var p = d.people[0];
+                        toast('ℹ️ ' + p.name + ' u nás už prodával (' + p.doc_number + ') — „Prodávající z dřívějška" doplní údaje.', true);
+                    })
+                    .catch(function () {});
+            });
+        });
+    })();
 
     document.getElementById('btnEmail').onclick = function () {
         var b = this; b.disabled = true;

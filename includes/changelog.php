@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.63.0',
+        'date' => '2026-08-26',
+        'time' => '03:05',
+        'title' => 'Výkup: prodávající z dřívějška — nemusí se přepisovat',
+        'items' => [
+            'Když ten samý člověk prodává opakovaně, stačí ve výkupním listu kliknout na <b>„Prodávající z dřívějška"</b>, najít ho podle jména, telefonu nebo e-mailu a <b>identifikace se doplní sama</b> z jeho posledního výkupu nebo zástavy — jméno, adresa, rodné číslo, datum a místo narození, občanství i doklad totožnosti.',
+            'Přenášejí se <b>jen údaje o osobě</b>. Popis věci, sériové číslo, výkupní částka, stav ani způsob výplaty se nekopírují nikdy — každý list musí popisovat svůj vlastní předmět. Nekopíruje se ani <b>ověření totožnosti</b>: to podle §&nbsp;8 zákona č. 253/2008 Sb. dělá konkrétní pracovník při konkrétním výkupu.',
+            'Co je ve formuláři už vyplněné, se <b>nepřepíše</b> — dopíší se jen prázdná pole a doklad rovnou připomene zkontrolovat platnost průkazu.',
+            'Když se do listu zapíše telefon nebo jméno někoho, kdo u nás už prodával, CRM to samo tiše připomene. Převzetí údajů se zaznamenává do historie (jde o AML agendu).',
+        ],
+    ],
+    [
         'version' => '3.62.0',
         'date' => '2026-08-26',
         'time' => '02:10',
