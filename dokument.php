@@ -308,7 +308,11 @@ $pageTitle = __($cfg['title_key'], $lang);
                         el.value = val;
                         filled.push(name === 'item_state' ? 'stav' : (name === 'item_serial' ? 'IMEI' : (name === 'item_model' ? 'model' : 'popis')));
                     });
-                    if (!filled.length) {
+                    if (d.doc.model_unknown) {
+                        // radši prázdný model než vymyšlený — ať to obsluha doplní
+                        // a nahlásí identifikátor k doplnění do číselníku
+                        toast('⚠️ Model ' + esc(d.doc.product_type || '') + ' zatím neznáme — název zařízení dopiš ručně a dej vědět, doplní se.', false);
+                    } else if (!filled.length) {
                         toast('Pole o věci už jsou vyplněná — nic se nepřepisovalo.', true);
                     } else {
                         toast('📱 Načteno z ' + esc(d.station || 'Macu') + ': ' + filled.join(', ')

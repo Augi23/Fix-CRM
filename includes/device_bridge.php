@@ -150,7 +150,8 @@ function afxDeviceBridgeStations(): array {
  */
 function afxDeviceBridgeToForm(array $d): array {
     require_once __DIR__ . '/imei_info.php';
-    $model = trim((string)($d['model'] ?? ''));
+    // „iPhone18,5" → „iPhone 17e"; neznámý identifikátor zůstane prázdný
+    $model = afxDeviceDisplayModel($d);
     $type = $model !== '' ? afxImeiDeviceType($model) : '';
     if ($type === '') {
         $cls = strtolower(trim((string)($d['device_class'] ?? '')));
@@ -192,10 +193,10 @@ function afxDeviceBridgeToForm(array $d): array {
  * dosud odhadovala a co se u výkupu nejvíc hádá.
  */
 function afxDeviceBridgeToDocFields(array $d): array {
-    $model = trim((string)($d['model'] ?? '')) ?: trim((string)($d['product_type'] ?? ''));
+    $model = afxDeviceDisplayModel($d);
     $cap = trim((string)($d['capacity'] ?? ''));
     $color = trim((string)($d['color'] ?? ''));
-    $desc = trim(implode(' ', array_filter([$model, $cap, $color], static fn($x) => $x !== '')));
+    $desc = afxDeviceDescription($model, $cap, $color);
 
     $stav = [];
     $h = $d['battery_health'] ?? null;
@@ -215,5 +216,96 @@ function afxDeviceBridgeToDocFields(array $d): array {
         // jen pro hlášku v UI, do dokladu se nepíše
         'serial_number'    => trim((string)($d['serial'] ?? '')),
         'imei'             => trim((string)($d['imei'] ?? '')),
+        'product_type'     => trim((string)($d['product_type'] ?? '')),
+        'model_unknown'    => $model === '' && trim((string)($d['product_type'] ?? '')) !== '',
     ];
+}
+
+/**
+ * Identifikátor zařízení → obchodní název (v3.66.0).
+ *
+ * Telefon o sobě řekne jen „iPhone18,5"; na dokladu i ve skladu ale musí být
+ * „iPhone 17e". Tabulka je schválně TADY na serveru, ne v můstku na Macu —
+ * doplnit nový model je pak otázka jedné aktualizace CRM a nemusí se obíhat
+ * všechny Macy a znovu je instalovat.
+ *
+ * Co v tabulce není, se NEPŘEKLÁDÁ a do formuláře se nevyplní — vymyšlený
+ * název modelu je horší než prázdné pole. Identifikátor se v takovém případě
+ * ukáže obsluze, ať ho může nahlásit k doplnění.
+ */
+function afxAppleModelNames(): array {
+    static $map = null;
+    if ($map !== null) { return $map; }
+    $map = [
+        // iPhone
+        'iPhone8,1' => 'iPhone 6s', 'iPhone8,2' => 'iPhone 6s Plus', 'iPhone8,4' => 'iPhone SE 2016',
+        'iPhone9,1' => 'iPhone 7', 'iPhone9,3' => 'iPhone 7', 'iPhone9,2' => 'iPhone 7 Plus', 'iPhone9,4' => 'iPhone 7 Plus',
+        'iPhone10,1' => 'iPhone 8', 'iPhone10,4' => 'iPhone 8', 'iPhone10,2' => 'iPhone 8 Plus', 'iPhone10,5' => 'iPhone 8 Plus',
+        'iPhone10,3' => 'iPhone X', 'iPhone10,6' => 'iPhone X',
+        'iPhone11,8' => 'iPhone XR', 'iPhone11,2' => 'iPhone XS', 'iPhone11,4' => 'iPhone XS Max', 'iPhone11,6' => 'iPhone XS Max',
+        'iPhone12,1' => 'iPhone 11', 'iPhone12,3' => 'iPhone 11 Pro', 'iPhone12,5' => 'iPhone 11 Pro Max',
+        'iPhone12,8' => 'iPhone SE 2020',
+        'iPhone13,1' => 'iPhone 12 mini', 'iPhone13,2' => 'iPhone 12', 'iPhone13,3' => 'iPhone 12 Pro',
+        'iPhone13,4' => 'iPhone 12 Pro Max',
+        'iPhone14,4' => 'iPhone 13 mini', 'iPhone14,5' => 'iPhone 13', 'iPhone14,2' => 'iPhone 13 Pro',
+        'iPhone14,3' => 'iPhone 13 Pro Max', 'iPhone14,6' => 'iPhone SE 2022',
+        'iPhone14,7' => 'iPhone 14', 'iPhone14,8' => 'iPhone 14 Plus',
+        'iPhone15,2' => 'iPhone 14 Pro', 'iPhone15,3' => 'iPhone 14 Pro Max',
+        'iPhone15,4' => 'iPhone 15', 'iPhone15,5' => 'iPhone 15 Plus',
+        'iPhone16,1' => 'iPhone 15 Pro', 'iPhone16,2' => 'iPhone 15 Pro Max',
+        'iPhone17,3' => 'iPhone 16', 'iPhone17,4' => 'iPhone 16 Plus',
+        'iPhone17,1' => 'iPhone 16 Pro', 'iPhone17,2' => 'iPhone 16 Pro Max', 'iPhone17,5' => 'iPhone 16e',
+        'iPhone18,3' => 'iPhone 17', 'iPhone18,1' => 'iPhone 17 Pro', 'iPhone18,2' => 'iPhone 17 Pro Max',
+        'iPhone18,4' => 'iPhone Air', 'iPhone18,5' => 'iPhone 17e',
+        // iPad
+        'iPad11,6' => 'iPad 8', 'iPad11,7' => 'iPad 8', 'iPad12,1' => 'iPad 9', 'iPad12,2' => 'iPad 9',
+        'iPad13,18' => 'iPad 10', 'iPad13,19' => 'iPad 10',
+        'iPad11,3' => 'iPad Air 3', 'iPad11,4' => 'iPad Air 3', 'iPad13,1' => 'iPad Air 4', 'iPad13,2' => 'iPad Air 4',
+        'iPad13,16' => 'iPad Air 5', 'iPad13,17' => 'iPad Air 5',
+        'iPad11,1' => 'iPad mini 5', 'iPad11,2' => 'iPad mini 5', 'iPad14,1' => 'iPad mini 6', 'iPad14,2' => 'iPad mini 6',
+    ];
+    // doplnění bez zásahu do kódu: Nastavení → system_settings, klíč
+    // apple_model_names ve tvaru "iPhone18,6=iPhone 18" (jeden na řádek)
+    $extra = trim((string)get_setting('apple_model_names', ''));
+    if ($extra !== '') {
+        foreach (preg_split('/[\r\n]+/', $extra) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || !str_contains($line, '=')) { continue; }
+            [$k, $v] = array_map('trim', explode('=', $line, 2));
+            if ($k !== '' && $v !== '') { $map[$k] = $v; }
+        }
+    }
+    return $map;
+}
+
+/** Vypadá to jako identifikátor („iPhone18,5", „iPad13,4")? */
+function afxIsDeviceIdentifier(string $s): bool {
+    return (bool)preg_match('/^[A-Za-z]+\d+,\d+$/', trim($s));
+}
+
+/** Obchodní název pro identifikátor; '' když ho neznáme. */
+function afxAppleModelName(string $productType): string {
+    $pt = trim($productType);
+    if ($pt === '') { return ''; }
+    return (string)(afxAppleModelNames()[$pt] ?? '');
+}
+
+/**
+ * Model, jak se má objevit v CRM: identifikátor se přeloží, obchodní název
+ * projde beze změny. Neznámý identifikátor vrací '' (radši prázdno).
+ */
+function afxDeviceDisplayModel(array $d): string {
+    $model = trim((string)($d['model'] ?? ''));
+    $pt = trim((string)($d['product_type'] ?? ''));
+    $byPt = afxAppleModelName($pt);
+    if ($byPt !== '') { return $byPt; }                       // server ví líp než můstek
+    if ($model !== '' && !afxIsDeviceIdentifier($model)) { return $model; }
+    return '';                                                // neznámý identifikátor
+}
+
+/** Popis věci: „iPhone 17e – 256 GB – Black" (pomlčky mezi částmi). */
+function afxDeviceDescription(string $model, string $capacity, string $color): string {
+    $parts = array_values(array_filter([trim($model), trim($capacity), trim($color)],
+        static fn($x) => $x !== ''));
+    return implode(' – ', $parts);
 }

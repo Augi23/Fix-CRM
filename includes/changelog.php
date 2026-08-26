@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.66.0',
+        'date' => '2026-08-27',
+        'time' => '09:15',
+        'title' => 'Zařízení: obchodní název místo identifikátoru a pomlčky v popisu',
+        'items' => [
+            'Telefon o sobě řekne jen technický identifikátor („iPhone18,5"). CRM ho nově <b>přepíše na obchodní název</b> — „iPhone 17e" — a to všude, kde se čte z připojeného zařízení: v naskladnění i ve výkupním listu.',
+            'V popisu věci jsou nově <b>pomlčky</b>: „iPhone 17e – 256 GB – Black". Když některý údaj chybí, pomlčka navíc nezůstane.',
+            'Tabulka názvů je <b>na serveru, ne v můstku na Macu</b> — nový model se doplní jednou aktualizací CRM a nemusí se obíhat počítače. Dá se rozšířit i bez zásahu do kódu přes nastavení <code>apple_model_names</code> (řádky ve tvaru <code>iPhone18,6=iPhone 18</code>).',
+            'Model, který zatím neznáme, se <b>nevyplní</b> a obsluze se ukáže identifikátor s výzvou dopsat název ručně — vymyšlený model v dokladu je horší než prázdné pole.',
+        ],
+    ],
+    [
         'version' => '3.65.0',
         'date' => '2026-08-27',
         'time' => '01:20',

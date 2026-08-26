@@ -66,8 +66,8 @@ ok('prázdný vstup nespadne', is_array(afxDeviceBridgeToForm([])));
 // ── 2b) údaje pro VÝKUPNÍ LIST ──
 head('Údaje z telefonu → výkupní list');
 $doc = afxDeviceBridgeToDocFields($iphone12);
-ok('popis věci se složí z modelu, kapacity a barvy',
-    $doc['item_description'] === 'iPhone 12 64 GB White', $doc['item_description']);
+ok('popis věci se složí z modelu, kapacity a barvy — s pomlčkami (v3.66.0)',
+    $doc['item_description'] === 'iPhone 12 – 64 GB – White', $doc['item_description']);
 ok('model zvlášť', $doc['item_model'] === 'iPhone 12', $doc['item_model']);
 ok('do pole SN/IMEI jde IMEI (ne sériové číslo)', $doc['item_serial'] === '353036118781852', $doc['item_serial']);
 ok('stav nese kondici baterie i cykly',
@@ -83,6 +83,35 @@ ok('neaktivovaný kus se ve stavu zvýrazní',
 $bezImei = afxDeviceBridgeToDocFields(['model' => 'iPad Air', 'serial' => 'DMPX123', 'capacity' => '64 GB']);
 ok('bez IMEI (iPad Wi-Fi) se použije sériové číslo', $bezImei['item_serial'] === 'DMPX123', $bezImei['item_serial']);
 ok('prázdný vstup nespadne', is_array(afxDeviceBridgeToDocFields([])));
+
+// ── 2c) překlad identifikátoru a pomlčky (v3.66.0) ──
+head('Označení modelu a pomlčky');
+ok('iPhone18,5 → iPhone 17e', afxAppleModelName('iPhone18,5') === 'iPhone 17e', afxAppleModelName('iPhone18,5'));
+ok('iPhone13,2 → iPhone 12', afxAppleModelName('iPhone13,2') === 'iPhone 12');
+ok('iPhone17,5 → iPhone 16e', afxAppleModelName('iPhone17,5') === 'iPhone 16e');
+ok('neznámý identifikátor se nepřekládá', afxAppleModelName('iPhone99,9') === '');
+ok('identifikátor se pozná', afxIsDeviceIdentifier('iPhone18,5') && afxIsDeviceIdentifier('iPad13,4'));
+ok('obchodní název se za identifikátor nepovažuje', !afxIsDeviceIdentifier('iPhone 17e'));
+
+ok('server přebije název z můstku', afxDeviceDisplayModel(['model' => 'iPhone18,5', 'product_type' => 'iPhone18,5']) === 'iPhone 17e');
+ok('obchodní název z můstku projde', afxDeviceDisplayModel(['model' => 'iPhone 12', 'product_type' => 'iPhone13,2']) === 'iPhone 12');
+ok('neznámý identifikátor NEskončí v poli', afxDeviceDisplayModel(['model' => 'iPhone99,9', 'product_type' => 'iPhone99,9']) === '');
+
+ok('pomlčky mezi modelem, kapacitou a barvou',
+    afxDeviceDescription('iPhone 17e', '256 GB', 'Black') === 'iPhone 17e – 256 GB – Black',
+    afxDeviceDescription('iPhone 17e', '256 GB', 'Black'));
+ok('chybějící barva neudělá dvojitou pomlčku',
+    afxDeviceDescription('iPhone 12', '64 GB', '') === 'iPhone 12 – 64 GB',
+    afxDeviceDescription('iPhone 12', '64 GB', ''));
+ok('samotný model zůstane bez pomlčky', afxDeviceDescription('iPad Air', '', '') === 'iPad Air');
+
+$novy = afxDeviceBridgeToDocFields(['product_type' => 'iPhone18,5', 'model' => 'iPhone18,5',
+    'capacity' => '256 GB', 'color' => 'Black', 'imei' => '353036118781852']);
+ok('výkupní list: identifikátor se přepsal a pomlčky sedí',
+    $novy['item_description'] === 'iPhone 17e – 256 GB – Black', $novy['item_description']);
+ok('výkupní list: model je obchodní název', $novy['item_model'] === 'iPhone 17e', $novy['item_model']);
+$nezn = afxDeviceBridgeToDocFields(['product_type' => 'iPhone99,9', 'model' => 'iPhone99,9', 'imei' => '1']);
+ok('neznámý model se v dokladu označí', $nezn['model_unknown'] === true && $nezn['item_model'] === '');
 
 // ── 3) uložení hlášení a jeho čtení ──
 head('Hlášení od můstku');
