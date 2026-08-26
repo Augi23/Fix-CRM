@@ -6,6 +6,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/chat_read.php';   // identity + přečteno (v3.64.0)
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['ok' => false]); exit;
@@ -47,12 +48,20 @@ try {
     ensureStaffChatTable();
     $me = crmChatActor();
     if ($me !== null) {
-        $q = $pdo->prepare("SELECT MAX(id) FROM staff_chat WHERE NOT (actor_type = ? AND actor_id = ?)");
-        $q->execute([$me[0], $me[1]]);
+        // „moje zprávy" = obě identity téhož člověka (users ↔ technicians).
+        // Dřív se porovnávala jen ta aktuální, takže vlastní starší zprávy
+        // z druhého přihlášení se počítaly jako cizí a bublina nešla zhasnout.
+        [$notMine, $notMinePar] = crmChatNotMineSql();
+        $q = $pdo->prepare("SELECT MAX(id) FROM staff_chat WHERE $notMine");
+        $q->execute($notMinePar);
         $lastChatOther = (int)($q->fetchColumn() ?: 0);
-        $seen = max(0, (int)($_GET['chat_seen'] ?? 0));
-        $q = $pdo->prepare("SELECT COUNT(*) FROM staff_chat WHERE id > ? AND NOT (actor_type = ? AND actor_id = ?)");
-        $q->execute([$seen, $me[0], $me[1]]);
+        // přečteno se drží NA SERVERU — po přihlášení na jiném zařízení
+        // (nebo v appce) by prohlížečová značka byla prázdná a bublina by
+        // se rozsvítila znovu, i když je všechno přečtené
+        $seen = max((int)($_GET['chat_seen'] ?? 0), crmChatLastSeenId());
+        if ((int)($_GET['chat_seen'] ?? 0) > 0) { crmChatMarkRead((int)$_GET['chat_seen']); }
+        $q = $pdo->prepare("SELECT COUNT(*) FROM staff_chat WHERE id > ? AND $notMine");
+        $q->execute(array_merge([$seen], $notMinePar));
         $chatUnread = (int)($q->fetchColumn() ?: 0);
     }
 } catch (Throwable $e) {}

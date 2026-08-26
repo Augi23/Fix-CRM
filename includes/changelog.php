@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.64.0',
+        'date' => '2026-08-27',
+        'time' => '00:40',
+        'title' => 'Účetnictví: nová záložka Prodej + oprava bubliny u chatu',
+        'items' => [
+            'V Účetnictví přibyla záložka <b>Prodej</b> — seznam <b>jednotlivých prodejů z kasy</b>, ne jen faktur a denních součtů. Doklad, čas, provozovna, kdo prodával, co se prodalo, způsob platby a částka; filtry na období, provozovnu a způsob platby, hledání podle dokladu, zboží i prodavače. Nahoře jsou součty a rozpad na základ DPH, daň a <b>použité zboží v režimu §&nbsp;90</b>. Odtud vede odkaz na účtenku, vystavenou fakturu i zakázku.',
+            '<b>Storna zůstávají vidět</b> (označená), ale do tržby se nepočítají — doklad, který zmizí, je pro účetní horší než doklad označený jako stornovaný.',
+            'Opraveno: u <b>chatu svítila bublina s počtem nepřečtených</b>, i když bylo všechno přečtené a poslední zpráva byla vlastní. CRM má dvojí přihlášení (uživatel / technik) a týž člověk má zprávy pod oběma identitami — filtr „moje zprávy" porovnával jen tu, pod kterou je zrovna přihlášený, takže si <b>vlastní starší zprávy počítal jako cizí</b>.',
+            'Zároveň se <b>„přečteno" přesunulo do databáze</b>. Dosud žilo jen v prohlížeči, takže po přihlášení na jiném počítači, telefonu nebo v appce začínalo od nuly a bublina se rozsvítila znovu. Teď stačí přečíst chat kdekoli a zhasne všude.',
+        ],
+    ],
+    [
         'version' => '3.63.1',
         'date' => '2026-08-26',
         'time' => '23:30',
