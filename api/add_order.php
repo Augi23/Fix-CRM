@@ -171,9 +171,7 @@ if ($priority_adjust != 0.0) {
 }
 $shipping_method  = trim($_POST['shipping_method'] ?? '') ?: null;
 $status           = getDefaultOrderStatus();
-$intake_photo_waiver = (string)($_POST['intake_photo_waiver'] ?? '') === '1';
 $intake_upload_attempt = crmOrderFilesHaveUploadAttempt($_FILES['files'] ?? null);
-$intake_photo_required_msg = __('intake_photos_server_required');
 $intake_photo_failed_msg = __('intake_photos_upload_failed');
 
 if (!$customer_id || !$device_model || $pin_code === '') {
@@ -183,15 +181,8 @@ if (!$customer_id || !$device_model || $pin_code === '') {
     );
 }
 
-if (!$intake_upload_attempt && !$intake_photo_waiver) {
-    // die() by ztratilo celý vyplněný formulář i s podpisem — afxOrderFail data zachová
-    afxOrderFail('Chybí fotky zařízení při příjmu', (string)$intake_photo_required_msg);
-}
-
-if ($intake_photo_waiver && !$intake_upload_attempt) {
-    $waiverNote = __('intake_photos_waiver_note');
-    $technician_notes = trim($technician_notes . ($technician_notes !== '' ? "\n\n" : '') . $waiverNote);
-}
+// Fotky při příjmu jsou doporučené, ne povinné — zakázka jde založit i bez nich
+// (na přání majitele zrušeno potvrzovací okno i blokace; 26. 8. 2026).
 
 if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
     afxOrderFail(
@@ -357,7 +348,7 @@ try {
         finfo_close($finfo);
     }
 
-    if (!$intake_photo_waiver && $intake_attachment_count < 1) {
+    if ($intake_upload_attempt && $intake_attachment_count < 1) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         afxOrderFail('Fotky se nepodařilo uložit', (string)$intake_photo_failed_msg);
     }

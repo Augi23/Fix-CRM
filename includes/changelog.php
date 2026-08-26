@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.60.2',
+        'date' => '2026-08-26',
+        'time' => '22:05',
+        'title' => 'Nová zakázka: konec vyskakovacího okna o chybějících fotkách',
+        'items' => [
+            'Při zakládání zakázky bez fotek se už <b>neotevře potvrzovací okno</b> („Chybí fotodokumentace při příjmu") — zakázka se rovnou uloží. Fotky zůstávají ve formuláři jako doporučená, ale nepovinná položka.',
+            'Zrušená je i serverová blokace, která zakázku bez fotek odmítala uložit, a automatická poznámka technikovi o pokračování bez fotodokumentace.',
+            'Hlídání zůstalo jen tam, kde dává smysl: když se fotky <b>vyberou</b>, ale nepodaří se uložit ani jedna, zakázka se neuloží a řekne si o nové nahrání — aby se nestalo, že fotky zmizí bez upozornění.',
+        ],
+    ],
+    [
         'version' => '3.61.0',
         'date' => '2026-08-26',
         'time' => '00:20',

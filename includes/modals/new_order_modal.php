@@ -244,7 +244,6 @@ $crm_order_model_catalog = crmNewOrderModelCatalog();
                                     <label class="form-label"><i class="fas fa-camera me-1 text-info"></i> <?php echo __('intake_photos_label'); ?></label>
                                     <input type="file" name="files[]" class="form-control" multiple accept="image/*,video/*">
                                     <div class="form-text"><?php echo __('intake_photos_hint'); ?></div>
-                                    <input type="hidden" name="intake_photo_waiver" value="0">
                                 </div>
                             </div>
                         </div>
@@ -408,12 +407,6 @@ $crm_order_model_catalog = crmNewOrderModelCatalog();
                 <?php endif; ?>
                 <script>
                 window.CRM_ORDER_MODEL_CATALOG = <?php echo json_encode($crm_order_model_catalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-                window.CRM_INTAKE_PHOTO_WARNING = <?php echo json_encode([
-                    'title' => __('intake_photos_required_warning_title'),
-                    'body' => __('intake_photos_required_warning_body'),
-                    'confirm' => __('intake_photos_required_confirm'),
-                    'cancel' => __('intake_photos_required_cancel'),
-                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
                 </script>
                 <div class="modal-footer bg-transparent border-secondary crm-wizard-footer">
                     <?php /* Storno: záměrné zrušení = zavřít A zahodit rozepsané údaje, ať se
