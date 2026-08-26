@@ -3534,30 +3534,48 @@ function gitRemoteSlug(string $repoRoot): ?string {
 /** Vytáhne první (nejnovější) číslo verze z obsahu includes/changelog.php.
  *  Changelog je jediný zdroj pravdy — nové záznamy se přidávají nahoru. */
 function crmVersionFromChangelogSource(string $src): string {
-    if ($src !== '' && preg_match("/'version'\s*=>\s*'(\d+\.\d+\.\d+)'/", $src, $m)) {
-        return $m[1];
+    // NEJVYŠŠÍ verze v souboru, ne první nalezená. Na CRM pracuje víc relací
+    // naráz a každá si píše záznam s vlastním časem — když se časy prostřídají,
+    // „první v souboru" a „první po seřazení podle času" jsou různé záznamy
+    // a instalovaná verze se pak nikdy neshodne s nabízenou (26. 8. 2026).
+    if ($src === '' || !preg_match_all("/'version'\s*=>\s*'(\d+\.\d+\.\d+)'/", $src, $m)) {
+        return '';
     }
-    return '';
+    $best = '';
+    foreach ($m[1] as $v) {
+        if ($best === '' || version_compare($v, $best, '>')) { $best = $v; }
+    }
+    return $best;
 }
 
 /** Lidská verze CRM (formát major.minor.patch).
  *  PRAVIDLO: velké číslo = zásadní přestavba, prostřední = nové funkce,
  *  poslední = opravy a drobnosti.
- *  Zdroj pravdy = NEJNOVĚJŠÍ záznam v includes/changelog.php (přidává se
- *  nahoru) — dřív se verze četla ze souboru VERSION, který se při psaní
- *  changelogu zapomínal bumpnout a dlaždice pak ukazovaly starou verzi.
+ *  Zdroj pravdy = NEJVYŠŠÍ číslo verze v includes/changelog.php. Ne první
+ *  záznam: seznam se řadí podle data a času a na CRM pracuje víc relací
+ *  naráz, takže kolega se zápisem na pozdější hodinu, ale nižším číslem,
+ *  jinak „snížil" verzi celého CRM a nabídka aktualizace pak nešla odklikat
+ *  (26. 8. 2026: nainstalováno 3.63.0, hlášeno 3.60.2).
  *  VERSION zůstává jen jako fallback, kdyby changelog nešel přečíst. */
 function crmAppVersion(): string {
     static $v = null;
     if ($v !== null) return $v;
-    // Verzi bereme z NEJNOVĚJŠÍHO záznamu SEŘAZENÉHO seznamu — stejný zdroj, jaký
-    // vidí uživatel v Historii úprav. Čtení regexem ze zdrojáku (níž jako záloha)
-    // bralo první výskyt v SOUBORU, takže po zavedení řazení podle času se dlaždice
-    // s verzí rozešla s prvním řádkem seznamu.
+    // Stejné pravidlo musí platit i pro vzdálený changelog (crmVersionFromChangelogSource),
+    // jinak se „nainstalovaná" a „dostupná" verze nikdy neshodnou.
     $cl = @include __DIR__ . '/changelog.php';
-    if (is_array($cl) && !empty($cl[0]['version'])) {
-        $v = (string)$cl[0]['version'];
-    } else {
+    $v = '';
+    if (is_array($cl)) {
+        // NEJVYŠŠÍ verze ze všech záznamů — ne první po seřazení podle času.
+        // Seznam se řadí podle data a času kvůli čtení, jenže verze tím pádem
+        // skákala podle toho, kdo si zápis napsal s pozdějším časem.
+        foreach ($cl as $e) {
+            $ev = (string)($e['version'] ?? '');
+            if (preg_match('/^\d+\.\d+\.\d+\z/', $ev) && ($v === '' || version_compare($ev, $v, '>'))) {
+                $v = $ev;
+            }
+        }
+    }
+    if ($v === '') {
         $v = crmVersionFromChangelogSource((string)@file_get_contents(__DIR__ . '/changelog.php'));
     }
     if ($v === '') {

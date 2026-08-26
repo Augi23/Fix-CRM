@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.63.1',
+        'date' => '2026-08-26',
+        'time' => '23:30',
+        'title' => 'Aktualizace: opraveno hlášení „máte nejnovější verzi" u starší verze',
+        'items' => [
+            'CRM ukazovalo jako nainstalovanou verzi <b>ten záznam v historii úprav, který měl nejpozdější čas</b> — ne ten s nejvyšším číslem. Když na CRM pracovaly dvě relace naráz a časy zápisů se prostřídaly, tvrdilo CRM po aktualizaci třeba „máte nejnovější 3.60.2" a zároveň nabízelo 3.63.0, která už ve skutečnosti nainstalovaná byla. Nabídka aktualizace tak nešla odklikat.',
+            'Nainstalovaná i dostupná verze se nově počítají stejně: <b>nejvyšší číslo verze</b> v historii úprav. Aktualizace samotná byla v pořádku po celou dobu — chybný byl jen ten popisek.',
+        ],
+    ],
+    [
         'version' => '3.63.0',
         'date' => '2026-08-26',
         'time' => '03:05',
