@@ -574,6 +574,10 @@ try {
                                 <input type="text" id="pcSerial" class="form-control" autocomplete="off">
                                 <?php /* doplnění údajů z IMEI (v3.61.0) — vyplní se sem výsledek z iFreeiCloud */ ?>
                                 <div id="pcImeiInfo" class="small mt-2" style="display:none;"></div>
+                                <?php /* čtení z telefonu připojeného k Macu (v3.62.0) — zdarma, umí i baterii */ ?>
+                                <button type="button" class="btn btn-sm btn-outline-info mt-2" id="pcDeviceRead">
+                                    <i class="fab fa-apple me-1"></i>Načíst z připojeného zařízení
+                                </button>
                             </div>
                             <div class="col-md-4 d-flex align-items-end<?php echo $isAccessoryTab ? ' d-none' : ''; ?>" id="pcPcrGroup">
                                 <div id="pcPcrBadge" class="w-100 text-center small fw-bold rounded py-2" style="background:rgba(255,255,255,.06);color:#9aa3b2;">PČR: nekontrolováno</div>
@@ -1450,6 +1454,61 @@ $(document).on('click', '.product-label-btn', function () {
             return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
         });
     }
+    // ── načtení z telefonu připojeného kabelem k Macu (v3.62.0) ──────────
+    // Údaje posílá můstek (device-bridge) na server, odsud se jen vyzvednou.
+    // Zdarma a navíc s kondicí baterie — proto je to první volba, iFreeiCloud
+    // zůstává pro kusy, které zrovna nejsou po ruce.
+    var $deviceBtn = el('pcDeviceRead');
+    if ($deviceBtn) {
+        $deviceBtn.addEventListener('click', function () {
+            var gen = formGen;
+            $deviceBtn.disabled = true;
+            renderImeiInfo('<i class="fas fa-spinner fa-spin me-1"></i>Čtu připojené zařízení…', '');
+            fetch('api/device_last.php', { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (gen !== formGen) return;
+                    if (!d || !d.ok || !d.info) {
+                        renderImeiInfo('<i class="fas fa-circle-info me-1"></i>' + escapeHtmlSafe((d && d.error) || 'Zařízení se nepodařilo přečíst.'), 'warn');
+                        return;
+                    }
+                    var info = d.info;
+                    // IMEI a sériové číslo se přepíšou vždy — čtou se přímo ze zařízení,
+                    // takže jsou spolehlivější než cokoli opsaného ručně
+                    if (info.imei) { $serial.value = info.imei; imeiAsked = String(info.imei).replace(/\D/g, ''); }
+                    else if (info.serial) { $serial.value = info.serial; }
+                    var res = applyImeiInfo(info);
+                    if (info.battery && $bat && $bat.value.trim() === '') {
+                        $bat.value = String(info.battery); res.filled.push('baterie');
+                    }
+                    var parts = [];
+                    if (info.model || info.product_type) parts.push('<b>' + escapeHtmlSafe(info.model || info.product_type) + '</b>');
+                    if (info.capacity) parts.push(escapeHtmlSafe(info.capacity));
+                    if (info.ios) parts.push('iOS ' + escapeHtmlSafe(info.ios));
+                    if (info.battery) {
+                        parts.push('baterie ' + (info.battery | 0) + ' %'
+                            + (info.battery_cycles ? ' (' + (info.battery_cycles | 0) + ' cyklů)' : ''));
+                    }
+                    if (info.serial) parts.push('SN ' + escapeHtmlSafe(info.serial));
+                    var line = '<i class="fab fa-apple me-1"></i>' + parts.join(' · ')
+                        + ' <span style="opacity:.6;">(' + escapeHtmlSafe(d.station || 'Mac') + ')</span>';
+                    if (res.filled.length) line += '<br><span style="color:#7ce39a;">Doplněno: ' + res.filled.join(', ') + '.</span>';
+                    if (res.skipped.length) {
+                        line += '<br><span style="color:#ffc46b;">Katalog nezná ' + escapeHtmlSafe(res.skipped.join(', ')) + ' — vyber ručně.</span>';
+                    }
+                    if (info.activation && info.activation !== 'Activated') {
+                        line += '<br><span style="color:#ffc46b;">Stav aktivace: ' + escapeHtmlSafe(info.activation) + '</span>';
+                    }
+                    renderImeiInfo(line, 'ok');
+                    refreshPreview();
+                })
+                .catch(function () {
+                    if (gen === formGen) { renderImeiInfo('<i class="fas fa-circle-info me-1"></i>Můstek se nepodařilo oslovit.', 'warn'); }
+                })
+                .then(function () { $deviceBtn.disabled = false; });
+        });
+    }
+
     var imeiTimer = null;
     $serial.addEventListener('input', function () {
         clearTimeout(imeiTimer);

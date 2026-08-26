@@ -1943,6 +1943,77 @@ require_once 'includes/header.php';
         <!-- TISK ŠTÍTKŮ TAB (dostupný všem zaměstnancům) -->
         <div class="tab-pane fade <?php echo $active_tab == 'tisk' ? 'show active' : ''; ?>">
             <?php if ($active_tab == 'tisk'): ?>
+            <?php /* ── Můstek pro čtení připojeného zařízení (v3.62.0) ──
+                     Schválně tady a ne v Integracích: Integrace vidí jen admin,
+                     ale nainstalovat si můstek na svůj Mac má umět kdokoli. */ ?>
+            <?php require_once __DIR__ . '/includes/device_bridge.php';
+                  $dbToken = afxDeviceBridgeToken();
+                  $dbCmd = afxDeviceBridgeInstallCommand($dbToken);
+                  $dbStations = afxDeviceBridgeStations(); ?>
+            <div class="glass-panel p-4 border-secondary mb-3">
+                <h5 class="mb-1 text-white"><i class="fab fa-apple me-2 text-info"></i>Načítání údajů z připojeného iPhonu/iPadu</h5>
+                <div class="small text-white-75 mb-3">
+                    Když se telefon připojí kabelem k tomuto Macu, umí CRM při naskladnění vyplnit
+                    <strong>IMEI, sériové číslo, model, kapacitu, verzi iOS</strong> a hlavně
+                    <strong>kondici baterie</strong> (cykly a skutečnou kapacitu) — tu žádná IMEI služba neřekne.
+                    Je to zdarma, nic se neplatí za dotaz.
+                </div>
+                <div class="small text-white-50 mb-2">Nainstaluj jedním příkazem — otevři <strong>Terminál</strong> (Cmd+mezerník → „Terminál"), vlož a stiskni Enter:</div>
+                <div class="d-flex gap-2 align-items-start flex-wrap mb-2">
+                    <input type="text" class="form-control font-monospace" id="devBridgeCmd" readonly
+                           value="<?php echo e($dbCmd); ?>" style="max-width:760px;font-size:.82rem;">
+                    <button type="button" class="btn btn-outline-info" id="devBridgeCopy">
+                        <i class="fas fa-copy me-1"></i>Zkopírovat
+                    </button>
+                </div>
+                <div class="small text-white-50 mb-3">
+                    Instalace si doinstaluje potřebný nástroj (libimobiledevice) a službu, která běží i po restartu.
+                    Na telefonu pak <strong>odemkni obrazovku a potvrď „Důvěřovat tomuto počítači"</strong>.
+                    Stejný příkaz spusť i na dalších Macích — každý se přihlásí sám pod svým názvem.
+                </div>
+                <div class="small text-white-75 mb-2"><strong>Připojené stanice</strong></div>
+                <?php if (!$dbStations): ?>
+                    <div class="small text-white-50">Zatím se nehlásí žádný Mac. Po instalaci se stanice objeví do minuty.</div>
+                <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead><tr class="text-white-50"><th>Mac</th><th>Stav</th><th>Připojené zařízení</th><th>Poslední hlášení</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($dbStations as $st): $d = $st['device']; ?>
+                            <tr>
+                                <td><?php echo e($st['station']); ?></td>
+                                <td>
+                                    <?php if ($st['online']): ?><span class="badge bg-success">běží</span>
+                                    <?php else: ?><span class="badge bg-secondary">neběží</span><?php endif; ?>
+                                </td>
+                                <td class="small">
+                                    <?php if ($d && !empty($d['serial'])): ?>
+                                        <?php echo e(($d['model'] ?? '') ?: ($d['product_type'] ?? 'zařízení')); ?>
+                                        <?php if (!empty($d['capacity'])): ?> · <?php echo e($d['capacity']); ?><?php endif; ?>
+                                        <?php if (!empty($d['battery_health'])): ?> · baterie <?php echo (int)$d['battery_health']; ?> %<?php endif; ?>
+                                        <span class="text-white-50">· SN <?php echo e($d['serial']); ?></span>
+                                    <?php else: ?><span class="text-white-50">nic není připojené</span><?php endif; ?>
+                                </td>
+                                <td class="small text-white-50"><?php echo e(date('j. n. H:i', strtotime($st['updated_at']))); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+            <script>
+            (function () {
+                var b = document.getElementById('devBridgeCopy'), i = document.getElementById('devBridgeCmd');
+                if (!b || !i) return;
+                b.addEventListener('click', function () {
+                    i.select(); i.setSelectionRange(0, 99999);
+                    var done = function () { b.innerHTML = '<i class="fas fa-check me-1"></i>Zkopírováno'; setTimeout(function () { b.innerHTML = '<i class="fas fa-copy me-1"></i>Zkopírovat'; }, 2000); };
+                    if (navigator.clipboard) { navigator.clipboard.writeText(i.value).then(done, function () { try { document.execCommand('copy'); done(); } catch (e) {} }); }
+                    else { try { document.execCommand('copy'); done(); } catch (e) {} }
+                });
+            })();
+            </script>
             <div class="row">
                 <div class="col-lg-7">
                     <div class="glass-panel p-4 border-secondary mb-3">

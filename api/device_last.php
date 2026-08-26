@@ -1,0 +1,28 @@
+<?php
+/** Co je zrovna připojené k Macu u pultu (pro naskladnění produktu).
+ *  GET → { ok, station, age, info:{…}, device:{…} }  */
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/device_bridge.php';
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+
+if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => __('unauthorized')], JSON_UNESCAPED_UNICODE); exit;
+}
+if (!function_exists('crmCanManageProducts') || !crmCanManageProducts()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Nemáš oprávnění naskladňovat produkty.'], JSON_UNESCAPED_UNICODE); exit;
+}
+
+$latest = afxDeviceBridgeLatest();
+if (!$latest) {
+    echo json_encode(['ok' => false, 'error' => 'Žádné připojené zařízení. Připoj iPhone/iPad kabelem k Macu, odemkni ho a potvrď „Důvěřovat tomuto počítači".'], JSON_UNESCAPED_UNICODE); exit;
+}
+echo json_encode([
+    'ok' => true,
+    'station' => $latest['station'],
+    'age' => $latest['age'],
+    'info' => afxDeviceBridgeToForm($latest['device']),
+], JSON_UNESCAPED_UNICODE);

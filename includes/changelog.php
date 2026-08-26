@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.62.0',
+        'date' => '2026-08-26',
+        'time' => '02:10',
+        'title' => 'Naskladnění: načtení údajů z připojeného iPhonu/iPadu (zdarma)',
+        'items' => [
+            'Když je telefon připojený kabelem k Macu u pultu, stačí v naskladnění kliknout na <b>„Načíst z připojeného zařízení"</b> a vyplní se IMEI, sériové číslo, model, kapacita, verze iOS a hlavně <b>kondice baterie</b> — počet cyklů a skutečná kapacita. Baterii dosud psala obsluha odhadem a žádná IMEI služba ji neřekne.',
+            'Je to <b>zdarma</b> (čte se přímo ze zařízení), takže je to první volba; placené doplnění z IMEI zůstává pro kusy, které zrovna nejsou po ruce.',
+            'Instalaci na Mac zvládne <b>kdokoli ze zaměstnanců</b>: v <b>Nastavení → Tisk štítků</b> je připravený jeden příkaz i s tokenem — zkopírovat, vložit do Terminálu, Enter. Sám si doinstaluje potřebné nástroje a založí službu, která běží i po restartu. Stejný příkaz jde spustit na libovolném dalším Macu; v Nastavení je pak vidět seznam stanic a co je k nim právě připojené.',
+            'Pozn.: <b>3uTools pro macOS neexistuje</b> (je to program pro Windows), proto se čte přes open-source libimobiledevice — umí to samé a je zdarma.',
+        ],
+    ],
+    [
         'version' => '3.60.2',
         'date' => '2026-08-26',
         'time' => '22:05',
