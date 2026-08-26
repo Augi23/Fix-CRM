@@ -209,6 +209,8 @@ try {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/main.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/main.js'); ?>"></script>
+    <?php /* Mac: odstranění capture u file inputů — jinak appka „Designed for iPad" padá při otevření foťáku */ ?>
+    <script src="assets/js/capture-fix.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/capture-fix.js'); ?>"></script>
     <script src="assets/js/draft.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/draft.js'); ?>"></script>
     <script src="assets/js/liquid-glass.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/liquid-glass.js'); ?>" defer></script>
     <script src="assets/js/liquid-glass-engine.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/liquid-glass-engine.js'); ?>" defer></script>

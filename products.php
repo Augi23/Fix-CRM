@@ -318,7 +318,24 @@ try {
                                             <span class="text-white-75">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="fw-bold text-primary"><?php echo formatMoney((float)$p['price']); ?></td>
+                                    <td class="fw-bold text-primary">
+                                        <?php
+                                        // Sloupec „Cena" je PRODEJNÍ cena. U čerstvého výkupu ještě není
+                                        // stanovená (0) — místo nuly ukážeme, za kolik jsme kus vykoupili,
+                                        // ať obsluha vidí, s čím počítat (marži řeší § 90 při prodeji).
+                                        $__pp = isset($p['purchase_price']) ? (float)$p['purchase_price'] : 0.0;
+                                        $__showBuy = ((float)$p['price'] <= 0) && $__pp > 0;
+                                        ?>
+                                        <?php if ($__showBuy): ?>
+                                            <span class="text-warning" title="Výkupní (nákupní) cena — prodejní cena zatím nenastavená"><?php echo formatMoney($__pp); ?></span>
+                                            <div class="small text-white-75 fw-normal">výkup · prodejní cena nenastavena</div>
+                                        <?php else: ?>
+                                            <?php echo formatMoney((float)$p['price']); ?>
+                                            <?php if ($__pp > 0): ?>
+                                                <div class="small text-white-75 fw-normal" title="Výkupní / nákupní cena">nákup <?php echo formatMoney($__pp); ?></div>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <?php if (productIsLoaned($p)): ?>
                                             <span class="badge" style="background:#8B5CF6" title="<?php echo e(($p['loan_to'] ?? '') . (!empty($p['loan_at']) ? ' · od ' . date('j.n.Y', strtotime($p['loan_at'])) : '') . (!empty($p['loan_note']) ? ' · ' . $p['loan_note'] : '')); ?>">Zapůjčeno/Komisní prod.</span>

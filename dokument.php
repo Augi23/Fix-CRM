@@ -97,6 +97,10 @@ $pageTitle = __($cfg['title_key'], $lang);
 
 <div id="docToast"></div>
 
+<?php /* Na Macu odstraní capture u file inputů — jinak appka „Designed for iPad"
+         padá při pokusu otevřít fotoaparát (viz assets/js/capture-fix.js). */ ?>
+<script src="assets/js/capture-fix.js?v=<?php echo (int)@filemtime(__DIR__ . '/assets/js/capture-fix.js'); ?>"></script>
+
 <script>
 (function () {
     var DOC_TYPE = <?php echo json_encode($type); ?>;

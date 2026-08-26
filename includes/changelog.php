@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.60.1',
+        'date' => '2026-08-26',
+        'time' => '21:10',
+        'title' => 'Fotky do výkupního listu na Macu (konec padání appky) + výkupní cena ve skladu',
+        'items' => [
+            '<b>Aplikace na Macu už u fotek nespadne:</b> pole pro fotky mělo natvrdo nastavené „vyfotit foťákem", což je správně na telefonu, ale v aplikaci na macOS to shazovalo celou appku (známá vada iOS aplikací běžících na Macu). Na Macu se teď rovnou otevře <b>výběr souborů</b> — jde vybrat <b>víc obrázků naráz odkudkoli z počítače</b> (plocha, složky, Fotky). Na telefonu a tabletu zůstává vše při starém: klepnutí na „+" otevře foťák.',
+            'Týká se všech fotek v dokladech (fotodokumentace stavu zařízení i doklad totožnosti) a fotek u nové reklamace.',
+            '<b>Ve skladu je vidět výkupní cena:</b> u kusu z výkupního listu bylo ve sloupci „Cena" nula. Sloupec ukazuje <b>prodejní</b> cenu, kterou po výkupu ještě nikdo nestanovil — nově se místo nuly vypíše <b>výkupní cena</b> s poznámkou „výkup · prodejní cena nenastavena". U ostatních kusů se pod prodejní cenou nově ukazuje i nákupní, ať je marže hned vidět.',
+            'Samotná výkupní částka se ukládala správně po celou dobu (v kartě kusu jako „Nákupní / výkupní cena") — šlo jen o to, že v přehledu nebyla vidět.',
+        ],
+    ],
+    [
         'version' => '3.60.0',
         'date' => '2026-08-25',
         'time' => '21:30',
