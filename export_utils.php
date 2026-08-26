@@ -28,6 +28,10 @@ class AccountingExporter {
             xmlns:inv="http://www.stormware.cz/schema/version_2/invoice.xsd" 
             xmlns:typ="http://www.stormware.cz/schema/version_2/type.xsd"></dat:dataPack>');
 
+        // SimpleXML::addChild NEescapuje „&" — „Novák & syn s.r.o." z ARESu by
+        // vyrobil nevalidní XML a import do Pohody by spadl (nález prověrky 25.8.)
+        $x = static fn($v) => htmlspecialchars((string)$v, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
         $item = $xml->addChild('dat:dataPackItem');
         $item->addAttribute('version', '2.0');
         $item->addAttribute('id', $invoice['invoice_number']);
@@ -37,7 +41,7 @@ class AccountingExporter {
 
         $header = $inv->addChild('inv:invoiceHeader');
         $header->addChild('inv:invoiceType', 'issuedInvoice');
-        $header->addChild('inv:number', $invoice['invoice_number']);
+        $header->addChild('inv:number', $x($invoice['invoice_number']));
         $header->addChild('inv:date', $invoice['date_issue']);
         $header->addChild('inv:dateTax', $invoice['date_tax']);
         $header->addChild('inv:dateDue', $invoice['date_due']);
@@ -49,11 +53,11 @@ class AccountingExporter {
         // Partner (Customer)
         $partner = $header->addChild('inv:partnerIdentity');
         $address = $partner->addChild('typ:address', null, 'http://www.stormware.cz/schema/version_2/type.xsd');
-        $address->addChild('typ:company', $invoice['customer']['company'] ?: ($invoice['customer']['first_name'] . ' ' . $invoice['customer']['last_name']));
-        $address->addChild('typ:city', $this->parseCity($invoice['customer']['address']));
-        $address->addChild('typ:street', $this->parseStreet($invoice['customer']['address']));
-        if ($invoice['customer']['ico']) $address->addChild('typ:ico', $invoice['customer']['ico']);
-        if ($invoice['customer']['dic']) $address->addChild('typ:dic', $invoice['customer']['dic']);
+        $address->addChild('typ:company', $x($invoice['customer']['company'] ?: trim($invoice['customer']['first_name'] . ' ' . $invoice['customer']['last_name'])));
+        $address->addChild('typ:city', $x($this->parseCity($invoice['customer']['address'])));
+        $address->addChild('typ:street', $x($this->parseStreet($invoice['customer']['address'])));
+        if ($invoice['customer']['ico']) $address->addChild('typ:ico', $x($invoice['customer']['ico']));
+        if ($invoice['customer']['dic']) $address->addChild('typ:dic', $x($invoice['customer']['dic']));
 
         $header->addChild('inv:paymentType', $this->mapPaymentMethod($invoice['payment_method']));
         
@@ -61,7 +65,7 @@ class AccountingExporter {
         $invItems = $inv->addChild('inv:invoiceDetail');
         foreach ($invoice['items'] as $row) {
             $invItem = $invItems->addChild('inv:invoiceItem');
-            $invItem->addChild('inv:text', $row['item_name']);
+            $invItem->addChild('inv:text', $x($row['item_name']));
             $invItem->addChild('inv:quantity', $row['quantity']);
             $invItem->addChild('inv:unit', $row['unit']);
             $invItem->addChild('inv:payVat', $invoice['is_vat_payer'] ? 'true' : 'false');
@@ -105,9 +109,24 @@ class AccountingExporter {
         $stmt->execute([$id]);
         $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        $stmt = $this->pdo->prepare("SELECT * FROM customers WHERE id = ?");
-        $stmt->execute([$invoice['customer_id']]);
-        $invoice['customer'] = $stmt->fetch(PDO::FETCH_ASSOC);
+        // odběratel: karta klienta, ale ručně vyplněné údaje NA FAKTUŘE mají přednost
+        // (faktura bez klienta v CRM má customer_id NULL a jen cust_*_override —
+        //  bez tohohle by export do Pohody spadl nebo poslal prázdného odběratele)
+        $cust = [];
+        if (!empty($invoice['customer_id'])) {
+            $stmt = $this->pdo->prepare("SELECT * FROM customers WHERE id = ?");
+            $stmt->execute([$invoice['customer_id']]);
+            $cust = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        }
+        $invoice['customer'] = [
+            'company'    => (string)($invoice['cust_name_override'] ?? '') ?: (string)($cust['company'] ?? ''),
+            'first_name' => (string)($cust['first_name'] ?? ''),
+            'last_name'  => (string)($cust['last_name'] ?? ''),
+            'address'    => (string)($invoice['cust_address_override'] ?? '') ?: (string)($cust['address'] ?? ''),
+            'ico'        => (string)($invoice['cust_ico_override'] ?? '') ?: (string)($cust['ico'] ?? ''),
+            'dic'        => (string)($invoice['cust_dic_override'] ?? '') ?: (string)($cust['dic'] ?? ''),
+            'email'      => (string)($invoice['cust_email_override'] ?? '') ?: (string)($cust['email'] ?? ''),
+        ];
         
         $stmt = $this->pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ?");
         $stmt->execute([$id]);
@@ -131,14 +150,20 @@ class AccountingExporter {
         return 'none';
     }
 
+    /** Adresa se zadává volně — dělí se čárkou i odřádkováním (kasa má textareu). */
+    private function addressParts($address): array {
+        $parts = preg_split('/[\r\n,]+/', (string)$address) ?: [];
+        $parts = array_values(array_filter(array_map('trim', $parts), static fn($p) => $p !== ''));
+        return $parts;
+    }
+
     private function parseCity($address) {
-        // Simple heuristic: last line or after comma
-        $parts = explode(',', $address);
-        return trim(end($parts));
+        $p = $this->addressParts($address);
+        return $p ? end($p) : '';
     }
 
     private function parseStreet($address) {
-        $parts = explode(',', $address);
-        return trim($parts[0]);
+        $p = $this->addressParts($address);
+        return $p[0] ?? '';
     }
 }

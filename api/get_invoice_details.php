@@ -20,7 +20,7 @@ if (!isset($_GET['id'])) {
 try {
     $stmt = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.company 
                            FROM invoices i 
-                           JOIN customers c ON i.customer_id = c.id 
+                           LEFT JOIN customers c ON i.customer_id = c.id 
                            WHERE i.id = ?");
     $stmt->execute([$_GET['id']]);
     $invoice = $stmt->fetch();

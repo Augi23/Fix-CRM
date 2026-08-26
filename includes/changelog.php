@@ -11,6 +11,30 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.60.0',
+        'date' => '2026-08-25',
+        'time' => '21:30',
+        'title' => 'Oprava: kontrola IMEI v databázi Policie ČR',
+        'items' => [
+            'Ověření, jestli není zařízení vedené jako <b>odcizené</b>, přestalo fungovat — Policie ČR přepsala svou aplikaci „Odcizené mobilní telefony" na nový web a starý formulář, na který jsme se ptali, přestal existovat. Kontrola pak u <b>každého</b> IMEI vracela „nelze ověřit". Opraveno na nový dotaz, ověřeno proti živé databázi.',
+            'Kontrola byla v CRM napsaná <b>dvakrát</b> (naskladnění produktu a ověření IMEI na Nástěnce) a rozbily se obě. Nově obě používají jeden společný kód, takže případná další změna na straně policie se bude opravovat na jednom místě.',
+            'Vyhodnocení odpovědi je odolnější: rozhoduje výhradně věta o výsledku hledání, takže jiná hláška na stránce (cookies, provozní upozornění) nemůže způsobit <b>falešné „ODCIZENO"</b> a zablokovat naskladnění poctivého kusu.',
+        ],
+    ],
+    [
+        'version' => '3.59.0',
+        'date' => '2026-08-25',
+        'time' => '14:20',
+        'title' => 'Kasa: faktura i bez klienta v CRM',
+        'items' => [
+            'Platba <b>na fakturu</b> už nevyžaduje založeného klienta. U faktury přibyl přepínač <b>„Odběratel není v CRM — vyplnit ručně"</b>: název firmy nebo jméno, adresa, IČO (s doplněním <b>z ARESu</b>), DIČ a e-mail. Údaje se uloží <b>jen na fakturu</b>, do klientů se nic nezakládá.',
+            'Bez e-mailu se doklad prostě <b>vytiskne</b> — po prodeji na to panel rovnou upozorní a tlačítko „Faktura" otevře tisk. „Fakturu e-mailem" se dál dá použít, jen se zeptá na adresu.',
+            'Takový doklad je vidět v <b>Účetnictví</b>, dá se v něm dodatečně opravit odběratel a korektně odchází i v <b>exportu pro účetní</b> — tam se nově u všech faktur bere ručně vyplněný odběratel přednostně před kartou klienta, aby si tisk a export nemohly odporovat. (V sestavách filtrovaných na pobočku se faktury bez zakázky jako dosud nezobrazují — pobočka se dá zjistit jen přes zakázku; sestava jejich počet i částku hlásí v poznámce.)',
+            'Faktura bez klienta i bez vyplněného odběratele nevznikne — hlídá to kasa i Účetnictví (doklad musí vědět, komu patří). Zákazník z CRM a ruční odběratel se navzájem vylučují: u zakázky na fakturu se při vyplněném odběrateli klient zakázky nedosazuje, jinak by doklad nesl jeho IČO a adresu a odešel by e-mailem jemu.',
+            'Při té příležitosti opraveno i pár starších věcí, na které se přišlo při kontrole: export do <b>Pohody</b> vyráběl nevalidní XML, když měl odběratel v názvu „&amp;" (např. „Novák &amp; syn"), a víceřádkovou adresu neuměl rozdělit na ulici a město. Dobropis nepřenášel e-mail odběratele.',
+        ],
+    ],
+    [
         'version' => '3.58.1',
         'date' => '2026-08-25',
         'time' => '09:30',

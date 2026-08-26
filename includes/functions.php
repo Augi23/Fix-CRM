@@ -2956,9 +2956,71 @@ function afxEnsureInvoiceSupplierColumn(): void {
     global $pdo;
     static $done = false;
     if ($done) return;
+    // DDL uvnitř transakce = implicitní COMMIT (rollback pak nic nevrátí).
+    // Volající si ensure pouští před transakcí; tenhle guard je pojistka.
+    if ($pdo->inTransaction()) { return; }
     $done = true;
     try { $pdo->exec("ALTER TABLE invoices ADD COLUMN supplier VARCHAR(8) NOT NULL DEFAULT 'sro'"); }
     catch (Throwable $e) { /* už existuje */ }
+}
+
+/**
+ * Faktura BEZ klienta v CRM (v3.59.0) — jednorázový odběratel se vyplní přímo
+ * na kase a uloží se do cust_*_override sloupců, které tu už byly pro „fakturuj
+ * na jiného odběratele". Aby doklad nemusel mít kartu klienta, povolí se
+ * customer_id NULL (cizí klíč NULL připouští) a přibude e-mail pro odeslání.
+ * POZOR: DDL nikdy uvnitř transakce (implicitní commit) — proto guard.
+ */
+function afxEnsureInvoiceAdhocBuyer(): void {
+    global $pdo;
+    static $done = false;
+    if ($done) return;
+    if ($pdo->inTransaction()) { return; }   // ať se dokončí transakce, ensure doběhne příště
+    $done = true;
+    try { $pdo->exec("ALTER TABLE invoices ADD COLUMN cust_email_override VARCHAR(190) NULL"); }
+    catch (Throwable $e) { /* už existuje */ }
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM invoices LIKE 'customer_id'")->fetch(PDO::FETCH_ASSOC);
+        if ($col && strtoupper((string)$col['Null']) === 'NO') {
+            $pdo->exec("ALTER TABLE invoices MODIFY customer_id INT(11) NULL");
+        }
+    } catch (Throwable $e) { error_log('afxEnsureInvoiceAdhocBuyer: ' . $e->getMessage()); }
+}
+
+/**
+ * Očištění ručně zadaného odběratele faktury (kasa i jinde).
+ * Vrací ['name','address','ico','dic','email','error'] — chybová hláška je
+ * neprázdná, když vstup nedává smysl; volající prodej odmítne.
+ */
+function afxInvoiceBuyerSanitize($raw): array {
+    $b = is_array($raw) ? $raw : [];
+    // pole/objekt v poli by po (string) přetypování skončil jako odběratel „Array"
+    $str = static fn($k, $max) => is_scalar($b[$k] ?? null) ? trim(mb_substr((string)$b[$k], 0, $max)) : '';
+    $out = [
+        'name'    => $str('name', 190),
+        'address' => $str('address', 400),
+        'ico'     => $str('ico', 20),
+        'dic'     => $str('dic', 20),
+        'email'   => $str('email', 190),
+        'error'   => '',
+    ];
+    if ($out['name'] === '') { return $out; }                       // prázdný = odběratel se nevyplňuje
+    if (mb_strlen($out['name']) < 2) { $out['error'] = 'Název odběratele je příliš krátký.'; return $out; }
+    if ($out['ico'] !== '') {
+        $ico = preg_replace('/\D+/', '', $out['ico']) ?? '';
+        if (strlen($ico) !== 8) { $out['error'] = 'IČO musí mít přesně 8 číslic (nebo ho nech prázdné).'; return $out; }
+        $out['ico'] = $ico;
+    }
+    if ($out['dic'] !== '') {
+        $out['dic'] = strtoupper(preg_replace('/\s+/', '', $out['dic']) ?? '');
+        if (!preg_match('/^[A-Z]{2}[0-9A-Z]{8,12}$/', $out['dic'])) {
+            $out['error'] = 'DIČ má mít tvar CZ12345678 (nebo ho nech prázdné).'; return $out;
+        }
+    }
+    if ($out['email'] !== '' && !filter_var($out['email'], FILTER_VALIDATE_EMAIL)) {
+        $out['error'] = 'E-mail odběratele nemá platný tvar.'; return $out;
+    }
+    return $out;
 }
 
 /** Druhá fakturační identita (OSVČ) z nastavení + příznak připravenosti. */
@@ -2985,9 +3047,16 @@ function afxIcoSupplier(): array {
  *   běžné zboží (díly) u plátce → cena/(1+sazba), vat_rate = sazba
  *   použité zboží §90 → cena beze změny, vat_rate 0 + povinná věta v poznámce
  * $items: [['name','qty','unit_price','used']]. Vrací id faktury.
+ * $buyer = jednorázový odběratel vyplněný ručně (name/address/ico/dic/email);
+ * uloží se do cust_*_override a MÁ PŘEDNOST před kartou klienta. Bez klienta
+ * i bez odběratele fakturu vystavit nelze — doklad musí vědět, komu patří.
  */
-function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, array $items, float $total, ?int $orderId = null, string $supplier = 'sro'): int {
+function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, array $items, float $total, ?int $orderId = null, string $supplier = 'sro', array $buyer = []): int {
     afxEnsureInvoiceSupplierColumn();
+    $bName  = trim((string)($buyer['name'] ?? ''));
+    if ($customerId <= 0 && $bName === '') {
+        throw new Exception('Faktura nemá odběratele — vyber zákazníka, nebo vyplň jednorázového odběratele.');
+    }
     // DPH stav podle VÝSTAVCE dokladu — s.r.o. a OSVČ mohou mít jiný režim
     $isVat = $supplier === 'ico'
         ? get_setting('ico_supplier_is_vat', '0') == '1'
@@ -3030,11 +3099,21 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
         ? (trim((string)get_setting('ico_supplier_invoice_prefix', '')) ?: ('9' . date('Y')))
         : (string)get_setting('acc_invoice_prefix', date('Y'));
     $currency = get_setting('currency', 'Kč');
+    // ručně zadaný odběratel jde do overridů (tisk/e-mail/účetní sestavy je už umí)
+    static $hasEmailCol = null;
+    if ($hasEmailCol === null) {
+        try { $hasEmailCol = (bool)$pdo->query("SHOW COLUMNS FROM invoices LIKE 'cust_email_override'")->fetch(); }
+        catch (Throwable $e) { $hasEmailCol = false; }
+    }
+    $ovCols = $bName !== ''
+        ? ', cust_name_override, cust_address_override, cust_ico_override, cust_dic_override' . ($hasEmailCol ? ', cust_email_override' : '')
+        : '';
+    $ovVals = $bName !== '' ? ', ?, ?, ?, ?' . ($hasEmailCol ? ', ?' : '') : '';
     $ins = $pdo->prepare("INSERT INTO invoices
             (invoice_number, variable_symbol, customer_id, order_id, date_issue, date_tax, date_due,
-             total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes, supplier)
+             total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes, supplier" . $ovCols . ")
         VALUES (?, ?, ?, ?, CURDATE(), CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY),
-                ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?, ?)");
+                ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?, ?" . $ovVals . ")");
     $invoiceId = 0;
     // Číslo z MAXIMA řady pod zámkem (stejný vzor jako pokladní doklady):
     // GET_LOCK proti souběhu dvou kas, UNIQUE klíč + opakování jako pojistka,
@@ -3049,8 +3128,17 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
         for ($try = 0; $try < 6; $try++) {
             $number = afxNextInvoiceNumber($pdo, $prefix, true);
             try {
-                $ins->execute([$number, preg_replace('/\D/', '', $number) ?: null, $customerId, $orderId,
-                    round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes, $supplier]);
+                $par = [$number, preg_replace('/\D/', '', $number) ?: null, $customerId > 0 ? $customerId : null, $orderId,
+                    round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes, $supplier];
+                if ($bName !== '') {
+                    // POZOR: prázdné pole ukládat jako NULL, ne ''. Tisk i export
+                    // vyhodnocují `override ?: karta klienta` — prázdný řetězec je
+                    // falsy, takže by se na doklad propašovalo IČO/adresa klienta.
+                    $nn = static fn($v) => ($v = trim((string)$v)) !== '' ? $v : null;
+                    array_push($par, $bName, $nn($buyer['address'] ?? ''), $nn($buyer['ico'] ?? ''), $nn($buyer['dic'] ?? ''));
+                    if ($hasEmailCol) { $par[] = $nn($buyer['email'] ?? ''); }
+                }
+                $ins->execute($par);
                 $invoiceId = (int)$pdo->lastInsertId();
                 break;
             } catch (PDOException $e) {
@@ -5790,14 +5878,18 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array 
     $st = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, c.email AS cust_email,
                                 o.device_brand, o.device_model, o.serial_number
                          FROM invoices i
-                         JOIN customers c ON i.customer_id = c.id
+                         LEFT JOIN customers c ON i.customer_id = c.id
                          LEFT JOIN orders o ON i.order_id = o.id
                          WHERE i.id = ? LIMIT 1");
     $st->execute([$invoiceId]);
     $invoice = $st->fetch();
     if (!$invoice) { return [false, 'Faktura nenalezena', '']; }
 
-    $to = trim((string)($toOverride ?? $invoice['cust_email'] ?? ''));
+    // pořadí: ruční adresa z UI → e-mail jednorázového odběratele → karta klienta
+    // (faktura bez klienta v CRM má adresu jen v cust_email_override)
+    $to = trim((string)($toOverride ?? ''));
+    if ($to === '') { $to = trim((string)($invoice['cust_email_override'] ?? '')); }
+    if ($to === '') { $to = trim((string)($invoice['cust_email'] ?? '')); }
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
         return [false, 'Klient nemá platný e-mail.', $to];
     }
@@ -6206,6 +6298,117 @@ function ensureStaffChatTable(): void {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         $done = true;
     } catch (Throwable $e) { error_log('ensureStaffChatTable: ' . $e->getMessage()); }
+}
+
+/** Přílohy chatu (v3.60.0) — jedna zpráva může nést víc souborů. */
+function ensureStaffChatFilesTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    if ($pdo->inTransaction()) { return; }   // DDL v transakci = implicitní commit
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS staff_chat_files (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            message_id INT UNSIGNED NOT NULL,
+            file_path VARCHAR(255) NOT NULL,
+            file_name VARCHAR(255) NOT NULL,
+            file_mime VARCHAR(120) NOT NULL,
+            file_size INT UNSIGNED NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_message (message_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $done = true;
+    } catch (Throwable $e) { error_log('ensureStaffChatFilesTable: ' . $e->getMessage()); }
+}
+
+/** Kam se ukládají přílohy chatu. `secure/` je na serveru blokované Caddym
+ *  (403), takže se soubory dají číst JEN přes api/chat_file.php s přihlášením. */
+function crmChatUploadDir(): string {
+    return dirname(__DIR__) . '/secure/chat/';
+}
+
+/** Povolené typy příloh: MIME → přípona. Whitelist, ne blacklist. */
+function crmChatAllowedTypes(): array {
+    return [
+        'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp',
+        'image/heic' => 'heic', 'image/heif' => 'heif',
+        'application/pdf' => 'pdf', 'text/plain' => 'txt', 'text/csv' => 'csv',
+        'application/zip' => 'zip', 'application/x-zip-compressed' => 'zip',
+        'application/msword' => 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        'application/vnd.ms-excel' => 'xls',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+        'video/mp4' => 'mp4', 'video/quicktime' => 'mov',
+        'audio/mpeg' => 'mp3', 'audio/mp4' => 'm4a', 'audio/x-m4a' => 'm4a', 'audio/wav' => 'wav',
+    ];
+}
+
+/** Obrázek, který prohlížeč umí ukázat rovnou v bublině (HEIC jen Safari). */
+function crmChatIsImageMime(string $mime): bool {
+    return in_array(strtolower($mime), ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'], true);
+}
+
+/** Strop pro přílohu chatu. Web zvládne 64 MB (.user.ini kvůli 360° fotkám),
+ *  ale chat je společná nástěnka — 25 MB na soubor bohatě stačí na fotky,
+ *  PDF i krátké video a nezaplní disk. Fotky se navíc zmenšují v prohlížeči. */
+const AFX_CHAT_FILE_CAP = 25 * 1024 * 1024;
+
+/** Kolik smí mít jeden soubor podle nastavení PHP (bajty). */
+function crmChatMaxUploadBytes(): int {
+    $toBytes = static function (string $v): int {
+        $v = trim($v);
+        if ($v === '') return 0;
+        $unit = strtolower(substr($v, -1));
+        $n = (int)$v;
+        if ($unit === 'g') return $n * 1024 * 1024 * 1024;
+        if ($unit === 'm') return $n * 1024 * 1024;
+        if ($unit === 'k') return $n * 1024;
+        return $n;
+    };
+    $vals = array_filter([$toBytes((string)ini_get('upload_max_filesize')), $toBytes((string)ini_get('post_max_size'))]);
+    $vals[] = AFX_CHAT_FILE_CAP;
+    return min($vals);
+}
+
+/**
+ * Uložená relativní cesta přílohy → absolutní cesta na disku, nebo null.
+ * Jediné místo, které rozhoduje, jestli soubor smí ven: musí ležet UVNITŘ
+ * secure/chat (žádné ../ ven) a existovat. Používá výdej i mazání příloh.
+ */
+function crmChatResolveFilePath(string $relative): ?string {
+    $base = realpath(crmChatUploadDir());
+    if ($base === false) { return null; }
+    $abs = realpath(dirname(__DIR__) . '/' . ltrim($relative, '/'));
+    if ($abs === false || !is_file($abs)) { return null; }
+    if (strncmp($abs, rtrim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR, strlen(rtrim($base, DIRECTORY_SEPARATOR)) + 1) !== 0) { return null; }
+    return $abs;
+}
+
+/** Přílohy k daným zprávám: [message_id => [ {id,name,size,mime,is_image}, … ]] */
+function crmChatFilesForMessages(array $messageIds): array {
+    global $pdo;
+    $ids = array_values(array_unique(array_map('intval', $messageIds)));
+    $ids = array_filter($ids, static fn($i) => $i > 0);
+    if (!$ids) { return []; }
+    $out = [];
+    try {
+        $in = implode(',', $ids);
+        $q = $pdo->query("SELECT id, message_id, file_name, file_mime, file_size
+                          FROM staff_chat_files WHERE message_id IN ($in) ORDER BY id ASC");
+        foreach ($q as $r) {
+            $out[(int)$r['message_id']][] = [
+                'id'       => (int)$r['id'],
+                'name'     => (string)$r['file_name'],
+                'mime'     => (string)$r['file_mime'],
+                'size'     => (int)$r['file_size'],
+                'is_image' => crmChatIsImageMime((string)$r['file_mime']),
+                'url'      => 'api/chat_file.php?id=' . (int)$r['id'],
+            ];
+        }
+    } catch (Throwable $e) { error_log('crmChatFilesForMessages: ' . $e->getMessage()); }
+    return $out;
 }
 
 /** Aktér chatu = přihlášený zaměstnanec (technik nebo admin účet). */

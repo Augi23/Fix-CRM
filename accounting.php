@@ -62,7 +62,7 @@ if (isset($_POST['save_acc_settings'])) {
 afxEnsureInvoicePayments();
 $stmt = $pdo->query("SELECT i.*, c.first_name, c.last_name, c.company,
     (SELECT GROUP_CONCAT(item_name SEPARATOR ', ') FROM invoice_items WHERE invoice_id = i.id) as item_names
-    FROM invoices i JOIN customers c ON i.customer_id = c.id ORDER BY i.created_at DESC");
+    FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id ORDER BY i.created_at DESC");
 $invoices = $stmt->fetchAll();
 
 // Fetch Customers for select
@@ -125,7 +125,7 @@ $customers = $stmt->fetchAll();
                                         <?php endif; ?>
                                     </td>
                                     <td><?php echo date('d.m.Y', strtotime($inv['date_issue'])); ?></td>
-                                    <td><?php echo htmlspecialchars($inv['company'] ?: $inv['first_name'] . ' ' . $inv['last_name']); ?></td>
+                                    <td><?php echo htmlspecialchars(trim((string)($inv['cust_name_override'] ?: ($inv['company'] ?: trim($inv['first_name'] . ' ' . $inv['last_name'])))) ?: '—'); ?></td>
                                     <td class="small"><?php echo htmlspecialchars($inv['item_names'] ?: '—'); ?></td>
                                     <td><?php echo getInvoiceStatusBadge($inv['status'], $inv); ?></td>
                                     <td class="fw-bold"><?php echo number_format((float)$inv['total_amount'], 0, ',', ' ') . ' ' . $inv['currency']; ?></td>
@@ -191,7 +191,7 @@ $customers = $stmt->fetchAll();
                         <div class="col-md-5">
                             <label class="form-label"><?php echo __('customer'); ?></label>
                             <div class="input-group">
-                                <select name="customer_id" id="inv_customer" class="form-select select2" required>
+                                <select name="customer_id" id="inv_customer" class="form-select select2">
                                     <option value=""><?php echo __('search_placeholder'); ?></option>
                                     <?php foreach ($customers as $c): ?>
                                     <option value="<?php echo $c['id']; ?>"><?php echo htmlspecialchars($c['company'] ?: $c['first_name'] . ' ' . $c['last_name']); ?></option>
@@ -508,6 +508,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('invoiceForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        // doklad musí mít odběratele: klient z CRM, nebo ručně vyplněný název
+        // (faktury z kasy na jednorázového odběratele klienta v CRM nemají)
+        if (!document.getElementById('inv_customer').value
+            && !document.getElementById('inv_cust_name').value.trim()) {
+            document.getElementById('customer_override_fields').style.display = 'flex';
+            alert('Faktura nemá odběratele — vyber zákazníka, nebo vyplň název odběratele ručně (tlačítko s tužkou u výběru).');
+            document.getElementById('inv_cust_name').focus();
+            return;
+        }
         const formData = new FormData(this);
         
         // Serialize items
@@ -546,6 +555,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function showNewInvoiceModal() {
     document.getElementById('invoiceForm').reset();
+    // form.reset() select2 nepřekreslí — v novém dokladu by svítil předchozí klient
+    if (window.jQuery) { jQuery('#inv_customer').val(null).trigger('change'); }
+    ['inv_cust_name', 'inv_cust_ico', 'inv_cust_dic', 'inv_cust_address'].forEach(function (id) {
+        var el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('customer_override_fields').style.display = 'none';
     document.querySelector('#invoiceForm [name="action"]').value = 'save_invoice';
     document.getElementById('inv_id').value = '';
     document.getElementById('inv_order_id').value = '';
@@ -633,11 +648,12 @@ function editInvoice(id) {
             document.getElementById('inv_order_id').value = data.order_id || '';
             document.getElementById('inv_is_vat_payer').value = data.is_vat_payer || '0';
             document.getElementById('inv_number').value = data.invoice_number;
-            document.getElementById('inv_customer').value = data.customer_id;
+            // faktura na jednorázového odběratele klienta nemá → prázdný výběr
+            document.getElementById('inv_customer').value = data.customer_id || '';
             
             // Trigger select2 update if used
             if (typeof jQuery !== 'undefined' && jQuery('#inv_customer').data('select2')) {
-                jQuery('#inv_customer').val(data.customer_id).trigger('change');
+                jQuery('#inv_customer').val(data.customer_id || null).trigger('change');
             }
 
             document.getElementById('inv_date_issue').value = data.date_issue;

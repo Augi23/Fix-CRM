@@ -12,7 +12,7 @@ if (!defined('INVOICE_DOC_EMBED')) {
     $id = (int)$_GET['id'];
     $stmt = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, c.preferred_language, o.device_brand, o.device_model, o.serial_number
                            FROM invoices i
-                           JOIN customers c ON i.customer_id = c.id
+                           LEFT JOIN customers c ON i.customer_id = c.id
                            LEFT JOIN orders o ON i.order_id = o.id
                            WHERE i.id = ?");
     $stmt->execute([$id]);
@@ -140,10 +140,12 @@ if (!function_exists('_l')) {
             <td>
                 <div class="addr-title"><?php echo _l('customer'); ?></div>
                 <?php 
-                $cust_name = $invoice['cust_name_override'] ?: ($invoice['company'] ?: $invoice['first_name'] . ' ' . $invoice['last_name']);
-                $cust_address = $invoice['cust_address_override'] ?: $invoice['address'];
-                $cust_ico = $invoice['cust_ico_override'] ?: $invoice['ico'];
-                $cust_dic = $invoice['cust_dic_override'] ?: $invoice['dic'];
+                // (string) casty: faktura bez klienta v CRM má tyhle sloupce NULL
+                // a PHP 8.1+ hlásí u htmlspecialchars(null) deprecation přímo do dokladu
+                $cust_name = (string)($invoice['cust_name_override'] ?: ($invoice['company'] ?: trim((string)$invoice['first_name'] . ' ' . (string)$invoice['last_name'])));
+                $cust_address = (string)($invoice['cust_address_override'] ?: $invoice['address']);
+                $cust_ico = (string)($invoice['cust_ico_override'] ?: $invoice['ico']);
+                $cust_dic = (string)($invoice['cust_dic_override'] ?: $invoice['dic']);
                 ?>
                 <div class="addr-name"><?php echo htmlspecialchars($cust_name); ?></div>
                 <div><?php echo nl2br(htmlspecialchars($cust_address)); ?></div>

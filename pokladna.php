@@ -631,8 +631,50 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
 
             <div id="posCustomerWrap" class="mb-3" style="display:none;">
-                <label class="form-label small text-white-50 mb-1">Zákazník — u faktury povinný; u zakázky můžeš nechat prázdné (faktura půjde na jejího klienta)</label>
+                <label class="form-label small text-white-50 mb-1">Zákazník z CRM — u zakázky můžeš nechat prázdné (faktura půjde na jejího klienta). Kdo v CRM není, se vyplní níž ručně.</label>
                 <select id="posCustomer" class="form-select" style="width:100%;"></select>
+                <?php /* jednorázový odběratel (v3.59.0): fakturu jde vystavit bez zakládání klienta —
+                         údaje se uloží JEN na fakturu (cust_*_override), do CRM klientů se nic nepřidá */ ?>
+                <div class="small text-white-50 mt-2">
+                    <i class="fas fa-lightbulb me-1"></i>Doprodej zákazníkovi, který fakturu nechce? Zvol
+                    <strong>Hotově</strong> nebo <strong>Kartou</strong> — účtenka odběratele vyplňovat nemusí.
+                </div>
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="posAdhocOn">
+                    <label class="form-check-label small text-white-50" for="posAdhocOn">
+                        Odběratel není v CRM — vyplnit ručně (nezakládá klienta)
+                    </label>
+                </div>
+                <div id="posAdhocWrap" class="mt-2" style="display:none;">
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <input type="text" class="form-control" id="posAdhocName" maxlength="190"
+                                   placeholder="Název firmy nebo jméno a příjmení *">
+                        </div>
+                        <div class="col-12">
+                            <textarea class="form-control" id="posAdhocAddr" rows="2" maxlength="400"
+                                      placeholder="Adresa (ulice, město, PSČ)"></textarea>
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="posAdhocIco" maxlength="12" inputmode="numeric" placeholder="IČO">
+                                <button class="btn btn-outline-info" type="button" id="posAdhocAres" title="Načíst z ARESu">ARES</button>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <input type="text" class="form-control" id="posAdhocDic" maxlength="20" placeholder="DIČ">
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <input type="email" class="form-control" id="posAdhocEmail" maxlength="190" placeholder="E-mail (pro zaslání faktury)">
+                        </div>
+                    </div>
+                    <div class="small text-white-50 mt-2">
+                        <i class="fas fa-circle-info me-1"></i>Povinný je <strong>jen název / jméno</strong> — daňový doklad
+                        musí mít odběratele. IČO a DIČ vyplňuj jen u firmy, adresu podle přání zákazníka.
+                        Údaje se uloží jen na fakturu, klient v CRM nevzniká. Bez e-mailu se faktura po prodeji
+                        <strong>vytiskne</strong> tlačítkem „Faktura".
+                    </div>
+                </div>
                 <?php /* varování o chybějícím účtu dle VÝSTAVCE zvolené faktury —
                          text plní JS podle payment (invoice → s.r.o., invoice_ico → OSVČ) */ ?>
                 <div class="alert alert-danger border-0 py-2 mt-2 mb-0" id="posAccWarn" style="font-size:.85rem;display:none;">
@@ -655,6 +697,10 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
             <div id="posDoneProductNote" class="alert alert-info border-0 py-2 small" style="display:none;">
                 <i class="fas fa-check me-1"></i> Sklad CRM odečten automaticky — produkt zůstane vyprodaný i po dalším nahrání souboru z naskladňovací appky.
+            </div>
+            <div id="posDoneInvoiceNote" class="alert alert-warning border-0 py-2 small" style="display:none;">
+                <i class="fas fa-print me-1"></i> Odběratel nemá e-mail — fakturu <strong>vytiskni</strong> tlačítkem
+                „Faktura". Poslat ji jde i tak: „Fakturu e-mailem" se na adresu zeptá.
             </div>
             <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-info" id="posDoneReceipt"><i class="fas fa-print me-1"></i> Účtenka</button>
@@ -1231,6 +1277,9 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.classList.add('sel-' + payment);
             var isInvPay = payment === 'invoice' || payment === 'invoice_ico';
             $custWrap.style.display = isInvPay ? '' : 'none';
+            // jiná platba než faktura → odemknout výběr klienta (jinak zůstane
+            // zamčený od ručního odběratele a obsluha nechápe proč)
+            if (!isInvPay && typeof adhocReset === 'function') { adhocReset(); }
             updateAccWarn();
             // „Faktura IČO" jde použít až po vyplnění a zapnutí identity OSVČ v Účetnictví
             if (payment === 'invoice_ico' && !ICO_SUPPLIER_READY) {
@@ -1316,6 +1365,67 @@ document.addEventListener('DOMContentLoaded', function () {
         }).on('change', updateFinish);
     });
 
+    // ── jednorázový odběratel (faktura bez klienta v CRM) ──
+    var $adhocOn = document.getElementById('posAdhocOn');
+    var $adhocWrap = document.getElementById('posAdhocWrap');
+    var $adhocName = document.getElementById('posAdhocName');
+    function adhocActive() { return $adhocOn.checked; }
+    function adhocData() {
+        if (!adhocActive()) return null;
+        var n = $adhocName.value.trim();
+        if (n === '') return null;
+        return {
+            name: n,
+            address: document.getElementById('posAdhocAddr').value.trim(),
+            ico: document.getElementById('posAdhocIco').value.trim(),
+            dic: document.getElementById('posAdhocDic').value.trim(),
+            email: document.getElementById('posAdhocEmail').value.trim()
+        };
+    }
+    function adhocReset() {
+        $adhocOn.checked = false;
+        $adhocWrap.style.display = 'none';
+        ['posAdhocName', 'posAdhocAddr', 'posAdhocIco', 'posAdhocDic', 'posAdhocEmail']
+            .forEach(function (id) { document.getElementById(id).value = ''; });
+        $('#posCustomer').prop('disabled', false).trigger('change.select2');
+    }
+    $adhocOn.addEventListener('change', function () {
+        $adhocWrap.style.display = this.checked ? '' : 'none';
+        // vybraný klient a ruční odběratel se vylučují — ať je jasné, komu faktura půjde
+        if (this.checked) { $('#posCustomer').val(null).trigger('change'); }
+        $('#posCustomer').prop('disabled', this.checked).trigger('change.select2');
+        if (this.checked) { setTimeout(function () { $adhocName.focus(); }, 40); }
+        updateFinish();
+    });
+    ['posAdhocName', 'posAdhocEmail'].forEach(function (id) {
+        document.getElementById(id).addEventListener('input', updateFinish);
+    });
+    // ARES: doplnění názvu, adresy a DIČ podle IČO (stejný veřejný rejstřík jako u klientů)
+    document.getElementById('posAdhocAres').addEventListener('click', function () {
+        var ico = document.getElementById('posAdhocIco').value.replace(/\D/g, '');
+        if (ico.length !== 8) { alert('IČO má mít 8 číslic.'); return; }
+        var btn = this; btn.disabled = true; btn.textContent = '…';
+        var ctl = new AbortController();
+        var tmr = setTimeout(function () { ctl.abort(); }, 8000);   // bez timeoutu tlačítko zůstalo navždy zamčené
+        fetch('https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/' + ico, { signal: ctl.signal })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('ares')); })
+            .catch(function () { return null; })
+            .then(function (d) {
+                clearTimeout(tmr);
+                btn.disabled = false; btn.textContent = 'ARES';
+                if (!d) { alert('ARES subjekt nenašel nebo je nedostupný — vyplň údaje ručně.'); return; }
+                if (d.obchodniJmeno) { $adhocName.value = d.obchodniJmeno; }
+                if (d.dic) { document.getElementById('posAdhocDic').value = d.dic; }
+                var s = d.sidlo || {};
+                var addr = s.textovaAdresa || [
+                    [s.nazevUlice || s.nazevObce, s.cisloDomovni].filter(Boolean).join(' '),
+                    [s.psc, s.nazevObce].filter(Boolean).join(' ')
+                ].filter(Boolean).join(', ');
+                if (addr) { document.getElementById('posAdhocAddr').value = addr; }
+                updateFinish();
+            });
+    });
+
     function updateFinish() {
         var t = total();
         var ok = cart.length > 0 && payment !== '';
@@ -1323,7 +1433,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // automaticky stává klient zakázky (pos_checkout si ho dotáhne sám)
         var isInvPay = payment === 'invoice' || payment === 'invoice_ico';
         var hasOrder = cart.some(function (c) { return c.type === 'order'; });
-        if (isInvPay && !$('#posCustomer').val() && !hasOrder) ok = false;
+        if (isInvPay && !$('#posCustomer').val() && !adhocData() && !hasOrder) ok = false;
         if (payment === 'invoice_ico' && !ICO_SUPPLIER_READY) ok = false;
         if (t < 0 && payment !== '' && payment !== 'cash') ok = false;   // výplata zákazníkovi jde jen hotově
         // výdaj z kasy = peníze ze zásuvky → jen hotově, i když je součet kladný
@@ -1415,6 +1525,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 payment: payment,
                 eshop_order_id: eshopOrderId,
                 customer_id: parseInt($('#posCustomer').val() || 0, 10),
+                buyer: adhocData(),   // jednorázový odběratel faktury (null = žádný)
                 cash_received: (payment === 'cash' && total() > 0) ? (cashVal() === null ? null : cashVal()) : null,
                 items: cart.map(function (c) {
                     var freeText = c.type === 'manual' || c.type === 'expense';   // volný název, bez vazby na sklad
@@ -1427,7 +1538,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(function (r) { return r.json(); })
         .then(function (d) {
             $finish.innerHTML = '<i class="fas fa-check me-2"></i>Dokončit prodej';
-            if (!d.success) { alert(d.message || 'Prodej se nepodařil.'); updateFinish(); return; }
+            if (!d.success) { alert(d.message || 'Prodej se nepodařil.'); updateFinish(); return; }   // adhoc necháváme vyplněný — obsluha to jen opraví
             lastSale = d;
             totalBeforeClear = total();   // pro zákaznický displej (než se košík smaže)
             // čistý výdaj z kasy: zákazník žádný není → „zaplaceno" na monitor nepatří
@@ -1436,6 +1547,8 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('posDoneProductNote').style.display = d.has_product ? '' : 'none';
             document.getElementById('posDoneInvoice').style.display = d.invoice_id ? '' : 'none';
             document.getElementById('posDoneInvoiceMail').style.display = d.invoice_id ? '' : 'none';
+            // faktura bez e-mailu: rovnou říct, že se tiskne (jinak obsluha klikne na mail a narazí)
+            document.getElementById('posDoneInvoiceNote').style.display = (d.invoice_id && !d.invoice_mail) ? '' : 'none';
             // velké „Vrátit zákazníkovi" — obsluha to potřebuje vidět hned, ne až na účtence
             var chg = (d.cash_change !== null && d.cash_change !== undefined && d.cash_change > 0);
             document.getElementById('posDoneChange').style.display = chg ? '' : 'none';
@@ -1447,6 +1560,7 @@ document.addEventListener('DOMContentLoaded', function () {
             $custWrap.style.display = 'none';
             $cashReceived.value = '';
             $('#posCustomer').val(null).trigger('change');
+            adhocReset();
             render();
             // zákaznický displej: „zaplaceno" + vráceno (sám se vrátí na reklamu);
             // u čistého výdaje z kasy se displej nechává na reklamě

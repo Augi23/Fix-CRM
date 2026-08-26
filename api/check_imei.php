@@ -2,6 +2,7 @@
 ob_start();
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/pcr.php';   // společná kontrola u PČR (jedno místo pravidel)
 ob_clean();
 
 header('Content-Type: application/json; charset=utf-8');
@@ -28,45 +29,13 @@ function loadHtmlDocument(string $html): ?DOMXPath {
     return $xpath;
 }
 
-function extractHiddenFields(string $html): array {
-    $xpath = loadHtmlDocument($html);
-    if (!$xpath) return [];
 
-    $fields = [];
-    foreach ($xpath->query('//input[@type="hidden"]') as $input) {
-        $name = $input->getAttribute('name');
-        if ($name !== '') {
-            $fields[$name] = $input->getAttribute('value');
-        }
-    }
 
-    return $fields;
-}
-
-function extractNodeTextById(string $html, string $id): string {
-    $xpath = loadHtmlDocument($html);
-    if (!$xpath) return '';
-
-    $node = $xpath->query('//*[@id="' . $id . '"]')->item(0);
-    return $node ? normalizeText($node->textContent) : '';
-}
-
+/** Slovník téhle stránky (found/not_found/unknown) nad společným vyhodnocením
+ *  z includes/pcr.php — pravidla se tak udržují na JEDNOM místě. */
 function classifyPoliceResult(string $message): string {
-    $lower = function_exists('mb_strtolower') ? mb_strtolower($message, 'UTF-8') : strtolower($message);
-
-    if ($lower === '') {
-        return 'unknown';
-    }
-
-    if (str_contains($lower, 'nebyl nalezen')) {
-        return 'not_found';
-    }
-
-    if (str_contains($lower, 'byl nalezen')) {
-        return 'found';
-    }
-
-    return 'unknown';
+    $r = afxPcrClassifyHtml('<div class="gov-message__content">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</div>');
+    return ['clean' => 'not_found', 'stolen' => 'found'][$r['status']] ?? 'unknown';
 }
 
 function imeiWithCheckDigit(string $digits): string {
@@ -327,43 +296,19 @@ if (strlen($imei) < 14) {
     exit;
 }
 
-$endpoint = 'https://aplikace.policie.gov.cz/patrani-mobily/';
-$cookieJar = tempnam(sys_get_temp_dir(), 'imei_police_');
-
-if ($cookieJar === false) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'Failed to prepare workspace for verification.',
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
 $ifreeicloudKey = get_setting_with_fallback('ifreeicloud_api_key', IFREEICLOUD_API_KEY_FALLBACK, 'IFREEICLOUD_API_KEY');
 $ifreeicloudService = (int) get_setting_with_fallback('ifreeicloud_service_id', (string) IFREEICLOUD_SERVICE_ID_FALLBACK, 'IFREEICLOUD_SERVICE_ID');
 
 try {
-    $initial = curlRequest($endpoint, null, $cookieJar);
-    if (!$initial['ok']) {
-        throw new RuntimeException('Failed to load Police database page.');
+    // PČR přepsala aplikaci (25. 8. 2026): starý ASP.NET postback zmizel a
+    // kontrola hlásila u všeho „neurčito". Dotaz i vyhodnocení teď dělá
+    // sdílená afxPcrCheckImei() z includes/pcr.php.
+    $pcr = afxPcrCheckImei($imeiPolice);
+    if ($pcr['status'] === 'error') {
+        throw new RuntimeException($pcr['text']);
     }
-
-    $postFields = extractHiddenFields($initial['body']);
-    $postFields['ctl00$Application$tbImei'] = $imeiPolice;
-    $postFields['ctl00$Application$Button1'] = 'Vyhledat';
-    $postFields['__EVENTTARGET'] = $postFields['__EVENTTARGET'] ?? '';
-    $postFields['__EVENTARGUMENT'] = $postFields['__EVENTARGUMENT'] ?? '';
-
-    $response = curlRequest($endpoint, $postFields, $cookieJar);
-    if (!$response['ok']) {
-        throw new RuntimeException('Search on Police website failed.');
-    }
-
-    $message = extractNodeTextById($response['body'], 'ctl00_Application_Label1');
-    if ($message === '') {
-        $message = normalizeText($response['body']);
-    }
-
-    $status = classifyPoliceResult($message);
+    $message = (string)$pcr['text'];
+    $status = ['clean' => 'not_found', 'stolen' => 'found'][$pcr['status']] ?? 'unknown';
     $success = $status !== 'unknown' || $message !== '';
 
     $ifreeicloud = [
@@ -434,8 +379,4 @@ try {
             'image_url' => '',
         ],
     ], JSON_UNESCAPED_UNICODE);
-} finally {
-    if (is_file($cookieJar)) {
-        @unlink($cookieJar);
-    }
 }

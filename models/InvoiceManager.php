@@ -18,7 +18,7 @@ class InvoiceManager {
         $stmt = $this->pdo->prepare("
             SELECT i.*, c.first_name, c.last_name, c.company, c.address, c.ico, c.dic 
             FROM invoices i 
-            JOIN customers c ON i.customer_id = c.id 
+            LEFT JOIN customers c ON i.customer_id = c.id 
             WHERE i.id = ?
         ");
         $stmt->execute([$id]);
@@ -67,12 +67,16 @@ private function getInvoiceStatusBadge($status) {
         if (!hasPermission('admin_access') && !(function_exists('crmCanAccountingEdit') && crmCanAccountingEdit())) {
             return ['success' => false, 'error' => __('access_denied_simple')];
         }
+        // schéma pro fakturu bez klienta (DDL musí být PŘED transakcí)
+        if (function_exists('afxEnsureInvoiceAdhocBuyer')) { afxEnsureInvoiceAdhocBuyer(); }
         try {
             $this->pdo->beginTransaction();
 
             $id = !empty($data['id']) ? (int)$data['id'] : null;
             $invoice_number = $data['invoice_number'] ?? '';
             $customer_id = (int)($data['customer_id'] ?? 0);
+            // faktura pro jednorázového odběratele klienta v CRM nemá — 0 by porušila cizí klíč
+            $customer_id = $customer_id > 0 ? $customer_id : null;
             $date_issue = !empty($data['date_issue']) ? $data['date_issue'] : date('Y-m-d');
             $date_tax = !empty($data['date_tax']) ? $data['date_tax'] : $date_issue;
             $date_due = !empty($data['date_due']) ? $data['date_due'] : date('Y-m-d', strtotime('+14 days'));
@@ -124,6 +128,11 @@ private function getInvoiceStatusBadge($status) {
             $cust_address = !empty($data['cust_address']) ? $data['cust_address'] : null;
             $cust_ico = !empty($data['cust_ico']) ? $data['cust_ico'] : null;
             $cust_dic = !empty($data['cust_dic']) ? $data['cust_dic'] : null;
+            // doklad musí vědět, komu patří: buď klient z CRM, nebo ručně vyplněný odběratel
+            if ($customer_id === null && ($cust_name === null || trim((string)$cust_name) === '')) {
+                $this->pdo->rollBack();
+                return ['success' => false, 'error' => 'Faktura nemá odběratele — vyber zákazníka, nebo vyplň název odběratele ručně.'];
+            }
 
             $items = [];
             if (!empty($data['items'])) {
@@ -287,8 +296,9 @@ private function getInvoiceStatusBadge($status) {
                     invoice_number, customer_id, date_issue, date_tax, date_due, 
                     total_amount, vat_amount, is_vat_payer, status, payment_method, currency, 
                     parent_id, invoice_type, notes,
-                    cust_name_override, cust_address_override, cust_ico_override, cust_dic_override, supplier
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'issued', ?, ?, ?, 'credit_note', ?, ?, ?, ?, ?, ?)
+                    cust_name_override, cust_address_override, cust_ico_override, cust_dic_override,
+                    cust_email_override, supplier
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'issued', ?, ?, ?, 'credit_note', ?, ?, ?, ?, ?, ?, ?)
             ");
             
             $stmt->execute([
@@ -298,6 +308,7 @@ private function getInvoiceStatusBadge($status) {
                 $original['id'], "Opravný k faktuře " . $original['invoice_number'],
                 $original['cust_name_override'], $original['cust_address_override'], 
                 $original['cust_ico_override'], $original['cust_dic_override'],
+                $original['cust_email_override'] ?? null,
                 // dobropis musí vystavit TENTÝŽ subjekt jako původní fakturu (sro|ico)
                 (string)($original['supplier'] ?? 'sro') ?: 'sro'
             ]);

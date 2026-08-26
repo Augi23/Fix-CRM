@@ -175,7 +175,7 @@ if (count($orderLines) > 1) {
 // Zakázka na fakturu: fakturu vystaví rovnou kasa (od v3.49.0 JEDINÉ místo,
 // kde se platba zakázky zaznamenává). Bez vybraného zákazníka se odběratelem
 // automaticky stává klient zakázky — obsluha nemusí nic dohledávat.
-if ($orderLines && $isInvoicePay && $customerId <= 0) {
+if ($orderLines && $isInvoicePay && $customerId <= 0 && trim((string)($in['buyer']['name'] ?? '')) === '') {
     $oc = $pdo->prepare("SELECT customer_id FROM orders WHERE id = ?");
     $oc->execute([(int)$orderLines[0]['id']]);
     $customerId = (int)$oc->fetchColumn();
@@ -259,14 +259,40 @@ if ($eshopOrderId > 0) {
     }
 }
 
+// jednorázový odběratel (v3.59.0): faktura jde vystavit i bez karty klienta —
+// údaje se uloží do cust_*_override přímo na faktuře, do CRM klientů se nic nezaloží
+$buyer = afxInvoiceBuyerSanitize($in['buyer'] ?? null);
+if ($isInvoicePay && $buyer['error'] !== '') {
+    echo json_encode(['success' => false, 'message' => $buyer['error']], JSON_UNESCAPED_UNICODE); exit;
+}
+if (!$isInvoicePay) { $buyer['name'] = ''; }   // u hotovosti/karty se odběratel nikam nepropisuje
+
 if ($isInvoicePay) {
-    if ($customerId <= 0) {
-        echo json_encode(['success' => false, 'message' => 'Pro platbu na fakturu vyber zákazníka.']); exit;
+    if ($customerId <= 0 && $buyer['name'] === '') {
+        echo json_encode(['success' => false, 'message' => 'Pro platbu na fakturu vyber zákazníka, nebo vyplň jednorázového odběratele.'], JSON_UNESCAPED_UNICODE); exit;
     }
-    $cust = $pdo->prepare("SELECT id FROM customers WHERE id = ?");
-    $cust->execute([$customerId]);
-    if (!$cust->fetch()) {
-        echo json_encode(['success' => false, 'message' => 'Zákazník nenalezen.']); exit;
+    // obojí naráz = nejasné, komu doklad patří (UI to nedovolí, API to musí hlídat taky)
+    if ($customerId > 0 && $buyer['name'] !== '') {
+        echo json_encode(['success' => false, 'message' => 'Vyber buď zákazníka z CRM, nebo vyplň jednorázového odběratele — ne obojí.'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    if ($buyer['name'] !== '') {
+        // kdyby ALTER neprošel, faktura by spadla až v transakci s nicneříkající hláškou
+        afxEnsureInvoiceAdhocBuyer();
+        $nullOk = false;
+        try {
+            $c = $pdo->query("SHOW COLUMNS FROM invoices LIKE 'customer_id'")->fetch(PDO::FETCH_ASSOC);
+            $nullOk = $c && strtoupper((string)$c['Null']) === 'YES';
+        } catch (Throwable $e) {}
+        if (!$nullOk) {
+            echo json_encode(['success' => false, 'message' => 'Databáze zatím fakturu bez klienta nepovoluje — spusť aktualizaci databáze (Nastavení → Systém → Databáze), nebo vyber zákazníka.'], JSON_UNESCAPED_UNICODE); exit;
+        }
+    }
+    if ($customerId > 0) {
+        $cust = $pdo->prepare("SELECT id FROM customers WHERE id = ?");
+        $cust->execute([$customerId]);
+        if (!$cust->fetch()) {
+            echo json_encode(['success' => false, 'message' => 'Zákazník nenalezen.']); exit;
+        }
     }
 }
 
@@ -281,6 +307,7 @@ afxEnsurePosCashColumns();
 afxEnsurePosShiftTable();
 afxEnsurePosPaymentEnum();       // ENUM payment_method musí znát 'invoice_ico'
 afxEnsureInvoiceSupplierColumn(); // faktura nese výstavce (sro|ico)
+afxEnsureInvoiceAdhocBuyer();     // faktura bez klienta v CRM (customer_id NULL + e-mail odběratele)
 ensureEshopOrdersTable();
 ensureEshopReservationSchema();   // reserved_qty čte i běžný prodej (guard rezervací)
 if ($vykupLines) {
@@ -443,7 +470,10 @@ try {
     // Klient zakázky doplní odběratele JEN když obsluha žádného nevybrala —
     // výslovně vybraný zákazník (např. firma platící opravu zaměstnance) má
     // přednost. Bezpodmínečný přepis tu do v3.49.0 tiše měnil odběratele faktury.
-    if ($orderCustomerId > 0 && $customerId <= 0) { $customerId = $orderCustomerId; }
+    // ...a nedosazuje se vůbec, když obsluha vyplnila jednorázového odběratele:
+    // faktura by pak nesla jeho jméno, ale IČO a adresu klienta zakázky, objevila
+    // by se klientovi v portálu a e-mailem by odešla jemu (nález prověrky 25.8.).
+    if ($orderCustomerId > 0 && $customerId <= 0 && $buyer['name'] === '') { $customerId = $orderCustomerId; }
 
     $total = 0.0;
     foreach ($cart as $line) { $total += $line['price'] * $line['qty']; }
@@ -610,7 +640,7 @@ try {
     if ($isInvoicePay) {
         $invItems = array_map(static fn($l) => ['name' => $l['name'], 'qty' => $l['qty'],
             'unit_price' => $l['price'], 'used' => $l['used']], $cart);
-        $invoiceId = crmPosCreateInvoice($pdo, $customerId, $saleNumber, $invItems, $total, $saleOrderId > 0 ? $saleOrderId : null, $payment === 'invoice_ico' ? 'ico' : 'sro');
+        $invoiceId = crmPosCreateInvoice($pdo, $customerId, $saleNumber, $invItems, $total, $saleOrderId > 0 ? $saleOrderId : null, $payment === 'invoice_ico' ? 'ico' : 'sro', $buyer);
         $pdo->prepare("UPDATE pos_sales SET invoice_id = ? WHERE id = ?")->execute([$invoiceId, $saleId]);
     }
 
@@ -690,7 +720,9 @@ if ($eshopOrderId > 0 && $eshopOrder) {
 $payLabel = ['cash' => 'hotově', 'card' => 'kartou', 'invoice' => 'na fakturu (s.r.o.)', 'invoice_ico' => 'na fakturu (IČO)'][$payment];
 crmAuditLog('kasa.sale', [
     'entity_type' => 'pos_sale', 'entity_id' => $saleId, 'entity_label' => $saleNumber,
-    'summary' => 'Prodej ' . count($cart) . ' pol. za ' . formatMoney($total) . ' (' . $payLabel . ')',
+    'summary' => 'Prodej ' . count($cart) . ' pol. za ' . formatMoney($total) . ' (' . $payLabel . ')'
+        . ($invoiceId ? ' — faktura ' . (string)($pdo->query("SELECT invoice_number FROM invoices WHERE id = " . (int)$invoiceId)->fetchColumn() ?: $invoiceId) : '')
+        . ($buyer['name'] !== '' ? ', odběratel ' . $buyer['name'] . ($buyer['ico'] !== '' ? ' (IČO ' . $buyer['ico'] . ')' : '') : ''),
     'branch_id' => $branchId,
 ]);
 if (!empty($saleOrderId)) {
@@ -701,12 +733,27 @@ if (!empty($saleOrderId)) {
     ]);
 }
 
+// má faktura kam odejít? UI podle toho poradí tisk místo mailu
+$invoiceMail = '';
+if ($invoiceId) {
+    $invoiceMail = $buyer['name'] !== '' ? trim((string)$buyer['email']) : '';
+    if ($invoiceMail === '' && $customerId > 0) {
+        try {
+            $em = $pdo->prepare("SELECT email FROM customers WHERE id = ?");
+            $em->execute([$customerId]);
+            $invoiceMail = trim((string)$em->fetchColumn());
+        } catch (Throwable $e) { $invoiceMail = ''; }
+    }
+    if (!filter_var($invoiceMail, FILTER_VALIDATE_EMAIL)) { $invoiceMail = ''; }
+}
+
 echo json_encode([
     'success' => true,
     'sale_id' => $saleId,
     'sale_number' => $saleNumber,
     'order_id' => !empty($saleOrderId) ? (int)$saleOrderId : null,
     'invoice_id' => $invoiceId,
+    'invoice_mail' => $invoiceMail,   // '' = faktura nemá kam odejít → nabídnout tisk
     'total' => round($total, 2),
     'cash_change' => $cashChange,   // kolik vrátit zákazníkovi (jen hotově s evidencí)
     'has_product' => $hasProduct,   // UI připomene vyřadit kus v naskladňovací appce
