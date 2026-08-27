@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.69.1',
+        'date' => '2026-08-27',
+        'time' => '19:10',
+        'title' => 'Návody: štítkovačka netiskne — postup na recepci',
+        'items' => [
+            'V <b>Návody → CRM</b> je nový postup <b>„Štítkovačka netiskne — co dělat"</b>: proč nemá smysl párovat tiskárnu s počítačem (štítky tiskne server), jak si z tiskárny <b>vytisknout její IP adresu</b> (podržet tlačítko Cut, adresa je na čtvrtém štítku), co znamená adresa <b>169.254.x.x</b> a jak tiskárnu vrátit na Wi-Fi.',
+            'Součástí je i <b>nastavení pevné IP</b> (Boot Method STATIC, 192.168.1.220) — po výpadku proudu nebo restartu routeru si jinak tiskárna vezme jinou adresu a CRM tiskne „do prázdna" na tu starou.',
+            'Návod připomíná, že <b>každá pobočka má svou tiskárnu</b> (Karlín QL-810W, Na Příkopě QL-820NWB) a že adresu přepíše vedení nebo pracovník pobočky v <b>Nastavení → Tisk</b>.',
+            'Drobnost: varování v návodech psaná starším zápisem se kreslila modře jako běžná informace — teď jsou správně oranžová.',
+        ],
+    ],
+    [
         'version' => '3.69.0',
         'date' => '2026-08-27',
         'time' => '13:20',

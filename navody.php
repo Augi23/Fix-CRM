@@ -387,6 +387,26 @@ $guides['crm'] = [
         ],
     ],
     [
+        'id' => 'stitkovacka-netiskne', 'icon' => 'fa-tag', 'color' => '#FF9F0A',
+        'title' => 'Štítkovačka netiskne — co dělat',
+        'intro' => 'Štítky tiskne <b>server</b> přímo na tiskárnu pobočky (tcp 9100), ne tvůj počítač. Když štítek nevyjede, bývá důvod skoro vždy stejný: tiskárna není připojená k firemní Wi-Fi. Párování tiskárny s počítačem s tím nesouvisí.',
+        'steps' => [
+            '<b>Nepárovat s počítačem a nerestartovat ho.</b> Windows ovladač ani „Přidat tiskárnu" tisk z CRM neovlivní — CRM tiskne ze serveru.',
+            'Vypni a zapni <b>tiskárnu</b> (nech ji 10 sekund vypnutou) a zkus štítek znovu. Hláška <b>„Tiskárna 192.168.1.220 neodpovídá (port 9100)"</b> znamená, že server tiskárnu na síti nevidí.',
+            '<b>Zjisti, jakou má tiskárna adresu:</b> podrž na ní tlačítko <b>Cut (✂)</b>, dokud nezačne tisknout. Vyjede několik štítků — první bývají prázdné, <b>na čtvrtém je IP adresa</b>.',
+            'Podle vytištěné adresy: <b>169.254.x.x</b> = tiskárna žádnou adresu nedostala a <b>není na Wi-Fi</b>. <b>Jiná 192.168.1.x</b> = adresa se změnila — přepiš ji v <b>Nastavení → Tisk</b> u své pobočky a dej <b>Otestovat</b>.',
+            '<b>Když tiskárna není na Wi-Fi</b> (kontrolka Wi-Fi nesvítí, nebo jen bliká): připoj ji USB kabelem k počítači, spusť <b>Brother Printer Setting Tool → Communication settings</b> a znovu zadej název sítě a heslo.',
+            'Hned tam nastav i <b>pevnou adresu</b>: Boot Method <b>STATIC</b>, IP <b>192.168.1.220</b>, maska <b>255.255.255.0</b>, brána <b>192.168.1.1</b>. Pak už tisk nerozhodí ani výpadek proudu, ani restart routeru.',
+            'Když má tiskárna správnou adresu a přesto netiskne: zkontroluj <b>roli štítků, zavřený kryt</b> a jestli nesvítí <b>červená kontrolka chyby</b>.',
+        ],
+        'conditions' => [
+            ['typ' => 'warn', 'text' => '<b>Nejčastější příčina:</b> po výpadku sítě nebo proudu si tiskárna vezme od routeru <b>jinou adresu</b> (nebo žádnou) a CRM pak tiskne „do prázdna" na tu starou. Proto se vyplatí pevná IP.'],
+            ['typ' => 'info', 'text' => '<b>Každá pobočka má svou tiskárnu:</b> Karlín <b>QL-810W (192.168.1.220)</b>, Na Příkopě <b>QL-820NWB (192.168.0.200)</b>. Štítek vyjede vždy jen na té pobočce, kde pracuješ.'],
+            ['typ' => 'info', 'text' => 'Tiskárna musí být <b>ve stejné síti jako server</b> — z domova ani z jiné sítě štítek nevytiskneš.'],
+            ['typ' => 'role', 'text' => 'Vytisknout štítek smí <b>každý přihlášený</b>. Adresu tiskárny mění <b>vedení</b> nebo <b>pracovník té pobočky</b> v Nastavení → Tisk.'],
+        ],
+    ],
+    [
         'id' => 'web-objednavky', 'icon' => 'fa-globe', 'color' => '#BF5AF2',
         'title' => 'Objednávky z webu (applefix.cz)',
         'intro' => 'Rezervace z webu se v CRM objevují samy jako zakázky — nic se nezakládá ručně.',
@@ -700,7 +720,9 @@ $guides['opravy'] = [];
                         </ol>
                         <?php foreach ($g['conditions'] as $c):
                             $map = ['info' => ['fa-circle-info', 'rgba(10,132,255,.12)', 'rgba(10,132,255,.35)'],
+                                    // 'pozor' je starší zápis téhož — bez něj se varování kreslila modře jako info
                                     'warn' => ['fa-triangle-exclamation', 'rgba(255,149,0,.12)', 'rgba(255,149,0,.4)'],
+                                    'pozor' => ['fa-triangle-exclamation', 'rgba(255,149,0,.12)', 'rgba(255,149,0,.4)'],
                                     'role' => ['fa-user-shield', 'rgba(191,90,242,.10)', 'rgba(191,90,242,.35)']];
                             [$cIco, $cBg, $cBd] = $map[$c['typ']] ?? $map['info']; ?>
                             <div class="afx-cond" style="background: <?php echo $cBg; ?>; border-color: <?php echo $cBd; ?>;">
