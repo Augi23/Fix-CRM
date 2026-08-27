@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.68.0',
+        'date' => '2026-08-27',
+        'time' => '12:30',
+        'title' => 'Podklady pro účetní: export do Excelu',
+        'items' => [
+            'U každé sestavy je nové <b>zelené tlačítko</b>, které ji stáhne jako <b>sešit pro Excel (.xlsx)</b> — Kniha vydaných faktur, Přehled úhrad, Pohledávky, Dobropisy, Tržby z pokladny, Zálohy i Bankovní pohyby.',
+            '<b>Částky jsou v sešitu čísla, ne text</b>, takže se dají rovnou sčítat a filtrovat; data jsou skutečná data. Hlavička je tučná, zmrazená a s filtrem, takže se v ní dá hned třídit. Na začátku listu je název sestavy, období a provozovna — po měsíci se dá poznat, co je to za soubor.',
+            'Na konci každého listu je <b>souhrn</b> (počty a součty), stejný jako v tiskové sestavě.',
+            'Nedělá se to přes CSV schválně: v českém Excelu se CSV pere s oddělovači a desetinnou čárkou a čísla končí jako text — účetní by pak nic nesečetla.',
+        ],
+    ],
+    [
         'version' => '3.67.1',
         'date' => '2026-08-27',
         'time' => '10:40',

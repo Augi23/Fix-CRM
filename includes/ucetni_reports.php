@@ -1070,3 +1070,164 @@ function afxUcetniPrintClose(string $title, array $period, int $branchId): void 
 </html>
     <?php
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// EXPORT DO EXCELU (v3.68.0)
+//
+// Sloupce jsou schválně definované ZVLÁŠŤ, ne vytažené z tiskové šablony:
+// tisková stránka míchá data s formátováním (přeškrtnutá storna, barevné
+// štítky) a přepisovat ji kvůli exportu by znamenalo sáhnout na sedm hotových
+// sestav. Tady je jen holý seznam „nadpis → hodnota → typ", ať se v Excelu
+// dá počítat (částky jsou čísla, data jsou data).
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Popis sloupců pro export. Vrací ['nazev','sloupce'=>[[h,f,t]],'bloky'?]. */
+function afxUcetniExportSpec(string $key, array $d): array {
+    $money = 'money'; $date = 'date'; $int = 'int'; $text = 'text';
+    $stav = static fn($s) => match ((string)$s) {
+        'paid' => 'zaplaceno', 'issued' => 'vystaveno', 'overdue' => 'po splatnosti',
+        'cancelled' => 'storno', 'draft' => 'koncept', default => (string)$s,
+    };
+
+    switch ($key) {
+        case 'kniha':
+            return ['rows' => $d['rows'], 'sloupce' => [
+                ['Číslo',      fn($r) => $r['invoice_number'], $text],
+                ['Výstavce',   fn($r) => ((string)($r['supplier'] ?? 'sro') === 'ico' ? 'OSVČ' : 's.r.o.'), $text],
+                ['Vystaveno',  fn($r) => $r['date_issue'], $date],
+                ['DUZP',       fn($r) => $r['date_tax'], $date],
+                ['Splatnost',  fn($r) => $r['date_due'], $date],
+                ['Odběratel',  fn($r) => $r['cust_name'], $text],
+                ['IČO',        fn($r) => $r['cust_ico'], $text],
+                ['Zakázka',    fn($r) => $r['order_id'] ? '#' . (int)$r['order_id'] : '', $text],
+                ['Částka',     fn($r) => $r['total_amount'], $money],
+                ['Uhrazeno',   fn($r) => $r['paid_calc'], $money],
+                ['Zbývá',      fn($r) => $r['remaining'], $money],
+                ['Stav',       fn($r) => $stav($r['status']), $text],
+                ['Po splatnosti', fn($r) => !empty($r['po_splatnosti']) ? 'ano' : '', $text],
+            ], 'soucty' => [
+                'Celkem faktur (bez storen)' => [(int)$d['soucty']['pocet'], $int],
+                'Částka celkem' => [$d['soucty']['celkem'], $money],
+                'Uhrazeno celkem' => [$d['soucty']['uhrazeno'], $money],
+                'Zbývá celkem' => [$d['soucty']['zbyva'], $money],
+            ]];
+
+        case 'uhrady':
+            return ['rows' => $d['rows'], 'sloupce' => [
+                ['Datum platby', fn($r) => $r['paid_on'], $date],
+                ['Faktura',      fn($r) => $r['invoice_number'], $text],
+                ['VS',           fn($r) => $r['variable_symbol'] ?: ($r['bank_vs'] ?? ''), $text],
+                ['Odběratel',    fn($r) => $r['cust_name'], $text],
+                ['Protistrana',  fn($r) => trim((string)($r['bank_name'] ?? '')), $text],
+                ['Účet protistrany', fn($r) => $r['bank_acc'] ?? '', $text],
+                ['Způsob',       fn($r) => $r['kind'], $text],
+                ['Poznámka',     fn($r) => $r['note'] ?? '', $text],
+                ['Částka',       fn($r) => $r['amount'], $money],
+            ], 'soucty' => [
+                'Plateb celkem' => [(int)$d['soucty']['pocet'], $int],
+                'Částka celkem' => [$d['soucty']['celkem'], $money],
+            ]];
+
+        case 'pohledavky':
+            return ['rows' => $d['rows'], 'sloupce' => [
+                ['Číslo',       fn($r) => $r['invoice_number'], $text],
+                ['Odběratel',   fn($r) => $r['cust_name'], $text],
+                ['IČO',         fn($r) => $r['cust_ico'], $text],
+                ['Vystaveno',   fn($r) => $r['date_issue'], $date],
+                ['Splatnost',   fn($r) => $r['date_due'], $date],
+                ['Dní po splatnosti', fn($r) => (int)($r['dni_po'] ?? 0), $int],
+                ['Částka',      fn($r) => $r['total_amount'], $money],
+                ['Uhrazeno k datu', fn($r) => $r['paid_calc'], $money],
+                ['Zbývá',       fn($r) => $r['remaining'], $money],
+                ['Stáří',       fn($r) => $r['kos'] ?? '', $text],
+            ], 'soucty' => [
+                'Pohledávek' => [(int)$d['soucty']['pocet'], $int],
+                'Zbývá celkem' => [$d['soucty']['celkem'], $money],
+            ]];
+
+        case 'dobropisy':
+            return ['rows' => $d['rows'], 'sloupce' => [
+                ['Číslo',      fn($r) => $r['invoice_number'], $text],
+                ['Vystaveno',  fn($r) => $r['date_issue'], $date],
+                ['DUZP',       fn($r) => $r['date_tax'], $date],
+                ['K faktuře',  fn($r) => $r['parent_number'] ?? '', $text],
+                ['Odběratel',  fn($r) => $r['cust_name'], $text],
+                ['IČO',        fn($r) => $r['cust_ico'], $text],
+                ['Důvod / poznámka', fn($r) => $r['notes'] ?? '', $text],
+                ['Částka',     fn($r) => $r['total_amount'], $money],
+                ['Stav',       fn($r) => $stav($r['status']), $text],
+            ], 'soucty' => [
+                'Dobropisů' => [(int)$d['soucty']['pocet'], $int],
+                'Částka celkem' => [$d['soucty']['celkem'], $money],
+            ]];
+
+        case 'kasa':
+            return ['rows' => $d['rows'], 'sloupce' => [
+                ['Den',            fn($r) => $r['den'], $date],
+                ['Dokladů',        fn($r) => (int)$r['doklady'], $int],
+                ['Hotovost',       fn($r) => $r['hotovost'], $money],
+                ['Karta',          fn($r) => $r['karta'], $money],
+                ['Faktura s.r.o.', fn($r) => $r['faktura'], $money],
+                ['Faktura IČO',    fn($r) => $r['faktura_ico'], $money],
+                ['Celkem',         fn($r) => $r['celkem'], $money],
+                ['Z toho s použitým zbožím', fn($r) => (int)($r['pouzite_doklady'] ?? 0), $int],
+            ], 'soucty' => [
+                'Dokladů celkem' => [(int)$d['soucty']['doklady'], $int],
+                'Hotovost' => [$d['soucty']['hotovost'], $money],
+                'Karta' => [$d['soucty']['karta'], $money],
+                'Faktura s.r.o.' => [$d['soucty']['faktura'], $money],
+                'Faktura IČO' => [$d['soucty']['faktura_ico'], $money],
+                'Tržba celkem' => [$d['soucty']['celkem'], $money],
+                'Storna (počet)' => [(int)$d['soucty']['storno_pocet'], $int],
+                'Storna (částka)' => [$d['soucty']['storno_castka'], $money],
+            ]];
+
+        case 'zalohy':
+            return ['rows' => $d['rows'], 'sloupce' => [
+                ['Datum',      fn($r) => $r['datum'], $date],
+                ['Zdroj',      fn($r) => $r['zdroj'], $text],
+                ['Popis',      fn($r) => $r['popis'], $text],
+                ['Klient',     fn($r) => $r['klient'], $text],
+                ['Doklad',     fn($r) => $r['doklad'], $text],
+                ['DUZP',       fn($r) => $r['duzp'] ?? '', $date],
+                ['Zúčtování',  fn($r) => $r['zuctovano'] ?? '', $text],
+                ['Částka',     fn($r) => $r['castka'], $money],
+            ], 'bloky' => [[
+                'nazev' => 'Faktury k zálohám',
+                'rows' => $d['faktury'] ?? [],
+                'sloupce' => [
+                    ['Číslo',     fn($r) => $r['invoice_number'], $text],
+                    ['Vystaveno', fn($r) => $r['date_issue'], $date],
+                    ['DUZP',      fn($r) => $r['date_tax'], $date],
+                    ['Odběratel', fn($r) => $r['cust_name'], $text],
+                    ['Částka',    fn($r) => $r['total_amount'], $money],
+                    ['Uhrazeno',  fn($r) => $r['paid_amount'], $money],
+                    ['Stav',      fn($r) => $stav($r['status']), $text],
+                ],
+            ]], 'soucty' => [
+                'Přijaté zálohy' => [$d['soucty']['prijato'], $money],
+                'Zúčtováno' => [$d['soucty']['zuctovano'], $money],
+                'Závazek k datu' => [$d['soucty']['zavazek'], $money],
+            ]];
+
+        case 'banka':
+            return ['rows' => $d['rows'], 'sloupce' => [
+                ['Datum',            fn($r) => $r['booking_date'], $date],
+                ['Směr',             fn($r) => ((string)($r['direction'] ?? '') === 'in' ? 'příjem' : 'výdaj'), $text],
+                ['Protistrana',      fn($r) => $r['counterparty_name'] ?? '', $text],
+                ['Účet protistrany', fn($r) => $r['counterparty_account'] ?? '', $text],
+                ['VS',               fn($r) => $r['vs'] ?? '', $text],
+                ['Zpráva',           fn($r) => $r['message'] ?? '', $text],
+                ['Částka',           fn($r) => $r['amount'], $money],
+                ['Spárovaná faktura', fn($r) => $r['invoice_number'] ?? '', $text],
+                ['Stav párování',    fn($r) => $r['match_status'] ?? '', $text],
+                ['Storno pohybu',    fn($r) => !empty($r['is_reversal']) ? 'ano' : '', $text],
+            ], 'soucty' => [
+                'Pohybů' => [(int)$d['soucty']['pocet'], $int],
+                'Příjem' => [$d['soucty']['prijem'], $money],
+                'Výdaj' => [$d['soucty']['vydaj'], $money],
+                'Spárováno' => [(int)($d['soucty']['sparovano'] ?? 0), $int],
+            ]];
+    }
+    return ['rows' => [], 'sloupce' => []];
+}

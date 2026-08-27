@@ -56,6 +56,65 @@ if ($sestava !== '' && isset($defs[$sestava])) {
     $title = (string)$def['nazev'];
     $orient = (string)$def['sirka'];
 
+    // ── Export do Excelu (v3.68.0) ──────────────────────────────────────────
+    // Musí být PŘED vykreslením tiskové stránky — jakýkoli výstup před
+    // hlavičkami by soubor poškodil.
+    if ((string)($_GET['format'] ?? '') === 'xlsx') {
+        require_once __DIR__ . '/includes/xlsx_writer.php';
+        $data = match ($sestava) {
+            'kniha'      => afxUcetniDataKniha($period['from'], $period['to'], $branchId),
+            'uhrady'     => afxUcetniDataUhrady($period['from'], $period['to'], $branchId),
+            'pohledavky' => afxUcetniDataPohledavky($period['to'], $branchId),
+            'dobropisy'  => afxUcetniDataDobropisy($period['from'], $period['to'], $branchId),
+            'kasa'       => afxUcetniDataKasa($period['from'], $period['to'], $branchId),
+            'zalohy'     => afxUcetniDataZalohy($period['from'], $period['to'], $branchId),
+            'banka'      => afxUcetniDataBanka($period['from'], $period['to'], $branchId),
+            default      => ['rows' => [], 'soucty' => [], 'pozn' => []],
+        };
+        $spec = afxUcetniExportSpec($sestava, $data);
+        $xlsx = new AfxXlsx($title);
+
+        // záhlaví sešitu: co to je, za jaké období a za kterou provozovnu —
+        // bez toho je vytažený soubor za měsíc k nepoznání
+        $xlsx->row([$title], ['text']);
+        $xlsx->row(['Období: ' . afxUcetniDate($period['from']) . ' – ' . afxUcetniDate($period['to'])
+            . '   ·   Provozovna: ' . afxUcetniBranchLabel($branchId)], ['text']);
+        $xlsx->row(['Vytvořeno z CRM ' . date('j. n. Y H:i') . ' — podklad, ne účetní doklad'], ['text']);
+        foreach (($data['pozn'] ?? []) as $note) { $xlsx->row([$note], ['text']); }
+        $xlsx->blank();
+
+        $render = static function (array $sloupce, array $rows) use ($xlsx): void {
+            $xlsx->header(array_map(static fn($c) => $c[0], $sloupce));
+            foreach ($rows as $r) {
+                $cells = []; $types = [];
+                foreach ($sloupce as $c) {
+                    $cells[] = ($c[1])($r);
+                    $types[] = $c[2];
+                }
+                $xlsx->row($cells, $types);
+            }
+        };
+        $render($spec['sloupce'], $spec['rows']);
+
+        foreach (($spec['bloky'] ?? []) as $blok) {
+            $xlsx->blank();
+            $xlsx->row([(string)$blok['nazev']], ['text']);
+            $render($blok['sloupce'], $blok['rows']);
+        }
+
+        if (!empty($spec['soucty'])) {
+            $xlsx->blank();
+            $xlsx->row(['Souhrn'], ['text']);
+            foreach ($spec['soucty'] as $popis => $val) {
+                $xlsx->row([$popis, $val[0]], ['text', $val[1]]);
+            }
+        }
+
+        $file = 'AppleFix-' . $sestava . '-' . $period['from'] . '_' . $period['to'] . '.xlsx';
+        $xlsx->send($file);
+        exit;
+    }
+
     switch ($sestava) {
 
         // ── 1) Kniha vydaných faktur ─────────────────────────────────────────
@@ -605,7 +664,9 @@ require __DIR__ . '/includes/accounting_tabs.php';
 <div class="alert alert-info bg-info bg-opacity-10 border-info border-opacity-25 text-white-75 small">
     <i class="fas fa-file-pdf me-1"></i>
     Sestava se otevře jako tisková stránka. PDF z ní uděláte tiskem (<b>Ctrl/⌘ + P</b>) a volbou cíle
-    <b>„Uložit jako PDF“</b>. Sestavy jsou podklad z CRM, ne účetní doklad.
+    <b>„Uložit jako PDF“</b>. Zelené tlačítko stáhne tutéž sestavu jako <b>sešit pro Excel</b> (.xlsx) —
+    částky jsou v něm čísla, takže se dají rovnou sčítat a filtrovat.
+    Sestavy jsou podklad z CRM, ne účetní doklad.
 </div>
 
 <div class="row g-3">
@@ -620,6 +681,9 @@ require __DIR__ . '/includes/accounting_tabs.php';
             <div class="d-flex gap-2">
                 <a href="<?php echo e($sestavaUrl($key)); ?>" target="_blank" rel="noopener" class="btn btn-sm btn-primary flex-grow-1">
                     <i class="fas fa-up-right-from-square me-1"></i>Otevřít sestavu
+                </a>
+                <a href="<?php echo e($sestavaUrl($key)); ?>&amp;format=xlsx" class="btn btn-sm btn-outline-success" title="Stáhnout jako sešit pro Excel (.xlsx)">
+                    <i class="fas fa-file-excel"></i>
                 </a>
                 <button type="button" class="btn btn-sm btn-outline-light" title="Náhled v okně"
                         onclick="ucetniNahled('<?php echo e($sestavaUrl($key)); ?>', '<?php echo e($def['nazev']); ?>')">
