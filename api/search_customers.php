@@ -6,7 +6,12 @@ ob_clean();
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['results' => [], 'pagination' => ['more' => false]]);
+    // POZOR: dřív se vracelo 200 s prázdným seznamem — v nabídce to vypadalo, že
+    // klient v CRM není, a obsluha ho založila znovu. 401 = volající pozná, že jde
+    // o odhlášení (v Účetnictví se otevře okno pro obnovení přihlášení).
+    http_response_code(401);
+    echo json_encode(['results' => [], 'pagination' => ['more' => false],
+                      'error' => 'auth', 'message' => 'Přihlášení vypršelo.']);
     exit;
 }
 
@@ -58,7 +63,7 @@ try {
         $stmt->execute($params);
         $total = (int)$stmt->fetchColumn();
 
-        $sql = "SELECT id, first_name, last_name, phone, company FROM customers $where ORDER BY last_name ASC LIMIT $per_page OFFSET $offset";
+        $sql = "SELECT id, first_name, last_name, phone, company FROM customers $where ORDER BY last_name ASC, first_name ASC, id ASC LIMIT $per_page OFFSET $offset";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

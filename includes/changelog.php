@@ -11,6 +11,21 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.69.0',
+        'date' => '2026-08-27',
+        'time' => '13:20',
+        'title' => 'Účetnictví: vystavit fakturu — hledání klienta konečně funguje',
+        'items' => [
+            'Ve formuláři <b>Vytvořit fakturu</b> se odběratel vybíral z jediného seznamu, do kterého se vypsali <b>všichni klienti</b> (přes tisíc položek). Rozbalení trvalo <b>přes vteřinu</b>, nabídka se vykreslovala mimo okno faktury a hledat se v ní pořádně nedalo. Teď se do pole <b>píše a hledá na serveru</b> — podle jména, firmy, telefonu i e-mailu, stejně jako v kase.',
+            'Bez psaní nabídne <b>posledních 8 klientů</b>, se kterými byla zakázka — u doplňkové faktury tak většinou stačí jedno kliknutí. Nabídka se otevírá <b>uvnitř okna faktury</b>.',
+            'Klienti se už <b>nevypisují do stránky dopředu</b>, takže se celé Účetnictví načítá rychleji.',
+            'Odběratel se správně předvyplní i při <b>úpravě faktury</b> a při <b>načtení z čísla zakázky</b>.',
+            'Tlačítko s tužkou (ruční vyplnění odběratele) už <b>nepřepadává pod pole</b> — dřív se zalamovalo na druhý řádek.',
+            'Když mezitím <b>vyprší přihlášení</b>, hledání si vyžádá heslo. Dřív odpovědělo prázdným seznamem, takže to vypadalo, že klient v CRM není — a založil se duplicitní odběratel.',
+            'U ručního přepisu odběratele je nově vysvětlivka, že se tyto údaje vytisknou <b>místo</b> údajů vybraného klienta (faktura bez klienta = výběr nechat prázdný).',
+        ],
+    ],
+    [
         'version' => '3.68.0',
         'date' => '2026-08-27',
         'time' => '12:30',

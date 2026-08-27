@@ -65,10 +65,21 @@ $stmt = $pdo->query("SELECT i.*, c.first_name, c.last_name, c.company,
     FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id ORDER BY i.created_at DESC");
 $invoices = $stmt->fetchAll();
 
-// Fetch Customers for select
-$stmt = $pdo->query("SELECT id, first_name, last_name, company FROM customers ORDER BY company, last_name");
-$customers = $stmt->fetchAll();
+// Klienti se do stránky NEVYPISUJÍ: vyhledávají se přes api/search_customers.php
+// (select2 s AJAX). Dřív se sem vysypal celý seznam jako <option> — přes tisíc
+// řádků HTML v každém otevření Účetnictví a v modalu se v nich nedalo hledat.
 ?>
+
+<style>
+/* Výběr klienta v input-group: globální `.select2-container { width:100% !important }`
+   ze style.css jinak vytlačí tlačítko „přepsat odběratele" na druhý řádek. */
+#invoiceModal .input-group > .select2-container { flex: 1 1 auto; width: 1% !important; }
+#invoiceModal .input-group > .select2-container .select2-selection--single {
+    height: 100%;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+</style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="fas fa-file-invoice-dollar me-2"></i> <?php echo __('accounting'); ?></h2>
@@ -191,13 +202,13 @@ $customers = $stmt->fetchAll();
                         <div class="col-md-5">
                             <label class="form-label"><?php echo __('customer'); ?></label>
                             <div class="input-group">
-                                <select name="customer_id" id="inv_customer" class="form-select select2">
-                                    <option value=""><?php echo __('search_placeholder'); ?></option>
-                                    <?php foreach ($customers as $c): ?>
-                                    <option value="<?php echo $c['id']; ?>"><?php echo htmlspecialchars($c['company'] ?: $c['first_name'] . ' ' . $c['last_name']); ?></option>
-                                    <?php endforeach; ?>
+                                <select name="customer_id" id="inv_customer" class="form-select">
+                                    <option value=""></option>
                                 </select>
-                                <button type="button" class="btn btn-outline-secondary" onclick="toggleCustomerOverride()"><i class="fas fa-user-edit"></i></button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="toggleCustomerOverride()" title="Vyplnit údaje odběratele ručně"><i class="fas fa-user-edit"></i></button>
+                            </div>
+                            <div id="inv_customer_fallback" class="form-text text-warning" style="display:none;">
+                                Vyhledávání klientů se nenačetlo — obnov stránku (Cmd+R). Do té doby jde odběratel vyplnit ručně tlačítkem s tužkou.
                             </div>
                         </div>
                         
@@ -217,6 +228,12 @@ $customers = $stmt->fetchAll();
                             <div class="col-md-12">
                                 <label class="form-label"><?php echo __('address_override'); ?></label>
                                 <textarea name="cust_address" id="inv_cust_address" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="form-text mb-0">
+                                    Vyplněné údaje se na faktuře vytisknou <b>místo</b> údajů vybraného klienta.
+                                    Faktura pro jednorázového odběratele (není v CRM) = výběr klienta nech prázdný.
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -496,6 +513,51 @@ document.addEventListener('DOMContentLoaded', function() {
     if (invModalEl) {
         invModal = new bootstrap.Modal(invModalEl);
     }
+
+    // ── vyhledávání klienta (v3.69.0) ───────────────────────────────────────
+    // Dřív pole zapínala globální inicializace $('.select2') v main.js — BEZ
+    // dropdownParent, takže se nabídka vykreslila mimo modal: Bootstrap si drží
+    // fokus uvnitř modalu, do vyhledávacího řádku tedy nešlo psát (přesně to
+    // uživatel hlásil jako „nelze vyhledávat"). Navíc se hledalo jen v tisícovce
+    // předem vysypaných <option>. Teď se klienti hledají přes stejné API jako
+    // v kase a dropdown patří do modalu.
+    if (window.jQuery && jQuery.fn.select2 && invModalEl) {
+        jQuery('#inv_customer').select2({
+            width: '100%',
+            placeholder: 'Hledat klienta (jméno, firma, telefon, e-mail)…',
+            allowClear: true,
+            minimumInputLength: 0,
+            dropdownParent: jQuery('#invoiceModal'),
+            language: {
+                inputTooShort: function () { return 'Piš dál…'; },
+                noResults: function () { return 'Nikdo takový v CRM není'; },
+                searching: function () { return 'Hledám…'; },
+                errorLoading: function () { return 'Hledání selhalo'; }
+            },
+            ajax: {
+                url: 'api/search_customers.php',
+                dataType: 'json',
+                delay: 250,
+                data: function (params) { return { q: params.term || '', page: params.page || 1 }; },
+                processResults: function (data, params) {
+                    params.page = params.page || 1;
+                    return { results: data.results || [], pagination: { more: !!(data.pagination && data.pagination.more) } };
+                },
+                // vypršelá relace se dřív tvářila jako „takový klient neexistuje" —
+                // účetní pak založila duplicitního odběratele. Teď vyskočí přihlášení.
+                error: function (xhr) {
+                    if (xhr && xhr.status === 401 && window.afxReauth && window.afxReauth.open) {
+                        window.afxReauth.open();
+                    }
+                }
+            }
+        });
+    } else {
+        // bez select2 (výpadek CDN) by zůstalo prázdné pole bez jediné položky —
+        // ať je aspoň vidět proč a že fakturu jde vystavit ručním odběratelem
+        var fb = document.getElementById('inv_customer_fallback');
+        if (fb) { fb.style.display = ''; }
+    }
     
     // UI reaction to VAT payer toggle in settings (if modal is open)
     const vatToggle = document.getElementById('vatPayerCheck');
@@ -553,10 +615,43 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+/** Jméno klienta do políčka. Zástupné pomlčky („-", „–") se v CRM používají
+ *  místo prázdné hodnoty — stejně je zahazuje i api/search_customers.php,
+ *  jinak by faktura ukazovala odběratele „-". */
+function invCustomerLabel(data) {
+    var clean = function (v) {
+        v = String(v == null ? '' : v).trim();
+        return (v === '-' || v === '–' || v === '—') ? '' : v;
+    };
+    var company = clean(data.company);
+    if (company !== '') return company;
+    return (clean(data.first_name) + ' ' + clean(data.last_name)).trim();
+}
+
+/** Nastaví klienta ve výběru. U vyhledávacího select2 nejsou položky předem
+ *  načtené, takže se ta jedna musí vložit ručně — jinak by pole zůstalo
+ *  prázdné, i když je customer_id vyplněné (a faktura by se uložila bez klienta). */
+function setInvoiceCustomer(id, label) {
+    var sel = document.getElementById('inv_customer');
+    if (!sel) return;
+    sel.innerHTML = '<option value=""></option>';
+    id = parseInt(id, 10) || 0;
+    if (id > 0) {
+        var opt = new Option(String(label || ('Klient #' + id)), String(id), true, true);
+        sel.appendChild(opt);
+        sel.value = String(id);
+    } else {
+        sel.value = '';
+    }
+    if (window.jQuery && jQuery('#inv_customer').data('select2')) {
+        jQuery('#inv_customer').trigger('change');
+    }
+}
+
 function showNewInvoiceModal() {
     document.getElementById('invoiceForm').reset();
     // form.reset() select2 nepřekreslí — v novém dokladu by svítil předchozí klient
-    if (window.jQuery) { jQuery('#inv_customer').val(null).trigger('change'); }
+    setInvoiceCustomer(0, '');
     ['inv_cust_name', 'inv_cust_ico', 'inv_cust_dic', 'inv_cust_address'].forEach(function (id) {
         var el = document.getElementById(id); if (el) el.value = '';
     });
@@ -649,12 +744,7 @@ function editInvoice(id) {
             document.getElementById('inv_is_vat_payer').value = data.is_vat_payer || '0';
             document.getElementById('inv_number').value = data.invoice_number;
             // faktura na jednorázového odběratele klienta nemá → prázdný výběr
-            document.getElementById('inv_customer').value = data.customer_id || '';
-            
-            // Trigger select2 update if used
-            if (typeof jQuery !== 'undefined' && jQuery('#inv_customer').data('select2')) {
-                jQuery('#inv_customer').val(data.customer_id || null).trigger('change');
-            }
+            setInvoiceCustomer(data.customer_id || 0, invCustomerLabel(data));
 
             document.getElementById('inv_date_issue').value = data.date_issue;
             document.getElementById('inv_date_tax').value = data.date_tax;
@@ -699,14 +789,10 @@ function loadFromOrder() {
     .then(r => r.json())
     .then(res => {
         if (res.success) {
-            document.getElementById('inv_customer').value = res.data.customer_id;
+            setInvoiceCustomer(res.data.customer_id, res.data.customer_display || '');
             document.getElementById('inv_order_id').value = orderId;
             document.getElementById('inv_is_vat_payer').value = res.data.is_vat_payer ? '1' : '0';
             
-            // Trigger select2 if present
-            if (typeof jQuery !== 'undefined' && jQuery('#inv_customer').data('select2')) {
-                jQuery('#inv_customer').val(res.data.customer_id).trigger('change');
-            }
 
             const tbody = document.querySelector('#itemsTable tbody');
             tbody.innerHTML = '';
