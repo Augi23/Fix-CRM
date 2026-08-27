@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.67.1',
+        'date' => '2026-08-27',
+        'time' => '10:40',
+        'title' => 'Chat na mobilu: konec poskakování při rolování',
+        'items' => [
+            '<b>Roluje se jen historie zpráv.</b> Chat měl výšku nastavenou napevno odečtením pevného počtu pixelů, což na telefonu nikdy nesedlo — okno přetékalo mimo displej a rolovaly se dvě věci naráz (chvíli stránka, chvíli zprávy). Působilo to, jako by „jela jen část textu". Výška se nově dopočítává z reálné výšky obrazovky.',
+            '<b>Počítá i s klávesnicí:</b> při psaní se okno samo zmenší, takže pole pro psaní zůstane vidět a nezakryje ho klávesnice (iPhone i Android).',
+            '<b>Využitá celá obrazovka:</b> dřív zbývalo pod chatem skoro 200 px prázdna, teď historie sahá až nad psací pole a to až nad spodní lištu.',
+            'Dojezd rolování se už „nepřelije" na stránku pod chatem — konec nechtěného posunu celé stránky při rychlém švihnutí.',
+        ],
+    ],
+    [
         'version' => '3.67.0',
         'date' => '2026-08-27',
         'time' => '10:05',
