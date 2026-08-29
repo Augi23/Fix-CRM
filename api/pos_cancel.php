@@ -65,12 +65,21 @@ try {
     if (!$sale) { throw new Exception('Doklad nenalezen.'); }
     if ((string)$sale['status'] === 'cancelled') { throw new Exception('Doklad už je stornovaný.'); }
 
-    // zaplacenou fakturu storno kasy rušit nesmí — na to je dobropis v Účetnictví
+    // Zaplacenou fakturu storno kasy rušit nesmí — na to je dobropis v Účetnictví.
+    // Když ale dobropis UŽ existuje, storno se pustit musí: od v3.71.0 vzniká
+    // k prodeji kartou dodatečná faktura rovnou jako zaplacená, takže bez téhle
+    // výjimky by takový prodej nešlo stornovat ani po vrácení peněz.
     if (!empty($sale['invoice_id'])) {
         $ist = $pdo->prepare("SELECT status FROM invoices WHERE id = ?");
         $ist->execute([(int)$sale['invoice_id']]);
         if ((string)$ist->fetchColumn() === 'paid') {
-            throw new Exception('Faktura k prodeji je už zaplacená — vyřeš dobropisem v Účetnictví, pak teprve storno.');
+            $dob = $pdo->prepare("SELECT COUNT(*) FROM invoices
+                WHERE parent_id = ? AND COALESCE(invoice_type, 'invoice') = 'credit_note'
+                  AND status <> 'cancelled'");
+            $dob->execute([(int)$sale['invoice_id']]);
+            if ((int)$dob->fetchColumn() === 0) {
+                throw new Exception('Faktura k prodeji je už zaplacená — vystav k ní nejdřív dobropis v Účetnictví, pak teprve storno.');
+            }
         }
     }
 

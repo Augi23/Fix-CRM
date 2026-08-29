@@ -762,6 +762,28 @@ function afxUcetniDataKasa(string $from, string $to, int $branchId): array {
     }
 
     $out['pozn'][] = 'Prodej „na fakturu" není hotovostní tržba — peníze přijdou až úhradou faktury (viz sestava „Přehled úhrad faktur"), aby se stejná částka nezaúčtovala dvakrát.';
+
+    // Doklady kasy, ke kterým se DODATEČNĚ vystavila faktura (v3.71.0): peníze
+    // přišly hotově/kartou v den prodeje, faktura je jen daňový doklad k téže
+    // platbě. Účetní to musí vidět, aby tržbu nezaúčtovala podruhé přes knihu faktur.
+    try {
+        $dod = afxUcetniQuery(
+            "SELECT COUNT(*) c, COALESCE(SUM(s.total), 0) s
+             FROM pos_sales s
+             WHERE s.status = 'completed' AND s.total >= 0
+               AND s.payment_method IN ('cash','card') AND s.invoice_id IS NOT NULL
+               AND s.created_at BETWEEN ? AND ?" . $bSql,
+            array_merge([$from . ' 00:00:00', $to . ' 23:59:59'], $bPar)
+        );
+        $dc = (int)($dod[0]['c'] ?? 0);
+        if ($dc > 0) {
+            $out['pozn'][] = '<b>Dodatečné faktury:</b> u ' . $dc . ' dokladů (' . afxUcetniMoney($dod[0]['s'] ?? 0)
+                . ' Kč) si zákazník vyžádal fakturu až po zaplacení hotově/kartou. Peníze jsou v tržbě kasy '
+                . 'zde; faktura je k téže platbě jen daňový doklad (v Knize faktur je vedená jako zaplacená) — '
+                . '<b>nezapočítávejte ji podruhé</b>.';
+        }
+    } catch (Throwable $e) { /* starší schéma bez invoice_id → poznámka odpadá */ }
+
     return $out;
 }
 

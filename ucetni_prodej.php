@@ -6,9 +6,10 @@
  * a sestava „Tržby z pokladny po dnech" jen denní součty — tady je vidět doklad
  * po dokladu i s tím, co se prodalo, kdo to prodal a jak bylo zaplaceno.
  *
- * Stránka je pouze ČTECÍ: nic nezapisuje ani nemění schéma (stejně jako
- * Podklady pro účetní). Storna zůstávají vidět, jen se nepočítají do tržby —
- * doklad, který zmizí, je pro účetní horší než doklad označený jako stornovaný.
+ * Výpis je čtecí; JEDINÝ zápis odsud je „Vystavit fakturu" k už proběhlému
+ * prodeji (v3.71.0, api/pos_invoice_after.php). Storna zůstávají vidět, jen se
+ * nepočítají do tržby — doklad, který zmizí, je pro účetní horší než doklad
+ * označený jako stornovaný.
  *
  * Přístup: vedení (crmCanManageInvoices) nebo účetní (crmCanAccountingRead) —
  * tedy stejná hranice jako zbytek sekce Účetnictví.
@@ -249,7 +250,18 @@ $qs = static function (array $over) use ($period, $branchId, $payFilter, $q, $sh
                             <?php endif; ?>
                         </td>
                         <td class="text-end fw-semibold"><?php echo formatMoney((float)$r['total']); ?></td>
-                        <td class="text-end">
+                        <td class="text-end text-nowrap">
+                            <?php /* Dodatečná faktura (v3.71.0): zákazník zaplatil kartou nebo
+                                     hotově a teprve pak si řekne o fakturu — vystaví se k hotovému
+                                     prodeji jako už uhrazená, prodej se nepřepisuje. */ ?>
+                            <?php if (!$isStorno && empty($r['invoice_id']) && (float)$r['total'] > 0
+                                      && !in_array((string)$r['payment_method'], ['invoice', 'invoice_ico'], true)
+                                      && crmCanUseInvoices()): ?>
+                            <button type="button" class="btn btn-sm btn-outline-success" title="Vystavit fakturu k tomuto prodeji"
+                                onclick="afxInvoiceAfterSale(<?php echo $sid; ?>, <?php echo htmlspecialchars(json_encode((string)$r['sale_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode(formatMoney((float)$r['total']), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)($payLabels[(string)$r['payment_method']] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </button>
+                            <?php endif; ?>
                             <a class="btn btn-sm btn-outline-light" href="print_receipt.php?id=<?php echo $sid; ?>&amp;format=58&amp;auto=1" target="_blank" title="Účtenka">
                                 <i class="fas fa-receipt"></i>
                             </a>
@@ -270,5 +282,8 @@ $qs = static function (array $over) use ($period, $branchId, $payFilter, $q, $sh
     </div>
     <?php endif; ?>
 </div>
+
+<?php /* okno „Vystavit fakturu k prodeji" (v3.71.0) — sdílené s druhou stránkou */ ?>
+<?php require_once 'includes/modals/invoice_after_sale_modal.php'; ?>
 
 <?php require_once 'includes/footer.php'; ?>

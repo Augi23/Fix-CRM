@@ -11,6 +11,21 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.71.0',
+        'date' => '2026-08-29',
+        'time' => '20:40',
+        'title' => 'Dodatečná faktura k prodeji, který už proběhl',
+        'items' => [
+            'Zákazník zaplatil <b>kartou</b> (nebo hotově) a teprve pak si řekne o fakturu? U prodeje je nově tlačítko <b>Vystavit fakturu</b> — v <b>Účetnictví → Prodej</b> u kteréhokoli dokladu a v <b>Pokladně</b> u dnešních transakcí.',
+            'Odběratele buď <b>vybereš z klientů</b> (hledá se stejně jako v kase), nebo ho <b>vyplníš ručně</b> (název, adresa, IČO, DIČ, e-mail) — a jedním zaškrtnutím se faktura rovnou <b>pošle e-mailem</b>.',
+            'Doklad vzniká jako <b>už zaplacený</b>: datum zdanitelného plnění, splatnost i úhrada = den prodeje, evidovaná platba kartou/hotově. Faktura se připojí k prodeji, takže je v seznamu vidět, ke kterému dokladu patří.',
+            '<b>Peníze se nikde nepočítají dvakrát.</b> Přehledy platbu k takové faktuře vynechají (částka už je v tržbě kasy) a v sestavě „Tržby z pokladny" na dodatečné faktury upozorní poznámka, aby je účetní nezaúčtovala podruhé.',
+            'Pojistky: k jednomu prodeji vznikne <b>jen jedna</b> faktura (i když kliknou dva lidé naráz), stornovaný a výdejový doklad (výkup) se nefakturuje, k zakázce se druhá faktura nezaloží a prodej z doby s jiným režimem DPH se odmítne.',
+            '<b>Kdo smí:</b> vedení, manažer a účetní kdykoli; obsluha pokladny ke <b>svému dnešnímu</b> prodeji (starší doklady řeší vedení) — stejné pravidlo jako u odesílání faktur.',
+            'Opraveno při té příležitosti: prodej s už zaplacenou fakturou <b>jde stornovat</b>, jakmile je k faktuře vystavený dobropis (dřív se takový prodej nedal stornovat vůbec), a <b>smazání faktury</b> uvolní vazbu na prodej — ten se dřív tvářil navždy jako vyfakturovaný.',
+        ],
+    ],
+    [
         'version' => '3.70.0',
         'date' => '2026-08-29',
         'time' => '18:20',

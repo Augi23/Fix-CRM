@@ -180,6 +180,10 @@ function afxAccountantApiGate(): void {
         'guide_viewed.php',                       // návody: značka přečtení
         'get_invoice_data.php', 'get_invoice_details.php',   // detail faktury (čtení)
         'invoice_email.php',                      // odeslání faktury klientovi (v3.70.0)
+        'pos_invoice_after.php',                  // dodatečná faktura k prodeji (v3.71.0)
+                                                  // POZOR: search_customers.php sem NEPATŘÍ —
+                                                  // účetní klientskou databázi procházet nemá,
+                                                  // odběratele si v tom okně vyplní ručně
         'tech_popups.php',                        // footer poller (vrátí prázdno; bez
                                                   // něj by log šuměl 403 každých 20 s)
     ];

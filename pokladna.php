@@ -305,6 +305,14 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
                 <a class="btn btn-sm btn-outline-light py-0 px-1" target="_blank" title="Faktura"
                    href="print_invoice.php?id=<?php echo (int)$sale['invoice_id']; ?>"><i class="fas fa-file-invoice-dollar"></i></a>
                 <?php endif; ?>
+                <?php /* Vystavit smí vedení/manažer/účetní kdykoli, obsluha kasy dnešní
+                         prodej své prodejny — server hlídá totéž (api/pos_invoice_after.php). */ ?>
+                <?php if (!$storno && empty($sale['invoice_id']) && (float)$sale['total'] > 0
+                          && !in_array((string)$sale['payment_method'], ['invoice', 'invoice_ico'], true)
+                          && (crmCanUseInvoices() || crmCanUsePos())): ?>
+                <button type="button" class="btn btn-sm btn-outline-success py-0 px-1" title="Vystavit fakturu k tomuto prodeji"
+                    onclick="afxInvoiceAfterSale(<?php echo (int)$sale['id']; ?>, <?php echo htmlspecialchars(json_encode((string)$sale['sale_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode(formatMoney((float)$sale['total']), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)$pmLabel, JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)"><i class="fas fa-file-invoice-dollar"></i></button>
+                <?php endif; ?>
                 <?php if (!$storno): ?>
                 <button type="button" class="btn btn-sm btn-outline-light py-0 px-1" title="Dotisk účtenky"
                     onclick="window.posReprintReceipt ? window.posReprintReceipt(<?php echo (int)$sale['id']; ?>) : window.open('print_receipt.php?id=<?php echo (int)$sale['id']; ?>&format=58&auto=1', '_blank')"><i class="fas fa-receipt"></i></button>
@@ -2017,5 +2025,8 @@ document.addEventListener('DOMContentLoaded', function () {
 })();
 </script>
 <?php endif; ?>
+
+<?php /* okno „Vystavit fakturu k prodeji" (v3.71.0) — sdílené s druhou stránkou */ ?>
+<?php require_once 'includes/modals/invoice_after_sale_modal.php'; ?>
 
 <?php require_once 'includes/footer.php'; ?>

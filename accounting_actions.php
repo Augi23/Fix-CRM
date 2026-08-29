@@ -136,6 +136,10 @@ switch ($action) {
             // číslo faktury pro historii zjistit PŘED smazáním
             $__invNo = '';
             try { $ns = $pdo->prepare("SELECT invoice_number FROM invoices WHERE id = ?"); $ns->execute([$id]); $__invNo = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
+            // vazba z prodeje musí pryč PŘED smazáním dokladu — jinak by prodej
+            // navždy ukazoval na neexistující fakturu a nešlo by k němu vystavit novou
+            try { $pdo->prepare("UPDATE pos_sales SET invoice_id = NULL WHERE invoice_id = ?")->execute([$id]); }
+            catch (Throwable $e) { /* kasa nemusí být nasazená */ }
             $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$id]);
             $pdo->prepare("DELETE FROM invoices WHERE id = ?")->execute([$id]);
             crmAuditLog('invoice.delete', [

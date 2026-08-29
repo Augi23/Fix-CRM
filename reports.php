@@ -146,7 +146,13 @@ function getCashFlowStats(PDO $pdo, string $start, string $end): array {
                  LEFT JOIN customers c ON c.id = i.customer_id
                  WHERE $dateExpr BETWEEN ? AND ?
                    AND i.status <> 'cancelled'
-                   AND COALESCE(i.invoice_type, 'invoice') <> 'credit_note'" . $scopeCond;
+                   AND COALESCE(i.invoice_type, 'invoice') <> 'credit_note'
+                   -- DODATEČNÁ FAKTURA k prodeji placenému hotově/kartou (v3.71.0):
+                   -- peníze už jsou započítané v tržbě kasy níž, jinak by se
+                   -- dlaždice prijatych penez nafoukla na dvojnasobek
+                   AND NOT EXISTS (SELECT 1 FROM pos_sales s2
+                                   WHERE s2.invoice_id = i.id AND s2.status = 'completed'
+                                     AND s2.payment_method IN ('cash','card'))" . $scopeCond;
 
         // Součty se počítají v SQL nad VŠEMI platbami období — výpis řádků níž je
         // oříznutý LIMITem, takže z něj sčítat nejde (zobrazí se jen část).

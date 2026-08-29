@@ -221,5 +221,119 @@ if ($feed) {
         !array_diff(array_unique(array_column($feed, 'status')), ['completed', 'cancelled']));
 }
 
+// ── dodatečná faktura k už proběhlému prodeji (v3.71.0) ──
+head('Dodatečná faktura k prodeji kartou');
+$sale = $pdo->query("SELECT * FROM pos_sales
+    WHERE status = 'completed' AND total > 0 AND invoice_id IS NULL AND payment_method IN ('card','cash')
+    ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if (!$sale) {
+    echo "  (žádný hotový prodej bez faktury — kontrola přeskočena)\n";
+} else {
+    $sid = (int)$sale['id'];
+    $saleDay = date('Y-m-d', strtotime((string)$sale['created_at']));
+    $its = $pdo->prepare("SELECT item_name, quantity, unit_price, is_used_goods FROM pos_sale_items WHERE sale_id = ? ORDER BY id");
+    $its->execute([$sid]);
+    $items = [];
+    foreach ($its->fetchAll(PDO::FETCH_ASSOC) as $it) {
+        $items[] = ['name' => (string)$it['item_name'], 'qty' => max(1, (int)$it['quantity']),
+                    'unit_price' => (float)$it['unit_price'], 'used' => !empty($it['is_used_goods'])];
+    }
+    if (!$items) { $items[] = ['name' => 'Prodej ' . $sale['sale_number'], 'qty' => 1, 'unit_price' => (float)$sale['total'], 'used' => false]; }
+    $payKind = (string)$sale['payment_method'] === 'cash' ? 'cash' : 'card';
+
+    $pdo->beginTransaction();
+    try {
+        $invId2 = crmPosCreateInvoice($pdo, 0, (string)$sale['sale_number'], $items, (float)$sale['total'],
+            !empty($sale['order_id']) ? (int)$sale['order_id'] : null, 'sro',
+            ['name' => 'Testovací odběratel (dodatečná faktura)', 'email' => 'test@example.com']);
+        ok('faktura k hotovému prodeji vznikne', $invId2 > 0);
+        $pdo->prepare("UPDATE invoices SET date_tax = ?, payment_method = ?, payment_date = ?, status = 'paid' WHERE id = ?")
+            ->execute([$saleDay, $payKind, $saleDay, $invId2]);
+        $pdo->prepare("UPDATE pos_sales SET invoice_id = ? WHERE id = ? AND invoice_id IS NULL")->execute([$invId2, $sid]);
+        afxInvoiceAddPayment($invId2, (float)$sale['total'], $payKind, $saleDay, null, 'test');
+        afxInvoiceRecalcPaid($invId2, true);
+
+        $chk = $pdo->query("SELECT * FROM invoices WHERE id = " . $invId2)->fetch(PDO::FETCH_ASSOC);
+        ok('doklad je rovnou zaplacený', (string)$chk['status'] === 'paid', (string)$chk['status']);
+        ok('DUZP i úhrada ke DNI PRODEJE (ne k dnešku)',
+            (string)$chk['date_tax'] === $saleDay && (string)$chk['payment_date'] === $saleDay,
+            $chk['date_tax'] . ' / ' . $chk['payment_date'] . ' vs. prodej ' . $saleDay);
+        ok('částka sedí s prodejem', abs((float)$chk['total_amount'] - (float)$sale['total']) < 0.02,
+            $chk['total_amount'] . ' vs ' . $sale['total']);
+        ok('faktura není v pohledávkách (paid_amount = částka)',
+            abs((float)$chk['paid_amount'] - (float)$chk['total_amount']) < 0.02, (string)$chk['paid_amount']);
+        ok('odběratel se uložil z ručního vyplnění',
+            (string)$chk['cust_name_override'] === 'Testovací odběratel (dodatečná faktura)');
+        ok('prodej má odkaz na fakturu',
+            (int)$pdo->query("SELECT invoice_id FROM pos_sales WHERE id = " . $sid)->fetchColumn() === $invId2);
+        ok('platba je evidovaná ke dni prodeje',
+            (string)$pdo->query("SELECT COALESCE(paid_on, DATE(created_at)) FROM invoice_payments
+                                 WHERE invoice_id = " . $invId2 . " ORDER BY id DESC LIMIT 1")->fetchColumn() === $saleDay);
+    } finally {
+        $pdo->rollBack();
+    }
+    ok('po rollbacku prodej zase nemá fakturu',
+        $pdo->query("SELECT invoice_id FROM pos_sales WHERE id = " . $sid)->fetchColumn() === null);
+    ok('a nezůstala ani faktura navíc',
+        (int)$pdo->query("SELECT COUNT(*) FROM invoices WHERE cust_name_override = 'Testovací odběratel (dodatečná faktura)'")->fetchColumn() === 0);
+}
+
+// ── nezapočítat tutéž tržbu dvakrát ──
+head('Dodatečná faktura se v Přehledech nepočítá dvakrát');
+$sale2 = $pdo->query("SELECT * FROM pos_sales
+    WHERE status = 'completed' AND total > 0 AND invoice_id IS NULL AND payment_method IN ('card','cash')
+    ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+if (!$sale2) {
+    echo "  (žádný vhodný prodej — kontrola přeskočena)\n";
+} else {
+    $sid2 = (int)$sale2['id'];
+    $den2 = date('Y-m-d', strtotime((string)$sale2['created_at']));
+    // SQL vytažené z reports.php — musí platbu k dodatečné faktuře vynechat
+    $sqlPlatby = "SELECT COALESCE(SUM(p.amount), 0)
+        FROM invoice_payments p JOIN invoices i ON i.id = p.invoice_id
+        WHERE COALESCE(p.paid_on, DATE(p.created_at)) = ?
+          AND i.status <> 'cancelled'
+          AND COALESCE(i.invoice_type, 'invoice') <> 'credit_note'
+          AND NOT EXISTS (SELECT 1 FROM pos_sales s2
+                          WHERE s2.invoice_id = i.id AND s2.status = 'completed'
+                            AND s2.payment_method IN ('cash','card'))";
+    $q0 = $pdo->prepare($sqlPlatby); $q0->execute([$den2]); $pred = (float)$q0->fetchColumn();
+
+    $pdo->beginTransaction();
+    try {
+        $invX = crmPosCreateInvoice($pdo, 0, (string)$sale2['sale_number'],
+            [['name' => 'Test', 'qty' => 1, 'unit_price' => (float)$sale2['total'], 'used' => false]],
+            (float)$sale2['total'], null, 'sro', ['name' => 'ZKOUŠKA dvojího započtení']);
+        $pdo->prepare("UPDATE invoices SET status='paid', date_tax=?, payment_date=?, payment_method=? WHERE id=?")
+            ->execute([$den2, $den2, 'card', $invX]);
+        $pdo->prepare("UPDATE pos_sales SET invoice_id=? WHERE id=? AND invoice_id IS NULL")->execute([$invX, $sid2]);
+        afxInvoiceAddPayment($invX, (float)$sale2['total'], 'card', $den2, null, 'test dvojího započtení');
+
+        $q1 = $pdo->prepare($sqlPlatby); $q1->execute([$den2]); $po = (float)$q1->fetchColumn();
+        ok('platba k dodatečné faktuře se do „přijatých peněz" NEPŘIČTE',
+            abs($po - $pred) < 0.005, 'před ' . $pred . ' → po ' . $po);
+
+        // bez té pojistky by se přičetla — kontrola, že test opravdu něco měří
+        $q2 = $pdo->prepare(str_replace(
+            "AND NOT EXISTS (SELECT 1 FROM pos_sales s2
+                          WHERE s2.invoice_id = i.id AND s2.status = 'completed'
+                            AND s2.payment_method IN ('cash','card'))", '', $sqlPlatby));
+        $q2->execute([$den2]);
+        ok('(bez pojistky by se přičetla — test měří správnou věc)',
+            (float)$q2->fetchColumn() > $po + 0.005);
+
+        // druhá faktura ke stejné zakázce se nesmí založit
+        if (!empty($sale2['order_id'])) {
+            $dup = $pdo->prepare("SELECT COUNT(*) FROM invoices WHERE order_id = ? AND status <> 'cancelled'
+                                  AND COALESCE(invoice_type,'invoice') = 'invoice'");
+            $dup->execute([(int)$sale2['order_id']]);
+            ok('kontrola duplicity faktury k zakázce má co hlídat', (int)$dup->fetchColumn() >= 1);
+        }
+    } finally {
+        $pdo->rollBack();
+    }
+    ok('po rollbacku je vše zpět', $pdo->query("SELECT invoice_id FROM pos_sales WHERE id = " . $sid2)->fetchColumn() === null);
+}
+
 echo "\n═══ " . ($fail === 0 ? "VŠE PROŠLO" : "NEPROŠLO") . " — $pass ok, $fail chyb ═══\n";
 exit($fail === 0 ? 0 : 1);
