@@ -219,6 +219,25 @@ if ($customerDisplayName === '' && !empty($customer['company'])) {
 
 $today = date('d.m.Y');
 
+/* ---- VŠECHNY faktury klienta (v3.70.0) ----------------------------------
+   Dřív viděl klient jen fakturu navázanou na vybranou zakázku — doklad za
+   prodej z kasy nebo doplňkovou fakturu neměl kde vzít. Bere se podle
+   customer_id, ne podle zakázky. Rozpracovaná (draft) a stornovaná faktura
+   klientovi nepatří. */
+$clientInvoices = [];
+if ($customerId > 0 && isset($pdo)) {
+    try {
+        $qi = $pdo->prepare("SELECT id, invoice_number, COALESCE(invoice_type, 'invoice') AS invoice_type,
+                                    date_issue, date_due, total_amount, currency, status
+                             FROM invoices
+                             WHERE customer_id = ? AND status IN ('issued','paid','overdue')
+                               AND COALESCE(invoice_type, 'invoice') IN ('invoice','credit_note')
+                             ORDER BY date_issue DESC, id DESC LIMIT 60");
+        $qi->execute([$customerId]);
+        $clientInvoices = $qi->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) { $clientInvoices = []; }
+}
+
 /* ---- Dokumenty dostupné klientovi + stav reklamace k vybrané zakázce ---- */
 $clientDocs = [];
 $orderComplaint = null;
@@ -233,26 +252,9 @@ if ($selectedOrder && isset($pdo)) {
     // Zakázkový list — vždy
     $clientDocs[] = ['type' => 'order_sheet', 'label' => __('client_doc_order_sheet'), 'icon' => 'fa-file-lines'];
 
-    // Faktura — jen pokud byla vystavena.
-    // Nezaplacená faktura PO SPLATNOSTI se klientovi ukazuje taky (dřív mu zmizela,
-    // protože stav 'overdue' nebyl ve výčtu) a zvýrazní se — ať ví, že má zaplatit.
-    try {
-        $q = $pdo->prepare("SELECT id, status, date_due FROM invoices
-            WHERE order_id = ? AND customer_id = ? AND status IN ('issued','paid','overdue')
-              AND invoice_type = 'invoice' ORDER BY created_at DESC LIMIT 1");
-        $q->execute([$oid, $customerId]);
-        $inv = $q->fetch(PDO::FETCH_ASSOC);
-        if ($inv) {
-            $poSplatnosti = (string)$inv['status'] !== 'paid'
-                && !empty($inv['date_due']) && strtotime((string)$inv['date_due']) < strtotime(date('Y-m-d'));
-            $clientDocs[] = [
-                'type' => 'invoice',
-                'label' => __('client_doc_invoice') . ($poSplatnosti ? ' — ' . __('client_invoice_overdue') : ''),
-                'icon' => 'fa-file-invoice-dollar',
-                'alert' => $poSplatnosti,
-            ];
-        }
-    } catch (Throwable $e) { /* faktura nedostupná */ }
+    // Faktura se tady UŽ NEVYPISUJE (v3.70.0): níž je samostatná sekce „Faktury"
+    // se VŠEMI doklady klienta včetně těch bez zakázky (prodej z kasy). Kdyby
+    // zůstala i tady, svítil by tentýž doklad na jedné obrazovce dvakrát.
 
     // Reklamace k této zakázce
     if (function_exists('ensureComplaintsClientColumns')) { ensureComplaintsClientColumns($pdo); }
@@ -1064,6 +1066,66 @@ if ($selectedOrder && isset($pdo)) {
                                     </span>
                                 </a>
                             <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </section>
+
+            <section class="client-card">
+                <div class="client-card-inner">
+                    <?php /* Faktury klienta — i bez vazby na zakázku (prodej z kasy).
+                             Otevírají se přes hlídaný klient/document.php, který ověří,
+                             že doklad opravdu patří přihlášenému zákazníkovi. */ ?>
+                    <div class="media-section">
+                        <div class="media-section-title">
+                            <div>
+                                <h4><i class="fas fa-file-invoice-dollar me-2"></i><?php echo e(__('client_invoices_title')); ?></h4>
+                                <p><?php echo e(__('client_invoices_desc')); ?></p>
+                            </div>
+                        </div>
+                        <style>
+                        /* nezaplacená faktura po splatnosti — ať ji klient nepřehlédne
+                           (stejný vzhled jako u dokladů zakázky, tahle sekce se ale
+                           vykresluje i bez vybrané zakázky, takže má styl u sebe) */
+                        .doc-link-alert { border-color: rgba(255,69,58,.55) !important; background: rgba(255,69,58,.10) !important; }
+                        .doc-link-alert .doc-link-label { color: #ff9f96; font-weight: 600; }
+                        .doc-link-alert .doc-link-ico { color: #ff453a; }
+                        </style>
+                        <?php if (empty($clientInvoices)): ?>
+                        <div class="empty-state"><?php echo e(__('client_invoices_empty')); ?></div>
+                        <?php else: ?>
+                        <div class="doc-links">
+                            <?php foreach ($clientInvoices as $ci):
+                                // DOBROPIS je vrácení peněz — nesmí se tvářit jako nezaplacená
+                                // faktura po splatnosti (klient by dostal červenou výzvu
+                                // k zaplacení peněz, které jsme mu právě vrátili).
+                                $ciDobropis = (string)$ci['invoice_type'] === 'credit_note';
+                                $ciDue = (!$ciDobropis && !empty($ci['date_due'])) ? strtotime((string)$ci['date_due']) : 0;
+                                $ciPaid = (string)$ci['status'] === 'paid';
+                                $ciLate = !$ciDobropis && !$ciPaid && $ciDue > 0 && $ciDue < strtotime(date('Y-m-d'));
+                                $ciLabel = ($ciDobropis ? __('client_credit_note') : __('client_invoices_title'))
+                                    . ' ' . (string)$ci['invoice_number'];
+                                $ciCastka = $ciDobropis
+                                    ? '−' . clientMoney(abs((float)$ci['total_amount']))
+                                    : clientMoney((float)$ci['total_amount']);
+                                $ciSub = date('j. n. Y', strtotime((string)$ci['date_issue'])) . ' · ' . $ciCastka;
+                                if (!$ciDobropis) {
+                                    $ciSub .= ' · ' . ($ciPaid ? __('client_invoice_paid')
+                                              : ($ciLate ? __('client_invoice_overdue_short') : __('client_invoice_open')))
+                                        . ($ciPaid || $ciDue <= 0 ? '' : ' (' . __('client_invoice_due') . ' ' . date('j. n. Y', $ciDue) . ')');
+                                }
+                            ?>
+                            <a class="doc-link<?php echo $ciLate ? ' doc-link-alert' : ''; ?>"
+                               href="document.php?type=invoice&amp;invoice=<?php echo (int)$ci['id']; ?>"
+                               target="_blank" rel="noopener noreferrer">
+                                <span class="doc-link-ico"><i class="fas <?php echo $ciDobropis ? 'fa-rotate-left' : 'fa-file-invoice-dollar'; ?>"></i></span>
+                                <span class="doc-link-label"><?php echo e($ciLabel); ?>
+                                    <span class="d-block small text-white-50"><?php echo e($ciSub); ?></span>
+                                </span>
+                                <i class="fas fa-arrow-up-right-from-square doc-link-ext"></i>
+                            </a>
+                            <?php endforeach; ?>
+                        </div>
                         <?php endif; ?>
                     </div>
                 </div>

@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id'])) {
 
 // Fakturační data (jméno/IČO/DIČ, ceny, číslo faktury): administrátor a Boss —
 // shodně s UI (tlačítko účtování).
-if (!(crmCanManageInvoices() || (function_exists('crmCanAccountingRead') && crmCanAccountingRead()))) {
+if (!crmCanUseInvoices()) {
     echo json_encode(['success' => false, 'message' => __('access_denied_msg')]);
     exit;
 }

@@ -52,12 +52,38 @@ try {
     $st = $pdo->query("SELECT id, direction, amount, purpose, ref_type, ref_id, ref_label, note, created_by, created_at
         FROM pos_cash_movements
         WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY"
-        . orderBranchScopeSql('branch_id') . " ORDER BY id DESC LIMIT 30");
-    foreach ($st as $m) {
-        $todayMoves[] = $m;
-        if ($m['direction'] === 'in') { $cashIn += (float)$m['amount']; } else { $cashOut += (float)$m['amount']; }
+        . orderBranchScopeSql('branch_id') . " ORDER BY id DESC LIMIT 40");
+    foreach ($st as $m) { $todayMoves[] = $m; }
+    // Součty za den se počítají ZVLÁŠŤ — dřív se sčítaly jen vypsané řádky, takže
+    // při rušném dni (přes limit) ukazovala hlavička nižší vklady i výdaje.
+    $ag = $pdo->query("SELECT direction, SUM(amount) s FROM pos_cash_movements
+        WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY"
+        . orderBranchScopeSql('branch_id') . " GROUP BY direction");
+    foreach ($ag as $a) {
+        if ((string)$a['direction'] === 'in') { $cashIn = (float)$a['s']; } else { $cashOut = (float)$a['s']; }
     }
 } catch (Throwable $e) {}
+
+// Dnešní PRODEJE — všechny způsoby platby (v3.70.0). Dřív se pod kasou ukazovaly
+// jen pohyby hotovosti, takže prodej kartou nebo na fakturu jako by neexistoval
+// a obsluha nepoznala, jestli se doklad vůbec uložil.
+$todaySales = [];
+try {
+    $ss = $pdo->query("SELECT id, sale_number, payment_method, total, status, invoice_id, order_id,
+                              seller_name, created_at
+        FROM pos_sales
+        WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY"
+        . orderBranchScopeSql('branch_id') . " ORDER BY id DESC LIMIT 40");
+    $todaySales = $ss->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) { $todaySales = []; }
+
+// Jeden časově řazený proud: prodeje + pohyby hotovosti.
+$todayFeed = [];
+foreach ($todaySales as $x) { $todayFeed[] = ['kind' => 'sale', 'at' => (string)$x['created_at'], 'row' => $x]; }
+foreach ($todayMoves as $x) { $todayFeed[] = ['kind' => 'move', 'at' => (string)$x['created_at'], 'row' => $x]; }
+usort($todayFeed, static fn($a, $b) => strcmp($b['at'], $a['at']) ?: 0);
+$todayFeed = array_slice($todayFeed, 0, 40);
+$posPayLabels = ['cash' => 'Hotově', 'card' => 'Kartou', 'invoice' => 'Faktura s.r.o.', 'invoice_ico' => 'Faktura IČO'];
 // Pohyb hotovosti POUZE za dnešek (to, co kasa ukazovala dřív jako „stav").
 $cashToday = $todaySums['cash'] + $cashIn - $cashOut;
 
@@ -251,11 +277,43 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
     </div>
 </div>
 
-<?php if (!empty($todayMoves)): ?>
+<?php if (!empty($todayFeed)): ?>
 <div class="glass-panel p-2 px-3 border-secondary mb-3">
-    <div class="small text-white-50 mb-1"><i class="fas fa-book me-1"></i>Dnešní pohyby hotovosti (mimo prodeje)</div>
+    <div class="small text-white-50 mb-1"><i class="fas fa-receipt me-1"></i>Dnešní transakce — prodeje i pohyby hotovosti</div>
     <div class="d-flex flex-column gap-1">
-        <?php foreach ($todayMoves as $m):
+        <?php foreach ($todayFeed as $f): if ($f['kind'] === 'sale'):
+            $sale = $f['row'];
+            $storno = (string)$sale['status'] === 'cancelled';
+            $pm = (string)$sale['payment_method'];
+            // záporná prodejka = výplata z kasy (výkup, výdaj) — pokladní kniha ji
+            // vede jako výdej, ať to tady neříká něco jiného
+            $vydej = (float)$sale['total'] < 0;
+            $pmLabel = $vydej ? 'Výdej z kasy' : ($posPayLabels[$pm] ?? $pm);
+            $pmClass = $vydej ? 'text-warning' : ($pm === 'cash' ? 'text-success' : ($pm === 'card' ? 'text-info' : 'text-primary'));
+        ?>
+        <div class="d-flex align-items-center gap-2 small<?php echo $storno ? ' opacity-50' : ''; ?>">
+            <span class="<?php echo $storno ? 'text-white-50' : $pmClass; ?>" style="min-width:86px;">
+                <strong<?php echo $storno ? ' style="text-decoration:line-through;"' : ''; ?>><?php echo formatMoney((float)$sale['total']); ?></strong>
+            </span>
+            <span><?php echo e($pmLabel); ?>
+                <span class="text-white-50"><?php echo e((string)$sale['sale_number']); ?></span>
+                <?php if ($storno): ?><span class="badge bg-danger bg-opacity-25 text-danger ms-1">storno</span><?php endif; ?>
+                <?php if (!empty($sale['order_id'])): ?><a class="text-info text-decoration-none ms-1" href="view_order.php?id=<?php echo (int)$sale['order_id']; ?>">zakázka</a><?php endif; ?>
+            </span>
+            <span class="ms-auto d-flex align-items-center gap-2">
+                <?php if (!empty($sale['invoice_id']) && function_exists('crmCanUseInvoices') && crmCanUseInvoices()): ?>
+                <a class="btn btn-sm btn-outline-light py-0 px-1" target="_blank" title="Faktura"
+                   href="print_invoice.php?id=<?php echo (int)$sale['invoice_id']; ?>"><i class="fas fa-file-invoice-dollar"></i></a>
+                <?php endif; ?>
+                <?php if (!$storno): ?>
+                <button type="button" class="btn btn-sm btn-outline-light py-0 px-1" title="Dotisk účtenky"
+                    onclick="window.posReprintReceipt ? window.posReprintReceipt(<?php echo (int)$sale['id']; ?>) : window.open('print_receipt.php?id=<?php echo (int)$sale['id']; ?>&format=58&auto=1', '_blank')"><i class="fas fa-receipt"></i></button>
+                <?php endif; ?>
+                <span class="text-white-50"><?php echo e(date('H:i', strtotime((string)$sale['created_at']))); ?><?php if (!empty($sale['seller_name'])): ?> · <?php echo e((string)$sale['seller_name']); ?><?php endif; ?></span>
+            </span>
+        </div>
+        <?php else:
+            $m = $f['row'];
             $isOut = $m['direction'] === 'out';
             $purposeLabels = ['vykup' => 'Výkup', 'vklad' => 'Vklad', 'vyber' => 'Výběr', 'zakazka' => 'Zakázka'];
             $pl = $purposeLabels[(string)$m['purpose']] ?? ucfirst((string)$m['purpose']);
@@ -269,7 +327,7 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
             <?php if (!empty($m['note'])): ?><span class="text-white-50 text-truncate" style="max-width:340px;"><?php echo e((string)$m['note']); ?></span><?php endif; ?>
             <span class="text-white-50 ms-auto"><?php echo e(date('H:i', strtotime((string)$m['created_at']))); ?><?php if (!empty($m['created_by'])): ?> · <?php echo e((string)$m['created_by']); ?><?php endif; ?></span>
         </div>
-        <?php endforeach; ?>
+        <?php endif; endforeach; ?>
     </div>
 </div>
 <?php endif; ?>

@@ -19,6 +19,10 @@ if (!defined('INVOICE_DOC_EMBED')) {
     $invoice = $stmt->fetch();
 
     if (!$invoice) die(__('print_not_found'));
+    // doklad druhé provozovny si manažer neotevře ani přímým odkazem
+    if (function_exists('crmCanSeeInvoiceBranch') && !crmCanSeeInvoiceBranch($invoice['branch_id'] ?? null)) {
+        die(__('unauthorized'));
+    }
 
     // Fetch invoice items
     $stmt = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC");

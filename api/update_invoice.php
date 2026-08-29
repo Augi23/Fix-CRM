@@ -6,7 +6,7 @@ require_once '../includes/functions.php';
 if (ob_get_length()) ob_clean();
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || !crmCanManageInvoices()) {
+if (!crmCanUseInvoices()) {   // vedení, pobočkový manažer i účetní (v3.70.0)
     echo json_encode(['success' => false, 'message' => __('access_denied_msg')]);
     exit;
 }

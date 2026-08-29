@@ -64,11 +64,15 @@ private function getInvoiceStatusBadge($status) {
 }
 
     public function saveInvoice($data) {
-        if (!hasPermission('admin_access') && !(function_exists('crmCanAccountingEdit') && crmCanAccountingEdit())) {
+        if (!hasPermission('admin_access')
+            && !(function_exists('crmCanUseInvoices') && crmCanUseInvoices())
+            && !(function_exists('crmCanAccountingEdit') && crmCanAccountingEdit())) {
             return ['success' => false, 'error' => __('access_denied_simple')];
         }
-        // schéma pro fakturu bez klienta (DDL musí být PŘED transakcí)
+        // schéma pro fakturu bez klienta a evidenci odeslání (DDL PŘED transakcí)
         if (function_exists('afxEnsureInvoiceAdhocBuyer')) { afxEnsureInvoiceAdhocBuyer(); }
+        if (function_exists('afxEnsureInvoiceEmailColumns')) { afxEnsureInvoiceEmailColumns(); }
+        if (function_exists('afxEnsureInvoiceBranch')) { afxEnsureInvoiceBranch(); }
         try {
             $this->pdo->beginTransaction();
 
@@ -128,6 +132,14 @@ private function getInvoiceStatusBadge($status) {
             $cust_address = !empty($data['cust_address']) ? $data['cust_address'] : null;
             $cust_ico = !empty($data['cust_ico']) ? $data['cust_ico'] : null;
             $cust_dic = !empty($data['cust_dic']) ? $data['cust_dic'] : null;
+            // e-mail odběratele (faktura bez klienta v CRM jinak nemá kam odejít).
+            // Nesmysl radši odmítnout, než potichu uložit adresu, na kterou nic nedorazí.
+            $cust_email = trim((string)($data['cust_email'] ?? ''));
+            if ($cust_email !== '' && !filter_var($cust_email, FILTER_VALIDATE_EMAIL)) {
+                $this->pdo->rollBack();
+                return ['success' => false, 'error' => 'E-mail odběratele nemá platný tvar.'];
+            }
+            $cust_email = $cust_email !== '' ? $cust_email : null;
             // doklad musí vědět, komu patří: buď klient z CRM, nebo ručně vyplněný odběratel
             if ($customer_id === null && ($cust_name === null || trim((string)$cust_name) === '')) {
                 $this->pdo->rollBack();
@@ -151,14 +163,15 @@ private function getInvoiceStatusBadge($status) {
                         invoice_number = ?, variable_symbol = ?, customer_id = ?, order_id = ?, date_issue = ?, date_tax = ?, date_due = ?, 
                         total_amount = ?, vat_amount = ?, is_vat_payer = ?, status = ?, 
                         payment_method = ?, payment_date = ?, currency = ?, notes = ?,
-                        cust_name_override = ?, cust_address_override = ?, cust_ico_override = ?, cust_dic_override = ?
+                        cust_name_override = ?, cust_address_override = ?, cust_ico_override = ?, cust_dic_override = ?,
+                        cust_email_override = ?
                     WHERE id = ?
                 ");
                 $stmt->execute([
                     $invoice_number, $variable_symbol, $customer_id, !empty($data['order_id']) ? (int)$data['order_id'] : null, $date_issue, $date_tax, $date_due, 
                     $total_amount, $vat_amount, $is_vat_payer, $status, 
                     $payment_method, $payment_date, $currency, $notes,
-                    $cust_name, $cust_address, $cust_ico, $cust_dic,
+                    $cust_name, $cust_address, $cust_ico, $cust_dic, $cust_email,
                     $id
                 ]);
                 $invoice_id = $id;
@@ -167,13 +180,16 @@ private function getInvoiceStatusBadge($status) {
                     INSERT INTO invoices (
                         invoice_number, variable_symbol, customer_id, order_id, date_issue, date_tax, date_due, 
                         total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes,
-                        cust_name_override, cust_address_override, cust_ico_override, cust_dic_override
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        cust_name_override, cust_address_override, cust_ico_override, cust_dic_override,
+                        cust_email_override, branch_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $invoice_number, $variable_symbol, $customer_id, !empty($data['order_id']) ? (int)$data['order_id'] : null, $date_issue, $date_tax, $date_due, 
                     $total_amount, $vat_amount, $is_vat_payer, $status, $payment_method, $payment_date, $currency, $notes,
-                    $cust_name, $cust_address, $cust_ico, $cust_dic
+                    $cust_name, $cust_address, $cust_ico, $cust_dic, $cust_email,
+                    function_exists('crmInvoiceBranchForNew')
+                        ? crmInvoiceBranchForNew(!empty($data['order_id']) ? (int)$data['order_id'] : null) : null
                 ]);
                 $invoice_id = $this->pdo->lastInsertId();
             }
@@ -274,6 +290,8 @@ private function getInvoiceStatusBadge($status) {
     public function createCreditNote($invoice_id) {
         $original = $this->getInvoice($invoice_id);
         if (!$original) return ['success' => false, 'error' => 'Original invoice not found'];
+        // schéma (DDL) VŽDY před transakcí — uvnitř by udělalo implicitní COMMIT
+        if (function_exists('afxEnsureInvoiceBranch')) { afxEnsureInvoiceBranch(); }
 
         try {
             $this->pdo->beginTransaction();
@@ -297,8 +315,8 @@ private function getInvoiceStatusBadge($status) {
                     total_amount, vat_amount, is_vat_payer, status, payment_method, currency, 
                     parent_id, invoice_type, notes,
                     cust_name_override, cust_address_override, cust_ico_override, cust_dic_override,
-                    cust_email_override, supplier
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'issued', ?, ?, ?, 'credit_note', ?, ?, ?, ?, ?, ?, ?)
+                    cust_email_override, supplier, branch_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'issued', ?, ?, ?, 'credit_note', ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             
             $stmt->execute([
@@ -310,7 +328,9 @@ private function getInvoiceStatusBadge($status) {
                 $original['cust_ico_override'], $original['cust_dic_override'],
                 $original['cust_email_override'] ?? null,
                 // dobropis musí vystavit TENTÝŽ subjekt jako původní fakturu (sro|ico)
-                (string)($original['supplier'] ?? 'sro') ?: 'sro'
+                (string)($original['supplier'] ?? 'sro') ?: 'sro',
+                // a patří na tutéž pobočku (jinak by manažerovi zmizel z výpisu)
+                $original['branch_id'] ?? null
             ]);
             
             $new_id = $this->pdo->lastInsertId();

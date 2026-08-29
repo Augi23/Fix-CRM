@@ -7,7 +7,7 @@ if (ob_get_length()) ob_clean();
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])
-    || !(crmCanManageInvoices() || (function_exists('crmCanAccountingRead') && crmCanAccountingRead()))) {
+    || !crmCanUseInvoices()) {
     echo json_encode(['success' => false, 'message' => __('access_denied_msg')]);
     exit;
 }
@@ -27,6 +27,10 @@ try {
 
     if (!$invoice) {
         throw new Exception('Invoice not found');
+    }
+    // manažer vidí jen doklady své provozovny (admin, Boss a účetní obě)
+    if (function_exists('crmCanSeeInvoiceBranch') && !crmCanSeeInvoiceBranch($invoice['branch_id'] ?? null)) {
+        throw new Exception(__('access_denied_msg'));
     }
 
     $stmt_items = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ?");

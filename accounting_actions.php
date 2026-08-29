@@ -2,10 +2,11 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
-// Access Check: vedení (admin_access) + role účetní (crmCanAccountingEdit) —
-// bez toho by účetní na accounting.php viděla faktury, ale každé tlačítko by
-// vrátilo Access denied. Mazání uvnitř hlídá crmCanAccountingDelete (účetní NE).
-if (!hasPermission('admin_access') && !(function_exists('crmCanAccountingEdit') && crmCanAccountingEdit())) {
+// Access Check: vedení (admin_access), POBOČKOVÝ MANAŽER a role účetní
+// (crmCanUseInvoices) — bez toho by na accounting.php viděli faktury, ale každé
+// tlačítko by vrátilo Access denied. Mazání uvnitř hlídá crmCanAccountingDelete
+// (účetní ani manažer NE) a fakturační údaje firmy crmCanManageInvoices.
+if (!hasPermission('admin_access') && !crmCanUseInvoices()) {
     die(json_encode(['success' => false, 'error' => 'Access denied']));
 }
 
@@ -15,6 +16,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !validateCsrfToken($_POST['csrf_tok
 }
 
 header('Content-Type: application/json');
+
+// Pobočkový manažer vidí a mění jen doklady SVÉ prodejny (admin, Boss a účetní
+// obě — účetnictví se vede za firmu). Bez téhle stráže by si přes ID doklady
+// druhé pobočky přečetl i změnil.
+afxEnsureInvoiceBranch();
+function afxAssertInvoiceBranch(int $invoiceId): void {
+    global $pdo;
+    if ($invoiceId <= 0) { return; }
+    try {
+        $st = $pdo->prepare("SELECT branch_id FROM invoices WHERE id = ?");
+        $st->execute([$invoiceId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) { return; }                    // neexistuje → řeší volající
+        if (!crmCanSeeInvoiceBranch($row['branch_id'])) {
+            die(json_encode(['success' => false, 'error' => 'Doklad patří jiné provozovně.'], JSON_UNESCAPED_UNICODE));
+        }
+    } catch (Throwable $e) { /* chyba čtení nesmí zablokovat práci */ }
+}
 
 $action = $_REQUEST['action'] ?? '';
 $valid_actions = ['save_invoice', 'get_invoice', 'delete_invoice', 'update_status', 'create_credit_note', 'export_pohoda', 'export_s3money', 'get_order_data'];
@@ -52,8 +71,20 @@ switch ($action) {
             if (empty($_POST['order_id']) && !empty($_POST['from_order_id'])) {
                 $_POST['order_id'] = $_POST['from_order_id'];
             }
+            if (!empty($_POST['id'])) { afxAssertInvoiceBranch((int)$_POST['id']); }
 
             $result = $manager->saveInvoice($_POST);
+            // adresa pro rovnou odeslání e-mailem: ruční e-mail odběratele, jinak
+            // e-mail z karty klienta (formulář ho nemá, ale server ano)
+            if (!empty($result['success'])) {
+                try {
+                    $em = $pdo->prepare("SELECT COALESCE(NULLIF(i.cust_email_override, ''), c.email) AS mail
+                                         FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id
+                                         WHERE i.id = ?");
+                    $em->execute([(int)($result['id'] ?? 0)]);
+                    $result['email'] = (string)($em->fetchColumn() ?: '');
+                } catch (Throwable $e) { $result['email'] = ''; }
+            }
             if (!empty($result['success'])) {
                 $__isEdit = !empty($_POST['id']);
                 $__invNo = trim((string)($_POST['invoice_number'] ?? '')) ?: ('#' . (int)($result['id'] ?? 0));
@@ -70,6 +101,7 @@ switch ($action) {
         break;
 
     case 'get_invoice':
+        afxAssertInvoiceBranch((int)($_GET['id'] ?? 0));
         try {
             require_once 'models/InvoiceManager.php';
             $manager = new InvoiceManager($pdo);
@@ -93,6 +125,7 @@ switch ($action) {
             if (function_exists('crmCanAccountingDelete') && !crmCanAccountingDelete()) {
                 echo json_encode(['success' => false, 'error' => 'Mazání dokladů je jen pro vedení — účetní doklad stornuje, nemaže.']); break;
             }
+            afxAssertInvoiceBranch($id);
             if (function_exists('afxAccountingAssertOpen')) {
                 $dv = $pdo->prepare("SELECT date_issue FROM invoices WHERE id = ?");
                 $dv->execute([$id]);
@@ -116,6 +149,7 @@ switch ($action) {
         break;
 
     case 'update_status':
+        afxAssertInvoiceBranch((int)($_POST['id'] ?? 0));
         // změna stavu (zaplaceno/…) zapisuje payment_date k dnešku a sahá na doklad —
         // u dokladu z uzamčeného měsíce ji pustit nesmíme
         if (function_exists('afxAccountingAssertOpen') && !empty($_POST['id'])) {
@@ -146,6 +180,13 @@ switch ($action) {
         break;
 
     case 'create_credit_note':
+        // Dobropis = vrácení peněz, stejná citlivost jako storno prodeje v kase
+        // (to smí taky jen vedení). Účetní ano — opravný doklad je její práce.
+        if (!(function_exists('crmCanAccountingEdit') && crmCanAccountingEdit())) {
+            die(json_encode(['success' => false,
+                'error' => 'Dobropis smí vystavit jen vedení nebo účetní.'], JSON_UNESCAPED_UNICODE));
+        }
+        afxAssertInvoiceBranch((int)($_POST['id'] ?? 0));
         require_once 'models/InvoiceManager.php';
         $manager = new InvoiceManager($pdo);
         $result = $manager->createCreditNote((int)$_POST['id']);
@@ -160,6 +201,7 @@ switch ($action) {
 
     case 'export_pohoda':
         $id = (int)$_GET['id'];
+        afxAssertInvoiceBranch($id);
         // Implementation for Pohoda XML
         require_once 'export_utils.php';
         $exporter = new AccountingExporter($pdo);
@@ -169,6 +211,7 @@ switch ($action) {
 
     case 'export_s3money':
         $id = (int)$_GET['id'];
+        afxAssertInvoiceBranch($id);
         // Implementation for S3 Money CSV
         require_once 'export_utils.php';
         $exporter = new AccountingExporter($pdo);
@@ -181,7 +224,13 @@ switch ($action) {
         $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.company, c.address, c.phone, c.email FROM orders o JOIN customers c ON o.customer_id = c.id WHERE o.id = ?");
         $stmt->execute([$order_id]);
         $order = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+        // zakázka druhé prodejny se manažerovi otevřít nesmí (stejně jako v
+        // api/get_invoice_data.php) — jinak by si přes ID pročetl cizí klienty
+        if ($order && function_exists('canAccessOrderBranch') && !canAccessOrderBranch($order)) {
+            echo json_encode(['success' => false, 'error' => 'Zakázka patří jiné provozovně.'], JSON_UNESCAPED_UNICODE);
+            break;
+        }
+
         if ($order) {
             $is_vat_payer = (get_setting('acc_is_vat_payer', '0') == '1');
             $data = [

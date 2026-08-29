@@ -11,6 +11,21 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.70.0',
+        'date' => '2026-08-29',
+        'time' => '18:20',
+        'title' => 'Faktury: odeslání klientovi, faktury v klientské sekci, kasa ukazuje všechny transakce',
+        'items' => [
+            '<b>Fakturu pošleš klientovi rovnou z Účetnictví</b> — u každého dokladu je zelené tlačítko a nabídne se to i hned po uložení. Adresa se předvyplní (z karty klienta nebo z ručně zadaného odběratele) a jde přepsat. U faktury je pak vidět, <b>kdy a kam odešla</b>.',
+            'Nové pole <b>E-mail odběratele</b> u ručně vyplněného odběratele: faktura bez klienta v CRM konečně má kam odejít. Rozpracovaný ani stornovaný doklad se neodešle a e-mail odchází <b>v jazyce klienta</b>.',
+            '<b>Klientská sekce má novou část „Faktury"</b> — klient v ní vidí <b>všechny</b> své doklady, i za prodej na prodejně bez zakázky (dřív jen fakturu k opravě), a jedním klikem si je otevře a uloží. Nezaplacená po splatnosti je červená, dobropis se už netváří jako dluh. Cizí doklad portál nevydá.',
+            '<b>Pokladna: „Dnešní transakce"</b> — v seznamu pod hlavičkou jsou nově <b>všechny prodeje</b> (hotově, kartou i na fakturu), ne jen pohyby hotovosti. U každého je čas, prodavač, dotisk účtenky, odkaz na fakturu i zakázku a viditelné storno. Výdej z kasy je označený jako výdej, ne jako platba hotově.',
+            'Vklady a výdaje v hlavičce kasy se počítají <b>za celý den</b> — dřív jen z posledních vypsaných řádků, takže při rušném dni čísla neseděla.',
+            '<b>Manažer prodejny smí vystavovat faktury.</b> Vidí a upravuje doklady <b>své provozovny</b> (Účetnictví se mu do druhé prodejny nedostane), fakturu <b>nesmaže</b>, <b>dobropis nevystaví</b> (vrácení peněz zůstává vedení a účetní) a fakturační údaje firmy nemění. Doklady se proto nově evidují i s provozovnou — u stávajících se dopočítala ze zakázky nebo prodeje.',
+            'Bezpečnostní úklid při té příležitosti: odeslat si cizí fakturu na vlastní adresu už nejde (obsluha kasy smí poslat jen doklad ze svého dnešního prodeje) a zakázku druhé provozovny si přes fakturační formulář nikdo nenačte.',
+        ],
+    ],
+    [
         'version' => '3.69.1',
         'date' => '2026-08-27',
         'time' => '19:10',

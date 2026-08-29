@@ -15,6 +15,11 @@ if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
     http_response_code(401);
     echo json_encode(['ok' => false, 'error' => 'Nepřihlášeno']); exit;
 }
+// Kdo smí posílat: vystavovatelé faktur (vedení, manažer) a účetní kdykoli.
+// Obsluha kasy JEN doklad z vlastního čerstvého prodeje na své pobočce —
+// crmCanUsePos() je totiž prakticky „každý přihlášený", takže by jinak šlo
+// vytáhnout si na vlastní adresu libovolnou fakturu kteréhokoli klienta.
+$__mayInvoices = crmCanUseInvoices();
 
 $in = json_decode((string)file_get_contents('php://input'), true);
 if (!is_array($in) || !validateCsrfToken((string)($in['csrf_token'] ?? ''))) {
@@ -24,6 +29,37 @@ if (!is_array($in) || !validateCsrfToken((string)($in['csrf_token'] ?? ''))) {
 
 $invoiceId = (int)($in['invoice_id'] ?? 0);
 if ($invoiceId <= 0) { echo json_encode(['ok' => false, 'error' => 'Chybí faktura.']); exit; }
+
+afxEnsureInvoiceBranch();
+if ($__mayInvoices) {
+    // pobočkový manažer jen svou provozovnu (admin, Boss a účetní obě)
+    try {
+        $bq = $pdo->prepare("SELECT branch_id FROM invoices WHERE id = ?");
+        $bq->execute([$invoiceId]);
+        $brow = $bq->fetch(PDO::FETCH_ASSOC);
+        if ($brow !== false && !crmCanSeeInvoiceBranch($brow['branch_id'])) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Doklad patří jiné provozovně.'], JSON_UNESCAPED_UNICODE); exit;
+        }
+    } catch (Throwable $e) { /* chyba čtení nesmí zablokovat odeslání */ }
+} else {
+    $mine = false;
+    if (function_exists('crmCanUsePos') && crmCanUsePos()) {
+        try {
+            $q = $pdo->prepare("SELECT 1 FROM pos_sales
+                WHERE invoice_id = ? AND created_at >= NOW() - INTERVAL 1 DAY"
+                . orderBranchScopeSql('branch_id') . " LIMIT 1");
+            $q->execute([$invoiceId]);
+            $mine = (bool)$q->fetchColumn();
+        } catch (Throwable $e) { $mine = false; }
+    }
+    if (!$mine) {
+        http_response_code(403);
+        echo json_encode(['ok' => false,
+            'error' => 'Odeslat můžeš jen fakturu ze svého dnešního prodeje. Ostatní posílá vedení z Účetnictví.'],
+            JSON_UNESCAPED_UNICODE); exit;
+    }
+}
 
 $to = trim((string)($in['to'] ?? ''));
 if ($to !== '' && !filter_var($to, FILTER_VALIDATE_EMAIL)) {

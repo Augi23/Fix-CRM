@@ -3,8 +3,9 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
-// Účetnictví: vedení (crmCanManageInvoices) + role účetní (crmCanAccountingRead)
-if (!(crmCanManageInvoices() || (function_exists('crmCanAccountingRead') && crmCanAccountingRead()))) {
+// Faktury: vedení, POBOČKOVÝ MANAŽER (v3.70.0) a role účetní. Manažer vidí jen
+// tuhle záložku — Banka, Prodej a Podklady zůstávají na crmCanAccountingRead().
+if (!crmCanUseInvoices()) {
     echo '<div class="alert alert-danger">' . __('access_denied') . '</div>';
     require_once 'includes/footer.php';
     exit;
@@ -60,10 +61,22 @@ if (isset($_POST['save_acc_settings'])) {
 
 // Fetch Invoices with items
 afxEnsureInvoicePayments();
-$stmt = $pdo->query("SELECT i.*, c.first_name, c.last_name, c.company,
+afxEnsureInvoiceEmailColumns();
+afxEnsureInvoiceBranch();
+// Manažer je pobočková role → vidí jen doklady své provozovny. Admin, Boss
+// a účetní vidí obě (účetnictví se vede za firmu, ne za prodejnu).
+$stmt = $pdo->query("SELECT i.*, c.first_name, c.last_name, c.company, c.email AS cust_email,
     (SELECT GROUP_CONCAT(item_name SEPARATOR ', ') FROM invoice_items WHERE invoice_id = i.id) as item_names
-    FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id ORDER BY i.created_at DESC");
+    FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id
+    WHERE 1=1" . crmInvoiceBranchSql('i.branch_id') . " ORDER BY i.created_at DESC");
 $invoices = $stmt->fetchAll();
+
+// mazat doklady smí jen vedení (§11 zák. 563/1991 — doklad se stornuje, nemaže);
+// manažerovi ani účetní se tlačítko vůbec neukáže, ne aby na něj klikli a dostali chybu
+$__canDeleteInvoice = !function_exists('crmCanAccountingDelete') || crmCanAccountingDelete();
+// dobropis = vrácení peněz → stejná citlivost jako storno prodeje: vedení a účetní,
+// manažer ne (server to hlídá taky, tohle jen neukazuje tlačítko, které nefunguje)
+$__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingEdit();
 
 // Klienti se do stránky NEVYPISUJÍ: vyhledávají se přes api/search_customers.php
 // (select2 s AJAX). Dřív se sem vysypal celý seznam jako <option> — přes tisíc
@@ -87,9 +100,13 @@ $invoices = $stmt->fetchAll();
         <button class="btn btn-primary" onclick="showNewInvoiceModal()">
             <i class="fas fa-plus me-2"></i> <?php echo __('new_invoice'); ?>
         </button>
+        <?php /* Fakturační údaje firmy (vč. čísla účtu na fakturách) mění jen vedení —
+                 manažerovi ani účetní se ozubené kolo neukazuje, server to hlídá taky. */ ?>
+        <?php if (crmCanManageInvoices()): ?>
         <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#accSettingsModal">
             <i class="fas fa-cog"></i>
         </button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -134,6 +151,11 @@ $invoices = $stmt->fetchAll();
                                         <?php if($inv['order_id']): ?>
                                             <div class="small text-muted fw-normal"><i class="fas fa-link me-1"></i><?php echo __('order'); ?> #<?php echo $inv['order_id']; ?></div>
                                         <?php endif; ?>
+                                        <?php if (!empty($inv['emailed_at'])): ?>
+                                            <div class="small text-success fw-normal" title="<?php echo htmlspecialchars((string)$inv['emailed_to']); ?>">
+                                                <i class="fas fa-paper-plane me-1"></i><?php echo date('j. n. Y H:i', strtotime((string)$inv['emailed_at'])); ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td><?php echo date('d.m.Y', strtotime($inv['date_issue'])); ?></td>
                                     <td><?php echo htmlspecialchars(trim((string)($inv['cust_name_override'] ?: ($inv['company'] ?: trim($inv['first_name'] . ' ' . $inv['last_name'])))) ?: '—'); ?></td>
@@ -144,11 +166,16 @@ $invoices = $stmt->fetchAll();
                                         <div class="btn-group btn-group-sm">
                                             <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" title="<?php echo __('preview'); ?>"><i class="fas fa-eye"></i></button>
                                             <button class="btn btn-outline-primary" onclick="editInvoice(<?php echo $inv['id']; ?>)" title="<?php echo __('edit'); ?>"><i class="fas fa-edit"></i></button>
+                                            <?php if ($__canCreditNote): ?>
                                             <button class="btn btn-outline-warning" onclick="createCreditNote(<?php echo $inv['id']; ?>)" title="<?php echo __('credit_note'); ?>"><i class="fas fa-undo"></i></button>
+                                            <?php endif; ?>
                                             <button class="btn btn-outline-info" onclick="exportPohoda(<?php echo $inv['id']; ?>)" title="Pohoda"><i class="fas fa-file-export"></i></button>
                                             <button class="btn btn-outline-secondary" onclick="exportS3(<?php echo $inv['id']; ?>)" title="S3 Money"><i class="fas fa-file-csv"></i></button>
                                             <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('print'); ?> <?php echo __('invoice'); ?>')"><i class="fas fa-print"></i></button>
+                                            <button class="btn btn-outline-success" onclick="emailInvoice(<?php echo $inv['id']; ?>, <?php echo htmlspecialchars(json_encode(trim((string)($inv['cust_email_override'] ?: ($inv['cust_email'] ?? ''))), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)$inv['invoice_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)" title="Odeslat e-mailem"><i class="fas fa-paper-plane"></i></button>
+                                            <?php if ($__canDeleteInvoice): ?>
                                             <button class="btn btn-outline-danger" onclick="deleteInvoice(<?php echo $inv['id']; ?>)"><i class="fas fa-trash"></i></button>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
@@ -161,7 +188,8 @@ $invoices = $stmt->fetchAll();
             
             <div class="tab-pane fade" id="stats-pane">
                 <?php
-                $stats = $pdo->query("SELECT status, COUNT(*) as count, SUM(total_amount) as total FROM invoices GROUP BY status")->fetchAll();
+                $stats = $pdo->query("SELECT status, COUNT(*) as count, SUM(total_amount) as total FROM invoices i
+                    WHERE 1=1" . crmInvoiceBranchSql('i.branch_id') . " GROUP BY status")->fetchAll();
                 ?>
                 <div class="row g-4">
                     <?php foreach ($stats as $s): ?>
@@ -228,6 +256,10 @@ $invoices = $stmt->fetchAll();
                             <div class="col-md-12">
                                 <label class="form-label"><?php echo __('address_override'); ?></label>
                                 <textarea name="cust_address" id="inv_cust_address" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">E-mail odběratele</label>
+                                <input type="email" name="cust_email" id="inv_cust_email" class="form-control" placeholder="kam poslat fakturu">
                             </div>
                             <div class="col-md-12">
                                 <div class="form-text mb-0">
@@ -607,13 +639,65 @@ document.addEventListener('DOMContentLoaded', function() {
             body: formData
         }).then(r => r.json()).then(data => {
             if (data.success) {
-                location.reload();
+                // hotovou fakturu je nejčastěji potřeba rovnou poslat klientovi —
+                // ať se kvůli tomu nemusí hledat řádek v seznamu
+                // adresu vrací server: ruční e-mail odběratele, jinak e-mail z karty klienta
+                var mailTo = (data.email || document.getElementById('inv_cust_email').value || '').trim();
+                var cislo = (document.getElementById('inv_number').value || '').trim();
+                if (data.id) {
+                    var odesilam = false;
+                    if (invModal) { invModal.hide(); }   // ať se nekupí dvě okna na sobě
+                    showConfirm('Faktura ' + cislo + ' je uložená. Odeslat ji rovnou e-mailem?',
+                        function () { odesilam = true; emailInvoice(data.id, mailTo, cislo, true); },
+                        'Uloženo');
+                    // odmítnuté odeslání (Zrušit, křížek, Esc) → jen překreslit seznam,
+                    // ať je nová faktura hned vidět
+                    var confirmEl = document.getElementById('globalConfirmModal');
+                    if (confirmEl) {
+                        confirmEl.addEventListener('hidden.bs.modal', function () {
+                            if (!odesilam) { location.reload(); }
+                        }, { once: true });
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    location.reload();
+                }
             } else {
                 showAlert(data.error);
             }
         });
     });
 });
+
+/** Odeslání faktury e-mailem (v3.70.0). Adresa se předvyplní z dokladu nebo
+ *  z karty klienta a obsluha ji smí přepsat — u faktury bez klienta v CRM je
+ *  ruční adresa jediná cesta, jak se doklad k odběrateli dostane. */
+function emailInvoice(id, defaultTo, number, reloadOnCancel) {
+    var konec = function () { if (reloadOnCancel) { location.reload(); } };
+    var to = window.prompt('Kam odeslat fakturu ' + (number || ('#' + id)) + '?', defaultTo || '');
+    if (to === null) { konec(); return; }
+    to = to.trim();
+    if (to === '') { showAlert('Bez e-mailové adresy fakturu odeslat nejde.'); konec(); return; }
+    fetch('api/invoice_email.php', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>', invoice_id: id, to: to })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+        if (j.ok) {
+            var bezpecne = String(j.to || '').replace(/[<>&"]/g, '');
+            showAlert('Faktura odeslána na <b>' + bezpecne + '</b>.');
+            setTimeout(function () { location.reload(); }, 1500);
+        } else {
+            // některé stráže vracejí {success:false,message:…} místo {ok,error}
+            showAlert(j.error || j.message || 'Odeslání se nepovedlo.');
+            konec();
+        }
+    })
+    .catch(function () { showAlert('Síťová chyba — e-mail neodešel.'); konec(); });
+}
 
 /** Jméno klienta do políčka. Zástupné pomlčky („-", „–") se v CRM používají
  *  místo prázdné hodnoty — stejně je zahazuje i api/search_customers.php,
@@ -652,7 +736,7 @@ function showNewInvoiceModal() {
     document.getElementById('invoiceForm').reset();
     // form.reset() select2 nepřekreslí — v novém dokladu by svítil předchozí klient
     setInvoiceCustomer(0, '');
-    ['inv_cust_name', 'inv_cust_ico', 'inv_cust_dic', 'inv_cust_address'].forEach(function (id) {
+    ['inv_cust_name', 'inv_cust_ico', 'inv_cust_dic', 'inv_cust_address', 'inv_cust_email'].forEach(function (id) {
         var el = document.getElementById(id); if (el) el.value = '';
     });
     document.getElementById('customer_override_fields').style.display = 'none';
@@ -757,9 +841,10 @@ function editInvoice(id) {
             document.getElementById('inv_cust_ico').value = data.cust_ico_override || '';
             document.getElementById('inv_cust_dic').value = data.cust_dic_override || '';
             document.getElementById('inv_cust_address').value = data.cust_address_override || '';
+            document.getElementById('inv_cust_email').value = data.cust_email_override || '';
             document.getElementById('inv_notes').value = data.notes || '';
             
-            if (data.cust_name_override || data.cust_ico_override || data.cust_address_override) {
+            if (data.cust_name_override || data.cust_ico_override || data.cust_address_override || data.cust_email_override) {
                 document.getElementById('customer_override_fields').style.display = 'flex';
             } else {
                 document.getElementById('customer_override_fields').style.display = 'none';

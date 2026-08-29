@@ -502,6 +502,25 @@ function crmCanManageInvoices(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 
+/** Kdo smí VYSTAVOVAT a odesílat faktury: vedení (admin, Boss) a nově i
+ *  POBOČKOVÝ MANAŽER (v3.70.0 — manažer fakturuje zákazníkům na své prodejně).
+ *  Není to totéž co crmCanManageInvoices(): ta hlídá i doklady totožnosti,
+ *  storna kasy a počáteční zůstatek — tam manažer nepatří.
+ *  Účetní sem NEspadá (má vlastní cestu přes crmCanAccountingEdit), aby se
+ *  nerozbilo pravidlo „účetní nemaže a nesahá na provoz". */
+function crmCanIssueInvoices(): bool {
+    if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) { return false; }
+    if (function_exists('crmIsAccountant') && crmIsAccountant()) { return false; }
+    return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['boss', 'manager'], true);
+}
+
+/** Kdo se vůbec dostane k fakturám (výpis, vystavení, úprava, tisk, odeslání):
+ *  vedení + manažer + role účetní. MAZÁNÍ zůstává crmCanAccountingDelete(). */
+function crmCanUseInvoices(): bool {
+    return crmCanIssueInvoices()
+        || (function_exists('crmCanAccountingEdit') && crmCanAccountingEdit());
+}
+
 /** Plná správa katalogů dodavatelů v Nákupech/Skladu (import, přidání dodavatele)
  *  smí administrátor a Boss (rozšířeno 17.7.2026 — Boss má neomezená práva na
  *  Nákupy a Sklad: katalogy, produkty, objednávky). Zbytek sekce mu pokrývají
@@ -2988,6 +3007,93 @@ function afxEnsureInvoiceAdhocBuyer(): void {
 }
 
 /**
+ * POBOČKA FAKTURY (v3.70.0). Manažer je pobočková role — bez tohohle sloupce by
+ * v Účetnictví viděl i doklady druhé prodejny. Sloupec se doplní za běhu a
+ * JEDNOU se dopočítá ze zakázky nebo z prodeje na kase, ke kterému faktura patří.
+ */
+function afxEnsureInvoiceBranch(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) { return; }
+    if ($pdo->inTransaction()) { return; }   // DDL v transakci = implicitní COMMIT
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM invoices LIKE 'branch_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE invoices ADD COLUMN branch_id INT NULL DEFAULT NULL, ADD KEY idx_invoices_branch (branch_id)");
+        }
+    } catch (Throwable $e) { error_log('afxEnsureInvoiceBranch: ' . $e->getMessage()); return; }
+    // jednorázový dopočet u dokladů, které vznikly před touto verzí
+    if ((string)get_setting('invoices_branch_backfilled', '') === '1') { return; }
+    try {
+        $pdo->exec("UPDATE invoices i JOIN orders o ON o.id = i.order_id
+                    SET i.branch_id = o.branch_id
+                    WHERE i.branch_id IS NULL AND o.branch_id IS NOT NULL");
+        $pdo->exec("UPDATE invoices i JOIN pos_sales s ON s.invoice_id = i.id
+                    SET i.branch_id = s.branch_id
+                    WHERE i.branch_id IS NULL AND s.branch_id IS NOT NULL");
+        set_setting('invoices_branch_backfilled', '1');
+    } catch (Throwable $e) { error_log('afxEnsureInvoiceBranch/backfill: ' . $e->getMessage()); }
+}
+
+/** Pobočka, na kterou se přihlášený smí u faktur dívat: 0 = bez omezení.
+ *  Účetnictví se vede za firmu, takže admin, Boss i účetní vidí obě prodejny;
+ *  POBOČKOVÝ MANAŽER jen svou (jediné pravidlo viditelnosti, isBranchGlobalViewer). */
+function crmInvoiceBranchScope(): int {
+    if (isBranchGlobalViewer()) { return 0; }
+    if (function_exists('crmIsAccountant') && crmIsAccountant()) { return 0; }
+    return (int)getCurrentStaffBranchId();
+}
+
+/** Doplněk do WHERE pro výpis faktur (prázdný, když se nemá omezovat). */
+function crmInvoiceBranchSql(string $col = 'i.branch_id'): string {
+    $b = crmInvoiceBranchScope();
+    return $b > 0 ? ' AND ' . $col . ' = ' . $b : '';
+}
+
+/** Smí přihlášený vidět KONKRÉTNÍ doklad? (řádková obdoba crmInvoiceBranchSql) */
+function crmCanSeeInvoiceBranch($branchId): bool {
+    $scope = crmInvoiceBranchScope();
+    return $scope <= 0 || (int)$branchId === $scope;
+}
+
+/** Pobočka pro NOVOU fakturu: podle zakázky, jinak podle přihlášeného. */
+function crmInvoiceBranchForNew($orderId = null): ?int {
+    global $pdo;
+    $orderId = (int)$orderId;
+    if ($orderId > 0) {
+        try {
+            $st = $pdo->prepare("SELECT branch_id FROM orders WHERE id = ?");
+            $st->execute([$orderId]);
+            $b = (int)$st->fetchColumn();
+            if ($b > 0) { return $b; }
+        } catch (Throwable $e) { /* fallback níž */ }
+    }
+    $own = (int)getCurrentStaffBranchId();
+    return $own > 0 ? $own : null;
+}
+
+/**
+ * Evidence odeslání faktury e-mailem: kdy a kam odešla naposledy.
+ * Bez toho nikdo nepozná, jestli klient fakturu dostal — a odesílalo by se
+ * podruhé „pro jistotu". Idempotentní runtime pojistka (migrace 053).
+ */
+function afxEnsureInvoiceEmailColumns(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) { return; }
+    if ($pdo->inTransaction()) { return; }   // DDL v transakci = implicitní COMMIT
+    $done = true;
+    foreach (['emailed_at' => 'emailed_at DATETIME NULL DEFAULT NULL',
+              'emailed_to' => 'emailed_to VARCHAR(190) NULL DEFAULT NULL'] as $name => $ddl) {
+        try {
+            if (!$pdo->query("SHOW COLUMNS FROM invoices LIKE " . $pdo->quote($name))->fetch()) {
+                $pdo->exec("ALTER TABLE invoices ADD COLUMN " . $ddl);
+            }
+        } catch (Throwable $e) { error_log('afxEnsureInvoiceEmailColumns: ' . $e->getMessage()); }
+    }
+}
+
+/**
  * Očištění ručně zadaného odběratele faktury (kasa i jinde).
  * Vrací ['name','address','ico','dic','email','error'] — chybová hláška je
  * neprázdná, když vstup nedává smysl; volající prodej odmítne.
@@ -3105,15 +3211,24 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
         try { $hasEmailCol = (bool)$pdo->query("SHOW COLUMNS FROM invoices LIKE 'cust_email_override'")->fetch(); }
         catch (Throwable $e) { $hasEmailCol = false; }
     }
+    // POZOR: prodej běží v transakci, takže afxEnsureInvoiceBranch() se tu přeskočí
+    // (DDL v transakci = implicitní COMMIT). Sloupec se proto do INSERTu přidá jen
+    // tehdy, když v databázi opravdu je — jinak by prodej na kase spadl.
+    static $hasBranchCol = null;
+    if ($hasBranchCol === null) {
+        try { $hasBranchCol = (bool)$pdo->query("SHOW COLUMNS FROM invoices LIKE 'branch_id'")->fetch(); }
+        catch (Throwable $e) { $hasBranchCol = false; }
+    }
     $ovCols = $bName !== ''
         ? ', cust_name_override, cust_address_override, cust_ico_override, cust_dic_override' . ($hasEmailCol ? ', cust_email_override' : '')
         : '';
     $ovVals = $bName !== '' ? ', ?, ?, ?, ?' . ($hasEmailCol ? ', ?' : '') : '';
     $ins = $pdo->prepare("INSERT INTO invoices
             (invoice_number, variable_symbol, customer_id, order_id, date_issue, date_tax, date_due,
-             total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes, supplier" . $ovCols . ")
+             total_amount, vat_amount, is_vat_payer, status, payment_method, payment_date, currency, notes, supplier"
+             . ($hasBranchCol ? ', branch_id' : '') . $ovCols . ")
         VALUES (?, ?, ?, ?, CURDATE(), CURDATE(), DATE_ADD(CURDATE(), INTERVAL 2 DAY),
-                ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?, ?" . $ovVals . ")");
+                ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?, ?" . ($hasBranchCol ? ', ?' : '') . $ovVals . ")");
     $invoiceId = 0;
     // Číslo z MAXIMA řady pod zámkem (stejný vzor jako pokladní doklady):
     // GET_LOCK proti souběhu dvou kas, UNIQUE klíč + opakování jako pojistka,
@@ -3130,6 +3245,7 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
             try {
                 $par = [$number, preg_replace('/\D/', '', $number) ?: null, $customerId > 0 ? $customerId : null, $orderId,
                     round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes, $supplier];
+                if ($hasBranchCol) { $par[] = crmInvoiceBranchForNew($orderId); }
                 if ($bName !== '') {
                     // POZOR: prázdné pole ukládat jako NULL, ne ''. Tisk i export
                     // vyhodnocují `override ?: karta klienta` — prázdný řetězec je
@@ -5894,6 +6010,7 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array 
     global $pdo;
     afxEnsureInvoiceSupplierColumn();
     $st = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, c.email AS cust_email,
+                                c.preferred_language,
                                 o.device_brand, o.device_model, o.serial_number
                          FROM invoices i
                          LEFT JOIN customers c ON i.customer_id = c.id
@@ -5902,6 +6019,10 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array 
     $st->execute([$invoiceId]);
     $invoice = $st->fetch();
     if (!$invoice) { return [false, 'Faktura nenalezena', '']; }
+    // rozpracovaný ani stornovaný doklad klientovi neodchází
+    if (!in_array((string)$invoice['status'], ['issued', 'paid', 'overdue'], true)) {
+        return [false, 'Odeslat jde jen vystavená faktura (tahle je ' . (string)$invoice['status'] . ').', ''];
+    }
 
     // pořadí: ruční adresa z UI → e-mail jednorázového odběratele → karta klienta
     // (faktura bez klienta v CRM má adresu jen v cust_email_override)
@@ -5918,6 +6039,11 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array 
     $is_vat_payer = $invoice['is_vat_payer'];
 
     if (!defined('INVOICE_DOC_EMBED')) { define('INVOICE_DOC_EMBED', true); }
+    // doklad se posílá v JAZYCE KLIENTA — _l() v print_invoice.php čte $target_lang
+    // přes global, takže lokální proměnná uvnitř funkce by mu byla k ničemu
+    // a mail by odešel v jazyce toho, kdo zrovna klikl.
+    global $target_lang;
+    $target_lang = crmCustomerDocLang((string)($invoice['preferred_language'] ?? 'cs'));
     ob_start();
     include __DIR__ . '/../print_invoice.php';
     $html = ob_get_clean();
@@ -5956,6 +6082,12 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array 
     $subject = $supName . ' — Faktura ' . (string)$invoice['invoice_number'];
     [$ok, $msg] = smtpSendMail($to, $subject, $html);
     if ($ok) {
+        // ať je v seznamu faktur vidět, že klient doklad dostal (a kam)
+        try {
+            afxEnsureInvoiceEmailColumns();
+            $pdo->prepare("UPDATE invoices SET emailed_at = NOW(), emailed_to = ? WHERE id = ?")
+                ->execute([mb_substr($to, 0, 190), $invoiceId]);
+        } catch (Throwable $e) { error_log('crmSendInvoiceEmail/stamp: ' . $e->getMessage()); }
         crmAuditLog('invoice.email', [
             'entity_type' => 'invoice', 'entity_id' => $invoiceId, 'entity_label' => (string)$invoice['invoice_number'],
             'summary' => 'Faktura ' . $invoice['invoice_number'] . ' odeslána e-mailem na ' . $to,

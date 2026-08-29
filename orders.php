@@ -553,8 +553,8 @@ $__techs     = getActiveTechnicians(true);
                                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> #<?php echo $order['id']; ?>')"><i class="fas fa-tools me-2 text-warning"></i> <?php echo __('work_order'); ?></a></li>
                                         </ul>
                                     </div>
-                                    <?php /* Účtování: admin a Boss; mazání zůstává jen adminovi */ ?>
-                                    <?php if (crmCanManageInvoices()): ?>
+                                    <?php /* Účtování: admin, Boss a pobočkový manažer (v3.70.0); mazání zůstává jen adminovi */ ?>
+                                    <?php if (crmCanUseInvoices()): ?>
                                     <button type="button" class="btn btn-outline-secondary accounting-btn" data-id="<?php echo $order['id']; ?>" title="<?php echo __('accounting'); ?>">
                                         <i class="fas fa-file-invoice-dollar text-success"></i>
                                     </button>

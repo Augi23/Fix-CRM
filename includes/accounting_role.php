@@ -179,6 +179,7 @@ function afxAccountantApiGate(): void {
         'reauth.php',                             // obnova přihlášení (globální poller)
         'guide_viewed.php',                       // návody: značka přečtení
         'get_invoice_data.php', 'get_invoice_details.php',   // detail faktury (čtení)
+        'invoice_email.php',                      // odeslání faktury klientovi (v3.70.0)
         'tech_popups.php',                        // footer poller (vrátí prázdno; bez
                                                   // něj by log šuměl 403 každých 20 s)
     ];

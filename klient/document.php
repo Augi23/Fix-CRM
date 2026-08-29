@@ -43,6 +43,35 @@ if ($type === 'complaint') {
     exit;
 }
 
+/* ------- faktura podle ID (i bez vazby na zakázku) -------
+   Prodej z kasy ani doplňková faktura zakázku nemají — klient by se k dokladu
+   jinak nedostal. Vydá se JEN doklad, který patří přihlášenému zákazníkovi;
+   rozpracovaná (draft) a stornovaná faktura se nevydává vůbec. */
+if ($type === 'invoice' && (int)($_GET['invoice'] ?? 0) > 0) {
+    $invId = (int)$_GET['invoice'];
+    $stmt = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic,
+                                  c.preferred_language,
+                                  o.device_brand, o.device_model, o.serial_number
+                           FROM invoices i
+                           JOIN customers c ON i.customer_id = c.id
+                           LEFT JOIN orders o ON i.order_id = o.id
+                           WHERE i.id = ? AND i.customer_id = ?
+                             AND i.status IN ('issued','paid','overdue')
+                             AND COALESCE(i.invoice_type, 'invoice') IN ('invoice','credit_note')
+                           LIMIT 1");
+    $stmt->execute([$invId, $customerId]);
+    $invoice = $stmt->fetch();
+    if (!$invoice) clientDocDeny();
+
+    $stmt = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC");
+    $stmt->execute([$invId]);
+    $items = $stmt->fetchAll();
+    $is_vat_payer = $invoice['is_vat_payer'];
+    define('INVOICE_DOC_EMBED', true);
+    include __DIR__ . '/../print_invoice.php';
+    exit;
+}
+
 /* ------- vše ostatní je vázané na zakázku vlastníka ------- */
 if ($orderId <= 0) clientDocDeny();
 
