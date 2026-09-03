@@ -22,6 +22,7 @@ $kTo = trim((string)($_GET['to'] ?? ''));
 $kPay = trim((string)($_GET['pay'] ?? ''));
 if ($activeTab === 'kasa') {
     ensurePosTables();
+    ensurePosSaleCancelReason();   // důvod storna se vypisuje u stornovaných prodejů
     $kPage = max(1, (int)($_GET['p'] ?? 1));
     $kPer = 60;
     $kw = []; $kp = [];
@@ -220,7 +221,18 @@ require_once 'includes/header.php';
             <tr<?php echo $cn ? ' class="opacity-50"' : ''; ?>>
                 <td>
                     <a href="print_receipt.php?id=<?php echo (int)$s['id']; ?>" target="_blank" class="text-info text-decoration-none"><code><?php echo htmlspecialchars($s['sale_number']); ?></code></a>
-                    <?php if ($cn): ?><div><span class="badge bg-danger">Storno</span></div><?php endif; ?>
+                    <?php if ($cn): ?>
+                        <div><span class="badge bg-danger">Storno</span></div>
+                        <?php /* Kdo, kdy a proč — u opravy účetního záznamu to musí být dohledatelné
+                                 (§ 35 odst. 3 zák. č. 563/1991 Sb.), ne jen barevný štítek. */ ?>
+                        <div class="small text-danger" style="opacity:.85;">
+                            <?php echo !empty($s['cancelled_at']) ? htmlspecialchars(date('d.m.Y H:i', strtotime((string)$s['cancelled_at']))) : ''; ?>
+                            <?php if (trim((string)($s['cancelled_by'] ?? '')) !== ''): ?> · <?php echo htmlspecialchars((string)$s['cancelled_by']); ?><?php endif; ?>
+                        </div>
+                        <?php if (trim((string)($s['cancel_reason'] ?? '')) !== ''): ?>
+                            <div class="small text-white-50">důvod: <?php echo htmlspecialchars((string)$s['cancel_reason']); ?></div>
+                        <?php endif; ?>
+                    <?php endif; ?>
                 </td>
                 <td class="small" style="white-space:nowrap;"><?php echo date('d.m.Y H:i', strtotime((string)$s['created_at'])); ?></td>
                 <td class="small"><?php echo htmlspecialchars(mb_substr((string)($s['items_txt'] ?? ''), 0, 90)); ?><?php echo mb_strlen((string)($s['items_txt'] ?? '')) > 90 ? '…' : ''; ?></td>
@@ -271,8 +283,14 @@ require_once 'includes/header.php';
 <script>
 $(document).on('click', '.kasa-cancel-btn', function () {
     var id = this.dataset.id, num = this.dataset.num;
+    // Důvod je povinný — opravný účetní záznam musí být srozumitelný (§ 35 zák.
+    // č. 563/1991 Sb.) a u opravného daňového dokladu je důvod přímo náležitostí.
+    var reason = prompt('Storno prodeje ' + num + '\n\nZboží se vrátí na sklad, případná faktura se zruší a hotovost se vydá zpět (zapíše se do pokladní knihy k dnešnímu dni).\n\nNapiš důvod storna (povinné, uvede se na dokladu):');
+    if (reason === null) { return; }
+    reason = reason.trim();
+    if (reason.length < 3) { showAlert('Bez důvodu storno provést nejde — napiš aspoň pár slov.'); return; }
     showConfirm('Stornovat prodej ' + num + '? Zboží se vrátí na sklad CRM a případná faktura se zruší. (Pokud byl kus mezitím vyřazen i v naskladňovací appce, vrať ho tam — jinak ho příští import zase odepíše.)', function () {
-        $.post('api/pos_cancel.php', { id: id, csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>' }, function (res) {
+        $.post('api/pos_cancel.php', { id: id, reason: reason, csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>' }, function (res) {
             if (res.success) { location.reload(); }
             else { showAlert('Chyba: ' + String(res.message || '').replace(/</g, '&lt;')); }
         }).fail(function (xhr) {

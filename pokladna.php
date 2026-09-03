@@ -450,8 +450,12 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
                     </td>
                     <td class="small">
                         <?php if (!empty($r['is_storno'])): ?><span class="badge bg-secondary me-1">STORNO</span><?php endif; ?>
+                        <?php if (!empty($r['sale_cancelled'])): ?><span class="badge bg-danger bg-opacity-25 text-danger me-1" title="Prodej byl stornovaný — vratka je zapsaná v den storna">stornováno</span><?php endif; ?>
                         <?php echo e((string)$r['title']); ?>
-                        <?php if (trim((string)$r['detail']) !== ''): ?><span class="text-white-50"> · <?php echo e(mb_substr(trim((string)$r['detail']), 0, 90)); ?></span><?php endif; ?>
+                        <?php if (trim((string)$r['detail']) !== ''): ?><span class="text-white-50" title="<?php echo e(trim((string)$r['detail'])); ?>"> · <?php echo e(mb_substr(trim((string)$r['detail']), 0, 90)); ?><?php echo mb_strlen(trim((string)$r['detail'])) > 90 ? '…' : ''; ?></span><?php endif; ?>
+                        <?php if (trim((string)($r['storno_note'] ?? '')) !== ''): ?>
+                            <div class="small text-danger mt-1" style="opacity:.85;"><?php echo e((string)$r['storno_note']); ?></div>
+                        <?php endif; ?>
                     </td>
                     <td class="text-end small text-success"><?php echo $r['dir'] === 'in' ? formatMoney((float)$r['amount']) : ''; ?></td>
                     <td class="text-end small text-warning"><?php echo $r['dir'] === 'out' ? '−' . formatMoney((float)$r['amount']) : ''; ?></td>
@@ -462,6 +466,17 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
                         <?php if (crmCanUsePos() && $r['source'] === 'pos_sale' && empty($r['is_storno'])): ?>
                         <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 me-1" title="Dotisknout účtenku"
                                 onclick="window.posReprintReceipt ? window.posReprintReceipt(<?php echo (int)$r['ref_id']; ?>) : window.open('print_receipt.php?id=<?php echo (int)$r['ref_id']; ?>&format=58&auto=1', '_blank')"><i class="fas fa-receipt"></i></button>
+                        <?php endif; ?>
+                        <?php /* Storno prodeje rovnou z knihy (dřív jen z Historie). Prodejka se
+                                 nemaže — označí se jako stornovaná, zboží se vrátí na sklad a k dnešku
+                                 vznikne výdajový pohyb + VPD, takže uzavřené dny knihy zůstávají beze
+                                 změny (opravný záznam dle § 35 zák. č. 563/1991 Sb.). Smí jen vedení. */ ?>
+                        <?php /* Stejné dvě branky jako server (api/pos_cancel.php): kasa + právo storna.
+                                 Účetní knihu vidí, ale storno mu nepatří (crmCanUsePos() ho nepustí). */ ?>
+                        <?php if ($r['source'] === 'pos_sale' && empty($r['sale_cancelled'])
+                                  && crmCanUsePos() && crmCanCancelPosSale()): ?>
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Stornovat prodej — vrátí zboží na sklad a vydá hotovost zpět"
+                                onclick="posSaleStorno(<?php echo (int)$r['ref_id']; ?>, <?php echo htmlspecialchars(json_encode((string)($r['sale_number'] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode(formatMoney((float)$r['amount']), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo $r['dir'] === 'out' ? 'true' : 'false'; ?>)">Storno</button>
                         <?php endif; ?>
                         <?php if ($cbCanEdit): ?>
                         <?php
@@ -572,6 +587,57 @@ function posOpeningBalance() {
 }
 
 /* Storno pokladního dokladu — doklad se nikdy nemaže, vystaví se protidoklad. */
+/**
+ * Storno PRODEJE z pokladní knihy (api/pos_cancel.php).
+ *
+ * Na rozdíl od storna papírového dokladu tohle vrací i zboží na sklad a peníze
+ * z kasy. Prodejka se nemaže — dostane příznak „stornováno" (kdo, kdy, proč)
+ * a k dnešnímu dni vznikne výdajový pohyb + výdajový pokladní doklad, takže
+ * už uzavřené dny knihy zůstávají beze změny (§ 35 zák. č. 563/1991 Sb.).
+ */
+function posSaleStorno(saleId, saleNumber, amountLabel, isPayout) {
+    var co = isPayout
+        ? 'Vrácená výplata se zapíše jako PŘÍJEM do pokladny (' + amountLabel + ') a výkupní list půjde vyplatit znovu.'
+        : 'Z pokladny se vydá ' + amountLabel + ' zpět zákazníkovi a zboží se vrátí na sklad.';
+    var reason = prompt(
+        'STORNO PRODEJE ' + saleNumber + ' — ' + amountLabel + '\n\n'
+        + co + '\n'
+        + 'Vystaví se pokladní doklad k dnešnímu dni; původní prodejka zůstává v knize (nemaže se).\n\n'
+        + 'Napiš důvod storna (povinné, uvede se na dokladu):'
+    );
+    if (reason === null) { return; }
+    reason = reason.trim();
+    if (reason.length < 3) { alert('Bez důvodu storno provést nejde — napiš aspoň pár slov.'); return; }
+
+    var fd = new FormData();
+    fd.append('id', saleId);
+    fd.append('reason', reason);
+    fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+    fetch('api/pos_cancel.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+            if (!j.success) { alert(j.message || 'Storno se nepodařilo'); return; }
+            // Hláška se skládá z toho, co se OPRAVDU stalo — u výplaty výkupu se
+            // žádné zboží nevrací a chybějící díl se vrátit nedá.
+            var t = ['Prodej ' + saleNumber + ' stornován.'];
+            if (j.cash_returned) {
+                t.push(j.cash_dir === 'out'
+                    ? 'Vydej zákazníkovi ' + j.cash_returned + ' — zapsáno do pokladní knihy k dnešku.'
+                    : 'Přijato zpět do pokladny: ' + j.cash_returned + '.');
+            }
+            if (j.storno_doc) { t.push('Pokladní doklad: ' + j.storno_doc); }
+            if (j.returned_count > 0) { t.push('Na sklad vráceno kusů: ' + j.returned_count + '.'); }
+            if (j.missing_parts && j.missing_parts.length) {
+                t.push('POZOR — tyhle díly už ve skladu nejsou a nevrátily se: ' + j.missing_parts.join(', ') + '.');
+            }
+            if (j.invoice_cancelled) { t.push('Navázaná faktura byla zrušena.'); }
+            if (j.eshop_back) { t.push('Objednávka z e-shopu ' + j.eshop_back + ' je zase rezervovaná.'); }
+            alert(t.join('\n'));
+            location.reload();
+        })
+        .catch(function () { alert('Chyba spojení — storno se nemuselo provést, zkontroluj knihu.'); });
+}
+
 function posCashDocStorno(docId, docNumber) {
     var reason = prompt('Storno dokladu ' + docNumber + ' — důvod (zapíše se na storno doklad):');
     if (reason === null) { return; }

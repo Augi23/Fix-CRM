@@ -408,6 +408,18 @@ function afxCashDocStorno(int $docId, string $reason = '', string $by = ''): arr
             $pdo->rollBack();
             return ['ok' => false, 'error' => 'Doklad patří k prodeji na kase — použij storno prodeje, to vrátí i zboží na sklad.'];
         }
+        // VPD vystavený ke STORNU prodeje taky ne: opačným pohybem by se hotovost
+        // vrátila do zůstatku, ale prodejka by zůstala stornovaná a zboží na skladě
+        // — kniha by pak tvrdila, že peníze jsou v zásuvce, ačkoli je zákazník dostal.
+        if ($refType === 'cash_movement' && (int)($doc['ref_id'] ?? 0) > 0) {
+            $mv = $pdo->prepare("SELECT purpose, ref_type, ref_id FROM pos_cash_movements WHERE id = ?");
+            $mv->execute([(int)$doc['ref_id']]);
+            $mvRow = $mv->fetch(PDO::FETCH_ASSOC);
+            if ($mvRow && (string)$mvRow['purpose'] === 'storno' && (string)$mvRow['ref_type'] === 'pos_sale') {
+                $pdo->rollBack();
+                return ['ok' => false, 'error' => 'Tenhle doklad je vratka ke stornu prodeje — stornovat zpět ho nelze. Když má prodej zase platit, založ ho v kase znovu.'];
+            }
+        }
 
         // U dokladu navázaného na pohyb vrací peníze OPAČNÝ pohyb v deníku.
         $moveId = 0;
@@ -576,13 +588,15 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
     global $pdo;
     afxEnsureCashBookTables();
     ensurePosCashMovementsTable();   // EXISTS v dotazu na prodeje ji potřebuje vždy
+    $hasCancelReason = ensurePosSaleCancelReason();   // důvod storna (u starších DB nemusí být)
     $rows = [];
     $linked = "'" . implode("','", afxCashLinkedRefTypes()) . "'";
     try {
         // Stejná pravidla jako v afxCashSums: stornovaný prodej s kompenzačním
         // pohybem v knize zůstává (příjem v den prodeje, výdej v den storna);
         // rozsah přes created_at bez funkce kvůli indexům.
-        $st = $pdo->prepare("SELECT s.id, s.sale_number, s.order_id, s.total, s.seller_name, s.created_at, s.status FROM pos_sales s
+        $st = $pdo->prepare("SELECT s.id, s.sale_number, s.order_id, s.total, s.seller_name, s.created_at, s.status,
+                   s.cancelled_at, s.cancelled_by, " . ($hasCancelReason ? "s.cancel_reason" : "NULL AS cancel_reason") . " FROM pos_sales s
             WHERE s.payment_method = 'cash'
               AND (s.status = 'completed' OR (s.status = 'cancelled' AND EXISTS (
                     SELECT 1 FROM pos_cash_movements m
@@ -604,11 +618,23 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
                 'amount' => $isPayout ? abs((float)$r['total']) : (float)$r['total'],
                 'title' => $isPayout ? 'Výplata z kasy (prodejka)'
                     : ((int)($r['order_id'] ?? 0) > 0 ? 'Úhrada zakázky' : 'Prodej na kase'),
-                'detail' => (string)$r['sale_number'] . ($cancelled ? ' · stornováno (' . ($isPayout ? 'vratka' : 'výdej') . ' v den storna)' : ''),
+                'detail' => (string)$r['sale_number'],
+                // Storno se vypisuje na samostatný řádek pod popisem — v useknutém
+                // detailu ani v tooltipu by ho obsluha na tabletu nikdy nepřečetla.
+                'storno_note' => $cancelled
+                    ? 'STORNOVÁNO ' . (!empty($r['cancelled_at']) ? date('j. n. Y H:i', strtotime((string)$r['cancelled_at'])) : '')
+                      . (trim((string)($r['cancelled_by'] ?? '')) !== '' ? ' · ' . (string)$r['cancelled_by'] : '')
+                      . (trim((string)($r['cancel_reason'] ?? '')) !== '' ? ' · důvod: ' . (string)$r['cancel_reason'] : '')
+                      . ' · ' . ($isPayout ? 'vratka' : 'výdej hotovosti') . ' zapsán v den storna'
+                    : '',
                 'source' => 'pos_sale', 'ref_id' => (int)$r['id'],
                 'by' => (string)$r['seller_name'], 'doc_number' => '', 'doc_id' => 0,
                 'storno' => false, 'is_storno' => false, 'doc_storno' => false,
                 'doc_is_storno' => false, 'counts' => true,
+                // příznak pro pokladní knihu: u nestornovaného prodeje smí vedení
+                // nabídnout storno rovnou z knihy (api/pos_cancel.php)
+                'sale_cancelled' => $cancelled,
+                'sale_number' => (string)$r['sale_number'],
             ];
         }
 

@@ -2873,6 +2873,30 @@ function ensureGuideViewsTable(): void {
 
 /** STORNO prodeje jen admin/Boss — vrací zboží i peníze z evidence (stejná citlivost
  *  jako faktury; manažer faktury nesmí — pravidlo 16.7.2026). */
+/**
+ * pos_sales.cancel_reason — DŮVOD storna prodejky.
+ *
+ * Opravný účetní záznam musí být dohledatelný a srozumitelný (§ 35 zák.
+ * č. 563/1991 Sb.): u storna se proto vedle „kdo" a „kdy" eviduje i „proč".
+ * Text se propisuje do výdajového pokladního dokladu i do auditní stopy.
+ */
+function ensurePosSaleCancelReason(): bool {
+    global $pdo;
+    static $has = null;
+    if ($has !== null) return $has;
+    if (!isset($pdo)) return false;
+    $has = false;
+    try {
+        if ($pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'cancel_reason'")->fetch()) {
+            $has = true;
+        } else {
+            $pdo->exec("ALTER TABLE pos_sales ADD COLUMN cancel_reason VARCHAR(255) NULL DEFAULT NULL");
+            $has = true;
+        }
+    } catch (Throwable $e) { error_log('ensurePosSaleCancelReason: ' . $e->getMessage()); $has = false; }
+    return $has;
+}
+
 function crmCanCancelPosSale(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }

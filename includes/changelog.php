@@ -11,6 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.72.0',
+        'date' => '2026-08-27',
+        'time' => '15:20',
+        'title' => 'Storno prodeje rovnou z pokladní knihy — s důvodem a dokladem',
+        'items' => [
+            '<b>Storno přímo v pokladní knize:</b> u řádku prodeje má vedení tlačítko <b>Storno</b> — dosud se muselo hledat v Historii. Systém napíše, co se stane, a <b>vyžádá si důvod</b> (bez něj storno neprovede).',
+            '<b>Co storno udělá:</b> prodejka se <b>nemaže</b> — označí se jako stornovaná s údajem <b>kdo, kdy a proč</b>; zboží se vrátí na sklad; případná faktura se zruší; objednávka z e-shopu se vrátí mezi rezervované; hotovost se vydá zpět a zapíše se <b>k dnešnímu dni</b> jako výdaj + vystaví se <b>výdajový pokladní doklad</b> s odkazem na původní prodejku a důvodem. Už uzavřené dny knihy tím zůstávají nedotčené (opravný účetní záznam podle § 35 zákona o účetnictví, ne přepis historie).',
+            '<b>V knize je storno vidět:</b> pod řádkem se vypíše „STORNOVÁNO — datum, kdo, důvod", takže se nemusí nikam proklikávat. Totéž nově ukazuje i Historie → Kasa.',
+            '<b>Pravdivé shrnutí po stornu:</b> hláška napíše, kolik hotovosti vydat, číslo dokladu, kolik kusů se vrátilo na sklad, a <b>upozorní</b>, když se některý díl vrátit nedal (byl mezitím vyřazen) — dřív systém vždy tvrdil, že zboží je zpět.',
+            '<b>Pojistka:</b> výdajový doklad vystavený ke stornu už nejde stornovat zpět — jinak by kniha tvrdila, že peníze jsou v zásuvce, ačkoliv je zákazník dostal, a zboží by zároveň leželo na skladě.',
+            'Storno smí i nadále jen vedení (admin, Boss) a jen v otevřeném účetním období.',
+        ],
+    ],
+    [
         'version' => '3.71.0',
         'date' => '2026-08-29',
         'time' => '20:40',

@@ -32,7 +32,17 @@ if ($id <= 0) {
     echo json_encode(['success' => false, 'message' => 'Chybí doklad.']); exit;
 }
 
+// DŮVOD STORNA je povinný: opravný účetní záznam musí být srozumitelný a
+// dohledatelný (§ 35 zák. č. 563/1991 Sb.). Text jde do výdajového pokladního
+// dokladu, do prodejky i do auditní stopy.
+$reason = trim((string)($_POST['reason'] ?? ''));
+$reason = mb_substr(preg_replace('/\s+/u', ' ', $reason), 0, 255);
+if (mb_strlen($reason) < 3) {
+    echo json_encode(['success' => false, 'message' => 'Napiš důvod storna (např. „vrácení zboží zákazníkem", „chybně naúčtováno") — bez něj nejde storno provést.'], JSON_UNESCAPED_UNICODE); exit;
+}
+
 ensurePosTables();
+ensurePosSaleCancelReason();
 ensureInventoryMovesTable();
 ensureProductsPosColumn();
 ensureEshopOrdersTable();
@@ -88,6 +98,7 @@ try {
     $items = $it->fetchAll();
 
     $missingParts = [];
+    $returnedCount = 0;          // kolik kusů se reálně vrátilo na sklad
     foreach ($items as $line) {
         if ((string)$line['item_type'] === 'part') {
             // díl mohl být mezitím smazán ze skladu — storno kvůli tomu nesmí navždy zamrznout
@@ -95,6 +106,7 @@ try {
             $chk->execute([(int)$line['item_id']]);
             if ($chk->fetch()) {
                 changeInventoryQuantity((int)$line['item_id'], (int)$line['quantity']);
+                $returnedCount += (int)$line['quantity'];
             } else {
                 $missingParts[] = (string)$line['item_name'];
             }
@@ -102,6 +114,7 @@ try {
             // vrácení produktu: zpět skladem, flag kasy pryč (kus je zase v appce pravdivě skladem)
             $pdo->prepare("UPDATE products SET stock_qty = stock_qty + ?, pos_sold_at = NULL WHERE id = ?")
                 ->execute([(int)$line['quantity'], (int)$line['item_id']]);
+            $returnedCount += (int)$line['quantity'];
         } elseif ((string)$line['item_type'] === 'vykup') {
             // storno výplaty výkupu: odvázat výkupní list (jde pak vyplatit znovu);
             // vrácenou hotovost řeší kompenzační pohyb níže
@@ -135,8 +148,8 @@ try {
     }
 
     $who = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
-    $pdo->prepare("UPDATE pos_sales SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = ? WHERE id = ?")
-        ->execute([$who !== '' ? $who : null, $id]);
+    $pdo->prepare("UPDATE pos_sales SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = ?, cancel_reason = ? WHERE id = ?")
+        ->execute([$who !== '' ? $who : null, $reason, $id]);
 
     if (!empty($sale['invoice_id'])) {
         $pdo->prepare("UPDATE invoices SET status = 'cancelled' WHERE id = ?")->execute([(int)$sale['invoice_id']]);
@@ -161,7 +174,8 @@ try {
                 ((int)($sale['branch_id'] ?? 0) > 0 ? (int)$sale['branch_id'] : null),
                 $stornoDir, $stornoAbs, $id,
                 mb_substr((string)$sale['sale_number'], 0, 40),
-                mb_substr(($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata (výkup / výdaj z kasy) — storno prodejky ') . (string)$sale['sale_number'], 0, 255),
+                mb_substr(($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata (výkup / výdaj z kasy) — storno prodejky ')
+                    . (string)$sale['sale_number'] . ' · důvod: ' . $reason, 0, 255),
                 $who !== '' ? mb_substr($who, 0, 100) : null,
             ]);
         $stornoMoveId = (int)$pdo->lastInsertId();
@@ -185,11 +199,13 @@ if ($stornoMoveId > 0) {
         'type' => $stornoDir === 'out' ? 'expense' : 'income',
         'amount' => $stornoAbs,
         'date' => date('Y-m-d'),
-        'purpose' => ($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata (výkup / výdaj z kasy) — storno prodejky ') . (string)$sale['sale_number'],
+        'purpose' => ($stornoDir === 'out' ? 'Vratka hotovosti — storno prodeje ' : 'Vrácená výplata (výkup / výdaj z kasy) — storno prodejky ')
+            . (string)$sale['sale_number'] . ' — ' . $reason,
         'issued_by' => $who,
         'ref_type' => 'cash_movement',
         'ref_id' => $stornoMoveId,
-        'note' => 'Storno prodeje ' . (string)$sale['sale_number'],
+        'note' => 'Storno prodeje ' . (string)$sale['sale_number'] . ' · důvod: ' . $reason
+            . ' · opravný záznam k dokladu ze dne ' . date('j. n. Y', strtotime((string)$sale['created_at'])),
     ]);
     if ($doc['ok']) { $stornoDocNumber = (string)$doc['number']; }
     else { error_log('pos_cancel: VPD ke stornu se nepodařilo vystavit — ' . (string)$doc['error']); }
@@ -203,6 +219,7 @@ foreach ($items as $line) {
 crmAuditLog('kasa.cancel', [
     'entity_type' => 'pos_sale', 'entity_id' => $id, 'entity_label' => (string)$sale['sale_number'],
     'summary' => 'Storno prodeje ' . $sale['sale_number'] . ' za ' . formatMoney((float)$sale['total'])
+        . ' — důvod: ' . $reason
         . ($eshopBack !== '' ? ' — objednávka z e-shopu ' . $eshopBack . ' je zase rezervovaná' : '')
         . (!empty($sale['invoice_id']) ? ' (zrušena i faktura)' : '')
         . ($stornoMoveId > 0 ? ' — výdej hotovosti zapsán do pokladního deníku' . ($stornoDocNumber !== '' ? ' (' . $stornoDocNumber . ')' : '') : '')
@@ -210,4 +227,15 @@ crmAuditLog('kasa.cancel', [
     'branch_id' => (int)getCurrentStaffBranchId(),
 ]);
 
-echo json_encode(['success' => true, 'storno_doc' => $stornoDocNumber]);
+echo json_encode([
+    'success' => true,
+    'storno_doc' => $stornoDocNumber,
+    // Podklady pro pravdivou hlášku v UI — dřív se vždy tvrdilo „zboží je zpět
+    // na skladě“, i když se nevrátilo nic (výplata výkupu) nebo díl už neexistuje.
+    'returned_count' => $returnedCount,
+    'missing_parts' => $missingParts,
+    'invoice_cancelled' => !empty($sale['invoice_id']),
+    'eshop_back' => $eshopBack,
+    'cash_returned' => $stornoMoveId > 0 ? formatMoney($stornoAbs) : '',
+    'cash_dir' => $stornoMoveId > 0 ? $stornoDir : '',
+], JSON_UNESCAPED_UNICODE);
