@@ -235,7 +235,34 @@ $pageTitle = __($cfg['title_key'], $lang);
               .finally(function () { b.disabled = false; });
     };
 
+    /* Kontrola úplnosti před tiskem: výkupní list musí identifikovat prodávajícího
+       i předmět obchodu (§ 31 odst. 6 zák. č. 455/1991 Sb.) a nést způsob úhrady.
+       Nebráníme tisku (kabel sériové číslo nemá), jen se ptáme — tištěný a
+       podepsaný neúplný doklad se opravuje mnohem hůř. */
+    var DOC_REQUIRED = <?php echo json_encode($type === 'vykup' ? [
+        'customer_name' => 'jméno a příjmení prodávajícího',
+        'customer_address' => 'adresa prodávajícího',
+        'customer_id_doc' => 'číslo dokladu totožnosti',
+        'customer_id_verified' => 'kdo ověřil totožnost',
+        'item_description' => 'popis zařízení',
+        'item_serial' => 'sériové číslo / IMEI',
+        'item_price' => 'výkupní cena',
+        'sign_payment' => 'způsob výplaty',
+    ] : new stdClass(), JSON_UNESCAPED_UNICODE); ?>;
+
+    function docMissingFields() {
+        var missing = [];
+        Object.keys(DOC_REQUIRED).forEach(function (name) {
+            var el = document.querySelector('[name="' + name + '"]');
+            if (el && String(el.value || '').trim() === '') { missing.push(DOC_REQUIRED[name]); }
+        });
+        return missing;
+    }
+
     document.getElementById('btnPrint').onclick = function () {
+        var missing = docMissingFields();
+        if (missing.length && !confirm('Doklad není kompletní — chybí:\n\n· ' + missing.join('\n· ')
+                + '\n\nOpravdu tisknout takhle?')) { return; }
         var b = this; b.disabled = true;
         save().then(function () { window.print(); })
               .catch(function (e) { toast('⚠️ ' + e.message, false); })

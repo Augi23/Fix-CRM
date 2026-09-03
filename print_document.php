@@ -31,9 +31,27 @@ $date = !empty($doc['doc_date']) ? date('d.m.Y', strtotime((string)$doc['doc_dat
         body { margin: 0; background: #eceff3; padding: 26px 18px;
                font-family: 'SF Pro Display', -apple-system, "Segoe UI", Arial, sans-serif; }
         <?php echo crmDocumentSheetCss(); ?>
+        .doc-missing { max-width: 840px; margin: 0 auto 14px; padding: 12px 18px; border-radius: 12px;
+                       background: #fff4e5; border: 1px solid #f0c48a; color: #8a4b00; font-size: 13px; }
+        .doc-missing a { color: #0a5bd6; margin-left: 6px; }
+        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
+<?php
+/* Chybějící povinné údaje se ukazují JEN na obrazovce (v tisku ne) — obsluha
+   tak stihne doklad doplnit dřív, než ho dá zákazníkovi podepsat. Výkupní list
+   musí identifikovat prodávajícího i předmět obchodu (§ 31 odst. 6 zák.
+   č. 455/1991 Sb.) a nést způsob úhrady. */
+$missing = function_exists('crmDocMissingImportant') ? crmDocMissingImportant($type, $doc['fields'] ?? []) : [];
+if ($missing):
+?>
+<div class="doc-missing no-print">
+    <strong>Doklad není kompletní — chybí:</strong>
+    <?php echo e(implode(', ', array_values($missing))); ?>.
+    <a href="dokument.php?id=<?php echo (int)$doc['id']; ?>">Doplnit údaje</a>
+</div>
+<?php endif; ?>
 <?php echo crmRenderDocumentSheet($type, $doc['fields'] ?? [], $lang, 'static', (string)$doc['doc_number'], $date, (int)$doc['id']); ?>
 </body>
 </html>

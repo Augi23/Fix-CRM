@@ -11,6 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.73.0',
+        'date' => '2026-09-03',
+        'time' => '16:10',
+        'title' => 'Výkupní list: správná provozovna, DIČ a kontrola úplnosti před tiskem',
+        'items' => [
+            '<b>Správná provozovna na dokladu:</b> v patičce se dosud tiskla adresa a telefon pobočky <b>přihlášeného člověka</b>, ne té, kde se výkup skutečně uskutečnil. Kdo tiskl list z jiné prodejny (typicky ze skladu), měl na dokladu nepravdivý údaj o místě obchodu. Nově se bere pobočka <b>z dokladu</b>.',
+            '<b>DIČ na dokladu:</b> patička nově tiskne i DIČ (pokud je vyplněné v Nastavení → Firma) — dosud tam bylo jen IČO.',
+            '<b>Kontrola před tiskem:</b> tlačítko Tisk upozorní, když na výkupním listu chybí něco podstatného — jméno a adresa prodávajícího, číslo dokladu totožnosti, kdo totožnost ověřil, popis zařízení, <b>sériové číslo/IMEI</b>, výkupní cena nebo způsob výplaty. Tisk to nezakazuje (kabel sériové číslo nemá), jen se zeptá — podepsaný neúplný doklad se opravuje mnohem hůř.',
+            'Stejné upozornění se ukáže i v náhledu k tisku (na papír se netiskne), takže je vidět i u dokladů vystavených dřív.',
+            '<b>Způsob výplaty se předvyplní</b> („Hotově") u nových výkupních listů — dosud zůstával prázdný a na dokladu chybělo, jak byly peníze předány.',
+            'Sériové číslo/IMEI je u výkupu podstatné: obchod s použitým zbožím vyžaduje identifikovat nejen prodávajícího, ale i předmět obchodu (§ 31 odst. 6 živnostenského zákona).',
+        ],
+    ],
+    [
         'version' => '3.72.0',
         'date' => '2026-08-27',
         'time' => '15:20',

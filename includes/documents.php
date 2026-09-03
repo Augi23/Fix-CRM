@@ -488,7 +488,22 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
     $L = function (string $key) use ($lang) { return __($key, $lang); };
     $company = get_setting('company_name', 'AppleFix s.r.o.');
     $companyIco = get_setting('company_ico', '');
-    $bc = crmOrderBranchContact((int)getCurrentStaffBranchId());
+    $companyDic = trim((string)get_setting('company_dic', ''));
+    // Provozovna se bere z DOKLADU, ne z přihlášeného člověka: kdo tiskne výkupní
+    // list pořízený na jiné pobočce (typicky ze skladu), měl by dřív v patičce
+    // adresu i telefon své vlastní prodejny — tedy nepravdivý údaj o tom, kde
+    // obchod proběhl. Bez uloženého dokladu (nový formulář) zůstává vlastní.
+    $docBranchId = (int)getCurrentStaffBranchId();
+    if ($docId > 0) {
+        try {
+            global $pdo;
+            $bst = $pdo->prepare("SELECT branch_id FROM crm_documents WHERE id = ? LIMIT 1");
+            $bst->execute([$docId]);
+            $bidDoc = (int)($bst->fetchColumn() ?: 0);
+            if ($bidDoc > 0) { $docBranchId = $bidDoc; }
+        } catch (Throwable $e) { /* zůstane pobočka přihlášeného */ }
+    }
+    $bc = crmOrderBranchContact($docBranchId);
     $companyEmail = $bc['email'] ?: get_setting('smtp_from_email', 'info@applefix.cz');
 
     $logoFs = __DIR__ . '/../assets/img/logo-black.png';
@@ -619,6 +634,7 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
     $h .= '<div class="foot"><div class="foot-name">' . e($company) . '</div><div class="foot-line">'
         . e(trim((string)$bc['address_inline']))
         . ($companyIco !== '' ? ' · IČO: ' . e($companyIco) : '')
+        . ($companyDic !== '' ? ' · DIČ: ' . e($companyDic) : '')
         . ' · Tel.: ' . e(trim((string)$bc['phone']))
         . ($companyEmail !== '' ? ' · ' . e($companyEmail) : '')
         . '</div></div>';
@@ -799,6 +815,37 @@ function crmDocDefaultValues(string $type): array {
     if ($misto === '') { $misto = trim((string)get_setting('company_city', '')); }
     $datum = date('j. n. Y');
     $out['sign_place_date'] = $misto !== '' ? ($misto . ', ' . $datum) : $datum;
+    // Způsob výplaty zůstával prázdný, přestože se drtivá většina výkupů platí
+    // hotově z kasy — a doklad bez toho, JAK byly peníze předány, je neúplný.
+    // Kdo platí převodem, přepíše (pole je normální text).
+    if ($type === 'vykup') { $out['sign_payment'] = 'Hotově'; }
+    return $out;
+}
+
+/**
+ * Údaje, bez kterých není výkupní list úplný.
+ *
+ * Živnostenský zákon (§ 31 odst. 6 zák. č. 455/1991 Sb.) ukládá u obchodu
+ * s použitým zbožím identifikovat nejen prodávajícího, ale i PŘEDMĚT obchodu —
+ * u elektroniky k tomu slouží sériové číslo / IMEI. Vrací popisky prázdných
+ * polí, ať obsluha ví, co doplnit, než doklad vytiskne a nechá podepsat.
+ */
+function crmDocMissingImportant(string $type, array $values): array {
+    if ($type !== 'vykup') { return []; }
+    $need = [
+        'customer_name'        => 'jméno a příjmení prodávajícího',
+        'customer_address'     => 'adresa prodávajícího',
+        'customer_id_doc'      => 'číslo dokladu totožnosti',
+        'customer_id_verified' => 'kdo ověřil totožnost',
+        'item_description'     => 'popis zařízení',
+        'item_serial'          => 'sériové číslo / IMEI zařízení',
+        'item_price'           => 'výkupní cena',
+        'sign_payment'         => 'způsob výplaty',
+    ];
+    $out = [];
+    foreach ($need as $field => $label) {
+        if (trim((string)($values[$field] ?? '')) === '') { $out[$field] = $label; }
+    }
     return $out;
 }
 
