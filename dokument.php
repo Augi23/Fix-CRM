@@ -245,6 +245,7 @@ $pageTitle = __($cfg['title_key'], $lang);
         'customer_id_doc' => 'číslo dokladu totožnosti',
         'customer_id_verified' => 'kdo ověřil totožnost',
         'item_description' => 'popis zařízení',
+        'item_brand' => 'výrobce / značka',
         'item_serial' => 'sériové číslo / IMEI',
         'item_price' => 'výkupní cena',
         'sign_payment' => 'způsob výplaty',

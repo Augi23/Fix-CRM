@@ -147,7 +147,16 @@ function afxProductLabelData(PDO $pdo, int $pid): array {
     $sn = (string)$p['product_code'];
     if (str_starts_with(strtoupper($sn), 'AFX') || str_starts_with(strtoupper($sn), 'PREVIEW')) { $sn = ''; }
 
-    $nazev = $model;
+    $manuf = trim((string)($p['manufacturer'] ?? ''));
+    // Název na cenovce: primárně model (u katalogových kusů je to „iPhone 14 Pro"),
+    // ale u výkupu bývá v modelu jen typ („7" u DJI Osmo Mobile 7) — takový model
+    // sám o sobě štítek nepopíše. Když je model kratší než dvě slova nebo v názvu
+    // produktu chybí, bere se název produktu.
+    // „Slabý" model = prázdný, nebo jen číslo/typ („7", „13", „II") — takový
+    // štítek nepopíše. U katalogových kusů („iPhone 14 Pro") se nic nemění.
+    $modelJeSlabý = ($model === '')
+        || (mb_strlen($model) <= 4 && preg_match('/^[0-9IVXivx\s\-\/\.]+$/u', $model) === 1);
+    $nazev = $modelJeSlabý ? '' : $model;
     if ($nazev === '') {   // ostatní značky bez PARAMETER Model — odsekat suffixy z názvu
         $nazev = $title;
         foreach ([$grade, $color, $cap] as $suf) {
@@ -155,6 +164,11 @@ function afxProductLabelData(PDO $pdo, int $pid): array {
                 $nazev = rtrim(mb_substr($nazev, 0, mb_strlen($nazev) - mb_strlen(' ' . $suf)));
             }
         }
+    }
+    // Výrobce dopředu, když ho název ještě neobsahuje (Apple se z názvů vynechává,
+    // protože „iPhone 14 Pro" značku nese už samo).
+    if ($manuf !== '' && mb_stripos($nazev, $manuf) === false && mb_strtolower($manuf) !== 'apple') {
+        $nazev = trim($manuf . ' ' . $nazev);
     }
     if (str_contains(mb_strtolower($title), 'macbook')) {
         // MacBook: starší kusy mají RAM/úložiště jen v názvu — doplnit odsud
@@ -172,7 +186,7 @@ function afxProductLabelData(PDO $pdo, int $pid): array {
     elseif ($priceF == (int)$priceF) { $cena = number_format($priceF, 0, ',', ' ') . ' Kč'; }
     else { $cena = rtrim(rtrim(number_format($priceF, 2, '.', ''), '0'), '.') . ' Kč'; }
     return ['ok' => true, 'data' => [
-        'nazev' => $nazev, 'barva' => $color, 'stav' => $grade, 'uloziste' => $cap,
+        'nazev' => $nazev, 'vyrobce' => $manuf, 'barva' => $color, 'stav' => $grade, 'uloziste' => $cap,
         'baterie' => $bat, 'ram' => $ram,
         // na cenovce se ročník procesoru netiskne (viz afxLabelProcessorShort)
         'procesor' => function_exists('afxLabelProcessorShort') ? afxLabelProcessorShort((string)$processor) : $processor,

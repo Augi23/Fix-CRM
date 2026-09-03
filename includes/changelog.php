@@ -11,6 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.74.0',
+        'date' => '2026-09-03',
+        'time' => '17:05',
+        'title' => 'Štítek u vykoupeného zboží: správný název, značka i model',
+        'items' => [
+            '<b>Cenovka u výkupu tiskla nesmysl.</b> U DJI Osmo Mobile 7 se na štítek dostalo jen <b>„7"</b> — štítek totiž bere jako název <i>model</i>, a ve výkupním listu byl v modelu jen typ. Nově se u takového „modelu" (samotné číslo nebo římská číslice) použije celý název zboží a doplní se před něj <b>výrobce</b>. Katalogové kusy (iPhone, MacBook) se tisknou úplně stejně jako dřív.',
+            '<b>Výkupní list má nové pole „Výrobce / značka".</b> Dosud bylo jedno pole „Značka / model", takže se do skladu i na cenovku dostal jen ten kousek, který obsluha stihla zapsat. Model má teď vlastní pole („Model / typ") a značka jde do skladu jako výrobce — je pak i v e-shopu a ve filtrech.',
+            '<b>Název ve skladu se skládá lidsky:</b> dřív „7 — Dji Osmo mobile", nově <b>„DJI Osmo Mobile 7"</b>. Systém nezdvojuje, co už je v popisu, a nevyrábí patvary typu „telefon Apple iPhone 13" (u starších dokladů, kde je značka schovaná v modelu, si ji vytáhne sám).',
+            '<b>Stav se propíše do skladu:</b> „Stav A" z výkupního listu nastaví u kusu stupeň A, takže se tiskne i na cenovce a je vidět v přehledu skladu.',
+            'Kontrola před tiskem výkupního listu teď hlídá i vyplněného výrobce.',
+            '<b>U už vykoupených kusů</b> stačí otevřít výkupní list, doplnit výrobce (a sériové číslo) a dát Uložit — údaje ve skladu se srovnají a štítek se vytiskne správně.',
+        ],
+    ],
+    [
         'version' => '3.73.0',
         'date' => '2026-09-03',
         'time' => '16:10',

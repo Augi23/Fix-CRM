@@ -84,6 +84,11 @@ function crmDocTypes(): array {
                 ]],
                 ['h' => 'cdoc_sec_item_vykup', 'fields' => [
                     ['n' => 'item_description', 'l' => 'cdoc_f_item_desc'],
+                    // Výrobce zvlášť od modelu: dřív se obojí psalo do jednoho pole
+                    // („Značka / model"), takže se do skladu i na cenovku dostal jen
+                    // ten kousek, který obsluha zapsala — u DJI Osmo Mobile 7 třeba
+                    // jen „7". Značka je navíc na štítku i v e-shopu vlastní údaj.
+                    ['n' => 'item_brand',       'l' => 'cdoc_f_item_brand'],
                     ['n' => 'item_model',       'l' => 'cdoc_f_item_model'],
                     ['n' => 'item_serial',      'l' => 'cdoc_f_item_serial'],
                     ['n' => 'item_price',       'l' => 'cdoc_f_price'],
@@ -324,6 +329,65 @@ function crmGetDocumentIdScans(int $documentId): array {
  * (další uložení jen aktualizuje název/kód/nákupku, kusů se nedotýká).
  * Vrací id produktu (0 = nic nevzniklo).
  */
+/**
+ * Výkupní list → údaje skladové položky (název, výrobce, model, stav).
+ *
+ * Dřív se název skládal jako „model — popis", takže z DJI Osmo Mobile 7 vznikl
+ * titulek „7 — Dji Osmo mobile" a na cenovku se dostal jen „7“ (štítek bere
+ * primárně model). Skládáme proto lidsky: výrobce + popis + model, bez
+ * zdvojování toho, co už v popisu je.
+ *
+ * Čistá funkce (bez DB) — jde otestovat i samostatně.
+ */
+function crmVykupProductFields(array $f): array {
+    $norm = static function (string $v): string { return trim(preg_replace('/\s+/u', ' ', $v) ?? $v); };
+    $brand = $norm((string)($f['item_brand'] ?? ''));
+    $descr = $norm((string)($f['item_description'] ?? ''));
+    $model = $norm((string)($f['item_model'] ?? ''));
+
+    // Starší doklady mají značku i model v jednom poli („Apple iPhone 13“) —
+    // pokud výrobce chybí, zkusíme ho vyčíst z prvního slova modelu nebo popisu.
+    if ($brand === '') {
+        $znamé = ['apple', 'samsung', 'dji', 'sony', 'lenovo', 'dell', 'hp', 'asus', 'acer', 'huawei',
+                  'xiaomi', 'google', 'microsoft', 'jbl', 'bose', 'canon', 'nikon', 'gopro', 'garmin', 'lg'];
+        foreach ([$model, $descr] as $zdroj) {
+            $prvni = mb_strtolower((string)(explode(' ', $zdroj)[0] ?? ''));
+            if ($prvni !== '' && in_array($prvni, $znamé, true)) {
+                $brand = mb_convert_case($prvni, MB_CASE_TITLE, 'UTF-8');
+                if ($prvni === 'dji' || $prvni === 'hp' || $prvni === 'jbl' || $prvni === 'lg') { $brand = mb_strtoupper($prvni, 'UTF-8'); }
+                break;
+            }
+        }
+    }
+
+    // Název: skládá se z popisu a modelu tak, aby nevznikly patvary typu
+    // „telefon Apple iPhone 13" (obecné slovo + celý název) ani „7 — Dji Osmo".
+    $obsahuje = static function (string $hay, string $needle): bool {
+        if ($needle === '') return true;
+        return mb_stripos($hay, $needle) !== false;
+    };
+    if ($model === '')                        { $nazev = $descr; }
+    elseif ($descr === '')                    { $nazev = $model; }
+    elseif ($obsahuje($model, $descr))        { $nazev = $model; }   // model je konkrétnější
+    elseif ($obsahuje($descr, $model))        { $nazev = $descr; }
+    elseif (mb_strpos($model, ' ') !== false) { $nazev = $model; }   // model je celý název věci
+    else                                      { $nazev = trim($descr . ' ' . $model); }
+    if ($brand !== '' && !$obsahuje($nazev, $brand)) { $nazev = trim($brand . ' ' . $nazev); }
+
+    // Stav „Stav A“ / „A“ / „grade B“ → jednopísmenný grade skladu.
+    $grade = '';
+    if (preg_match('/\b([ABCD])\b/u', mb_strtoupper($norm((string)($f['item_state'] ?? ''))), $mm)) {
+        $grade = $mm[1];
+    }
+
+    return [
+        'title' => mb_substr($nazev !== '' ? $nazev : 'Výkup', 0, 255),
+        'manufacturer' => $brand !== '' ? mb_substr($brand, 0, 64) : null,
+        'model' => $model !== '' ? mb_substr($model, 0, 128) : null,
+        'grade' => $grade,
+    ];
+}
+
 function crmSyncVykupProduct(int $docId): int {
     global $pdo;
     $doc = crmGetDocument($docId);
@@ -335,12 +399,10 @@ function crmSyncVykupProduct(int $docId): int {
     ensureSkladBranchSchema();
 
     $f = is_array($doc['fields'] ?? null) ? $doc['fields'] : [];
-    $model = trim((string)($f['item_model'] ?? ''));
-    $descr = trim((string)($f['item_description'] ?? ''));
     $serial = trim((string)($f['item_serial'] ?? ''));
-    $title = trim($model . ($descr !== '' ? ' — ' . $descr : ''));
-    if ($title === '') { $title = 'Výkup ' . (string)$doc['doc_number']; }
-    $title = mb_substr($title, 0, 255);
+    $pf = crmVykupProductFields($f);
+    $title = $pf['title'] !== 'Výkup' ? $pf['title'] : ('Výkup ' . (string)$doc['doc_number']);
+    $model = (string)($pf['model'] ?? '');
     $buyPrice = crmParseAmountCzk((string)($doc['price'] ?? ''));
     $branch = (int)($doc['branch_id'] ?? 0) ?: (int)getDefaultBranchId();
     $stockKey = skladBranchCode($branch) === 'prikope' ? 'vaclavak' : 'karlin';
@@ -351,8 +413,8 @@ function crmSyncVykupProduct(int $docId): int {
         $existingId = (int)($doc['vykup_product_id'] ?? 0);
         if ($existingId > 0) {
             // oprava listu → jen srovnat údaje produktu; počet kusů nechat být
-            $pdo->prepare("UPDATE products SET title = ?, model = ?, product_code = ?, purchase_price = ?, branch_id = ?, stock_key = ? WHERE id = ? AND COALESCE(is_vykup, 0) = 1")
-                ->execute([$title, $model !== '' ? mb_substr($model, 0, 128) : null, $code,
+            $pdo->prepare("UPDATE products SET title = ?, manufacturer = ?, model = ?, grade = ?, product_code = ?, purchase_price = ?, branch_id = ?, stock_key = ? WHERE id = ? AND COALESCE(is_vykup, 0) = 1")
+                ->execute([$title, $pf['manufacturer'], $pf['model'], (string)$pf['grade'], $code,
                     $buyPrice > 0 ? $buyPrice : null, $branch, $stockKey, $existingId]);
             return $existingId;
         }
@@ -364,9 +426,9 @@ function crmSyncVykupProduct(int $docId): int {
             $pdo->prepare("UPDATE crm_documents SET vykup_product_id = ? WHERE id = ?")->execute([$pid, $docId]);
             return $pid;
         }
-        $pdo->prepare("INSERT INTO products (product_code, title, model, grade, price, stock_qty, stock_key, branch_id, purchase_price, source, created_by, is_vykup, vykup_document_id, hide_eshop, added_at, first_seen_at, last_seen_at)
-                       VALUES (?, ?, ?, '', 0, 1, ?, ?, ?, 'crm', ?, 1, ?, 1, NOW(), NOW(), NOW())")
-            ->execute([$code, $title, $model !== '' ? mb_substr($model, 0, 128) : null, $stockKey, $branch,
+        $pdo->prepare("INSERT INTO products (product_code, title, manufacturer, model, grade, price, stock_qty, stock_key, branch_id, purchase_price, source, created_by, is_vykup, vykup_document_id, hide_eshop, added_at, first_seen_at, last_seen_at)
+                       VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?, ?, 'crm', ?, 1, ?, 1, NOW(), NOW(), NOW())")
+            ->execute([$code, $title, $pf['manufacturer'], $pf['model'], (string)$pf['grade'], $stockKey, $branch,
                 $buyPrice > 0 ? $buyPrice : null, $by, $docId]);
         $pid = (int)$pdo->lastInsertId();
         $pdo->prepare("UPDATE crm_documents SET vykup_product_id = ? WHERE id = ?")->execute([$pid, $docId]);
@@ -518,7 +580,7 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
         'customer_citizenship' => 3, 'customer_id_type' => 3, 'customer_id_doc' => 3,
         'customer_id_issuer' => 4, 'customer_id_valid' => 2, 'customer_id_verified' => 3,
         'customer_biz_name' => 4, 'customer_biz_address' => 5, 'customer_biz_ico' => 3,
-        'item_description' => 6, 'item_model' => 3, 'item_serial' => 3,
+        'item_description' => 6, 'item_brand' => 3, 'item_model' => 3, 'item_serial' => 3,
         'item_price' => 3, 'item_estimate' => 3,
         'loan_amount' => 3, 'due_date' => 3, 'fee_rate' => 3,
         'sign_place_date' => 6, 'sign_payment' => 6,
@@ -838,6 +900,7 @@ function crmDocMissingImportant(string $type, array $values): array {
         'customer_id_doc'      => 'číslo dokladu totožnosti',
         'customer_id_verified' => 'kdo ověřil totožnost',
         'item_description'     => 'popis zařízení',
+        'item_brand'           => 'výrobce / značka (jde na cenovku i do skladu)',
         'item_serial'          => 'sériové číslo / IMEI zařízení',
         'item_price'           => 'výkupní cena',
         'sign_payment'         => 'způsob výplaty',
