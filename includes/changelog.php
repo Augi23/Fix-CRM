@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.76.0',
+        'date' => '2026-09-04',
+        'time' => '19:37',
+        'title' => 'E-shop: úprava kontaktů zákazníků — v administraci i zákazníkem samotným',
+        'items' => [
+            'Administrace e-shopu má novou sekci <b>Zákazníci</b>: hledání podle jména, firmy, e-mailu či telefonu a úprava kontaktních i fakturačních údajů (jméno, telefon, adresa, firma, IČO, DIČ). Údaje se ukládají <b>rovnou do klientů v CRM</b> — na prodejně i v zakázkách se změna projeví hned.',
+            'Přihlášený zákazník si na e-shopu v <b>Můj účet</b> může své údaje upravit sám; při dalším nákupu se mu pokladna předvyplní. E-mail se měnit nedá — je to jeho přihlášení a podle něj k němu patří objednávky.',
+            'Nový endpoint <code>api/eshop_customers.php</code> (výpis + uložení, feed token). Každé uložení se zapisuje do auditu s tím, kdo ho provedl.',
+        ],
+    ],
+    [
         'version' => '3.75.0',
         'date' => '2026-09-04',
         'time' => '11:20',
