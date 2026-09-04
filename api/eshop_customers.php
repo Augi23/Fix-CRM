@@ -129,6 +129,9 @@ if ($in['dic'] !== '' && !preg_match('/^[A-Za-z]{2}[0-9A-Za-z]{2,18}$/', $in['di
 // by úprava vždy trefila NEJNOVĚJŠÍ řádek, ne ten, který si obsluha otevřela. E-mail musí
 // k id sedět — zákaznická cesta id neposílá a upsertuje podle e-mailu ze své session.
 $idIn = (int)($_POST['id'] ?? 0);
+// `create=1` (administrace „Nový zákazník"): e-mail už v CRM NESMÍ být — jinak by
+// „založení" tiše přepsalo cizí záznam, který obsluha ani neviděla.
+$createOnly = !empty($_POST['create']);
 try {
     if ($idIn > 0) {
         $find = $pdo->prepare("SELECT * FROM customers WHERE id = ? AND email = ? LIMIT 1");
@@ -139,6 +142,10 @@ try {
         $find = $pdo->prepare("SELECT * FROM customers WHERE email = ? ORDER BY id DESC LIMIT 1");
         $find->execute([$email]);
         $existing = $find->fetch(PDO::FETCH_ASSOC);
+        if ($createOnly && $existing) {
+            afx_ec_out(['ok' => false, 'error' => 'Zákazník s tímto e-mailem už v CRM je — otevři ho a uprav.',
+                        'existing_id' => (int)$existing['id']], 409);
+        }
     }
 
     if ($existing) {

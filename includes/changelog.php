@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.76.1',
+        'date' => '2026-09-04',
+        'time' => '22:45',
+        'title' => 'E-shop administrace: založení nového zákazníka',
+        'items' => [
+            'V sekci <b>Zákazníci</b> jde nově zákazníka i <b>založit</b> (e-mail + kontakty). Pokud už klient s tím e-mailem v CRM je, založení se odmítne s odkazem na existující záznam — nic se tiše nepřepíše.',
+            'Úprava v administraci míří vždy na <b>konkrétní záznam</b> (podle ID), ne na první se stejným e-mailem — v CRM je několik e-mailů vedených u více klientů.',
+        ],
+    ],
+    [
         'version' => '3.76.0',
         'date' => '2026-09-04',
         'time' => '19:37',
