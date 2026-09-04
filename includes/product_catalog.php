@@ -808,10 +808,10 @@ function afxEnsureCatalogCustomTable(): void {
 
 /** Všechny vlastní hodnoty najednou: ['kind' => ['context' => [hodnoty…]]].
  *  Při výpadku DB vrací [] — formulář pak jede jen s vestavěnými seznamy. */
-function afxCatalogCustomAll(): array {
+function afxCatalogCustomAll(bool $refresh = false): array {
     global $pdo;
     static $cache = null;
-    if ($cache !== null) return $cache;
+    if ($cache !== null && !$refresh) return $cache;
     $cache = [];
     try {
         afxEnsureCatalogCustomTable();
@@ -841,8 +841,12 @@ function afxCatalogCustomAdd(string $kind, string $context, string $value): void
         || str_contains($value, 'Vlastní…') || str_contains($value, '✏️')) return;
     try {
         afxEnsureCatalogCustomTable();
-        $pdo->prepare("INSERT IGNORE INTO product_catalog_custom (kind, context, value) VALUES (?, ?, ?)")
-            ->execute([$kind, $context, $value]);
+        $st = $pdo->prepare("INSERT IGNORE INTO product_catalog_custom (kind, context, value) VALUES (?, ?, ?)");
+        $st->execute([$kind, $context, $value]);
+        // Nová hodnota musí být vidět hned i ve zbytku tohoto požadavku — jinak
+        // by ji čtení z paměti (statická cache) přehlédlo a další kontrola v téže
+        // zakázce/produktu by ji registrovala znovu.
+        if ($st->rowCount() > 0) afxCatalogCustomAll(true);
     } catch (Throwable $e) { error_log('afxCatalogCustomAdd: ' . $e->getMessage()); }
 }
 
@@ -1010,6 +1014,102 @@ function afxProductCatalogMerged(): array {
         'processors' => $processors,
         'gpuModels' => $gpuModels,
     ];
+}
+
+/* ── NOVÁ ZAKÁZKA: značka a model zařízení ─────────────────────────────────
+   Příjmový formulář má vlastní nabídku (značka + model podle typu zařízení).
+   Skládala se jen z vestavěného katalogu a číselníku device_brands, takže
+   značka/model dopsané rukou (select2 tags) se nikam neuložily a při další
+   zakázce se musely psát znovu. Nově se po uložení zakázky zapíšou do
+   product_catalog_custom — do stejné tabulky jako vlastní hodnoty ze
+   skladu — a od další zakázky jsou v nabídce. Značky jsou pro sklad
+   i zakázky společné (kind 'manufacturer'), modely mají vlastní kind
+   'order_model' s kontextem „značka|typ zařízení" (Phone, Notebook…),
+   protože typy zakázky jsou jiné než typy skladu. */
+
+/** Typ zakázky (Phone/Notebook/PC/Tablet/HDD/Other) pro skladový typ zařízení. */
+function crmOrderDeviceTypeKeysForProductType(string $productType): array {
+    return match ($productType) {
+        'iPhone', 'Telefon' => ['Phone'],
+        'iPad', 'Tablet' => ['Tablet'],
+        'MacBook', 'Notebook' => ['Notebook'],
+        'iMac', 'Mac mini', 'Mac Studio', 'Mac Pro', 'Počítač' => ['PC'],
+        default => ['Other'],
+    };
+}
+
+/** Typy zařízení, které nabízí formulář zakázky (hodnoty <select name="device_type">). */
+function crmOrderDeviceTypeKeys(): array {
+    return ['Phone', 'Notebook', 'PC', 'Tablet', 'HDD', 'Other'];
+}
+
+/** Značky pro formulář zakázky = číselník device_brands + výrobci ze skladu
+ *  (vestavění i vlastní). Řazeno přirozeně, bez ohledu na velikost písmen. */
+function crmOrderBrands(): array {
+    $brands = [];
+    if (function_exists('getDeviceBrands')) {
+        try { $brands = (array)getDeviceBrands(); } catch (Throwable $e) { $brands = []; }
+    }
+    foreach (afxProductCatalogMerged()['manufacturers'] as $m) { $brands[] = $m; }
+    $out = [];
+    foreach ($brands as $b) {
+        $b = trim((string)$b);
+        if ($b === '' || afxCatalogListHas($out, $b)) continue;
+        $out[] = $b;
+    }
+    natcasesort($out);
+    return array_values($out);
+}
+
+/** Modely pro formulář zakázky: ['Značka']['Phone'] => [modely].
+ *  Skládá se ze skladového katalogu (vč. vlastních modelů) a z modelů
+ *  dopsaných dřív přímo v zakázce (kind 'order_model'). */
+function crmOrderModelCatalog(): array {
+    $catalog = [];
+    foreach (afxProductCatalogMerged()['types'] as $type) {
+        $brand = trim((string)($type['manuf'] ?? ''));
+        $models = array_values(array_filter(array_map('trim', $type['models'] ?? [])));
+        if ($brand === '' || empty($models)) continue;
+        foreach (crmOrderDeviceTypeKeysForProductType((string)($type['id'] ?? '')) as $orderType) {
+            $catalog[$brand][$orderType] = array_values(array_unique(array_merge($catalog[$brand][$orderType] ?? [], $models)));
+        }
+    }
+    foreach ((afxCatalogCustomAll()['order_model'] ?? []) as $ctx => $vals) {
+        $parts = explode('|', (string)$ctx, 2);
+        $brand = trim($parts[0] ?? '');
+        $type = trim($parts[1] ?? '');
+        if ($brand === '' || $type === '') continue;
+        foreach ($vals as $v) {
+            if (!afxCatalogListHas($catalog[$brand][$type] ?? [], $v)) $catalog[$brand][$type][] = (string)$v;
+        }
+    }
+    ksort($catalog, SORT_NATURAL | SORT_FLAG_CASE);
+    return $catalog;
+}
+
+/** Po ÚSPĚŠNÉM uložení zakázky: značku a model, které v nabídce nebyly,
+ *  zapíše do katalogu — od další zakázky se vybírají ze seznamu.
+ *  Jednopísmenné hodnoty se ignorují (překlep při psaní, ne značka). */
+function crmCatalogRegisterOrderDevice(string $brand, string $deviceType, string $model): void {
+    $brand = trim($brand);
+    $model = trim($model);
+    $deviceType = trim($deviceType);
+    if (!in_array($deviceType, crmOrderDeviceTypeKeys(), true)) $deviceType = 'Other';
+    // „|" odděluje značku a typ v kontextu — hodnota s ním by kontext rozbila
+    if ($brand === '' || mb_strlen($brand) < 2 || str_contains($brand, '|')) return;
+
+    $brands = crmOrderBrands();
+    if (!afxCatalogListHas($brands, $brand)) {
+        afxCatalogCustomAdd('manufacturer', '', $brand);
+    } else {
+        // sjednotit zápis („apple" → „Apple"), ať model nesedí pod dvěma značkami
+        foreach ($brands as $b) { if (mb_strtolower($b) === mb_strtolower($brand)) { $brand = $b; break; } }
+    }
+    if ($model === '' || mb_strlen($model) < 2) return;
+    $known = crmOrderModelCatalog()[$brand][$deviceType] ?? [];
+    if (!afxCatalogListHas($known, $model)) {
+        afxCatalogCustomAdd('order_model', $brand . '|' . $deviceType, $model);
+    }
 }
 
 /** Kanonická hlavička exportu skladu — pro export CSV. */

@@ -9,40 +9,10 @@ $techs_list_modal = getActiveTechnicians();   // technici SVÉ pobočky (admin/B
 $branches_modal = getBranches();
 $order_templates_modal = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)get_setting('order_templates', '')))));
 $order_note_templates_modal = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)get_setting('order_note_templates', '')))));
-$crm_order_brands_modal = array_values(array_unique(array_filter(array_merge(getDeviceBrands(), afxProductManufacturers()), static fn($b) => trim((string)$b) !== '')));
-natcasesort($crm_order_brands_modal);
-$crm_order_brands_modal = array_values($crm_order_brands_modal);
-
-if (!function_exists('crmOrderDeviceTypeKeysForProductType')) {
-    function crmOrderDeviceTypeKeysForProductType(string $productType): array {
-        return match ($productType) {
-            'iPhone', 'Telefon' => ['Phone'],
-            'iPad', 'Tablet' => ['Tablet'],
-            'MacBook', 'Notebook' => ['Notebook'],
-            'iMac', 'Mac mini', 'Mac Studio', 'Mac Pro', 'Počítač' => ['PC'],
-            default => ['Other'],
-        };
-    }
-}
-
-if (!function_exists('crmNewOrderModelCatalog')) {
-    function crmNewOrderModelCatalog(): array {
-        $catalog = [];
-        foreach (afxProductTypes() as $type) {
-            $brand = trim((string)($type['manuf'] ?? ''));
-            $models = array_values(array_filter(array_map('trim', $type['models'] ?? [])));
-            if ($brand === '' || empty($models)) {
-                continue;
-            }
-            foreach (crmOrderDeviceTypeKeysForProductType((string)($type['id'] ?? '')) as $orderType) {
-                $catalog[$brand][$orderType] = array_values(array_unique(array_merge($catalog[$brand][$orderType] ?? [], $models)));
-            }
-        }
-        ksort($catalog, SORT_NATURAL | SORT_FLAG_CASE);
-        return $catalog;
-    }
-}
-$crm_order_model_catalog = crmNewOrderModelCatalog();
+/* Značky i modely = číselník + skladový katalog + hodnoty dopsané v dřívějších
+   zakázkách (viz crmCatalogRegisterOrderDevice v product_catalog.php). */
+$crm_order_brands_modal = crmOrderBrands();
+$crm_order_model_catalog = crmOrderModelCatalog();
 ?>
 <div class="modal fade crm-wizard-modal" id="newOrderModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-lg">

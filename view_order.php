@@ -1764,7 +1764,8 @@ function deleteOrder(id) {
                                 // PAST „prvního vybraného": značka zakázky (volný text z wizardu)
                                 // nemusí být v číselníku → bez selected by spadla na první ('Acer')
                                 // a uložení by ji tiše přepsalo. Aktuální značku vždy doplníme.
-                                $__brands = getDeviceBrands();
+                                require_once __DIR__ . '/includes/product_catalog.php';
+                                $__brands = crmOrderBrands();   // číselník + sklad + zapamatované z příjmu
                                 $__curBrand = trim((string)($order['device_brand'] ?? ''));
                                 if ($__curBrand !== '' && !in_array($__curBrand, $__brands, true)) { array_unshift($__brands, $__curBrand); }
                                 foreach($__brands as $brand): ?>

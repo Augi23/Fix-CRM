@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.75.0',
+        'date' => '2026-09-04',
+        'time' => '11:20',
+        'title' => 'Nová zakázka: značka a model dopsané rukou si CRM zapamatuje',
+        'items' => [
+            '<b>Co se jednou napíše, je příště v nabídce.</b> Ve formuláři <b>Nová zakázka</b> šla značka i model dopsat rukou (nabídka je nevynucuje), ale nikam se neuložily — u další stejné zakázky se musely psát znovu. Nově se po uložení zakázky zapíšou do katalogu a <b>od následujícího zadání se vybírají ze seznamu</b>.',
+            '<b>Sklad a zakázky sdílejí, co se naučily:</b> výrobce zadaný přes „✏️ Vlastní…" při naskladnění se objeví i mezi značkami v zakázce (a naopak), modely se drží u své značky a typu zařízení (telefon zvlášť, notebook zvlášť). Značky se nabízejí i při úpravě zakázky, ne jen při jejím zakládání.',
+            '<b>Seznam se nenafukuje zbytečně:</b> co v nabídce už je, se neukládá podruhé (a nerozlišuje se velikost písmen — „apple" nezaloží druhé „Apple"); jednopísmenné překlepy a placeholder „✏️ Vlastní…" se ignorují.',
+            'Ve <b>skladu</b> („Naskladnit produkt") se vlastní výrobce, typ zařízení i model pamatují už od verze 3.53.0 — nově to hlídá i automatický test (<code>scripts/catalog_custom_test.php</code>), aby to žádná další úprava tiše nerozbila.',
+            'Kdyby zápis do katalogu selhal, zakázka se uloží normálně dál — nabídka je pomůcka, ne podmínka příjmu.',
+        ],
+    ],
+    [
         'version' => '3.74.0',
         'date' => '2026-09-03',
         'time' => '17:05',
