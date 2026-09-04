@@ -19,10 +19,13 @@ $src = ($_GET['src'] ?? 'media') === 'attachment' ? 'complaint_attachments' : 'c
 if ($id <= 0) { http_response_code(404); exit; }
 
 try {
+    // stejné vlastnictví jako výpis na nástěnce (duplicitní záznamy zákazníka,
+    // reklamace k jeho zakázce, import bez zákazníka) — viz clientComplaintOwnerSql
+    $own = clientComplaintOwnerSql($pdo, $customerId, 'c');
     $st = $pdo->prepare("SELECT m.file_path, m.file_name, m.file_type
         FROM `$src` m JOIN complaints c ON c.id = m.complaint_id
-        WHERE m.id = ? AND c.customer_id = ? LIMIT 1");
-    $st->execute([$id, $customerId]);
+        WHERE m.id = ? AND " . $own['sql'] . " LIMIT 1");
+    $st->execute(array_merge([$id], $own['params']));
     $row = $st->fetch(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     error_log('klient complaint_file: ' . $e->getMessage());

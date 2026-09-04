@@ -6,8 +6,15 @@
         <div class="modal-content glass-card border-secondary text-white shadow-lg">
             <form action="api/add_complaint.php" method="POST" enctype="multipart/form-data" id="newComplaintForm" data-draft-key="new-complaint">
                 <?php echo csrfField(); ?>
+                <?php /* Z detailu zakázky (tlačítko „Reklamace"): order_id naváže reklamaci
+                         na zakázku (a tím i na klienta v jeho portálu), return_order_id
+                         vrátí obsluhu po založení zpět na zakázku. Vyplňuje JS openComplaintForOrder. */ ?>
+                <input type="hidden" name="order_id" id="complaintOrderId" value="">
+                <input type="hidden" name="return_order_id" id="complaintReturnOrderId" value="">
                 <div class="modal-header bg-transparent border-secondary py-3">
-                    <h5 class="modal-title mb-0"><i class="fas fa-rotate-left me-2" style="color:#f97316"></i><?php echo __('new_complaint'); ?></h5>
+                    <h5 class="modal-title mb-0"><i class="fas fa-rotate-left me-2" style="color:#f97316"></i><?php echo __('new_complaint'); ?>
+                        <span id="complaintOrderNote" class="badge rounded-pill ms-2" style="background:rgba(249,115,22,.18);color:#fdba74;font-weight:600" hidden></span>
+                    </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -125,6 +132,54 @@
 document.addEventListener('DOMContentLoaded', function () {
     if (!window.jQuery) return;
     var $ = window.jQuery;
+
+    // Otevřeno jinak než tlačítkem „Reklamace" na zakázce (menu, přehled reklamací)
+    // → žádná vazba na zakázku z minula (jinak by se reklamace tiše přivázala k cizí zakázce).
+    function afxComplaintDropOrderLink(form) {
+        ['complaintOrderId', 'complaintReturnOrderId'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+        var ref = form ? form.querySelector('[name="orig_ref"]') : null; if (ref) ref.value = '';
+        var note = document.getElementById('complaintOrderNote'); if (note) { note.hidden = true; note.textContent = ''; }
+    }
+    function afxComplaintClearDraft() {
+        try { if (window.afxDraft) afxDraft.clearKey('new-complaint'); else localStorage.removeItem('afx_draft:new-complaint'); } catch (e) {}
+    }
+    // Obsluha vymění klienta (jiný, nebo „nový klient") → vazba na zakázku pryč: reklamace
+    // cizího člověka nesmí viset na klientově zakázce (ukázala by se mu v portálu).
+    $('#complaintCustomerSelect').on('change', function () {
+        var m = document.getElementById('newComplaintModal');
+        if (m && m.__afxPrefilled && String(this.value || '') !== String(m.__afxPrefillCustomer || '')) afxComplaintDropOrderLink(document.getElementById('newComplaintForm'));
+    });
+    $('#complaintNewCustomer').on('show.bs.collapse', function () {
+        var m = document.getElementById('newComplaintModal');
+        if (m && m.__afxPrefilled) afxComplaintDropOrderLink(document.getElementById('newComplaintForm'));
+    });
+    // Zavření předvyplněného modalu bez uložení → koncept zahodit (jinak by ho draft.js
+    // obnovil i na jiné stránce a nová reklamace by se navázala na starou zakázku).
+    $('#newComplaintModal').on('hidden.bs.modal', function () {
+        if (this.__afxPrefilled) afxComplaintClearDraft();
+    });
+    $('#newComplaintModal').on('show.bs.modal', function () {
+        if (this.__afxFromOrder) { this.__afxFromOrder = false; this.__afxPrefilled = true; return; }
+        if (!this.__afxPrefilled) return;   // běžné otevření bez předchozího předvyplnění — nic neměnit
+        // po předchozím předvyplnění ze zakázky: pryč i klient, zařízení, SN a „Doklad/zakázka",
+        // jinak by se nová reklamace tiše navázala na cizí zakázku a ukázala cizímu klientovi
+        this.__afxPrefilled = false;
+        afxComplaintClearDraft();
+        var form = document.getElementById('newComplaintForm');
+        if (form) {
+            form.reset();
+            form.querySelectorAll('[data-no-draft]').forEach(function (el) { el.removeAttribute('data-no-draft'); });
+        }
+        var sel = document.getElementById('complaintCustomerSelect');
+        if (sel) {
+            Array.prototype.slice.call(sel.options).forEach(function (opt) { if (opt.value !== '') sel.removeChild(opt); });
+            if ($(sel).data('select2')) $(sel).val(null).trigger('change');
+        }
+        ['complaintOrderId', 'complaintReturnOrderId'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+        var ref = form ? form.querySelector('[name="orig_ref"]') : null; if (ref) ref.value = '';
+        var note = document.getElementById('complaintOrderNote'); if (note) { note.hidden = true; note.textContent = ''; }
+        var grid = document.getElementById('complaintPhotoPreview'); if (grid) grid.innerHTML = '';
+    });
 
     // select2 hledání klienta (stejné API jako Nová zakázka)
     $('#newComplaintModal').on('shown.bs.modal', function () {

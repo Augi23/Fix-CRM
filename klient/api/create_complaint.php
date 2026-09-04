@@ -106,8 +106,15 @@ try {
         . '<div style="white-space:pre-wrap;border:1px solid #e5e7eb;border-radius:8px;padding:10px">' . nl2br(e($fullReason)) . '</div>'
         . '<p style="margin:14px 0 0;color:#6b7280;font-size:12px">Reklamace je v CRM přiřazena nahoře v sekci Reklamace, dokud se jí někdo ze servisu neujme.</p>'
         . '</div>';
-    if (function_exists('smtpSendMail')) { smtpSendMail($notify, $subject, $html); }
-} catch (Throwable $e) { /* mail selhal — reklamace i tak založena */ }
+    if (function_exists('smtpSendMail')) {
+        [$mOk, $mErr] = smtpSendMail($notify, $subject, $html);
+        // servis se o reklamaci musí dozvědět — když mail nedojde, ať je to aspoň vidět v Historii
+        if (function_exists('crmMailAudit')) {
+            crmMailAudit('upozornění servisu na reklamaci z portálu', (bool)$mOk, $mErr,
+                ['entity_type' => 'complaint', 'entity_label' => $code, 'to' => $notify]);
+        }
+    }
+} catch (Throwable $e) { error_log('klient create_complaint mail: ' . $e->getMessage()); /* reklamace i tak založena */ }
 
 echo json_encode(['ok' => true, 'code' => $code,
     'message' => __('client_complaint_sent')], JSON_UNESCAPED_UNICODE);

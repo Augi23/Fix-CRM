@@ -25,8 +25,8 @@ if ($type === 'complaint') {
     $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, cu.phone AS cust_phone, cu.email, cu.address
                            FROM complaints c
                            LEFT JOIN customers cu ON cu.id = c.customer_id
-                           WHERE c.id = ? AND c.customer_id = ? LIMIT 1");
-    $stmt->execute([$complaintId, $customerId]);
+                           WHERE c.id = ? AND " . ($__own = clientComplaintOwnerSql($pdo, $customerId, 'c'))['sql'] . " LIMIT 1");
+    $stmt->execute(array_merge([$complaintId], $__own['params']));
     $complaint = $stmt->fetch();
     if (!$complaint) clientDocDeny();
 

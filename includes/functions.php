@@ -5931,6 +5931,35 @@ function crmSendOrderSheetEmail(int $orderId, ?string $toOverride = null): array
 /** ── Platba při výdeji zakázky (hotově / kartou / převodem) ─────────────── */
 
 /** orders.payment_method — jak klient při výdeji zaplatil (cash|card|transfer). */
+/** orders.pin_unverified — 1 = „PIN" zakázky vyplnil kdokoli na webu (rezervace
+ *  z applefix.cz zapisuje heslo zařízení do pin_code) a servis ho zatím neověřil.
+ *  Takový PIN klientský portál nepřijímá (revize 4. 9. 2026: útočník by si přes
+ *  rezervaci s cizím telefonem zvolil PIN k cizímu účtu). Příznak zruší až
+ *  podpis klienta na tabletu (klient je fyzicky u nás) nebo změna PINu obsluhou —
+ *  tisk náhledu či pouhé uložení zakázky ne (to bývá triáž bez klienta). */
+function ensureOrderPinUnverifiedColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM orders LIKE 'pin_unverified'")->fetch();
+        if (!$col) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN pin_unverified TINYINT(1) NOT NULL DEFAULT 0");
+        }
+    } catch (Throwable $e) { error_log('ensureOrderPinUnverifiedColumn: ' . $e->getMessage()); }
+}
+
+/** Podpis klienta nebo změna PINu obsluhou → PIN platí i pro portál. */
+function crmOrderPinVerified(int $orderId): void {
+    global $pdo;
+    if ($orderId <= 0 || !isset($pdo)) return;
+    try {
+        ensureOrderPinUnverifiedColumn();
+        $pdo->prepare("UPDATE orders SET pin_unverified = 0 WHERE id = ? AND pin_unverified = 1")->execute([$orderId]);
+    } catch (Throwable $e) { error_log('crmOrderPinVerified: ' . $e->getMessage()); }
+}
+
 function ensureOrderPaymentMethodColumn(): void {
     global $pdo;
     static $done = false;
@@ -7126,6 +7155,7 @@ function crmAuditActionLabel(string $action): string {
         'supplier_catalog.create' => 'Přidání katalogu dodavatele',
         'settings.update' => 'Změna nastavení', 'system.update' => 'Aktualizace systému',
         'sms.sent' => 'Odeslána SMS klientovi',
+        'email.sent' => 'Odeslán e-mail', 'email.failed' => 'E-mail se neodeslal',
     ];
     return $map[$action] ?? $action;
 }
@@ -7222,6 +7252,29 @@ function crmOrderBranchContact($branchId): array {
 
 /** Odešle klientovi e-mail, že je zakázka připravena k vyzvednutí (jen jednou, přes guard
  *  pickup_notified_at). Volá se při přechodu stavu do skupiny 'completed'. */
+/** Stopa po každém AUTOMATICKÉM e-mailu (audit 4. 9. 2026): dosud se výsledek
+ *  smtpSendMail u automatiky zahazoval, takže při špatném SMTP mlčky vypadly
+ *  všechny maily a v CRM to nebylo nikde vidět. Teď má každý pokus řádek
+ *  v Historii — úspěch i selhání s důvodem — a chyba jde i do error_logu. */
+function crmMailAudit(string $what, bool $ok, ?string $err, array $ctx = []): void {
+    $to = (string)($ctx['to'] ?? '');
+    $label = mb_substr((string)($ctx['entity_label'] ?? ''), 0, 190);
+    // summary je VARCHAR(255): dlouhá chyba SMTP by ve strict módu celý řádek zahodila
+    $summary = ($ok ? 'Odeslán e-mail: ' : 'E-mail se NEODESLAL: ') . $what
+        . ($to !== '' ? ' → ' . $to : '')
+        . ($ok ? '' : ' — ' . trim((string)$err));
+    try {
+        crmAuditLog($ok ? 'email.sent' : 'email.failed', [
+            'entity_type' => (string)($ctx['entity_type'] ?? 'system'),
+            'entity_id' => (int)($ctx['entity_id'] ?? 0),
+            'entity_label' => $label,
+            'summary' => mb_substr($summary, 0, 255),
+            'details' => ['what' => $what, 'to' => $to, 'ok' => $ok, 'error' => $ok ? null : (string)$err],
+        ]);
+    } catch (Throwable $e) { /* audit nesmí shodit odeslání */ }
+    if (!$ok) { error_log('E-mail „' . $what . '"' . ($label !== '' ? ' (' . $label . ')' : '') . ' → ' . $to . ' selhal: ' . (string)$err); }
+}
+
 function crmSendPickupReadyEmail(int $orderId): void
 {
     global $pdo;
@@ -7264,7 +7317,10 @@ function crmSendPickupReadyEmail(int $orderId): void
         if ($ok) {
             $pdo->prepare("UPDATE orders SET pickup_notified_at = NOW() WHERE id = ?")->execute([$orderId]);
         }
-    } catch (Throwable $e) { /* best-effort — nesmí shodit změnu stavu */ }
+        crmMailAudit('připraveno k vyzvednutí', (bool)$ok, $err, ['entity_type' => 'order', 'entity_id' => $orderId, 'entity_label' => $code, 'to' => $to]);
+    } catch (Throwable $e) {
+        error_log('crmSendPickupReadyEmail #' . $orderId . ': ' . $e->getMessage());   // best-effort — nesmí shodit změnu stavu
+    }
 }
 
 /** Sloupec orders.review_email_sent_at — žádost o recenzi se každé zakázce pošle max. jednou. */
@@ -7490,11 +7546,15 @@ function crmSendOrderReviewEmail(int $orderId): void {
             'en' => 'thank you for your trust',
             'uk' => 'дякуємо за вашу довіру',
         ][$lang];
-        [$ok, ] = smtpSendMail($to, $subject, crmReviewRequestEmailHtml($o));
+        [$ok, $err] = smtpSendMail($to, $subject, crmReviewRequestEmailHtml($o));
         if ($ok) {
             $pdo->prepare("UPDATE orders SET review_email_sent_at = NOW() WHERE id = ?")->execute([$orderId]);
         }
-    } catch (Throwable $e) { /* best-effort — nesmí shodit změnu stavu */ }
+        $code = trim((string)($o['order_code'] ?? '')) !== '' ? (string)$o['order_code'] : ('#' . $orderId);
+        crmMailAudit('poděkování + žádost o recenzi', (bool)$ok, $err, ['entity_type' => 'order', 'entity_id' => $orderId, 'entity_label' => $code, 'to' => $to]);
+    } catch (Throwable $e) {
+        error_log('crmSendOrderReviewEmail #' . $orderId . ': ' . $e->getMessage());   // best-effort — nesmí shodit změnu stavu
+    }
 }
 
 /** HTML e-mailu s poděkováním a žádostí o Google recenzi — „liquid glass" pojetí:
@@ -7610,7 +7670,7 @@ function crmSendEshopOrderEmail(array $o): void
         : 'potvrzení objednávky ' . $ref);
 
     [$ok, $err] = smtpSendMail($to, $subject, crmEshopOrderEmailHtml($o));
-    if (!$ok) error_log('crmSendEshopOrderEmail: ' . (string)$err);
+    crmMailAudit('potvrzení objednávky z e-shopu', (bool)$ok, $err, ['entity_type' => 'eshop_order', 'entity_label' => $ref, 'to' => $to]);
 }
 
 /** HTML potvrzení objednávky z e-shopu — světlý „glass" AppleFix design (jako review/pickup).
@@ -9017,10 +9077,11 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
         $deviceType = crmGuessDeviceType($device);
 
         ensureOrderCreatedByColumn();
+        ensureOrderPinUnverifiedColumn();   // heslo z webu není ověřený PIN pro portál
         $pdo->prepare("INSERT INTO orders
             (customer_id, technician_id, branch_id, device_type, order_type, device_brand, device_model,
-             problem_description, technician_notes, serial_number, pin_code, priority, estimated_cost, status, order_code, created_by_name)
-            VALUES (?, NULL, ?, ?, 'Non-Warranty', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Web (applefix.cz)')")
+             problem_description, technician_notes, serial_number, pin_code, priority, estimated_cost, status, order_code, created_by_name, pin_unverified)
+            VALUES (?, NULL, ?, ?, 'Non-Warranty', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Web (applefix.cz)', 1)")
             ->execute([
                 $customerId, $branchId, $deviceType,
                 mb_substr($brand !== '' ? $brand : '', 0, 100), $deviceModel,

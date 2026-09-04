@@ -909,8 +909,26 @@ require_once 'includes/header.php';
                                 <input type="text" name="smtp_from_name" class="form-control" value="<?php echo htmlspecialchars(get_setting('smtp_from_name', get_setting('company_name', 'AppleFix'))); ?>" placeholder="AppleFix servis"></div>
                         </div>
                         <div class="form-text small text-white-75 mt-2">
-                            Heslo se ukládá jen do vaší databáze a v poli se nikdy nezobrazuje. Po uložení lze e-mail otestovat tlačítkem u kterékoli zakázky.
+                            Heslo se ukládá jen do vaší databáze a v poli se nikdy nezobrazuje. Touto cestou odcházejí i <b>automatické e-maily</b>:
+                            klientovi „připraveno k vyzvednutí" a poděkování po vydání, potvrzení objednávky z e-shopu a upozornění servisu na reklamaci z klientské sekce.
+                            Každý pokus (i neúspěšný, s důvodem) je vidět v <a href="history.php" class="text-info">Historii</a>.
                         </div>
+                        <div class="d-flex gap-2 align-items-center mt-2 flex-wrap">
+                            <input type="email" id="smtpTestEmail" class="form-control" style="max-width:280px;" placeholder="kam poslat test (např. tvůj e-mail)" value="<?php echo htmlspecialchars((string)get_setting('smtp_user')); ?>">
+                            <button type="button" class="btn btn-outline-info" onclick="afxSmtpTest()"><i class="fas fa-paper-plane me-1"></i>Poslat testovací e-mail</button>
+                            <span id="smtpTestResult" class="small text-white-75"></span>
+                        </div>
+                        <script>
+                        function afxSmtpTest() {
+                            var to = document.getElementById('smtpTestEmail').value.trim();
+                            var out = document.getElementById('smtpTestResult');
+                            if (!to) { out.textContent = 'Zadej e-mail.'; return; }
+                            out.textContent = 'Odesílám… (test používá ULOŽENÉ nastavení — po změně nejdřív ulož)';
+                            $.post('api/smtp_test.php', { email: to }, function (r) {   // csrf_token doplní $.ajaxSetup v header.php
+                                out.textContent = r.success ? '✓ Odesláno — zkontroluj schránku (i spam).' : ('✗ ' + (r.message || 'Chyba'));
+                            }, 'json').fail(function () { out.textContent = '✗ Chyba spojení'; });
+                        }
+                        </script>
                     </div>
 
                     <div class="col-12 border-top border-secondary pt-3">

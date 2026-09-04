@@ -165,10 +165,12 @@ try {
     $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
     $pdo->prepare("INSERT INTO order_signatures (order_id, sig_type, file_path, requested_by) VALUES (?, ?, ?, ?)")
         ->execute([$orderId, $sigType, 'uploads/signatures/' . $name, $by !== '' ? mb_substr($by, 0, 100) : null]);
+    if (function_exists('crmOrderPinVerified')) { crmOrderPinVerified((int)$orderId); }   // klient byl u nás → PIN platí
 
     // požadavek z podpisové stanice → označit vyřízený (+ případný auto e-mail listu)
     $reqId = (int)($_POST['request_id'] ?? 0);
     $emailed = false;
+    $emailError = '';
     if ($reqId > 0) {
         try {
             ensureSignatureRequestsTable();
@@ -178,16 +180,23 @@ try {
             $pdo->prepare("UPDATE signature_requests SET status = 'done' WHERE id = ? AND order_id = ?")->execute([$reqId, $orderId]);
             if ($emailAfter) {
                 // zakázkový list odchází UŽ S PODPISEM (print_order podpisy vkládá)
-                [$emailed, ] = crmSendOrderSheetEmail($orderId);
+                [$emailed, $emailError] = crmSendOrderSheetEmail($orderId);
+                $emailed = (bool)$emailed;
+                // dřív se chyba zahodila a obsluha u tabletu viděla jen „neodesláno" bez důvodu
+                if (function_exists('crmMailAudit')) {
+                    crmMailAudit('zakázkový list po podpisu', $emailed, $emailed ? null : (string)$emailError,
+                        ['entity_type' => 'order', 'entity_id' => (int)$orderId]);
+                }
             }
-        } catch (Throwable $e) { /* podpis je uložen, zbytek je best-effort */ }
+        } catch (Throwable $e) { $emailError = $e->getMessage(); error_log('save_signature mail: ' . $e->getMessage()); }
     }
 
     crmAuditLog('order.signature_add', [
         'entity_type' => 'order', 'entity_id' => (int)$orderId,
         'summary' => 'Uložen podpis klienta k zakázce #' . (int)$orderId . ' (' . $sigType . ')' . ($emailed ? ', list odeslán e-mailem' : ''),
     ]);
-    echo json_encode(['ok' => true, 'signed_at' => date('d.m.Y H:i'), 'emailed' => $emailed]);
+    echo json_encode(['ok' => true, 'signed_at' => date('d.m.Y H:i'), 'emailed' => $emailed,
+        'email_error' => ($emailed || $emailError === '') ? null : (string)$emailError], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     echo json_encode(['ok' => false, 'error' => 'Chyba serveru']);
 }

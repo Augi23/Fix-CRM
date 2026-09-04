@@ -15,8 +15,16 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     die(__('csrf_token_invalid'));
 }
 
+// Z detailu zakázky se obsluha vrací zpět na zakázku (tam i vidí novou reklamaci);
+// z přehledu reklamací zůstává přehled. return_order_id posílá modal (openComplaintForOrder).
+$__returnOrderId = (int)($_POST['return_order_id'] ?? 0);
 function complaint_redirect(string $qs): void {
-    header("Location: ../reklamace.php?" . $qs);
+    global $__returnOrderId;
+    if ($__returnOrderId > 0) {
+        header("Location: ../view_order.php?id=" . $__returnOrderId . "&" . $qs);
+    } else {
+        header("Location: ../reklamace.php?" . $qs);
+    }
     exit;
 }
 
@@ -26,6 +34,7 @@ $device_model  = trim($_POST['device_model'] ?? '');
 $serial        = trim($_POST['serial_number'] ?? '');
 $purchase_date = trim($_POST['purchase_date'] ?? '');
 $orig_ref      = trim($_POST['orig_ref'] ?? '');
+$order_id_in   = (int)($_POST['order_id'] ?? 0);   // z tlačítka „Reklamace" na zakázce
 $reason        = trim($_POST['reason'] ?? '');
 $resolution    = trim($_POST['resolution'] ?? '');
 
@@ -34,7 +43,27 @@ if ($device_model === '' || $reason === '') {
 }
 
 try {
+    // sloupce order_id/order_code/source si dosud zajišťovaly jen jiné stránky —
+    // na čerstvé instalaci by INSERT níž spadl na „Unknown column" (DDL před transakcí)
+    ensureComplaintsClientColumns($pdo);
     $pdo->beginTransaction();
+
+    // Reklamace k existující zakázce: zakázka je zdroj pravdy pro vazbu (order_id,
+    // order_code) i pro klienta — reklamace se pak klientovi ukáže v jeho portálu
+    // u té zakázky, ať ji obsluha přiřadí komukoli (na zakázce je jen jeden klient).
+    $orderRow = null;
+    if ($order_id_in > 0) {
+        $oq = $pdo->prepare("SELECT id, order_code, customer_id FROM orders WHERE id = ? LIMIT 1");
+        $oq->execute([$order_id_in]);
+        $orderRow = $oq->fetch(PDO::FETCH_ASSOC) ?: null;
+        if (!$orderRow) {
+            $pdo->rollBack();
+            complaint_redirect('error=' . urlencode('Zakázka k reklamaci nebyla nalezena.'));
+        }
+        if (!$customer_id && trim($_POST['nc_first_name'] ?? '') === '') {
+            $customer_id = (int)$orderRow['customer_id'];   // klient ze zakázky, když obsluha nic nevybrala
+        }
+    }
 
     // nový klient (když není vybraný existující)
     if (!$customer_id) {
@@ -68,7 +97,32 @@ try {
     if ($purchase_date !== '') { $ts = strtotime($purchase_date); if ($ts) $pd = date('Y-m-d', $ts); }
     // „Doklad/zakázka" → zkusit dohledat skutečnou zakázku (propíše původní opravu)
     $order_id = null; $order_code = ($orig_ref !== '' ? $orig_ref : null);
-    if ($orig_ref !== '') {
+    // Vazba na zakázku jen když reklamaci podává klient zakázky (nebo někdo se stejným
+    // telefonem) — reklamace cizího člověka by se jinak ukázala klientovi zakázky v portálu.
+    $sameParty = static function (int $a, int $b) use ($pdo): bool {
+        if ($a === $b) return true;
+        try {
+            $q = $pdo->prepare("SELECT id, phone FROM customers WHERE id IN (?, ?)");
+            $q->execute([$a, $b]);
+            $ph = [];
+            foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $d = preg_replace('/\D+/', '', (string)$r['phone']) ?: '';
+                if (str_starts_with($d, '00')) $d = substr($d, 2);
+                if (strlen($d) === 9) $d = '420' . $d;
+                $ph[(int)$r['id']] = strlen($d) >= 11 ? $d : '';
+            }
+            return ($ph[$a] ?? '') !== '' && ($ph[$a] ?? '') === ($ph[$b] ?? null);
+        } catch (Throwable $e) { return false; }
+    };
+    if ($orderRow && !$sameParty((int)$customer_id, (int)$orderRow['customer_id'])) {
+        $orderRow = null;                       // jiný člověk → bez vazby na zakázku
+        if ($orig_ref !== '' && $order_code === $orig_ref) { $order_code = null; }
+        $orig_ref = '';
+    }
+    if ($orderRow) {
+        $order_id = (int)$orderRow['id'];
+        $order_code = (string)$orderRow['order_code'] !== '' ? (string)$orderRow['order_code'] : $order_code;
+    } elseif ($orig_ref !== '') {
         try {
             $oq = $pdo->prepare("SELECT id, order_code FROM orders WHERE order_code = ? LIMIT 1");
             $oq->execute([$orig_ref]);

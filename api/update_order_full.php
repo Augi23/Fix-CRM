@@ -239,7 +239,23 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
+    // Reklamace k zakázce patří k jejímu klientovi: při změně klienta zakázky se
+    // přepíšou i ony (jinak by zůstaly na starém záznamu a klient by je v portálu
+    // neviděl). Jen ty, které dosud ukazovaly na původního klienta.
+    if ($customerIdToSave !== (int)$current['customer_id']) {
+        try {
+            $pdo->prepare("UPDATE complaints SET customer_id = ? WHERE order_id = ? AND (customer_id = ? OR customer_id IS NULL)")
+                ->execute([$customerIdToSave, (int)$order_id, (int)$current['customer_id']]);
+        } catch (Throwable $e) { /* starší DB bez complaints.order_id */ }
+    }
+
     if ($__custChangeAudit !== null) { crmAuditLog('order.customer_change', $__custChangeAudit); }
+    // PIN z webové rezervace začne platit pro portál, až když ho obsluha sama ZMĚNÍ
+    // (pouhé uložení zakázky nestačí — to může být jen triáž bez klienta)
+    if (function_exists('crmOrderPinVerified') && isset($_POST['pin_code'])
+        && trim((string)$_POST['pin_code']) !== '' && trim((string)$_POST['pin_code']) !== trim((string)($current['pin_code'] ?? ''))) {
+        crmOrderPinVerified((int)$order_id);
+    }
 
     // Per-technician work segments (mirror the orders.work_* transitions above).
     if ($is_starting || $is_reassigning_in_progress) {

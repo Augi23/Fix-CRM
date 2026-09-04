@@ -11,6 +11,23 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.77.0',
+        'date' => '2026-09-04',
+        'time' => '23:00',
+        'title' => 'Reklamace v klientské sekci, tlačítko „Reklamace" u zakázky, stopa po každém e-mailu',
+        'items' => [
+            '<b>Proč některé reklamace klient neviděl:</b> CRM zákazníky neslučuje — nová reklamace „s novým klientem", import nebo rezervace z webu založí <b>další záznam</b> téhož člověka (stejný telefon, jinak zapsaný). Klientská sekce brala jen jeden z těch záznamů (ten, ke kterému sedl PIN), takže reklamace zapsaná pod druhým záznamem pro klienta neexistovala. Nově klient vidí i reklamace pod svými dalšími záznamy se <b>stejným telefonním číslem a příjmením</b> (číslo se porovnává celé po číslicích: „+420 777 123 456" = „777123456"; slovenské +421 je jiné číslo, sdílená čísla typu 000 000 000 se nepárují; příjmení bez ohledu na diakritiku), reklamace navázané na jeho zakázku a reklamace ze starého importu bez zákazníka, když na nich sedí přesně jeho číslo. E-mail se ke slučování nepoužívá (rodina či firma sdílí schránku).',
+            '<b>Zakázky, doklady a faktury zůstávají přísně podle záznamu, který klient prokázal PINem</b> — sourozenecké záznamy se použijí jen u reklamací, aby sdílené číslo nikdy neotevřelo cizí doklady.',
+            '<b>Přihlášení:</b> PIN ze zakázkového listu sedí, i když zakázku kolega založil pod duplicitním záznamem — a přihlásí právě ten záznam, kterému zakázka patří. Přihlásit se nově jde i <b>číslem zakázky</b> (APFAZ…, i starým kódem z importu). <b>Bezpečnostní pojistka:</b> „PIN" rezervace z webu (na webu ho vyplní kdokoli jako heslo zařízení) portál nepřijímá, dokud klient <b>nepodepíše zakázkový list na tabletu</b> nebo obsluha <b>PIN u zakázky nezmění</b>. Platí to v každé variantě přihlášení (telefon, e-mail i číslo zakázky); tisk náhledu, odeslání listu ani změna stavu to neodemknou.',
+            '<b>Reklamace jsou vidět, i když klient zrovna nemá žádnou zakázku</b> (dosud byl výpis schovaný uvnitř karty vybrané zakázky), a když se výpis nepovede načíst, klient uvidí hlášku místo prázdna.',
+            '<b>Nové tlačítko „Reklamace" v hlavičce zakázky</b> otevře formulář předvyplněný ze zakázky (klient, zařízení, SN/IMEI, číslo zakázky); reklamace vzniká <b>navázaná na zakázku</b>, obsluha se po založení vrátí na zakázku (štítek + protokol jako dosud) a v hlavičce vidí všechny reklamace k zakázce. Klient ji má ve své sekci okamžitě. Když už k zakázce běží otevřená reklamace, systém se před založením další zeptá.',
+            '<b>Změna klienta u zakázky přetáhne i její reklamace</b> na nového klienta (dosud zůstaly na starém a klient je ztratil); klienta s reklamacemi nejde smazat (reklamace by osiřely).',
+            '<b>Audit automatických e-mailů:</b> podmínky jsou správně (připraveno k vyzvednutí, poděkování + recenze po vydání, potvrzení z e-shopu, upozornění servisu na reklamaci z portálu, zakázkový list po podpisu na tabletu), ale při selhání SMTP dosud <b>všechny mlčely</b>. Teď má každý pokus řádek v <b>Historii</b> („Odeslán e-mail" / „E-mail se neodeslal" s důvodem) a Nastavení → Integrace má tlačítko <b>Poslat testovací e-mail</b>. Podpis na tabletu vrací důvod, proč list neodešel.',
+            '<b>Oprava: Klienti → „Přidat klienta" hlásilo „Neplatný bezpečnostní token".</b> Formulář v sekci Klienti bezpečnostní token neposílal (zakládání klienta v Nové zakázce fungovalo, to jde jinou cestou). Doplněno; ostatní formuláře v CRM jsem prošla — chyběl jen tady.',
+            'Testy: <code>scripts/klient_identita_test.php</code> (39 kontrol — párování záznamů, přihlášení, podmínky vlastnictví, neověřený PIN z webu) a <code>scripts/catalog_custom_test.php</code>.',
+        ],
+    ],
+    [
         'version' => '3.76.1',
         'date' => '2026-09-04',
         'time' => '22:45',

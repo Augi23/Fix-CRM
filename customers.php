@@ -296,6 +296,10 @@ function showCustomerOrders(id, name) {
     <div class="modal-dialog">
         <div class="modal-content">
             <form action="api/add_customer.php" method="POST" id="newCustomerForm">
+                <?php /* api/add_customer.php token vyžaduje; formulář ho dosud neposílal
+                         (odesílá se klasicky, ne přes $.ajax, kde token doplňuje header.php)
+                         → „Neplatný bezpečnostní token" při každém přidání klienta odsud. */ ?>
+                <?php echo csrfField(); ?>
                 <div class="modal-header">
                     <h5 class="modal-title"><?php echo __('add_customer'); ?></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

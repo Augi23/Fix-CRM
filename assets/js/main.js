@@ -1592,12 +1592,74 @@ window.openComplaintDocChoice = function (complaintId, code) {
     bootstrap.Modal.getOrCreateInstance(el).show();
 };
 
+/* Reklamace k zakázce (tlačítko „Reklamace" v hlavičce detailu zakázky):
+   otevře globální modal „Nová reklamace" předvyplněný ze zakázky — klient,
+   zařízení, SN/IMEI, číslo zakázky. Reklamace tak vzniká NAVÁZANÁ na zakázku
+   (order_id), a proto ji klient hned vidí ve své sekci u té zakázky. */
+window.openComplaintForOrder = function (o) {
+    o = o || {};
+    var modalEl = document.getElementById('newComplaintModal');
+    var form = document.getElementById('newComplaintForm');
+    if (!modalEl || !form) { window.location.href = 'reklamace.php'; return; }
+    // k zakázce už běží reklamace → druhá jen po potvrzení (API duplicity nehlídá)
+    if ((o.open_count || 0) > 0 && !window.confirm(o.confirm_text || 'K této zakázce už existuje otevřená reklamace. Založit další?')) { return; }
+    // rozepsaný koncept jiné reklamace by přepsal předvyplnění (draft.js obnovuje při otevření)
+    try { if (window.afxDraft) afxDraft.clearKey('new-complaint'); else localStorage.removeItem('afx_draft:new-complaint'); } catch (e) {}
+    form.reset();
+    var set = function (name, value) { var el = form.querySelector('[name="' + name + '"]'); if (el) el.value = value == null ? '' : String(value); };
+
+    // klient ze zakázky → jako vybraná položka select2 (option existuje dřív než se select2 inicializuje)
+    var sel = document.getElementById('complaintCustomerSelect');
+    if (sel) {
+        Array.prototype.slice.call(sel.options).forEach(function (opt) { if (opt.value !== '') sel.removeChild(opt); });
+        if (o.customer_id) {
+            var opt = new Option(o.customer_label || ('#' + o.customer_id), String(o.customer_id), true, true);
+            sel.appendChild(opt);
+        }
+        if (window.jQuery && window.jQuery(sel).data('select2')) window.jQuery(sel).trigger('change');
+    }
+    var nc = document.getElementById('complaintNewCustomer');
+    if (nc && nc.classList.contains('show') && window.bootstrap) { bootstrap.Collapse.getOrCreateInstance(nc).hide(); }
+
+    // zařízení: typ podle značky a typu zakázky, model = značka + model, SN, číslo zakázky
+    var brand = String(o.device_brand || '').trim(), model = String(o.device_model || '').trim();
+    var isApple = /apple/i.test(brand) || /^(iphone|ipad|macbook|imac|mac\s|apple\s|airpods)/i.test(model);
+    var typeMap = isApple
+        ? { Phone: 'iPhone', Tablet: 'iPad', Notebook: 'MacBook', PC: 'iMac / Mac mini' }
+        : { Phone: 'Telefon (jiná značka)' };
+    var typeSel = form.querySelector('[name="device_type"]');
+    if (typeSel) {
+        var want = typeMap[String(o.device_type || '')] || 'Jiné';
+        var has = Array.prototype.some.call(typeSel.options, function (op) { return op.value === want; });
+        typeSel.value = has ? want : 'Jiné';
+    }
+    var fullModel = (brand && model.toLowerCase().indexOf(brand.toLowerCase()) !== 0) ? (brand + ' ' + model) : model;
+    set('device_model', fullModel.trim());
+    set('serial_number', o.serial_number || '');
+    set('orig_ref', o.order_code || '');
+    set('order_id', o.order_id || '');
+    set('return_order_id', o.order_id || '');
+    // předvyplněné údaje ze zakázky nepatří do konceptu (draft.js) — obnovený koncept na jiné
+    // stránce by novou reklamaci tiše přivázal k téhle zakázce
+    ['orig_ref', 'order_id', 'return_order_id', 'device_model', 'serial_number'].forEach(function (n) {
+        var el = form.querySelector('[name="' + n + '"]'); if (el) el.setAttribute('data-no-draft', '1');
+    });
+    modalEl.__afxPrefillCustomer = String(o.customer_id || '');
+
+    var note = document.getElementById('complaintOrderNote');
+    if (note) { note.textContent = (o.note_prefix || 'k zakázce') + ' ' + (o.order_code || ''); note.hidden = !o.order_code; }
+    var grid = document.getElementById('complaintPhotoPreview'); if (grid) grid.innerHTML = '';
+    modalEl.__afxFromOrder = true;   // show.bs.modal v modalu jinak vazbu na zakázku vyčistí
+    if (window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+};
+
 // po založení reklamace: štítek na tiskárnu + nabídka reklamačního protokolu (podpis / tisk)
 (function () {
     var params = new URLSearchParams(window.location.search);
     var createdId = params.get('created_id');
     var createdCode = params.get('created') || '';
-    if (!createdId || !/reklamace\.php$/.test(window.location.pathname)) { return; }
+    // běží na přehledu reklamací i na detailu zakázky (tlačítko „Reklamace" vrací obsluhu tam)
+    if (!createdId || !/(?:reklamace|view_order)\.php$/.test(window.location.pathname)) { return; }
     // Reklamace založena → zahodit draft nové reklamace (viz new-order výše).
     try { if (window.afxDraft) afxDraft.clearKey('new-complaint'); else localStorage.removeItem('afx_draft:new-complaint'); } catch (e) {}
     params.delete('created_id');

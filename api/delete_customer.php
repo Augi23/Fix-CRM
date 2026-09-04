@@ -37,6 +37,15 @@ try {
     if ($check->fetchColumn() > 0) {
         throw new Exception('Nelze smazat klienta, který má zakázky. Nejdřív smažte zakázky.');
     }
+    // …ani s reklamacemi: smazáním by reklamace osiřely (customer_id na neexistující řádek)
+    // a klient by je ve své sekci ztratil.
+    try {
+        $chk2 = $pdo->prepare("SELECT COUNT(*) FROM complaints WHERE customer_id = ?");
+        $chk2->execute([$id]);
+        if ((int)$chk2->fetchColumn() > 0) {
+            throw new Exception('Nelze smazat klienta, který má reklamace. Nejdřív reklamace přiřaďte jinému klientovi nebo smažte.');
+        }
+    } catch (PDOException $e) { /* bez tabulky reklamací není co hlídat */ }
 
     $stmt = $pdo->prepare("DELETE FROM customers WHERE id = ?");
     $stmt->execute([$id]);

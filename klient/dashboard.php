@@ -95,12 +95,21 @@ if (isset($pdo) && $selectedOrder) {
    POZOR: žádné ensure funkce ani DDL — schéma se z veřejného portálu neupravuje. */
 $clientComplaints = [];
 $clientComplaintsMore = 0;
+$clientComplaintsError = false;
 if (isset($pdo) && $customerId > 0) {
     try {
+        // sloupce order_id/source musí existovat dřív, než se na ně dotaz zeptá
+        // (dřív se zajišťovaly až níž u vybrané zakázky → první načtení bez reklamací)
+        if (function_exists('ensureComplaintsClientColumns')) { ensureComplaintsClientColumns($pdo); }
+        // Vlastnictví = jeho záznam + záznamy se stejným telefonem + reklamace
+        // k jeho zakázkám (viz clientComplaintOwnerSql) — dřív jen c.customer_id =
+        // přihlášený řádek, takže reklamace založená „s novým klientem" byla neviditelná.
+        $own = clientComplaintOwnerSql($pdo, $customerId, 'c');
+        // štítek „k zakázce …" jen u zakázky přihlášeného záznamu (kód zakázky je i přihlašovací údaj)
         $cst = $pdo->prepare("SELECT c.*, o.order_code AS linked_order_code
-            FROM complaints c LEFT JOIN orders o ON o.id = c.order_id AND o.customer_id = c.customer_id
-            WHERE c.customer_id = ? ORDER BY c.id DESC LIMIT 31");
-        $cst->execute([$customerId]);
+            FROM complaints c LEFT JOIN orders o ON o.id = c.order_id AND o.customer_id = ?
+            WHERE " . $own['sql'] . " ORDER BY c.id DESC LIMIT 31");
+        $cst->execute(array_merge([$customerId], $own['params']));
         $clientComplaints = $cst->fetchAll(PDO::FETCH_ASSOC) ?: [];
         if (count($clientComplaints) > 30) {        // 31. řádek je jen signál „je toho víc"
             $clientComplaintsMore = 1;
@@ -116,6 +125,7 @@ if (isset($pdo) && $customerId > 0) {
         // tichý catch dřív maskoval přesně ten problém, který se tu opravuje
         error_log('klient dashboard reklamace: ' . $e->getMessage());
         $clientComplaints = [];
+        $clientComplaintsError = true;   // místo prázdna klient uvidí, že se výpis nepovedl
     }
 }
 
@@ -259,8 +269,11 @@ if ($selectedOrder && isset($pdo)) {
     // Reklamace k této zakázce
     if (function_exists('ensureComplaintsClientColumns')) { ensureComplaintsClientColumns($pdo); }
     try {
-        $q = $pdo->prepare("SELECT * FROM complaints WHERE order_id = ? AND customer_id = ? ORDER BY id DESC LIMIT 1");
-        $q->execute([$oid, $customerId]);
+        // zakázka je klientova (viz výběr výš) → reklamace k ní je jeho, i když ji
+        // obsluha zapsala pod jiný záznam se stejným telefonem nebo bez zákazníka
+        $__own = clientComplaintOwnerSql($pdo, $customerId, 'complaints');
+        $q = $pdo->prepare("SELECT * FROM complaints WHERE order_id = ? AND " . $__own['sql'] . " ORDER BY id DESC LIMIT 1");
+        $q->execute(array_merge([$oid], $__own['params']));
         $orderComplaint = $q->fetch() ?: null;
     } catch (Throwable $e) { $orderComplaint = null; }
 
@@ -922,7 +935,33 @@ if ($selectedOrder && isset($pdo)) {
                             </div>
                         </div>
 
-                        <?php if (!empty($clientComplaints)): ?>
+
+                        <?php if ($orderComplaint): ?>
+                            <div class="order-notice" style="background: rgba(249,115,22,0.12); border-color: rgba(249,115,22,0.28); color: #ffcfa1;">
+                                <i class="fas fa-rotate-left me-2"></i>
+                                <?php echo __('client_complaint_existing'); ?>
+                                <strong><?php echo e($orderComplaint['complaint_code']); ?></strong>
+                                — <?php echo e($orderComplaint['complaint_status'] ?? ''); ?>
+                            </div>
+                        <?php elseif ($canComplain): ?>
+                            <div class="claim-box">
+                                <div class="claim-head"><i class="fas fa-rotate-left me-2"></i><?php echo __('client_complaint_cta_title'); ?></div>
+                                <p class="claim-sub mb-0"><?php echo __('client_complaint_cta_desc'); ?></p>
+                                <button type="button" class="btn-claim mt-3" onclick="afxOpenClaim()">
+                                    <i class="fas fa-rotate-left me-2"></i><?php echo __('client_complaint_cta'); ?>
+                                </button>
+                            </div>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-folder-open fa-2x mb-3"></i>
+                            <div><?php echo __('client_no_active_order'); ?></div>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php /* Reklamace klienta — mimo větev vybrané zakázky: klient je uvidí,
+                             i když zrovna nemá žádnou (zbývající) zakázku. */ ?>
+                        <?php if (!empty($clientComplaints) || $clientComplaintsError): ?>
                         <?php /* VŠECHNY reklamace zákazníka i s fotkami — i ty přijaté na
                                  prodejně bez vazby na konkrétní zakázku (ty klient dřív neviděl).
                                  Přílohy se servírují přes hlídaný endpoint (klient/api/complaint_file.php),
@@ -934,6 +973,9 @@ if ($selectedOrder && isset($pdo)) {
                                     <p><?php echo e(__('client_complaints_desc')); ?></p>
                                 </div>
                             </div>
+                            <?php if ($clientComplaintsError): ?>
+                                <p class="mb-0" style="font-size:13px;color:#fca5a5;"><i class="fas fa-triangle-exclamation me-1"></i><?php echo e(__('client_complaints_load_failed')); ?></p>
+                            <?php endif; ?>
                             <div class="cmpl-list">
                                 <?php foreach ($clientComplaints as $c): ?>
                                     <?php
@@ -1013,29 +1055,6 @@ if ($selectedOrder && isset($pdo)) {
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>
-
-                        <?php if ($orderComplaint): ?>
-                            <div class="order-notice" style="background: rgba(249,115,22,0.12); border-color: rgba(249,115,22,0.28); color: #ffcfa1;">
-                                <i class="fas fa-rotate-left me-2"></i>
-                                <?php echo __('client_complaint_existing'); ?>
-                                <strong><?php echo e($orderComplaint['complaint_code']); ?></strong>
-                                — <?php echo e($orderComplaint['complaint_status'] ?? ''); ?>
-                            </div>
-                        <?php elseif ($canComplain): ?>
-                            <div class="claim-box">
-                                <div class="claim-head"><i class="fas fa-rotate-left me-2"></i><?php echo __('client_complaint_cta_title'); ?></div>
-                                <p class="claim-sub mb-0"><?php echo __('client_complaint_cta_desc'); ?></p>
-                                <button type="button" class="btn-claim mt-3" onclick="afxOpenClaim()">
-                                    <i class="fas fa-rotate-left me-2"></i><?php echo __('client_complaint_cta'); ?>
-                                </button>
-                            </div>
-                        <?php endif; ?>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <i class="fas fa-folder-open fa-2x mb-3"></i>
-                            <div><?php echo __('client_no_active_order'); ?></div>
-                        </div>
-                    <?php endif; ?>
                 </div>
             </section>
 

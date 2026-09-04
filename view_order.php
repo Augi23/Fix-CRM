@@ -157,7 +157,46 @@ function localizedOrderStatusLabel(string $status): string {
     return getOrderStatusLabel($status);
 }
 
+// Reklamace navázané na tuhle zakázku (tlačítko „Reklamace" v hlavičce je zakládá
+// s order_id) — obsluha je vidí rovnou u zakázky, klient u sebe v portálu.
+$orderComplaints = [];
+try {
+    if (function_exists('ensureComplaintsClientColumns')) { ensureComplaintsClientColumns($pdo); }
+    $__cq = $pdo->prepare("SELECT id, complaint_code, complaint_status, created_at FROM complaints WHERE order_id = ? ORDER BY id DESC LIMIT 10");
+    $__cq->execute([$id]);
+    $orderComplaints = $__cq->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $e) { $orderComplaints = []; }
+// údaje pro předvyplnění modalu „Nová reklamace" (JS openComplaintForOrder v main.js)
+$complaintPrefill = [
+    'order_id' => (int)$order['id'],
+    'order_code' => (string)orderDisplayCode($order),
+    'customer_id' => (int)($order['customer_id'] ?? 0),
+    'customer_label' => trim(trim((string)($order['first_name'] ?? '') . ' ' . (string)($order['last_name'] ?? ''))
+        . ((string)($order['phone'] ?? '') !== '' ? ' (' . (string)$order['phone'] . ')' : '')),
+    'device_type' => (string)($order['device_type'] ?? ''),
+    'device_brand' => (string)($order['device_brand'] ?? ''),
+    'device_model' => (string)($order['device_model'] ?? ''),
+    'serial_number' => (string)($order['serial_number'] ?? ''),
+    'note_prefix' => __('complaint_for_order_note'),
+    // otevřené reklamace k zakázce → JS se před založením další zeptá (duplicity)
+    'open_count' => count(array_filter($orderComplaints, static fn($c) => !in_array((string)($c['complaint_status'] ?? ''), ['Vyřízeno', 'Zamítnuto'], true))),
+    'confirm_text' => __('order_complaint_exists_confirm'),
+];
+
 ?>
+
+<?php if (!empty($_GET['created'])): ?>
+    <div class="alert alert-success d-flex align-items-center gap-2 flex-wrap">
+        <i class="fas fa-check-circle"></i>
+        <span><?php echo __('complaint'); ?> <strong><?php echo e((string)$_GET['created']); ?></strong> <?php echo __('order_complaint_created_suffix'); ?></span>
+        <?php if (!empty($_GET['created_id'])): ?>
+            <a class="btn btn-sm btn-outline-success ms-auto" href="view_complaint.php?id=<?php echo (int)$_GET['created_id']; ?>"><i class="fas fa-rotate-left me-1"></i><?php echo __('open_complaint'); ?></a>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+<?php if (!empty($_GET['error'])): ?>
+    <div class="alert alert-danger"><i class="fas fa-triangle-exclamation me-2"></i><?php echo e((string)$_GET['error']); ?></div>
+<?php endif; ?>
 
 <div class="row">
     <div class="col-md-8">
@@ -174,10 +213,17 @@ function localizedOrderStatusLabel(string $status): string {
                         <i class="fas fa-edit me-1"></i> <?php echo __('edit_order_btn'); ?>
                     </button>
                     <?php if(crmCanDeleteOrders()): ?>
-                    <button class="btn btn-sm btn-outline-danger me-3" onclick="deleteOrder(<?php echo $order['id']; ?>)">
+                    <button class="btn btn-sm btn-outline-danger me-2" onclick="deleteOrder(<?php echo $order['id']; ?>)">
                         <i class="fas fa-trash me-1"></i> <?php echo __('delete'); ?>
                     </button>
                     <?php endif; ?>
+                    <?php /* Reklamace k této zakázce: otevře globální modal „Nová reklamace"
+                             předvyplněný ze zakázky (klient, zařízení, SN, číslo zakázky). */ ?>
+                    <button type="button" class="btn btn-sm me-3 fw-semibold text-nowrap" style="background:#f97316;color:#fff"
+                            title="<?php echo e(__('order_create_complaint_title')); ?>"
+                            onclick='openComplaintForOrder(<?php echo json_encode($complaintPrefill, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP); ?>)'>
+                        <i class="fas fa-rotate-left me-1"></i> <?php echo __('order_create_complaint_btn'); ?>
+                    </button>
                     <div>
                         <h5 class="mb-0">
                             <?php echo __('order'); ?> <?php echo e(orderDisplayCode($order)); ?> - <?php echo htmlspecialchars($order['device_model']); ?>
@@ -187,6 +233,16 @@ function localizedOrderStatusLabel(string $status): string {
                         </h5>
                         <?php if (($__legacyCode = trim((string)($order['legacy_code'] ?? ''))) !== ''): ?>
                             <div class="mt-1" style="font-size:.9rem; color:rgba(255,255,255,.72);"><i class="fas fa-clock-rotate-left me-1" style="font-size:.8rem;"></i>(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
+                        <?php endif; ?>
+                        <?php if ($orderComplaints): ?>
+                        <div class="small mt-1" style="color:#fdba74;">
+                            <i class="fas fa-rotate-left me-1"></i><?php echo __('order_complaints_line'); ?>:
+                            <?php foreach ($orderComplaints as $__i => $__c): ?>
+                                <?php if ($__i > 0) echo ' · '; ?>
+                                <a class="fw-semibold" style="color:#fdba74;" href="view_complaint.php?id=<?php echo (int)$__c['id']; ?>"><?php echo e((string)$__c['complaint_code']); ?></a>
+                                <span class="text-white-75">(<?php echo e((string)($__c['complaint_status'] ?: '—')); ?>)</span>
+                            <?php endforeach; ?>
+                        </div>
                         <?php endif; ?>
                         <?php if (!empty($webBookingRef['wp_booking_id'])): ?>
                         <div class="small mt-1" style="color:#5fd2ff;">

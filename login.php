@@ -227,6 +227,12 @@ if (isset($_POST['login'])) {
             }
 
             if ($customer && $matchedOrder) {
+                // PIN prokázal konkrétní zakázku → přihlášený je ZÁZNAM, kterému patří
+                // (ne první záznam se stejným telefonem — ten může být jiného člověka)
+                $__owner = (int)($matchedOrder['customer_id'] ?? 0);
+                if ($__owner > 0 && $__owner !== (int)$customer['id'] && isset($lookup['customers'][$__owner])) {
+                    $customer = $lookup['customers'][$__owner];
+                }
                 session_regenerate_id(true);
                 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));   // nový token k nové relaci
                 clearStaffSession();
