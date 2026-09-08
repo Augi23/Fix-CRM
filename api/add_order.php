@@ -361,7 +361,19 @@ try {
         afxOrderFail('Fotky se nepodařilo uložit', (string)$intake_photo_failed_msg);
     }
 
-    $pdo->commit();
+    if ($pdo->inTransaction()) {
+        $pdo->commit();
+    } else {
+        // Transakce zmizela cestou (implicitní COMMIT nějakého DDL) — zakázka je
+        // v DB už uložená; zaznamenáme, ať se viník dá dohledat v auditu.
+        try {
+            crmAuditLog('order.create.warn', [
+                'entity_type' => 'order', 'entity_id' => $order_id,
+                'entity_label' => ($new_order_code ?: ('#' . $order_id)),
+                'summary' => 'VAROVÁNÍ: transakce příjmu skončila implicitním commitem (DDL uvnitř transakce) — zakázka vznikla, hledá se viník.',
+            ]);
+        } catch (Throwable $eW) { error_log('add_order txn-lost audit: ' . $eW->getMessage()); }
+    }
 
     // Od commitu je zakázka VYTVOŘENÁ — audit a notifikace jsou best-effort a
     // NESMÍ shodit odpověď na „Order creation failed" (uživatel by ji zkusil
@@ -394,10 +406,45 @@ try {
 
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
-    error_log("add_order error: " . $e->getMessage());
+    $errDetail = get_class($e) . ' [' . (string)$e->getCode() . ']: ' . $e->getMessage()
+        . ' @ ' . basename((string)$e->getFile()) . ':' . $e->getLine();
+    error_log('add_order error: ' . $errDetail);
+
+    // Zakázka mohla PŘESTO vzniknout (implicitní commit DDL uprostřed transakce
+    // rollback nezruší). Když ji najdeme, pošleme obsluhu rovnou na ni — druhé
+    // odeslání formuláře by jinak vyrobilo duplicitu nebo falešnou paniku.
+    try {
+        $chk = $pdo->prepare(
+            "SELECT id FROM orders
+             WHERE customer_id = ? AND device_model = ? AND COALESCE(problem_description,'') = ?
+               AND created_at >= (NOW() - INTERVAL 90 SECOND)
+             ORDER BY id DESC LIMIT 1"
+        );
+        $chk->execute([(int)($customer_id ?? 0), (string)($device_model ?? ''), (string)($problem_description ?? '')]);
+        $existingId = (int)$chk->fetchColumn();
+        if ($existingId > 0) {
+            try {
+                crmAuditLog('order.create.recovered', [
+                    'entity_type' => 'order', 'entity_id' => $existingId,
+                    'summary' => 'Příjem ohlásil chybu, ale zakázka v DB vznikla — obsluha přesměrována na ni. Chyba: ' . mb_substr($errDetail, 0, 400),
+                ]);
+            } catch (Throwable $eA) { /* audit je bonus */ }
+            header('Location: ../view_order.php?id=' . $existingId . '&recovered=1');
+            exit;
+        }
+    } catch (Throwable $eChk) { /* kontrola je bonus */ }
+
+    try {
+        crmAuditLog('order.create.failed', [
+            'entity_type' => 'order',
+            'summary' => 'Založení zakázky selhalo: ' . mb_substr($errDetail, 0, 400),
+        ]);
+    } catch (Throwable $eA) { /* audit je bonus */ }
+
     afxOrderFail(
         'Zakázku se nepodařilo uložit',
-        'Uložení do databáze neproběhlo, zakázka tedy nevznikla. Zkuste ji odeslat znovu — pokud to selže i podruhé, dejte prosím vědět správci.'
+        'Uložení do databáze neproběhlo, zakázka tedy nevznikla. Zkuste ji odeslat znovu — pokud to selže i podruhé, ukažte prosím správci tento technický detail: '
+        . mb_substr($errDetail, 0, 220)
     );
 }
 ?>

@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.77.1',
+        'date' => '2026-09-08',
+        'time' => '21:49',
+        'title' => 'Falešné „zakázku se nepodařilo uložit" při příjmu',
+        'items' => [
+            'Když příjem zakázky ohlásí chybu, systém nově sám ověří, jestli zakázka přesto nevznikla — a rovnou ji otevře, místo aby nutil obsluhu odesílat formulář znovu.',
+            'Chybová hláška nově obsahuje technický detail pro správce a každé selhání i zotavení příjmu se zapisuje do auditu.',
+        ],
+    ],
+    [
         'version' => '3.77.0',
         'date' => '2026-09-04',
         'time' => '23:00',
