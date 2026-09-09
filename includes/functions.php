@@ -2387,6 +2387,14 @@ function ensureEshopReservationSchema(): void {
             ['collected_at', "ALTER TABLE eshop_orders ADD COLUMN collected_at DATETIME NULL DEFAULT NULL"],
             ['paid_at', "ALTER TABLE eshop_orders ADD COLUMN paid_at DATETIME NULL DEFAULT NULL"],
             ['shipped_at', "ALTER TABLE eshop_orders ADD COLUMN shipped_at DATETIME NULL DEFAULT NULL"],
+            // strukturované údaje z objednávky (v3.77.2) — dřív jen slepené v note
+            ['pay_label', "ALTER TABLE eshop_orders ADD COLUMN pay_label VARCHAR(120) NULL DEFAULT NULL"],
+            ['ship_id', "ALTER TABLE eshop_orders ADD COLUMN ship_id VARCHAR(32) NULL DEFAULT NULL"],
+            ['ship_label', "ALTER TABLE eshop_orders ADD COLUMN ship_label VARCHAR(160) NULL DEFAULT NULL"],
+            ['addr_street', "ALTER TABLE eshop_orders ADD COLUMN addr_street VARCHAR(160) NULL DEFAULT NULL"],
+            ['addr_zip', "ALTER TABLE eshop_orders ADD COLUMN addr_zip VARCHAR(20) NULL DEFAULT NULL"],
+            ['addr_city', "ALTER TABLE eshop_orders ADD COLUMN addr_city VARCHAR(120) NULL DEFAULT NULL"],
+            ['access_point_json', "ALTER TABLE eshop_orders ADD COLUMN access_point_json TEXT NULL DEFAULT NULL"],
         ] as [$col, $ddl]) {
             if (!$pdo->query("SHOW COLUMNS FROM eshop_orders LIKE '" . $col . "'")->fetch()) { $pdo->exec($ddl); }
         }

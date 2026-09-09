@@ -91,6 +91,7 @@ $payId     = mb_substr(trim((string)($body['pay_id'] ?? '')), 0, 32);
 // projde teprve při skutečném placení. Ostatní metody (karta, převod, dobírka)
 // zůstávají prodejem jako dosud.
 $isReservation = afxEshopPayIsReservation($payId);
+$payLabel  = mb_substr(trim((string)($body['pay_label'] ?? '')), 0, 120);
 $shipId    = mb_substr(trim((string)($body['ship_id'] ?? '')), 0, 32);
 $shipLabel = mb_substr(trim((string)($body['ship_label'] ?? '')), 0, 120);
 $addrIn    = is_array($body['address'] ?? null) ? $body['address'] : [];
@@ -99,6 +100,15 @@ $address   = [
     'zip'    => mb_substr(trim((string)($addrIn['zip'] ?? '')), 0, 20),
     'city'   => mb_substr(trim((string)($addrIn['city'] ?? '')), 0, 120),
 ];
+$apIn = is_array($body['access_point'] ?? null) ? $body['access_point'] : null;
+$accessPointJson = $apIn ? json_encode([
+    'code'   => mb_substr(trim((string)($apIn['code'] ?? '')), 0, 32),
+    'name'   => mb_substr(trim((string)($apIn['name'] ?? '')), 0, 100),
+    'type'   => mb_substr(trim((string)($apIn['type'] ?? '')), 0, 32),
+    'street' => mb_substr(trim((string)($apIn['street'] ?? '')), 0, 100),
+    'zip'    => mb_substr(trim((string)($apIn['zip'] ?? '')), 0, 12),
+    'city'   => mb_substr(trim((string)($apIn['city'] ?? '')), 0, 80),
+], JSON_UNESCAPED_UNICODE) : null;
 
 // ── transakce: idempotentní zápis objednávky + atomický odečet skladu ──────────
 try {
@@ -108,13 +118,17 @@ try {
     //    (opakovaný webhook) → vrať původní výsledek, sklad NEODEČÍTEJ podruhé.
     try {
         $ins = $pdo->prepare("INSERT INTO eshop_orders
-            (order_ref, status, items_json, total, customer_name, customer_email, customer_phone, note, pay_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            (order_ref, status, items_json, total, customer_name, customer_email, customer_phone, note, pay_id,
+             pay_label, ship_id, ship_label, addr_street, addr_zip, addr_city, access_point_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $ins->execute([
             $orderRef,
             $isReservation ? 'reserved' : 'paid',
             json_encode(array_map(fn($c, $q) => ['code' => $c, 'qty' => $q], array_keys($items), array_values($items)), JSON_UNESCAPED_UNICODE),
             $total, $cName, $cEmail, $cPhone, $note, $payId !== '' ? $payId : null,
+            $payLabel !== '' ? $payLabel : null, $shipId !== '' ? $shipId : null, $shipLabel !== '' ? $shipLabel : null,
+            $address['street'] !== '' ? $address['street'] : null, $address['zip'] !== '' ? $address['zip'] : null,
+            $address['city'] !== '' ? $address['city'] : null, $accessPointJson,
         ]);
         $eshopOrderId = (int)$pdo->lastInsertId();
     } catch (PDOException $e) {
@@ -171,7 +185,13 @@ try {
         $after->execute([(int)$p['id']]);
         $results[] = ['code' => $code, 'qty' => $qty, 'stock_after' => (int)$after->fetchColumn()];
         $emailItems[] = ['title' => (string)$p['title'], 'qty' => $qty, 'price' => (float)$p['price']];
+        $storedItems[] = ['code' => $code, 'qty' => $qty, 'name' => (string)$p['title'], 'price' => round((float)$p['price'], 2)];
     }
+    // položky s názvem a zamrzlou cenou — administrace pak nemusí luštit kódy
+    try {
+        $pdo->prepare("UPDATE eshop_orders SET items_json = ? WHERE id = ?")
+            ->execute([json_encode($storedItems ?? [], JSON_UNESCAPED_UNICODE), $eshopOrderId]);
+    } catch (Throwable $eItems) { error_log('eshop_sale items_json enrich: ' . $eItems->getMessage()); }
 
     $pdo->commit();
 

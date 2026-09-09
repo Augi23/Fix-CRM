@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.77.2',
+        'date' => '2026-09-09',
+        'time' => '19:57',
+        'title' => 'E-shop objednávky: názvy produktů a všechny údaje z objednávky',
+        'items' => [
+            'Administrace e-shopu ukazuje u položek <b>název produktu</b> (ne jen kód) — i u starších objednávek, názvy se dohledají ze skladu.',
+            'Nově se z objednávky ukládají zvlášť <b>doprava, platba, doručovací adresa i výdejní místo</b> — v přehledu objednávek jsou to samostatné sloupce; u starých objednávek se vytáhnou z poznámky.',
+            'Poznámka k objednávce (zdroj Google Ads, potvrzení platby kartou apod.) je v přehledu vidět přímo.',
+        ],
+    ],
+    [
         'version' => '3.77.1',
         'date' => '2026-09-08',
         'time' => '21:49',
