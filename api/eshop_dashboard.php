@@ -24,7 +24,7 @@ try {
     // Nevyřízené objednávky (rezervace + dobírky na cestě) se do výpisu berou VŽDY,
     // i kdyby byly starší než limit — jinak by zapadly a nikdo by je neuvolnil.
     $cols = "id, order_ref, status, items_json, total, customer_name, customer_phone,
-            pay_id, created_at, collected_at, paid_at, shipped_at";
+            pay_id, created_at, collected_at, paid_at, shipped_at, customer_note";
     $st = $pdo->prepare("SELECT $cols FROM eshop_orders
         WHERE status IN ('reserved', 'shipped')
            OR id IN (SELECT id FROM (SELECT id FROM eshop_orders ORDER BY id DESC LIMIT $limit) t)
@@ -62,6 +62,7 @@ try {
             'total' => (float)$r['total'],
             'customer' => trim((string)($r['customer_name'] ?? '')) ?: '—',
             'phone' => trim((string)($r['customer_phone'] ?? '')),
+            'customer_note' => trim((string)($r['customer_note'] ?? '')),   // volná poznámka zákazníka z pokladny
             'pay_id' => (string)($r['pay_id'] ?? ''),
             'reason' => (string)$r['status'] === 'reserved' ? afxEshopReservationReason((string)($r['pay_id'] ?? '')) : '',
             'status_label' => afxEshopStatusLabel((string)$r['status'], (string)($r['pay_id'] ?? '')),

@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.77.3',
+        'date' => '2026-09-09',
+        'time' => '20:10',
+        'title' => 'E-shop: poznámka zákazníka k objednávce',
+        'items' => [
+            'V pokladně e-shopu je nové nepovinné pole <b>Poznámka k objednávce</b> — zákazník může napsat, kdy ho zastihneme, nebo přání k doručení.',
+            'Poznámka se ukládá zvlášť (ne do systémové poznámky) a je vidět v přehledu objednávek v adminu e-shopu, na nástěnce CRM u objednávky z e-shopu a v potvrzovacím e-mailu zákazníkovi („Vaše poznámka").',
+            '<b>Pořadí nasazení:</b> nejdřív toto CRM, teprve potom nový build e-shopu (applefix.click). Starší zápis objednávky v CRM pole nezná — objednávky z mezidobí by o poznámku přišly (nic nespadne, jen se neuloží).',
+        ],
+    ],
+    [
         'version' => '3.77.2',
         'date' => '2026-09-09',
         'time' => '19:57',

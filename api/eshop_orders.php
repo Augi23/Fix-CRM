@@ -52,7 +52,7 @@ if ($where && $params) {
 }
 
 $sql = "SELECT order_ref, status, items_json, total, customer_name, customer_email, customer_phone, note, created_at,
-               pay_id, pay_label, ship_id, ship_label, addr_street, addr_zip, addr_city, access_point_json
+               pay_id, pay_label, ship_id, ship_label, addr_street, addr_zip, addr_city, access_point_json, customer_note
         FROM eshop_orders $where ORDER BY id DESC LIMIT $limit OFFSET $offset";
 $st = $pdo->prepare($sql);
 $st->execute($params);
@@ -117,6 +117,7 @@ foreach ($rows as $r) {
         'customer_phone' => $r['customer_phone'] !== null ? (string)$r['customer_phone'] : null,
         'note'           => $r['note'] !== null ? (string)$r['note'] : null,
         'note_extra'     => implode(' · ', $legacy['rest']) ?: null,   // co zbylo mimo dopravu/platbu/adresu
+        'customer_note'  => ($r['customer_note'] !== null && $r['customer_note'] !== '') ? (string)$r['customer_note'] : null,   // volná poznámka zákazníka z pokladny
         'pay_id'         => $r['pay_id'] !== null ? (string)$r['pay_id'] : null,
         'pay_label'      => $r['pay_label'] ?: $legacy['pay'],
         'ship_id'        => $r['ship_id'] !== null ? (string)$r['ship_id'] : null,

@@ -344,6 +344,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
 
                 + '<div class="who">' + esc(o.customer) + (o.phone ? ' · ' + esc(o.phone) : '') + ' · ' + esc(o.date) + '</div>'
                 + '<div class="items">' + esc(items || '—') + '</div>'
+                + (o.customer_note ? '<div class="who" style="white-space:pre-line;overflow-wrap:anywhere;">💬 ' + esc(o.customer_note) + '</div>' : '')
                 + (o.waiting_days > 2 ? '<div class="who" style="color:#ffd479;">čeká už ' + Number(o.waiting_days) + ' dní</div>' : '')
                 + '<div class="d-flex gap-2 flex-wrap mt-2">'
                 + (o.can_ship ? btn('ship', o, 'btn-primary', 'fa-truck', 'Předáno dopravci — odesláno') : '')

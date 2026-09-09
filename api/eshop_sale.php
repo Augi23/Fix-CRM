@@ -92,6 +92,8 @@ $payId     = mb_substr(trim((string)($body['pay_id'] ?? '')), 0, 32);
 // zůstávají prodejem jako dosud.
 $isReservation = afxEshopPayIsReservation($payId);
 $payLabel  = mb_substr(trim((string)($body['pay_label'] ?? '')), 0, 120);
+// volná poznámka zákazníka z pokladny — řídicí znaky pryč (odřádkování zůstává), max 500 znaků
+$customerNote = mb_substr(trim((string)preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/u', '', (string)($body['customer_note'] ?? ''))), 0, 500);
 $shipId    = mb_substr(trim((string)($body['ship_id'] ?? '')), 0, 32);
 $shipLabel = mb_substr(trim((string)($body['ship_label'] ?? '')), 0, 120);
 $addrIn    = is_array($body['address'] ?? null) ? $body['address'] : [];
@@ -119,8 +121,8 @@ try {
     try {
         $ins = $pdo->prepare("INSERT INTO eshop_orders
             (order_ref, status, items_json, total, customer_name, customer_email, customer_phone, note, pay_id,
-             pay_label, ship_id, ship_label, addr_street, addr_zip, addr_city, access_point_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+             pay_label, ship_id, ship_label, addr_street, addr_zip, addr_city, access_point_json, customer_note)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $ins->execute([
             $orderRef,
             $isReservation ? 'reserved' : 'paid',
@@ -129,6 +131,7 @@ try {
             $payLabel !== '' ? $payLabel : null, $shipId !== '' ? $shipId : null, $shipLabel !== '' ? $shipLabel : null,
             $address['street'] !== '' ? $address['street'] : null, $address['zip'] !== '' ? $address['zip'] : null,
             $address['city'] !== '' ? $address['city'] : null, $accessPointJson,
+            $customerNote !== '' ? $customerNote : null,
         ]);
         $eshopOrderId = (int)$pdo->lastInsertId();
     } catch (PDOException $e) {
@@ -221,6 +224,7 @@ try {
                 'ship_id'        => $shipId,
                 'ship_label'     => $shipLabel,
                 'address'        => $address,
+                'customer_note'  => $customerNote,
             ]);
         } catch (Throwable $mailEx) {
             error_log('eshop_sale email: ' . $mailEx->getMessage());

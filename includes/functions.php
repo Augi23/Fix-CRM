@@ -2395,6 +2395,8 @@ function ensureEshopReservationSchema(): void {
             ['addr_zip', "ALTER TABLE eshop_orders ADD COLUMN addr_zip VARCHAR(20) NULL DEFAULT NULL"],
             ['addr_city', "ALTER TABLE eshop_orders ADD COLUMN addr_city VARCHAR(120) NULL DEFAULT NULL"],
             ['access_point_json', "ALTER TABLE eshop_orders ADD COLUMN access_point_json TEXT NULL DEFAULT NULL"],
+            // volná poznámka zákazníka z pokladny e-shopu (v3.77.3) — zvlášť od systémové note
+            ['customer_note', "ALTER TABLE eshop_orders ADD COLUMN customer_note TEXT NULL DEFAULT NULL"],
         ] as [$col, $ddl]) {
             if (!$pdo->query("SHOW COLUMNS FROM eshop_orders LIKE '" . $col . "'")->fetch()) { $pdo->exec($ddl); }
         }
@@ -7775,6 +7777,13 @@ function crmEshopOrderEmailHtml(array $o): string
             . $e($addr['street']) . ', ' . $e(trim(($addr['zip'] ?? '') . ' ' . ($addr['city'] ?? ''))) . '</div>';
     }
 
+    // ── poznámka zákazníka (jen když ji v pokladně napsal) ──────
+    $note = trim((string)($o['customer_note'] ?? ''));
+    $noteHtml = $note !== ''
+        ? '<tr><td class="px" style="padding:42px 48px 0;">' . $label('Vaše poznámka')
+            . '<div style="' . $t(15, 400, '1.55', $ink) . '">' . nl2br($e($note)) . '</div></td></tr>'
+        : '';
+
     // ── patička ─────────────────────────────────────────────────
     $cAddr  = trim((string)get_setting('company_address', ''));
     $cPhone = trim((string)get_setting('company_phone', ''));
@@ -7813,6 +7822,9 @@ function crmEshopOrderEmailHtml(array $o): string
         // doručení
         . '<tr><td class="px" style="padding:42px 48px 0;">' . $label('Doručení')
         . '<div style="' . $t(15, 500, '1.4', $ink) . '">' . ($shipLabel !== '' ? $e($shipLabel) : 'Dle volby v objednávce') . '</div>' . $addrHtml . '</td></tr>'
+
+        // poznámka zákazníka (prázdná, když nic nenapsal)
+        . $noteHtml
 
         // dotaz
         . '<tr><td class="px" style="padding:42px 48px 0;">'
