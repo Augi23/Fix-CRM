@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.78.2',
+        'date' => '2026-09-10',
+        'time' => '21:44',
+        'title' => 'Potvrzení platby a další akce nad objednávkou i z administrace e-shopu',
+        'items' => [
+            'V administraci e-shopu (applefix.click/admin → Objednávky) jsou u čekajících objednávek stejná tlačítka jako na nástěnce CRM: <b>Platba dorazila</b>, <b>Předáno dopravci</b>, <b>Nedoručeno — zpět na sklad</b> a <b>Zrušit rezervaci</b>.',
+            'Akce provádí CRM (sklad, rezervace, historie) a do záznamu se zapíše, kdo ji v adminu e-shopu potvrdil. Přehled objednávek z CRM nově posílá i popisek stavu a povolené akce.',
+            '<b>Pořadí nasazení:</b> nejdřív toto CRM, teprve potom nový build e-shopu (applefix.click) — starší CRM neposílá povolené akce, tlačítka by se v adminu neukázala.',
+        ],
+    ],
+    [
         'version' => '3.78.1',
         'date' => '2026-09-10',
         'time' => '10:40',

@@ -2468,6 +2468,17 @@ function afxEshopStatusLabel(string $status, string $payId = ''): string {
     return $status;
 }
 
+/** Co jde s objednávkou z e-shopu ručně udělat — JEDNA sada pravidel pro nástěnku CRM
+ *  i administraci e-shopu (vyzvednutí řeší kasa, proto u 'odber' jen zrušení). */
+function afxEshopOrderActions(string $status, string $payId): array {
+    return [
+        'can_pay'    => ($status === 'reserved' && $payId === 'prevod') || $status === 'shipped',
+        'can_ship'   => $status === 'reserved' && $payId === 'dobirka',
+        'can_return' => $status === 'shipped',
+        'can_cancel' => $status === 'reserved',
+    ];
+}
+
 /**
  * DOBÍRKA — předáno dopravci: zboží fyzicky odchází (odečet skladu, uvolnění
  * rezervace), ale peníze ještě nedorazily → stav 'shipped'. Zaplaceno se označí
@@ -7056,6 +7067,12 @@ function crmAuditResolveActor(array $opts): array {
             isset($opts['actor_role']) ? (string)$opts['actor_role'] : null,
         ];
     }
+    // Volání bez CRM session, u kterého známe skutečného člověka (admin e-shopu přes
+    // api/eshop_order_paid.php) — endpoint si aktéra nastaví pro celý požadavek.
+    if (!empty($GLOBALS['crmAuditActorOverride']) && is_array($GLOBALS['crmAuditActorOverride'])
+        && isset($GLOBALS['crmAuditActorOverride']['actor_type'])) {
+        return crmAuditResolveActor($GLOBALS['crmAuditActorOverride']);
+    }
     $name = trim((string)($_SESSION['full_name'] ?? ''));
     if (!empty($_SESSION['tech_id'])) {                 // technik (i Boss/manažer)
         $role = ($_SESSION['role'] ?? '') === 'admin' ? 'admin' : (string)($_SESSION['internal_role'] ?? $_SESSION['role'] ?? 'technician');
@@ -7095,7 +7112,7 @@ function crmAuditLog(string $action, array $opts = []): void {
             $opts['entity_type'] ?? null,
             isset($opts['entity_id']) ? (int)$opts['entity_id'] : null,
             $opts['entity_label'] ?? null,
-            $opts['summary'] ?? null,
+            isset($opts['summary']) ? mb_substr((string)$opts['summary'], 0, 255) : null,   // sloupec je VARCHAR(255)
             ($details !== null && $details !== '') ? $details : null,
             ($ip !== '' ? $ip : null),
             isset($opts['branch_id']) ? (int)$opts['branch_id'] : null,

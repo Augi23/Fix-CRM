@@ -55,6 +55,7 @@ try {
             $c = trim((string)($it['code'] ?? ''));
             $items[] = ['name' => $titles[$c] ?? $c, 'code' => $c, 'qty' => max(1, (int)($it['qty'] ?? 1))];
         }
+        $act = afxEshopOrderActions((string)$r['status'], (string)($r['pay_id'] ?? ''));
         $orders[] = [
             'id' => (int)$r['id'],
             'order_ref' => (string)$r['order_ref'],
@@ -66,12 +67,11 @@ try {
             'pay_id' => (string)($r['pay_id'] ?? ''),
             'reason' => (string)$r['status'] === 'reserved' ? afxEshopReservationReason((string)($r['pay_id'] ?? '')) : '',
             'status_label' => afxEshopStatusLabel((string)$r['status'], (string)($r['pay_id'] ?? '')),
-            // co s objednávkou jde udělat (vyzvednutí řeší kasa, proto u 'odber' jen zrušení)
-            'can_pay' => ((string)$r['status'] === 'reserved' && (string)($r['pay_id'] ?? '') === 'prevod')
-                || (string)$r['status'] === 'shipped',
-            'can_ship' => (string)$r['status'] === 'reserved' && (string)($r['pay_id'] ?? '') === 'dobirka',
-            'can_return' => (string)$r['status'] === 'shipped',
-            'can_cancel' => (string)$r['status'] === 'reserved',
+            // co s objednávkou jde udělat — stejná pravidla jako v adminu e-shopu (afxEshopOrderActions)
+            'can_pay' => $act['can_pay'],
+            'can_ship' => $act['can_ship'],
+            'can_return' => $act['can_return'],
+            'can_cancel' => $act['can_cancel'],
             'waiting_days' => (string)$r['status'] === 'reserved'
                 ? (int)floor((time() - strtotime((string)$r['created_at'])) / 86400) : 0,
             'date' => date('j. n. Y H:i', strtotime((string)$r['created_at'])),

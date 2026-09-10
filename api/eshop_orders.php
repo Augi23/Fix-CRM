@@ -8,7 +8,9 @@
  *   (?token / hlavička X-Feed-Token proti settingu eshop_feed_token).
  *
  * Parametry (GET): limit (max 500, default 100), offset, q (fulltext v ref/jméno/e-mail).
- * Odpověď: { ok, total, count, orders:[ { order_ref, status, total, customer_*, items:[…], note, created_at } ] }
+ * Odpověď: { ok, total, count, orders:[ { order_ref, status, status_label, actions:{can_pay,can_ship,can_return,can_cancel},
+ *            total, customer_*, items:[…], note, customer_note, pay_*, ship_*, address, access_point, created_at } ] }
+ * Akce nad objednávkou (platba dorazila apod.) dělá api/eshop_order_paid.php (token nebo přihlášené vedení).
  */
 ob_start();
 require_once '../includes/config.php';
@@ -118,6 +120,8 @@ foreach ($rows as $r) {
         'note'           => $r['note'] !== null ? (string)$r['note'] : null,
         'note_extra'     => implode(' · ', $legacy['rest']) ?: null,   // co zbylo mimo dopravu/platbu/adresu
         'customer_note'  => ($r['customer_note'] !== null && $r['customer_note'] !== '') ? (string)$r['customer_note'] : null,   // volná poznámka zákazníka z pokladny
+        'status_label'   => afxEshopStatusLabel((string)$r['status'], (string)($r['pay_id'] ?? '')),
+        'actions'        => afxEshopOrderActions((string)$r['status'], (string)($r['pay_id'] ?? '')),   // co smí admin e-shopu udělat (v3.78.2)
         'pay_id'         => $r['pay_id'] !== null ? (string)$r['pay_id'] : null,
         'pay_label'      => $r['pay_label'] ?: $legacy['pay'],
         'ship_id'        => $r['ship_id'] !== null ? (string)$r['ship_id'] : null,
