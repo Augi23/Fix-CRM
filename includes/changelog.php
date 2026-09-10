@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.78.0',
+        'date' => '2026-09-10',
+        'time' => '10:20',
+        'title' => 'Týmový chat: přílohy, @zmínky a chat přes celou obrazovku',
+        'items' => [
+            'Chat teď sedí <b>přesně na výšku obrazovky</b> na každém zařízení — stránka se už nedá „popotáhnout", roluje se výhradně historie zpráv (na počítači dřív ujížděla celá stránka i s chatem).',
+            '<b>Posílání souborů</b>: sponkou u pole vybereš <b>fotky, video, audio i dokumenty</b> (PDF, Word, Excel, ZIP…) — až 6 souborů na zprávu, do 25 MB. Fotky se ukážou rovnou v bublině, video a audio s přehrávačem, dokumenty jako pilulka ke stažení. Soubory leží v zabezpečené složce a bez přihlášení se k nim nikdo nedostane.',
+            '<b>@zmínky</b>: napiš @ a vyskočí našeptávač kolegů (hledá i bez diakritiky, šipky + Enter). Zmíněné jméno je ve zprávě zvýrazněné — a když někdo označí tebe, celá zpráva se ti <b>zlatě orámuje</b>.',
+            'Smazání vlastní zprávy uklidí i její přílohy z disku. Technicky: úložiště <code>secure/chat</code> (přímý přístup blokovaný), výdej přes <code>api/chat_file.php</code> s přihlášením, typy souborů se ověřují podle skutečného obsahu.',
+        ],
+    ],
+    [
         'version' => '3.77.3',
         'date' => '2026-09-09',
         'time' => '20:10',

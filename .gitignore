@@ -6,6 +6,7 @@ backup_db/
 uploads/
 temp/
 facktura/
+secure/chat/
 
 # AI memory files
 memory/

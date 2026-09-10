@@ -22,9 +22,13 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
              mimo obrazovku: rolovala se hned dvě věci najednou. */ ?>
     <div class="d-flex flex-column afx-chat-box">
         <div id="chatMessages" class="flex-grow-1 overflow-auto d-flex flex-column gap-2"></div>
+        <div id="chatPending" class="afx-chat-pending" hidden></div>
         <form id="chatForm" class="afx-chat-inputbar" autocomplete="off">
-            <input type="text" id="chatInput" placeholder="Napiš zprávu týmu…" maxlength="2000" autofocus>
-            <button type="submit" aria-label="Odeslat zprávu"><i class="fas fa-paper-plane"></i></button>
+            <div id="chatMentionMenu" class="afx-mention-menu" hidden></div>
+            <label class="afx-attach-btn" for="chatFiles" title="Přiložit fotku, video nebo dokument" aria-label="Přiložit soubor"><i class="fas fa-paperclip"></i></label>
+            <input type="file" id="chatFiles" multiple hidden accept="image/*,video/mp4,video/quicktime,audio/*,.pdf,.txt,.csv,.zip,.doc,.docx,.xls,.xlsx,.pptx">
+            <input type="text" id="chatInput" placeholder="Napiš zprávu týmu… (@ označí kolegu)" maxlength="2000" autofocus>
+            <button type="submit" id="chatSendBtn" aria-label="Odeslat zprávu"><i class="fas fa-paper-plane"></i></button>
         </form>
     </div>
 </div>
@@ -44,17 +48,68 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 /* Android WebView jinak zvětšuje text podle systémové velikosti písma a bubliny
    pak přetékají; velikost si řídí appka (textZoom) i tahle pojistka. */
 .afx-chat-box, .afx-chat-box * { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-/* Mobilní layout drží pod obsahem rezervu na spodní lištu. Chat si ale výšku
-   počítá sám (lištu už odečítá), takže by rezerva jen přidala stránce pár
-   desítek pixelů navíc — a rolovaly by pak dvě věci naráz: chvíli stránka,
-   chvíli historie zpráv. Na téhle stránce ji proto rušíme. */
-@media (max-width: 1080px) {
-  .crm-main-content { padding-bottom: 0 !important; }
-  /* Obsah má jinak min-height 100 % výšky obrazovky, ale začíná až pod horní
-     lištou → stránka je o její výšku delší než displej a jde „popotáhnout".
-     Na chatu to nechceme: roluje se výhradně historie zpráv. */
-  #content, #content.crm-v2-content { min-height: 0 !important; }
+/* Stránka chatu NIKDY neroluje — na žádném zařízení. Roluje se výhradně
+   historie zpráv uvnitř. Dřív platilo jen pro mobil (≤1080 px) a na desktopu
+   šla stránka pořád „popotáhnout" o výšku horní lišty; teď globálně:
+   1) žádná spodní rezerva, 2) obsah si nevynucuje min-height přes viewport,
+   3) body má scroll zamčený úplně (výšku chatu dopočítává afxSizeChat). */
+.crm-main-content { padding-bottom: 0 !important; }
+#content, #content.crm-v2-content { min-height: 0 !important; }
+html, body { height: 100%; overflow: hidden !important; }
+
+/* Vybrané soubory před odesláním — chipy nad psací lištou */
+.afx-chat-pending { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 2px 0; }
+.afx-chat-chip {
+  display: inline-flex; align-items: center; gap: 7px; max-width: 260px;
+  font-size: .78rem; color: #fff; background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14); border-radius: 14px; padding: 4px 8px 4px 10px;
 }
+.afx-chat-chip .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.afx-chat-chip .sz { color: rgba(255,255,255,.45); flex: 0 0 auto; }
+.afx-chat-chip button { border: 0; background: transparent; color: rgba(255,255,255,.55); padding: 0 2px; line-height: 1; }
+.afx-chat-chip button:hover { color: #ff6b6b; }
+
+/* Sponka vedle vstupu */
+.afx-attach-btn {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; margin: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+  color: rgba(255,255,255,.75); background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14);
+}
+.afx-attach-btn:hover { color: #fff; border-color: rgba(10,132,255,.65); }
+
+/* Přílohy ve zprávě */
+.chat-att { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chat-msg.mine .chat-att { justify-content: flex-end; }
+.chat-att img { max-width: 240px; max-height: 240px; border-radius: 12px; display: block; cursor: zoom-in; }
+.chat-att video { max-width: 280px; max-height: 240px; border-radius: 12px; display: block; background: #000; }
+.chat-att audio { max-width: 260px; display: block; }
+.chat-att-doc {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 280px; text-decoration: none;
+  font-size: .82rem; color: #fff; background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14); border-radius: 12px; padding: 8px 12px;
+}
+.chat-att-doc:hover { color: #fff; border-color: rgba(10,132,255,.65); background: rgba(10,132,255,.15); }
+.chat-att-doc .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-att-doc .sz { color: rgba(255,255,255,.5); flex: 0 0 auto; font-size: .72rem; }
+.chat-att-doc i { color: rgba(140,200,255,.9); flex: 0 0 auto; }
+
+/* @zmínky: zvýraznění ve zprávě + „mluví se o mně" celá bublina */
+.mention { color: #8CC8FF; font-weight: 700; background: rgba(10,132,255,.16); border-radius: 6px; padding: 0 4px; }
+.chat-msg.mine .bubble .mention { color: #fff; background: rgba(255,255,255,.22); }
+.mention.me { color: #FFD262; background: rgba(255,171,0,.18); }
+.chat-msg.mentions-me .bubble { border: 1px solid rgba(255,171,0,.55); box-shadow: 0 0 0 2px rgba(255,171,0,.14); }
+
+/* Našeptávač @zmínek nad psací lištou */
+.afx-chat-inputbar { position: relative; }
+.afx-mention-menu {
+  position: absolute; bottom: calc(100% + 6px); left: 52px; right: 52px; max-width: 340px; z-index: 50;
+  background: rgba(24,26,32,.97); border: 1px solid rgba(255,255,255,.14); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.5); overflow: hidden;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+.afx-mention-menu .it { display: flex; align-items: center; gap: 8px; padding: 9px 13px; color: #fff; font-size: .88rem; cursor: pointer; }
+.afx-mention-menu .it i { color: rgba(140,200,255,.85); font-size: .8rem; }
+.afx-mention-menu .it.active, .afx-mention-menu .it:hover { background: rgba(10,132,255,.25); }
 /* Plovoucí psací lišta — pilulka + kulaté odesílací tlačítko (messenger styl). */
 .afx-chat-inputbar { display: flex; gap: 8px; align-items: center; padding: 10px 2px 4px; }
 .afx-chat-inputbar input {
@@ -98,6 +153,23 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
     var lastId = 0, lastDay = '', firstLoad = true;
     var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
     var chatBox = document.querySelector('.afx-chat-box');
+    var sendBtn = document.getElementById('chatSendBtn');
+    var filesInput = document.getElementById('chatFiles');
+    var pendingBox = document.getElementById('chatPending');
+    var mentionMenu = document.getElementById('chatMentionMenu');
+    var ME = <?php echo json_encode($__me, JSON_UNESCAPED_UNICODE); ?>;
+    var FILE_CAP = 25 * 1024 * 1024;   // musí sedět s AFX_CHAT_FILE_CAP na serveru
+    var pending = [];                  // vybrané soubory před odesláním
+    var members = [];                  // jména zaměstnanců pro @zmínky
+    var membersByLen = [];             // nejdelší dřív — greedy match víceslovných jmen
+    var mIndex = -1, mItems = [], mQueryStart = -1;
+
+    function fold(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+    function fmtSize(b) {
+        if (b >= 1048576) return (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
+        if (b >= 1024) return Math.round(b / 1024) + ' kB';
+        return b + ' B';
+    }
 
     /* ── Výška chatu podle SKUTEČNÉHO viewportu ───────────────────────────────
        Pevné odečty nefungovaly: na iPhonu ubírá adresní řádek, v appce překrývá
@@ -139,6 +211,123 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
         input.addEventListener('blur', function () { setTimeout(afxSizeChat, 300); });
     }
 
+    /* ── @zmínky: text bubliny se skládá z DOM uzlů (žádné innerHTML = žádné XSS);
+       jména se hledají greedy od nejdelších, ať „Tomáš Zahradník" vyhraje nad „Tomáš". */
+    function appendTextWithMentions(el, text) {
+        var i = 0;
+        while (i < text.length) {
+            var at = text.indexOf('@', i);
+            if (at === -1) { el.appendChild(document.createTextNode(text.slice(i))); return; }
+            var matched = null;
+            for (var k = 0; k < membersByLen.length; k++) {
+                var n = membersByLen[k];
+                if (fold(text.substr(at + 1, n.length)) === fold(n)) { matched = text.substr(at + 1, n.length); break; }
+            }
+            if (matched) {
+                if (at > i) el.appendChild(document.createTextNode(text.slice(i, at)));
+                var sp = document.createElement('span');
+                sp.className = 'mention' + (ME && fold(matched) === fold(ME) ? ' me' : '');
+                sp.textContent = '@' + matched;
+                el.appendChild(sp);
+                i = at + 1 + matched.length;
+            } else {
+                el.appendChild(document.createTextNode(text.slice(i, at + 1)));
+                i = at + 1;
+            }
+        }
+    }
+
+    /* Příloha ve zprávě: obrázek inline (klik = plná velikost), video/audio
+       s přehrávačem, ostatní jako pilulka ke stažení. */
+    function buildAttachment(f) {
+        if (f.is_image) {
+            var a = document.createElement('a'); a.href = f.url; a.target = '_blank'; a.rel = 'noopener';
+            var img = document.createElement('img'); img.src = f.url; img.loading = 'lazy'; img.alt = f.name;
+            a.appendChild(img); return a;
+        }
+        var mime = f.mime || '';
+        if (mime.indexOf('video/') === 0) {
+            var v = document.createElement('video'); v.controls = true; v.preload = 'metadata'; v.src = f.url; return v;
+        }
+        if (mime.indexOf('audio/') === 0) {
+            var au = document.createElement('audio'); au.controls = true; au.preload = 'metadata'; au.src = f.url; return au;
+        }
+        var d = document.createElement('a'); d.className = 'chat-att-doc'; d.href = f.url + '&dl=1';
+        var ic = document.createElement('i'); ic.className = 'fas ' + (mime === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-lines');
+        d.appendChild(ic);
+        var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = f.name; d.appendChild(nm);
+        var sz = document.createElement('span'); sz.className = 'sz'; sz.textContent = fmtSize(f.size || 0); d.appendChild(sz);
+        return d;
+    }
+
+    /* Chipy vybraných souborů nad psací lištou */
+    function setPending(list) {
+        pending = list;
+        pendingBox.innerHTML = '';
+        pendingBox.hidden = pending.length === 0;
+        pending.forEach(function (f, i) {
+            var chip = document.createElement('span'); chip.className = 'afx-chat-chip';
+            var ic = document.createElement('i');
+            ic.className = 'fas ' + (f.type.indexOf('image/') === 0 ? 'fa-image' : (f.type.indexOf('video/') === 0 ? 'fa-video' : 'fa-file'));
+            chip.appendChild(ic);
+            var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = f.name; chip.appendChild(nm);
+            var sz = document.createElement('span'); sz.className = 'sz'; sz.textContent = fmtSize(f.size); chip.appendChild(sz);
+            var x = document.createElement('button'); x.type = 'button'; x.innerHTML = '&times;';
+            x.setAttribute('aria-label', 'Odebrat soubor');
+            x.addEventListener('click', function () { setPending(pending.filter(function (_, j) { return j !== i; })); });
+            chip.appendChild(x);
+            pendingBox.appendChild(chip);
+        });
+    }
+
+    /* ── Našeptávač @zmínek ──────────────────────────────────────────────── */
+    function mHide() { mentionMenu.hidden = true; mItems = []; mIndex = -1; mQueryStart = -1; }
+    function mRender(list) {
+        mentionMenu.innerHTML = '';
+        mItems = list; mIndex = 0;
+        list.forEach(function (name, i) {
+            var it = document.createElement('div');
+            it.className = 'it' + (i === 0 ? ' active' : '');
+            var ic = document.createElement('i'); ic.className = 'fas fa-at';
+            it.appendChild(ic);
+            it.appendChild(document.createTextNode(name));
+            // mousedown místo click: nesmí stihnout blur inputu
+            it.addEventListener('mousedown', function (ev) { ev.preventDefault(); mIndex = i; mPick(); });
+            mentionMenu.appendChild(it);
+        });
+        mentionMenu.hidden = list.length === 0;
+    }
+    function mMove(d) {
+        if (!mItems.length) return;
+        mIndex = (mIndex + d + mItems.length) % mItems.length;
+        Array.prototype.forEach.call(mentionMenu.children, function (c, i) { c.classList.toggle('active', i === mIndex); });
+    }
+    function mPick() {
+        if (mIndex < 0 || !mItems[mIndex]) return;
+        var name = mItems[mIndex];
+        var v = input.value, caret = input.selectionStart || v.length;
+        input.value = v.slice(0, mQueryStart) + '@' + name + ' ' + v.slice(caret);
+        var pos = mQueryStart + name.length + 2;
+        input.setSelectionRange(pos, pos);
+        mHide();
+        input.focus();
+    }
+    function mCheck() {
+        if (!members.length) return;
+        var v = input.value, caret = input.selectionStart || v.length;
+        var at = v.lastIndexOf('@', caret - 1);
+        if (at === -1 || (at > 0 && !/\s/.test(v[at - 1]))) { mHide(); return; }
+        var q = v.slice(at + 1, caret);
+        if (q.length > 30 || q.indexOf('@') !== -1) { mHide(); return; }
+        var fq = fold(q);
+        var list = members.filter(function (n) {
+            var fn = fold(n);
+            return fn.indexOf(fq) === 0 || fn.split(/\s+/).some(function (w) { return w.indexOf(fq) === 0; });
+        }).slice(0, 6);
+        mQueryStart = at;
+        mRender(list);
+    }
+
     function dayLabel(d) {
         var today = new Date().toISOString().slice(0, 10);
         var y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -163,8 +352,18 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
             el.className = 'chat-msg ' + (m.mine ? 'mine' : 'other');
             el.dataset.messageId = String(m.id);
             if (!m.mine) gotOther = true;
-            var b = document.createElement('div'); b.className = 'bubble'; b.textContent = m.text;
-            el.appendChild(b);
+            if (m.text) {
+                var b = document.createElement('div'); b.className = 'bubble';
+                appendTextWithMentions(b, m.text);
+                el.appendChild(b);
+                // zpráva zmiňuje MĚ → zlaté zvýraznění celé bubliny
+                if (!m.mine && ME && fold(m.text).indexOf('@' + fold(ME)) !== -1) { el.classList.add('mentions-me'); }
+            }
+            if (m.files && m.files.length) {
+                var att = document.createElement('div'); att.className = 'chat-att';
+                m.files.forEach(function (f) { att.appendChild(buildAttachment(f)); });
+                el.appendChild(att);
+            }
             // jméno odesílatele + čas POD bublinou (u každé zprávy)
             var meta = document.createElement('div'); meta.className = 'meta';
             var who = document.createElement('span'); who.className = 'who'; who.textContent = m.author;
@@ -237,21 +436,58 @@ $__me = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 
     form.addEventListener('submit', function (e) {
         e.preventDefault();
+        if (!mentionMenu.hidden) return;                    // Enter právě potvrzuje zmínku
         var text = input.value.trim();
-        if (!text) return;
-        input.value = '';
+        if (!text && !pending.length) return;
         var fd = new FormData();
         fd.append('message', text);
         fd.append('csrf_token', csrf);
+        pending.forEach(function (f) { fd.append('files[]', f, f.name); });
+        if (sendBtn) sendBtn.disabled = true;
         fetch('api/chat.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
-            .then(function () { poll(); })
-            .catch(function () {});
-        input.focus();
+            .then(function (d) {
+                if (d && d.ok) { input.value = ''; setPending([]); poll(); }
+                else { (window.showAlert || alert)((d && d.message) || 'Odeslání selhalo'); }
+            })
+            .catch(function () { (window.showAlert || alert)('Odeslání selhalo — zkus to znovu.'); })
+            .finally(function () { if (sendBtn) sendBtn.disabled = false; input.focus(); });
     });
 
-    poll();
-    setInterval(poll, 4000);
+    /* výběr souborů sponkou (limit počtu a velikosti hlídá i server) */
+    filesInput.addEventListener('change', function () {
+        var list = pending.slice();
+        Array.prototype.forEach.call(filesInput.files, function (f) {
+            if (list.length >= 6) { (window.showAlert || alert)('Najednou lze poslat nejvýš 6 souborů.'); return; }
+            if (f.size > FILE_CAP) { (window.showAlert || alert)('Soubor „' + f.name + '" je moc velký (limit 25 MB).'); return; }
+            list.push(f);
+        });
+        filesInput.value = '';
+        setPending(list);
+    });
+
+    /* klávesy našeptávače: šipky = výběr, Enter/Tab = potvrdit, Esc = zavřít */
+    input.addEventListener('keydown', function (e) {
+        if (mentionMenu.hidden) return;
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); mMove(e.key === 'ArrowDown' ? 1 : -1); }
+        else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); mPick(); }
+        else if (e.key === 'Escape') { mHide(); }
+    });
+    input.addEventListener('input', mCheck);
+    input.addEventListener('blur', function () { setTimeout(mHide, 150); });
+
+    /* Jména pro zmínky načíst PŘED prvním vykreslením — jinak by prvních 60
+       zpráv nemělo zvýrazněné @zmínky. Chat běží i při selhání (finally). */
+    fetch('api/chat.php?op=members', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.ok && d.members) {
+                members = d.members;
+                membersByLen = members.slice().sort(function (a, b) { return b.length - a.length; });
+            }
+        })
+        .catch(function () {})
+        .finally(function () { poll(); setInterval(poll, 4000); });
 })();
 </script>
 
