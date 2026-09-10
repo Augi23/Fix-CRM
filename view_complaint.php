@@ -8,6 +8,15 @@ require_once 'includes/functions.php';
 
 if (!isset($_SESSION['user_id']) && !isset($_SESSION['tech_id'])) { header('Location: login.php'); exit; }
 
+// ?code=RK-123 → otevřít reklamaci podle kódu (odkazy z týmového chatu apod.)
+if (empty($_GET['id']) && !empty($_GET['code'])) {
+    $__st = $pdo->prepare("SELECT id FROM complaints WHERE complaint_code = ? ORDER BY id DESC LIMIT 1");
+    $__st->execute([strtoupper(trim((string)$_GET['code']))]);
+    $__cid = (int)$__st->fetchColumn();
+    header('Location: ' . ($__cid > 0 ? 'view_complaint.php?id=' . $__cid : 'reklamace.php'));
+    exit;
+}
+
 ensureComplaintsClientColumns($pdo);
 ensureComplaintsWorkflowColumns($pdo);
 ensureComplaintMediaTable($pdo);

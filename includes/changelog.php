@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.78.1',
+        'date' => '2026-09-10',
+        'time' => '10:40',
+        'title' => 'Chat: číslo zakázky nebo reklamace ve zprávě je klikací',
+        'items' => [
+            'Když někdo v týmovém chatu napíše číslo zakázky (<code>APFAZ…</code>) nebo reklamace (<code>RK-…</code>), zobrazí se jako <b>klikací odkaz</b> — jedním klikem se otevře rovnou detail. Funguje i ve starších zprávách.',
+            'Reklamaci jde nově otevřít i podle kódu (<code>view_complaint.php?code=RK-123</code>).',
+        ],
+    ],
+    [
         'version' => '3.78.0',
         'date' => '2026-09-10',
         'time' => '10:20',

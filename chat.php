@@ -93,6 +93,16 @@ html, body { height: 100%; overflow: hidden !important; }
 .chat-att-doc .sz { color: rgba(255,255,255,.5); flex: 0 0 auto; font-size: .72rem; }
 .chat-att-doc i { color: rgba(140,200,255,.9); flex: 0 0 auto; }
 
+/* Číslo zakázky / reklamace v textu = klikací odkaz na detail */
+.chat-code-link {
+  color: #8CC8FF; font-weight: 700; text-decoration: none;
+  border-bottom: 1px dashed rgba(140,200,255,.7); padding-bottom: 1px;
+  font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .01em;
+}
+.chat-code-link:hover, .chat-code-link:focus { color: #fff; border-bottom-style: solid; background: rgba(10,132,255,.18); border-radius: 4px; }
+.chat-msg.mine .bubble .chat-code-link { color: #fff; border-bottom-color: rgba(255,255,255,.7); }
+.chat-msg.mine .bubble .chat-code-link:hover { background: rgba(255,255,255,.22); }
+
 /* @zmínky: zvýraznění ve zprávě + „mluví se o mně" celá bublina */
 .mention { color: #8CC8FF; font-weight: 700; background: rgba(10,132,255,.16); border-radius: 6px; padding: 0 4px; }
 .chat-msg.mine .bubble .mention { color: #fff; background: rgba(255,255,255,.22); }
@@ -211,27 +221,54 @@ html, body { height: 100%; overflow: hidden !important; }
         input.addEventListener('blur', function () { setTimeout(afxSizeChat, 300); });
     }
 
+    /* Čísla zakázek (APFAZ + 7 číslic) a reklamací (RK-NNN) v textu → klikací odkaz
+       rovnou na detail. Zakázka jde přes ?scan= (resolver order_code/legacy), reklamace
+       přes ?code=. Zase jen DOM uzly, žádné innerHTML. */
+    var CODE_RE = /\b(APFAZ\d{7}|RK-\d{3,})\b/gi;
+    function appendLinkified(el, seg) {
+        var last = 0, m;
+        CODE_RE.lastIndex = 0;
+        while ((m = CODE_RE.exec(seg)) !== null) {
+            if (m.index > last) el.appendChild(document.createTextNode(seg.slice(last, m.index)));
+            var code = m[0].toUpperCase();
+            var a = document.createElement('a');
+            a.className = 'chat-code-link';
+            if (code.indexOf('RK-') === 0) {
+                a.href = 'view_complaint.php?code=' + encodeURIComponent(code);
+                a.title = 'Otevřít reklamaci ' + code;
+            } else {
+                a.href = 'view_order.php?scan=' + encodeURIComponent(code);
+                a.title = 'Otevřít zakázku ' + code;
+            }
+            a.textContent = m[0];
+            el.appendChild(a);
+            last = m.index + m[0].length;
+        }
+        if (last < seg.length) el.appendChild(document.createTextNode(seg.slice(last)));
+    }
+
     /* ── @zmínky: text bubliny se skládá z DOM uzlů (žádné innerHTML = žádné XSS);
-       jména se hledají greedy od nejdelších, ať „Tomáš Zahradník" vyhraje nad „Tomáš". */
+       jména se hledají greedy od nejdelších, ať „Tomáš Zahradník" vyhraje nad „Tomáš".
+       Prostý text mezi zmínkami prochází linkifikací čísel zakázek. */
     function appendTextWithMentions(el, text) {
         var i = 0;
         while (i < text.length) {
             var at = text.indexOf('@', i);
-            if (at === -1) { el.appendChild(document.createTextNode(text.slice(i))); return; }
+            if (at === -1) { appendLinkified(el, text.slice(i)); return; }
             var matched = null;
             for (var k = 0; k < membersByLen.length; k++) {
                 var n = membersByLen[k];
                 if (fold(text.substr(at + 1, n.length)) === fold(n)) { matched = text.substr(at + 1, n.length); break; }
             }
             if (matched) {
-                if (at > i) el.appendChild(document.createTextNode(text.slice(i, at)));
+                if (at > i) appendLinkified(el, text.slice(i, at));
                 var sp = document.createElement('span');
                 sp.className = 'mention' + (ME && fold(matched) === fold(ME) ? ' me' : '');
                 sp.textContent = '@' + matched;
                 el.appendChild(sp);
                 i = at + 1 + matched.length;
             } else {
-                el.appendChild(document.createTextNode(text.slice(i, at + 1)));
+                appendLinkified(el, text.slice(i, at + 1));
                 i = at + 1;
             }
         }
