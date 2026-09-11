@@ -11,6 +11,23 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.79.0',
+        'date' => '2026-09-11',
+        'time' => '23:30',
+        'title' => 'Opravy po auditu: Klienti, exporty, historie stavů, výdej, faktury manažera, účetní, hledání ve skladu',
+        'items' => [
+            '<b>Klienti → tlačítko s počtem zakázek nic neotevíralo.</b> Skript na stránce měl chybu (zpětná lomítka před uvozovkami), takže neběžela ani jedna funkce v něm. Opraveno — seznam zakázek klienta se zase otevře.',
+            '<b>Účetnictví → export do Pohody / Money S3 nikdy nestáhl soubor.</b> Volala se funkce, která existovala jen v Nastavení. Stahování je teď společné pro celé CRM a export při chybě řekne proč.',
+            '<b>Historie stavů zakázky se u techniků, manažera i Bosse neukládala.</b> Do číselného sloupce se zapisoval identifikátor účtu „t15", zápis tiše selhal. V historii zakázky bude zase vidět, kdo a kdy stav změnil (u starých změn už to dohledat nejde).',
+            '<b>„There is no active transaction" při výdeji nezaplacené zakázky, mazání či úpravě dílu u dokončené zakázky a trvalém mazání zakázky.</b> Příčina: vytvoření tabulky (CREATE TABLE) uvnitř transakce, které v MariaDB transakci tiše potvrdí. Dotčené kontrolní funkce už uvnitř transakce nic nevytvářejí a v dotčených akcích běží před ní. Akce dřív ve skutečnosti proběhla, ale obsluha viděla chybu a klikala znovu — u výdeje tak mohla nezaplacenou zakázku označit jako plně vydanou.',
+            'Stejná příčina stála za varováním „transakce příjmu skončila implicitním commitem", které od v3.75.0 přibývalo v Historii u každé nové zakázky (zapamatování značek běželo uvnitř transakce) — zapamatování značek teď běží až po uložení zakázky.',
+            '<b>Expresní faktura z detailu zakázky pro manažera:</b> tlačítko vidět, ale API vracelo „Neautorizováno" (chtělo admin). API má teď stejná práva jako tlačítko (vedení + manažer).',
+            '<b>Účetní: záložka Prodej vracela zpět do Účetnictví</b> (stránka chyběla v jejím seznamu povolených stránek) a účtenka z druhé pobočky hlásila „Doklad patří jiné pobočce". Obojí opraveno.',
+            '<b>Sklad: hledání z horní lišty</b> končilo na výběru pobočky a hledaný text se ztratil. Na stránce skladu si hledání pamatuje pobočku; z jiné stránky (⌘K) se text přenese na vybranou pobočku.',
+            'Test <code>scripts/catalog_custom_test.php</code> nově hlídá, že se v otevřené transakci CREATE TABLE nespustí.',
+        ],
+    ],
+    [
         'version' => '3.78.2',
         'date' => '2026-09-10',
         'time' => '21:44',

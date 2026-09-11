@@ -26,6 +26,7 @@ if (!$id) {
 }
 
 ensureOrderItemStockFlag(); // DDL — před transakcí
+ensureInventoryMovesTable();  // DDL — před transakcí (pohyb skladu se loguje uvnitř)
 
 try {
     $pdo->beginTransaction();

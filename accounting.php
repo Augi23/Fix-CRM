@@ -927,21 +927,18 @@ function toggleCustomerOverride() {
     div.style.display = (div.style.display === 'none') ? 'flex' : 'none';
 }
 
-function exportPohoda(id) {
-    fetch('accounting_actions.php?action=export_pohoda&id=' + id)
+// triggerDownload je globální (assets/js/main.js); dřív tu chyběla → export se nikdy nestáhl
+function afxInvoiceExport(action, id, label) {
+    fetch('accounting_actions.php?action=' + action + '&id=' + id, { credentials: 'same-origin' })
     .then(r => r.json())
     .then(res => {
-        if (res.success) triggerDownload('temp/exports/' + res.file);
-    });
+        if (res.success && res.file) { triggerDownload('temp/exports/' + res.file, res.file); }
+        else { showAlert((label || 'Export') + ': ' + (res.message || res.error || 'nepodařilo se vytvořit soubor')); }
+    })
+    .catch(() => showAlert((label || 'Export') + ': chyba spojení'));
 }
-
-function exportS3(id) {
-    fetch('accounting_actions.php?action=export_s3money&id=' + id)
-    .then(r => r.json())
-    .then(res => {
-        if (res.success) triggerDownload('temp/exports/' + res.file);
-    });
-}
+function exportPohoda(id) { afxInvoiceExport('export_pohoda', id, 'Export Pohoda'); }
+function exportS3(id) { afxInvoiceExport('export_s3money', id, 'Export Money S3'); }
 </script>
 
 <?php require_once 'includes/footer.php'; ?>

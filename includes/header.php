@@ -44,6 +44,7 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) {
         'accounting.php',      // faktury a dobropisy
         'banka.php',           // bankovní pohyby a párování plateb
         'ucetni_sestavy.php',  // tiskové podklady za období
+        'ucetni_prodej.php',   // prodeje z kasy (záložka Prodej v Účetnictví — dřív chyběla → vracelo to zpět)
         'pokladna.php',        // pokladní kniha (prodejní UI se jí skryje, viz pokladna.php)
         'navody.php',          // návody (Jak fungují platby apod.)
         'settings.php',        // JEN kvůli záložce Uzávěrka — ostatní záložky i akce
@@ -430,6 +431,10 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
     <form action="<?php echo $search_action; ?>" method="GET" class="afx-search crm-navbar-search">
         <div class="input-group">
             <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <?php if ($search_action === 'inventory.php' && (int)($_GET['branch'] ?? 0) > 0): ?>
+                <?php /* sklad je pobočkový — bez ?branch by hledání skončilo na rozcestníku poboček */ ?>
+                <input type="hidden" name="branch" value="<?php echo (int)$_GET['branch']; ?>">
+            <?php endif; ?>
             <input type="text" name="search" class="form-control" placeholder="<?php echo e($search_placeholder); ?>" value="<?php echo e($_GET['search'] ?? ''); ?>">
             <span class="input-group-text crm-kbd-hint">⌘K</span>
         </div>

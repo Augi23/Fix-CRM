@@ -33,6 +33,9 @@ $technician_id = $_REQUEST['technician_id'] ?? null;
 ensureOrderWorkTrackingSchema();
 ensureOrderWorkLogSchema(); // DDL — must run before beginTransaction()
 ensureOrderRepairSolutionColumn(); // DDL — „Provedená oprava" (povinná před dokončením)
+ensureOrderPaymentMethodColumn();  // DDL — před transakcí (dřív až uvnitř)
+ensurePosTables();                 // DDL — před transakcí: výdej se ptá kasy (crmOrderPosSale)
+ensurePosCashMovementsTable();     // DDL — před transakcí: kontrola hotovosti při výdeji
 
 if (!$order_id || !$new_status) {
     echo json_encode(['success' => false, 'message' => $t('missing_data')]);
@@ -48,7 +51,6 @@ if (!$order_id || !$new_status) {
 try {
     $pdo->beginTransaction();
 
-    ensureOrderPaymentMethodColumn();
     $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, repair_solution, payment_method, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $order_data = $stmt->fetch();

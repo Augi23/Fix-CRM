@@ -46,6 +46,8 @@ try {
     ensureOrderWorkLogSchema(); // DDL — must run before beginTransaction()
     ensureOrderPriorityLowValue(); // DDL — ENUM priority musí znát 'Low'
     ensureOrderRepairSolutionColumn(); // DDL — „Provedená oprava"
+    ensurePosTables();                 // DDL — před transakcí: výdej se ptá kasy (crmOrderPosSale)
+    ensurePosCashMovementsTable();
 
     $pdo->beginTransaction();
 

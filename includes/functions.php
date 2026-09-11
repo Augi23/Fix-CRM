@@ -1919,8 +1919,11 @@ function ensurePosCashMovementsTable(): void {
     global $pdo;
     static $done = false;
     if ($done || !isset($pdo)) return;
+    // DDL nikdy uvnitř transakce (implicitní COMMIT v MariaDB) — zkusí se příště
+    if ($pdo->inTransaction()) return;
     $done = true;
     try {
+        if ($pdo->query("SHOW TABLES LIKE 'pos_cash_movements'")->fetch()) { return; }
         $pdo->exec("CREATE TABLE IF NOT EXISTS pos_cash_movements (
             id INT NOT NULL AUTO_INCREMENT,
             branch_id INT NULL DEFAULT NULL,
@@ -1954,8 +1957,13 @@ function ensurePosTables(): void {
     global $pdo;
     static $done = false;
     if ($done || !isset($pdo)) return;
+    // DDL nikdy uvnitř transakce: crmOrderPosSale() se volá i z výdeje zakázky
+    // (update_order_status) — CREATE TABLE tam dělal implicitní COMMIT a
+    // následný commit() padal na „There is no active transaction".
+    if ($pdo->inTransaction()) return;
     $done = true;
     try {
+        if ($pdo->query("SHOW TABLES LIKE 'pos_sale_items'")->fetch()) { return; }
         $pdo->exec("CREATE TABLE IF NOT EXISTS pos_sales (
             id INT NOT NULL AUTO_INCREMENT,
             sale_number VARCHAR(20) NOT NULL,
@@ -4355,7 +4363,11 @@ function logOrderStatusChange($order_id, $old_status, $new_status) {
         if (!$pdo->inTransaction()) {
             ensureOrderStatusLogTable();
         }
-        $changed_by = $_SESSION['user_id'] ?? ($_SESSION['tech_id'] ?? null);
+        // Účty z tabulky techniků mají v user_id pseudo-klíč „t15" — do INT sloupce
+        // by spadl jako chyba (strict) nebo 0, a historie stavů se u nich neukládala.
+        $changed_by = is_numeric($_SESSION['user_id'] ?? null)
+            ? (int)$_SESSION['user_id']
+            : (!empty($_SESSION['tech_id']) ? (int)$_SESSION['tech_id'] : null);
         $changed_role = $_SESSION['role'] ?? null;
         // snímek přiděleného technika v okamžiku změny (pro „V opravě: <jméno>" v historii)
         $log_tech_id = null;
@@ -4584,7 +4596,11 @@ function ensureInventoryMovesTable(): void {
     global $pdo;
     static $done = false;
     if ($done || !isset($pdo)) return;
+    // DDL nikdy uvnitř transakce: crmLogInventoryMove() běží i při mazání/úpravě
+    // dílu a mazání zakázky uvnitř transakce (implicitní COMMIT → chyba commitu)
+    if ($pdo->inTransaction()) return;
     try {
+        if ($pdo->query("SHOW TABLES LIKE 'inventory_moves'")->fetch()) { $done = true; return; }
         $pdo->exec("CREATE TABLE IF NOT EXISTS inventory_moves (
             id INT AUTO_INCREMENT PRIMARY KEY,
             inventory_id INT NOT NULL,
@@ -4606,6 +4622,7 @@ function ensureOrderItemStockFlag(): void {
     global $pdo;
     static $done = false;
     if ($done || !isset($pdo)) return;
+    if ($pdo->inTransaction()) return;   // DDL nikdy uvnitř transakce
     try {
         if (!$pdo->query("SHOW COLUMNS FROM order_items LIKE 'stock_deducted'")->fetch()) {
             $pdo->exec("ALTER TABLE order_items ADD COLUMN stock_deducted TINYINT(1) NOT NULL DEFAULT 0");
@@ -5985,6 +6002,7 @@ function ensureOrderPaymentMethodColumn(): void {
     global $pdo;
     static $done = false;
     if ($done || !isset($pdo)) return;
+    if ($pdo->inTransaction()) return;   // DDL nikdy uvnitř transakce
     $done = true;
     try {
         $col = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_method'")->fetch();

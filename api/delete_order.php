@@ -55,6 +55,8 @@ try {
         }
     } catch (Throwable $e) { /* tabulka complaints nemusí existovat na všech instancích */ }
 
+    ensureInventoryMovesTable();   // DDL — před transakcí (vrácení dílů se loguje uvnitř)
+    ensureOrderItemStockFlag();
     $pdo->beginTransaction();
 
     // Smazat fyzické soubory příloh (řádky padnou níže s ostatními child tabulkami)

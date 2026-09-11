@@ -792,9 +792,12 @@ function afxProductAssemble(array $in): array {
 function afxEnsureCatalogCustomTable(): void {
     global $pdo;
     static $done = false;
-    if ($done) return;
+    if ($done || !isset($pdo)) return;
+    // DDL nikdy uvnitř transakce (implicitní COMMIT v MariaDB) — zkusí se příště
+    if ($pdo->inTransaction()) return;
     $done = true;
     try {
+        if ($pdo->query("SHOW TABLES LIKE 'product_catalog_custom'")->fetch()) { return; }
         $pdo->exec("CREATE TABLE IF NOT EXISTS product_catalog_custom (
             id INT AUTO_INCREMENT PRIMARY KEY,
             kind VARCHAR(32) NOT NULL,

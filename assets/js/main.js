@@ -1592,6 +1592,21 @@ window.openComplaintDocChoice = function (complaintId, code) {
     bootstrap.Modal.getOrCreateInstance(el).show();
 };
 
+/* Stažení souboru (zálohy v Nastavení, exporty Pohoda / Money v Účetnictví).
+   Dřív žilo jen v settings.php, takže „Exportovat" v Účetnictví skončilo
+   chybou ReferenceError a nic se nestáhlo. */
+if (typeof window.triggerDownload !== 'function') {
+    window.triggerDownload = function (path, filename) {
+        if (!path) return;
+        var a = document.createElement('a');
+        a.href = path;
+        a.setAttribute('download', filename || '');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    };
+}
+
 /* Reklamace k zakázce (tlačítko „Reklamace" v hlavičce detailu zakázky):
    otevře globální modal „Nová reklamace" předvyplněný ze zakázky — klient,
    zařízení, SN/IMEI, číslo zakázky. Reklamace tak vzniká NAVÁZANÁ na zakázku

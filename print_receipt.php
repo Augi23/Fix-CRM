@@ -30,7 +30,9 @@ $sale = $st->fetch();
 if (!$sale) { die(__('print_not_found')); }
 
 // technici vedlejší pobočky vidí jen doklady své pobočky (stejná hranice jako Historie)
-if (!crmCanViewHistory() && (int)($sale['branch_id'] ?? 0) !== (int)getCurrentStaffBranchId()) {
+// účetní vidí prodeje obou poboček (Účetnictví → Prodej), tak i jejich účtenky
+$__accountant = function_exists('crmIsAccountant') && crmIsAccountant();
+if (!crmCanViewHistory() && !$__accountant && (int)($sale['branch_id'] ?? 0) !== (int)getCurrentStaffBranchId()) {
     die(__('rcpt_wrong_branch'));
 }
 

@@ -5,7 +5,9 @@ require_once '../includes/functions.php';
 ob_clean(); // discard any output/warnings
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || !hasPermission('admin_access')) {
+// Stejná hranice jako tlačítko v detailu zakázky (vedení + manažer) — dřív API
+// chtělo admin_access a manažer dostal „Neautorizováno" na formulář, který viděl.
+if (!isset($_SESSION['user_id']) || !crmCanIssueInvoices()) {
     echo json_encode(['success' => false, 'message' => __('access_denied_simple')]);
     exit;
 }

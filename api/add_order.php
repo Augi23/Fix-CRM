@@ -284,14 +284,6 @@ try {
 
     logOrderStatusChange($order_id, '', $status);
 
-    // Značka/model, které obsluha dopsala ručně (v nabídce nebyly), si CRM
-    // zapamatuje — od další zakázky se vybírají ze seznamu. Bonus: selhání
-    // nesmí shodit příjem zakázky, proto try/catch.
-    try {
-        require_once __DIR__ . '/../includes/product_catalog.php';
-        crmCatalogRegisterOrderDevice($device_brand, $device_type, $device_model);
-    } catch (Throwable $eCat) { error_log('add_order katalog: ' . $eCat->getMessage()); }
-
 
     // Zakázka vznikla z webové rezervace → označit rezervaci jako převzatou
     $webBookingId = (int)($_POST['web_booking_id'] ?? 0);
@@ -374,6 +366,15 @@ try {
             ]);
         } catch (Throwable $eW) { error_log('add_order txn-lost audit: ' . $eW->getMessage()); }
     }
+
+    // Značka/model, které obsluha dopsala ručně (v nabídce nebyly), si CRM
+    // zapamatuje — od další zakázky se vybírají ze seznamu. Až PO commitu:
+    // uvnitř transakce dělalo CREATE TABLE katalogu implicitní COMMIT (v3.75–3.77
+    // proto u každé zakázky přibylo varování „transakce skončila implicitním commitem").
+    try {
+        require_once __DIR__ . '/../includes/product_catalog.php';
+        crmCatalogRegisterOrderDevice($device_brand, $device_type, $device_model);
+    } catch (Throwable $eCat) { error_log('add_order katalog: ' . $eCat->getMessage()); }
 
     // Od commitu je zakázka VYTVOŘENÁ — audit a notifikace jsou best-effort a
     // NESMÍ shodit odpověď na „Order creation failed" (uživatel by ji zkusil

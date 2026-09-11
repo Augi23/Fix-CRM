@@ -38,10 +38,15 @@ class AfxFakeCatalogStmt {
     }
     public function rowCount(): int { return $this->affected; }
 }
+class AfxFakeShowStmt { public function fetch() { return false; } }       // SHOW TABLES → tabulka „neexistuje"
 class AfxFakeCatalogPdo {
     public array $rows = [];
-    public function exec(string $sql): int { return 0; }                     // CREATE TABLE IF NOT EXISTS
-    public function query(string $sql): array {
+    public bool $inTx = false;          // simulace otevřené transakce (DDL se nesmí spustit)
+    public int $ddl = 0;                // počet CREATE TABLE
+    public function inTransaction(): bool { return $this->inTx; }
+    public function exec(string $sql): int { if (str_contains($sql, 'CREATE TABLE')) $this->ddl++; return 0; }
+    public function query(string $sql) {
+        if (str_starts_with($sql, 'SHOW TABLES')) return new AfxFakeShowStmt();
         $r = $this->rows;
         usort($r, static fn($a, $b) => strcmp($a['value'], $b['value']));     // ORDER BY value
         return $r;
@@ -136,6 +141,14 @@ ok('vlastní výrobce ze skladu je i mezi značkami zakázky', afxCatalogListHas
 ok('vlastní model ze skladu je i v nabídce zakázky (iPhone → Phone)',
     afxCatalogListHas(crmOrderModelCatalog()['Apple']['Phone'] ?? [], 'iPhone 18 Pro Max'));
 ok('vestavěné značky zůstávají', afxCatalogListHas(crmOrderBrands(), 'Apple') && afxCatalogListHas(crmOrderBrands(), 'Samsung'));
+
+head('DDL nikdy uvnitř transakce (implicitní COMMIT v MariaDB)');
+$ddlBefore = $pdo->ddl;
+$pdo->inTx = true;
+afxCatalogCustomAdd('manufacturer', '', 'Fairphone-tx');
+ok('v otevřené transakci se CREATE TABLE nespustí', $pdo->ddl === $ddlBefore, 'ddl=' . $pdo->ddl);
+ok('hodnota se přesto uloží (tabulka na ostré instalaci existuje)', afxCatalogListHas(crmOrderBrands(), 'Fairphone-tx'));
+$pdo->inTx = false;
 
 head('Neznámý typ zakázky spadne do „Other" (kontext se nerozbije)');
 crmCatalogRegisterOrderDevice('Nothing', 'Nesmysl', 'Ear (a)');

@@ -32,14 +32,17 @@ $__pl = function (int $n, string $one, string $few, string $many): string {
     if ($n === 1) return $one; if ($n >= 2 && $n <= 4) return $few; return $many;
 };
 ?>
+<?php // hledaný text z lišty (⌘K z jiné stránky) se přenese na vybranou pobočku — dřív se ztratil
+$__pickSearch = trim((string)($_GET['search'] ?? ''));
+$__pickQs = $__pickSearch !== '' ? '&search=' . rawurlencode($__pickSearch) : ''; ?>
 <div class="mb-2">
     <h2 class="mb-0"><?php echo __('inventory'); ?></h2>
-    <small class="text-muted">Vyber pobočku skladu — každá má vlastní zásoby</small>
+    <small class="text-muted">Vyber pobočku skladu — každá má vlastní zásoby<?php if ($__pickSearch !== ''): ?> · hledáš „<?php echo e($__pickSearch); ?>"<?php endif; ?></small>
 </div>
 
 <div class="sklad-branch-picker">
     <?php foreach ($__branches as $__b): $bid = (int)$__b['id']; $code = (string)$__b['code']; $c = $__counts[$bid]; ?>
-    <a href="inventory.php?branch=<?php echo $bid; ?>" class="sklad-branch-card">
+    <a href="inventory.php?branch=<?php echo $bid; ?><?php echo $__pickQs; ?>" class="sklad-branch-card">
         <span class="sklad-branch-ico"><?php echo $__svg[$code] ?? $__svg['karlin']; ?></span>
         <span class="sklad-branch-name"><?php echo e(skladBranchLabel($bid)); ?></span>
         <span class="sklad-branch-addr"><?php echo e($__streets[$code] ?? (string)$__b['address']); ?></span>

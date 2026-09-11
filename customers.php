@@ -272,8 +272,8 @@ function showCustomerOrders(id, name) {
                 html = '<tr><td colspan="5" class="text-center py-4"><?php echo __('orders_not_found'); ?></td></tr>';
             } else {
                 function escapeHtml(text) {
-                    if (text == null) return \'\';
-                    return $(\'<div>\').text(text).html();
+                    if (text == null) return '';
+                    return $('<div>').text(text).html();
                 }
                 res.orders.forEach(function(o) {
                     html += '<tr>';
