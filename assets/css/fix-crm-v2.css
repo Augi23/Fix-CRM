@@ -3044,8 +3044,10 @@ input[type="number"], .input-group-text,
   /* Strankovani zakazek pretekalo (11 kruhovych polozek ~530px) */
   .pagination { flex-wrap: wrap; justify-content: center; row-gap: 6px; }
 
-  /* Chat: odecist i spodni mobilni listu */
-  .afx-chat-box { height: calc(100dvh - 330px) !important; min-height: 320px !important; }
+  /* Chat: vysku pocita JS (afxSizeChat v chat.php) podle skutecneho viewportu a
+     spodni listy; drivejsi pevne `height: calc(100dvh - 330px) !important` ho
+     prebijelo -> pod psacim polem zustaval prazdny pas (mobil, iOS i Android appka). */
+  .afx-chat-box { min-height: 320px !important; }
 }
 
 /* dvh/svh: presnejsi minimalni vysky na iOS (vh fallback zustava vyse) */

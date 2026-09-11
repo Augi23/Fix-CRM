@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.80.1',
+        'date' => '2026-09-11',
+        'time' => '16:10',
+        'title' => 'Chat na mobilu: bez prázdného pásu pod psacím polem',
+        'items' => [
+            'Na telefonu (web, iOS i Android aplikace) zůstával v týmovém chatu pod psacím polem prázdný pás a zprávy měly málo místa. Pevná výška z mobilního stylu přebíjela výšku, kterou si chat počítá podle skutečné obrazovky. Pevná výška je pryč, chat vyplní obrazovku přesně.',
+        ],
+    ],
+    [
         'version' => '3.80.0',
         'date' => '2026-09-12',
         'time' => '10:30',
