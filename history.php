@@ -73,9 +73,15 @@ if ($fAction !== '') { $where[] = 'action = ?';       $params[] = $fAction; }
 if ($fEmp !== '' && strpos($fEmp, '|') !== false) {
     // filtr dle IDENTITY zaměstnance (typ + id) — přejmenování účtu záznamy nerozdělí
     [$__et, $__eid] = explode('|', $fEmp, 2);
-    $where[] = 'actor_type = ? AND actor_id = ?';
-    $params[] = $__et;
-    $params[] = $__eid;
+    if ($__eid === '') {
+        // „Systém" (webhooky, automatika) má actor_id NULL — porovnání s '' nikdy nesedlo
+        $where[] = 'actor_type = ? AND actor_id IS NULL';
+        $params[] = $__et;
+    } else {
+        $where[] = 'actor_type = ? AND actor_id = ?';
+        $params[] = $__et;
+        $params[] = $__eid;
+    }
 } elseif ($fActor !== '') {
     $where[] = 'actor_name LIKE ?';
     $params[] = '%' . $fActor . '%';

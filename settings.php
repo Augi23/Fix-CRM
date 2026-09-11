@@ -80,6 +80,7 @@ if (isset($_POST['update_apns']) && $is_admin_check) {
 if (isset($_POST['update_integrations']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     set_setting('tg_bot_token', trim($_POST['tg_bot_token']));
+    set_setting('admin_telegram_id', trim((string)($_POST['admin_telegram_id'] ?? '')));   // přehledy pro admina (users)
     set_setting('fixer_webhook_url', trim($_POST['fixer_webhook_url'] ?? ''));
     set_setting('fixer_webhook_secret', trim($_POST['fixer_webhook_secret'] ?? ''));
     set_setting('fixer_api_token', trim($_POST['fixer_api_token'] ?? ''));
@@ -291,14 +292,18 @@ if (isset($_POST['edit_tech'])) {
         $sql = "UPDATE technicians SET name = ?, email = ?, phone = ?, specialization = ?, role = ?, branch_id = ?, telegram_id = ?, telegram_username = ?, is_active = ?, username = ?, engineer_rate = ?" . $pbtSql . " WHERE id = ?";
         $params = [$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $active, $username_val, $engineer_rate, $id];
     }
+    // Předchozí pobočka se musí přečíst PŘED uložením — dřív se četla až po UPDATE,
+    // takže se vždy rovnala nové a zakázky technika se nikdy nepřesunuly.
+    $__prevBranch = null;
+    if ($is_admin_check) {
+        try { $bs = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ?'); $bs->execute([$id]); $__prevBranch = $bs->fetchColumn(); } catch (Throwable $e) { $__prevBranch = null; }
+    }
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     if ($is_admin_check) {
         // Hromadný přesun zakázek technika mezi pobočkami JEN při skutečné změně
         // pobočky — dřív běžel při KAŽDÉM uložení karty zaměstnance (tichý přesun).
-        $__prevBranch = null;
-        try { $bs = $pdo->prepare('SELECT branch_id FROM technicians WHERE id = ?'); $bs->execute([$id]); $__prevBranch = $bs->fetchColumn(); } catch (Throwable $e) {}
-        if ($__prevBranch === null || (int)$__prevBranch !== (int)$branch_id) {
+        if ($__prevBranch !== null && $__prevBranch !== false && (int)$__prevBranch !== (int)$branch_id) {
             $pdo->prepare('UPDATE orders SET branch_id = ? WHERE technician_id = ?')->execute([$branch_id, $id]);
         }
     }
@@ -622,7 +627,8 @@ if (isset($_POST['delete_greeting']) && crmCanManageSettings()) {
 // Security for technicians
 if (!$is_admin_user) {
     // Systém smí manažer/Boss jen kvůli Aktualizacím; jinak je celý admin-only.
-    $__blocked = in_array($active_tab, ['company', 'loyalty', 'banka', 'admins'], true)
+    $__blocked = in_array($active_tab, ['company', 'loyalty', 'banka'], true)
+        || ($active_tab === 'admins' && !hasPermission('manage_passwords'))   // „Správa hesel" (dřív se právo uložilo, ale záložka zůstala zavřená)
         || ($active_tab === 'system' && !crmCanRunUpdates());
     if ($__blocked) { $active_tab = 'staff'; }
 }
@@ -681,7 +687,7 @@ require_once 'includes/header.php';
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'tisk' ? 'active' : 'text-white-75'; ?>" href="?tab=tisk"><i class="fas fa-print me-2"></i><?php echo __('label_bridge_tab'); ?></a>
         </li>
-        <?php if ($is_admin_user): ?>
+        <?php if ($is_admin_user || hasPermission('manage_passwords')): ?>
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'admins' ? 'active' : 'text-white-75'; ?>" href="?tab=admins"><i class="fas fa-user-shield me-2"></i><?php echo __('admin_tab'); ?></a>
         </li>
@@ -796,6 +802,11 @@ require_once 'includes/header.php';
                         <div class="mb-3">
                             <label class="form-label small text-white-75">API Bot Token</label>
                             <input type="password" name="tg_bot_token" class="form-control" value="<?php echo htmlspecialchars(get_setting('tg_bot_token')); ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-white-75">Telegram administrátora (přehledové notifikace)</label>
+                            <input type="text" name="admin_telegram_id" class="form-control" value="<?php echo htmlspecialchars((string)get_setting('admin_telegram_id', '')); ?>" placeholder="chat ID, např. 123456789">
+                            <div class="form-text small text-white-50">Administrátor není v tabulce zaměstnanců, proto se jeho Telegram nastavuje tady. Prázdné = přehledy admin nedostává.</div>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-12"><label class="form-label small text-white-75">Fixer webhook URL</label><input type="text" name="fixer_webhook_url" class="form-control" value="<?php echo htmlspecialchars(get_setting('fixer_webhook_url', '')); ?>" placeholder="https://your-domain.com"></div>

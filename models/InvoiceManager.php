@@ -304,10 +304,15 @@ private function getInvoiceStatusBadge($status) {
 
             // Check if prefix exists in settings
             $prefix = get_setting('acc_credit_note_prefix', 'ODD' . date('Y'));
-            $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM invoices WHERE invoice_number LIKE ?");
-            $stmt->execute([$prefix . '%']);
-            $count = $stmt->fetchColumn();
-            $new_number = $prefix . str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+            // Z MAXIMA řady, ne z počtu: po smazání dobropisu dával COUNT+1 už obsazené
+            // číslo (UNIQUE invoice_number → surová SQL chyba u každého dalšího dobropisu).
+            if (function_exists('afxNextInvoiceNumber')) {
+                $new_number = afxNextInvoiceNumber($this->pdo, (string)$prefix);
+            } else {
+                $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM invoices WHERE invoice_number LIKE ?");
+                $stmt->execute([$prefix . '%']);
+                $new_number = $prefix . str_pad((int)$stmt->fetchColumn() + 1, 4, '0', STR_PAD_LEFT);
+            }
 
             $stmt = $this->pdo->prepare("
                 INSERT INTO invoices (

@@ -47,9 +47,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             throw new Exception('Order or Customer not found');
         }
 
-        $stmt = $pdo->prepare("INSERT INTO invoices (invoice_number, variable_symbol, order_id, customer_id, date_issue, date_tax, date_due, total_amount, is_vat_payer, vat_amount, currency) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
+        // Číslo faktury: přehled zakázek ho předvyplňuje číslem zakázky — to už může mít
+        // expresní faktura z detailu (UNIQUE → „Duplicate entry"). Obsazené nebo prázdné
+        // číslo nahradí další volné z řady.
+        $invoice_number = trim((string)$invoice_number);
+        $dupChk = $pdo->prepare("SELECT COUNT(*) FROM invoices WHERE invoice_number = ?");
+        $dupChk->execute([$invoice_number]);
+        if ($invoice_number === '' || (int)$dupChk->fetchColumn() > 0) {
+            $invoice_number = afxNextInvoiceNumber($pdo, (string)get_setting('acc_invoice_prefix', date('Y')));
+        }
+        // Pobočka faktury: bez ní pobočkový manažer fakturu neviděl v seznamu ani na tisku
+        // (crmCanSeeInvoiceBranch). Sloupec přidala migrace 054; starší DB → bez pobočky.
+        $branchId = function_exists('crmInvoiceBranchForNew') ? crmInvoiceBranchForNew($order_id) : null;
+        $hasBranchCol = false;
+        try { $hasBranchCol = (bool)$pdo->query("SHOW COLUMNS FROM invoices LIKE 'branch_id'")->fetch(); } catch (Throwable $e) {}
+        $stmt = $pdo->prepare("INSERT INTO invoices (invoice_number, variable_symbol, order_id, customer_id, date_issue, date_tax, date_due, total_amount, is_vat_payer, vat_amount, currency" . ($hasBranchCol ? ", branch_id" : "") . ")
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" . ($hasBranchCol ? ", ?" : "") . ")");
+        $vals = [
             $invoice_number,
             $variable_symbol,
             $order_id,
@@ -61,7 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $is_vat_payer ? 1 : 0,
             $vat_amount,
             $currency
-        ]);
+        ];
+        if ($hasBranchCol) { $vals[] = $branchId; }
+        $stmt->execute($vals);
         $invoice_id = $pdo->lastInsertId();
 
         // Add dynamic items

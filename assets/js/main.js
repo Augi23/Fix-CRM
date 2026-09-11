@@ -330,15 +330,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         } catch (err) { /* pojistka nesmí submit rozbít */ }
+        // Neplatný formulář (prázdné povinné pole): prohlížeč ukáže bublinu a NEODEŠLE —
+        // dřív se tlačítko přesto na 15 s zamklo s falešným „Ukládám…".
+        if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+            form.requestSubmit ? form.requestSubmit(this) : form.reportValidity();
+            return;
+        }
         form.dataset.afxSubmitting = '1';
         // odeslat, DOKUD je tlačítko aktivní (kvůli jeho name/value), pak zamknout
         form.requestSubmit ? form.requestSubmit(this) : form.submit();
         const btn = this, oldHtml = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + (window.LANG_SAVING || 'Ukládám…');
-        // záchranná síť: kdyby server vrátil chybu bez přesměrování, po 15 s povolit další pokus
-        setTimeout(function () { form.dataset.afxSubmitting = ''; btn.disabled = false; btn.innerHTML = oldHtml; }, 15000);
+        form.__afxUnlock = function () { form.dataset.afxSubmitting = ''; btn.disabled = false; btn.innerHTML = oldHtml; form.__afxUnlock = null; };
+        // záchranná síť: kdyby server vrátil chybu bez přesměrování, po 8 s povolit další pokus
+        setTimeout(function () { if (form.__afxUnlock) form.__afxUnlock(); }, 8000);
     });
+    // Jakmile dorazí odpověď AJAXu (chyba i úspěch bez přesměrování) nebo se ukáže hláška,
+    // tlačítka v modálech odemknout hned — ochrana proti dvojkliku platí jen během požadavku.
+    window.afxUnlockModalSubmits = function () {
+        document.querySelectorAll('.modal form').forEach(function (f) { if (f.__afxUnlock) f.__afxUnlock(); });
+    };
+    // pollery na pozadí (zvoneček, chat, přítomnost…) odemknout NESMÍ — jinak by se
+    // během pomalého uložení dal formulář odeslat podruhé
+    function afxIsBackgroundUrl(u) { return /notify_poll|tech_popups|presence|heartbeat|chat|poll|customer_display|print_poll|staff_activity/i.test(String(u || '')); }
+    $(document).ajaxComplete(function (e, xhr, settings) { if (!afxIsBackgroundUrl(settings && settings.url)) setTimeout(window.afxUnlockModalSubmits, 150); });
+    document.addEventListener('afx:fetch-done', function (ev) { if (!afxIsBackgroundUrl(ev.detail && ev.detail.url)) setTimeout(window.afxUnlockModalSubmits, 150); });
 
     // Fallback for inline new-customer panel inside order modals
     $(document).on('click', '#toggleNewCustomerPanelBtn', function(e) {
@@ -457,6 +474,7 @@ function initGlobalModals() {
  * Show a global alert
  */
 function showAlert(message, title = window.LANG_NOTICE || 'Notice') {
+    try { if (window.afxUnlockModalSubmits) window.afxUnlockModalSubmits(); } catch (e) {}   // hláška = pokus skončil, tlačítko modalu odemknout
     if (!globalAlertModal) initGlobalModals();
     
     document.getElementById('globalAlertTitle').innerText = title;

@@ -865,7 +865,8 @@ $complaintPrefill = [
                                     if (!j.ok) { alert(j.error || 'Chyba'); return; }
                                     var reqId = j.request_id;
                                     var $wait = $('<span class="small text-info"><i class="fas fa-tablet-screen-button me-1"></i><?php echo __('sign_station_waiting'); ?> <a href="javascript:void(0)" class="text-white-75">✕</a></span>');
-                                    $row.find('span.d-inline-flex, button').last().parent().find('.d-inline-flex').replaceWith($wait);
+                                    // dřív .last().parent().find('.d-inline-flex') hledalo POTOMKY tlačítkového spanu → nic → stav se nezobrazil
+                                    $row.find('span.d-inline-flex').first().replaceWith($wait);
                                     var iv = setInterval(function () {
                                         fetch('api/request_signature.php?check=' + reqId, { cache: 'no-store' })
                                             .then(function (r) { return r.json(); })
@@ -1838,7 +1839,10 @@ function deleteOrder(id) {
                             <select name="device_type" class="form-select">
                                 <option value="Phone" <?php echo ($order['device_type'] == 'Phone') ? 'selected' : ''; ?>><?php echo __('phone_type'); ?></option>
                                 <option value="Notebook" <?php echo ($order['device_type'] == 'Notebook') ? 'selected' : ''; ?>><?php echo __('notebook_type'); ?></option>
+                                <?php /* PC a HDD nabízí průvodce Nové zakázky — bez nich se tu typ tiše přepsal na Telefon */ ?>
+                                <option value="PC" <?php echo ($order['device_type'] == 'PC') ? 'selected' : ''; ?>>🖥️ <?php echo __('PC'); ?></option>
                                 <option value="Tablet" <?php echo ($order['device_type'] == 'Tablet') ? 'selected' : ''; ?>><?php echo __('tablet_type'); ?></option>
+                                <option value="HDD" <?php echo ($order['device_type'] == 'HDD') ? 'selected' : ''; ?>>💾 <?php echo __('HDD'); ?></option>
                                 <option value="Other" <?php echo ($order['device_type'] == 'Other') ? 'selected' : ''; ?>><?php echo __('other_type'); ?></option>
                             </select>
                         </div>

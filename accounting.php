@@ -553,7 +553,23 @@ document.addEventListener('DOMContentLoaded', function() {
     // uživatel hlásil jako „nelze vyhledávat"). Navíc se hledalo jen v tisícovce
     // předem vysypaných <option>. Teď se klienti hledají přes stejné API jako
     // v kase a dropdown patří do modalu.
-    if (window.jQuery && jQuery.fn.select2 && invModalEl) {
+    // Role účetní nesmí procházet klientskou databázi (api/search_customers.php jí
+    // vrací 403 → „Hledání selhalo" u každého písmene). Místo hledání má rovnou
+    // ruční odběratele.
+    var AFX_IS_ACCOUNTANT = <?php echo (function_exists('crmIsAccountant') && crmIsAccountant()) ? 'true' : 'false'; ?>;
+    if (AFX_IS_ACCOUNTANT && invModalEl) {
+        var grp = document.getElementById('inv_customer') ? document.getElementById('inv_customer').closest('.input-group') : null;
+        if (grp) {
+            grp.style.display = 'none';
+            var note = document.createElement('div');
+            note.className = 'form-text text-white-75';
+            note.textContent = 'Účetní vyplňuje odběratele ručně (hledání v klientech není pro tuto roli povolené).';
+            grp.parentNode.insertBefore(note, grp.nextSibling);
+        }
+        var ov = document.getElementById('customer_override_fields');
+        if (ov) ov.style.display = 'flex';
+    }
+    if (window.jQuery && jQuery.fn.select2 && invModalEl && !AFX_IS_ACCOUNTANT) {
         jQuery('#inv_customer').select2({
             width: '100%',
             placeholder: 'Hledat klienta (jméno, firma, telefon, e-mail)…',

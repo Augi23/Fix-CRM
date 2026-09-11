@@ -292,6 +292,7 @@ try {
                         }).catch(function () {});
                     }
                 } catch (err) {}
+                try { document.dispatchEvent(new CustomEvent('afx:fetch-done', { detail: { url: String(input && input.url ? input.url : input) } })); } catch (err) {}   // odemknout tlačítka modálů
                 return resp;
             });
         };

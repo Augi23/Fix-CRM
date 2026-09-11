@@ -647,8 +647,14 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
         };
         $h .= '<div class="block block--internal"><h3>' . e($L('cdoc_idscan_title'))
             . ' <span class="internal-tag">' . e($L('cdoc_internal_only')) . '</span></h3>';
-        $h .= '<div class="idscans">' . $slot('id_front', $L('cdoc_idscan_front')) . $slot('id_back', $L('cdoc_idscan_back')) . '</div>';
-        $h .= '<div class="idscan-note">' . e($L('cdoc_idscan_note')) . '</div>';
+        if (function_exists('crmCanManageInvoices') && crmCanManageInvoices()) {
+            $h .= '<div class="idscans">' . $slot('id_front', $L('cdoc_idscan_front')) . $slot('id_back', $L('cdoc_idscan_back')) . '</div>';
+            $h .= '<div class="idscan-note">' . e($L('cdoc_idscan_note')) . '</div>';
+        } else {
+            // API (document_media / document_id_scan) sken povolí jen vedení — technikovi se
+            // dřív ukázala políčka, která skončila 403 a rozbitým náhledem
+            $h .= '<div class="idscan-note">' . e($L('cdoc_idscan_mgmt_only')) . '</div>';
+        }
         $h .= '</div>';
     }
 

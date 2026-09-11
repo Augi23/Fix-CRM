@@ -770,7 +770,9 @@ function setTechPermissions($tech_id, $permissions) {
 function getAvailablePermissions() {
     return [
         'admin_access' => ['name' => __('perm_admin_access'), 'desc' => __('perm_admin_access_desc'), 'icon' => 'fas fa-crown text-warning'],
-        'view_all_orders' => ['name' => __('perm_view_all_orders'), 'desc' => __('perm_view_all_orders_desc'), 'icon' => 'fas fa-eye text-info'],
+        // 'view_all_orders' schválně chybí: nikde se nečetlo (viditelnost poboček řídí
+        // výhradně isBranchGlobalViewer — admin/Boss, rozhodnutí majitele 20.7.2026);
+        // zaškrtnutí bez účinku jen mátlo.
         'edit_orders' => ['name' => __('perm_edit_orders'), 'desc' => __('perm_edit_orders_desc'), 'icon' => 'fas fa-edit text-primary'],
         'edit_customers' => ['name' => __('perm_edit_customers'), 'desc' => __('perm_edit_customers_desc'), 'icon' => 'fas fa-user-edit text-success'],
         'manage_inventory' => ['name' => 'Inventory management', 'desc' => 'Can edit inventory, adjust stock quantity, and work with the parts catalog.', 'icon' => 'fas fa-boxes text-info'],
@@ -2854,8 +2856,11 @@ function afxEshopReservationHits(string $q = '', int $limit = 12): array {
 
 /** Klíč účtu pro potvrzení upozornění — stejný vzor jako blokace kasy/auth epochy. */
 function afxEshopAlertAccountKey(): string {
-    if (!empty($_SESSION['user_id'])) { return 'u' . (int)$_SESSION['user_id']; }
+    // Účty z tabulky techniků mají v user_id pseudo-klíč „t15" — (int) z něj udělalo 0,
+    // takže technik, manažer i Boss sdíleli jeden klíč 'u0' a potvrzení jednoho
+    // schovalo upozornění všem. Napřed tech_id, users až pro číselné user_id.
     if (!empty($_SESSION['tech_id'])) { return 't' . (int)$_SESSION['tech_id']; }
+    if (is_numeric($_SESSION['user_id'] ?? null)) { return 'u' . (int)$_SESSION['user_id']; }
     return '';
 }
 
@@ -7201,6 +7206,24 @@ function crmAuditActionLabel(string $action): string {
         'settings.update' => 'Změna nastavení', 'system.update' => 'Aktualizace systému',
         'sms.sent' => 'Odeslána SMS klientovi',
         'email.sent' => 'Odeslán e-mail', 'email.failed' => 'E-mail se neodeslal',
+        'accounting.period_lock' => 'Uzamčení účetního období', 'accounting.period_unlock' => 'Odemčení účetního období',
+        'banka.napojeni' => 'Napojení banky', 'banka.storno' => 'Storno v bance',
+        'chat.delete' => 'Smazání zprávy v chatu',
+        'document.id_scan' => 'Sken dokladu totožnosti', 'document.id_scan_view' => 'Zobrazení skenu dokladu totožnosti',
+        'document.media_upload' => 'Příloha k dokumentu', 'document.online_fill' => 'Dokument vyplněn klientem online',
+        'document.seller_reuse' => 'Převzetí prodávajícího z dřívějšího dokladu',
+        'eshop.order_paid' => 'E-shop: objednávka zaplacena', 'eshop.order_shipped' => 'E-shop: objednávka odeslána',
+        'eshop.order_returned' => 'E-shop: objednávka vrácena', 'eshop.order_cancelled' => 'E-shop: objednávka zrušena',
+        'eshop_customer.save' => 'E-shop: uložení zákazníka',
+        'inventory.restock' => 'Naskladnění dílů', 'inventory.transfer' => 'Přesun dílů mezi pobočkami',
+        'kasa.cash_doc' => 'Pokladní doklad', 'kasa.cash_doc_storno' => 'Storno pokladního dokladu',
+        'kasa.eshop_pickup' => 'Výdej e-shop objednávky na kase', 'kasa.expense' => 'Výdaj z kasy',
+        'kasa.opening_balance' => 'Počáteční stav kasy', 'kasa.shift_open' => 'Otevření směny kasy', 'kasa.shift_close' => 'Uzavření směny kasy',
+        'model_photo.set' => 'Fotka modelu nastavena', 'model_photo.clear' => 'Fotka modelu odebrána',
+        'product_video.upload' => 'Nahrání 360° videa produktu',
+        'supplier_catalog.delete' => 'Smazání katalogu dodavatele',
+        'system.backup_run' => 'Záloha systému', 'system.backup_restore' => 'Obnova ze zálohy',
+        'order.create.warn' => 'Varování při příjmu zakázky',
     ];
     return $map[$action] ?? $action;
 }

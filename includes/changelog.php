@@ -11,6 +11,27 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.80.0',
+        'date' => '2026-09-12',
+        'time' => '10:30',
+        'title' => 'Opravy po auditu (2. dávka): faktury, dobropisy, Historie, modály, reklamace z portálu, karta zaměstnance, účetní',
+        'items' => [
+            '<b>Faktura z přehledu zakázek (Účtování):</b> vystavovala se bez pobočky (manažer pak dostal „Neautorizováno" na tisku a v seznamu ji nenašel) a s číslem = číslo zakázky, které kolidovalo s expresní fakturou z detailu. Nově má pobočku zakázky a obsazené číslo nahradí další volné z řady.',
+            '<b>Dobropisy:</b> číslo se počítalo z počtu dobropisů, po smazání jednoho každý další skončil surovou SQL chybou duplicity. Číslo se bere z nejvyššího v řadě.',
+            '<b>Historie → filtr „Systém"</b> vždy vrátil „Žádné záznamy" (automatika nemá id zaměstnance). Opraveno.',
+            '<b>Tlačítka Uložit v modálech</b> se po odmítnuté validaci nebo chybě zamykala na 15 s s falešným „Ukládám…". Nezamykají se, když prohlížeč formulář odmítne, a odemknou se hned po odpovědi serveru nebo po zobrazení hlášky. Ochrana proti dvojkliku během ukládání zůstává.',
+            '<b>Reklamace z klientského portálu:</b> požadované řešení klienta se ukládalo do popisu, protokol tiskl „Posouzení technikem" a přehled ukazoval „—". Ukládá se do správného pole.',
+            '<b>Upravit zakázku:</b> typ zařízení PC / HDD se tiše přepsal na Telefon (v nabídce chyběly). Doplněno.',
+            '<b>Karta zaměstnance:</b> přeřazení technika na jinou pobočku nikdy nepřesunulo jeho zakázky (předchozí pobočka se četla až po uložení). Opraveno.',
+            '<b>Podpis na tabletu z detailu zakázky:</b> po odeslání se nezobrazil čekací stav ani křížek pro zrušení. Opraveno.',
+            '<b>Výkupní list — sken dokladu totožnosti:</b> políčka se ukazovala všem, ale nahrát a prohlížet sken smí jen vedení (technik dostal 403 a rozbité náhledy). Technik teď vidí jen upozornění, sken řeší vedení.',
+            '<b>Účetní:</b> v modalu nové faktury hledání klienta vždy hlásilo „Hledání selhalo" (procházení klientů má tato role záměrně zakázané). Modal jí rovnou nabídne ruční odběratele.',
+            '<b>E-shop upozornění:</b> potvrzení jednoho technika/manažera skrylo upozornění všem (všichni sdíleli jeden klíč účtu). Opraveno.',
+            '<b>Nastavení → Integrace:</b> nové pole „Telegram administrátora" — přehledové notifikace pro admina dosud nešly zapnout (nastavení nemělo pole). Právo „Správa hesel" nově skutečně otevře záložku Administrátoři; mrtvé právo „Zobrazit všechny zakázky" (nikde se nečetlo) z nabídky zmizelo.',
+            'Drobnosti: chybějící překlad „Nákupní cena" u naskladnění dílu ze zakázky; 30 typů úkonů v Historii má český popisek místo surového kódu.',
+        ],
+    ],
+    [
         'version' => '3.79.0',
         'date' => '2026-09-11',
         'time' => '23:30',

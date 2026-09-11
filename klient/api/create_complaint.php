@@ -43,6 +43,7 @@ if (!isOrderStatusIn((string)$order['status'], 'collected')) {
 }
 
 ensureComplaintsClientColumns($pdo);
+ensureComplaintsLegalColumns($pdo);   // requested_resolution — DDL před transakcí
 
 $orderCode = trim((string)($order['order_code'] ?? '')) !== '' ? (string)$order['order_code'] : ('#' . $orderId);
 $device    = trim(((string)($order['device_brand'] ?? '')) . ' ' . ((string)($order['device_model'] ?? '')));
@@ -71,16 +72,16 @@ try {
     $code = sprintf('RK-%03d', $max + 1);
 
     $fullReason = $reason;
-    $meta = [];
-    if ($resolution !== '') $meta[] = 'Požadavek: ' . $resolution;
-    $meta[] = 'Doklad/zakázka: ' . $orderCode;
-    $meta[] = 'Založeno klientem z portálu';
+    $meta = ['Doklad/zakázka: ' . $orderCode, 'Založeno klientem z portálu'];
     $fullReason .= "\n" . implode(' · ', $meta);
 
+    // Požadované řešení do vlastního sloupce — v popisu ho protokol i přehled ignorovaly
+    // (tiskl se výchozí „Posouzení technikem", v seznamu „—")
     $ins = $pdo->prepare("INSERT INTO complaints
-        (complaint_code, customer_id, order_id, order_code, phone, device, serial_number, complaint_reason, complaint_status, source)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Přijato', 'client')");
-    $ins->execute([$code, $customerId, $orderId, $orderCode, $phone, $device, $serial, $fullReason]);
+        (complaint_code, customer_id, order_id, order_code, phone, device, serial_number, complaint_reason, requested_resolution, complaint_status, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Přijato', 'client')");
+    $ins->execute([$code, $customerId, $orderId, $orderCode, $phone, $device, $serial, $fullReason,
+        $resolution !== '' ? mb_substr($resolution, 0, 60) : null]);
 
     $pdo->commit();
 
