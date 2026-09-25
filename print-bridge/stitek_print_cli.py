@@ -25,17 +25,19 @@ def main() -> int:
     p.add_argument("--date", default="")
     p.add_argument("--client", default="")
     p.add_argument("--product-json", default="", help="base64(JSON) dat produktového štítku")
+    p.add_argument("--red-media", default="", help="1 = vložená černo-červená role DK-22251 (vše dvoubarevně)")
     a = p.parse_args()
 
     os.environ["STITEK_PRINTER_IP"] = a.ip
     os.environ["STITEK_PRINTER_MODEL"] = a.model
-    red = False
+    # s černo-červenou rolí tiskárna běžný černý rastr odmítne → vše jako 62red
+    red = a.red_media == "1"
     try:
         if a.product_json:
             from stitek_product import render_product_label  # noqa: E402
             data = json.loads(base64.b64decode(a.product_json).decode("utf-8"))
             img = render_product_label(data)
-            red = bool(data.get("akce"))   # AKCE = dvoubarevný tisk (role DK-22251)
+            red = red or bool(data.get("akce"))   # AKCE = dvoubarevný tisk (role DK-22251)
         else:
             if not a.code:
                 raise ValueError("chybí --code (štítek zakázky) nebo --product-json (produkt)")

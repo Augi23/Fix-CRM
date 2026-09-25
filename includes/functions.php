@@ -5731,6 +5731,11 @@ function ensureBranchPrinterColumn(): void {
         }
         // Účtenková tiskárna pobočky (v3.81.0): dřív byl cíl tisku jediný globální
         // (receipt_printer_target), takže druhá pobočka neměla kam tisknout.
+        // Vložená role štítků (v3.84.0): 'red' = černo-červená DK-22251. S ní tiskárna
+        // odmítne běžný černý rastr, takže se tiskne všechno dvoubarevně (bez červené).
+        if ($bc && !in_array('label_media', $bc, true)) {
+            $pdo->exec("ALTER TABLE `branches` ADD COLUMN `label_media` VARCHAR(16) NULL DEFAULT NULL");
+        }
         if ($bc && !in_array('receipt_printer_target', $bc, true)) {
             $pdo->exec("ALTER TABLE `branches` ADD COLUMN `receipt_printer_target` VARCHAR(120) NULL DEFAULT NULL");
         }
@@ -5814,6 +5819,22 @@ function branchPrinterMode(?int $branchId): string {
         return strtolower(trim((string)$st->fetchColumn())) === 'local' ? 'local' : 'server';
     } catch (Throwable $e) {
         return 'server';
+    }
+}
+
+/** Je v tiskárně štítků pobočky černo-červená role (DK-22251)? Pak se tiskne vše
+ *  jako dvoubarevný rastr 62red — běžný štítek nemá červené pixely, vyjede černě.
+ *  S obyčejnou černou rolí by naopak tiskárna dvoubarevnou úlohu odmítla. */
+function branchLabelRedMedia(?int $branchId): bool {
+    global $pdo;
+    if (!$branchId) { return false; }
+    try {
+        ensureBranchPrinterColumn();
+        $st = $pdo->prepare("SELECT label_media FROM branches WHERE id = ? LIMIT 1");
+        $st->execute([(int)$branchId]);
+        return strtolower(trim((string)$st->fetchColumn())) === 'red';
+    } catch (Throwable $e) {
+        return false;
     }
 }
 

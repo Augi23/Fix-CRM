@@ -1362,7 +1362,7 @@ window.afxLabelToast = function (msg, ok) {
 /* Záložní tisk štítku PŘES TENTO POČÍTAČ (lokální můstek 127.0.0.1:9110).
    Potřebuje ho pobočka, která je v jiné síti než server — server na její tiskárnu
    nedosáhne, ale počítač u pultu ano. Vrací Promise: true = vytištěno. */
-window.afxLabelViaBridge = function (orderId, isComplaint, printerModel) {
+window.afxLabelViaBridge = function (orderId, isComplaint, printerModel, redMedia) {
     // Na iPadu/Safari se http://127.0.0.1 z HTTPS stránky nikdy nepovolí — výsledek
     // testu si proto zapamatujeme na relaci, ať se do konzole nesype chyba při
     // každém tisku.
@@ -1379,7 +1379,7 @@ window.afxLabelViaBridge = function (orderId, isComplaint, printerModel) {
             return fetch('http://127.0.0.1:9110/print', {
                 method: 'POST', signal: ctl.signal,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: d.code || '', defect: d.defect || '', date: d.date || '', client: d.client || '', printer_model: printerModel || '' })
+                body: JSON.stringify({ code: d.code || '', defect: d.defect || '', date: d.date || '', client: d.client || '', printer_model: printerModel || '', red_media: !!redMedia })
             })
                 .then(function (r2) { clearTimeout(t); return r2.json(); })
                 .then(function (j) { return !!(j && j.ok); })
@@ -1397,7 +1397,7 @@ window.afxLabelViaBridge = function (orderId, isComplaint, printerModel) {
         .catch(function () { return false; });
 };
 
-window.afxProductLabelViaBridge = function (product, copies, printerModel) {
+window.afxProductLabelViaBridge = function (product, copies, printerModel, redMedia) {
     if (!product || typeof product !== 'object') { return Promise.resolve(false); }
     if (sessionStorage.getItem('afxNoLabelBridge') === '1') { return Promise.resolve(false); }
     copies = Math.max(1, Math.min(20, parseInt(copies || 1, 10) || 1));
@@ -1407,7 +1407,7 @@ window.afxProductLabelViaBridge = function (product, copies, printerModel) {
     return fetch('http://127.0.0.1:9110/print', {
         method: 'POST', signal: ctl.signal,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product: product, copies: copies, printer_model: printerModel || '' })
+        body: JSON.stringify({ product: product, copies: copies, printer_model: printerModel || '', red_media: !!redMedia })
     })
         .then(function (r) { clearTimeout(t); return r.json(); })
         .then(function (j) { return !!(j && j.ok); })
@@ -1437,7 +1437,7 @@ window.printOrderLabel = function (orderId, opts) {
                 // pobočky, jinak by vedení tisklo štítky druhé pobočky u sebe
                 // res.local = pobočka tiskne zásadně přes počítač u pultu (jiná síť než server)
                 if (res.bridge_ok && (res.not_paired || res.unreachable || res.local)) {
-                    return window.afxLabelViaBridge(orderId, false, res.printer_model).then(function (printed) {
+                    return window.afxLabelViaBridge(orderId, false, res.printer_model, res.red_media).then(function (printed) {
                         if (printed) {
                             window.afxLabelToast('🏷️ Štítek vytištěn přes tenhle počítač', true);
                             return;
@@ -1557,7 +1557,7 @@ window.printComplaintLabel = function (complaintId, opts) {
                 // a jen u vlastní pobočky (rozhoduje server přes bridge_ok)
                 // res.local = pobočka tiskne zásadně přes počítač u pultu (jiná síť než server)
                 if (res.bridge_ok && (res.not_paired || res.unreachable || res.local)) {
-                    return window.afxLabelViaBridge(complaintId, true, res.printer_model).then(function (printed) {
+                    return window.afxLabelViaBridge(complaintId, true, res.printer_model, res.red_media).then(function (printed) {
                         if (printed) { window.afxLabelToast('🏷️ Štítek reklamace vytištěn přes tenhle počítač', true); return; }
                         throw new Error(res.error || 'tisk selhal');
                     });

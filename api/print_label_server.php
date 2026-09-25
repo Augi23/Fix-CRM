@@ -74,6 +74,7 @@ if ($action === 'save_ip') {
     // 'local' = tiskne počítač obsluhy přes můstek; IP na serveru pak nedává smysl
     // (server na tu síť nevidí) a ukládá se prázdná, ať nikoho nemate v přehledu.
     $mode = ((string)($_POST['mode'] ?? '') === 'local') ? 'local' : 'server';
+    $media = ((string)($_POST['media'] ?? '') === 'red') ? 'red' : 'black';
     if ($mode === 'local') { $ip = ''; }
     // Párovat smí admin kteroukoli pobočku, ostatní zaměstnanci JEN tu svou —
     // druhá pobočka si tak tiskárnu nastaví sama a nikomu ji nepřepíše.
@@ -97,16 +98,17 @@ if ($action === 'save_ip') {
     }
     if ($bid > 0) {
         // prázdná IP = rozpárovat (pobočka pak nemá tiskárnu a tisk to řekne)
-        $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ?, label_printer_model = ?, label_printer_mode = ? WHERE id = ?");
-        $st->execute([$ip !== '' ? $ip : null, ($ip !== '' || $mode === 'local') ? $model : null, $mode, $bid]);
+        $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ?, label_printer_model = ?, label_printer_mode = ?, label_media = ? WHERE id = ?");
+        $st->execute([$ip !== '' ? $ip : null, ($ip !== '' || $mode === 'local') ? $model : null, $mode, $media, $bid]);
         $__bn = $pdo->prepare("SELECT name FROM branches WHERE id = ?");
         $__bn->execute([$bid]);
         crmAuditLog('settings.printer', [
             'entity_type' => 'branch', 'entity_id' => $bid, 'entity_label' => (string)$__bn->fetchColumn(),
             'branch_id' => $bid,
-            'summary' => $mode === 'local'
+            'summary' => ($mode === 'local'
                 ? 'Štítky tiskne počítač u pultu (místní můstek) · ' . $model
-                : ($ip !== '' ? 'Spárována tiskárna štítků ' . $ip . ' (' . $model . ')' : 'Tiskárna štítků odpárována'),
+                : ($ip !== '' ? 'Spárována tiskárna štítků ' . $ip . ' (' . $model . ')' : 'Tiskárna štítků odpárována'))
+                . ($media === 'red' ? ' · role černo-červená DK-22251' : ''),
         ]);
         // ZÁMĚRNĚ BEZ sondy dosažitelnosti: kdyby uložení rovnou hlásilo „odpovídá",
         // dalo by se opakovaným ukládáním proskenovat port 9100 po celé síti serveru.
@@ -128,6 +130,7 @@ if ($action === 'status') {
         'ok' => true,
         'branch_id' => $bid,
         'mode' => $mode,
+        'red_media' => branchLabelRedMedia($bid ?: null),
         'printer_ip' => $canPair ? $printerIp : '',   // adresu vidí jen ten, kdo pobočku spravuje
         'printer_model' => $canPair ? $printerModel : '',
         // v režimu 'local' je „spárováno" věcí můstku na počítači u pultu, ne serveru
@@ -255,6 +258,7 @@ if ($action === 'print_complaint') {
 }
 $printerIp = branchPrinterIp($branchId);
 $printerModel = branchPrinterModel($branchId);
+$redMedia = branchLabelRedMedia((int)$branchId);
 $productLabel = null;
 $productCopies = max(1, min(20, (int)($_POST['copies'] ?? 1)));
 if ($action === 'print_product') {
@@ -289,7 +293,7 @@ if (branchPrinterMode((int)$branchId) === 'local') {
     $__bname = (string)$__bn->fetchColumn();
     $payload = ['ok' => false, 'local' => true, 'branch_id' => (int)$branchId,
         'printer_model' => $printerModel !== '' ? $printerModel : 'QL-810W',
-        'bridge_ok' => $bridgeOk,
+        'bridge_ok' => $bridgeOk, 'red_media' => $redMedia,
         'error' => $bridgeOk
             ? 'Tiskne počítač u pultu — posílám štítek na místní můstek.'
             : 'Štítky pobočky ' . ($__bname !== '' ? $__bname : '#' . (int)$branchId)
@@ -311,7 +315,7 @@ if ($printerIp === '') {
     $bridgeOk = afxLabelBridgeAllowed((int)$branchId);
     $payload = ['ok' => false, 'not_paired' => true, 'branch_id' => (int)$branchId,
         'printer_model' => $printerModel,
-        'bridge_ok' => $bridgeOk,
+        'bridge_ok' => $bridgeOk, 'red_media' => $redMedia,
         'error' => 'Pobočka ' . ($__bname !== '' ? $__bname : '#' . (int)$branchId)
             . ' nemá spárovanou tiskárnu štítků — spáruj ji v Nastavení → Tisk štítků.'];
     if ($bridgeOk && $action === 'print_product' && !empty($productLabel['data'])) {
@@ -325,7 +329,7 @@ if (!afxPrinterReachable($printerIp)) {
     $bridgeOk = afxLabelBridgeAllowed((int)$branchId);
     $payload = ['ok' => false, 'unreachable' => true, 'printer_ip' => $printerIp,
         'printer_model' => $printerModel,
-        'branch_id' => (int)$branchId, 'bridge_ok' => $bridgeOk,
+        'branch_id' => (int)$branchId, 'bridge_ok' => $bridgeOk, 'red_media' => $redMedia,
         'error' => 'Tiskárna ' . $printerIp . ' neodpovídá (port 9100). Je zapnutá a na síti pobočky?'];
     if ($bridgeOk && $action === 'print_product' && !empty($productLabel['data'])) {
         $payload['bridge_product'] = $productLabel['data'];
@@ -371,7 +375,8 @@ if ($action === 'print_product') {
 }
 
 $cmd = escapeshellarg($PY) . ' ' . escapeshellarg($CLI) . ' --ip ' . escapeshellarg($printerIp)
-    . ' --model ' . escapeshellarg($printerModel);
+    . ' --model ' . escapeshellarg($printerModel)
+    . ($redMedia ? ' --red-media 1' : '');
 foreach ($args as $k => $v) { $cmd .= ' ' . $k . ' ' . escapeshellarg((string)$v); }
 // POČET KOPIÍ: u produktu naskladněného po víc kusech chce obsluha štítek na každý
 // kus (jinak by 19 z 20 krytů leželo v regále bez ceny — přesně to, kvůli čemu se

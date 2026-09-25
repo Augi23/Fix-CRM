@@ -2053,10 +2053,12 @@ require_once 'includes/header.php';
                         $labelIps = [];
                         $labelPrinterModels = [];
                         $labelModes = [];
+                        $labelMedia = [];
                         $labelModels = labelPrinterModels();
                         try {
                             foreach ($pdo->query("SELECT id, COALESCE(label_printer_ip,'') AS ip, COALESCE(label_printer_model,'QL-810W') AS model,
-                                                         COALESCE(label_printer_mode,'server') AS mode FROM branches")->fetchAll(PDO::FETCH_ASSOC) as $__r) {
+                                                         COALESCE(label_printer_mode,'server') AS mode, COALESCE(label_media,'black') AS media FROM branches")->fetchAll(PDO::FETCH_ASSOC) as $__r) {
+                                $labelMedia[(int)$__r['id']] = strtolower((string)$__r['media']) === 'red' ? 'red' : 'black';
                                 $labelIps[(int)$__r['id']] = (string)$__r['ip'];
                                 $labelPrinterModels[(int)$__r['id']] = normalizeLabelPrinterModel((string)$__r['model']);
                                 $labelModes[(int)$__r['id']] = strtolower((string)$__r['mode']) === 'local' ? 'local' : 'server';
@@ -2084,6 +2086,10 @@ require_once 'includes/header.php';
                                 <select id="srvMode<?php echo $__bid; ?>" class="form-select form-select-sm" style="max-width:520px;" onchange="srvModeChanged(<?php echo $__bid; ?>)">
                                     <option value="server"<?php echo $__mode === 'server' ? ' selected' : ''; ?>>Tiskne server — tiskárna je v síti serveru (Karlín)</option>
                                     <option value="local"<?php echo $__mode === 'local' ? ' selected' : ''; ?>>Tiskne počítač u pultu — pobočka má vlastní síť (Na Příkopě)</option>
+                                </select>
+                                <select id="srvMedia<?php echo $__bid; ?>" class="form-select form-select-sm mt-2" style="max-width:520px;" title="Jaká role je právě vložená v tiskárně" onchange="srvSaveMedia(<?php echo $__bid; ?>)">
+                                    <option value="black"<?php echo ($labelMedia[$__bid] ?? 'black') === 'black' ? ' selected' : ''; ?>>Vložená role: černá (DK-22205)</option>
+                                    <option value="red"<?php echo ($labelMedia[$__bid] ?? 'black') === 'red' ? ' selected' : ''; ?>>Vložená role: černo-červená (DK-22251) — běžné štítky se tisknou černě</option>
                                 </select>
                             </div>
                             <div class="row g-2 align-items-center" style="max-width:780px;">
@@ -2196,6 +2202,18 @@ require_once 'includes/header.php';
                                 ? '<i class="fas fa-circle-info me-1"></i>Zvoleno <b>tisk přes počítač u pultu</b> — ulož to tlačítkem <b>Uložit nastavení</b>.'
                                 : '<i class="fas fa-circle-info me-1"></i>Zvoleno <b>tisk přes server</b> — zadej IP tiskárny a dej Spárovat.');
                         }
+                        /* Výměna role se ukládá hned — IP i režim zůstávají, jak jsou uložené. */
+                        function srvSaveMedia(bid) {
+                            var input = document.getElementById('srvIp' + bid);
+                            var ip = srvMode(bid) === 'local' ? '' : (input ? (input.getAttribute('data-orig') || '') : '');
+                            srvSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>Ukládám vloženou roli…');
+                            srvSaveIp(bid, ip, function () {
+                                var red = (document.getElementById('srvMedia' + bid) || {}).value === 'red';
+                                srvSay(bid, 'text-success', '<i class="fas fa-check-circle me-1"></i>Uloženo: ' + (red
+                                    ? '<b>černo-červená role</b> — běžné štítky se tisknou černě, akční cenovky červeně.'
+                                    : '<b>černá role</b> — akční (červené) cenovky na ní nejdou.'));
+                            });
+                        }
                         function srvSaveLocal(bid) {
                             srvSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>Ukládám…');
                             srvSaveIp(bid, '', function () { srvStatus(bid); });
@@ -2218,6 +2236,8 @@ require_once 'includes/header.php';
                             fd.append('branch_id', bid);
                             fd.append('ip', ip);
                             fd.append('mode', srvMode(bid));
+                            var mediaEl = document.getElementById('srvMedia' + bid);
+                            fd.append('media', mediaEl ? mediaEl.value : 'black');
                             fd.append('model', modelEl ? modelEl.value : 'QL-810W');
                             fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
                             return fetch('api/print_label_server.php', { method: 'POST', body: fd })
@@ -2320,7 +2340,7 @@ require_once 'includes/header.php';
                                         return fetch('http://127.0.0.1:9110/print', {
                                             method: 'POST', signal: ctl.signal,
                                             headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ code: 'TEST-' + bid, defect: 'Zkušební štítek z Nastavení', date: den, client: 'AppleFix', printer_model: j.printer_model || '' })
+                                            body: JSON.stringify({ code: 'TEST-' + bid, defect: 'Zkušební štítek z Nastavení', date: den, client: 'AppleFix', printer_model: j.printer_model || '', red_media: !!j.red_media })
                                         })
                                             .then(function (r2) { clearTimeout(t); return r2.json(); })
                                             .then(function (b) {

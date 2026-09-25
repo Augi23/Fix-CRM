@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.84.0',
+        'date' => '2026-09-25',
+        'time' => '18:17',
+        'title' => 'Štítky Brother: tisk i na černo-červenou roli',
+        'items' => [
+            'V Nastavení → Tisk štítků se u pobočky vybírá, <b>jaká role je vložená</b>: černá (DK-22205), nebo černo-červená (DK-22251). S černo-červenou rolí tiskárna odmítala všechny běžné štítky a vyjely jen akční cenovky. Teď se v tom režimu tiskne všechno dvoubarevně: štítky zakázek, reklamací a běžné cenovky vyjedou normálně <b>černě</b>, červeně jen akční cenovky.',
+            'Volba platí pro tisk přes server i přes počítač u pultu a ukládá se hned po změně.',
+        ],
+    ],
+    [
         'version' => '3.83.3',
         'date' => '2026-09-25',
         'time' => '14:35',

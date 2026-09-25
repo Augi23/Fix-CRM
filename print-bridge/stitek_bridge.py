@@ -407,6 +407,8 @@ def build_instructions(img: Image.Image, model: str = "", red: bool = False):
     from brother_ql.conversion import convert
     qlr = BrotherQLRaster(printer_model(model))
     qlr.exception_on_warning = True
+    if red and img.mode != "RGB":
+        img = img.convert("RGB")   # dvoubarevný rastr čte barvy — šedotónový obrázek by neprošel
     return convert(qlr=qlr, images=[img], label="62red" if red else "62", rotate="auto",
                    threshold=70, dither=False, cut=True, red=red)
 
@@ -704,12 +706,15 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = self._body()
             model = str(data.get("printer_model") or "")
-            red = False
+            # red_media = v tiskárně je černo-červená role DK-22251: tiskárna pak
+            # odmítne běžný (jen černý) rastr, takže VŠECHNO jde dvoubarevně —
+            # obyčejný štítek nemá červené pixely, vyjede tedy normálně černě
+            red = bool(data.get("red_media"))
             if isinstance(data.get("product"), dict):
                 from stitek_product import render_product_label
                 img = render_product_label(data["product"])
                 copies = max(1, min(20, int(data.get("copies") or 1)))
-                red = bool(data["product"].get("akce"))   # AKCE = dvoubarevný tisk
+                red = red or bool(data["product"].get("akce"))   # AKCE = dvoubarevný tisk
             else:
                 img = render_label(str(data.get("code", "")), str(data.get("defect", "")), str(data.get("date", "")), str(data.get("client", "")))
                 copies = 1
