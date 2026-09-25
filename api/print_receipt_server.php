@@ -119,7 +119,7 @@ try {
                 }
             } catch (Throwable $e) { error_log('slip shift_close pohyby: ' . $e->getMessage()); $moves = null; }
         }
-        $bytes = crmEscposReceipt(crmShiftSlipRaster($shift, $slip === 'shift_open' ? 'open' : 'close', $prev, $moves));
+        $bytes = crmEscposPreamble() . crmEscposReceipt(crmShiftSlipRaster($shift, $slip === 'shift_open' ? 'open' : 'close', $prev, $moves));
         // enqueue = tisková fronta (appka z TestFlightu / Safari nedosáhnou na můstek)
         if (!empty($in['enqueue'])) {
             $qok = afxPrintJobEnqueue($branch, $bytes);
@@ -136,7 +136,7 @@ try {
     $data = !empty($in['test']) ? afxReceiptTestData($testBranch) : afxReceiptDataForSale((int)($in['sale_id'] ?? 0), $saleBranch);
     if (!$data) { echo json_encode(['ok' => false, 'error' => 'Doklad nenalezen.']); exit; }
 
-    $bytes = '';
+    $bytes = crmEscposPreamble();   // tiskárna ve výchozím stavu, i kdyby visela v cizí úloze
     if (!empty($in['drawer'])) { $bytes .= crmEscposDrawerPulse(); }   // šuplík ještě před tiskem
     $bytes .= crmEscposReceipt(crmReceiptRaster($data));
 

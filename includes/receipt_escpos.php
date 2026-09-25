@@ -398,6 +398,17 @@ function crmShiftSlipRaster(array $shift, string $typ, ?array $prev = null, ?arr
     return $fin;
 }
 
+/** Úvod KAŽDÉ tiskové úlohy: výplň NUL + ESC @ (reset).
+ *  Když tiskárna ještě visí v nedokončeném obrazovém příkazu (předchozí úloha se
+ *  usekla, tiskárna se zrovna probouzí), spolkla by začátek nové účtenky jako
+ *  data obrázku a zbytek prvního pásu vytiskla jako TEXT — nahoře účtenky pak
+ *  vyjely nesmyslné znaky („aaaa≡x…", Praha 1, 25. 9. 2026). NUL tiskárna mimo
+ *  příkaz ignoruje; uvnitř příkazu jím nedokončený pás doplní (nejdelší pás
+ *  ESC * = 3 × 384 = 1152 bajtů) a ESC @ ho pak smaže, takže nic navíc nevyjede. */
+function crmEscposPreamble(): string {
+    return str_repeat("\x00", 1200) . "\x1B\x40";
+}
+
 /** Impulz do pokladní zásuvky (RJ11 na tiskárně): ESC p 0 60ms 120ms. */
 function crmEscposDrawerPulse(): string {
     return "\x1B\x70\x00\x3C\x78";

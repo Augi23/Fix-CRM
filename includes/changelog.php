@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.83.3',
+        'date' => '2026-09-25',
+        'time' => '14:35',
+        'title' => 'Účtenky: bez nesmyslných znaků na začátku',
+        'items' => [
+            'Na Praze 1 vyjížděly na začátku účtenky řádky nesmyslných znaků („aaaa≡x…") a hlavička se ořízla. Tiskárna ještě dojídala nedokončený příkaz a začátek nové účtenky spolkla. Každá účtenka i lístek směny teď začíná výplní a resetem tiskárny, jak to dělají pokladní ovladače — tiskárna tak začne vždy načisto.',
+            'Pobočky mají v Nastavení → Firma vyplněné skutečné adresy (Křižíkova 177/29, Praha 8 · Na Příkopě 853, Praha 1). Tisknou se v hlavičce účtenek, na zakázkových listech a v e-mailech.',
+        ],
+    ],
+    [
         'version' => '3.83.2',
         'date' => '2026-09-25',
         'time' => '14:31',
