@@ -22,8 +22,14 @@ if ! lpstat -p xprinter >/dev/null 2>&1; then
         echo "❌ USB tiskárna nenalezena — je zapojená do TOHOTO počítače a zapnutá?"
         exit 1
     fi
+    # Novější macOS RAW fronty odmítá („neformátované fronty už nejsou podporovány").
+    # Nevadí: účtenky jdou přes `lp -o raw`, který filtry obejde u jakékoli fronty —
+    # stačí obyčejná fronta s obecným ovladačem.
+    GENERIC_PPD="/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/PrintCore.framework/Versions/A/Resources/Generic.ppd"
     lpadmin -p xprinter -E -v "$URI" -m raw 2>/dev/null \
-        || sudo lpadmin -p xprinter -E -v "$URI" -m raw \
+        || { [ -f "$GENERIC_PPD" ] && lpadmin -p xprinter -E -v "$URI" -P "$GENERIC_PPD" 2>/dev/null; } \
+        || sudo lpadmin -p xprinter -E -v "$URI" -m raw 2>/dev/null \
+        || { [ -f "$GENERIC_PPD" ] && sudo lpadmin -p xprinter -E -v "$URI" -P "$GENERIC_PPD"; } \
         || { echo "❌ Frontu se nepodařilo založit."; exit 1; }
 fi
 lpadmin -p xprinter -o printer-error-policy=abort-job -o printer-is-shared=false 2>/dev/null \

@@ -5700,6 +5700,18 @@ function ensureBranchPrinterColumn(): void {
         if ($bc && !in_array('label_printer_model', $bc, true)) {
             $pdo->exec("ALTER TABLE `branches` ADD COLUMN `label_printer_model` VARCHAR(32) NULL DEFAULT 'QL-810W'");
         }
+        // Jak pobočka tiskne štítky (v3.81.0): 'server' = server pošle štítek přímo na
+        // IP tiskárny (musí na ni dosáhnout), 'local' = tiskne POČÍTAČ OBSLUHY přes
+        // místní můstek 127.0.0.1:9110. Na Příkopě není se serverem v Karlíně nijak
+        // propojené, takže tam platí 'local' — server se o tiskárnu ani nepokouší.
+        if ($bc && !in_array('label_printer_mode', $bc, true)) {
+            $pdo->exec("ALTER TABLE `branches` ADD COLUMN `label_printer_mode` VARCHAR(16) NULL DEFAULT NULL");
+        }
+        // Účtenková tiskárna pobočky (v3.81.0): dřív byl cíl tisku jediný globální
+        // (receipt_printer_target), takže druhá pobočka neměla kam tisknout.
+        if ($bc && !in_array('receipt_printer_target', $bc, true)) {
+            $pdo->exec("ALTER TABLE `branches` ADD COLUMN `receipt_printer_target` VARCHAR(120) NULL DEFAULT NULL");
+        }
         // JEDNORÁZOVÝ seed Karlína: 192.168.1.220 je karlínský Brother, který byl do
         // v3.39.0 natvrdo v kódu jako výchozí hodnota — bez něj by Karlín po zrušení
         // náhrady za cizí pobočku (branchPrinterIp) přestal tisknout.
@@ -5760,6 +5772,46 @@ function branchPrinterModel(?int $branchId): string {
     } catch (Throwable $e) {
         return 'QL-810W';
     }
+}
+
+/** Režim tisku štítků pobočky: 'server' (server tiskne přímo na IP tiskárny) nebo
+ *  'local' (tiskne počítač obsluhy přes místní můstek 127.0.0.1:9110).
+ *
+ *  Proč to vůbec je: pobočka Na Příkopě není se serverem v Karlíně nijak propojená.
+ *  Server na její tiskárnu nikdy nedosáhne, takže by při každém štítku zbytečně čekal
+ *  na timeout portu 9100 a do Historie psal „tisk SELHAL", i když štítek nakonec
+ *  v pořádku vyjel z můstku. V režimu 'local' se server o tiskárnu vůbec nepokouší
+ *  a rovnou řekne prohlížeči, ať tiskne přes svůj můstek. */
+function branchPrinterMode(?int $branchId): string {
+    global $pdo;
+    if (!$branchId) { return 'server'; }
+    try {
+        ensureBranchPrinterColumn();
+        $st = $pdo->prepare("SELECT label_printer_mode FROM branches WHERE id = ? LIMIT 1");
+        $st->execute([(int)$branchId]);
+        return strtolower(trim((string)$st->fetchColumn())) === 'local' ? 'local' : 'server';
+    } catch (Throwable $e) {
+        return 'server';
+    }
+}
+
+/** Cíl tisku účtenek PRO DANOU POBOČKU (branches.receipt_printer_target), jinak
+ *  globální receipt_printer_target. Tvary cíle popisuje includes/receipt_escpos.php.
+ *  Prázdno = pobočka nemá serverový cíl a tiskne se přes počítač u kasy (můstek
+ *  127.0.0.1:9101, případně tisková fronta + poller). */
+function crmBranchReceiptTarget(?int $branchId): string {
+    global $pdo;
+    $branchId = (int)$branchId;
+    if ($branchId > 0) {
+        try {
+            ensureBranchPrinterColumn();
+            $st = $pdo->prepare("SELECT receipt_printer_target FROM branches WHERE id = ? LIMIT 1");
+            $st->execute([$branchId]);
+            $t = trim((string)$st->fetchColumn());
+            if ($t !== '') { return $t; }
+        } catch (Throwable $e) { /* starší DB → globální nastavení níž */ }
+    }
+    return trim((string)get_setting('receipt_printer_target', ''));
 }
 
 /** Smí uživatel spárovat tiskárnu dané pobočky? Admin kteroukoli, ostatní zaměstnanci

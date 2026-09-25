@@ -1,51 +1,76 @@
 # Štítkový můstek — Fix-CRM → Brother QL-8xx
 
-Lokální služba na recepčním Macu, přes kterou CRM tiskne štítky zakázek
-na Brother QL-810W / QL-820NWB **stejně jako aplikace „Naskladnění produktů"**
-(stejná tiskárna z `~/.naskladneni_produktu.json` → `printer_ip`,
-stejná knihovna `brother_ql`, 62mm role, stejné parametry rastru).
+Lokální služba na Macu u pultu (http://127.0.0.1:9110), přes kterou CRM
+v prohlížeči tiskne štítky zakázek, reklamací a cenovky produktů na
+Brother QL-810W / QL-820NWB. Knihovna `brother_ql`, 62mm role, stejné
+parametry rastru jako aplikace „Naskladnění produktů".
 
-## Instalace na prodejním MacBooku (jeden příkaz v Terminálu)
+## Kdy je potřeba
+
+V **Nastavení → Tisk štítků** má každá pobočka vybráno, **kdo tiskne**:
+
+- **Tiskne server** — tiskárna je v síti serveru (Karlín). Můstek není potřeba,
+  slouží jen jako záloha.
+- **Tiskne počítač u pultu** — pobočka síť se serverem nesdílí (Na Příkopě).
+  Server se o tiskárnu nepokouší a štítek pošle na tisk prohlížeč přihlášené
+  obsluhy. **Můstek je nutný** a CRM je potřeba otevírat v **Chromu**
+  (Safari z HTTPS stránky na 127.0.0.1 nepustí).
+
+## Instalace na pobočce (jeden příkaz v Terminálu)
+
+Příkazy jsou v CRM připravené ke zkopírování (Nastavení → Tisk štítků, u pobočky
+s volbou „Tiskne počítač u pultu").
 
 ```bash
-mkdir -p ~/stitek-bridge && cd ~/stitek-bridge \
-&& curl -fsSL -o stitek_bridge.py https://raw.githubusercontent.com/Augi23/Fix-CRM/main/print-bridge/stitek_bridge.py \
-&& curl -fsSL -o install.sh https://raw.githubusercontent.com/Augi23/Fix-CRM/main/print-bridge/install.sh \
-&& chmod +x install.sh && ./install.sh
+# Brother zapojený USB kabelem do tohoto Macu
+curl -fsSL https://admin.applefix.cloud/print-bridge/bootstrap.sh | bash -s -- usb
+
+# Brother na Wi-Fi / v síti pobočky (IP vytiskne po podržení tlačítka Wi-Fi/střihu)
+curl -fsSL https://admin.applefix.cloud/print-bridge/bootstrap.sh | bash -s -- tcp:192.168.1.220
+
+# bez argumentu: ponechá dosavadní nastavení, jinak najde USB Brother sám
+curl -fsSL https://admin.applefix.cloud/print-bridge/bootstrap.sh | bash
 ```
 
-Předpoklady: na MacBooku běží aplikace „Naskladnění produktů" (tj. existuje
-`~/.naskladneni_produktu.json` s IP tiskárny). Pokud si macOS vyžádá instalaci
-Command Line Tools (kvůli python3), potvrď ji a příkaz spusť znovu.
+Instalace stáhne `stitek_bridge.py`, `stitek_product.py` (cenovky), `label_logo.png`
+a `install.sh` do `~/stitek-bridge/`, vytvoří venv `~/.stitek_bridge_venv`
+a LaunchAgent `cz.applefix.stitek-bridge` v doméně přihlášeného uživatele
+(běží trvale, i po restartu). U USB varianty založí tiskovou frontu `brotherql`.
+Novější macOS odmítá RAW fronty — instalace pak použije obecný ovladač; nevadí to,
+můstek posílá data přes `lp -o raw`, které ovladač obejde.
 
-**Aktualizace můstku** = spustit tentýž příkaz znovu (stáhne novou verzi a restartuje službu).
+Spouštět klidně opakovaně — **aktualizace můstku = tentýž příkaz znovu.**
+Když si macOS vyžádá Command Line Tools (kvůli python3), potvrď a spusť znovu.
 
-## Instalace z repa (vývojový Mac)
+## Kam tiskne (cíl tisku)
 
-```bash
-cd ~/Fix-CRM/print-bridge && ./install.sh
-```
+Cíl je `tcp:<IP>` (síťová tiskárna, port 9100) nebo `cups:<fronta>` (tiskárna
+připojená k tomuto Macu). Hledá se v tomto pořadí:
 
-Vytvoří venv `~/.stitek_bridge_venv` a LaunchAgent
-`cz.applefix.stitek-bridge` (běží trvale, i po restartu). Log: `/tmp/stitek-bridge.log`.
+1. proměnná `STITEK_PRINTER_TARGET` (nebo `STITEK_PRINTER_IP` → tcp),
+2. `~/Library/AppleFix/stitek_bridge.json` — `{"printer_target": "...", "printer_model": "QL-810W"}`,
+3. `printer_ip` z `~/.naskladneni_produktu.json` (karlínský Mac s naskladňovací
+   appkou — funguje beze změny jako dřív).
 
-## Jak to funguje
+Cíl jde změnit bez Terminálu přes `POST /config` (volá ho CRM) nebo znovu
+spuštěným instalátorem s argumentem.
 
-- Po založení zakázky v CRM prohlížeč zavolá `http://127.0.0.1:9110/print`
-  → můstek vyrenderuje štítek (Code128 = č. zakázky + závada + datum přijetí)
-  a pošle ho na tiskárnu (TCP:9100).
-- Tlačítko „Štítek — Brother QL" je i v detailu zakázky (menu tisků).
-- Naskenování kódu otevře zakázku (vyhledávání v CRM zná č. zakázky).
-- Na počítačích bez můstku se auto-tisk tiše ohlásí hláškou — tisknout
-  umí každý Mac, kde se spustí `install.sh`.
+## API můstku
+
+| Metoda | Cesta | Co dělá |
+|---|---|---|
+| GET | `/health` | `{ok, target, kind: "tcp"\|"cups"\|null, printer_ip, printer_queue, printer_model, ready, error}` |
+| GET | `/printers` | `{ok, queues: [{name, info, is_brother}], usb: [{uri, name}], suggestion}` |
+| POST | `/config` | `{target, model}` → uloží cíl, vrátí stejné tělo jako `/health` |
+| POST | `/adopt_usb` | `{uri, queue}` → založí frontu pro USB Brother a nastaví ji |
+| POST | `/print` | štítek zakázky `{code, defect, date, client}` nebo cenovka `{product, copies}` |
+| GET | `/preview?code=…&defect=…&date=…&client=…` | PNG náhled bez tisku |
+
+Volat smí jen `https://admin.applefix.cloud` a localhost (CORS + Private Network Access).
 
 ## Údržba
 
-- **Aktualizace můstku**: přijde s `git pull` repa; pak
-  `launchctl kickstart -k gui/$(id -u)/cz.applefix.stitek-bridge`
-- **Test bez tisku**: http://127.0.0.1:9110/preview?code=TEST123&defect=zkouška&date=07.07.2026
-- **Stav**: http://127.0.0.1:9110/health
-- Jiná IP tiskárny: změň `printer_ip` v `~/.naskladneni_produktu.json`
-  (sdílené s naskladňovací appkou) a restartuj můstek.
-- Model QL-820NWB: do stejného JSONu doplň `"printer_model": "QL-820NWB"`.
-  Když hodnota chybí, můstek použije výchozí `QL-810W`.
+- **Stav:** http://127.0.0.1:9110/health
+- **Log:** `/tmp/stitek-bridge.log`
+- **Restart:** `launchctl kickstart -k gui/$(id -u)/cz.applefix.stitek-bridge`
+- **Test bez tisku:** http://127.0.0.1:9110/preview?code=TEST123&defect=zkouška&date=25.09.2026

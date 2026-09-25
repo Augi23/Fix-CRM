@@ -18,6 +18,15 @@ if ($branch <= 0) {
 }
 
 afxEnsurePrintJobsTable();
+// Stopa pro Nastavení → Tisk: kdy se agent pobočky naposledy ozval. Zapisuje se
+// nejvýš jednou za minutu — poller se ptá každé 2 s a zápis při každém dotazu by
+// byl zbytečná zátěž databáze.
+try {
+    $__k = 'print_poll_last_' . $branch;
+    $__prev = (int)strtotime((string)get_setting($__k, ''));
+    if ($__prev < time() - 60) { set_setting($__k, date('Y-m-d H:i:s')); }
+} catch (Throwable $e) { /* stopa je jen informativní */ }
+
 try {
     // pár pokusů: propadnutí přes prošlé úlohy až k první čerstvé
     for ($i = 0; $i < 10; $i++) {

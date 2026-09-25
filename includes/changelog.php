@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.81.0',
+        'date' => '2026-09-25',
+        'time' => '12:14',
+        'title' => 'Tiskárny na pobočce Na Příkopě: štítky i účtenky bez propojení se serverem',
+        'items' => [
+            '<b>Štítky Brother na druhé pobočce.</b> U každé pobočky se v Nastavení → Tisk štítků nově vybírá, <b>kdo tiskne</b>: server (tiskárna musí být v jeho síti), nebo <b>počítač u pultu</b>. Na Příkopě nesdílí síť s Karlínem, takže tam platí druhá volba — server se o tiskárnu vůbec nepokouší, štítek pošle na tisk prohlížeč přihlášené obsluhy. Dřív se u každého štítku čekalo na marné spojení a do Historie se psalo „tisk selhal", i když štítek nakonec vyjel.',
+            '<b>Brother zapojený USB kabelem.</b> Štítkový můstek na Macu doteď uměl jen síťovou tiskárnu. Nově umí i tiskárnu připojenou přímo k tomu počítači a instalace si ji sama najde a nastaví; cíl tisku se dá změnit z CRM.',
+            '<b>Účtenková tiskárna pro každou pobočku.</b> Nová sekce v Nastavení → Tisk štítků: tlačítkem <b>Připravit tiskárnu</b> se pobočce vyrobí token a vypíše se příkaz, který se na Macu u kasy jednou spustí. Je vidět, jestli se ten počítač hlásí, a jde na něj poslat <b>zkušební účtenku</b>. Dřív se token nedal nikde získat a nová pokladna tak neměla jak tisknout.',
+            'Cíl tisku účtenek je nově veden <b>u pobočky</b>, ne jediný pro celé CRM — každá kasa tiskne na svou tiskárnu.',
+        ],
+    ],
+    [
         'version' => '3.80.1',
         'date' => '2026-09-11',
         'time' => '16:10',

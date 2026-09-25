@@ -141,6 +141,10 @@ try {
         // fronta pobočky DOKLADU (u testu pobočka obsluhy) — účtenka jede na kasu,
         // kde prodej proběhl, ne kde zrovna sedí vedení
         $qBranch = !empty($in['test']) ? (int)getCurrentStaffBranchId() : $saleBranch;
+        // zkušební účtenku smí vedení poslat na KONKRÉTNÍ pobočku (nastavení tiskáren
+        // druhé pobočky se jinak nedá odsud vyzkoušet)
+        $reqBranch = (int)($in['branch_id'] ?? 0);
+        if (!empty($in['test']) && $reqBranch > 0 && hasPermission('admin_access')) { $qBranch = $reqBranch; }
         if ($qBranch <= 0) { $qBranch = (int)getCurrentStaffBranchId(); }
         $qok = afxPrintJobEnqueue($qBranch, $bytes);
         echo json_encode(['ok' => $qok, 'queued' => $qok ? 1 : 0,
@@ -154,7 +158,8 @@ try {
         echo json_encode(['ok' => true, 'b64' => base64_encode($bytes)]); exit;
     }
 
-    $res = crmReceiptSendBytes($bytes);
+    // cíl tisku podle pobočky DOKLADU (u testu pobočka obsluhy / zvolená adminem)
+    $res = crmReceiptSendBytes($bytes, null, $saleBranch ?: (int)getCurrentStaffBranchId());
     if (!$res['ok']) { error_log('print_receipt_server: ' . $res['error']); }
     echo json_encode($res);
 } catch (Throwable $e) {

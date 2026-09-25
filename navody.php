@@ -59,6 +59,7 @@ $guides['crm'] = [
             ['typ' => 'pozor', 'text' => '<b>Bez převzaté pokladny nejde markovat.</b> Před prvním prodejem musíš pokladnu převzít (kontrola hotovosti ANO/NE) — viz návod „Převzetí a uzávěrka pokladny". Pokladnu drží vždy jen jeden pracovník.'],
             ['typ' => 'info', 'text' => '<b>Sklad se odečítá automaticky</b> v okamžiku prodeje: díl ubere kusy (se záznamem ve skladových pohybech), produkt se přepne na vyprodáno. Produkt prodaný na kase zůstane vyprodaný i po dalším nahrání souboru z naskladňovací appky — systém to ohlídá sám.'],
             ['typ' => 'info', 'text' => '<b>E-shop applefix.click jede ze stejného skladu:</b> co se prodá na kase, zmizí z e-shopu do 1–2 minut (a naopak — prodej z e-shopu okamžitě odečte sklad v CRM; stejný kus nikdy neprodají obě strany). Ve <b>Sklad → Produkty</b> je u každého kusu vidět <b>datum posledního prodeje</b>.'],
+            ['typ' => 'info', 'text' => '<b>Nová pokladna na pobočce:</b> zapoj Xprinter do Macu u kasy přes USB a v <b>Nastavení → Tisk štítků</b> dej u té pobočky <b>Připravit tiskárnu</b> — vypíše se příkaz, který na tom Macu jednou spustíš v Terminálu. Pak je hned vidět, že se počítač hlásí, a dá se poslat <b>zkušební účtenka</b>.'],
             ['typ' => 'info', 'text' => '<b>Termotiskárna účtenek</b> (Xprinter, role 57 mm) je v USB počítače pokladny — tiskne VŽDY jen tento počítač (CRM pošle doklad prohlížeči a ten ho předá tiskárně, bez dialogu). Z jiných zařízení se doklad tiskne dialogem prohlížeče. Zkušební tisk: tlačítko <b>„Test účtenky"</b> nahoře v Pokladně. Účtenka sama hlídá náležitosti: typ dokladu podle plátcovství DPH a částky (do 10 000 Kč zjednodušený daňový doklad), označení použitého zboží, režim § 90 a záruční věty podle položek (nové 24 měs. / použité 12 měs. / oprava běžně 6 měs.).'],
             ['typ' => 'info', 'text' => '<b>Historie → Kasa prodejna:</b> všechny doklady, souhrn Hotově/Kartou/Fakturou za zvolené období (denní uzávěrka) a dotisk účtenek.'],
             ['typ' => 'info', 'text' => '<b>DPH u použitého zboží (§ 90):</b> na účtence i faktuře se u bazarového zboží DPH nevyčísluje — doklad má správný režim automaticky, nic neřešíš.'],
@@ -379,18 +380,19 @@ $guides['crm'] = [
         'intro' => 'Zakázkový list, servisní příkaz i štítek na zařízení vytiskneš z detailu zakázky (nebo ze seznamu ikonou tiskárny).',
         'steps' => [
             'V detailu zakázky klikni na tlačítko tisku — nabídka: <b>Zakázkový list A4</b> (pro klienta, s podpisy a rozpisem ceny), <b>Servisní příkaz</b> (pro dílnu).',
-            '<b>Tisk štítku</b> — pošle štítek s kódem zakázky rovnou na štítkovačku Brother (bez dialogu, tiskne server).',
+            '<b>Tisk štítku</b> — pošle štítek s kódem zakázky rovnou na štítkovačku Brother (bez dialogu). V Karlíně ho tiskne server, Na Příkopě počítač, na kterém jsi přihlášený.',
             'Ze seznamu zakázek jde totéž přes ikonu tiskárny u řádku.',
         ],
         'conditions' => [
-            ['typ' => 'info', 'text' => 'Štítkovačka je zapojená na Karlíně — štítky se tisknou tam. Čárový kód na štítku umí přečíst skener v horní liště (otevře zakázku).'],
+            ['typ' => 'info', 'text' => 'Každá pobočka má svou štítkovačku a štítek vyjede na té, které zakázka patří — ne u kolegů. Čárový kód na štítku umí přečíst skener v horní liště (otevře zakázku).'],
         ],
     ],
     [
         'id' => 'stitkovacka-netiskne', 'icon' => 'fa-tag', 'color' => '#FF9F0A',
         'title' => 'Štítkovačka netiskne — co dělat',
-        'intro' => 'Štítky tiskne <b>server</b> přímo na tiskárnu pobočky (tcp 9100), ne tvůj počítač. Když štítek nevyjede, bývá důvod skoro vždy stejný: tiskárna není připojená k firemní Wi-Fi. Párování tiskárny s počítačem s tím nesouvisí.',
+        'intro' => 'Nejdřív se podívej v <b>Nastavení → Tisk štítků</b>, jak má tvoje pobočka nastavené, <b>kdo tiskne</b>. V Karlíně tiskne <b>server</b> přímo na tiskárnu (tcp 9100). Na Příkopě tiskne <b>počítač u pultu</b>, protože ta pobočka se serverem síť nesdílí — tam musí být na počítači nainstalovaný štítkový můstek a použitý prohlížeč <b>Chrome</b> (Safari na místní můstek nepustí).',
         'steps' => [
+            '<b>Na Příkopě:</b> když přijde hláška, že můstek neběží, spusť na tom počítači instalační příkaz z <b>Nastavení → Tisk štítků</b> (je tam připravený ke zkopírování — zvlášť pro Brother v USB a zvlášť pro Brother na Wi-Fi). Pak dej <b>Zkušební štítek</b>.',
             '<b>Nepárovat s počítačem a nerestartovat ho.</b> Windows ovladač ani „Přidat tiskárnu" tisk z CRM neovlivní — CRM tiskne ze serveru.',
             'Vypni a zapni <b>tiskárnu</b> (nech ji 10 sekund vypnutou) a zkus štítek znovu. Hláška <b>„Tiskárna 192.168.1.220 neodpovídá (port 9100)"</b> znamená, že server tiskárnu na síti nevidí.',
             '<b>Zjisti, jakou má tiskárna adresu:</b> podrž na ní tlačítko <b>Cut (✂)</b>, dokud nezačne tisknout. Vyjede několik štítků — první bývají prázdné, <b>na čtvrtém je IP adresa</b>.',
@@ -401,8 +403,8 @@ $guides['crm'] = [
         ],
         'conditions' => [
             ['typ' => 'warn', 'text' => '<b>Nejčastější příčina:</b> po výpadku sítě nebo proudu si tiskárna vezme od routeru <b>jinou adresu</b> (nebo žádnou) a CRM pak tiskne „do prázdna" na tu starou. Proto se vyplatí pevná IP.'],
-            ['typ' => 'info', 'text' => '<b>Každá pobočka má svou tiskárnu:</b> Karlín <b>QL-810W (192.168.1.220)</b>, Na Příkopě <b>QL-820NWB (192.168.0.200)</b>. Štítek vyjede vždy jen na té pobočce, kde pracuješ.'],
-            ['typ' => 'info', 'text' => 'Tiskárna musí být <b>ve stejné síti jako server</b> — z domova ani z jiné sítě štítek nevytiskneš.'],
+            ['typ' => 'info', 'text' => '<b>Každá pobočka má svou tiskárnu:</b> Karlín <b>QL-810W</b> (tiskne server), Na Příkopě <b>QL-820NWB</b> (tiskne počítač u pultu — přes USB i přes Wi-Fi). Štítek vyjede vždy jen na té pobočce, kde pracuješ.'],
+            ['typ' => 'info', 'text' => 'Když tiskne <b>server</b>, musí být tiskárna ve stejné síti jako on — z domova ani z jiné sítě štítek nevytiskneš. Když tiskne <b>počítač u pultu</b>, stačí, že tiskárna patří k tomu počítači.'],
             ['typ' => 'role', 'text' => 'Vytisknout štítek smí <b>každý přihlášený</b>. Adresu tiskárny mění <b>vedení</b> nebo <b>pracovník té pobočky</b> v Nastavení → Tisk.'],
         ],
     ],

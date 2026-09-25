@@ -403,14 +403,18 @@ function crmEscposDrawerPulse(): string {
     return "\x1B\x70\x00\x3C\x78";
 }
 
-/** Kam se tiskne. */
-function crmReceiptPrintTarget(): string {
-    return trim((string)get_setting('receipt_printer_target', 'usb:/dev/usb/lp0'));
+/** Kam se tiskne — PER POBOČKU (branches.receipt_printer_target), jinak globální
+ *  nastavení. Každá pobočka má svou pokladnu i svou účtenkovou tiskárnu; dokud byl
+ *  cíl jediný globální, druhá pobočka neměla kam tisknout. */
+function crmReceiptPrintTarget(?int $branchId = null): string {
+    $t = function_exists('crmBranchReceiptTarget') ? crmBranchReceiptTarget($branchId) : '';
+    if ($t === '') { $t = trim((string)get_setting('receipt_printer_target', '')); }
+    return $t !== '' ? $t : 'usb:/dev/usb/lp0';
 }
 
 /** Pošle syrové bajty na tiskárnu. Vrací ['ok'=>bool,'error'=>?string]. */
-function crmReceiptSendBytes(string $bytes, ?string $target = null): array {
-    $target = $target ?: crmReceiptPrintTarget();
+function crmReceiptSendBytes(string $bytes, ?string $target = null, ?int $branchId = null): array {
+    $target = $target ?: crmReceiptPrintTarget($branchId);
     try {
         if (str_starts_with($target, 'usb:')) {
             $dev = substr($target, 4);

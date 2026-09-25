@@ -2052,15 +2052,20 @@ require_once 'includes/header.php';
                         ensureBranchPrinterColumn();
                         $labelIps = [];
                         $labelPrinterModels = [];
+                        $labelModes = [];
                         $labelModels = labelPrinterModels();
                         try {
-                            foreach ($pdo->query("SELECT id, COALESCE(label_printer_ip,'') AS ip, COALESCE(label_printer_model,'QL-810W') AS model FROM branches")->fetchAll(PDO::FETCH_ASSOC) as $__r) {
+                            foreach ($pdo->query("SELECT id, COALESCE(label_printer_ip,'') AS ip, COALESCE(label_printer_model,'QL-810W') AS model,
+                                                         COALESCE(label_printer_mode,'server') AS mode FROM branches")->fetchAll(PDO::FETCH_ASSOC) as $__r) {
                                 $labelIps[(int)$__r['id']] = (string)$__r['ip'];
                                 $labelPrinterModels[(int)$__r['id']] = normalizeLabelPrinterModel((string)$__r['model']);
+                                $labelModes[(int)$__r['id']] = strtolower((string)$__r['mode']) === 'local' ? 'local' : 'server';
                             }
                         } catch (Throwable $e) {}
+                        $__crmBase = 'https://' . (string)($_SERVER['HTTP_HOST'] ?? 'admin.applefix.cloud');
                         ?>
-                        <div class="small text-white-75 mb-3">Každá pobočka má <strong>svou tiskárnu</strong> — štítek vyjede tam, kam patří. Dokud pobočka tiskárnu spárovanou nemá, <strong>nic se nevytiskne u kolegů</strong>: tisk rovnou řekne, že tiskárna chybí. Server tiskne přímo (tcp 9100), takže tiskárna musí být v dosahu serveru (stejná síť / VPN).</div>
+                        <div class="small text-white-75 mb-3">Každá pobočka má <strong>svou tiskárnu</strong> — štítek vyjede tam, kam patří. Dokud pobočka tiskárnu nastavenou nemá, <strong>nic se nevytiskne u kolegů</strong>: tisk rovnou řekne, že tiskárna chybí.
+                            U každé pobočky se vybírá, <strong>kdo tiskne</strong>: <em>server</em> (tiskárna musí být v dosahu serveru — stejná síť nebo VPN), nebo <em>počítač u pultu</em> přes štítkový můstek. Druhá cesta je určená pobočce, která se serverem síť nesdílí — třeba Na&nbsp;Příkopě.</div>
                         <?php foreach ($labelBranches as $__b): $__bid = (int)$__b['id'];
                               $__canPair = crmCanPairBranchPrinter($__bid);
                               $__isMine = $__bid === crmStaffBranchIdStrict();
@@ -2074,9 +2079,15 @@ require_once 'includes/header.php';
                                 <?php if ($__isMine): ?><span class="badge bg-info text-dark ms-1">tvoje pobočka</span><?php endif; ?>
                                 — tiskárna štítků (Brother QL-8xx)
                             </label>
-                            <?php if ($__canPair): ?>
+                            <?php if ($__canPair): $__mode = $labelModes[$__bid] ?? 'server'; ?>
+                            <div class="mb-2" style="max-width:780px;">
+                                <select id="srvMode<?php echo $__bid; ?>" class="form-select form-select-sm" style="max-width:520px;" onchange="srvModeChanged(<?php echo $__bid; ?>)">
+                                    <option value="server"<?php echo $__mode === 'server' ? ' selected' : ''; ?>>Tiskne server — tiskárna je v síti serveru (Karlín)</option>
+                                    <option value="local"<?php echo $__mode === 'local' ? ' selected' : ''; ?>>Tiskne počítač u pultu — pobočka má vlastní síť (Na Příkopě)</option>
+                                </select>
+                            </div>
                             <div class="row g-2 align-items-center" style="max-width:780px;">
-                                <div class="col-md-4">
+                                <div class="col-md-4" id="srvIpCol<?php echo $__bid; ?>"<?php echo $__mode === 'local' ? ' style="display:none;"' : ''; ?>>
                                     <input type="text" id="srvIp<?php echo $__bid; ?>" class="form-control font-monospace" placeholder="IP tiskárny, např. 192.168.1.220" value="<?php echo e($labelIps[$__bid] ?? ''); ?>" data-orig="<?php echo e($labelIps[$__bid] ?? ''); ?>">
                                 </div>
                                 <div class="col-md-3">
@@ -2087,12 +2098,13 @@ require_once 'includes/header.php';
                                     </select>
                                 </div>
                                 <div class="col-md-5 d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-primary btn-sm" id="srvLocalSave<?php echo $__bid; ?>" onclick="srvSaveLocal(<?php echo $__bid; ?>)"<?php echo $__mode === 'local' ? '' : ' style="display:none;"'; ?>><i class="fas fa-floppy-disk me-1"></i>Uložit nastavení</button>
                                     <?php if ($__isMine): ?>
-                                    <button type="button" class="btn btn-primary btn-sm" onclick="srvPair(<?php echo $__bid; ?>)"><i class="fas fa-link me-1"></i>Spárovat tiskárnu</button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="srvPairBtn<?php echo $__bid; ?>" onclick="srvPair(<?php echo $__bid; ?>)"<?php echo $__mode === 'local' ? ' style="display:none;"' : ''; ?>><i class="fas fa-link me-1"></i>Spárovat tiskárnu</button>
                                     <?php else: ?>
                                     <?php /* cizí pobočka (admin): žádná autodetekce — můstek by nabídl tiskárnu
                                              u TOHOTO počítače a pobočka by se spárovala na cizí zařízení */ ?>
-                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="srvPair(<?php echo $__bid; ?>, 1)"><i class="fas fa-floppy-disk me-1"></i>Uložit IP</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="srvPairBtn<?php echo $__bid; ?>" onclick="srvPair(<?php echo $__bid; ?>, 1)"<?php echo $__mode === 'local' ? ' style="display:none;"' : ''; ?>><i class="fas fa-floppy-disk me-1"></i>Uložit IP</button>
                                     <?php endif; ?>
                                     <button type="button" class="btn btn-outline-success btn-sm" onclick="srvTestPrint(<?php echo $__bid; ?>)"><i class="fas fa-print me-1"></i>Zkušební štítek</button>
                                     <?php if (($labelIps[$__bid] ?? '') !== ''): ?>
@@ -2100,9 +2112,28 @@ require_once 'includes/header.php';
                                     <?php endif; ?>
                                 </div>
                             </div>
-                            <div class="form-text small text-white-50 mt-1">
+                            <div class="form-text small text-white-50 mt-1" id="srvHelpServer<?php echo $__bid; ?>"<?php echo $__mode === 'local' ? ' style="display:none;"' : ''; ?>>
                                 <i class="fas fa-wand-magic-sparkles me-1"></i><b>Spárovat</b> zkusí tiskárnu najít samo na tomto počítači.
                                 Když ji nenajde, opiš IP z tiskárny a vyber model: na QL-810W/QL-820NWB podrž <b>tlačítko Wi-Fi/střihu</b>, dokud nevyjede lístek se síťovým nastavením — IP je na něm.
+                            </div>
+                            <div id="srvLocalBox<?php echo $__bid; ?>" class="mt-2"<?php echo $__mode === 'local' ? '' : ' style="display:none;"'; ?>>
+                                <div class="small text-white-75 mb-2">
+                                    Na počítači u pultu <b>na téhle pobočce</b> spusť v Terminálu jeden z příkazů — jednou provždy. Brother pak drží tenhle počítač a server do toho nemluví.
+                                </div>
+                                <div class="input-group input-group-sm mb-1" style="max-width:780px;">
+                                    <span class="input-group-text" style="min-width:132px;">Brother v USB</span>
+                                    <input type="text" class="form-control font-monospace" readonly value="curl -fsSL <?php echo e($__crmBase); ?>/print-bridge/bootstrap.sh | bash -s -- usb">
+                                    <button class="btn btn-outline-light" type="button" onclick="srvCopyNear(this)"><i class="fas fa-copy"></i></button>
+                                </div>
+                                <div class="input-group input-group-sm mb-2" style="max-width:780px;">
+                                    <span class="input-group-text" style="min-width:132px;">Brother na Wi-Fi</span>
+                                    <input type="text" class="form-control font-monospace" readonly value="curl -fsSL <?php echo e($__crmBase); ?>/print-bridge/bootstrap.sh | bash -s -- tcp:192.168.1.220">
+                                    <button class="btn btn-outline-light" type="button" onclick="srvCopyNear(this)"><i class="fas fa-copy"></i></button>
+                                </div>
+                                <div class="small text-white-50">
+                                    IP u Wi-Fi varianty nahraď skutečnou — QL-810W/QL-820NWB ji vytiskne po podržení <b>tlačítka Wi-Fi/střihu</b>.
+                                    Štítek pak tiskne vždycky ten počítač, na kterém je obsluha přihlášená do CRM.
+                                </div>
                             </div>
                             <?php endif; ?>
                             <div id="srvStatus<?php echo $__bid; ?>" class="small mt-2 text-white-50"><i class="fas fa-circle-notch fa-spin me-1"></i>Zjišťuji stav…</div>
@@ -2120,6 +2151,14 @@ require_once 'includes/header.php';
                                 .then(function (r) { return r.json(); })
                                 .then(function (d) {
                                     var el = document.getElementById('srvStatus' + bid); if (!el) return;
+                                    if (d.mode === 'local') {
+                                        // pobočka tiskne přes počítač u pultu — server její tiskárnu ani nezkouší
+                                        el.className = 'small mt-2 text-white-50';
+                                        el.innerHTML = d.bridge_ok
+                                            ? '<i class="fas fa-desktop me-1"></i>Štítky tiskne <b>počítač u pultu</b>. Tohle je tvoje pobočka — zkus <b>Zkušební štítek</b>; když nevyjede, spusť na tom počítači instalační příkaz níž.'
+                                            : '<i class="fas fa-desktop me-1"></i>Štítky tiskne <b>počítač u pultu na téhle pobočce</b>. Odsud je vytisknout nejde a to je správně — jinak by vyjely o město dál.';
+                                        return;
+                                    }
                                     if (!d.paired) {
                                         el.className = 'small mt-2 text-white-50';
                                         el.innerHTML = '<i class="fas fa-plug-circle-xmark me-1"></i><b>Tiskárna zatím není spárovaná</b> — štítky téhle pobočky se nikde nevytisknou (a hlavně ne u kolegů na druhé pobočce).';
@@ -2139,12 +2178,46 @@ require_once 'includes/header.php';
                             el.className = 'small mt-2 ' + cls;
                             el.innerHTML = html;
                         }
+                        function srvMode(bid) {
+                            var m = document.getElementById('srvMode' + bid);
+                            return (m && m.value === 'local') ? 'local' : 'server';
+                        }
+                        /* Přepínač „kdo tiskne": překreslí řádek pobočky. Uloží se až tlačítkem,
+                           ať se omylem nepřepne tiskárna kolegům jen projetím seznamu. */
+                        function srvModeChanged(bid) {
+                            var local = srvMode(bid) === 'local';
+                            var show = function (id, on) { var el = document.getElementById(id + bid); if (el) { el.style.display = on ? '' : 'none'; } };
+                            show('srvIpCol', !local);
+                            show('srvHelpServer', !local);
+                            show('srvPairBtn', !local);
+                            show('srvLocalBox', local);
+                            show('srvLocalSave', local);
+                            srvSay(bid, 'text-white-50', local
+                                ? '<i class="fas fa-circle-info me-1"></i>Zvoleno <b>tisk přes počítač u pultu</b> — ulož to tlačítkem <b>Uložit nastavení</b>.'
+                                : '<i class="fas fa-circle-info me-1"></i>Zvoleno <b>tisk přes server</b> — zadej IP tiskárny a dej Spárovat.');
+                        }
+                        function srvSaveLocal(bid) {
+                            srvSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>Ukládám…');
+                            srvSaveIp(bid, '', function () { srvStatus(bid); });
+                        }
+                        function srvCopyNear(btn) {
+                            var i = btn.parentNode.querySelector('input');
+                            if (!i) { return; }
+                            var done = function () {
+                                var h = btn.innerHTML;
+                                btn.innerHTML = '<i class="fas fa-check"></i>';
+                                setTimeout(function () { btn.innerHTML = h; }, 1800);
+                            };
+                            if (navigator.clipboard) { navigator.clipboard.writeText(i.value).then(done, function () { i.select(); try { document.execCommand('copy'); done(); } catch (e) {} }); }
+                            else { i.select(); try { document.execCommand('copy'); done(); } catch (e) {} }
+                        }
                         function srvSaveIp(bid, ip, done) {
                             var fd = new FormData();
                             var modelEl = document.getElementById('srvModel' + bid);
                             fd.append('action', 'save_ip');
                             fd.append('branch_id', bid);
                             fd.append('ip', ip);
+                            fd.append('mode', srvMode(bid));
                             fd.append('model', modelEl ? modelEl.value : 'QL-810W');
                             fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
                             return fetch('api/print_label_server.php', { method: 'POST', body: fd })
@@ -2237,6 +2310,31 @@ require_once 'includes/header.php';
                             fetch('api/print_label_server.php', { method: 'POST', body: fd })
                                 .then(function (r) { return r.json(); })
                                 .then(function (j) {
+                                    // lokální režim: server netiskne, štítek pošle prohlížeč na svůj můstek
+                                    if (!j.ok && j.local && j.bridge_ok) {
+                                        el.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>Posílám štítek na můstek tohoto počítače…';
+                                        var d = new Date();
+                                        var den = d.getDate() + '. ' + (d.getMonth() + 1) + '. ' + d.getFullYear();
+                                        var ctl = new AbortController();
+                                        var t = setTimeout(function () { ctl.abort(); }, 20000);
+                                        return fetch('http://127.0.0.1:9110/print', {
+                                            method: 'POST', signal: ctl.signal,
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ code: 'TEST-' + bid, defect: 'Zkušební štítek z Nastavení', date: den, client: 'AppleFix', printer_model: j.printer_model || '' })
+                                        })
+                                            .then(function (r2) { clearTimeout(t); return r2.json(); })
+                                            .then(function (b) {
+                                                el.className = 'small mt-2 ' + (b && b.ok ? 'text-success' : 'text-danger');
+                                                el.innerHTML = (b && b.ok)
+                                                    ? '<i class="fas fa-check-circle me-1"></i>Zkušební štítek vyjel z tiskárny u tohoto počítače.'
+                                                    : '<i class="fas fa-triangle-exclamation me-1"></i>Můstek tisk odmítl: ' + ((b && b.error) || 'neznámá chyba') + '. Zkontroluj, že je Brother zapnutý a nastavený (instalační příkaz níž).';
+                                            })
+                                            .catch(function () {
+                                                clearTimeout(t);
+                                                el.className = 'small mt-2 text-danger';
+                                                el.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i><b>Štítkový můstek na tomhle počítači neběží.</b> Spusť na něm instalační příkaz níž (a v Safari to nepůjde — použij Chrome).';
+                                            });
+                                    }
                                     el.className = j.ok ? 'small mt-2 text-success' : 'small mt-2 text-danger';
                                     el.innerHTML = j.ok ? '<i class="fas fa-check-circle me-1"></i>Testovací štítek odeslán na tiskárnu.' : '<i class="fas fa-triangle-exclamation me-1"></i>' + (j.error || 'Chyba');
                                 });
@@ -2283,6 +2381,174 @@ require_once 'includes/header.php';
                             <li class="mb-2"><?php echo __('label_bridge_how_2'); ?></li>
                             <li class="mb-2"><?php echo __('label_bridge_how_3'); ?></li>
                             <li><?php echo __('label_bridge_how_4'); ?></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <?php /* ── ÚČTENKOVÉ TISKÁRNY POBOČEK (v3.81.0) ────────────────────────────
+                     Každá pobočka má svou pokladnu i svůj Xprinter XP58-IIN. Tiskne vždy
+                     počítač u té kasy: prohlížeč pošle bajty na můstek 127.0.0.1:9101, a
+                     když na něj nedosáhne (appka z TestFlightu, Safari), úloha se uloží do
+                     fronty a poller na tom Macu si ji do ~2 s stáhne. Poller se prokazuje
+                     tokenem pobočky — ten se tady vyrábí a odsud se kopíruje instalační
+                     příkaz. Pobočka tak nepotřebuje žádné propojení se serverem v Karlíně. */ ?>
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="glass-panel p-4 border-secondary mb-3">
+                        <h5 class="mb-1 text-white"><i class="fas fa-receipt me-2 text-warning"></i>Účtenková tiskárna pokladny</h5>
+                        <div class="small text-white-75 mb-3">
+                            Účtenky tiskne <strong>počítač u té kasy</strong>, kde prodej proběhl — tiskárna je v něm zapojená přes USB a nikam se nesdílí.
+                            Aby to fungovalo i z appky a ze Safari, má každá pobočka <strong>svůj token</strong>: počítač u kasy se jím hlásí serveru a stahuje si čekající účtenky.
+                            Bez tokenu se na nové pobočce nevytiskne nic.
+                        </div>
+                        <?php $__anyRcptRow = false;
+                              foreach ($labelBranches as $__b): $__bid = (int)$__b['id'];
+                              if (!crmCanPairBranchPrinter($__bid)) { continue; }
+                              $__isMine = $__bid === crmStaffBranchIdStrict();
+                              $__anyRcptRow = true; ?>
+                        <div class="mb-3 pb-3 border-bottom border-secondary" data-rcpt-row="<?php echo $__bid; ?>">
+                            <label class="form-label small text-white-75 mb-2">
+                                <i class="fas fa-location-dot me-1 text-warning"></i><strong><?php echo e($__b['name']); ?></strong>
+                                <?php if ($__isMine): ?><span class="badge bg-info text-dark ms-1">tvoje pobočka</span><?php endif; ?>
+                                — pokladní tiskárna (Xprinter XP58-IIN)
+                            </label>
+                            <div class="d-flex gap-2 flex-wrap mb-2">
+                                <button type="button" class="btn btn-primary btn-sm" id="rcptTokenBtn<?php echo $__bid; ?>" onclick="rcptToken(<?php echo $__bid; ?>)"><i class="fas fa-key me-1"></i>Připravit tiskárnu</button>
+                                <button type="button" class="btn btn-outline-success btn-sm" onclick="rcptTest(<?php echo $__bid; ?>)"><i class="fas fa-print me-1"></i>Zkušební účtenka</button>
+                            </div>
+                            <div id="rcptCmdBox<?php echo $__bid; ?>" style="display:none;">
+                                <div class="small text-white-75 mb-1">Na počítači u kasy <b>na téhle pobočce</b> spusť v Terminálu (jednou provždy):</div>
+                                <div class="input-group input-group-sm mb-2" style="max-width:820px;">
+                                    <input type="text" class="form-control font-monospace" id="rcptCmd<?php echo $__bid; ?>" readonly value="">
+                                    <button class="btn btn-outline-light" type="button" onclick="srvCopyNear(this)"><i class="fas fa-copy"></i></button>
+                                </div>
+                                <div class="small text-white-50">
+                                    Příkaz založí tiskovou frontu, spustí můstek i stahovač účtenek a všechno se po restartu Macu samo nahodí.
+                                    Token je tajný — patří jen na počítač té pobočky.
+                                </div>
+                            </div>
+                            <div id="rcptStatus<?php echo $__bid; ?>" class="small mt-2 text-white-50"><i class="fas fa-circle-notch fa-spin me-1"></i>Zjišťuji stav…</div>
+                            <details class="mt-2">
+                                <summary class="small text-white-50" style="cursor:pointer;">Tiskne přímo server (jen když tiskárna visí na serveru)</summary>
+                                <div class="input-group input-group-sm mt-2" style="max-width:560px;">
+                                    <input type="text" class="form-control font-monospace" id="rcptTarget<?php echo $__bid; ?>" placeholder="prázdné = tiskne počítač u kasy" value="">
+                                    <button class="btn btn-outline-light" type="button" onclick="rcptSaveTarget(<?php echo $__bid; ?>)">Uložit</button>
+                                </div>
+                                <div class="small text-white-50 mt-1">
+                                    Tvary: <code>usb:/dev/usb/lp0</code> · <code>tcp:192.168.x.x</code> · <code>cups:192.168.x.x:631:fronta</code> · <code>lp:fronta</code>.
+                                    Nech prázdné, pokud tiskárna není zapojená do serveru — to je případ obou poboček.
+                                </div>
+                            </details>
+                        </div>
+                        <?php endforeach; ?>
+                        <?php if (!$__anyRcptRow): ?>
+                        <div class="alert alert-warning bg-transparent border-warning small py-2 px-3 mb-0">
+                            <i class="fas fa-triangle-exclamation me-1"></i><strong>Nemáš přiřazenou pobočku</strong> — pokladní tiskárnu proto nastavit nejde.
+                        </div>
+                        <?php endif; ?>
+                        <script>
+                        function rcptSay(bid, cls, html) {
+                            var el = document.getElementById('rcptStatus' + bid); if (!el) { return; }
+                            el.className = 'small mt-2 ' + cls;
+                            el.innerHTML = html;
+                        }
+                        function rcptRender(bid, d) {
+                            if (!d || !d.ok) { rcptSay(bid, 'text-danger', '<i class="fas fa-triangle-exclamation me-1"></i>' + ((d && d.error) || 'Stav se nepodařilo zjistit.')); return; }
+                            var box = document.getElementById('rcptCmdBox' + bid);
+                            var cmd = document.getElementById('rcptCmd' + bid);
+                            var btn = document.getElementById('rcptTokenBtn' + bid);
+                            if (d.has_token && cmd) { cmd.value = d.install_cmd; }
+                            var tgt = document.getElementById('rcptTarget' + bid);
+                            if (tgt && document.activeElement !== tgt) { tgt.value = d.target || ''; }
+                            if (box) { box.style.display = d.has_token ? '' : 'none'; }
+                            if (btn) {
+                                btn.dataset.hasToken = d.has_token ? '1' : '';
+                                btn.className = d.has_token ? 'btn btn-outline-warning btn-sm' : 'btn btn-primary btn-sm';
+                                btn.innerHTML = d.has_token ? '<i class="fas fa-rotate me-1"></i>Vygenerovat nový token' : '<i class="fas fa-key me-1"></i>Připravit tiskárnu';
+                            }
+                            if (!d.has_token) {
+                                rcptSay(bid, 'text-white-50', '<i class="fas fa-plug-circle-xmark me-1"></i><b>Tiskárna zatím není připravená</b> — dej <b>Připravit tiskárnu</b> a příkaz, který se objeví, spusť na počítači u kasy té pobočky.');
+                            } else if (d.agent_alive) {
+                                rcptSay(bid, 'text-success', '<i class="fas fa-check-circle me-1"></i>Počítač u kasy je <b>připojený</b> (naposledy ' + d.last_poll_ago + '). Vyzkoušej <b>Zkušební účtenku</b>.'
+                                    + (d.target ? ' <span class="text-white-50">· server navíc tiskne přímo na ' + d.target + '</span>' : ''));
+                            } else if (d.last_poll) {
+                                rcptSay(bid, 'text-warning', '<i class="fas fa-triangle-exclamation me-1"></i>Počítač u kasy se naposledy ozval <b>' + d.last_poll_ago + '</b> — teď se nehlásí. Je zapnutý a přihlášený? Účtenky zatím čekají ve frontě.');
+                            } else {
+                                rcptSay(bid, 'text-warning', '<i class="fas fa-circle-info me-1"></i>Token je připravený, ale <b>počítač u kasy se ještě nikdy neozval</b> — spusť na něm příkaz níž.');
+                            }
+                        }
+                        function rcptStatus(bid) {
+                            fetch('api/print_station.php?action=status&branch_id=' + bid, { cache: 'no-store', credentials: 'same-origin' })
+                                .then(function (r) { return r.json(); })
+                                .then(function (d) { rcptRender(bid, d); })
+                                .catch(function () { rcptSay(bid, 'text-danger', 'Síťová chyba — zkus obnovit stránku.'); });
+                        }
+                        function rcptToken(bid) {
+                            var btn = document.getElementById('rcptTokenBtn' + bid);
+                            var novy = !!(btn && btn.dataset.hasToken === '1');
+                            if (novy && !confirm('Vygenerovat NOVÝ token?\n\nPočítač u kasy téhle pobočky okamžitě přestane tisknout, dokud na něm nespustíš nový příkaz.')) { return; }
+                            rcptSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>Připravuji…');
+                            var fd = new FormData();
+                            fd.append('action', 'token');
+                            fd.append('branch_id', bid);
+                            fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
+                            fetch('api/print_station.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                                .then(function (r) { return r.json(); })
+                                .then(function (d) { rcptRender(bid, d); })
+                                .catch(function () { rcptSay(bid, 'text-danger', 'Síťová chyba — zkus to znovu.'); });
+                        }
+                        function rcptSaveTarget(bid) {
+                            var tgt = document.getElementById('rcptTarget' + bid);
+                            rcptSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>Ukládám cíl tisku…');
+                            var fd = new FormData();
+                            fd.append('action', 'save_target');
+                            fd.append('branch_id', bid);
+                            fd.append('target', tgt ? tgt.value.trim() : '');
+                            fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
+                            fetch('api/print_station.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                                .then(function (r) { return r.json(); })
+                                .then(function (d) {
+                                    if (!d || !d.ok) { rcptSay(bid, 'text-danger', '<i class="fas fa-triangle-exclamation me-1"></i>' + ((d && d.error) || 'Uložení selhalo.')); return; }
+                                    rcptRender(bid, d);
+                                })
+                                .catch(function () { rcptSay(bid, 'text-danger', 'Síťová chyba — zkus to znovu.'); });
+                        }
+                        function rcptTest(bid) {
+                            rcptSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>Posílám zkušební účtenku do fronty pobočky…');
+                            fetch('api/print_receipt_server.php', {
+                                method: 'POST', credentials: 'same-origin',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    csrf_token: document.querySelector('meta[name="csrf-token"]').content,
+                                    test: 1, enqueue: 1, branch_id: bid
+                                })
+                            })
+                                .then(function (r) { return r.json(); })
+                                .then(function (j) {
+                                    if (j && j.ok) {
+                                        rcptSay(bid, 'text-success', '<i class="fas fa-check-circle me-1"></i>Zkušební účtenka je ve frontě — z tiskárny na pobočce vyjede do pár vteřin. Když nevyjede, počítač u kasy se serverem nemluví (viz příkaz výš).');
+                                    } else {
+                                        rcptSay(bid, 'text-danger', '<i class="fas fa-triangle-exclamation me-1"></i>' + ((j && j.error) || 'Tisk se nepodařil.'));
+                                    }
+                                })
+                                .catch(function () { rcptSay(bid, 'text-danger', 'Síťová chyba — zkus to znovu.'); });
+                        }
+                        document.addEventListener('DOMContentLoaded', function () {
+                            document.querySelectorAll('[data-rcpt-row]').forEach(function (row) {
+                                rcptStatus(parseInt(row.getAttribute('data-rcpt-row'), 10));
+                            });
+                        });
+                        </script>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="glass-panel p-4 border-secondary">
+                        <h6 class="text-uppercase small text-muted mb-3">Jak to funguje</h6>
+                        <ul class="small text-white-75 mb-0">
+                            <li class="mb-2">Účtenku vždy tiskne <b>počítač u kasy</b>, kde prodej proběhl — ne server a ne počítač kolegy na druhé pobočce.</li>
+                            <li class="mb-2">Když prohlížeč na místní můstek dosáhne, pošle účtenku rovnou. Z appky a ze Safari to nejde, proto úloha počká ve frontě a počítač u kasy si ji sám stáhne.</li>
+                            <li class="mb-2">Token je <b>heslo té jedné pokladny</b>. Kdo ho má, může stahovat její účtenky — proto patří jen na ten počítač a nikam se neposílá.</li>
+                            <li>Nová tiskárna na pobočce: zapoj ji do Macu u kasy přes USB, tady dej <b>Připravit tiskárnu</b> a příkaz spusť v Terminálu toho Macu.</li>
                         </ul>
                     </div>
                 </div>

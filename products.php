@@ -739,7 +739,7 @@ function printProductLabel(productId, copies, akce) {
         .then(function (r) { return r.json(); })
         .then(function (d) {
             if (d.ok) { return { ok: true, copies: d.copies || copies, via_bridge: false }; }
-            if (d.bridge_ok && d.bridge_product && (d.not_paired || d.unreachable) && window.afxProductLabelViaBridge) {
+            if (d.bridge_ok && d.bridge_product && (d.not_paired || d.unreachable || d.local) && window.afxProductLabelViaBridge) {
                 return window.afxProductLabelViaBridge(d.bridge_product, d.copies || copies, d.printer_model)
                     .then(function (printed) {
                         if (printed) { return { ok: true, copies: d.copies || copies, via_bridge: true }; }

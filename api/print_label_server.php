@@ -8,7 +8,10 @@
      POST action=test [branch_id]              → testovací štítek (tiskárna pobočky / zvolené admin)
      POST action=print_product, id=<prod_id>   → cenový štítek produktu
      GET  action=status [branch_id]            → dosažitelnost tiskárny pobočky + stav prostředí
-     POST action=save_ip, ip=<IP> [branch_id]  → uložení IP tiskárny pobočky (admin) */
+     POST action=save_ip, ip=<IP> [branch_id] [mode=server|local] → uložení tiskárny pobočky
+   REŽIM POBOČKY (v3.81.0): 'server' = server tiskne přímo na IP (musí na ni dosáhnout),
+   'local' = tiskne POČÍTAČ OBSLUHY přes místní můstek 127.0.0.1:9110. Pobočka Na Příkopě
+   není se serverem nijak propojená → 'local'; server se tam o tiskárnu ani nepokouší. */
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 require_once __DIR__ . '/../includes/config.php';
@@ -68,6 +71,10 @@ if ($action === 'save_ip') {
     $ip = trim((string)($_POST['ip'] ?? ''));
     $model = normalizeLabelPrinterModel((string)($_POST['model'] ?? 'QL-810W'));
     $bid = (int)($_POST['branch_id'] ?? 0);
+    // 'local' = tiskne počítač obsluhy přes můstek; IP na serveru pak nedává smysl
+    // (server na tu síť nevidí) a ukládá se prázdná, ať nikoho nemate v přehledu.
+    $mode = ((string)($_POST['mode'] ?? '') === 'local') ? 'local' : 'server';
+    if ($mode === 'local') { $ip = ''; }
     // Párovat smí admin kteroukoli pobočku, ostatní zaměstnanci JEN tu svou —
     // druhá pobočka si tak tiskárnu nastaví sama a nikomu ji nepřepíše.
     if (!crmCanPairBranchPrinter($bid > 0 ? $bid : null)) {
@@ -90,19 +97,21 @@ if ($action === 'save_ip') {
     }
     if ($bid > 0) {
         // prázdná IP = rozpárovat (pobočka pak nemá tiskárnu a tisk to řekne)
-        $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ?, label_printer_model = ? WHERE id = ?");
-        $st->execute([$ip !== '' ? $ip : null, $ip !== '' ? $model : null, $bid]);
+        $st = $pdo->prepare("UPDATE branches SET label_printer_ip = ?, label_printer_model = ?, label_printer_mode = ? WHERE id = ?");
+        $st->execute([$ip !== '' ? $ip : null, ($ip !== '' || $mode === 'local') ? $model : null, $mode, $bid]);
         $__bn = $pdo->prepare("SELECT name FROM branches WHERE id = ?");
         $__bn->execute([$bid]);
         crmAuditLog('settings.printer', [
             'entity_type' => 'branch', 'entity_id' => $bid, 'entity_label' => (string)$__bn->fetchColumn(),
             'branch_id' => $bid,
-            'summary' => $ip !== '' ? 'Spárována tiskárna štítků ' . $ip . ' (' . $model . ')' : 'Tiskárna štítků odpárována',
+            'summary' => $mode === 'local'
+                ? 'Štítky tiskne počítač u pultu (místní můstek) · ' . $model
+                : ($ip !== '' ? 'Spárována tiskárna štítků ' . $ip . ' (' . $model . ')' : 'Tiskárna štítků odpárována'),
         ]);
         // ZÁMĚRNĚ BEZ sondy dosažitelnosti: kdyby uložení rovnou hlásilo „odpovídá",
         // dalo by se opakovaným ukládáním proskenovat port 9100 po celé síti serveru.
         // Stav si klient vyžádá zvlášť přes action=status (a jen pro svou pobočku).
-        echo json_encode(['ok' => true, 'ip' => $ip, 'branch_id' => $bid]); exit;
+        echo json_encode(['ok' => true, 'ip' => $ip, 'mode' => $mode, 'branch_id' => $bid]); exit;
     }
     // Globální tiskárna už neexistuje — od v3.40.0 se tiskne výhradně podle pobočky
     // (branchPrinterIp), takže uložení „bez pobočky" by nemělo na tisk žádný vliv.
@@ -114,14 +123,19 @@ if ($action === 'status') {
     $printerIp = branchPrinterIp($bid ?: null);
     $printerModel = branchPrinterModel($bid ?: null);
     $canPair = crmCanPairBranchPrinter($bid ?: null);
+    $mode = branchPrinterMode($bid ?: null);
     echo json_encode([
         'ok' => true,
         'branch_id' => $bid,
+        'mode' => $mode,
         'printer_ip' => $canPair ? $printerIp : '',   // adresu vidí jen ten, kdo pobočku spravuje
         'printer_model' => $canPair ? $printerModel : '',
-        'paired' => $printerIp !== '',
+        // v režimu 'local' je „spárováno" věcí můstku na počítači u pultu, ne serveru
+        'paired' => $mode === 'local' ? true : ($printerIp !== ''),
         'can_pair' => $canPair,
-        'printer_reachable' => $printerIp !== '' && afxPrinterReachable($printerIp),
+        'bridge_ok' => afxLabelBridgeAllowed($bid),
+        // server sondu pouští jen tam, kam vůbec může dosáhnout
+        'printer_reachable' => $mode !== 'local' && $printerIp !== '' && afxPrinterReachable($printerIp),
         'env_ready' => is_file($PY),
     ]); exit;
 }
@@ -265,6 +279,28 @@ function afxLabelAuditFail(string $why, int $branchId, string $action, string $l
     } catch (Throwable $e) { error_log('label.print_failed audit: ' . $e->getMessage()); }
 }
 
+if (branchPrinterMode((int)$branchId) === 'local') {
+    // Pobočka tiskne přes POČÍTAČ OBSLUHY (můstek 127.0.0.1:9110) — server na její
+    // tiskárnu nevidí a nemá smysl čekat na timeout portu 9100 ani psát do Historie,
+    // že tisk selhal. Rovnou pošli prohlížeči pokyn „vytiskni si to u sebe".
+    $bridgeOk = afxLabelBridgeAllowed((int)$branchId);
+    $__bn = $pdo->prepare("SELECT name FROM branches WHERE id = ?");
+    $__bn->execute([(int)$branchId]);
+    $__bname = (string)$__bn->fetchColumn();
+    $payload = ['ok' => false, 'local' => true, 'branch_id' => (int)$branchId,
+        'printer_model' => $printerModel !== '' ? $printerModel : 'QL-810W',
+        'bridge_ok' => $bridgeOk,
+        'error' => $bridgeOk
+            ? 'Tiskne počítač u pultu — posílám štítek na místní můstek.'
+            : 'Štítky pobočky ' . ($__bname !== '' ? $__bname : '#' . (int)$branchId)
+              . ' tiskne počítač u jejich pultu. Odsud je vytisknout nejde — pošli je z počítače na pobočce.'];
+    if ($bridgeOk && $action === 'print_product' && !empty($productLabel['data'])) {
+        $payload['bridge_product'] = $productLabel['data'];
+        $payload['copies'] = $productCopies;
+    }
+    if (!$bridgeOk) { afxLabelAuditFail('pobočka tiskne lokálně, tisk spuštěn odjinud', (int)$branchId, $action); }
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE); exit;
+}
 if ($printerIp === '') {
     // Dřív se tady spadlo na tiskárnu v Karlíně — štítek z druhé pobočky vyjel
     // o město dál a nikdo o tom nevěděl. Teď se to rovnou řekne.

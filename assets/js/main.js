@@ -1435,7 +1435,8 @@ window.printOrderLabel = function (orderId, opts) {
             if (!res.ok) {
                 // bridge_ok určuje SERVER: můstek smí nastoupit jen u zakázky VLASTNÍ
                 // pobočky, jinak by vedení tisklo štítky druhé pobočky u sebe
-                if (res.bridge_ok && (res.not_paired || res.unreachable)) {
+                // res.local = pobočka tiskne zásadně přes počítač u pultu (jiná síť než server)
+                if (res.bridge_ok && (res.not_paired || res.unreachable || res.local)) {
                     return window.afxLabelViaBridge(orderId, false, res.printer_model).then(function (printed) {
                         if (printed) {
                             window.afxLabelToast('🏷️ Štítek vytištěn přes tenhle počítač', true);
@@ -1554,7 +1555,8 @@ window.printComplaintLabel = function (complaintId, opts) {
             if (!res.ok) {
                 // stejná záložní cesta jako u zakázek: můstek na počítači obsluhy,
                 // a jen u vlastní pobočky (rozhoduje server přes bridge_ok)
-                if (res.bridge_ok && (res.not_paired || res.unreachable)) {
+                // res.local = pobočka tiskne zásadně přes počítač u pultu (jiná síť než server)
+                if (res.bridge_ok && (res.not_paired || res.unreachable || res.local)) {
                     return window.afxLabelViaBridge(complaintId, true, res.printer_model).then(function (printed) {
                         if (printed) { window.afxLabelToast('🏷️ Štítek reklamace vytištěn přes tenhle počítač', true); return; }
                         throw new Error(res.error || 'tisk selhal');
