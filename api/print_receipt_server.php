@@ -58,7 +58,10 @@ function afxReceiptDataForSale(int $id, ?int &$branchOut = null): ?array {
     ]);
 }
 
-function afxReceiptTestData(): array {
+/** Zkušební účtenka — hlavička s adresou POBOČKY, na kterou se tiskne (ať je hned
+ *  vidět, jestli má pobočka v Nastavení → Firma vyplněnou správnou adresu). */
+function afxReceiptTestData(int $branchId = 0): array {
+    $bc = crmOrderBranchContact($branchId > 0 ? $branchId : (int)getCurrentStaffBranchId());
     return crmBuildPosReceipt58(
         ['sale_number' => 'TEST', 'created_at' => date('Y-m-d H:i:s'),
          'seller_name' => trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? '')),
@@ -66,9 +69,9 @@ function afxReceiptTestData(): array {
          'cash_received' => 200, 'cash_change' => 77],
         [['item_name' => 'Zkušební tisk účtenky — ěščřžýáíéúů ĚŠČŘŽ', 'item_code' => 'TEST-58',
           'quantity' => 1, 'unit_price' => 123, 'is_used_goods' => 0]],
-        ['name' => get_setting('company_name', 'AppleFix s.r.o.'), 'address' => 'Zkušební tisk',
+        ['name' => get_setting('company_name', 'AppleFix s.r.o.'), 'address' => trim((string)$bc['address']),
          'ico' => trim((string)get_setting('company_ico', '')), 'dic' => '',
-         'phone' => '', 'web' => 'www.applefix.cz']
+         'phone' => (string)$bc['phone'], 'web' => 'www.applefix.cz']
     );
 }
 
@@ -127,7 +130,10 @@ try {
     }
 
     $saleBranch = 0;
-    $data = !empty($in['test']) ? afxReceiptTestData() : afxReceiptDataForSale((int)($in['sale_id'] ?? 0), $saleBranch);
+    // zkušební účtenka: pobočka zvolená adminem v Nastavení, jinak pobočka obsluhy
+    $testBranch = (!empty($in['test']) && (int)($in['branch_id'] ?? 0) > 0 && hasPermission('admin_access'))
+        ? (int)$in['branch_id'] : 0;
+    $data = !empty($in['test']) ? afxReceiptTestData($testBranch) : afxReceiptDataForSale((int)($in['sale_id'] ?? 0), $saleBranch);
     if (!$data) { echo json_encode(['ok' => false, 'error' => 'Doklad nenalezen.']); exit; }
 
     $bytes = '';

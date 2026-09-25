@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.83.2',
+        'date' => '2026-09-25',
+        'time' => '14:31',
+        'title' => 'Zkušební účtenka s adresou pobočky',
+        'items' => [
+            'Zkušební účtenka (Pokladna i Nastavení → Tisk štítků) má v hlavičce adresu a telefon <b>té pobočky, na kterou se tiskne</b>, místo textu „Zkušební tisk". Hned je tak vidět, jestli má pobočka v Nastavení → Firma → Pobočky vyplněnou správnou adresu — účtenky z prodeje ji berou odtud.',
+        ],
+    ],
+    [
         'version' => '3.83.1',
         'date' => '2026-09-25',
         'time' => '14:25',
