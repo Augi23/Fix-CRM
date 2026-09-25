@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.83.0',
+        'date' => '2026-09-25',
+        'time' => '12:52',
+        'title' => '3D mapa skladu: klik na polici ukáže obsah, naskladnění přímo z mapy',
+        'items' => [
+            '<b>Klik na polici.</b> V 3D náhledu regálu (vpravo) se dá kliknout přímo na polici. Vybraná police se rozsvítí fialově a pod náhledem se ukáže, <b>co na ní leží</b>: název, model, cena a počet kusů. Totéž udělá klik na polici v seznamu pod náhledem. U šuplíkové stěny stačí kliknout na box přímo ve scéně.',
+            '<b>+ Naskladnit díly.</b> V obsahu police je tlačítko, které otevře krátký formulář (název, kusy, cena, model). Díl se založí rovnou s umístěním na téhle polici. Formulář zůstane otevřený, takže jde zapisovat díl za dílem (Enter v názvu = přidat), a model zůstává předvyplněný.',
+            '<b>+ u dílu</b> přidá další kusy dílu, který už na polici je (zapíše se jako naskladnění do deníku pohybů). Klik na název dílu otevře jeho kartu (výdej na zakázku atd.).',
+            'Hledaný díl teď rovnou otevře obsah své police a je v něm zvýrazněný. Naskladňovat z mapy smí jen zaměstnanci dané pobočky (a vedení), ostatní obsah jen vidí.',
+        ],
+    ],
+    [
         'version' => '3.82.0',
         'date' => '2026-09-25',
         'time' => '12:20',

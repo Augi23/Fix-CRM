@@ -113,6 +113,42 @@
   .chip.hot .cd { color: #BF5AF2; }
   .chip.loose { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.12); color: rgba(255,255,255,.6); }
   .chip .n { color: rgba(255,255,255,.45); }
+  /* vybraná police: obsah + naskladnění (klik na polici v 3D náhledu nebo v seznamu) */
+  .shelfRow[data-shelf] { cursor: pointer; }
+  .shelfRow[data-shelf]:hover { border-color: rgba(110,58,250,.4); background: rgba(110,58,250,.05); }
+  .shelfRow.selShelf { border-color: #BF5AF2; background: rgba(110,58,250,.14); }
+  .shelfHead .sp { flex: 1; }
+  .shelfHead .cnt { font-size: 11px; color: #5E9BFF; white-space: nowrap; }
+  .shelfHead .cnt.zero { color: rgba(255,255,255,.3); }
+  #shelfDetail { border: 1px solid rgba(191,90,242,.45); background: rgba(110,58,250,.08); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .sdHead { display: flex; align-items: center; gap: 8px; }
+  .sdHead .cd { font-size: 15px; font-weight: 700; color: #BF5AF2; }
+  .sdHead .nm { font-size: 12px; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sdHead .sp { flex: 1; }
+  .sdX { background: transparent; border: none; color: rgba(255,255,255,.5); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+  .sdX:hover { color: #fff; }
+  .sdSub { font-size: 11px; color: rgba(255,255,255,.5); margin-top: -4px; }
+  .sdSub a { color: #5E9BFF; text-decoration: none; }
+  .sdAdd { justify-content: center; width: 100%; }
+  .sdForm { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 8px; }
+  .sdForm input { width: 100%; min-width: 0; height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: #fff; font-size: 12px; font-family: inherit; outline: none; }
+  .sdForm input:focus { border-color: rgba(191,90,242,.6); }
+  .sdRow { display: flex; gap: 6px; }
+  .sdRow > * { flex: 1; min-width: 0; justify-content: center; }
+  .sdRow #sdQty { flex: 0 0 72px; }
+  .sdHint { font-size: 10px; color: rgba(255,255,255,.35); line-height: 1.5; }
+  .pList { display: flex; flex-direction: column; }
+  .pRow { display: flex; align-items: center; gap: 8px; padding: 6px 2px; border-top: 1px solid rgba(255,255,255,.06); }
+  .pRow.hot { background: rgba(191,90,242,.12); border-radius: 6px; }
+  .pMain { flex: 1; min-width: 0; display: flex; flex-direction: column; text-decoration: none; }
+  .pNm { font-size: 12px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pMain:hover .pNm { color: #BF5AF2; }
+  .pMeta { font-size: 10px; color: rgba(255,255,255,.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pQty { font-size: 11px; font-weight: 600; color: #30D158; white-space: nowrap; }
+  .pQty.zero { color: #FF453A; }
+  .pPlus { width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; border: 1px solid rgba(48,209,88,.45); background: rgba(48,209,88,.12); color: #30D158; font-size: 16px; line-height: 1; cursor: pointer; }
+  .pPlus:hover { background: rgba(48,209,88,.25); }
+  .pPlus:disabled { opacity: .4; cursor: default; }
   #toast {
     position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 100;
     background: #0D0B1F; border: 1px solid rgba(255,255,255,.14); border-radius: 10px;
@@ -160,7 +196,7 @@
       <div id="mapBox">
         <warehouse-3d id="map" model="{}"></warehouse-3d>
         <button id="homeBtn" title="Výchozí pohled (od vchodu u RegK9)" style="position:absolute; right:10px; top:10px; z-index:5; width:32px; height:32px; border-radius:8px; border:1px solid rgba(255,255,255,.14); background:rgba(13,11,31,.85); color:rgba(255,255,255,.8); cursor:pointer; font-size:15px;">⌂</button>
-        <span class="hint">Levým tažením se posouváš po skladě (na trackpadu dva prsty) · pravým tlačítkem otáčíš pohled · kolečko/pinch přibližuje · klik na regál ukáže police</span>
+        <span class="hint">Levým tažením se posouváš po skladě (na trackpadu dva prsty) · pravým tlačítkem otáčíš pohled · kolečko/pinch přibližuje · klik na regál ukáže police · klik na polici její obsah</span>
       </div>
       <div id="legend">
         <span><i style="background:rgba(110,58,250,.35);border:1.5px solid #BF5AF2"></i>Regál s hledaným dílem</span>
@@ -387,7 +423,7 @@
         } else if (pan) {
           if (!moved) {
             if (pan.g) { this.dispatchEvent(new CustomEvent('wh-rack-click', { bubbles: true, detail: { id: pan.g.userData.id } })); }
-            else if (pan.dr && this._model.drawerRack) { this.dispatchEvent(new CustomEvent('wh-rack-click', { bubbles: true, detail: { id: this._model.drawerRack.n } })); }
+            else if (pan.dr && this._model.drawerRack) { this.dispatchEvent(new CustomEvent('wh-rack-click', { bubbles: true, detail: { id: this._model.drawerRack.n, unit: pan.dr.userData.unit || 0 } })); }
           }
           pan = null; renderer.domElement.style.cursor = 'default';
         }
@@ -530,13 +566,17 @@
 </script>
 
 <script>
-/* ═══ <rack-3d> — z handoffu Claude Design, beze změn ═══ */
+/* ═══ <rack-3d> — z handoffu Claude Design; úprava: klik na polici (patro) → událost
+   rack-shelf-click {p}, vybrané patro (model.sel) svítí, najetí myší patro podbarví ═══ */
 (function () {
   const THREE_URL = 'https://unpkg.com/three@0.184.0/build/three.module.js';
   class Rack3D extends HTMLElement {
     static get observedAttributes() { return ['model']; }
     connectedCallback() {
-      if (this._init) return; this._init = true;
+      // prvek se při překreslení panelu jen PŘESOUVÁ (jeden WebGL kontext napořád) —
+      // smyčka se po odpojení zastaví, po připojení ji znovu rozběhnout
+      if (this._init) { if (this._loop && !this._running) { this._running = true; this._loop(); } return; }
+      this._init = true;
       this.style.display = 'block'; this.style.width = '100%'; this.style.height = '100%';
       this._boot();
     }
@@ -557,17 +597,41 @@
       const fill = new THREE.DirectionalLight(0x8877ff, 0.45); fill.position.set(-3, 2, -2); scene.add(fill);
       const group = new THREE.Group(); scene.add(group);
       this._group = group; this._rotY = -0.5; this._hotMats = []; this._pin = null;
-      let sx = 0, base = 0, drag = false;
+      let sx = 0, sy = 0, base = 0, drag = false, moved = false;
+      const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+      // které patro je pod kurzorem (průhledné „zóny" nad každou deskou, viz _build)
+      const pickFloor = (e) => {
+        const r = renderer.domElement.getBoundingClientRect();
+        ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+        ray.setFromCamera(ptr, cam);
+        const hit = ray.intersectObjects(this._zones || [], false)[0];
+        return hit ? hit.object.userData.p : null;
+      };
       renderer.domElement.addEventListener('pointerdown', (e) => {
-        drag = true; sx = e.clientX; base = this._rotY;
+        drag = true; moved = false; sx = e.clientX; sy = e.clientY; base = this._rotY;
         renderer.domElement.setPointerCapture(e.pointerId);
         renderer.domElement.style.cursor = 'grabbing';
       });
-      renderer.domElement.addEventListener('pointermove', (e) => { if (drag) this._rotY = base + (e.clientX - sx) * 0.01; });
-      renderer.domElement.addEventListener('pointerup', () => { drag = false; renderer.domElement.style.cursor = 'grab'; });
+      renderer.domElement.addEventListener('pointermove', (e) => {
+        if (drag) {
+          if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 4) moved = true;
+          this._rotY = base + (e.clientX - sx) * 0.01;
+          return;
+        }
+        const p = pickFloor(e);
+        this._setHover(p);
+        renderer.domElement.style.cursor = p ? 'pointer' : 'grab';
+      });
+      renderer.domElement.addEventListener('pointerup', (e) => {
+        drag = false; renderer.domElement.style.cursor = 'grab';
+        if (moved) return;                       // tažení = otáčení, ne výběr
+        const p = pickFloor(e);
+        if (p) this.dispatchEvent(new CustomEvent('rack-shelf-click', { bubbles: true, detail: { p: p } }));
+      });
+      renderer.domElement.addEventListener('pointerleave', () => { if (!drag) this._setHover(null); });
       const clock = new THREE.Clock();
       const loop = () => {
-        if (!this.isConnected) return;
+        if (!this.isConnected) { this._running = false; return; }
         requestAnimationFrame(loop);
         const t = clock.getElapsedTime();
         group.rotation.y += (this._rotY - group.rotation.y) * 0.15;
@@ -578,9 +642,15 @@
         }
         renderer.render(scene, cam);
       };
+      this._loop = loop; this._running = true;
       loop();
       this._build();
       this._frame();
+    }
+    _setHover(p) {
+      (this._zones || []).forEach((z) => {
+        z.material.opacity = z.userData.p === this._selP ? 0.16 : (z.userData.p === p ? 0.09 : 0);
+      });
     }
     attributeChangedCallback() { if (this.T) { this._build(); this._frame(); } }
     _frame() {
@@ -596,11 +666,12 @@
       const SH = m.shelves || 5, CE = m.cells || 4, boxes = m.boxes || [];
       const g = this._group;
       while (g.children.length) g.remove(g.children[0]);
-      this._hotMats = []; this._pin = null;
+      this._hotMats = []; this._pin = null; this._zones = []; this._selP = m.sel || null;
       const W = 1.4, D = 0.5, H = SH <= 2 ? 0.9 : 1.8, T = 0.035;
       const metal = new THREE.MeshStandardMaterial({ color: 0x17171c, roughness: 0.55, metalness: 0.6 });
       const wood = new THREE.MeshStandardMaterial({ color: 0xC9A876, roughness: 0.85 });
       const boxMat = new THREE.MeshStandardMaterial({ color: 0x2e2e36, roughness: 0.8 });
+      const selWood = new THREE.MeshStandardMaterial({ color: 0xBF5AF2, emissive: 0x6E3AFA, emissiveIntensity: 0.45, roughness: 0.6 });
       const pg = new THREE.BoxGeometry(0.05, H, 0.05);
       [[-W / 2 + 0.025, D / 2 - 0.025], [W / 2 - 0.025, D / 2 - 0.025], [-W / 2 + 0.025, -D / 2 + 0.025], [W / 2 - 0.025, -D / 2 + 0.025]].forEach(([x, z]) => {
         const p = new THREE.Mesh(pg, metal); p.name = 'post'; p.position.set(x, H / 2, z); g.add(p);
@@ -609,8 +680,14 @@
       const cellW = (W - 0.1) / CE;
       for (let i = 1; i <= SH; i++) {
         const y = T / 2 + (i - 1) * gap;
-        const board = new THREE.Mesh(new THREE.BoxGeometry(W - 0.02, T, D - 0.02), wood);
+        const board = new THREE.Mesh(new THREE.BoxGeometry(W - 0.02, T, D - 0.02), i === this._selP ? selWood : wood);
         board.name = 'shelf'; board.position.set(0, y, 0); g.add(board);
+        // klikací zóna = prostor NAD deskou (tenká deska sama se myší trefuje špatně)
+        const zh = Math.max(0.12, i < SH ? gap - T : Math.min(0.32, gap - T));
+        const zone = new THREE.Mesh(new THREE.BoxGeometry(W - 0.06, zh, D - 0.04),
+          new THREE.MeshBasicMaterial({ color: 0xBF5AF2, transparent: true, opacity: i === this._selP ? 0.16 : 0, depthWrite: false }));
+        zone.name = 'zone'; zone.userData = { p: i }; zone.position.set(0, y + T / 2 + zh / 2, 0);
+        g.add(zone); this._zones.push(zone);
         const edge = new THREE.Mesh(new THREE.BoxGeometry(W, T + 0.012, 0.022), metal);
         edge.position.set(0, y, D / 2); g.add(edge);
         const edge2 = new THREE.Mesh(new THREE.BoxGeometry(W, T + 0.012, 0.022), metal);
@@ -658,6 +735,7 @@
 
   let D = null, racks = [], byLoc = {}, partsIdx = [];
   let sel = null, target = null, edit = false, dirty = false;
+  let selShelf = null, addOpen = false, lastModel = null, rackEl = null;   // vybraná police v panelu
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -679,10 +757,12 @@
     const f = $('fatal'); f.style.display = 'flex'; f.innerHTML = '<div>🗺️<br><br>' + esc(msg) + '</div>';
   }
 
+  const dataUrl = () => 'api/warehouse_map_data.php?with_parts=1' + (BRANCH ? '&branch=' + encodeURIComponent(BRANCH) : '');
+
   async function load() {
     let r;
     try {
-      r = await fetch('api/warehouse_map_data.php?with_parts=1' + (BRANCH ? '&branch=' + encodeURIComponent(BRANCH) : ''), { credentials: 'same-origin' });
+      r = await fetch(dataUrl(), { credentials: 'same-origin' });
     } catch (e) { fatal('Data mapy se nepodařilo stáhnout — zkontroluj připojení.'); return; }
     if (r.status === 401) { fatal('Nepřihlášeno — otevři mapu z CRM (Sklad → Umístění → 3D mapa).'); return; }
     let j;
@@ -759,6 +839,10 @@
       const ui = target.policeLoc ? asc.findIndex((po) => po.loc.id === target.policeLoc.id) : -1;
       if (ui >= 0) { drawerTarget = { u: ui + 1, d: 0 }; }
     }
+    if (!drawerTarget && drawer && sel === drawer.n && selShelf) {
+      const ui = ascShelves(drawer).findIndex((po) => po.loc.id === selShelf);
+      if (ui >= 0) { drawerTarget = { u: ui + 1, d: 0 }; }
+    }
     const model = {
       racks: racks.filter((r) => !r.drawer).map((r) => ({ id: r.n, label: (r.n < 900 ? 'R' + r.n : r.code), x: r.x, y: r.y, rot: r.rot, sh: r.sh })),
       shelves: 5,
@@ -771,21 +855,66 @@
     $('map').setAttribute('model', JSON.stringify(model));
   }
 
-  function setTarget(p) {
+  function targetFor(p) {
     const l = p.loc;
     let policeLoc = null, rackLoc = null;
     if (l.type === 'police') { policeLoc = l; rackLoc = byLoc[l.parent_id] || null; }
     else { rackLoc = l; }
-    target = { part: p, policeLoc: policeLoc, rackLoc: rackLoc, rackN: rackLoc ? num(rackLoc.code) : null };
+    return { part: p, policeLoc: policeLoc, rackLoc: rackLoc, rackN: rackLoc ? num(rackLoc.code) : null };
+  }
+
+  function setTarget(p) {
+    target = targetFor(p);
     if (target.rackN != null) { sel = target.rackN; }
-    render(); renderPanel();
+    selShelf = target.policeLoc ? target.policeLoc.id : null;   // hledaný díl rovnou ukáže obsah své police
+    render(); renderPanel(true);
   }
 
   function posLabel(t) {
     return posOfLoc(t.policeLoc || t.rackLoc);
   }
 
-  function renderPanel() {
+  const ascShelves = (r) => r.police.slice().sort((a, b) => a.no - b.no);   // P1, P2, … (P1 = nahoře)
+  const shelfPos = (r, po) => (r.n < 900 ? 'R' + r.n : r.code) + '-P' + po.no;
+  const price = (v) => (Math.round(Number(v) || 0)).toLocaleString('cs-CZ') + ' Kč';
+  // model z názvu police („iPhone 12 – drobné díly" → „iPhone 12") — stejně jako sklad.php
+  const modelFromName = (s) => { const m = /^((?:iPhone|iPad|MacBook|iMac|Mac mini|Apple Watch|Watch|AirPods)[\w\s.+]*?)(?=\s*[–\-—,(]|$)/i.exec(s || ''); return m ? m[1].trim() : ''; };
+
+  /** Obsah vybrané police: díly (klik = karta dílu, + = další kusy) a naskladnění nového dílu. */
+  function shelfDetailHtml(r, po) {
+    const parts = (po.loc.parts || []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'cs'));
+    const units = parts.reduce((s, p) => s + (p.qty || 0), 0);
+    let h = '<div id="shelfDetail">';
+    h += '<div class="sdHead"><span class="cd mono">' + esc(shelfPos(r, po)) + '</span><span class="nm">' + esc(po.loc.name || '') + '</span>'
+      + '<span class="sp"></span><button type="button" class="sdX" id="sdClose" title="Zavřít">×</button></div>';
+    h += '<div class="sdSub">' + parts.length + ' dílů · ' + units + ' ks · <a href="#" id="sdOpen">otevřít polici v CRM →</a></div>';
+    if (D.can_edit) {
+      h += '<button type="button" class="btn grad sdAdd" id="sdAddBtn"' + (addOpen ? ' style="display:none"' : '') + '>+ Naskladnit díly</button>';
+      h += '<div class="sdForm" id="sdForm"' + (addOpen ? '' : ' style="display:none"') + '>'
+        + '<div class="cap">Nový díl na ' + esc(shelfPos(r, po)) + '</div>'
+        + '<input id="sdName" placeholder="Název dílu (např. Displej iPhone 12)" autocomplete="off">'
+        + '<div class="sdRow"><input id="sdQty" type="number" min="1" max="10000" value="1" title="Kusů"><input id="sdPrice" type="number" min="0" step="1" placeholder="Prodejní Kč"></div>'
+        + '<input id="sdModel" placeholder="Model (iPhone 12…) — nepovinné" autocomplete="off" value="' + esc(lastModel != null ? lastModel : modelFromName(po.loc.name)) + '">'
+        + '<div class="sdRow"><button type="button" class="btn grad" id="sdSave">Přidat na polici</button><button type="button" class="btn" id="sdCancel">Hotovo</button></div>'
+        + '<div class="sdHint">Enter v názvu = rovnou přidat. Díl, který už v CRM je, přidáš tlačítkem + u něj.</div>'
+        + '</div>';
+    }
+    if (!parts.length) {
+      h += '<div class="empty">Police je zatím prázdná.</div>';
+    } else {
+      h += '<div class="pList">' + parts.map((p) =>
+        '<div class="pRow' + (target && target.part.id === p.id ? ' hot' : '') + '">'
+        + '<a href="#" class="pMain" data-part="' + p.id + '" title="Otevřít kartu dílu (naskladnit / vydat na zakázku)">'
+        + '<span class="pNm">' + esc(p.name) + '</span>'
+        + '<span class="pMeta">' + esc([p.model, p.sku ? 'SKU ' + p.sku : '', price(p.price)].filter(Boolean).join(' · ')) + '</span></a>'
+        + '<span class="pQty' + (p.qty > 0 ? '' : ' zero') + '">' + p.qty + ' ks</span>'
+        + (D.can_edit ? '<button type="button" class="pPlus" data-plus="' + p.id + '" title="Naskladnit další kusy">+</button>' : '')
+        + '</div>').join('') + '</div>';
+    }
+    return h + '</div>';
+  }
+
+  function renderPanel(scrollToShelf) {
     const P = $('panel');
     const r = sel != null ? rackByN(sel) : null;
     if (!r) { P.innerHTML = '<div class="empty">Klikni na regál v mapě pro zobrazení polic.</div>'; return; }
@@ -800,27 +929,29 @@
         + ' &nbsp;<a href="#" id="openPart" style="color:#BF5AF2;font-size:11px;text-decoration:none">karta dílu →</a></div>';
     }
 
+    const rows = ascShelves(r);
+    const cur = selShelf ? rows.find((po) => po.loc.id === selShelf) || null : null;
+    if (!cur) { selShelf = null; }
+
     if (!r.drawer) {
-      html += '<div class="cap">3D náhled regálu · táhni pro otočení</div>';
-      html += '<div id="rackView"><rack-3d id="rack" model="{}"></rack-3d></div>';
+      html += '<div class="cap">3D náhled regálu · táhni pro otočení · klikni na polici</div>';
+      html += '<div id="rackView"></div>';
     } else {
-      html += '<div class="cap">Šuplíkové boxy · 6 boxů — vybraný box svítí přímo ve scéně</div>';
+      html += '<div class="cap">Šuplíkové boxy · 6 boxů — klikni na box ve scéně nebo v seznamu</div>';
     }
 
+    if (cur) { html += shelfDetailHtml(r, cur); }
+
     // police SHORA: P1 = nejvrchnější (konvence štítků), v seznamu tedy P1 první
-    const rows = r.police.slice().sort((a, b) => a.no - b.no);
+    html += '<div class="cap">Police</div>';
     rows.forEach((po) => {
       const hotShelf = !!(target && target.policeLoc && target.policeLoc.id === po.loc.id);
-      html += '<div class="shelfRow' + (hotShelf ? ' hotShelf' : '') + '">';
-      html += '<div class="shelfHead"><span class="cd mono">' + esc(rpos + '-P' + po.no) + '</span><span class="nm">' + esc(po.loc.name || '') + '</span><span class="mono" style="font-size:10px;color:rgba(255,255,255,.3)">' + esc(po.loc.code) + '</span></div>';
-      html += '<div class="chips">';
-      if (po.parts > 0) {
-        html += '<span class="chip' + (hotShelf ? ' hot' : '') + '" data-loc="' + po.loc.id + '" title="Otevřít obsah police">'
-          + '<span>' + po.parts + ' dílů</span><span class="n">otevřít →</span></span>';
-      } else {
-        html += '<span class="chip loose" data-loc="' + po.loc.id + '" title="Otevřít polici a naskladnit">prázdná police</span>';
-      }
-      html += '</div></div>';
+      const isSel = cur && cur.loc.id === po.loc.id;
+      html += '<div class="shelfRow' + (hotShelf ? ' hotShelf' : '') + (isSel ? ' selShelf' : '') + '" data-shelf="' + po.loc.id + '" title="Zobrazit obsah police">';
+      html += '<div class="shelfHead"><span class="cd mono">' + esc(shelfPos(r, po)) + '</span><span class="nm">' + esc(po.loc.name || '') + '</span>'
+        + '<span class="sp"></span><span class="cnt' + (po.parts > 0 ? '' : ' zero') + '">' + (po.parts > 0 ? po.parts + ' dílů' : 'prázdná') + '</span>'
+        + '<span class="mono" style="font-size:10px;color:rgba(255,255,255,.3)">' + esc(po.loc.code) + '</span></div>';
+      html += '</div>';
     });
     if (r.loose > 0) {
       html += '<div class="shelfRow"><div class="shelfHead"><span class="nm">Přímo na regálu</span></div><div class="chips">'
@@ -833,30 +964,130 @@
     P.innerHTML = html;
 
     if (!r.drawer) {
-      // rack-3d model: police → patra (P1 NAHOŘE → pořadí obrátit: první police
-      // v seznamu dostane nejvyšší patro); obsazená police = blok přes celé patro
+      // rack-3d model: police → patra (P1 NAHOŘE → první police v seznamu dostane
+      // nejvyšší patro); obsazená police = blok přes celé patro; vybraná svítí
       const boxes3d = [];
-      const asc = r.police.slice().sort((a, b) => a.no - b.no);   // P1, P2, …
-      asc.forEach((po, idx) => {
+      let selP = null;
+      rows.forEach((po, idx) => {
         const p = Math.max(1, r.sh - idx);   // P1 → horní patro
+        if (cur && cur.loc.id === po.loc.id) { selP = p; }
         if (po.parts > 0) {
           boxes3d.push({ p: p, b: 1, hot: !!(target && target.policeLoc && target.policeLoc.id === po.loc.id) });
         }
       });
-      const rackEl = P.querySelector('#rack');
-      if (rackEl) rackEl.setAttribute('model', JSON.stringify({ shelves: r.sh, cells: 1, boxes: boxes3d }));
+      // JEDEN prvek rack-3d po celou dobu (jen se přesouvá) — nový by pokaždé
+      // založil další WebGL kontext a ztratil natočení regálu
+      if (!rackEl) { rackEl = document.createElement('rack-3d'); rackEl.id = 'rack'; }
+      P.querySelector('#rackView').appendChild(rackEl);
+      rackEl.setAttribute('model', JSON.stringify({ shelves: r.sh, cells: 1, boxes: boxes3d, sel: selP }));
     }
 
     const inv = P.querySelector('#openInv');
     if (inv) inv.onclick = (e) => { e.preventDefault(); nav('inventory.php?branch=' + D.branch.id + '&location=' + r.locId); };
     const op = P.querySelector('#openPart');
     if (op) op.onclick = (e) => { e.preventDefault(); nav('sklad.php?qr=' + target.part.id); };
-    P.querySelectorAll('.chip[data-loc]').forEach((ch) => {
-      ch.onclick = () => nav('sklad.php?loc=' + ch.dataset.loc);
+    P.querySelectorAll('.shelfRow[data-shelf]').forEach((row) => {
+      row.onclick = () => selectShelf(parseInt(row.dataset.shelf, 10));
     });
     P.querySelectorAll('.chip[data-locinv]').forEach((ch) => {
       ch.onclick = () => nav('inventory.php?branch=' + D.branch.id + '&location=' + ch.dataset.locinv);
     });
+    if (cur) { wireShelfDetail(r, cur); }
+    if (cur && scrollToShelf) {
+      const sd = $('shelfDetail');
+      if (sd) sd.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  function selectShelf(id) {
+    if (selShelf !== id) { addOpen = false; lastModel = null; }
+    selShelf = id;
+    render(); renderPanel(true);
+  }
+
+  function wireShelfDetail(r, po) {
+    $('sdClose').onclick = () => { selShelf = null; addOpen = false; render(); renderPanel(); };
+    $('sdOpen').onclick = (e) => { e.preventDefault(); nav('sklad.php?loc=' + po.loc.id); };
+    $('shelfDetail').querySelectorAll('.pMain[data-part]').forEach((a) => {
+      a.onclick = (e) => { e.preventDefault(); nav('sklad.php?qr=' + a.dataset.part); };
+    });
+    if (!D.can_edit) return;
+
+    // + u dílu = naskladnit další kusy (stejný pohyb jako QR karta dílu)
+    $('shelfDetail').querySelectorAll('.pPlus[data-plus]').forEach((b) => {
+      b.onclick = () => {
+        const part = (po.loc.parts || []).find((x) => x.id === parseInt(b.dataset.plus, 10));
+        if (!part) return;
+        const v = prompt('Kolik kusů „' + part.name + '" naskladnit na ' + shelfPos(r, po) + '?', '1');
+        if (v === null) return;
+        const qty = parseInt(v, 10);
+        if (!(qty >= 1 && qty <= 10000)) { toast('Zadej počet kusů 1–10000.', false); return; }
+        b.disabled = true;
+        const fd = new FormData();
+        fd.append('op', 'restock'); fd.append('inventory_id', part.id); fd.append('qty', qty);
+        fd.append('note', 'Naskladněno z 3D mapy (' + shelfPos(r, po) + ')');
+        fd.append('csrf_token', CSRF);
+        fetch('api/inventory_move.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+          .then((x) => x.json())
+          .then((d) => {
+            if (!d.success) { b.disabled = false; toast(d.message || 'Naskladnění se nepovedlo.', false); return; }
+            toast('✓ ' + part.name + ': +' + qty + ' ks (skladem ' + d.new_quantity + ' ks)', true);
+            refresh();
+          })
+          .catch(() => { b.disabled = false; toast('Síťová chyba — zkus to znovu.', false); });
+      };
+    });
+
+    // + Naskladnit díly = nová karta dílu rovnou s umístěním na téhle polici
+    const form = $('sdForm'), addBtn = $('sdAddBtn');
+    addBtn.onclick = () => { addOpen = true; addBtn.style.display = 'none'; form.style.display = ''; $('sdName').focus(); };
+    $('sdCancel').onclick = () => { addOpen = false; lastModel = null; form.style.display = 'none'; addBtn.style.display = ''; };
+    if (addOpen) { setTimeout(() => { const n = $('sdName'); if (n) n.focus(); }, 30); }
+    let busy = false;
+    const save = () => {
+      if (busy) return;
+      const name = $('sdName').value.trim();
+      const qty = parseInt($('sdQty').value, 10) || 1;
+      if (!name) { toast('Zadej název dílu.', false); $('sdName').focus(); return; }
+      if (qty < 1 || qty > 10000) { toast('Zadej počet kusů 1–10000.', false); return; }
+      busy = true; $('sdSave').disabled = true;
+      lastModel = $('sdModel').value.trim();
+      const fd = new FormData();
+      fd.append('part_name', name);
+      fd.append('quantity', qty);
+      fd.append('sale_price', $('sdPrice').value || 0);
+      fd.append('device_model', lastModel);
+      fd.append('location_id', po.loc.id);
+      fd.append('branch_id', D.branch.id);
+      fd.append('min_stock', 0);
+      fd.append('csrf_token', CSRF);
+      fetch('api/add_inventory.php', { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then((x) => x.json())
+        .then((d) => {
+          busy = false;
+          if (!d.success) { $('sdSave').disabled = false; toast(d.message || 'Naskladnění se nepovedlo.', false); return; }
+          toast('✓ Naskladněno na ' + shelfPos(r, po) + ': ' + name + ' — ' + qty + ' ks', true);
+          refresh();   // formulář zůstane otevřený (addOpen) a prázdný — další díl hned
+        })
+        .catch(() => { busy = false; $('sdSave').disabled = false; toast('Síťová chyba — zkus to znovu.', false); });
+    };
+    $('sdSave').onclick = save;
+    $('sdName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+  }
+
+  /** Znovu načíst data (po naskladnění) — výběr regálu/police i hledaný díl zůstanou. */
+  async function refresh() {
+    try {
+      const x = await fetch(dataUrl(), { credentials: 'same-origin' });
+      const j = await x.json();
+      if (!j.success) { toast(j.message || 'Data se nepodařilo obnovit.', false); return; }
+      D = j; build();
+      if (target) {
+        const p = partsIdx.find((y) => y.id === target.part.id);
+        target = p ? targetFor(p) : null;
+      }
+      render(); renderPanel();
+    } catch (e) { toast('Data se nepodařilo obnovit — načti mapu znovu.', false); }
   }
 
   /* ── vyhledávání ── */
@@ -880,7 +1111,22 @@
   document.addEventListener('click', (e) => { if (!$('searchWrap').contains(e.target)) res.style.display = 'none'; });
 
   /* ── výběr / úpravy rozmístění ── */
-  document.addEventListener('wh-rack-click', (e) => { sel = e.detail.id; render(); renderPanel(); });
+  document.addEventListener('wh-rack-click', (e) => {
+    if (sel !== e.detail.id) { selShelf = null; addOpen = false; lastModel = null; }
+    sel = e.detail.id;
+    const r = rackByN(sel);
+    if (r && e.detail.unit) {                        // box šuplíkové stěny = police
+      const po = ascShelves(r)[e.detail.unit - 1];
+      if (po) { selectShelf(po.loc.id); return; }
+    }
+    render(); renderPanel();
+  });
+  document.addEventListener('rack-shelf-click', (e) => {
+    const r = sel != null ? rackByN(sel) : null;
+    if (!r) return;
+    const po = ascShelves(r)[r.sh - e.detail.p];     // patro p ← police (P1 = nejvyšší patro)
+    if (po) selectShelf(po.loc.id);
+  });
   document.addEventListener('wh-rack-move', (e) => {
     const r = rackByN(e.detail.id); if (!r || !edit) return;
     r.x = e.detail.x; r.y = e.detail.y; dirty = true; updateSave();

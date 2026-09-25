@@ -112,6 +112,8 @@ try {
         ],
         'generated_at' => date('Y-m-d H:i:s'),
         'unplaced_parts' => $unplaced,
+        // smí přihlášený na téhle pobočce naskladňovat? (mapa podle toho ukáže „+ Naskladnit díly")
+        'can_edit' => crmCanModifyBranchStock($branchId),
         'locations' => $out,
         // šablony odkazů pro kliknutí v mapě ({id}/{branch} nahradí mapa sama);
         // mapa běží v iframe → navigovat přes window.parent.location.href
