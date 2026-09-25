@@ -11,6 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.82.0',
+        'date' => '2026-09-25',
+        'time' => '12:20',
+        'title' => 'Sklad bez krabiček: jen regály a police',
+        'items' => [
+            '<b>Krabičky jsou zrušené.</b> Sklad má nově jen <b>regály a police</b>. Pozice dílu je tedy <b>R1-P2</b>, bez třetí části „-B3".',
+            '<b>Díly z krabiček nikam nezmizely.</b> Při prvním otevření skladu po aktualizaci se z krabiček „vyndají" a zůstanou na polici, kde krabička stála. Když měla krabička název nebo poznámku (třeba „iPhone 15 Pro Max · Celé devices") a police žádnou neměla, přejde text na polici. Do Historie se zapíše, kolik krabiček zmizelo a kolik dílů se přesunulo.',
+            '<b>Staré štítky z krabiček nejsou slepá ulička.</b> Když někdo naskenuje QR z krabičky nebo napíše její kód (KrK028) do hledání, otevře se police, kde krabička stála, a nahoře ho upozorní, že krabička je zrušená a štítek může sundat.',
+            'Umístění: z Rychlého nastavení zmizelo pole „krabiček na polici", z dialogu Přidat umístění typ Krabička a pod policemi tlačítka „+ krabička". <b>Šuplíkové boxy</b> se zakládají jako 6 boxů (polic) bez jednotlivých šuplíků.',
+            'Výběr umístění u dílu nabízí jen police a regály. Naskladňovací kolečko (Projít sklad) prochází police R1-P1 → R10-P6 a arch štítků už krabičky netiskne.',
+            '<b>3D mapa</b>: u každé police je počet dílů a klik otevře její obsah. V 3D náhledu regálu je obsazená police vyplněná blokem a hledaný díl rozsvítí svou polici.',
+        ],
+    ],
+    [
         'version' => '3.81.0',
         'date' => '2026-09-25',
         'time' => '12:14',

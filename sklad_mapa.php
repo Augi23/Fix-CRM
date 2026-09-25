@@ -1,6 +1,6 @@
 <?php
 /**
- * 3D MAPA SKLADU — vizualizace rozložení skladu (regály/police/krabičky)
+ * 3D MAPA SKLADU — vizualizace rozložení skladu (regály/police)
  * vyrobená v Claude Design a exportovaná jako samostatné HTML.
  *   sklad_mapa.php            — stránka v CRM (chrome + iframe s mapou)
  *   sklad_mapa.php?raw=1      — samotné HTML mapy (servíruje se ze
@@ -41,14 +41,14 @@ ensureSkladBranchSchema();
 $branchId = (int)skladBranchOrOwn();
 $hasMap = is_file($mapFile);
 // deep-link „ukázat díl na mapě": ?focus=<id dílu> se protahuje do iframe —
-// mapa díl vyhledá, rozsvítí regál majákem a vpravo zvýrazní jeho krabičku
+// mapa díl vyhledá, rozsvítí regál majákem a vpravo zvýrazní jeho polici
 $focusId = (int)($_GET['focus'] ?? 0);
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
         <h2 class="mb-0">3D mapa skladu <span class="fs-6 text-white-50"><?php echo e(skladBranchLabel($branchId)); ?></span></h2>
-        <small class="text-muted">Rozložení regálů, polic a krabiček — data živě ze skladu</small>
+        <small class="text-muted">Rozložení regálů a polic — data živě ze skladu</small>
     </div>
     <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
         <a href="sklad_umisteni.php?branch=<?php echo (int)$branchId; ?>" class="btn btn-outline-info"><i class="fas fa-map-location-dot me-2"></i> Umístění</a>

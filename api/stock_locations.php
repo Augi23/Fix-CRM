@@ -1,8 +1,8 @@
 <?php
 /**
- * Umístění skladu (regály / police / krabičky) + přiřazování dílů:
+ * Umístění skladu (regály / police — krabičky zrušeny 25.9.2026) + přiřazování dílů:
  *   op=create    — nové umístění (type, name, parent_id, count 1–50 → hromadně)
- *   op=update    — přejmenování / přesun na jinou polici (parent_id) / poznámka / (de)aktivace
+ *   op=update    — přejmenování / přesun police na jiný regál (parent_id) / poznámka / (de)aktivace
  *   op=delete    — smazání prázdného umístění (jinak poradí deaktivaci)
  *   op=assign    — hromadné přiřazení dílů do umístění (location_id=0 → odebrat umístění)
  *   op=set_model — hromadné nastavení modelu zařízení u dílů (prázdný model → smazat)
@@ -28,7 +28,7 @@ ensureSkladBranchSchema();
 // Hromadné skladové akce smí zaměstnanec provést jen u dílů SVÉ pobočky (admin/Boss všude).
 $__invBranchScope = isBranchGlobalViewer() ? '' : ' AND branch_id = ' . (int)getCurrentStaffBranchId();
 
-// POBOČKA: regály/police/krabičky patří konkrétní provozovně — Karlín a Na Příkopě
+// POBOČKA: regály a police patří konkrétní provozovně — Karlín a Na Příkopě
 // mají každý svůj sklad, takže se jejich umístění nesmí míchat ani přepisovat.
 $branchId = (int)($_POST['branch_id'] ?? 0);
 // jen SKUTEČNÁ pobočka — jinak by admin (vidí všude) založil umístění na pobočce,
@@ -47,8 +47,8 @@ function _locRequireBranch(int $branchId): void {
 }
 
 /** Založí jedno umístění a vrátí ['id'=>…, 'code'=>…].
- *  Kód se odvozuje z nejvyššího už použitého v TÉ pobočce (RegK1, RegK1-P2,
- *  KrK001…), takže dva lidé
+ *  Kód se odvozuje z nejvyššího už použitého v TÉ pobočce (RegK1, RegK1-P2…),
+ *  takže dva lidé
  *  zakládající naráz by dostali tentýž — proto se celé zakládání dělá pod zámkem
  *  _locLock() (opakování po chybě duplicity by uvnitř transakce nepomohlo: čtení
  *  vidí kvůli REPEATABLE READ pořád stejný snímek dat). */
@@ -79,8 +79,8 @@ function _reqIds($raw): array {
 try {
     if ($op === 'create') {
         _locRequireBranch($branchId);
-        $type = (string)($_POST['type'] ?? 'krabicka');
-        if (!in_array($type, ['regal', 'police', 'krabicka'], true)) { throw new Exception('Neznámý typ umístění.'); }
+        $type = (string)($_POST['type'] ?? 'police');
+        if (!in_array($type, ['regal', 'police'], true)) { throw new Exception('Sklad má jen regály a police.'); }
         $name = mb_substr(trim((string)($_POST['name'] ?? '')), 0, 120);
         $parentId = (int)($_POST['parent_id'] ?? 0);
         $count = max(1, min(50, (int)($_POST['count'] ?? 1)));
@@ -94,7 +94,6 @@ try {
             if (!$parent) { throw new Exception('Nadřazené umístění nenalezeno.'); }
             if (empty($parent['is_active'])) { throw new Exception('Nadřazené umístění je deaktivované.'); }
             if ($type === 'police' && $parent['type'] !== 'regal') { throw new Exception('Police patří na regál.'); }
-            if ($type === 'krabicka' && $parent['type'] === 'krabicka') { throw new Exception('Krabička nemůže být uvnitř jiné krabičky.'); }
             // regál z Karlína nesmí dostat polici Na Příkopě — sklad by se promíchal
             $branchId = (int)($parent['branch_id'] ?? 0) ?: $branchId;
             _locRequireBranch($branchId);
@@ -125,25 +124,23 @@ try {
     }
 
     if ($op === 'setup') {
-        // RYCHLÉ NASTAVENÍ SKLADU: „mám 4 regály, v každém 5 polic, v každé 2 krabičky"
+        // RYCHLÉ NASTAVENÍ SKLADU: „mám 4 regály, v každém 5 polic"
         // → založí celou kostru najednou. Bez toho by obsluha proklikávala desítky
         // dialogů. Přidává VŽDY (existující regály zůstávají), aby šlo sklad rozšířit.
         _locRequireBranch($branchId);
         $racks  = max(0, min(30, (int)($_POST['racks'] ?? 0)));
         $shelves = max(0, min(30, (int)($_POST['shelves_per_rack'] ?? 0)));
-        $boxes  = max(0, min(20, (int)($_POST['boxes_per_shelf'] ?? 0)));
         $intoExisting = _reqIds($_POST['into_racks'] ?? '');   // police do UŽ existujících regálů
 
         if ($racks === 0 && !$intoExisting) { throw new Exception('Zadej, kolik regálů se má založit.'); }
-        $total = $racks + ($racks * $shelves) + ($racks * $shelves * $boxes)
-               + (count($intoExisting) * $shelves) + (count($intoExisting) * $shelves * $boxes);
+        $total = $racks + ($racks * $shelves) + (count($intoExisting) * $shelves);
         if ($total > 600) {
             throw new Exception('To by bylo ' . $total . ' umístění najednou — rozděl to na menší dávky (limit 600).');
         }
         if ($total === 0) { throw new Exception('Není co zakládat.'); }
 
         // vybrané „regály" musí být opravdu AKTIVNÍ REGÁLY TÉHLE pobočky — jinak by
-        // police vznikly třeba uvnitř krabičky a ve stromu by je nikdo neuviděl
+        // police vznikly třeba na jiné polici a ve stromu by je nikdo neuviděl
         if ($intoExisting) {
             $ph = implode(',', array_fill(0, count($intoExisting), '?'));
             $rq = $pdo->prepare("SELECT id FROM stock_locations
@@ -154,12 +151,7 @@ try {
                 throw new Exception('Vybrané umístění není aktivní regál téhle pobočky.');
             }
         }
-        // krabičky bez polic nemají kam — říct to, ne je tiše zahodit
-        if ($boxes > 0 && $shelves === 0) {
-            throw new Exception('Krabičky se zakládají do nových polic — zadej i počet polic (nebo krabičky přidej u konkrétní police tlačítkem „+ krabička").');
-        }
-
-        $madeR = 0; $madeP = 0; $madeK = 0;
+        $madeR = 0; $madeP = 0;
         _locLock($pdo);
         try {
             $pdo->beginTransaction();   // uvnitř try — finally pak zámek uvolní vždy
@@ -171,12 +163,8 @@ try {
             }
             foreach ($rackIds as $rackId) {
                 for ($p = 0; $p < $shelves; $p++) {
-                    $shelf = _locInsert($pdo, 'police', '', (int)$rackId, $branchId);
+                    _locInsert($pdo, 'police', '', (int)$rackId, $branchId);
                     $madeP++;
-                    for ($b = 0; $b < $boxes; $b++) {
-                        _locInsert($pdo, 'krabicka', '', (int)$shelf['id'], $branchId);
-                        $madeK++;
-                    }
                 }
             }
             $pdo->commit();
@@ -185,7 +173,7 @@ try {
             throw $e;
         } finally { _locUnlock($pdo); }
 
-        $sum = trim(($madeR ? $madeR . ' regálů, ' : '') . ($madeP ? $madeP . ' polic, ' : '') . ($madeK ? $madeK . ' krabiček' : ''), ', ');
+        $sum = trim(($madeR ? $madeR . ' regálů, ' : '') . ($madeP ? $madeP . ' polic' : ''), ', ');
         crmAuditLog('location.create', [
             'entity_type' => 'stock_location', 'entity_label' => skladBranchLabel($branchId),
             'branch_id' => $branchId,
@@ -225,13 +213,12 @@ try {
                     throw new Exception('Přesunout jde jen v rámci skladu jedné pobočky.');
                 }
                 if ($loc['type'] === 'police' && $parent['type'] !== 'regal') { throw new Exception('Police patří na regál.'); }
-                if ($loc['type'] === 'krabicka' && $parent['type'] === 'krabicka') { throw new Exception('Krabička nemůže být uvnitř jiné krabičky.'); }
             }
             $set[] = 'parent_id = ?'; $vals[] = $parentId > 0 ? $parentId : null;
         }
         // POLICE PŘESTĚHOVANÁ NA JINÝ REGÁL musí dostat nový kód: kód police obsahuje
         // kód regálu (RegK1-P2), takže po přesunu na RegK3 by štítek lhal o tom, kde
-        // police je. U krabičky je naopak trvalý kód záměr (štítek se netiskne znovu).
+        // police je.
         $newCode = null;
         $needCode = false;
         if (isset($_POST['parent_id']) && (string)$loc['type'] === 'police') {
@@ -316,7 +303,7 @@ try {
         }
         $ph = implode(',', array_fill(0, count($ids), '?'));
         // Díl se smí uložit jen do umístění SVÉ pobočky — jinak by díl z Karlína
-        // „ležel" v krabičce Na Příkopě (a v inventuře by chyběl na obou místech).
+        // „ležel" na polici Na Příkopě (a v inventuře by chyběl na obou místech).
         // POZOR: nesmí se to poznávat podle rowCount() — MySQL vrací počet SKUTEČNĚ
         // změněných řádků, takže přiřazení do umístění, kde díly už leží, by vypadalo
         // jako chyba. Proto se pobočka ověří samostatným dotazem PŘED zápisem.
@@ -376,9 +363,10 @@ try {
     }
 
     if ($op === 'setup_drawers') {
-        // ŠUPLÍKOVÉ BOXY na stěně u vchodu (6 boxů × 8 šuplíků) jako regál
-        // „Šuplíkové boxy" + police „Box 1–6" + krabičky „Šuplík 1–8".
-        // 3D mapa regál s tímhle názvem kreslí jako červenou stěnu šuplíků.
+        // ŠUPLÍKOVÉ BOXY na stěně u vchodu (6 boxů po 8 šuplících) jako regál
+        // „Šuplíkové boxy" + police „Box 1–6" (šuplíky se zvlášť neevidují —
+        // krabičky zrušeny 25.9.2026). 3D mapa regál s tímhle názvem kreslí jako
+        // červenou stěnu šuplíků.
         _locRequireBranch($branchId);
         $chk = $pdo->prepare("SELECT id FROM stock_locations WHERE type = 'regal' AND branch_id = ? AND is_active = 1 AND name LIKE '%uplík%'");
         $chk->execute([$branchId]);
@@ -389,10 +377,7 @@ try {
             $pdo->beginTransaction();
             $rack = _locInsert($pdo, 'regal', 'Šuplíkové boxy', 0, $branchId);
             for ($u = 1; $u <= 6; $u++) {
-                $po = _locInsert($pdo, 'police', 'Box ' . $u, (int)$rack['id'], $branchId);
-                for ($d = 1; $d <= 8; $d++) {
-                    _locInsert($pdo, 'krabicka', 'Šuplík ' . $d, (int)$po['id'], $branchId);
-                }
+                _locInsert($pdo, 'police', 'Box ' . $u, (int)$rack['id'], $branchId);
             }
             $pdo->commit();
         } catch (Throwable $e) {
@@ -401,10 +386,10 @@ try {
         } finally { _locUnlock($pdo); }
         crmAuditLog('location.create', [
             'entity_type' => 'stock_location', 'entity_id' => (int)$rack['id'], 'entity_label' => (string)$rack['code'],
-            'summary' => 'Založeny šuplíkové boxy (' . $rack['code'] . ' „Šuplíkové boxy": 6 boxů × 8 šuplíků)',
+            'summary' => 'Založeny šuplíkové boxy (' . $rack['code'] . ' „Šuplíkové boxy": 6 boxů)',
         ]);
         echo json_encode(['success' => true, 'created_rack' => $rack,
-            'message' => 'Šuplíkové boxy založeny (' . $rack['code'] . ' — 6 boxů × 8 šuplíků, 55 umístění).'], JSON_UNESCAPED_UNICODE);
+            'message' => 'Šuplíkové boxy založeny (' . $rack['code'] . ' — 6 boxů, každý se svým QR štítkem).'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

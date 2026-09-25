@@ -2,9 +2,9 @@
 /**
  * Data pro 3D MAPU SKLADU (vizualizace z Claude Design, sklad_mapa.php).
  *   GET api/warehouse_map_data.php?branch=<id>[&with_parts=1]
- * Vrací umístění pobočky (regály/police/krabičky) + obsazenost; s with_parts=1
+ * Vrací umístění pobočky (regály/police) + obsazenost; s with_parts=1
  * i seznam dílů v každém umístění (pro boční panel / hover v mapě).
- * Mapa se vazbí na `code` (RegK1, RegK1-P2, KrK001…) — geometrie je ve scéně,
+ * Mapa se vazbí na `code` (RegK1, RegK1-P2…) — geometrie je ve scéně,
  * struktura a čísla VŽDY odsud (živá data, nic natvrdo).
  * Práva: přihlášení + manage_inventory (rozvržení skladu = provozní informace,
  * stejné pravidlo jako location_labels.php). Bez přihlášení HTTP 401 (fetch
@@ -42,7 +42,7 @@ try {
     $cq->execute([$branchId]);
     foreach ($cq as $r) { $counts[(int)$r['location_id']] = ['c' => (int)$r['c'], 'q' => (int)$r['q']]; }
 
-    // volitelně díly per umístění (boční panel: co v krabičce je)
+    // volitelně díly per umístění (boční panel: co na polici leží)
     $partsByLoc = [];
     if ($withParts) {
         // součástky uvnitř dílů-dárců (nevyjmuté) — hledání v mapě je pak najde
@@ -78,7 +78,7 @@ try {
         $row = [
             'id' => $id,
             'code' => (string)$l['code'],
-            'type' => (string)$l['type'],                     // regal | police | krabicka
+            'type' => (string)$l['type'],                     // regal | police
             'name' => (string)$l['name'],
             'note' => (string)($l['note'] ?? ''),
             'parent_id' => (int)($l['parent_id'] ?? 0),       // 0 = bez rodiče

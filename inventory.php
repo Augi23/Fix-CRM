@@ -92,7 +92,7 @@ try {
     }
 } catch (Throwable $e) {}
 
-// poziční kódy umístění (R3-P2-B4) k odznakům u dílů
+// poziční kódy umístění (R3-P2) k odznakům u dílů
 $posByLoc = [];
 try { $posByLoc = stockLocationPosCodes($pdo, array_column($inventory, 'location_id')); } catch (Throwable $e) {}
 
@@ -101,16 +101,16 @@ $inventory_stats = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN quantity
 // nabídky pro filtry / hromadné akce / modal nového dílu (jen vybraná pobočka)
 $modelOptions = [];
 try { $modelOptions = $pdo->query("SELECT DISTINCT device_model FROM inventory WHERE branch_id = " . (int)$skladBranch . " AND device_model IS NOT NULL AND device_model <> '' ORDER BY device_model ASC")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
-// jen umístění TÉTO pobočky — díl z Karlína nesmí jít do krabičky Na Příkopě
+// jen umístění TÉTO pobočky — díl z Karlína nesmí jít na polici Na Příkopě
 $allLocations = stockLocationsAll($pdo, true, (int)$skladBranch);
 $posByLocAll = [];
 try { $posByLocAll = stockLocationPosCodes($pdo, array_column($allLocations, 'id')); } catch (Throwable $e) {}
 $unplacedCount = 0;
 try { $unplacedCount = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE location_id IS NULL AND branch_id = " . (int)$skladBranch . " AND " . inventoryStockedWhereSql())->fetchColumn(); } catch (Throwable $e) {}
 
-/** <option> seznam umístění seskupený podle typu — značení R-P-B, řazené dle pozice */
+/** <option> seznam umístění seskupený podle typu — značení R-P, řazené dle pozice */
 function invLocationOptionsHtml(array $allLocations, string $selected, array $posMap = []): string {
-    $groups = ['krabicka' => 'Krabičky', 'police' => 'Police', 'regal' => 'Regály'];
+    $groups = ['police' => 'Police', 'regal' => 'Regály'];
     $html = '';
     foreach ($groups as $t => $glabel) {
         $items = array_values(array_filter($allLocations, fn($l) => $l['type'] === $t));
@@ -339,7 +339,7 @@ function invLocationOptionsHtml(array $allLocations, string $selected, array $po
             <?php foreach ($modelOptions as $m): ?><option value="<?php echo htmlspecialchars($m); ?>"></option><?php endforeach; ?>
         </datalist>
 
-        <!-- Hromadné akce nad zaškrtnutými díly (třídění skladu do krabiček) — jen zaměstnanec pobočky -->
+        <!-- Hromadné akce nad zaškrtnutými díly (třídění skladu na police) — jen zaměstnanec pobočky -->
         <?php if ($canModifyStock): ?>
         <div id="bulkBar" class="card shadow-lg border-secondary position-fixed start-50 translate-middle-x p-2 px-3" style="display:none; bottom: 18px; z-index: 1040; max-width: 96vw;">
             <div class="d-flex flex-wrap gap-2 align-items-center">

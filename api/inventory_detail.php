@@ -1,7 +1,7 @@
 <?php
 /**
  * NÁHLED skladového dílu (read-only) pro modal ve Skladu: karta dílu,
- * umístění (poziční kód R-P-B), součástky uvnitř (dárce) a posledních
+ * umístění (poziční kód R-P), součástky uvnitř (dárce) a posledních
  * 8 pohybů z deníku. Gate: přihlášený personál (prohlížet sklad smí
  * každý zaměstnanec — stejné pravidlo jako sklad.php?qr=).
  */

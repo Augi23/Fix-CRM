@@ -8,8 +8,8 @@
   3D mapa skladu — vizualizace z Claude Design (handoff „Vizualizace pozic v skladě")
   napojená na živá data CRM. Servíruje ji sklad_mapa.php?raw=1 (vstřikuje CSRF token
   místo __CSRF_TOKEN__); data: api/warehouse_map_data.php?with_parts=1 (same-origin).
-  Párování: regál v mapě ↔ číslo v kódu (RegK1 → 1). Struktura (police, krabičky,
-  díly) je VŽDY z API; mapa drží jen souřadnice regálů (op=map_layout, per pobočka).
+  Párování: regál v mapě ↔ číslo v kódu (RegK1 → 1). Struktura (police, díly;
+  krabičky zrušeny 25.9.2026) je VŽDY z API; mapa drží jen souřadnice regálů (op=map_layout, per pobočka).
   Komponenty <warehouse-3d> a <rack-3d> jsou z handoffu (three.js z CDN); jediná
   úprava: popisek regálu zobrazuje celý kód umístění (r.label), ne jen R+id.
 -->
@@ -168,7 +168,7 @@
         <span><i style="background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.14)"></i>Ostatní regály</span>
       </div>
     </div>
-    <div id="panel"><div class="empty">Klikni na regál v mapě pro zobrazení polic a krabiček.</div></div>
+    <div id="panel"><div class="empty">Klikni na regál v mapě pro zobrazení polic.</div></div>
   </div>
 </div>
 <div id="toast"></div>
@@ -715,19 +715,18 @@
     (D.locations || []).forEach((l) => (l.parts || []).forEach((p) => partsIdx.push(Object.assign({ loc: l }, p))));
     const regals = (D.locations || []).filter((l) => l.type === 'regal');
     const police = (D.locations || []).filter((l) => l.type === 'police');
-    const boxes = (D.locations || []).filter((l) => l.type === 'krabicka');
     const srv = D.layout && D.layout.racks ? D.layout.racks : null;
     let auto = 0;
     racks = regals.map((rg) => {
       let n = num(rg.code); if (n == null) { n = 900 + (auto++); }
       const pol = police.filter((p) => p.parent_id === rg.id)
-        .map((p) => ({ loc: p, no: num(p.code) || 0, boxes: boxes.filter((b) => b.parent_id === p.id), loose: (p.parts || []).length }))
+        .map((p) => ({ loc: p, no: num(p.code) || 0, parts: p.parts_count || 0 }))
         .sort((a, b) => a.no - b.no);
       const lay = (srv && srv[n]) || DEFAULT_LAYOUT[n];
       const pos = lay || { x: 430 + (auto++) * 152, y: 8, rot: 0 };
       return {
         n: n, code: rg.code, name: rg.name || '', locId: rg.id, police: pol,
-        directBoxes: boxes.filter((b) => b.parent_id === rg.id),
+        loose: rg.parts_count || 0,                    // díly přímo na regálu (bez police)
         x: Math.max(414, pos.x), y: pos.y, rot: pos.rot ? 1 : 0,
         sh: Math.max(2, pol.length || 5),
         drawer: /šuplík|suplik/i.test(rg.name || '')   // regál „Šuplíkové boxy" = stěna šuplíků
@@ -737,8 +736,8 @@
 
   function rackByN(n) { return racks.find((r) => r.n === n) || null; }
 
-  // poziční kód „R3-P2-B4": R/P z kódů, B = pořadí krabičky na polici podle kódu
-  // vzestupně (= fyzicky zleva doprava; konvence skladu). Police číslované shora.
+  // poziční kód „R3-P2": R/P z kódů, police číslované shora (P1 = nejvrchnější).
+  // (Krabičky a třetí úroveň „-B4" zrušeny 25.9.2026 — sklad má jen regály a police.)
   function posOfLoc(l) {
     if (!l) return '';
     const numc = (c) => { const m = /(\d+)$/.exec(c || ''); return m ? parseInt(m[1], 10) : null; };
@@ -748,18 +747,6 @@
       const rk = byLoc[l.parent_id]; const rn = rk ? numc(rk.code) : null; const p = pnoc(l.code);
       return (rn != null && p != null) ? 'R' + rn + '-P' + p : l.code;
     }
-    const par = byLoc[l.parent_id];
-    if (!par) return l.code;
-    const sibs = (D.locations || []).filter((x) => x.type === 'krabicka' && x.parent_id === par.id)
-      .sort((a, b) => (a.code.length - b.code.length) || (a.code < b.code ? -1 : (a.code > b.code ? 1 : 0)));
-    const b = sibs.findIndex((x) => x.id === l.id) + 1;
-    if (par.type === 'police') {
-      const rk = byLoc[par.parent_id]; const rn = rk ? numc(rk.code) : null; const p = pnoc(par.code);
-      if (rn != null && p != null && b > 0) return 'R' + rn + '-P' + p + '-B' + b;
-    } else {
-      const rn = numc(par.code);
-      if (rn != null && b > 0) return 'R' + rn + '-B' + b;
-    }
     return l.code;
   }
 
@@ -767,11 +754,10 @@
     const drawer = racks.find((r) => r.drawer) || null;
     let drawerTarget = null;
     if (drawer && target && target.rackN === drawer.n) {
+      // box šuplíkové stěny = police; svítí celý box (šuplíky se zvlášť neevidují)
       const asc = drawer.police.slice().sort((a, b) => a.no - b.no);
       const ui = target.policeLoc ? asc.findIndex((po) => po.loc.id === target.policeLoc.id) : -1;
-      let d = 0;
-      if (ui >= 0 && target.boxLoc) { d = asc[ui].boxes.findIndex((b) => b.id === target.boxLoc.id) + 1; }
-      if (ui >= 0) { drawerTarget = { u: ui + 1, d: d }; }
+      if (ui >= 0) { drawerTarget = { u: ui + 1, d: 0 }; }
     }
     const model = {
       racks: racks.filter((r) => !r.drawer).map((r) => ({ id: r.n, label: (r.n < 900 ? 'R' + r.n : r.code), x: r.x, y: r.y, rot: r.rot, sh: r.sh })),
@@ -787,28 +773,22 @@
 
   function setTarget(p) {
     const l = p.loc;
-    let boxLoc = null, policeLoc = null, rackLoc = null;
-    if (l.type === 'krabicka') {
-      boxLoc = l;
-      const par = byLoc[l.parent_id];
-      if (par && par.type === 'police') { policeLoc = par; rackLoc = byLoc[par.parent_id] || null; }
-      else { rackLoc = par || null; }
-    } else if (l.type === 'police') {
-      policeLoc = l; rackLoc = byLoc[l.parent_id] || null;
-    } else { rackLoc = l; }
-    target = { part: p, boxLoc: boxLoc, policeLoc: policeLoc, rackLoc: rackLoc, rackN: rackLoc ? num(rackLoc.code) : null };
+    let policeLoc = null, rackLoc = null;
+    if (l.type === 'police') { policeLoc = l; rackLoc = byLoc[l.parent_id] || null; }
+    else { rackLoc = l; }
+    target = { part: p, policeLoc: policeLoc, rackLoc: rackLoc, rackN: rackLoc ? num(rackLoc.code) : null };
     if (target.rackN != null) { sel = target.rackN; }
     render(); renderPanel();
   }
 
   function posLabel(t) {
-    return posOfLoc(t.boxLoc || t.policeLoc || t.rackLoc);
+    return posOfLoc(t.policeLoc || t.rackLoc);
   }
 
   function renderPanel() {
     const P = $('panel');
     const r = sel != null ? rackByN(sel) : null;
-    if (!r) { P.innerHTML = '<div class="empty">Klikni na regál v mapě pro zobrazení polic a krabiček.</div>'; return; }
+    if (!r) { P.innerHTML = '<div class="empty">Klikni na regál v mapě pro zobrazení polic.</div>'; return; }
 
     const rpos = r.n < 900 ? 'R' + r.n : r.code;
     let html = '<h3>' + esc(rpos) + (r.name ? ' <span style="font-weight:400;font-size:13px;color:rgba(255,255,255,.5)">' + esc(r.name) + '</span>' : '') + ' <span class="mono" style="font-size:11px;color:rgba(255,255,255,.3)" title="Kód regálu (identita)">' + esc(r.code) + '</span><span class="sp"></span></h3>';
@@ -816,8 +796,7 @@
 
     if (target && target.rackN === r.n) {
       html += '<div class="targetBox"><span>' + esc(target.part.name) + '</span> <span style="color:rgba(255,255,255,.5)">· ' + target.part.qty + ' ks</span><br>'
-        + '<span class="ps mono" title="' + esc(target.boxLoc ? target.boxLoc.code : '') + '">' + esc(posLabel(target)) + '</span>'
-        + (target.boxLoc ? ' <span style="color:rgba(255,255,255,.35);font-size:10px">· ' + esc(target.boxLoc.code) + '</span>' : '')
+        + '<span class="ps mono" title="' + esc(target.policeLoc ? target.policeLoc.code : (target.rackLoc ? target.rackLoc.code : '')) + '">' + esc(posLabel(target)) + '</span>'
         + ' &nbsp;<a href="#" id="openPart" style="color:#BF5AF2;font-size:11px;text-decoration:none">karta dílu →</a></div>';
     }
 
@@ -825,7 +804,7 @@
       html += '<div class="cap">3D náhled regálu · táhni pro otočení</div>';
       html += '<div id="rackView"><rack-3d id="rack" model="{}"></rack-3d></div>';
     } else {
-      html += '<div class="cap">Šuplíkové boxy · 6 boxů × 8 šuplíků — vybraný šuplík svítí přímo ve scéně</div>';
+      html += '<div class="cap">Šuplíkové boxy · 6 boxů — vybraný box svítí přímo ve scéně</div>';
     }
 
     // police SHORA: P1 = nejvrchnější (konvence štítků), v seznamu tedy P1 první
@@ -835,50 +814,37 @@
       html += '<div class="shelfRow' + (hotShelf ? ' hotShelf' : '') + '">';
       html += '<div class="shelfHead"><span class="cd mono">' + esc(rpos + '-P' + po.no) + '</span><span class="nm">' + esc(po.loc.name || '') + '</span><span class="mono" style="font-size:10px;color:rgba(255,255,255,.3)">' + esc(po.loc.code) + '</span></div>';
       html += '<div class="chips">';
-      po.boxes.forEach((b, bi) => {
-        const hot = !!(target && target.boxLoc && target.boxLoc.id === b.id);
-        html += '<span class="chip' + (hot ? ' hot' : '') + '" data-loc="' + b.id + '" title="Otevřít obsah krabičky — ' + esc(b.code) + '">'
-          + '<span class="cd mono">B' + (bi + 1) + '</span><span class="cd mono" style="opacity:.55">' + esc(b.code) + '</span>' + (b.name ? '<span>' + esc(b.name) + '</span>' : '')
-          + '<span class="n">' + (b.parts_count || 0) + '</span></span>';
-      });
-      if (po.loose > 0) {
-        html += '<span class="chip loose" data-locinv="' + po.loc.id + '" title="Díly volně na polici — otevřít ve skladu">volně: ' + po.loose + ' dílů</span>';
+      if (po.parts > 0) {
+        html += '<span class="chip' + (hotShelf ? ' hot' : '') + '" data-loc="' + po.loc.id + '" title="Otevřít obsah police">'
+          + '<span>' + po.parts + ' dílů</span><span class="n">otevřít →</span></span>';
+      } else {
+        html += '<span class="chip loose" data-loc="' + po.loc.id + '" title="Otevřít polici a naskladnit">prázdná police</span>';
       }
-      if (!po.boxes.length && !po.loose) { html += '<span style="font-size:11px;color:rgba(255,255,255,.3)">prázdná police</span>'; }
       html += '</div></div>';
     });
-    if (r.directBoxes.length) {
-      html += '<div class="shelfRow"><div class="shelfHead"><span class="nm">Přímo na regálu</span></div><div class="chips">';
-      r.directBoxes.forEach((b) => {
-        const hot = !!(target && target.boxLoc && target.boxLoc.id === b.id);
-        html += '<span class="chip' + (hot ? ' hot' : '') + '" data-loc="' + b.id + '"><span class="cd mono">' + esc(b.code) + '</span>' + (b.name ? '<span>' + esc(b.name) + '</span>' : '') + '<span class="n">' + (b.parts_count || 0) + '</span></span>';
-      });
-      html += '</div></div>';
+    if (r.loose > 0) {
+      html += '<div class="shelfRow"><div class="shelfHead"><span class="nm">Přímo na regálu</span></div><div class="chips">'
+        + '<span class="chip loose" data-locinv="' + r.locId + '" title="Díly bez police — otevřít ve skladu">' + r.loose + ' dílů</span></div></div>';
     }
-    if (!r.police.length && !r.directBoxes.length) {
-      html += '<div class="empty">Regál zatím nemá v CRM police ani krabičky — založ je v Umístěních.</div>';
+    if (!r.police.length) {
+      html += '<div class="empty">Regál zatím nemá v CRM police — založ je v Umístěních.</div>';
     }
-    html += '<div style="font-size:10px;color:rgba(255,255,255,.3);line-height:1.6">Názvy a struktura polic/krabiček se spravují v CRM (Sklad → Umístění); mapa je jen zobrazuje.</div>';
+    html += '<div style="font-size:10px;color:rgba(255,255,255,.3);line-height:1.6">Názvy a struktura polic se spravují v CRM (Sklad → Umístění); mapa je jen zobrazuje.</div>';
     P.innerHTML = html;
 
     if (!r.drawer) {
       // rack-3d model: police → patra (P1 NAHOŘE → pořadí obrátit: první police
-      // v seznamu dostane nejvyšší patro), krabičky → boxy zleva (b = pořadí), „volně" = box navíc
-      let maxCells = 2;
-      r.police.forEach((po) => { maxCells = Math.max(maxCells, po.boxes.length + (po.loose > 0 ? 1 : 0)); });
+      // v seznamu dostane nejvyšší patro); obsazená police = blok přes celé patro
       const boxes3d = [];
       const asc = r.police.slice().sort((a, b) => a.no - b.no);   // P1, P2, …
       asc.forEach((po, idx) => {
         const p = Math.max(1, r.sh - idx);   // P1 → horní patro
-        po.boxes.forEach((b, i) => {
-          boxes3d.push({ p: p, b: i + 1, hot: !!(target && target.boxLoc && target.boxLoc.id === b.id) });
-        });
-        if (po.loose > 0) {
-          boxes3d.push({ p: p, b: po.boxes.length + 1, hot: !!(target && target.policeLoc && target.policeLoc.id === po.loc.id && !target.boxLoc) });
+        if (po.parts > 0) {
+          boxes3d.push({ p: p, b: 1, hot: !!(target && target.policeLoc && target.policeLoc.id === po.loc.id) });
         }
       });
       const rackEl = P.querySelector('#rack');
-      if (rackEl) rackEl.setAttribute('model', JSON.stringify({ shelves: r.sh, cells: Math.min(8, maxCells), boxes: boxes3d }));
+      if (rackEl) rackEl.setAttribute('model', JSON.stringify({ shelves: r.sh, cells: 1, boxes: boxes3d }));
     }
 
     const inv = P.querySelector('#openInv');

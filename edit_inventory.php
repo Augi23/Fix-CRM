@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canEditBranch) {
 
 // umístění pobočky, které díl patří (sklad se mezi provozovnami nemíchá)
 $allLocations = stockLocationsAll($pdo, true, (int)($item['branch_id'] ?? 0) ?: getDefaultBranchId());
-// jednotné značení R-P-B ve výběru umístění
+// jednotné značení R-P ve výběru umístění
 $posAllLoc = [];
 try { $posAllLoc = stockLocationPosCodes($pdo, array_merge(array_column($allLocations, 'id'), [(int)($item['location_id'] ?? 0)])); } catch (Throwable $e) {}
 $modelOptions = [];
@@ -241,7 +241,7 @@ try {
                             <?php $__sameBranch = (int)($__cl['branch_id'] ?? 0) === ((int)($item['branch_id'] ?? 0) ?: getDefaultBranchId()); ?>
                             <option value="<?php echo (int)$curLoc; ?>" selected><?php echo htmlspecialchars(($posAllLoc[(int)$curLoc] ?? $__cl['code']) . (trim((string)$__cl['name']) !== '' ? ' · ' . $__cl['name'] : '')); ?> — <?php echo $__sameBranch ? 'deaktivované' : 'jiná pobočka'; ?></option>
                         <?php endif; endif; ?>
-                        <?php foreach (['krabicka' => 'Krabičky', 'police' => 'Police', 'regal' => 'Regály'] as $t => $glabel): ?>
+                        <?php foreach (['police' => 'Police', 'regal' => 'Regály'] as $t => $glabel): ?>
                             <?php
                             $grp = array_values(array_filter($allLocations, fn($l) => $l['type'] === $t));
                             if (!$grp) continue;
@@ -254,7 +254,7 @@ try {
                             </optgroup>
                         <?php endforeach; ?>
                     </select>
-                    <div class="form-text">Vyber <b>krabičku</b>, když je díl v ní — nebo rovnou <b>polici</b> či <b>regál</b>, když leží volně. Umístění se zakládají v <a href="sklad_umisteni.php" class="text-info">Sklad → Umístění</a>.</div>
+                    <div class="form-text">Vyber <b>polici</b>, na které díl leží (nebo rovnou <b>regál</b>). Umístění se zakládají v <a href="sklad_umisteni.php" class="text-info">Sklad → Umístění</a>.</div>
                 </div>
                 <div class="col-12 mt-4">
                     <button type="submit" class="btn btn-primary px-5"><?php echo __('save'); ?></button>

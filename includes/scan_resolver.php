@@ -24,9 +24,9 @@ if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '' && function_exi
             exit;
         }
     }
-    // Kód umístění skladu (RegK1 / RegK1-P2 / KrK001, historicky R1 / K001)
-    // napsaný či naskenovaný do hledání
-    // → rovnou obsah krabičky/police. Přesná shoda v DB, jinak se nic neděje.
+    // Kód umístění skladu (RegK1 / RegK1-P2, historicky R1) napsaný či naskenovaný
+    // do hledání → rovnou obsah police/regálu. Přesná shoda v DB, jinak se nic neděje.
+    // Kód zrušené krabičky (KrK001 / K001) dovede na polici, kde krabička stála.
     if (!empty($_SESSION['user_id'])) {
         if (function_exists('ensureStockLocationsSchema')) { ensureStockLocationsSchema(); }
         $_lcands = [$_scan];
@@ -42,6 +42,10 @@ if (isset($pdo) && ($_scan = trim($_GET['search'] ?? '')) !== '' && function_exi
                 $_lq->execute([$_lc]);
                 if (($_lid = (int)$_lq->fetchColumn()) > 0) {
                     header("Location: sklad.php?loc=" . $_lid);
+                    exit;
+                }
+                if (function_exists('skladDissolvedBox') && ($_bx = skladDissolvedBox(0, $_lc)) !== null && $_bx['parent_id'] > 0) {
+                    header("Location: sklad.php?loc=" . (int)$_bx['parent_id']);
                     exit;
                 }
             } catch (Throwable $e) { break; }

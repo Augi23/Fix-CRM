@@ -1,11 +1,10 @@
 <?php
 /**
  * SKLAD → UMÍSTĚNÍ — správa fyzické organizace skladu dílů.
- * Strom: regály (RegK1) → police (RegK1-P2) → krabičky (KrK001…) — kód nese
- * zkratku pobočky, každá provozovna má vlastní řadu od jedničky.
- * Krabička má trvalý kód; přesun na jinou polici = jen změna tady v CRM,
- * štítek na krabičce se nikdy nepřetiskuje. POLICE je jiný případ: její kód
- * obsahuje regál, takže po přesunu na jiný regál se přečísluje (nový štítek). Štítky: location_labels.php.
+ * Strom: regály (RegK1) → police (RegK1-P2) — kód nese zkratku pobočky, každá
+ * provozovna má vlastní řadu od jedničky. Krabičky zrušeny 25.9.2026 (Jan).
+ * Kód police obsahuje regál, takže po přesunu na jiný regál se přečísluje
+ * (nový štítek). Štítky: location_labels.php.
  * Obsah umístění: inventory.php?location=<id> (desktop) / sklad.php?loc=<id> (mobil, QR).
  */
 require_once 'includes/config.php';
@@ -16,7 +15,7 @@ ensureStockLocationsSchema();
 ensureInventoryStockedSchema();
 ensureSkladBranchSchema();
 
-// Sklad je POBOČKOVÝ: každá provozovna má vlastní regály, police i krabičky.
+// Sklad je POBOČKOVÝ: každá provozovna má vlastní regály i police.
 // Vidět je smí každý (přepínač poboček nad záložkami), měnit jen zaměstnanec
 // té pobočky — a admin/Boss všude (crmCanModifyBranchStock).
 $branchId = (int)skladBranchOrOwn();
@@ -24,8 +23,8 @@ $canEdit = crmCanModifyBranchStock($branchId);
 
 $locs = stockLocationsAll($pdo, false, $branchId);   // včetně deaktivovaných
 
-// jednotné značení R-P-B (R2, R2-P4, R2-P4-B2) — stejné jako u dílů ve Skladu;
-// kód (RegK2 / KrK028) zůstává jen jako neměnná identita pro QR štítek
+// jednotné značení R-P (R2, R2-P4) — stejné jako u dílů ve Skladu;
+// kód (RegK2 / RegK2-P4) zůstává jako identita pro QR štítek
 $posMap = [];
 try { $posMap = stockLocationPosCodes($pdo, array_column($locs, 'id')); } catch (Throwable $e) {}
 $GLOBALS['__locPosMap'] = $posMap;
@@ -47,27 +46,25 @@ try {
     $unplaced = (int)$uq->fetchColumn();
 } catch (Throwable $e) {}
 
-$regaly = []; $policeByParent = []; $boxByParent = []; $inactive = [];
-$typeTotals = ['regal' => 0, 'police' => 0, 'krabicka' => 0];
+$regaly = []; $policeByParent = []; $inactive = [];
+$typeTotals = ['regal' => 0, 'police' => 0];
 foreach ($locs as $l) {
     if (!(int)$l['is_active']) { $inactive[] = $l; continue; }
     $typeTotals[$l['type']] = ($typeTotals[$l['type']] ?? 0) + 1;
     $pid = (int)($l['parent_id'] ?? 0);
     if ($l['type'] === 'regal') { $regaly[] = $l; }
     elseif ($l['type'] === 'police') { $policeByParent[$pid][] = $l; }
-    else { $boxByParent[$pid][] = $l; }
 }
 
-/** řádek krabičky/police v přehledu — značení R-P-B, kód jen jako drobná identita */
+/** řádek police v přehledu — značení R-P, kód jen jako drobná identita */
 function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
     $cnt = $counts[(int)$l['id']] ?? ['c' => 0, 'q' => 0];
-    $isBox = $l['type'] === 'krabicka';
     $pos = $GLOBALS['__locPosMap'][(int)$l['id']] ?? (string)$l['code']; ?>
     <div class="d-flex align-items-center gap-2 py-2 border-bottom border-secondary border-opacity-25 loc-row">
-        <span class="badge <?php echo $isBox ? 'bg-info text-dark' : 'bg-secondary'; ?>" style="min-width:56px;"><?php echo e($pos); ?></span>
+        <span class="badge bg-secondary" style="min-width:56px;"><?php echo e($pos); ?></span>
         <div class="flex-grow-1 min-w-0">
             <span class="text-white"><?php echo trim((string)$l['name']) !== '' ? e($l['name']) : '<span class="text-white-75">bez názvu</span>'; ?></span>
-            <?php if ($pos !== (string)$l['code']): ?><span class="small text-white-50 ms-1" style="font-family:'SF Mono',Menlo,monospace;" title="Neměnná identita krabičky (je na QR štítku)"><?php echo e($l['code']); ?></span><?php endif; ?>
+            <?php if ($pos !== (string)$l['code']): ?><span class="small text-white-50 ms-1" style="font-family:'SF Mono',Menlo,monospace;" title="Kód police (je na QR štítku)"><?php echo e($l['code']); ?></span><?php endif; ?>
             <?php if (trim((string)($l['note'] ?? '')) !== ''): ?><div class="small text-white-75 text-truncate"><?php echo e($l['note']); ?></div><?php endif; ?>
         </div>
         <span class="small text-white-75 text-nowrap"><?php echo $cnt['c']; ?> dílů · <?php echo $cnt['q']; ?> ks</span>
@@ -83,7 +80,7 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
         <h2 class="mb-0">Umístění skladu <span class="fs-6 text-white-50"><?php echo e(skladBranchLabel($branchId)); ?></span></h2>
-        <small class="text-muted"><?php echo $typeTotals['regal']; ?> regálů · <?php echo $typeTotals['police']; ?> polic · <?php echo $typeTotals['krabicka']; ?> krabiček</small>
+        <small class="text-muted"><?php echo $typeTotals['regal']; ?> regálů · <?php echo $typeTotals['police']; ?> polic</small>
     </div>
     <div class="d-flex gap-2 align-items-center flex-wrap justify-content-end">
         <?php if ($unplaced > 0): ?>
@@ -92,7 +89,7 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
         <a href="sklad_mapa.php?branch=<?php echo (int)$branchId; ?>" class="btn btn-outline-info" title="3D vizualizace rozložení skladu"><i class="fas fa-cube me-2"></i> 3D mapa</a>
         <?php $__walkIds = skladWalkSequence($pdo, $branchId); ?>
         <?php if ($__walkIds): ?>
-        <a href="sklad.php?loc=<?php echo (int)$__walkIds[0]; ?>" class="btn btn-outline-success" title="Naskladňovací kolečko: CRM tě provede police a krabičky jednu po druhé (Předchozí/Další) a v každé rovnou zapíšeš obsah"><i class="fas fa-person-walking me-2"></i> Projít sklad</a>
+        <a href="sklad.php?loc=<?php echo (int)$__walkIds[0]; ?>" class="btn btn-outline-success" title="Naskladňovací kolečko: CRM tě provede police jednu po druhé (Předchozí/Další) a na každé rovnou zapíšeš obsah"><i class="fas fa-person-walking me-2"></i> Projít sklad</a>
         <?php endif; ?>
         <a href="location_labels.php?all=1&amp;branch=<?php echo (int)$branchId; ?>" target="_blank" class="btn btn-outline-info"><i class="fas fa-qrcode me-2"></i> Arch štítků</a>
         <a href="location_labels.php?layout=strip&amp;branch=<?php echo (int)$branchId; ?>" target="_blank" class="btn btn-outline-info" title="Arch A4 na výšku, 4 štítky přes celou šířku: regály (jen velký kód) a police (na 1 štítku všechny police regálu, každá s QR)"><i class="fas fa-table-cells-large me-2"></i> Regály + police (arch)</a>
@@ -105,7 +102,7 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
         }
         ?>
         <?php if (!$__hasDrawers): ?>
-        <button class="btn btn-outline-danger" id="setupDrawersBtn" title="Založí stěnu šuplíkových boxů u vchodu: 6 boxů × 8 šuplíků (regál „Šuplíkové boxy")"><i class="fas fa-inbox me-2"></i> Založit šuplíkové boxy</button>
+        <button class="btn btn-outline-danger" id="setupDrawersBtn" title="Založí stěnu šuplíkových boxů u vchodu: regál „Šuplíkové boxy" se 6 boxy (každý jako police se svým QR)"><i class="fas fa-inbox me-2"></i> Založit šuplíkové boxy</button>
         <?php endif; ?>
         <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#setupLocModal"><i class="fas fa-wand-magic-sparkles me-2"></i> Rychlé nastavení skladu</button>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newLocModal"><i class="fas fa-plus me-2"></i> Přidat umístění</button>
@@ -124,13 +121,13 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
 
 <div class="alert alert-info border-0 mb-4">
     <i class="fas fa-lightbulb me-2"></i>
-    <b>Regál → police → krabička.</b> Díl nemusí být v krabičce — u dílu se v poli <b>Umístění</b> dá vybrat i police (nebo rovnou regál), když leží volně.
-    Krabička má <b>trvalý kód</b> (Kr<?php echo e(skladBranchShort($branchId)); ?>001…) — štítek tiskneš jen jednou. Když ji přestěhuješ na jinou polici, změň jí tady jen <b>pozici</b> (tužtička → Umístit na).
-    Obsah krabičky zobrazíš i mobilem: naskenuj <b>QR na jejím štítku</b>.
+    <b>Regál → police.</b> U dílu se v poli <b>Umístění</b> vybírá police (nebo rovnou regál), na které leží.
+    Kód police obsahuje regál (Reg<?php echo e(skladBranchShort($branchId)); ?>1-P2) — když polici přestěhuješ na jiný regál, přečísluje se a vytiskneš jí nový štítek.
+    Obsah police zobrazíš i mobilem: naskenuj <b>QR na jejím štítku</b>.
 </div>
 
 <div class="row g-4">
-<?php if (!$regaly && !$boxByParent && !$policeByParent): ?>
+<?php if (!$regaly && !$policeByParent): ?>
     <div class="col-12">
         <div class="glass-panel p-5 border-secondary text-center text-white-75">
             <i class="fas fa-map-location-dot fa-3x mb-3 d-block opacity-25"></i>
@@ -160,29 +157,22 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
             </div>
             <?php if ($rcnt['c'] > 0): ?><div class="small text-white-75 mb-2">Přímo na regálu: <?php echo $rcnt['c']; ?> dílů</div><?php endif; ?>
 
-            <?php foreach ($policeByParent[$rid] ?? [] as $p): $pid = (int)$p['id']; ?>
-                <div class="ps-2 border-start border-secondary border-opacity-50 mb-2">
+            <?php foreach ($policeByParent[$rid] ?? [] as $p): ?>
+                <div class="ps-2 border-start border-secondary border-opacity-50">
                     <?php locRow($p, $counts, $canEdit, $branchId); ?>
-                    <div class="ps-4">
-                        <?php foreach ($boxByParent[$pid] ?? [] as $b) { locRow($b, $counts, $canEdit, $branchId); } ?>
-                        <?php if ($canEdit): ?><button type="button" class="btn btn-sm btn-outline-secondary my-2 loc-add-child" data-parent="<?php echo $pid; ?>" data-type="krabicka"><i class="fas fa-plus me-1"></i> krabička na <?php echo e($p['code']); ?></button><?php endif; ?>
-                    </div>
                 </div>
             <?php endforeach; ?>
-
-            <?php foreach ($boxByParent[$rid] ?? [] as $b) { locRow($b, $counts, $canEdit, $branchId); } ?>
         </div>
     </div>
 <?php endforeach; ?>
 
-<?php $loosePolice = $policeByParent[0] ?? []; $looseBoxes = $boxByParent[0] ?? []; ?>
-<?php if ($loosePolice || $looseBoxes): ?>
+<?php $loosePolice = $policeByParent[0] ?? []; ?>
+<?php if ($loosePolice): ?>
     <div class="col-12 col-xl-6">
         <div class="glass-panel p-3 border-secondary h-100">
             <div class="fw-bold text-white mb-2"><i class="fas fa-box me-2 text-warning"></i>Bez pozice (zatím nikam nezařazené)</div>
             <?php foreach ($loosePolice as $p) { locRow($p, $counts, $canEdit, $branchId); } ?>
-            <?php foreach ($looseBoxes as $b) { locRow($b, $counts, $canEdit, $branchId); } ?>
-            <div class="small text-white-75 mt-2">Tužtičkou u řádku jim přiřaď polici nebo regál. (Police tady být nemají — pokud tu nějaká je, jde o starší data; přiřaď ji na regál, dostane nový kód.)</div>
+            <div class="small text-white-75 mt-2">Police bez regálu jsou starší data — tužtičkou u řádku ji přiřaď na regál, dostane nový kód.</div>
         </div>
     </div>
 <?php endif; ?>
@@ -216,21 +206,16 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="text-white-75">Řekni, jak sklad fyzicky vypadá — CRM založí všechna umístění najednou, očísluje je (<b>Reg<?php echo e(skladBranchShort($branchId)); ?>1</b>, <b>Reg<?php echo e(skladBranchShort($branchId)); ?>1-P1</b>, <b>Kr<?php echo e(skladBranchShort($branchId)); ?>001</b>…) a připraví QR štítky k tisku.</p>
+                <p class="text-white-75">Řekni, jak sklad fyzicky vypadá — CRM založí všechna umístění najednou, očísluje je (<b>Reg<?php echo e(skladBranchShort($branchId)); ?>1</b>, <b>Reg<?php echo e(skladBranchShort($branchId)); ?>1-P1</b>…) a připraví QR štítky k tisku.</p>
                 <div class="row g-3">
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <label class="form-label">Kolik regálů</label>
                         <input type="number" id="setRacks" class="form-control form-control-lg" value="<?php echo $typeTotals['regal'] > 0 ? 0 : 4; ?>" min="0" max="30">
                         <div class="form-text">nových, k těm stávajícím</div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <label class="form-label">Polic v každém</label>
                         <input type="number" id="setShelves" class="form-control form-control-lg" value="5" min="0" max="30">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Krabiček na polici</label>
-                        <input type="number" id="setBoxes" class="form-control form-control-lg" value="0" min="0" max="20">
-                        <div class="form-text">0 = zatím žádné</div>
                     </div>
                     <?php if ($regaly): ?>
                     <div class="col-12">
@@ -270,7 +255,6 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
                         <label class="form-label">Typ</label>
                         <select id="newLocType" class="form-select">
                             <?php $__sh = skladBranchShort($branchId); ?>
-                            <option value="krabicka">Krabička (Kr<?php echo e($__sh); ?>001…)</option>
                             <option value="police">Police (Reg<?php echo e($__sh); ?>1-P1…)</option>
                             <option value="regal">Regál (Reg<?php echo e($__sh); ?>1…)</option>
                         </select>
@@ -280,14 +264,14 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
                         <input type="number" id="newLocCount" class="form-control" value="1" min="1" max="50">
                     </div>
                     <div class="col-12" id="newLocParentWrap">
-                        <label class="form-label">Umístit na (regál / police)</label>
+                        <label class="form-label">Na který regál</label>
                         <select id="newLocParent" class="form-select"></select>
                     </div>
                     <div class="col-12">
                         <label class="form-label">Název (např. „iPhone 12 – drobné díly")</label>
                         <input type="text" id="newLocName" class="form-control" maxlength="120" placeholder="nepovinné — u více kusů se čísluje">
                     </div>
-                    <div class="col-12 small text-muted">Kód se přidělí automaticky a už se nemění. Nese <b>zkratku pobočky</b>, takže je ze štítku hned poznat, kam patří — <b>Reg<?php echo e($__sh); ?>1</b> / <b>Reg<?php echo e($__sh); ?>1-P2</b> / <b>Kr<?php echo e($__sh); ?>001</b>. Každá pobočka má vlastní řadu od jedničky.</div>
+                    <div class="col-12 small text-muted">Kód se přidělí automaticky a už se nemění. Nese <b>zkratku pobočky</b>, takže je ze štítku hned poznat, kam patří — <b>Reg<?php echo e($__sh); ?>1</b> / <b>Reg<?php echo e($__sh); ?>1-P2</b>. Každá pobočka má vlastní řadu od jedničky.</div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -314,9 +298,9 @@ function locRow(array $l, array $counts, bool $canEdit, int $branchId): void {
                         <input type="text" id="editLocName" class="form-control" maxlength="120">
                     </div>
                     <div class="col-12" id="editLocParentWrap">
-                        <label class="form-label">Umístit na</label>
+                        <label class="form-label">Na který regál</label>
                         <select id="editLocParent" class="form-select"></select>
-                        <div class="form-text" id="editLocParentHint">Přestěhovaná krabička = jen tahle změna. Štítek zůstává platný.</div>
+                        <div class="form-text" id="editLocParentHint"></div>
                     </div>
                     <div class="col-12">
                         <label class="form-label">Poznámka</label>
@@ -364,22 +348,12 @@ function locPost(data, cb, onFail) {
         .catch(() => { showAlert('Síťová chyba.'); if (onFail) { onFail(); } });
 }
 
-// nabídka rodičů podle typu: police → regály; krabička → police + regály
+// nabídka rodičů: police patří VŽDY na regál (kód police se z něj odvozuje)
 function parentOptions(type, selected) {
-    const groups = type === 'police'
-        ? [['Regály', LOCS.filter(l => l.type === 'regal' && l.is_active)]]
-        : [['Police', LOCS.filter(l => l.type === 'police' && l.is_active)],
-           ['Regály (přímo)', LOCS.filter(l => l.type === 'regal' && l.is_active)]];
-    // police musí mít regál (kód police se z něj odvozuje), krabička může viset volně
-    let html = type === 'police' ? '<option value="0">— vyber regál —</option>' : '<option value="0">— bez pozice —</option>';
-    groups.forEach(([label, items]) => {
-        if (!items.length) return;
-        html += '<optgroup label="' + label + '">';
-        items.forEach(l => {
-            html += '<option value="' + l.id + '"' + (l.id === selected ? ' selected' : '') + '>' +
-                (l.pos || l.code) + (l.name ? ' · ' + l.name.replace(/</g, '&lt;') : '') + '</option>';
-        });
-        html += '</optgroup>';
+    let html = '<option value="0">— vyber regál —</option>';
+    LOCS.filter(l => l.type === 'regal' && l.is_active).forEach(l => {
+        html += '<option value="' + l.id + '"' + (l.id === selected ? ' selected' : '') + '>' +
+            (l.pos || l.code) + (l.name ? ' · ' + l.name.replace(/</g, '&lt;') : '') + '</option>';
     });
     return html;
 }
@@ -389,7 +363,6 @@ function parentOptions(type, selected) {
     const $r = document.getElementById('setRacks');
     if (!$r) { return; }                       // jen ke čtení (cizí pobočka)
     const $p = document.getElementById('setShelves');
-    const $b = document.getElementById('setBoxes');
     const $into = document.getElementById('setIntoRacks');
     const $prev = document.getElementById('setupPreview');
     const $btn = document.getElementById('setupLocSave');
@@ -398,24 +371,19 @@ function parentOptions(type, selected) {
         return $into ? Array.from($into.selectedOptions).map(o => o.value) : [];
     }
     function preview() {
-        // stejné stropy jako server (30/30/20), ať náhled neslibuje víc, než vznikne
+        // stejné stropy jako server (30/30), ať náhled neslibuje víc, než vznikne
         const racks = Math.max(0, Math.min(30, parseInt($r.value, 10) || 0));
         const shelves = Math.max(0, Math.min(30, parseInt($p.value, 10) || 0));
-        const boxes = Math.max(0, Math.min(20, parseInt($b.value, 10) || 0));
         const extra = chosenRacks().length;
         const nP = (racks + extra) * shelves;
-        const nK = nP * boxes;
-        const total = racks + nP + nK;
-        const boxesNoShelf = (boxes > 0 && shelves === 0);
-        $prev.innerHTML = boxesNoShelf
-            ? '<span class="text-warning">Krabičky se zakládají do nových polic — zadej i počet polic.</span>'
-            : (total === 0
-                ? 'Zatím není co založit — zadej počet regálů (nebo vyber stávající a počet polic).'
-                : 'Založí se <b>' + racks + '</b> regálů, <b>' + nP + '</b> polic a <b>' + nK + '</b> krabiček — celkem <b>' + total + '</b> umístění.'
-                  + (total > 600 ? ' <span class="text-warning">Najednou jde max. 600 — rozděl to.</span>' : ''));
-        $btn.disabled = (boxesNoShelf || total === 0 || total > 600);
+        const total = racks + nP;
+        $prev.innerHTML = total === 0
+            ? 'Zatím není co založit — zadej počet regálů (nebo vyber stávající a počet polic).'
+            : 'Založí se <b>' + racks + '</b> regálů a <b>' + nP + '</b> polic — celkem <b>' + total + '</b> umístění.'
+              + (total > 600 ? ' <span class="text-warning">Najednou jde max. 600 — rozděl to.</span>' : '');
+        $btn.disabled = (total === 0 || total > 600);
     }
-    [$r, $p, $b].forEach(el => el.addEventListener('input', preview));
+    [$r, $p].forEach(el => el.addEventListener('input', preview));
     if ($into) { $into.addEventListener('change', preview); }
     preview();
 
@@ -430,7 +398,6 @@ function parentOptions(type, selected) {
             branch_id: BRANCH_ID,
             racks: $r.value || 0,
             shelves_per_rack: $p.value || 0,
-            boxes_per_shelf: $b.value || 0,
             into_racks: chosenRacks().join(',')
         },
         function (d) { showAlert(d.message || 'Hotovo'); setTimeout(() => location.reload(), 700); },
@@ -438,12 +405,12 @@ function parentOptions(type, selected) {
     });
 })();
 
-// ── šuplíkové boxy (6 × 8) jedním klikem ──
+// ── šuplíkové boxy (6 boxů) jedním klikem ──
 (function () {
     const b = document.getElementById('setupDrawersBtn');
     if (!b) { return; }
     b.addEventListener('click', function () {
-        showConfirm('Založit stěnu šuplíkových boxů? Vznikne regál „Šuplíkové boxy" se 6 boxy (police) po 8 šuplících (krabičky) — celkem 55 umístění s QR štítky.', function () {
+        showConfirm('Založit stěnu šuplíkových boxů? Vznikne regál „Šuplíkové boxy" se 6 boxy (každý jako police se svým QR štítkem).', function () {
             b.disabled = true;
             b.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>Zakládám…';
             locPost({op: 'setup_drawers', branch_id: BRANCH_ID});
@@ -471,7 +438,7 @@ document.getElementById('newLocSave').addEventListener('click', function () {
     });
 });
 
-// „+ police / + krabička" přímo z karty regálu/police
+// „+ police" přímo z karty regálu
 document.querySelectorAll('.loc-add-child').forEach(btn => btn.addEventListener('click', function () {
     newType.value = this.dataset.type;
     refreshNewParent();
@@ -495,9 +462,7 @@ document.querySelectorAll('.loc-edit').forEach(btn => btn.addEventListener('clic
     wrap.style.display = l.type === 'regal' ? 'none' : '';
     const hint = document.getElementById('editLocParentHint');
     if (hint) {
-        hint.innerHTML = l.type === 'police'
-            ? '<b>Pozor:</b> přesun na jiný regál polici PŘEČÍSLUJE (kód obsahuje regál) — po uložení jí vytiskni nový štítek.'
-            : 'Přestěhovaná krabička = jen tahle změna. Štítek zůstává platný.';
+        hint.innerHTML = '<b>Pozor:</b> přesun na jiný regál polici PŘEČÍSLUJE (kód obsahuje regál) — po uložení jí vytiskni nový štítek.';
     }
     document.getElementById('editLocParent').innerHTML = parentOptions(l.type, l.parent_id);
     new bootstrap.Modal(document.getElementById('editLocModal')).show();

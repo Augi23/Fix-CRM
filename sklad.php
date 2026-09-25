@@ -4,8 +4,8 @@
  * Otevře se skenem QR (sklad.php?qr=<inventory_id>) a nabídne dvě akce:
  *   NASKLADNIT  — přijaté kusy ihned přičte ke skladu
  *   VYDAT NA ZAKÁZKU — přidá díl k zakázce s cenou a ihned odečte sklad
- * Druhý režim: sklad.php?loc=<location_id> — QR z krabičky/police ukáže OBSAH
- * umístění (drobné díly sdílející krabičku): ťuknutím na díl se přejde na jeho
+ * Druhý režim: sklad.php?loc=<location_id> — QR z police/regálu ukáže OBSAH
+ * umístění (drobné díly sdílející polici): ťuknutím na díl se přejde na jeho
  * kartu, vedení může rovnou opravit počty (inventura) a přiřazovat díly sem.
  * Předvybraná zakázka = ta, u které technik klikl „Vzít díl skenem QR"
  * (drží se 30 minut v relaci), jinak výběr z aktivních zakázek.
@@ -21,7 +21,7 @@ ensureStockLocationsSchema();
 
 $qrId = (int)($_GET['qr'] ?? $_GET['id'] ?? 0);
 $inv = null;
-$invLoc = null;   // umístění dílu (krabička/police) pro odznak na kartě
+$invLoc = null;   // umístění dílu (police/regál) pro odznak na kartě
 if ($qrId > 0) {
     $stmt = $pdo->prepare("SELECT * FROM inventory WHERE id = ?");
     $stmt->execute([$qrId]);
@@ -47,13 +47,18 @@ if ($inv) {
     } catch (Throwable $e) {}
 }
 
-// ── režim UMÍSTĚNÍ (QR na krabičce/polici): sklad.php?loc=<id> ──
+// ── režim UMÍSTĚNÍ (QR na polici/regálu): sklad.php?loc=<id> ──
 $loc = null; $locParts = []; $locChildren = [];
+$fromBox = '';   // QR ze štítku ZRUŠENÉ krabičky → ukáže se police, kde stála
 if (!$inv && (int)($_GET['loc'] ?? 0) > 0) {
     try {
         $ls = $pdo->prepare("SELECT l.*, p.code AS parent_code, p.name AS parent_name FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id WHERE l.id = ?");
         $ls->execute([(int)$_GET['loc']]);
         $loc = $ls->fetch() ?: null;
+        if (!$loc && ($__bx = skladDissolvedBox((int)$_GET['loc'])) !== null) {
+            $fromBox = $__bx['code'];
+            if ($__bx['parent_id'] > 0) { $ls->execute([$__bx['parent_id']]); $loc = $ls->fetch() ?: null; }
+        }
         if ($loc) {
             $ps = $pdo->prepare("SELECT id, part_name, sku, quantity, sale_price, image_path, device_model FROM inventory WHERE location_id = ? ORDER BY part_name ASC");
             $ps->execute([(int)$loc['id']]);
@@ -65,7 +70,7 @@ if (!$inv && (int)($_GET['loc'] ?? 0) > 0) {
     } catch (Throwable $e) {}
 }
 
-// R-P-B značení pro hlavičku umístění a krabičky uvnitř (kód zůstává identitou)
+// R-P značení pro hlavičku umístění a police uvnitř regálu (kód zůstává identitou)
 $locPosMap = [];
 if ($loc) {
     try { $locPosMap = stockLocationPosCodes($pdo, array_merge([(int)$loc['id']], array_map(fn($c) => (int)$c['id'], $locChildren))); } catch (Throwable $e) {}
@@ -139,6 +144,10 @@ if ($inv) {
         </div>
     </div>
 
+    <?php if ($fromBox !== ''): ?>
+        <div class="alert alert-warning py-2 small mb-3"><i class="fas fa-circle-info me-1"></i>Krabička <b><?php echo e($fromBox); ?></b> je zrušená (sklad má jen regály a police) — díly z ní jsou tady na polici. Starý štítek z krabičky můžeš sundat.</div>
+    <?php endif; ?>
+
     <?php if ($armed): ?>
         <div class="alert alert-info py-2 small mb-3"><i class="fas fa-link me-1"></i>Připravena zakázka <b><?php echo e($armed['code'] ?: ('#' . $armed['id'])); ?></b> — ťukni na díl a rovnou ho vydáš.</div>
     <?php endif; ?>
@@ -157,7 +166,7 @@ if ($inv) {
     <div id="qrMsg" class="mb-3" style="display:none;"></div>
 
     <?php if ($canQuickAdd):
-        // předvyplnění modelu z názvu krabičky („iPhone 12 – drobné díly" → „iPhone 12")
+        // předvyplnění modelu z názvu police („iPhone 12 – drobné díly" → „iPhone 12")
         $qaModel = '';
         if (preg_match('/^((?:iPhone|iPad|MacBook|iMac|Mac mini|Apple Watch|Watch|AirPods)[\w\s\.\+]*?)(?=\s*[–\-—,(]|$)/iu', (string)$loc['name'], $qm)) { $qaModel = trim($qm[1]); }
     ?>
@@ -228,7 +237,7 @@ if ($inv) {
         box.innerHTML = '<div class="alert ' + (ok ? 'alert-success' : 'alert-danger') + ' mb-0">' + html + '</div>';
         window.scrollTo({top: 0, behavior: 'smooth'});
     }
-    // inventura: oprava stavu přímo z krabičky (jen vedení)
+    // inventura: oprava stavu přímo z police (jen vedení)
     document.querySelectorAll('.loc-correct').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var v = prompt('Skutečný (napočítaný) počet kusů „' + this.dataset.name + '":', this.dataset.qty);

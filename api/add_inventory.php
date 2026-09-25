@@ -47,7 +47,7 @@ try {
     ensureSkladBranchSchema();
     if ($location_id > 0) {
         // umístění musí patřit STEJNÉ pobočce jako díl — jinak by díl Karlína
-        // „ležel" v krabičce Na Příkopě (poslední neošetřená cesta zápisu)
+        // „ležel" na polici Na Příkopě (poslední neošetřená cesta zápisu)
         $lchk = $pdo->prepare("SELECT id FROM stock_locations WHERE id = ? AND is_active = 1 AND branch_id = ?");
         $lchk->execute([$location_id, $branch_id]);
         if (!$lchk->fetch()) { $location_id = 0; }

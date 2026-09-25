@@ -73,7 +73,7 @@ try {
     $stmt->execute($params);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // poziční kódy umístění (R3-P2-B4) — u dílů se zobrazuje pozice, ne kód krabičky
+    // poziční kódy umístění (R3-P2) — u dílů se zobrazuje pozice, ne kód police
     $posByLoc = [];
     try { $posByLoc = stockLocationPosCodes($pdo, array_column($items, 'location_id')); } catch (Throwable $e) {}
 
@@ -100,7 +100,7 @@ try {
         }
         $__pos = $posByLoc[(int)($item['location_id'] ?? 0)] ?? ($item['loc_code'] ?? '');
         if ($__pos !== '') {
-            $label .= ' · 📍 ' . $__pos;   // pozice R3-P2-B4 (kde díl fyzicky leží)
+            $label .= ' · 📍 ' . $__pos;   // pozice R3-P2 (kde díl fyzicky leží)
         }
         $__comps = $compByInv[(int)$item['id']] ?? [];
         if ($__comps) {

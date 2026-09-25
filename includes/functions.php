@@ -388,7 +388,7 @@ function skladBranchLabel(int $branchId): string {
 }
 
 /** ZKRATKA POBOČKY do kódů umístění: Karlín = K, Černá Růže (Na Příkopě) = CR.
- *  Kód regálu pak vypadá „RegK1" / „RegCR1", krabička „KrK001" / „KrCR001" —
+ *  Kód regálu pak vypadá „RegK1" / „RegCR1", police „RegK1-P2" / „RegCR1-P2" —
  *  na štítku je tedy na první pohled vidět, do kterého skladu patří.
  *  Neznámá pobočka: první dvě písmena jejího kódu (aby kód vždycky vznikl). */
 function skladBranchShort(int $branchId): string {
@@ -4647,13 +4647,14 @@ function crmLogInventoryMove(int $inventoryId, int $delta, string $reason, ?int 
     } catch (Throwable $e) { error_log('crmLogInventoryMove: ' . $e->getMessage()); }
 }
 
-/* ═══════════════ SKLAD: fyzická umístění (regál → police → krabička) ═══════════════
-   Organizace 29.7.2026: krabička má TRVALÝ kód (KrK001…) a štítek s QR
-   (sklad.php?loc=<id>); na které polici leží, drží parent_id v CRM — přesun
-   krabičky = změna v CRM, štítek se NEpřetiskuje. Dražší díly mají vlastní
-   kartu + svůj QR (sklad.php?qr=), drobné levné díly sdílí krabičku: buď jako
-   samostatné karty se stejným umístěním (zachová vazbu na dodavatele), nebo
-   jako jedna souhrnná karta („Drobné díly – iPhone 12") — obojí je podporované. */
+/* ═══════════════ SKLAD: fyzická umístění (regál → police) ═══════════════
+   Organizace 29.7.2026, zjednodušeno 25.9.2026: KRABIČKY ZRUŠENY (Jan: „budou
+   jen regály a police"). Regál RegK1 a police RegK1-P2 mají štítek s QR
+   (sklad.php?loc=<id>). Dražší díly mají vlastní kartu + svůj QR (sklad.php?qr=),
+   drobné levné díly sdílí polici: buď jako samostatné karty se stejným
+   umístěním (zachová vazbu na dodavatele), nebo jako jedna souhrnná karta
+   („Drobné díly – iPhone 12") — obojí je podporované. Krabičky z dřívějška
+   rozpustí skladDissolveBoxes() — díly zůstanou na polici, kde krabička stála. */
 
 /** Tabulka umístění + sloupce inventory.location_id / device_model. */
 function ensureStockLocationsSchema(): void {
@@ -4666,7 +4667,7 @@ function ensureStockLocationsSchema(): void {
             id INT AUTO_INCREMENT PRIMARY KEY,
             code VARCHAR(20) NOT NULL UNIQUE,
             name VARCHAR(120) NOT NULL DEFAULT '',
-            type VARCHAR(10) NOT NULL DEFAULT 'krabicka',
+            type VARCHAR(10) NOT NULL DEFAULT 'police',
             parent_id INT NULL DEFAULT NULL,
             note VARCHAR(255) NULL DEFAULT NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -4682,7 +4683,85 @@ function ensureStockLocationsSchema(): void {
             $pdo->exec("ALTER TABLE inventory ADD COLUMN device_model VARCHAR(64) NULL DEFAULT NULL");
             try { $pdo->exec("ALTER TABLE inventory ADD INDEX idx_inventory_model (device_model)"); } catch (Throwable $e) {}
         }
+        skladDissolveBoxes($pdo);
     } catch (Throwable $e) { error_log('ensureStockLocationsSchema: ' . $e->getMessage()); }
+}
+
+/**
+ * ZRUŠENÍ KRABIČEK (25.9.2026, Jan: „budou jen regály a police"). Co v krabičce
+ * leželo, se z ní „vyndá" a zůstane tam, kde krabička stála — na její polici
+ * (krabička přímo na regálu → regál, nezařazená → bez umístění). Název a
+ * poznámka krabičky přejdou na polici, pokud police vlastní nemá — jinak by se
+ * ztratilo třeba „iPhone 15 Pro Max · Celé devices". Očíslované šuplíky
+ * („Šuplík 3") se nepřenáší, o obsahu nic neříkají. Pak se krabičky smažou.
+ *
+ * Volá se z ensureStockLocationsSchema(), tedy při prvním otevření skladu po
+ * nasazení — nezávisle na tom, kdy doběhne run_migrations. Idempotentní: bez
+ * krabiček je to jeden levný dotaz. Vrací počet přesunutých dílů (-1 = nic).
+ */
+function skladDissolveBoxes(PDO $pdo): int {
+    try {
+        if ($pdo->inTransaction()) { return -1; }
+        if (!$pdo->query("SELECT 1 FROM stock_locations WHERE type = 'krabicka' LIMIT 1")->fetchColumn()) { return -1; }
+        // dva souběžné požadavky nesmí rozpouštět naráz (stejný zámek jako zakládání umístění)
+        if ((int)$pdo->query("SELECT GET_LOCK('afx_stock_loc', 5)")->fetchColumn() !== 1) { return -1; }
+        try {
+            $boxes = $pdo->query("SELECT id, code, name, note, parent_id FROM stock_locations
+                                  WHERE type = 'krabicka' ORDER BY LENGTH(code), code")->fetchAll();
+            if (!$boxes) { return -1; }
+            $names = []; $notes = [];
+            // id/kód zrušené krabičky → police: QR na starém štítku krabičky pak
+            // dovede na polici, kde krabička stála (viz skladDissolvedBox)
+            $redirect = json_decode((string)get_setting('sklad_zrusene_krabicky', ''), true);
+            if (!is_array($redirect)) { $redirect = []; }
+            foreach ($boxes as $b) {
+                $pid = (int)($b['parent_id'] ?? 0);
+                $redirect[(string)(int)$b['id']] = [$pid, (string)$b['code']];
+                if ($pid <= 0) { continue; }
+                $nm = trim((string)$b['name']);
+                if ($nm !== '' && !preg_match('/^šuplík\s*\d*$/iu', $nm)) { $names[$pid][$nm] = $nm; }
+                $nt = trim((string)($b['note'] ?? ''));
+                if ($nt !== '') { $notes[$pid][$nt] = $nt; }
+            }
+            $pdo->beginTransaction();
+            $upName = $pdo->prepare("UPDATE stock_locations SET name = ? WHERE id = ? AND TRIM(name) = ''");
+            foreach ($names as $pid => $arr) { $upName->execute([mb_substr(implode(', ', $arr), 0, 120), $pid]); }
+            $upNote = $pdo->prepare("UPDATE stock_locations SET note = ? WHERE id = ? AND (note IS NULL OR TRIM(note) = '')");
+            foreach ($notes as $pid => $arr) { $upNote->execute([mb_substr(implode('; ', $arr), 0, 255), $pid]); }
+            $moved = (int)$pdo->exec("UPDATE inventory i JOIN stock_locations b ON b.id = i.location_id AND b.type = 'krabicka'
+                                      SET i.location_id = b.parent_id");
+            $deleted = (int)$pdo->exec("DELETE FROM stock_locations WHERE type = 'krabicka'");
+            set_setting('sklad_zrusene_krabicky', json_encode($redirect, JSON_UNESCAPED_UNICODE));
+            $pdo->commit();
+        } finally {
+            try { $pdo->query("SELECT RELEASE_LOCK('afx_stock_loc')"); } catch (Throwable $e) {}
+        }
+        crmAuditLog('location.delete', [
+            'entity_type' => 'stock_location', 'entity_id' => 0, 'entity_label' => 'krabičky',
+            'summary' => 'Zrušeny krabičky ve skladu: smazáno ' . $deleted . ' krabiček, ' . $moved
+                       . ' dílů zůstalo na polici, kde krabička stála',
+        ]);
+        return $moved;
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) { try { $pdo->rollBack(); } catch (Throwable $e2) {} }
+        error_log('skladDissolveBoxes: ' . $e->getMessage());
+        return -1;
+    }
+}
+
+/** Zrušená krabička podle id (z QR) nebo kódu (KrK028) → ['code', 'parent_id'];
+ *  null = taková nebyla. Starý štítek krabičky tak vede na polici, kde stála. */
+function skladDissolvedBox(int $id = 0, string $code = ''): ?array {
+    $map = json_decode((string)get_setting('sklad_zrusene_krabicky', ''), true);
+    if (!is_array($map)) { return null; }
+    $code = strtoupper(trim($code));
+    foreach ($map as $bid => $r) {
+        if (!is_array($r)) { continue; }
+        if (($id > 0 && (int)$bid === $id) || ($code !== '' && strtoupper((string)($r[1] ?? '')) === $code)) {
+            return ['code' => (string)($r[1] ?? ''), 'parent_id' => (int)($r[0] ?? 0)];
+        }
+    }
+    return null;
 }
 
 /** Součástky uvnitř skladového dílu (zařízení-dárce): co použitelného v něm je.
@@ -4709,8 +4788,8 @@ function stockLocationTypeLabel(string $type): string {
     return ['regal' => 'Regál', 'police' => 'Police', 'krabicka' => 'Krabička'][$type] ?? $type;
 }
 
-/** Další volný kód V RÁMCI POBOČKY: regál RegK1/RegCR1…; police <regál>-P1…;
- *  krabička KrK001/KrCR001… (trvalý — nemění se ani po přestěhování). */
+/** Další volný kód V RÁMCI POBOČKY: regál RegK1/RegCR1…; police <regál>-P1….
+ *  (Krabičky KrK001… zrušeny 25.9.2026 — jiný typ se už nezakládá.) */
 function nextStockLocationCode(PDO $pdo, string $type, int $parentId = 0, int $branchId = 0): string {
     if ($branchId <= 0) { $branchId = getDefaultBranchId(); }
     $short = skladBranchShort($branchId);
@@ -4754,25 +4833,11 @@ function nextStockLocationCode(PDO $pdo, string $type, int $parentId = 0, int $b
         }
         return $parentCode . '-P' . ($max + 1);
     }
-    // krabička — řada per pobočka: KrK001, KrK002… / KrCR001…
-    // (kód se nemění ani po přestěhování krabičky na jinou polici)
-    $max = 0;
-    $st = $pdo->prepare("SELECT code FROM stock_locations WHERE type = 'krabicka' AND code LIKE ?");
-    $st->execute(['Kr' . $short . '%']);
-    foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $c) {
-        if (preg_match('/^Kr' . preg_quote($short, '/') . '(\d+)$/i', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
-    }
-    // historické kódy K001… (před v3.38.4) — jen u výchozí pobočky
-    $lg = $pdo->prepare("SELECT code FROM stock_locations WHERE type = 'krabicka' AND code REGEXP '^K[0-9]+$' AND branch_id = ?");
-    $lg->execute([$branchId]);
-    foreach ($lg->fetchAll(PDO::FETCH_COLUMN) as $c) {
-        if (preg_match('/^K(\d+)$/', (string)$c, $m)) { $max = max($max, (int)$m[1]); }
-    }
-    return 'Kr' . $short . str_pad((string)($max + 1), 3, '0', STR_PAD_LEFT);
+    throw new RuntimeException('Sklad má jen regály a police.');
 }
 
 /** Všechna umístění (+ kód/název rodiče) pro selecty, stromy a štítky. */
-/** Umístění skladu. $branchId = jen regály/police/krabičky DANÉ POBOČKY
+/** Umístění skladu. $branchId = jen regály/police DANÉ POBOČKY
  *  (null = všechny; každá provozovna má vlastní regály, sklad se nesdílí). */
 function stockLocationsAll(PDO $pdo, bool $activeOnly = true, ?int $branchId = null): array {
     ensureStockLocationsSchema();
@@ -4785,7 +4850,7 @@ function stockLocationsAll(PDO $pdo, bool $activeOnly = true, ?int $branchId = n
         $sql = "SELECT l.*, p.code AS parent_code, p.name AS parent_name
                 FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id"
              . ($where ? ' WHERE ' . implode(' AND ', $where) : '')
-             . " ORDER BY FIELD(l.type,'regal','police','krabicka'), l.code ASC";
+             . " ORDER BY FIELD(l.type,'regal','police'), l.code ASC";
         $st = $pdo->prepare($sql);
         $st->execute($params);
         return $st->fetchAll();
@@ -4796,7 +4861,7 @@ function stockLocationsAll(PDO $pdo, bool $activeOnly = true, ?int $branchId = n
     }
 }
 
-/** Pobočka umístění (regálu/police/krabičky); 0 = neexistuje. */
+/** Pobočka umístění (regálu/police); 0 = neexistuje. */
 function stockLocationBranchId(int $locationId): int {
     global $pdo;
     if ($locationId <= 0) { return 0; }
@@ -4808,7 +4873,7 @@ function stockLocationBranchId(int $locationId): int {
     } catch (Throwable $e) { return 0; }
 }
 
-/** „KrK012 · iPhone 12 – drobné (RegK1-P2)" — plný popisek umístění. */
+/** „RegK1-P2 · iPhone 12 – drobné (RegK1)" — plný popisek umístění. */
 function stockLocationFullLabel(array $loc): string {
     $s = (string)$loc['code'];
     if (trim((string)($loc['name'] ?? '')) !== '') { $s .= ' · ' . $loc['name']; }
@@ -4817,14 +4882,11 @@ function stockLocationFullLabel(array $loc): string {
 }
 
 /**
- * POZIČNÍ kód umístění „R3-P2-B4" (regál – police – kolikátá krabička) pro
- * zobrazování u DÍLŮ (Jan, 9.8.2026 dle Design návrhu). Odvozuje se z hierarchie:
- *   R = číslo regálu z kódu (RegK3 → R3), P = číslo police z kódu (RegK3-P2 → P2),
- *   B = pořadí krabičky na polici podle kódu VZESTUPNĚ = FYZICKY ZLEVA DOPRAVA
- *       (konvence: krabičky se na polici rovnají vzestupně zleva; B1 vlevo).
+ * POZIČNÍ kód umístění „R3-P2" (regál – police) pro zobrazování u DÍLŮ
+ * (Jan, 9.8.2026 dle Design návrhu). Odvozuje se z hierarchie:
+ *   R = číslo regálu z kódu (RegK3 → R3), P = číslo police z kódu (RegK3-P2 → P2).
  * Police se číslují SHORA (P1 = nejvrchnější) — to je věc nalepení štítků,
- * 3D náhled to kreslí stejně. IDENTITA krabičky zůstává trvalý kód (KrK028,
- * štítek se nepřetiskuje) — poziční kód se při přesunu přepočítá sám.
+ * 3D náhled to kreslí stejně. (Třetí úroveň „-B4" = krabička zanikla 25.9.2026.)
  * Vrací mapu id → poziční kód; kde nejde odvodit, vrací kód umístění.
  */
 function stockLocationPosCodes(PDO $pdo, array $locIds): array {
@@ -4842,24 +4904,7 @@ function stockLocationPosCodes(PDO $pdo, array $locIds): array {
             foreach ($st as $r) { $byId[(int)$r['id']] = $r; }
         };
         $fetch($locIds);
-        $fetch(array_map(fn($r) => (int)($r['parent_id'] ?? 0), $byId));           // rodiče
-        $fetch(array_map(fn($r) => (int)($r['parent_id'] ?? 0), $byId));           // prarodiče
-
-        // pořadí krabiček u dotčených rodičů (jen aktivní; delší kód řadit za kratší)
-        $parents = [];
-        foreach ($byId as $r) { if ($r['type'] === 'krabicka' && (int)$r['parent_id'] > 0) { $parents[(int)$r['parent_id']] = 1; } }
-        $orderMap = [];
-        if ($parents) {
-            $pids = array_keys($parents);
-            $st = $pdo->prepare("SELECT id, parent_id FROM stock_locations WHERE type = 'krabicka' AND is_active = 1 AND parent_id IN (" . implode(',', array_fill(0, count($pids), '?')) . ") ORDER BY parent_id, LENGTH(code), code");
-            $st->execute($pids);
-            $cnt = [];
-            foreach ($st as $r) {
-                $p = (int)$r['parent_id'];
-                $cnt[$p] = ($cnt[$p] ?? 0) + 1;
-                $orderMap[$p][(int)$r['id']] = $cnt[$p];
-            }
-        }
+        $fetch(array_map(fn($r) => (int)($r['parent_id'] ?? 0), $byId));           // regály polic
 
         $num = fn($c) => preg_match('/(\d+)$/', (string)$c, $m) ? (int)$m[1] : null;
         $pno = fn($c) => preg_match('/-P(\d+)$/i', (string)$c, $m) ? (int)$m[1] : null;
@@ -4875,26 +4920,14 @@ function stockLocationPosCodes(PDO $pdo, array $locIds): array {
                 $p = $pno($l['code']);
                 $out[$lid] = ($rn !== null && $p !== null) ? 'R' . $rn . '-P' . $p : (string)$l['code'];
             } else {
-                $par = $byId[(int)$l['parent_id']] ?? null;
-                $b = $orderMap[(int)$l['parent_id']][$lid] ?? null;
-                $pos = null;
-                if ($par && $par['type'] === 'police' && $b !== null) {
-                    $rk = $byId[(int)$par['parent_id']] ?? null;
-                    $rn = $rk ? $num($rk['code']) : null;
-                    $p = $pno($par['code']);
-                    if ($rn !== null && $p !== null) { $pos = 'R' . $rn . '-P' . $p . '-B' . $b; }
-                } elseif ($par && $par['type'] === 'regal' && $b !== null) {
-                    $rn = $num($par['code']);
-                    if ($rn !== null) { $pos = 'R' . $rn . '-B' . $b; }
-                }
-                $out[$lid] = $pos ?? (string)$l['code'];
+                $out[$lid] = (string)$l['code'];
             }
         }
     } catch (Throwable $e) { error_log('stockLocationPosCodes: ' . $e->getMessage()); }
     return $out;
 }
 
-/** Poziční kód jednoho umístění („R3-P2-B4"); '' když umístění neexistuje. */
+/** Poziční kód jednoho umístění („R3-P2"); '' když umístění neexistuje. */
 function stockLocationPosCode(PDO $pdo, int $locationId): string {
     if ($locationId <= 0) { return ''; }
     $m = stockLocationPosCodes($pdo, [$locationId]);
@@ -4903,34 +4936,23 @@ function stockLocationPosCode(PDO $pdo, int $locationId): string {
 
 /**
  * PRŮCHOD SKLADEM (naskladňovací kolečko): pořadí, ve kterém se obchází
- * umístění při zapisování obsahu — regál za regálem (R1, R2…), v regálu
- * police SHORA (P1 první), hned za policí její krabičky zleva (dle kódu),
- * pak krabičky visící přímo na regálu; nezařazené krabičky úplně nakonec.
- * Vrací pole id umístění (police + krabičky) dané pobočky.
+ * police při zapisování obsahu — regál za regálem (R1, R2…), v regálu police
+ * SHORA (P1 první); police bez rozpoznatelné pozice úplně nakonec.
+ * Vrací pole id polic dané pobočky.
  */
 function skladWalkSequence(PDO $pdo, int $branchId): array {
     ensureStockLocationsSchema();
     ensureSkladBranchSchema();
     try {
-        $st = $pdo->prepare("SELECT l.id, l.code, l.type, p.code AS pcode, p.type AS ptype
-            FROM stock_locations l LEFT JOIN stock_locations p ON p.id = l.parent_id
-            WHERE l.branch_id = ? AND l.is_active = 1 AND l.type IN ('police','krabicka')");
+        $st = $pdo->prepare("SELECT id, code FROM stock_locations
+            WHERE branch_id = ? AND is_active = 1 AND type = 'police'");
         $st->execute([$branchId]);
         $seq = [];
         foreach ($st as $r) {
-            $rack = 9998; $pol = 997;
-            $isBox = $r['type'] === 'krabicka' ? 1 : 0;
-            if ($r['type'] === 'police') {
-                if (preg_match('/(\d+)-P(\d+)$/i', (string)$r['code'], $m)) { $rack = (int)$m[1]; $pol = (int)$m[2]; }
-            } elseif (($r['ptype'] ?? '') === 'police' && preg_match('/(\d+)-P(\d+)$/i', (string)$r['pcode'], $m)) {
-                $rack = (int)$m[1]; $pol = (int)$m[2];
-            } elseif (($r['ptype'] ?? '') === 'regal' && preg_match('/(\d+)$/', (string)$r['pcode'], $m)) {
-                $rack = (int)$m[1]; $pol = 998;   // krabičky přímo na regálu — za všemi policemi
-            } else {
-                $rack = 9999; $pol = 999;         // bez pozice — nakonec
-            }
+            $rack = 9999; $pol = 999;         // bez pozice — nakonec
+            if (preg_match('/(\d+)-P(\d+)$/i', (string)$r['code'], $m)) { $rack = (int)$m[1]; $pol = (int)$m[2]; }
             $seq[] = ['id' => (int)$r['id'],
-                'k' => sprintf('%04d-%03d-%d-%03d-%s', $rack, $pol, $isBox, strlen((string)$r['code']), (string)$r['code'])];
+                'k' => sprintf('%04d-%03d-%03d-%s', $rack, $pol, strlen((string)$r['code']), (string)$r['code'])];
         }
         usort($seq, fn($a, $b) => strcmp($a['k'], $b['k']));
         return array_column($seq, 'id');

@@ -1,12 +1,11 @@
 <?php
 /**
- * Tisk štítků UMÍSTĚNÍ skladu (regály / police / krabičky).
+ * Tisk štítků UMÍSTĚNÍ skladu (regály / police — krabičky zrušeny 25.9.2026).
  *   ?id=N              — jeden štítek
  *   ?all=1             — arch všech aktivních umístění
- *   ?type=krabicka     — arch jen daného typu (regal | police | krabicka)
+ *   ?type=police       — arch jen daného typu (regal | police)
  * QR kód vede na sklad.php?loc=<id> — mobil ukáže obsah umístění
- * (u krabičky seznam dílů; ťuknutím na díl rovnou naskladnění/výdej).
- * Kód KRABIČKY je TRVALÝ — štítek platí, i když se krabička přestěhuje.
+ * (u police seznam dílů; ťuknutím na díl rovnou naskladnění/výdej).
  * Kód POLICE obsahuje regál (RegK1-P2), takže po přesunu police na jiný regál
  * se přečísluje a štítek se tiskne znovu.
  */
@@ -30,19 +29,19 @@ try {
         $stmt = $pdo->prepare($sqlBase . " WHERE l.id = ?");
         $stmt->execute([$one]);
         $items = $stmt->fetchAll();
-    } elseif (in_array($type, ['regal', 'police', 'krabicka'], true)) {
+    } elseif (in_array($type, ['regal', 'police'], true)) {
         $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.type = ? AND l.branch_id = ? ORDER BY LENGTH(l.code) ASC, l.code ASC");
         $stmt->execute([$type, $labelBranch]);
         $items = $stmt->fetchAll();
     } elseif (!empty($_GET['all'])) {
-        $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.branch_id = ? ORDER BY FIELD(l.type,'regal','police','krabicka'), LENGTH(l.code) ASC, l.code ASC");
+        $stmt = $pdo->prepare($sqlBase . " WHERE l.is_active = 1 AND l.branch_id = ? ORDER BY FIELD(l.type,'regal','police'), LENGTH(l.code) ASC, l.code ASC");
         $stmt->execute([$labelBranch]);
         $items = $stmt->fetchAll();
     }
 } catch (Throwable $e) { $items = []; }
 
-// na štítku je VELKÉ značení R-P-B (jak ho vidí obsluha u dílů) + malá neměnná
-// identita (KrK028) — QR míří na id, takže platí i po přestěhování krabičky
+// na štítku je VELKÉ značení R-P (jak ho vidí obsluha u dílů) + malý kód
+// umístění (RegK1-P2) — QR míří na id umístění
 $labelPos = [];
 try { $labelPos = stockLocationPosCodes($pdo, array_column($items, 'id')); } catch (Throwable $e) {}
 
@@ -212,7 +211,6 @@ if (($_GET['layout'] ?? '') === 'strip') {
 <div class="toolbar">
     <button onclick="window.print()">🖨 Tisknout</button>
     <a href="sklad_umisteni.php">← Zpět na umístění</a>
-    <a href="location_labels.php?type=krabicka&amp;branch=<?php echo (int)$labelBranch; ?>">Jen krabičky</a>
     <a href="location_labels.php?type=police&amp;branch=<?php echo (int)$labelBranch; ?>">Jen police</a>
     <a href="location_labels.php?type=regal&amp;branch=<?php echo (int)$labelBranch; ?>">Jen regály</a>
     <a href="location_labels.php?all=1&amp;branch=<?php echo (int)$labelBranch; ?>">Vše</a>
