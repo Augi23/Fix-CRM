@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.83.1',
+        'date' => '2026-09-25',
+        'time' => '14:25',
+        'title' => 'Účtenková tiskárna na pobočce: poznat hned, kde tisk vázne',
+        'items' => [
+            '<b>Instalační příkaz pokladní tiskárny</b> na konci sám vytiskne zkušební lístek přímo z Macu a ověří token u serveru. Napíše rovnou, jestli je chyba v tiskárně, ve frontě, nebo v tokenu (např. když se v CRM mezitím vygeneroval nový).',
+            '<b>Zkušební účtenka v Nastavení</b> zkusí nejdřív tisk přímo přes počítač, u kterého sedíš, a teprve pak frontu. Po pár vteřinách řekne, jestli si počítač u kasy účtenku stáhl, nebo se serveru vůbec nehlásí.',
+            'U druhé pobočky se v nastavení účtenek už neukazuje karlínská tiskárna (brala se z celofiremního nastavení a mátla).',
+        ],
+    ],
+    [
         'version' => '3.83.0',
         'date' => '2026-09-25',
         'time' => '12:52',

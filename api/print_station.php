@@ -95,6 +95,15 @@ function afxStationValidTarget(string $t, ?string &$err = null): bool {
     return false;
 }
 
+function afxStationOwnTarget(int $bid): string {
+    global $pdo;
+    try {
+        $st = $pdo->prepare("SELECT receipt_printer_target FROM branches WHERE id = ?");
+        $st->execute([$bid]);
+        return trim((string)$st->fetchColumn());
+    } catch (Throwable $e) { return ''; }
+}
+
 /** Stav pobočky pro nastavení + instalační příkaz. */
 function afxStationStatus(int $bid): array {
     global $pdo;
@@ -110,7 +119,9 @@ function afxStationStatus(int $bid): array {
         'ok' => true,
         'branch_id' => $bid,
         'branch_name' => $name,
-        'target' => crmBranchReceiptTarget($bid),
+        // jen VLASTNÍ cíl pobočky — globální nastavení patří Karlínu a u druhé
+        // pobočky by mátlo (ukazovalo by karlínskou tiskárnu)
+        'target' => afxStationOwnTarget($bid),
         'global_target' => trim((string)get_setting('receipt_printer_target', '')),
         'has_token' => $token !== '',
         'token' => $token,

@@ -2513,8 +2513,37 @@ require_once 'includes/header.php';
                                 })
                                 .catch(function () { rcptSay(bid, 'text-danger', 'Síťová chyba — zkus to znovu.'); });
                         }
+                        /* Zkušební účtenka jako v Pokladně: nejdřív PŘÍMO přes tento počítač
+                           (můstek 127.0.0.1:9101 — jen když sedíš u kasy té pobočky), a teprve
+                           když to nejde, přes frontu. Obsluha tak hned ví, kterou cestou to šlo. */
                         function rcptTest(bid) {
-                            rcptSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>Posílám zkušební účtenku do fronty pobočky…');
+                            var row = document.querySelector('[data-rcpt-row="' + bid + '"]');
+                            var mine = row && row.querySelector('.badge.bg-info');
+                            if (!mine) { return rcptQueueTest(bid, ''); }
+                            rcptSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>Zkouším tisk přímo přes tento počítač…');
+                            fetch('api/print_receipt_server.php', {
+                                method: 'POST', credentials: 'same-origin',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ csrf_token: document.querySelector('meta[name="csrf-token"]').content, test: 1, bytes: 1 })
+                            })
+                                .then(function (r) { return r.json(); })
+                                .then(function (d) {
+                                    if (!d || !d.ok || !d.b64) { return rcptQueueTest(bid, ''); }
+                                    var bin = Uint8Array.from(atob(d.b64), function (c) { return c.charCodeAt(0); });
+                                    return fetch('http://127.0.0.1:9101/print', { method: 'POST', mode: 'cors', body: bin })
+                                        .then(function (r2) {
+                                            if (r2.ok) {
+                                                rcptSay(bid, 'text-success', '<i class="fas fa-check-circle me-1"></i>Účtenka odešla <b>přímo z tohoto počítače</b> do tiskárny. Když nevyjela, je problém v tiskárně nebo v USB (zkus ji vypnout a zapnout).');
+                                            } else {
+                                                rcptQueueTest(bid, 'Můstek na tomto počítači tisk odmítl. ');
+                                            }
+                                        })
+                                        .catch(function () { rcptQueueTest(bid, 'Můstek na tomto počítači neběží (nebo jde o Safari/appku). '); });
+                                })
+                                .catch(function () { rcptQueueTest(bid, ''); });
+                        }
+                        function rcptQueueTest(bid, prefix) {
+                            rcptSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>' + prefix + 'Posílám zkušební účtenku do fronty pobočky…');
                             fetch('api/print_receipt_server.php', {
                                 method: 'POST', credentials: 'same-origin',
                                 headers: { 'Content-Type': 'application/json' },
@@ -2526,7 +2555,19 @@ require_once 'includes/header.php';
                                 .then(function (r) { return r.json(); })
                                 .then(function (j) {
                                     if (j && j.ok) {
-                                        rcptSay(bid, 'text-success', '<i class="fas fa-check-circle me-1"></i>Zkušební účtenka je ve frontě — z tiskárny na pobočce vyjede do pár vteřin. Když nevyjede, počítač u kasy se serverem nemluví (viz příkaz výš).');
+                                        rcptSay(bid, 'text-white-50', '<i class="fas fa-circle-notch fa-spin me-1"></i>' + prefix + 'Účtenka je ve frontě, čekám, až si ji počítač u kasy stáhne…');
+                                        // po ~6 s ověřit, jestli se počítač u kasy vůbec hlásí
+                                        setTimeout(function () {
+                                            fetch('api/print_station.php?action=status&branch_id=' + bid, { cache: 'no-store', credentials: 'same-origin' })
+                                                .then(function (r) { return r.json(); })
+                                                .then(function (st) {
+                                                    if (st && st.agent_alive) {
+                                                        rcptSay(bid, 'text-success', '<i class="fas fa-check-circle me-1"></i>' + prefix + 'Počítač u kasy se hlásí (naposledy ' + st.last_poll_ago + ') a účtenku si stáhl. Když z tiskárny nic nevyjelo, spusť na něm instalační příkaz znovu — na konci sám vytiskne zkušební lístek a řekne, kde je chyba.');
+                                                    } else {
+                                                        rcptSay(bid, 'text-danger', '<i class="fas fa-triangle-exclamation me-1"></i>' + prefix + '<b>Počítač u kasy se serveru nehlásí</b>, účtenka čeká ve frontě a za 3 minuty propadne. Na tom počítači spusť AKTUÁLNÍ instalační příkaz výš (token se mohl mezitím změnit) — na konci napíše, jestli ho server přijal.');
+                                                    }
+                                                });
+                                        }, 6000);
                                     } else {
                                         rcptSay(bid, 'text-danger', '<i class="fas fa-triangle-exclamation me-1"></i>' + ((j && j.error) || 'Tisk se nepodařil.'));
                                     }

@@ -155,6 +155,31 @@ else
 fi
 
 sleep 1
+echo "── Zkušební tisk přímo z tohoto Macu (ověří frontu a tiskárnu):"
+# ESC @ = reset, text, 4 řádky posuv, GS V A 0 = ustřihnout
+if printf '\033@AppleFix: tiskarna OK\n%s\n\n\n\n\035VA\000' "$(date '+%d.%m.%Y %H:%M')" | /usr/bin/lp -d xprinter -o raw >/dev/null 2>&1; then
+    echo "✅ Odesláno do tiskárny — MUSÍ vyjet lístek „AppleFix: tiskarna OK“."
+    echo "   Když nevyjede: tiskárna je vypnutá, bez papíru, nebo fronta míří na jiné USB zařízení:"
+    lpstat -v xprinter 2>/dev/null | sed 's/^/   /'
+else
+    echo "❌ Fronta xprinter tisk odmítla:"; lpstat -p xprinter -l 2>&1 | sed 's/^/   /'
+fi
+
+echo "── Ověření tokenu u serveru:"
+if [ -s "$TOKEN_FILE" ]; then
+    TMP_CHK="$(mktemp /tmp/afxchk.XXXXXX)"
+    CODE=$(curl -s -o "$TMP_CHK" -w '%{http_code}' --max-time 8 "https://admin.applefix.cloud/api/print_poll.php?token=$(cat "$TOKEN_FILE")" || echo 000)
+    case "$CODE" in
+        200) /usr/bin/lp -d xprinter -o raw -s "$TMP_CHK" >/dev/null 2>&1
+             echo "✅ Server token přijal a poslal čekající účtenku — právě se tiskne." ;;
+        204) echo "✅ Server token přijal (fronta je prázdná). V CRM teď dej Zkušební účtenku." ;;
+        403) echo "❌ Server token ODMÍTL. V CRM se mezitím nejspíš vygeneroval nový —"
+             echo "   zkopíruj z Nastavení → Tisk štítků AKTUÁLNÍ příkaz a spusť ho znovu." ;;
+        *)   echo "❌ Server neodpovídá (HTTP $CODE) — je Mac připojený k internetu?" ;;
+    esac
+    rm -f "$TMP_CHK"
+fi
+
 echo "── Ověření můstku (nic se netiskne):"
 RESP=$(curl -s -X OPTIONS http://127.0.0.1:9101/print -o /dev/null -w '%{http_code}' || echo 000)
 if [ "$RESP" = "204" ]; then
