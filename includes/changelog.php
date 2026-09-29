@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.84.2',
+        'date' => '2026-09-29',
+        'time' => '18:32',
+        'title' => 'Online výkupní list: odeslání se už neztratí potichu',
+        'items' => [
+            'Formulář pro klienta měl skryté pole proti robotům. Automatické doplňování v telefonu ho umělo vyplnit a stránka pak klientovi ukázala „Odesláno", ale <b>nic neuložila</b> a v CRM po tom nezůstala žádná stopa. Pole je pryč; formulář dál chrání tajný odkaz, na který se robot nedostane.',
+        ],
+    ],
+    [
         'version' => '3.84.1',
         'date' => '2026-09-29',
         'time' => '18:26',

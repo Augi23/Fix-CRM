@@ -52,7 +52,10 @@ foreach ($cfg['sections'] as $sec) {
 $saved = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     usleep(300000);   // zpomalení proti hrubé síle / robotům
-    if (trim((string)($_POST['website'] ?? '')) !== '') { vo_die('Odesláno.', 200); }   // honeypot
+    // Past na roboty (skryté pole „website") je pryč (v3.84.2): automatické doplňování
+    // v telefonu ji umělo vyplnit kontaktem klienta a stránka pak ukázala „Odesláno",
+    // aniž by cokoli uložila — bez jediné stopy v CRM. Robota sem stejně nepustí
+    // tajný 48místný odkaz, past tu nic nechránila.
 
     $fields = $doc['fields'];
     foreach ($allowed as $n) {
@@ -140,7 +143,6 @@ foreach ($locked as $n) {
 
 <form method="post" action="vykup_online.php" autocomplete="on">
     <input type="hidden" name="t" value="<?php echo e($token); ?>">
-    <input type="text" name="website" value="" style="position:absolute;left:-9999px;" tabindex="-1" aria-hidden="true">
     <?php echo $sheet; ?>
     <div class="vo-submit"><button type="submit">📨 Odeslat do AppleFix</button></div>
     <div class="vo-note">Údaje slouží výhradně k sepsání kupní smlouvy (výkupního listu) dle zákona č. 253/2008 Sb.
