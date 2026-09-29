@@ -137,6 +137,12 @@ $pageTitle = __($cfg['title_key'], $lang);
     var DOC_TYPE = <?php echo json_encode($type); ?>;
     var DOC_LANG = <?php echo json_encode($lang); ?>;
     var docId = <?php echo (int)$docId; ?>;
+    // Verze listu na serveru, ze které editor vychází (updated_at). Koncept v prohlížeči
+    // se k ní váže: když se list mezitím na serveru změnil — typicky ho klient vyplnil
+    // online přes vykup_online.php — starý koncept se NESMÍ obnovit, jinak by klientovy
+    // údaje přepsal prázdnými poli.
+    var DOC_VERSION = <?php echo json_encode((string)($doc['updated_at'] ?? '')); ?>;
+    var ONLINE_FILLED = <?php echo json_encode((string)($values['online_filled_at'] ?? '')); ?>;
     var CSRF = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
     function toast(msg, ok) {
@@ -164,7 +170,7 @@ $pageTitle = __($cfg['title_key'], $lang);
         try {
             var data = collect();
             var any = Object.keys(data).some(function (k) { return String(data[k] || '').trim() !== ''; });
-            if (any) { localStorage.setItem(draftKey(), JSON.stringify({ t: Date.now(), d: data })); }
+            if (any) { localStorage.setItem(draftKey(), JSON.stringify({ t: Date.now(), v: DOC_VERSION, d: data })); }
             else { localStorage.removeItem(draftKey()); }
         } catch (e) {}
     }
@@ -173,11 +179,22 @@ $pageTitle = __($cfg['title_key'], $lang);
             var raw = localStorage.getItem(draftKey());
             if (!raw) { return; }
             var obj = JSON.parse(raw); var data = obj && obj.d; if (!data) { return; }
+            // koncept vznikl nad JINOU verzí listu → list se mezitím změnil na serveru
+            // (klient ho vyplnil online / uložil ho kolega) — platí data ze serveru
+            if (docId > 0 && obj.v && DOC_VERSION && obj.v !== DOC_VERSION) {
+                clearDraft();
+                if (ONLINE_FILLED) { toast('✍️ Klient list vyplnil online — zobrazuji jeho údaje.', true); }
+                return;
+            }
+            // koncept ze starší verze CRM (bez značky verze) smí jen DOPLNIT prázdná
+            // pole — údaj, který už na serveru je, nikdy nepřepíše
+            var legacy = docId > 0 && !obj.v;
             var changed = 0;
             document.querySelectorAll('#docForm .dinput').forEach(function (el) {
-                if (el.name && Object.prototype.hasOwnProperty.call(data, el.name) && el.value !== data[el.name]) {
-                    el.value = data[el.name]; changed++;
-                }
+                if (!el.name || !Object.prototype.hasOwnProperty.call(data, el.name) || el.value === data[el.name]) { return; }
+                if (String(data[el.name] || '').trim() === '' && el.value.trim() !== '') { return; }   // prázdno nepřepisuje údaj
+                if (legacy && el.value.trim() !== '') { return; }
+                el.value = data[el.name]; changed++;
             });
             if (changed) { toast('↩︎ Obnoveny rozpracované údaje (neuložené).', true); }
         } catch (e) {}
@@ -216,6 +233,14 @@ $pageTitle = __($cfg['title_key'], $lang);
                     }
                 } catch (e) {}
                 docId = j.id;
+                // koncept se teď váže k nově uložené verzi (jinak by se po znovuotevření zahodil)
+                if (j.version) {
+                    DOC_VERSION = j.version;
+                    try {
+                        var dk = draftKey(), dr = localStorage.getItem(dk);
+                        if (dr) { var dobj = JSON.parse(dr); dobj.v = DOC_VERSION; localStorage.setItem(dk, JSON.stringify(dobj)); }
+                    } catch (e) {}
+                }
                 var codeEl = document.querySelector('.doc-code');
                 if (codeEl) { codeEl.textContent = j.doc_number; }
                 var tn = document.getElementById('tbNum'); if (tn) { tn.textContent = j.doc_number; }

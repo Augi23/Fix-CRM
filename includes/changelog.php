@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.84.1',
+        'date' => '2026-09-29',
+        'time' => '18:26',
+        'title' => 'Výkupní list vyplněný klientem online se už nepřepíše',
+        'items' => [
+            'Když klient vyplnil výkupní list přes odkaz z e-mailu, na prodejně jeho údaje po otevření listu zmizely. Editor si rozepsaná data drží v prohlížeči až do podpisu a při otevření obnovil <b>starý koncept</b>, ve kterém byla klientova pole ještě prázdná. Dalším uložením se pak klientovy údaje přepsaly i v CRM.',
+            'Koncept si teď pamatuje, ze které verze listu vznikl. Když se list mezitím změnil (klient ho vyplnil online nebo ho uložil kolega), starý koncept se zahodí a editor ukáže aktuální údaje s hláškou <b>„Klient list vyplnil online"</b>.',
+            'Pojistka i na serveru: u listu vyplněného online prázdné políčko z prodejny nesmaže klientem vyplněný údaj, třeba když zůstala otevřená karta z doby před vyplněním. Zachová se i záznam, kdy a odkud klient list vyplnil.',
+        ],
+    ],
+    [
         'version' => '3.84.0',
         'date' => '2026-09-25',
         'time' => '18:17',

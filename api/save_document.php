@@ -67,6 +67,35 @@ if (!empty($clean['doc_date'])) {
 }
 
 ensureCrmDocumentsTable();
+
+// Výkupní list vyplněný KLIENTEM ONLINE (vykup_online.php): editor na prodejně mohl
+// zůstat otevřený z doby PŘED vyplněním (nebo obnovit starý koncept) a uložení by
+// klientovy údaje přepsalo prázdnými poli. Údaj, který na serveru je, proto prázdná
+// hodnota z formuláře nesmaže, a metadata o online vyplnění se zachovají.
+if ($id > 0) {
+    try {
+        $__pv = $pdo->prepare("SELECT payload FROM crm_documents WHERE id = ? LIMIT 1");
+        $__pv->execute([$id]);
+        $__prev = json_decode((string)$__pv->fetchColumn(), true);
+        if (is_array($__prev) && !empty($__prev['online_filled_at'])) {
+            foreach ($__prev as $__k => $__v) {
+                if (!is_string($__k) || !is_scalar($__v)) { continue; }
+                $__v = (string)$__v;
+                if ($__v !== '' && (!isset($clean[$__k]) || $clean[$__k] === '')) { $clean[$__k] = $__v; }
+            }
+            // sloupce seznamu přepočítat z doplněných hodnot
+            $name  = mb_substr((string)($clean['customer_name'] ?? ''), 0, 190);
+            $phone = mb_substr((string)($clean['customer_phone'] ?? ''), 0, 60);
+            $email = mb_substr((string)($clean['customer_email'] ?? ''), 0, 190);
+            $subject = '';
+            foreach ($cfg['subject_fields'] as $sf) {
+                $sv = trim((string)($clean[$sf] ?? ''));
+                if ($sv !== '') { $subject = trim($subject . ($subject !== '' ? ' — ' : '') . $sv); }
+            }
+            $subject = mb_substr($subject, 0, 255);
+        }
+    } catch (Throwable $e) { error_log('save_document online merge: ' . $e->getMessage()); }
+}
 $payload = json_encode($clean, JSON_UNESCAPED_UNICODE);
 $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 $branch = (int)getCurrentStaffBranchId() ?: null;
@@ -124,7 +153,14 @@ try {
         catch (Throwable $e) { error_log('save_document kasa: ' . $e->getMessage()); /* kasa je bonus */ }
     }
 
-    echo json_encode(['ok' => true, 'id' => $id, 'doc_number' => $docNumber], JSON_UNESCAPED_UNICODE);
+    // verze listu na serveru — editor si ji zapíše ke konceptu (viz dokument.php)
+    $__ver = '';
+    try {
+        $__u = $pdo->prepare("SELECT updated_at FROM crm_documents WHERE id = ?");
+        $__u->execute([$id]);
+        $__ver = (string)$__u->fetchColumn();
+    } catch (Throwable $e) {}
+    echo json_encode(['ok' => true, 'id' => $id, 'doc_number' => $docNumber, 'version' => $__ver], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     error_log('save_document: ' . $e->getMessage());
     sd_fail('Chyba serveru', 500);
