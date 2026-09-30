@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.84.3',
+        'date' => '2026-09-30',
+        'time' => '11:43',
+        'title' => 'Tisk výkupního listu a dokumentů: tiskové okno se otevře vždy',
+        'items' => [
+            'Tlačítko <b>Tisk</b> u výkupního listu (a ostatních dokumentů) teď hned otevře systémové tiskové okno s výběrem tiskárny. Dřív se čekalo na uložení listu, a když neprošlo, okno se vůbec neotevřelo. List se ukládá souběžně; kdyby se uložení nepovedlo, objeví se hláška, ale vytisknout jde vždy.',
+        ],
+    ],
+    [
         'version' => '3.84.2',
         'date' => '2026-09-29',
         'time' => '18:32',

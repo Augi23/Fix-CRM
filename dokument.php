@@ -285,14 +285,15 @@ $pageTitle = __($cfg['title_key'], $lang);
         return missing;
     }
 
+    // Tisk = HNED systémové tiskové okno (výběr tiskárny). Dřív se nejdřív čekalo na
+    // uložení a když neprošlo (chybějící údaj, síť), okno se vůbec neotevřelo — obsluha
+    // pak „nemohla vytisknout". Uložení teď běží souběžně; tiskne se to, co je na obrazovce.
     document.getElementById('btnPrint').onclick = function () {
         var missing = docMissingFields();
         if (missing.length && !confirm('Doklad není kompletní — chybí:\n\n· ' + missing.join('\n· ')
                 + '\n\nOpravdu tisknout takhle?')) { return; }
-        var b = this; b.disabled = true;
-        save().then(function () { window.print(); })
-              .catch(function (e) { toast('⚠️ ' + e.message, false); })
-              .finally(function () { b.disabled = false; });
+        save().catch(function (e) { toast('⚠️ Vytištěno, ale neuloženo: ' + e.message, false); });
+        window.print();
     };
 
     var btnLink = document.getElementById('btnOnlineLink');
