@@ -19,8 +19,8 @@
  * které od PHP 8.4 v jádře není. Zprávy se čtou přes BODY.PEEK, takže
  * třídění NEMĚNÍ stav přečteno/nepřečteno.
  *
- * Spouštění: samo z notify_poll (poor-man's cron, každé ~3 min na pozadí),
- * nebo systémovým cronem:  * /5 * * * * php /cesta/k/crm/scripts/mail_sort.php
+ * Spouštění: samo z často otevíraných stránek (poor-man's cron, každé ~3 min
+ * na pozadí), nebo systémovým cronem:  * /5 * * * * php /cesta/k/crm/posta/cron.php
  */
 
 const CRM_MAIL_CATEGORIES = ['customer', 'offer', 'robot'];
@@ -1123,7 +1123,26 @@ function crmMailSortRunAll(): array
     return $out;
 }
 
-/** Poor-man's cron: z notify_poll spustí třídění na pozadí každé ~3 minuty. */
+/**
+ * Úklid po nepovedené aktualizaci na v3.85.0: git tehdy stihl zapsat jen soubory
+ * mimo api/ a includes/ (tam webový server nesmí zapisovat) a ty pak blokovaly
+ * každou další aktualizaci. Smaže se jen soubor, který git nesleduje a je to
+ * prokazatelně stará kopie třídiče.
+ */
+function crmMailCleanupLeftovers(): void
+{
+    $root = dirname(__DIR__);
+    foreach (['posta.php', 'scripts/mail_sort.php', 'scripts/mail_sort_test.php'] as $rel) {
+        $f = $root . '/' . $rel;
+        if (!is_file($f)) { continue; }
+        $head = (string)@file_get_contents($f, false, null, 0, 600);
+        if (stripos($head, 'TŘÍDĚNÍ POŠTY') === false) { continue; }
+        $tracked = trim((string)@shell_exec('cd ' . escapeshellarg($root) . ' && git ls-files -- ' . escapeshellarg($rel) . ' 2>/dev/null'));
+        if ($tracked === '') { @unlink($f); }
+    }
+}
+
+/** Poor-man's cron: z často otevíraných stránek spustí třídění na pozadí každé ~3 minuty. */
 function crmMailSortMaybeSchedule(): void
 {
     try {
@@ -1139,7 +1158,7 @@ function crmMailSortMaybeSchedule(): void
         set_setting('mail_sort_last_attempt', (string)time());       // claim (proti souběhu)
         if (!function_exists('exec') || !function_exists('crmBackupFindBin')) { return; }
         $php = crmBackupFindBin(['php', 'php8.3', 'php8.2', 'php8.1']);
-        $script = dirname(__DIR__) . '/scripts/mail_sort.php';
+        $script = __DIR__ . '/cron.php';
         if ($php !== null && is_file($script)) {
             exec('nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($script) . ' > /dev/null 2>&1 &');
         }

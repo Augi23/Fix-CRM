@@ -1,12 +1,12 @@
 <?php
 /**
  * TŘÍDĚNÍ POŠTY — automatické roztřídění firemních schránek (Forpsi IMAP)
- * na Zákazníky / Nabídky / Roboty. Logika: includes/mail_sort.php,
- * akce: api/mail_sort.php. Přístup: jen administrátor (hesla ke schránkám).
+ * na Zákazníky / Nabídky / Roboty. Logika: posta/lib.php,
+ * akce: posta/api.php. Přístup: jen administrátor (hesla ke schránkám).
  */
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
-require_once 'includes/mail_sort.php';
+require_once 'posta/lib.php';
 
 if (empty($_SESSION['user_id']) || !crmCanManageSettings()) {
     header('Location: index.php');
@@ -15,6 +15,7 @@ if (empty($_SESSION['user_id']) || !crmCanManageSettings()) {
 
 require_once 'includes/header.php';
 crmMailEnsureSchema();
+crmMailCleanupLeftovers();
 
 $meta = crmMailCategoryMeta();
 $accounts = crmMailAccounts();
@@ -61,7 +62,7 @@ $rules = $pdo->query('SELECT * FROM mail_sort_rules ORDER BY created_at DESC')->
 
 $qs = static function (array $over) use ($fCat, $fAcc, $fQ): string {
     $p = array_filter(array_merge(['cat' => $fCat, 'acc' => $fAcc ?: '', 'q' => $fQ], $over), static fn($v) => $v !== '' && $v !== null && $v !== 0);
-    return 'posta.php' . ($p ? '?' . http_build_query($p) : '');
+    return 'trideni-posty.php' . ($p ? '?' . http_build_query($p) : '');
 };
 $methodLabel = ['rule' => 'pravidlo', 'crm' => 'klient CRM', 'heuristic' => 'automaticky', 'ai' => 'AI', 'manual' => 'ručně'];
 ?>
@@ -357,7 +358,7 @@ $methodLabel = ['rule' => 'pravidlo', 'crm' => 'klient CRM', 'heuristic' => 'aut
             </div>
             <div class="text-white-50 mt-3">
                 Třídí se samo každé ~3 minuty, když je někdo v CRM přihlášený. Aby se třídilo i v noci, přidej na serveru cron:<br>
-                <code>*/5 * * * * php <?php echo e(__DIR__); ?>/scripts/mail_sort.php</code>
+                <code>*/5 * * * * php <?php echo e(__DIR__); ?>/posta/cron.php</code>
             </div>
         </div>
     </div>
@@ -524,7 +525,7 @@ $methodLabel = ['rule' => 'pravidlo', 'crm' => 'klient CRM', 'heuristic' => 'aut
         data.csrf_token = CSRF;
         var html = btn ? btn.innerHTML : '';
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + (btn.dataset.busy || 'Pracuji…'); }
-        $.post('api/mail_sort.php', data, function (res) { done(res || {}); })
+        $.post('posta/api.php', data, function (res) { done(res || {}); })
             .fail(function () { done({ success: false, message: 'Server neodpověděl — zkus to znovu.' }); })
             .always(function () { if (btn) { btn.disabled = false; btn.innerHTML = html; } });
     };

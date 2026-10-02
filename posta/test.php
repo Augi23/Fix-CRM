@@ -1,10 +1,10 @@
 <?php
 /**
  * TŘÍDĚNÍ POŠTY — test klasifikátoru a čtení MIME (bez DB a bez sítě).
- * Spuštění z kořene CRM:  php scripts/mail_sort_test.php
+ * Spuštění z kořene CRM:  php posta/test.php
  */
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit("Jen z příkazové řádky.\n"); }
-require_once dirname(__DIR__) . '/includes/mail_sort.php';
+require_once __DIR__ . '/lib.php';
 
 $pass = 0; $fail = 0;
 function ok(string $what, bool $cond, string $detail = ''): void {

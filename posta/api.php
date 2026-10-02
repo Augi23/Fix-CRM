@@ -1,12 +1,12 @@
 <?php
 /**
- * Třídění pošty — akce ze stránky posta.php (jen administrátor).
+ * Třídění pošty — akce ze stránky trideni-posty.php (jen administrátor).
  * Hesla ke schránkám se nikdy nevrací do prohlížeče; prázdné pole = ponechat uložené.
  */
 ob_start();
-require_once '../includes/config.php';
-require_once '../includes/functions.php';
-require_once '../includes/mail_sort.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/lib.php';
 if (ob_get_length()) ob_clean();
 header('Content-Type: application/json; charset=utf-8');
 

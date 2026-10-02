@@ -11,18 +11,6 @@
 return (static function (): array {
 $entries = [
     [
-        'version' => '3.85.0',
-        'date' => '2026-10-02',
-        'time' => '09:10',
-        'title' => 'Třídění pošty: zákazníci, nabídky a roboti zvlášť',
-        'items' => [
-            'Nová stránka <b>Nastavení → Systém → Třídění pošty</b>. Po připojení firemní schránky z Forpsi se každý nový e-mail sám zařadí: <b>zákazníci</b> (lidé s dotazem, poptávkou, reklamací, zprávy z kontaktního formuláře) zůstávají v Doručené poště, <b>firemní nabídky</b> a newslettery jdou do složky Nabídky, <b>automatické souhrny a notifikace</b> z webů a služeb do složky Roboti. Složky se založí samy a jsou vidět i v telefonu, Outlooku a webmailu.',
-            'Než se třídění zapne, <b>Náhled</b> ukáže, jak by se roztřídilo posledních 30 e-mailů, a nic přitom nepřesune. Při zapnutí jde roztřídit i starší poštu (den až 90 dní).',
-            'Třídič pozná klienty z CRM, hromadnou poštu, adresy noreply@, rozesílací systémy i kontaktní formuláře z webu. U nejasných e-mailů se může zeptat AI (volitelně). Když si není jistý, nechá zprávu v Doručené poště. Stav přečteno/nepřečteno se nemění.',
-            'Špatně zařazený e-mail jde v přehledu jedním klikem přeřadit. Přesune se i na serveru a třídič si zapamatuje odesílatele nebo celou firmu. Zprávu, kterou ručně vrátíš do Doručené pošty, už znovu neodklidí.',
-        ],
-    ],
-    [
         'version' => '3.84.3',
         'date' => '2026-09-30',
         'time' => '11:43',
