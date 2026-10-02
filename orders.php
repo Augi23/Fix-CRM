@@ -9,6 +9,10 @@ ensureOrderDeviceBranchColumn(); // fyzické umístění zařízení (přesun me
 ensureOrdersSourceColumn();     // source + legacy_code (migrace 7/2026) — hledání níže se na legacy_code ptá
 
 require_once 'includes/header.php';
+// Třídění pošty na pozadí (levná kontrola, běh max. 1× za ~3 min). Patří do
+// api/notify_poll.php, jenže tam aktualizace na serveru zatím nesmí zapisovat.
+require_once __DIR__ . '/posta/lib.php';
+crmMailSortMaybeSchedule();
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 $limit  = 13;

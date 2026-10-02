@@ -18,6 +18,10 @@ if (!isset($_GET['id']) && !isset($_GET['order_id']) && isset($_GET['scan'])) {
 }
 
 require_once 'includes/header.php';
+// Třídění pošty na pozadí (levná kontrola, běh max. 1× za ~3 min). Patří do
+// api/notify_poll.php, jenže tam aktualizace na serveru zatím nesmí zapisovat.
+require_once __DIR__ . '/posta/lib.php';
+crmMailSortMaybeSchedule();
 
 $id = $_GET['id'] ?? $_GET['order_id'] ?? null;
 if (!$id) die(__('order_id_missing'));

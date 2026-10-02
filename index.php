@@ -3,6 +3,10 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/scan_resolver.php';
 require_once 'includes/header.php';
+// Třídění pošty na pozadí (levná kontrola, běh max. 1× za ~3 min). Patří do
+// api/notify_poll.php, jenže tam aktualizace na serveru zatím nesmí zapisovat.
+require_once __DIR__ . '/posta/lib.php';
+crmMailSortMaybeSchedule();
 
 // Filter for Dashboard - keep same accepted statuses as orders.php
 $allowed_statuses = getAllowedOrderFilterStatuses();

@@ -10,6 +10,10 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
+// Třídění pošty na pozadí (levná kontrola, běh max. 1× za ~3 min). Patří do
+// api/notify_poll.php, jenže tam aktualizace na serveru zatím nesmí zapisovat.
+require_once __DIR__ . '/posta/lib.php';
+crmMailSortMaybeSchedule();
 require_once 'includes/cash_book.php';
 require_once 'includes/pos_shift.php';
 

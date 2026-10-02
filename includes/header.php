@@ -126,7 +126,6 @@ $pageTitleMap = [
     'view_order.php' => __('orders'),
     'dokumenty.php' => 'Dokumenty',
     'dokument.php' => 'Dokumenty',
-    'posta.php' => 'Třídění pošty',
 ];
 $topbarTitle = $pageTitleMap[$current_page] ?? get_setting('company_name', 'Repair CRM');
 
