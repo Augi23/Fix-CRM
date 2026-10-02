@@ -46,6 +46,18 @@ $accountFromPost = static function (?array $existing): array {
         'folder_customer' => $clean((string)($_POST['folder_customer'] ?? ''), 'INBOX'),
         'folder_offer' => $clean((string)($_POST['folder_offer'] ?? ''), 'Nabídky'),
         'folder_robot' => $clean((string)($_POST['folder_robot'] ?? ''), 'Roboti'),
+        // Vlastní složky chodí jako folder[ckey]; vestavěné mají i svoje sloupce,
+        // ale do JSON se ukládají taky, ať je mapování na jednom místě.
+        'folders_json' => (static function () use ($clean): string {
+            $in = $_POST['folder'] ?? [];
+            if (!is_array($in)) { return '[]'; }
+            $out = [];
+            foreach (crmMailCategoryMeta() as $k => $m) {
+                if (!array_key_exists($k, $in)) { continue; }
+                $out[$k] = $clean((string)$in[$k], (string)($m['folder'] ?: 'INBOX'));
+            }
+            return json_encode($out, JSON_UNESCAPED_UNICODE);
+        })(),
         'use_ai' => !empty($_POST['use_ai']) ? 1 : 0,
     ];
 };
@@ -77,14 +89,14 @@ case 'save': {
     try {
         if ($existing) {
             $pdo->prepare('UPDATE mail_sort_accounts SET email=?, imap_host=?, imap_port=?, imap_secure=?, username=?, password=?,
-                folder_customer=?, folder_offer=?, folder_robot=?, use_ai=? WHERE id=?')
+                folder_customer=?, folder_offer=?, folder_robot=?, folders_json=?, use_ai=? WHERE id=?')
                 ->execute([$acc['email'], $acc['imap_host'], $acc['imap_port'], $acc['imap_secure'], $acc['username'], $acc['password'],
-                    $acc['folder_customer'], $acc['folder_offer'], $acc['folder_robot'], $acc['use_ai'], $id]);
+                    $acc['folder_customer'], $acc['folder_offer'], $acc['folder_robot'], $acc['folders_json'], $acc['use_ai'], $id]);
         } else {
             $pdo->prepare('INSERT INTO mail_sort_accounts (email, imap_host, imap_port, imap_secure, username, password,
-                folder_customer, folder_offer, folder_robot, use_ai, enabled) VALUES (?,?,?,?,?,?,?,?,?,?,0)')
+                folder_customer, folder_offer, folder_robot, folders_json, use_ai, enabled) VALUES (?,?,?,?,?,?,?,?,?,?,?,0)')
                 ->execute([$acc['email'], $acc['imap_host'], $acc['imap_port'], $acc['imap_secure'], $acc['username'], $acc['password'],
-                    $acc['folder_customer'], $acc['folder_offer'], $acc['folder_robot'], $acc['use_ai']]);
+                    $acc['folder_customer'], $acc['folder_offer'], $acc['folder_robot'], $acc['folders_json'], $acc['use_ai']]);
             $id = (int)$pdo->lastInsertId();
         }
     } catch (PDOException $e) {
@@ -150,10 +162,55 @@ case 'reclassify': {
     $reply($ok, $msg);
 }
 
+case 'save_category': {
+    $key = strtolower(trim((string)($_POST['ckey'] ?? '')));
+    $label = trim((string)($_POST['label'] ?? ''));
+    $folder = trim(str_replace(['"', "\r", "\n", '*', '%'], '', (string)($_POST['folder'] ?? '')));
+    if ($label === '') { $reply(false, 'Zadej název složky.'); }
+    // klíč se odvodí z názvu (Účetnictví → ucetnictvi) a už se nikdy nemění —
+    // visí na něm pravidla i historie v logu
+    if ($key === '') {
+        $tr = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $label);
+        $key = strtolower(preg_replace('/[^a-z0-9]+/i', '_', (string)$tr));
+        $key = trim($key, '_');
+    }
+    if (!preg_match('/^[a-z0-9_]{2,40}$/', $key)) { $reply(false, 'Z názvu nejde odvodit klíč — použij písmena a číslice.'); }
+    $existing = crmMailCategoryMeta()[$key] ?? null;
+    if ($existing && !empty($existing['builtin'])) {
+        // vestavěné jdou přejmenovat, ale ne smazat ani překlíčovat
+        $pdo->prepare('UPDATE mail_sort_categories SET label=?, folder_default=? WHERE ckey=?')
+            ->execute([$label, $folder ?: (string)$existing['folder'], $key]);
+        $reply(true, 'Složka upravena.');
+    }
+    $pdo->prepare('INSERT INTO mail_sort_categories (ckey, label, one_label, icon, color, folder_default, position, builtin)
+        VALUES (?,?,?,?,?,?,?,0)
+        ON DUPLICATE KEY UPDATE label=VALUES(label), folder_default=VALUES(folder_default),
+                                icon=VALUES(icon), color=VALUES(color)')
+        ->execute([$key, $label, $label,
+            trim((string)($_POST['icon'] ?? '')) ?: 'fa-folder',
+            trim((string)($_POST['color'] ?? '')) ?: '#8e8e93',
+            $folder ?: $label, (int)($_POST['position'] ?? 100)]);
+    crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Třídění pošty — složka ' . $label]);
+    $reply(true, 'Složka uložena.', ['ckey' => $key]);
+}
+
+case 'delete_category': {
+    $key = strtolower(trim((string)($_POST['ckey'] ?? '')));
+    $meta = crmMailCategoryMeta()[$key] ?? null;
+    if (!$meta) { $reply(false, 'Složka neexistuje.'); }
+    if (!empty($meta['builtin'])) { $reply(false, 'Vestavěnou složku smazat nejde — jen přejmenovat.'); }
+    // Pravidla na smazanou složku by tiše přestala fungovat, proto jdou pryč s ní.
+    $n = (int)$pdo->query('SELECT COUNT(*) FROM mail_sort_rules WHERE category = ' . $pdo->quote($key))->fetchColumn();
+    $pdo->prepare('DELETE FROM mail_sort_rules WHERE category = ?')->execute([$key]);
+    $pdo->prepare('DELETE FROM mail_sort_categories WHERE ckey = ? AND builtin = 0')->execute([$key]);
+    crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Třídění pošty — smazána složka ' . $meta['label']]);
+    $reply(true, $n > 0 ? ('Složka smazána i s ' . $n . ' pravidly.') : 'Složka smazána.');
+}
+
 case 'add_rule': {
     $pattern = strtolower(trim((string)($_POST['pattern'] ?? '')));
     $cat = (string)($_POST['category'] ?? '');
-    if (!in_array($cat, CRM_MAIL_CATEGORIES, true)) { $reply(false, 'Vyber kategorii.'); }
+    if (!crmMailCategoryExists($cat)) { $reply(false, 'Vyber složku.'); }
     if (str_starts_with($pattern, '@')) {
         $dom = substr($pattern, 1);
         if (!preg_match('/^[a-z0-9.\-]+\.[a-z]{2,}$/', $dom)) { $reply(false, 'Neplatná doména.'); }

@@ -229,6 +229,12 @@ $methodLabel = ['rule' => 'pravidlo', 'crm' => 'klient CRM', 'heuristic' => 'aut
                     'id' => (int)$a['id'], 'email' => $a['email'], 'imap_host' => $a['imap_host'], 'imap_port' => (int)$a['imap_port'],
                     'imap_secure' => $a['imap_secure'], 'username' => $a['username'], 'folder_customer' => $a['folder_customer'],
                     'folder_offer' => $a['folder_offer'], 'folder_robot' => $a['folder_robot'], 'use_ai' => (int)$a['use_ai'],
+                    // složka pro KAŽDOU kategorii (i vlastní) — formulář je kreslí dynamicky
+                    'folders' => (static function () use ($a, $meta): array {
+                        $out = [];
+                        foreach ($meta as $k => $m) { $out[$k] = crmMailFolderFor($a, $k); }
+                        return $out;
+                    })(),
                 ], JSON_UNESCAPED_UNICODE)); ?>'><i class="fas fa-pen me-1"></i>Upravit</button>
                 <button class="btn btn-sm btn-outline-danger ms-del ms-auto" data-id="<?php echo (int)$a['id']; ?>" data-email="<?php echo e($a['email']); ?>"><i class="fas fa-trash"></i></button>
             </div>
@@ -321,6 +327,32 @@ $methodLabel = ['rule' => 'pravidlo', 'crm' => 'klient CRM', 'heuristic' => 'aut
         <div class="glass-panel border-secondary p-3 h-100">
             <h5 class="mb-1"><i class="fas fa-filter me-2 text-info"></i>Pravidla</h5>
             <div class="small text-white-50 mb-3">Mají přednost před vším ostatním. Vznikají samy, když v přehledu zprávu přeřadíš.</div>
+            <div class="mb-3 pb-3 border-bottom border-secondary">
+                <div class="small text-white-50 mb-2">
+                    Složky, do kterých se třídí. Tři vestavěné plní třídění samo podle obsahu;
+                    vlastní složky se plní <b>pravidly na odesílatele</b> níže.
+                </div>
+                <div class="d-flex gap-2 flex-wrap mb-2">
+                    <?php foreach ($meta as $cat => $m): ?>
+                        <span class="ms-chip" style="--c:<?php echo e($m['color']); ?>">
+                            <i class="fas <?php echo e($m['icon']); ?>"></i><?php echo e($m['label']); ?>
+                            <span class="text-white-50 ms-1">→ <?php echo e($m['folder']); ?></span>
+                            <?php if (empty($m['builtin'])): ?>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2 ms-cat-del"
+                                        data-ckey="<?php echo e($cat); ?>" data-label="<?php echo e($m['label']); ?>"
+                                        title="Smazat složku"><i class="fas fa-xmark"></i></button>
+                            <?php endif; ?>
+                        </span>
+                    <?php endforeach; ?>
+                </div>
+                <form id="msCatForm" class="d-flex gap-2 flex-wrap">
+                    <input type="text" name="label" class="form-control form-control-sm" style="flex:1 1 160px"
+                           placeholder="Název složky (Účetnictví)" required>
+                    <input type="text" name="folder" class="form-control form-control-sm" style="flex:1 1 160px"
+                           placeholder="Složka na serveru (nechat prázdné = stejná)">
+                    <button class="btn btn-sm btn-outline-light"><i class="fas fa-folder-plus me-1"></i>Přidat složku</button>
+                </form>
+            </div>
             <form id="msRuleForm" class="d-flex gap-2 mb-3 flex-wrap">
                 <input type="text" name="pattern" class="form-control form-control-sm" style="flex:1 1 200px" placeholder="jan@firma.cz nebo @firma.cz" required>
                 <select name="category" class="form-select form-select-sm" style="width:auto">
@@ -387,19 +419,13 @@ $methodLabel = ['rule' => 'pravidlo', 'crm' => 'klient CRM', 'heuristic' => 'aut
                 </div>
 
                 <div class="row g-3 mt-1">
+                    <?php foreach ($meta as $cat => $m): ?>
                     <div class="col-md-4">
-                        <label class="form-label small"><span class="ms-chip" style="--c:#30d158"><i class="fas fa-user"></i>Zákazníci</span></label>
-                        <input type="text" name="folder_customer" class="form-control form-control-sm" value="INBOX">
-                        <div class="form-text small">INBOX = zůstávají v Doručené poště</div>
+                        <label class="form-label small"><span class="ms-chip" style="--c:<?php echo e($m['color']); ?>"><i class="fas <?php echo e($m['icon']); ?>"></i><?php echo e($m['label']); ?></span></label>
+                        <input type="text" name="folder[<?php echo e($cat); ?>]" class="form-control form-control-sm" value="<?php echo e($m['folder']); ?>">
+                        <?php if ($cat === 'customer'): ?><div class="form-text small">INBOX = zůstávají v Doručené poště</div><?php endif; ?>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label small"><span class="ms-chip" style="--c:#ff9f0a"><i class="fas fa-tags"></i>Nabídky</span></label>
-                        <input type="text" name="folder_offer" class="form-control form-control-sm" value="Nabídky">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small"><span class="ms-chip" style="--c:#64d2ff"><i class="fas fa-robot"></i>Roboti</span></label>
-                        <input type="text" name="folder_robot" class="form-control form-control-sm" value="Roboti">
-                    </div>
+                    <?php endforeach; ?>
                 </div>
                 <div class="form-text small mb-2">Chybějící složky se na serveru založí samy.</div>
 
@@ -553,11 +579,32 @@ $methodLabel = ['rule' => 'pravidlo', 'crm' => 'klient CRM', 'heuristic' => 'aut
         document.getElementById('msPassHint').classList.toggle('d-none', !acc);
         document.getElementById('msTestOut').innerHTML = '';
         if (acc) {
-            ['email', 'imap_host', 'imap_port', 'imap_secure', 'username', 'folder_customer', 'folder_offer', 'folder_robot'].forEach(function (k) { if (form[k]) form[k].value = acc[k]; });
+            ['email', 'imap_host', 'imap_port', 'imap_secure', 'username'].forEach(function (k) { if (form[k]) form[k].value = acc[k]; });
+            Object.keys(acc.folders || {}).forEach(function (k) {
+                var f = form.querySelector('[name="folder[' + k + ']"]');
+                if (f) f.value = acc.folders[k];
+            });
             form.use_ai.checked = !!acc.use_ai;
         }
         accModal().show();
     };
+    var catForm = document.getElementById('msCatForm');
+    if (catForm) {
+        catForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            api({ action: 'save_category', label: catForm.label.value, folder: catForm.folder.value },
+                function (r) { if (r.success) { flash(r.message); } else { showAlert(esc(r.message)); } },
+                catForm.querySelector('button'));
+        });
+    }
+    document.querySelectorAll('.ms-cat-del').forEach(function (b) {
+        b.addEventListener('click', function () {
+            showConfirm('Smazat složku „' + esc(b.dataset.label) + '“? Smažou se i pravidla, která do ní míří.', function () {
+                api({ action: 'delete_category', ckey: b.dataset.ckey },
+                    function (r) { if (r.success) { flash(r.message); } else { showAlert(esc(r.message)); } });
+            });
+        });
+    });
     ['msAddBtn', 'msAddBtn2'].forEach(function (id) { var b = document.getElementById(id); if (b) b.addEventListener('click', function () { openAcc(null); }); });
     document.querySelectorAll('.ms-edit').forEach(function (b) { b.addEventListener('click', function () { openAcc(JSON.parse(b.dataset.acc)); }); });
     var formData = function (action) {

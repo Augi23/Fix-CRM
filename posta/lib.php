@@ -26,12 +26,51 @@
 const CRM_MAIL_CATEGORIES = ['customer', 'offer', 'robot'];
 
 /** Popisky kategorií pro UI. */
-function crmMailCategoryMeta(): array {
+/** Tři složky, se kterými třídění umí pracovat samo. Heuristika i AI vracejí jen
+ *  tyhle klíče — vlastní složky se plní PRAVIDLY na odesílatele, ne rozpoznáváním. */
+function crmMailBuiltinCategories(): array {
     return [
-        'customer' => ['label' => 'Zákazníci', 'one' => 'Zákazník', 'icon' => 'fa-user', 'color' => '#30d158'],
-        'offer'    => ['label' => 'Nabídky',   'one' => 'Nabídka',  'icon' => 'fa-tags', 'color' => '#ff9f0a'],
-        'robot'    => ['label' => 'Roboti',    'one' => 'Robot',    'icon' => 'fa-robot', 'color' => '#64d2ff'],
+        'customer' => ['label' => 'Zákazníci', 'one' => 'Zákazník', 'icon' => 'fa-user', 'color' => '#30d158', 'folder' => 'INBOX'],
+        'offer'    => ['label' => 'Nabídky',   'one' => 'Nabídka',  'icon' => 'fa-tags', 'color' => '#ff9f0a', 'folder' => 'Nabídky'],
+        'robot'    => ['label' => 'Roboti',    'one' => 'Robot',    'icon' => 'fa-robot', 'color' => '#64d2ff', 'folder' => 'Roboti'],
     ];
+}
+
+/**
+ * Všechny složky — tři vestavěné plus vlastní, které si obsluha založila
+ * (Účetnictví, B2B…). Čte se z `mail_sort_categories`; kdyby tabulka ještě
+ * nebyla, vrátí aspoň vestavěné, aby třídění běželo dál.
+ */
+function crmMailCategoryMeta(): array {
+    global $pdo;
+    static $cache = null;
+    if ($cache !== null) { return $cache; }
+    $cache = crmMailBuiltinCategories();
+    if (!isset($pdo)) { return $cache; }
+    try {
+        crmMailEnsureSchema();
+        $rows = $pdo->query('SELECT ckey, label, one_label, icon, color, folder_default, builtin
+                             FROM mail_sort_categories ORDER BY builtin DESC, position, id');
+        $out = [];
+        foreach ($rows as $r) {
+            $k = (string)$r['ckey'];
+            $out[$k] = [
+                'label'   => (string)$r['label'],
+                'one'     => (string)($r['one_label'] ?: $r['label']),
+                'icon'    => (string)($r['icon'] ?: 'fa-folder'),
+                'color'   => (string)($r['color'] ?: '#8e8e93'),
+                'folder'  => (string)($r['folder_default'] ?: $k),
+                'builtin' => (int)$r['builtin'] === 1,
+            ];
+        }
+        if ($out) { $cache = $out; }
+    } catch (Throwable $e) { /* zůstanou vestavěné */ }
+    return $cache;
+}
+
+/** Existuje taková složka? Pojistka proti pravidlu na smazanou složku. */
+function crmMailCategoryExists(string $key): bool {
+    return isset(crmMailCategoryMeta()[$key]);
 }
 
 /* ═════════════════════════════  IMAP KLIENT  ═════════════════════════════ */
@@ -839,6 +878,40 @@ function crmMailEnsureSchema(): void
         PRIMARY KEY (id),
         UNIQUE KEY uq_pattern (pattern)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS mail_sort_categories (
+        id INT NOT NULL AUTO_INCREMENT,
+        ckey VARCHAR(40) NOT NULL,
+        label VARCHAR(80) NOT NULL,
+        one_label VARCHAR(80) NOT NULL DEFAULT '',
+        icon VARCHAR(40) NOT NULL DEFAULT 'fa-folder',
+        color VARCHAR(16) NOT NULL DEFAULT '#8e8e93',
+        folder_default VARCHAR(190) NOT NULL DEFAULT '',
+        position INT NOT NULL DEFAULT 100,
+        builtin TINYINT(1) NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_ckey (ckey)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // vestavěné složky musí v tabulce být vždy — maže se jen to, co si obsluha založila
+    $ins = $pdo->prepare('INSERT IGNORE INTO mail_sort_categories
+        (ckey, label, one_label, icon, color, folder_default, position, builtin)
+        VALUES (?,?,?,?,?,?,?,1)');
+    $i = 0;
+    foreach (crmMailBuiltinCategories() as $k => $m) {
+        $ins->execute([$k, $m['label'], $m['one'], $m['icon'], $m['color'], $m['folder'], $i++]);
+    }
+
+    // Vlastní složky nemají vlastní sloupec u schránky (šlo by to do nekonečna) —
+    // mapování „složka → název na IMAP serveru" se ukládá jako JSON. Tři vestavěné
+    // zůstávají i ve svých sloupcích, aby starší kód a migrace nespadly.
+    foreach ([
+        "ALTER TABLE mail_sort_accounts ADD COLUMN folders_json TEXT NULL",
+        "ALTER TABLE mail_sort_rules MODIFY category VARCHAR(40) NOT NULL",
+        "ALTER TABLE mail_sort_log MODIFY category VARCHAR(40) NOT NULL",
+    ] as $sql) {
+        try { $pdo->exec($sql); } catch (Throwable $e) { /* už existuje */ }
+    }
     $done = true;
 }
 
@@ -928,9 +1001,21 @@ function crmMailConnect(array $acc): CrmImap
     return $imap;
 }
 
+/**
+ * Do jaké složky na IMAP serveru patří daná kategorie u této schránky.
+ * Pořadí: vlastní nastavení schránky (folders_json) → starý sloupec u tří
+ * vestavěných → výchozí název složky → INBOX.
+ */
 function crmMailFolderFor(array $acc, string $category): string
 {
-    $f = trim((string)($acc['folder_' . $category] ?? ''));
+    $map = [];
+    if (!empty($acc['folders_json'])) {
+        $d = json_decode((string)$acc['folders_json'], true);
+        if (is_array($d)) { $map = $d; }
+    }
+    $f = trim((string)($map[$category] ?? ''));
+    if ($f === '') { $f = trim((string)($acc['folder_' . $category] ?? '')); }
+    if ($f === '') { $f = trim((string)(crmMailCategoryMeta()[$category]['folder'] ?? '')); }
     return $f === '' ? 'INBOX' : $f;
 }
 
@@ -1173,7 +1258,7 @@ function crmMailReclassify(int $logId, string $category, string $learn = 'sender
 {
     global $pdo;
     crmMailEnsureSchema();
-    if (!in_array($category, CRM_MAIL_CATEGORIES, true)) { return [false, 'Neznámá kategorie.']; }
+    if (!crmMailCategoryExists($category)) { return [false, 'Neznámá složka.']; }
     $s = $pdo->prepare('SELECT * FROM mail_sort_log WHERE id = ?');
     $s->execute([$logId]);
     $row = $s->fetch(PDO::FETCH_ASSOC);
