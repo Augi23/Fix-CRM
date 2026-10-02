@@ -597,6 +597,10 @@ $sysSubnav = function (string $cur) use ($sys_subs_allowed) {
            . '" href="?tab=system&sub=' . $key . '"><i class="fas ' . $it[0] . ' me-2"></i>'
            . htmlspecialchars($it[1]) . '</a></li>';
     }
+    // Třídění pošty má vlastní stránku (posta.php) — jen odkaz, admin-only
+    if (in_array('integrace', $sys_subs_allowed, true)) {
+        echo '<li class="nav-item"><a class="nav-link text-white-75" href="posta.php"><i class="fas fa-envelope-open-text me-2"></i>Třídění pošty</a></li>';
+    }
     echo '</ul>';
 };
 
@@ -940,6 +944,14 @@ require_once 'includes/header.php';
                             }, 'json').fail(function () { out.textContent = '✗ Chyba spojení'; });
                         }
                         </script>
+                        <div class="d-flex align-items-center gap-3 flex-wrap mt-3 p-3 rounded border border-secondary">
+                            <i class="fas fa-envelope-open-text fa-lg text-info"></i>
+                            <div class="flex-grow-1 small">
+                                <b>Třídění příchozí pošty</b> — e-maily ve firemní schránce (Forpsi) se samy rozdělí na
+                                zákazníky, firemní nabídky a automatické souhrny.
+                            </div>
+                            <a href="posta.php" class="btn btn-sm btn-outline-info"><i class="fas fa-arrow-right me-1"></i>Otevřít</a>
+                        </div>
                     </div>
 
                     <div class="col-12 border-top border-secondary pt-3">

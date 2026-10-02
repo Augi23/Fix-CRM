@@ -16,6 +16,11 @@ if (!isset($_SESSION['user_id'])) {
 // místo pro odpálení automatické zálohy (každých 15 minut, na pozadí).
 crmBackupMaybeSchedule();
 
+// Třídění firemní pošty (Forpsi IMAP) — na pozadí každé ~3 minuty, jen když je
+// nějaká schránka zapnutá (Nastavení → Systém → Třídění pošty).
+require_once __DIR__ . '/../includes/mail_sort.php';
+crmMailSortMaybeSchedule();
+
 // Měření aktivního času v systému (statistiky: hodiny Bosse/adminů = práce na CRM)
 crmTrackStaffActivity();
 
