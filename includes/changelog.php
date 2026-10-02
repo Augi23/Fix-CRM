@@ -11,6 +11,39 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.86.1',
+        'date' => '2026-10-02',
+        'time' => '15:30',
+        'title' => 'Sklad: hodinky s vlastními parametry, sloupec Zápůjčka, přesný text o DPH',
+        'items' => [
+            'Apple Watch a hodinky mají ve formuláři vlastní pole: <b>velikost pouzdra, konektivitu</b> (GPS / Cellular), u Apple Watch i <b>materiál a sklo</b>. Velikost a konektivita jdou do názvu, zbytek do parametrů a popisu. Barvy hodinek mají vlastní seznam a přibyly nové modely (Series 11–12, Ultra 3–4, SE 3. gen).',
+            'Seznam skladu ukazuje sloupec <b>Zápůjčka</b> (důvod, komu, od kdy, kdo zapsal), když je na stránce zapůjčený kus nebo filtr Zapůjčeno.',
+            'Popis produktů a feedy pro e-shop, Heureku a Zboží.cz už neuvádějí „zvláštní režim DPH §90“. AppleFix je neplátce DPH, text teď zní <b>„Použité zboží — neplátce DPH, cena je konečná“</b>.',
+            'Náhled na e-shopu už nezmizí po přejmenování modelu nebo opravě barvy. Kus si původní fotku ponechá a knihovna fotek pozná i zápis bez značky, české názvy barev a odstíny černé (Space Black, Midnight…).',
+            'Tyto úpravy byly dřív jen na serveru a blokovaly aktualizace. Teď jsou součástí verze, takže se při další aktualizaci neztratí.',
+        ],
+    ],
+    [
+        'version' => '3.86.0',
+        'date' => '2026-10-02',
+        'time' => '14:14',
+        'title' => 'Třídění pošty: vlastní složky',
+        'items' => [
+            'Kromě složek Zákazníci, Nabídky a Roboti jdou v Třídění pošty zakládat <b>vlastní složky</b> (např. Účetnictví, B2B). Plní se pravidly podle odesílatele nebo domény.',
+        ],
+    ],
+    [
+        'version' => '3.85.1',
+        'date' => '2026-10-02',
+        'time' => '11:13',
+        'title' => 'Třídění firemní pošty (Forpsi)',
+        'items' => [
+            'Nová stránka <b>Třídění pošty</b> (Nastavení → Systém): pošta ve firemní schránce se sama rozdělí. Zákazníci zůstávají v Doručené poště, firemní nabídky a reklama jdou do složky Nabídky, automatické souhrny a notifikace do složky Roboti.',
+            'Rozhoduje se podle pravidel, podle toho, jestli je odesílatel klient v CRM, podle hlaviček hromadné pošty a volitelně AI. Když si třídič není jistý, nechá zprávu v Doručené poště. Přeřazení jedním klikem se naučí jako pravidlo.',
+            'Třídí se samo každých 5 minut i bez přihlášeného uživatele.',
+        ],
+    ],
+    [
         'version' => '3.84.3',
         'date' => '2026-09-30',
         'time' => '11:43',

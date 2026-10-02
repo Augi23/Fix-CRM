@@ -18,8 +18,10 @@
  *   limit=<n>            max 2000 (default 500), offset=<n>
  *
  * Odpověď: { ok, generated_at, count, total, limit, offset, products:[ … ] }
- * Ceny jsou S DPH. Použité zboží běží ve zvláštním režimu §90 (vat_margin_scheme_90=true) —
- * e-shop NESMÍ z prodejní ceny vyčíslovat DPH.
+ * Ceny jsou KONEČNÉ. AppleFix je neplátce DPH, takže se DPH nevyčísluje vůbec —
+ * e-shop NESMÍ z prodejní ceny žádnou DPH odvozovat. Příznak se z historických
+ * důvodů jmenuje vat_margin_scheme_90, ale znamená právě „cena je konečná, DPH
+ * se nevyčísluje" (§90 může uplatnit jen plátce — oprava 30.9.2026).
  */
 ob_start();
 require_once '../includes/config.php';
@@ -85,7 +87,8 @@ try {
         $raw = json_decode((string)($p['raw_csv'] ?? ''), true);
         if (!is_array($raw)) $raw = [];
 
-        // §90 (zvláštní režim použitého zboží): [VAT]=0 nebo věta „§90" v krátkém popisu.
+        // Cena je konečná, DPH se nevyčísluje: [VAT]=0. Věty „§90" / „zvláštní režim"
+        // se v popisech už negenerují (neplátce DPH), zůstávají jen pro starší kusy.
         $shortDesc = (string)($raw['[SHORT_DESCRIPTION]'] ?? $raw['SHORT_DESCRIPTION'] ?? '');
         $vatVal    = trim((string)($raw['[VAT]'] ?? $raw['VAT'] ?? ''));
         $margin90  = ($vatVal === '0' || $vatVal === '0.0' || $vatVal === '0.00')

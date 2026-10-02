@@ -12,6 +12,17 @@ const AFX_ANDROID_COLORS = ['Black', 'White', 'Blue', 'Green', 'Grey', 'Silver',
 const AFX_COMPUTER_COLORS = ['Black', 'White', 'Silver', 'Grey', 'Space Gray', 'Graphite', 'Blue', 'Red'];
 const AFX_ACCESSORY_COLORS = ['Black', 'White', 'Grey', 'Silver', 'Transparent', 'Blue', 'Green', 'Pink', 'Purple', 'Red'];
 const AFX_ACCESSORY_PROPERTIES = ['ochranný', 'designový', 'vodotěsný', 'průhledný', 'MagSafe', 'odolný', 'slim', 'kožený', 'sportovní', 'univerzální'];
+/* Apple Watch — vlastní číselníky. Generická AFX_APPLE_COLORS je paleta iPhonů
+   (Sierra Blue, Desert Titanium…), u hodinek by nabízela barvy, které Apple nikdy
+   nedělal. Materiál a sklo jdou jen do popisu a parametrů, do názvu ne. */
+const AFX_WATCH_SIZES = ['38 mm', '40 mm', '41 mm', '42 mm', '44 mm', '45 mm', '46 mm', '49 mm'];
+const AFX_WATCH_CONNECTIVITY = ['GPS', 'GPS + Cellular'];
+const AFX_WATCH_CASES = ['Hliník', 'Nerezová ocel', 'Titan', 'Keramika'];
+const AFX_WATCH_GLASS = ['Ion-X', 'Safírové'];
+const AFX_WATCH_COLORS = ['Silver', 'Space Gray', 'Space Black', 'Graphite', 'Slate',
+    'Gold', 'Rose Gold', 'Black', 'Jet Black', 'White', 'Midnight', 'Starlight',
+    'Blue', 'Green', 'Pink', 'Red', 'Yellow', 'Orange',
+    'Natural Titanium', 'Black Titanium', 'Ceramic White'];
 const AFX_CAPS = ['16 GB', '32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB', '2 TB'];
 // RAM/jádra mají i telefony, tablety, konzole… — menší hodnoty pro ne-Macy (31.7. rozšířeno)
 const AFX_RAMS = ['2 GB', '3 GB', '4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '18 GB', '24 GB', '32 GB', '36 GB', '48 GB', '64 GB', '96 GB', '128 GB'];
@@ -184,6 +195,8 @@ const AFX_APPLE_WATCHES = [
     'Apple Watch Series 3', 'Apple Watch Series 4', 'Apple Watch Series 5', 'Apple Watch Series 6',
     'Apple Watch SE (1. gen)', 'Apple Watch Series 7', 'Apple Watch Series 8', 'Apple Watch Ultra',
     'Apple Watch SE (2. gen)', 'Apple Watch Series 9', 'Apple Watch Ultra 2', 'Apple Watch Series 10',
+    'Apple Watch Series 11', 'Apple Watch Ultra 3', 'Apple Watch SE (3. gen)',
+    'Apple Watch Series 12', 'Apple Watch Ultra 4',
 ];
 const AFX_AIRPODS = [
     'AirPods (2. generace)', 'AirPods (3. generace)', 'AirPods (4. generace)',
@@ -389,7 +402,7 @@ function afxProductTypes(): array {
             ['id' => 'Mac mini', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver', 'Space Gray'], 'models' => AFX_MAC_MINI],
             ['id' => 'Mac Studio', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver'], 'models' => AFX_MAC_STUDIO],
             ['id' => 'Mac Pro', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver', 'Black'], 'models' => AFX_MAC_PRO],
-            ['id' => 'Apple Watch', 'manuf' => 'Apple', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'colors' => AFX_APPLE_COLORS, 'models' => AFX_APPLE_WATCHES],
+            ['id' => 'Apple Watch', 'manuf' => 'Apple', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'watch' => true, 'colors' => AFX_WATCH_COLORS, 'models' => AFX_APPLE_WATCHES],
             ['id' => 'AirPods', 'manuf' => 'Apple', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'colors' => ['White', 'Midnight', 'Blue', 'Purple', 'Orange'], 'models' => AFX_AIRPODS],
             ['id' => 'Apple TV', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => ['Black'], 'models' => AFX_APPLE_TV],
             ['id' => 'HomePod', 'manuf' => 'Apple', 'k' => '', 'cap' => false, 'ram' => false, 'gen' => false, 'colors' => ['White', 'Midnight', 'Space Gray', 'Yellow', 'Orange', 'Blue'], 'models' => AFX_HOMEPODS],
@@ -466,7 +479,23 @@ function afxProductFieldRelevance(array $t, string $model): array {
     }
     $noBattery = $desktop || in_array($id, ['apple tv', 'homepod'], true);
     $noRam = in_array($id, ['apple watch', 'hodinky', 'airpods', 'sluchátka', 'apple tv', 'homepod'], true);
-    return ['battery' => !$noBattery, 'ram' => !$noRam];
+    // velikost + konektivita dávají smysl u VŠECH hodinek, materiál a sklo jen
+    // u Apple Watch (u Garminu by to byl balast). Zrcadlo v products.php::fieldRelevance().
+    return ['battery' => !$noBattery, 'ram' => !$noRam,
+            'watch' => afxProductIsWatch($t, $model), 'watchCase' => afxProductIsAppleWatch($t, $model)];
+}
+
+/** Apple Watch — typ má příznak 'watch', nebo to prozradí název (ruční zadání). */
+function afxProductIsAppleWatch(array $t, string $model = ''): bool {
+    if (!empty($t['accessory'])) return false;
+    if (!empty($t['watch'])) return true;
+    return str_contains(mb_strtolower(trim((string)($t['id'] ?? '') . ' ' . $model)), 'apple watch');
+}
+/** Hodinky obecně: Apple Watch + typ „Hodinky" cizích značek. */
+function afxProductIsWatch(array $t, string $model = ''): bool {
+    if (afxProductIsAppleWatch($t, $model)) return true;
+    if (!empty($t['accessory'])) return false;
+    return mb_strtolower(trim((string)($t['id'] ?? ''))) === 'hodinky';
 }
 
 /** Kam patří pole jader/grafiky (přání 23.8.2026):
@@ -656,10 +685,19 @@ function afxProductAssemble(array $in): array {
     $fieldRel = afxProductFieldRelevance($t, $model);
     if (!$fieldRel['battery']) { $bat = ''; }
     if (!$fieldRel['ram']) { $ram = ''; }
+    // Hodinková pole. Pojistka: u ne-hodinek se zahodí, aby je přepnutí typu
+    // ve formuláři nepřeneslo na iPhone.
+    $watchSize  = trim((string)($in['watch_size'] ?? ''));
+    $watchConn  = trim((string)($in['watch_conn'] ?? ''));
+    $watchCase  = trim((string)($in['watch_case'] ?? ''));
+    $watchGlass = trim((string)($in['watch_glass'] ?? ''));
+    if (empty($fieldRel['watch']))     { $watchSize = ''; $watchConn = ''; }
+    if (empty($fieldRel['watchCase'])) { $watchCase = ''; $watchGlass = ''; }
     $rocnik = trim((string)($in['rocnik'] ?? ''));
     $generace = $t['gen'] ? trim((string)($in['generace'] ?? '')) : '';
     if (!empty($t['accessory'])) {
         $cap = $ram = $cpu = $gpu = $gpuModel = $processorFamily = $processorModel = $processorDisplay = $bat = $rocnik = $generace = '';
+        $watchSize = $watchConn = $watchCase = $watchGlass = '';
     } else {
         $accessoryForModel = $accessoryProperty = $accessoryNote = '';
     }
@@ -700,7 +738,10 @@ function afxProductAssemble(array $in): array {
     $spec = implode(', ', $specParts);
     // Stav (grade) do NÁZVU nepatří (přání 1.8.2026) — zůstává jen v parametru
     // [PARAMETER "Stav"], v popisu a v buňce Stav (CRM tabulka i e-shop).
-    $titleParts = array_filter([$titleModel, $spec, $color], static fn($p) => $p !== '');
+    // Do NÁZVU jde jen velikost a konektivita — 41 vs 45 mm a GPS vs Cellular
+    // rozhodují o ceně a lidé to tak hledají. Materiál a sklo zůstávají v parametrech.
+    $watchTitle = trim($watchSize . ' ' . $watchConn);
+    $titleParts = array_filter([$titleModel, $spec, $watchTitle, $color], static fn($p) => $p !== '');
     $title = trim(implode(' ', $titleParts));
 
     // SHORT_DESCRIPTION — pořadí přesně dle form_row()
@@ -716,10 +757,17 @@ function afxProductAssemble(array $in): array {
     if ($accessoryForModel !== '') $sd[] = 'Pro model: ' . $accessoryForModel;
     if ($accessoryProperty !== '') $sd[] = 'Vlastnost: ' . $accessoryProperty;
     if ($accessoryNote !== '') $sd[] = 'Vlastní text: ' . $accessoryNote;
+    if ($watchSize !== '') $sd[] = 'Velikost pouzdra: ' . $watchSize;
+    if ($watchConn !== '') $sd[] = 'Konektivita: ' . $watchConn;
+    if ($watchCase !== '') $sd[] = 'Materiál pouzdra: ' . $watchCase;
+    if ($watchGlass !== '') $sd[] = 'Krycí sklo: ' . $watchGlass;
     if ($color !== '') $sd[] = 'Barva: ' . $color;
     if ($rocnik !== '') $sd[] = 'Ročník: ' . $rocnik;
     if ($generace !== '') $sd[] = 'Generace: ' . $generace;
-    $sd[] = 'Zvláštní režim DPH §90 (použité zboží)';
+    // AppleFix NENÍ plátce DPH — zvláštní režim podle §90 zákona o DPH může uplatnit
+    // jen plátce, u neplátce by to bylo nepravdivé tvrzení (oprava 30.9.2026).
+    // Věta jde i do feedů pro Heureku a Zboží.cz, proto musí být přesná.
+    $sd[] = 'Použité zboží — neplátce DPH, cena je konečná';
     $shortDesc = implode(' | ', $sd);
 
     $stockVal = $sold ? '0' : '1';
@@ -748,6 +796,10 @@ function afxProductAssemble(array $in): array {
         '[PARAMETER "Pro model"]' => $accessoryForModel,
         '[PARAMETER "Vlastnost"]' => $accessoryProperty,
         '[PARAMETER "Vlastní text"]' => $accessoryNote,
+        '[PARAMETER "Velikost pouzdra"]' => $watchSize,
+        '[PARAMETER "Konektivita"]' => $watchConn,
+        '[PARAMETER "Materiál pouzdra"]' => $watchCase,
+        '[PARAMETER "Krycí sklo"]' => $watchGlass,
         '[PARAMETER "Barva"]' => $color,
         '[PARAMETER "Stav"]' => $gradeToken,
         '[PARAMETER "Baterie"]' => $bat !== '' ? $bat . ' %' : '',

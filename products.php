@@ -86,6 +86,15 @@ $stmt = $pdo->prepare("SELECT * FROM products" . $where_sql . " ORDER BY added_a
 $stmt->execute($params);
 $products = $stmt->fetchAll();
 
+// Sloupec „Zápůjčka“ se ukazuje jen když dává smysl — při filtru Zapůjčeno,
+// nebo když je na stránce aspoň jeden zapůjčený kus. Jinak by v široké tabulce
+// zabíral místo naprázdno. Při přidání dalšího sloupce upravit i colspan níže.
+$showLoanCol = ($avail === 'loan');
+if (!$showLoanCol) {
+    foreach ($products as $__p) { if (!empty($__p['loan_at'])) { $showLoanCol = true; break; } }
+    unset($__p);
+}
+
 $statStmt = $pdo->prepare("SELECT COUNT(*) AS total,
         SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN stock_qty ELSE 0 END) AS in_stock,
         SUM(CASE WHEN stock_qty > 0 AND loan_at IS NULL THEN price * stock_qty ELSE 0 END) AS stock_value,
@@ -173,8 +182,9 @@ try {
           <input type="text" class="form-control" id="loanTo" placeholder="např. Štěpán Říčan" maxlength="120">
         </div>
         <div class="mb-2">
-          <label class="form-label small">Poznámka</label>
-          <input type="text" class="form-control" id="loanNote" placeholder="kontakt, do kdy, dohoda…" maxlength="255">
+          <label class="form-label small">Důvod zapůjčení / poznámka</label>
+          <input type="text" class="form-control" id="loanNote" placeholder="např. náhrada po dobu servisu, vrátí 20. 10." maxlength="255">
+          <div class="form-text small">Ukáže se v seznamu skladu ve sloupci Zápůjčka.</div>
         </div>
         <div class="small text-white-50">Kus zůstane ve skladu i v přehledech, ale na e-shop se posílat nebude.</div>
       </div>
@@ -269,13 +279,14 @@ try {
                                 <th>Cena</th>
                                 <th>Dostupnost</th>
                                 <th>Naskladněno</th>
+                                <?php if ($showLoanCol): ?><th>Zápůjčka</th><?php endif; ?>
                                 <th class="text-end pe-4"><?php echo __('action'); ?></th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($products)): ?>
                                 <tr>
-                                    <td colspan="9" class="text-center py-5 text-muted">
+                                    <td colspan="<?php echo $showLoanCol ? 10 : 9; ?>" class="text-center py-5 text-muted">
                                         <i class="fas fa-mobile-alt fa-3x mb-3 d-block opacity-25"></i>
                                         Zatím žádné produkty.<?php echo $canManage ? ' Naskladni první kus tlačítkem „Naskladnit produkt" vpravo nahoře.' : ''; ?>
                                     </td>
@@ -374,6 +385,32 @@ try {
                                             <div style="font-size:11px;opacity:.62;line-height:1.35;"><i class="fas fa-user" style="font-size:.85em;margin-right:.25em;"></i><?php echo e($p['created_by']); ?></div>
                                         <?php endif; ?>
                                     </td>
+                                    <?php if ($showLoanCol): ?>
+                                    <td style="max-width:230px;">
+                                        <?php if (!empty($p['loan_at'])): ?>
+                                            <?php $loanNote = trim((string)($p['loan_note'] ?? '')); ?>
+                                            <?php if ($loanNote !== ''): ?>
+                                                <div class="fw-semibold" style="font-size:12px;line-height:1.4;white-space:normal;"><?php echo e($loanNote); ?></div>
+                                            <?php else: ?>
+                                                <div class="fst-italic text-white-75" style="font-size:12px;line-height:1.4;">důvod nevyplněn</div>
+                                            <?php endif; ?>
+                                            <?php if (trim((string)($p['loan_to'] ?? '')) !== ''): ?>
+                                                <div style="font-size:11.5px;line-height:1.4;margin-top:.15rem;"><i class="fas fa-user-tag me-1" style="color:#8B5CF6"></i><?php echo e($p['loan_to']); ?></div>
+                                            <?php endif; ?>
+                                            <?php
+                                                $loanFrom = strtotime((string)$p['loan_at']);
+                                                $loanDays = $loanFrom ? (int)floor((time() - $loanFrom) / 86400) : null;
+                                            ?>
+                                            <div style="font-size:10.5px;opacity:.62;line-height:1.35;margin-top:.15rem;">
+                                                <?php if ($loanFrom): ?>od <?php echo date('j.n.Y', $loanFrom); ?><?php endif; ?>
+                                                <?php if ($loanDays !== null): ?> · <?php echo $loanDays; ?>&nbsp;<?php echo ($loanDays === 1 ? 'den' : ($loanDays >= 2 && $loanDays <= 4 ? 'dny' : 'dní')); ?><?php endif; ?>
+                                                <?php if (trim((string)($p['loan_by'] ?? '')) !== ''): ?><br>zapsal(a) <?php echo e($p['loan_by']); ?><?php endif; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-white-75">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <?php endif; ?>
                                     <?php if ($canManageBranch): ?>
                                     <td class="text-end pe-4">
                                         <div class="btn-group btn-group-sm afx-row-actions">
@@ -507,6 +544,24 @@ try {
                             <div class="col-md-3 pc-field-cap">
                                 <label class="form-label small">Úložiště</label>
                                 <select id="pcCap" class="form-select"></select>
+                            </div>
+                            <?php /* Apple Watch: velikost/konektivita u všech hodinek,
+                                     materiál a sklo jen u Apple — řídí syncFieldVisibility() */ ?>
+                            <div class="col-md-3 pc-field-watch" style="display:none;">
+                                <label class="form-label small">Velikost pouzdra</label>
+                                <select id="pcWatchSize" class="form-select"></select>
+                            </div>
+                            <div class="col-md-3 pc-field-watch" style="display:none;">
+                                <label class="form-label small">Konektivita</label>
+                                <select id="pcWatchConn" class="form-select"></select>
+                            </div>
+                            <div class="col-md-3 pc-field-watchcase" style="display:none;">
+                                <label class="form-label small">Materiál pouzdra</label>
+                                <select id="pcWatchCase" class="form-select"></select>
+                            </div>
+                            <div class="col-md-3 pc-field-watchcase" style="display:none;">
+                                <label class="form-label small">Krycí sklo</label>
+                                <select id="pcWatchGlass" class="form-select"></select>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small">Barva</label>
@@ -781,6 +836,8 @@ $(document).on('click', '.product-label-btn', function () {
         'caps' => AFX_CAPS, 'rams' => AFX_RAMS, 'cpus' => AFX_CPU_CORES, 'gpus' => AFX_GPU_CORES,
         'gpuModels' => $pcMerged['gpuModels'],
         'processors' => $pcMerged['processors'],
+        'watchSizes' => AFX_WATCH_SIZES, 'watchConn' => AFX_WATCH_CONNECTIVITY,
+        'watchCases' => AFX_WATCH_CASES, 'watchGlass' => AFX_WATCH_GLASS,
         'grades' => AFX_GRADE_LABELS,
         'years' => array_map('strval', range(2026, 2010)),
         'gens' => array_map('strval', range(1, 11)),
@@ -796,6 +853,8 @@ $(document).on('click', '.product-label-btn', function () {
         $accessoryForModel = el('pcAccessoryForModel'), $accessoryProperty = el('pcAccessoryProperty'), $accessoryPropertyC = el('pcAccessoryPropertyCustom'),
         $accessoryText = el('pcAccessoryText'),
         $cap = el('pcCap'), $color = el('pcColor'), $colorC = el('pcColorCustom'),
+        $watchSize = el('pcWatchSize'), $watchConn = el('pcWatchConn'),
+        $watchCase = el('pcWatchCase'), $watchGlass = el('pcWatchGlass'),
         $grade = el('pcGrade'), $stockKey = el('pcStockKey'), $bat = el('pcBattery'),
         $price = el('pcPrice'), $purchase = el('pcPurchasePrice'), $serial = el('pcSerial'), $ram = el('pcRam'),
         $processorFamily = el('pcProcessorFamily'), $processorModel = el('pcProcessorModel'), $processorModelC = el('pcProcessorModelCustom'),
@@ -902,13 +961,18 @@ $(document).on('click', '.product-label-btn', function () {
             .some(function (n) { return hay.indexOf(n) >= 0; });
         var noBattery = desktop || id === 'apple tv' || id === 'homepod';
         var noRam = ['apple watch', 'hodinky', 'airpods', 'sluchátka', 'apple tv', 'homepod'].indexOf(id) >= 0;
-        return { cap: !!t.cap, battery: !noBattery, ram: !noRam };
+        // zrcadlo afxProductIsWatch()/afxProductIsAppleWatch()
+        var isAppleWatch = !!t.watch || hay.indexOf('apple watch') >= 0;
+        var isWatch = isAppleWatch || id === 'hodinky';
+        return { cap: !!t.cap, battery: !noBattery, ram: !noRam, watch: isWatch, watchCase: isAppleWatch };
     }
     function syncFieldVisibility() {
         var rel = fieldRelevance();
         document.querySelectorAll('.pc-field-cap').forEach(function (n) { n.style.display = rel.cap ? '' : 'none'; });
         document.querySelectorAll('.pc-field-battery').forEach(function (n) { n.style.display = rel.battery ? '' : 'none'; });
         document.querySelectorAll('.pc-field-ram').forEach(function (n) { n.style.display = rel.ram ? '' : 'none'; });
+        document.querySelectorAll('.pc-field-watch').forEach(function (n) { n.style.display = rel.watch ? '' : 'none'; });
+        document.querySelectorAll('.pc-field-watchcase').forEach(function (n) { n.style.display = rel.watchCase ? '' : 'none'; });
     }
     function processorFamiliesForType() {
         if (!typeHasProcessorFields()) return [];
@@ -1069,7 +1133,8 @@ $(document).on('click', '.product-label-btn', function () {
         if (colorVal()) out.push('Barva: ' + colorVal());
         if ($rocnik.value) out.push('Ročník: ' + $rocnik.value);
         if (t.gen && $gen.value) out.push('Generace: ' + $gen.value);
-        out.push('Zvláštní režim DPH §90 (použité zboží)');
+        // Neplátce DPH — žádný §90 (musí souhlasit s afxProductAssemble()).
+        out.push('Použité zboží — neplátce DPH, cena je konečná');
         return out.join(' | ');
     }
     function refreshPreview() {
@@ -1232,6 +1297,11 @@ $(document).on('click', '.product-label-btn', function () {
     // init
     fillSelect($manuf, CATALOG.manufacturers, false, true);
     fillSelect($cap, CATALOG.caps, true, false);
+    // hodinky: prázdná volba navrch (u starších kusů se nemusí vědět), vlastní hodnota povolená
+    fillSelect($watchSize, CATALOG.watchSizes || [], true, true);
+    fillSelect($watchConn, CATALOG.watchConn || [], true, false);
+    fillSelect($watchCase, CATALOG.watchCases || [], true, true);
+    fillSelect($watchGlass, CATALOG.watchGlass || [], true, false);
     fillSelect($grade, CATALOG.grades, false, false);
     fillSelect($ram, CATALOG.rams, true, false);
     fillSelect($processorFamily, [], true, false);
@@ -1962,6 +2032,10 @@ $(document).on('click', '.product-label-btn', function () {
         fd.append('stock_qty', String(qty));
         if (qtyOriginal !== '') { fd.append('stock_qty_orig', qtyOriginal); }
         fd.append('stock_key', $stockKey.value);
+        fd.append('watch_size', $watchSize.value);
+        fd.append('watch_conn', $watchConn.value);
+        fd.append('watch_case', $watchCase.value);
+        fd.append('watch_glass', $watchGlass.value);
         fd.append('image_url', $imageUrl.value);
         fd.append('studio_url', $studioUrl.value);
         fd.append('gallery_urls', $galleryUrls.value);
@@ -2039,6 +2113,7 @@ $(document).on('click', '.product-label-btn', function () {
         if (el('pcQty')) { el('pcQty').value = '1'; el('pcQty').disabled = false; }
         qtyBeforeSold = '1';
         syncQtyWithSerial();                    // SN je vyčištěné → pole zase odemknout
+                [$watchSize, $watchConn, $watchCase, $watchGlass].forEach(function (n) { n.value = ''; });
                 $photo.value = ''; $imageUrl.value = '';
                 resetGalleryAll([], '', '');
                 el('pcPreviewImgWrap').style.display = 'none';
@@ -2115,6 +2190,7 @@ $(document).on('click', '.product-label-btn', function () {
         $sold.checked = false;
         el('pcHideEshop').checked = false;
         if (el('pcEshopNote')) { el('pcEshopNote').value = ''; }
+        [$watchSize, $watchConn, $watchCase, $watchGlass].forEach(function (n) { n.value = ''; });
         $photo.value = ''; $imageUrl.value = '';
         resetGalleryAll([], '', '');
         el('pcPreviewImgWrap').style.display = 'none';
@@ -2178,6 +2254,8 @@ $(document).on('click', '.product-label-btn', function () {
                 else if (p.color) { $color.value = CUSTOM; $colorC.style.display = ''; $colorC.value = p.color; }
                 syncProcessorVisibility();
                 setSelectValue($cap, p.cap);
+                setSelectValue($watchSize, p.watch_size); setSelectValue($watchConn, p.watch_conn);
+                setSelectValue($watchCase, p.watch_case); setSelectValue($watchGlass, p.watch_glass);
                 // grade token → celý label
                 var gl = CATALOG.grades.filter(function (g) { return g.split(' ')[0] === p.grade; });
                 $grade.value = gl.length ? gl[0] : 'Nový';

@@ -1904,8 +1904,92 @@ function crmModelPhotoMap(): array {
                              WHERE studio_image_url IS NOT NULL AND studio_image_url <> ''")
                     ->fetchAll(PDO::FETCH_KEY_PAIR);
         if (is_array($rows)) $cache = $rows;
+        $cache = crmModelPhotoAliases($cache);
     } catch (Throwable $e) { $cache = []; }
     return $cache;
+}
+
+/**
+ * Aliasy nad knihovnou fotek. Klíč je jen shoda textu, takže se dědičnost rozpadne
+ * na drobnostech v zápisu. Vrstvy jsou PŘÍDAVNÉ a PŘESNÁ SHODA MÁ VŽDY PŘEDNOST
+ * (alias se zapíše jen tam, kde ještě nic není):
+ *   1) bez značky   — „samsung galaxy s22 ultra|black" = i „galaxy s22 ultra|black";
+ *                     ruční zadávání značku jednou má a jindy ne. Nejednoznačné
+ *                     (dvě značky, stejný zbytek, jiná fotka) se zahazuje.
+ *   2) české barvy  — OBOUSMĚRNĚ (černý ↔ black). Nutné oboje: češtinu má část kusů
+ *                     i část knihovny, takže jednosměrné sjednocení fotky rozbije.
+ *   3) černé odstíny— space black / black titanium / midnight → black. Apple tutéž
+ *                     černou pojmenovává u každé řady jinak, do CRM se píše „Black".
+ *                     JEN na černou — Space Gray, Starlight ani Natural Titanium
+ *                     mapovat NELZE, to jsou viditelně jiné barvy.
+ * Podobnostní dopárování se tu NEDĚLÁ — vyrábí falešné shody (obal na iPhone 16 by
+ * dostal fotku samotného telefonu).
+ */
+function crmModelPhotoAliases(array $map): array {
+    static $brands = ['samsung','xiaomi','apple','google','huawei','honor','oneplus',
+        'oppo','vivo','realme','motorola','nokia','sony','lenovo','asus','acer',
+        'dell','hp','lg','tcl','zte','alcatel','doogee','ulefone','cat','nothing'];
+    static $cz = ['černý'=>'black','černá'=>'black','černé'=>'black','cerny'=>'black',
+        'bílý'=>'white','bílá'=>'white','bílé'=>'white','bily'=>'white',
+        'červený'=>'red','červená'=>'red','cerveny'=>'red',
+        'modrý'=>'blue','modrá'=>'blue','modry'=>'blue',
+        'zelený'=>'green','zelená'=>'green','zeleny'=>'green',
+        'žlutý'=>'yellow','žlutá'=>'yellow',
+        'růžový'=>'pink','růžová'=>'pink','ruzovy'=>'pink',
+        'fialový'=>'purple','fialová'=>'purple',
+        'šedý'=>'gray','šedá'=>'gray','sedy'=>'gray',
+        'zlatý'=>'gold','zlatá'=>'gold','zlaty'=>'gold',
+        'stříbrný'=>'silver','stříbrná'=>'silver','stribrny'=>'silver',
+        'oranžový'=>'orange','oranžová'=>'orange',
+        'hnědý'=>'brown','hnědá'=>'brown'];
+    static $black = ['space black','black titanium','midnight'];
+
+    $add = [];                 // alias => url
+    $clash = [];               // alias, který vyrobily dva různé zdroje s jinou fotkou
+    $put = function (string $key, string $url) use (&$add, &$clash, $map) {
+        if ($key === '' || $url === '') return;
+        if (isset($map[$key])) return;                      // přesná shoda vyhrává
+        if (isset($clash[$key])) return;
+        if (isset($add[$key]) && $add[$key] !== $url) { unset($add[$key]); $clash[$key] = true; return; }
+        $add[$key] = $url;
+    };
+
+    foreach ($map as $key => $url) {
+        $url = (string)$url;
+        [$fam, $col] = array_pad(explode('|', (string)$key, 2), 2, '');
+        if ($fam === '') continue;
+
+        // 1) bez vedoucí značky
+        $bare = $fam;
+        $first = explode(' ', $fam)[0] ?? '';
+        if (in_array($first, $brands, true)) {
+            $bare = trim(mb_substr($fam, mb_strlen($first)));
+        }
+
+        // 2) barevné varianty téhož odstínu
+        $cols = [$col];
+        if ($col !== '') {
+            if (isset($cz[$col])) {
+                $cols[] = $cz[$col];                        // čeština → angličtina
+            } else {
+                foreach ($cz as $czWord => $enWord) {       // angličtina → čeština
+                    if ($enWord === $col) $cols[] = $czWord;
+                }
+            }
+            // 3) odstíny černé
+            if (in_array($col, $black, true)) $cols[] = 'black';
+        }
+        $cols = array_values(array_unique(array_filter($cols, 'strlen')));
+
+        foreach (array_unique([$fam, $bare]) as $f) {
+            if ($f === '') continue;
+            foreach ($cols as $c) {
+                if ($f === $fam && $c === $col) continue;   // to už je původní klíč
+                $put($f . '|' . $c, $url);
+            }
+        }
+    }
+    return $map + $add;
 }
 
 /**

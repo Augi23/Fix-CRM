@@ -50,7 +50,8 @@ if ($action === 'lend' && function_exists('afxProductReservationBlock')) {
 }
 if ($action === 'lend') {
     if ($to === '') { echo json_encode(['success' => false, 'message' => 'Vyplň, komu je kus zapůjčen.']); exit; }
-    $who = trim((string)($_SESSION['user_name'] ?? $_SESSION['tech_name'] ?? ''));
+    $who = trim((string)($_SESSION['full_name'] ?? $_SESSION['user_name']
+        ?? $_SESSION['tech_name'] ?? $_SESSION['username'] ?? ''));
     $up = $pdo->prepare("UPDATE products SET loan_to = ?, loan_note = ?, loan_by = ?, loan_at = NOW(), updated_at = NOW() WHERE id = ?");
     $up->execute([mb_substr($to, 0, 120), mb_substr($note, 0, 255), mb_substr($who, 0, 120), $id]);
     echo json_encode(['success' => true, 'state' => 'loaned', 'loan_to' => $to,

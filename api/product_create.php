@@ -110,6 +110,12 @@ if ($action === 'get') {
         'show_gallery'     => (int)($p['show_gallery'] ?? 1),
         'show_360'         => (int)($p['show_360'] ?? 1),
 
+        // Hodinková pole nemají vlastní sloupce — žijí v raw_csv. Bez tohohle čtení
+        // by je formulář otevřel prázdné a uložení by je vymazalo.
+        'watch_size'  => (string)($raw['[PARAMETER "Velikost pouzdra"]'] ?? ''),
+        'watch_conn'  => (string)($raw['[PARAMETER "Konektivita"]'] ?? ''),
+        'watch_case'  => (string)($raw['[PARAMETER "Materiál pouzdra"]'] ?? ''),
+        'watch_glass' => (string)($raw['[PARAMETER "Krycí sklo"]'] ?? ''),
         'ram' => (string)($raw['[PARAMETER "RAM"]'] ?? ''),
         'accessory_for_model' => (string)($raw['[PARAMETER "Pro model"]'] ?? ''),
         'accessory_property' => (string)($raw['[PARAMETER "Vlastnost"]'] ?? ''),
@@ -148,6 +154,10 @@ $in = [
     'price' => trim((string)($_POST['price'] ?? '')),
     'purchase_price' => trim((string)($_POST['purchase_price'] ?? '')),
     'ram' => trim((string)($_POST['ram'] ?? '')),
+    'watch_size' => trim((string)($_POST['watch_size'] ?? '')),
+    'watch_conn' => trim((string)($_POST['watch_conn'] ?? '')),
+    'watch_case' => trim((string)($_POST['watch_case'] ?? '')),
+    'watch_glass' => trim((string)($_POST['watch_glass'] ?? '')),
     'processor_family' => trim((string)($_POST['processor_family'] ?? '')),
     'processor_model' => trim((string)($_POST['processor_model'] ?? '')),
     'cpu' => trim((string)($_POST['cpu'] ?? '')),
@@ -460,6 +470,27 @@ try {
         $resBlock = afxProductReservationBlock($editId, $stockQty);
         if ($resBlock !== '') {
             echo json_encode(['success' => false, 'message' => $resBlock], JSON_UNESCAPED_UNICODE); exit;
+        }
+    }
+
+    // Pojistka proti tichému zmizení náhledu na e-shopu. Většina kusů nemá vlastní
+    // studiovku a náhled DĚDÍ z knihovny model_photos podle klíče „rodina|barva".
+    // Přejmenování modelu nebo opravu barvy ten klíč změní, kus na žádnou fotku
+    // nedosáhne a z e-shopu tiše zmizí náhled (detail produktu ho má dál — proto si
+    // toho nikdo nevšimne). Měl-li kus fotku ZDĚDĚNOU a po uložení by na žádnou
+    // nedosáhl, zapíše se mu ta původní natvrdo jako vlastní studio_image_url.
+    // Bere se JEN ta jedna fotka, kterou kus prokazatelně ukazoval — dopárovávat
+    // podle podobnosti klíče NELZE, vyrábí to falešné shody.
+    if ($action === 'update' && $in['studio_image_url'] === ''
+        && trim((string)($existing['studio_image_url'] ?? '')) === ''
+        && function_exists('crmModelPhotoMap')) {
+        $photoMap = crmModelPhotoMap();
+        $oldKey   = productModelKey((string)($existing['model'] ?? ''), (string)($existing['color'] ?? ''));
+        $newKey   = productModelKey((string)$asm['display_model'], (string)$in['color']);
+        $oldPhoto = $oldKey !== '' ? trim((string)($photoMap[$oldKey] ?? '')) : '';
+        $newPhoto = $newKey !== '' ? trim((string)($photoMap[$newKey] ?? '')) : '';
+        if ($oldPhoto !== '' && $newPhoto === '') {
+            $in['studio_image_url'] = $oldPhoto;
         }
     }
 
