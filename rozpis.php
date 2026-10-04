@@ -246,10 +246,10 @@ arsort($weekMinutes);
 /* fix-crm-v2.css nastavuje p, span, label… na 18px !important pro celé CRM.
    V kompaktní kartě rozpisu by to rozbilo řádek (odznak „ty" i role přetekly),
    proto si tyhle drobné texty drží velikost samy. */
-.rz .rz-you { font-size: 9.5px !important; }
-.rz .rz-role { font-size: 10.5px !important; }
+.rz .rz-you { font-size: 11px !important; }
+.rz .rz-role { font-size: 12.5px !important; }
 .rz .rz-dow span { font-size: inherit !important; }
-.rz .rz-dow .rz-today-pill { font-size: 10px !important; vertical-align: 2px; margin-left: 4px; }
+.rz .rz-dow .rz-today-pill { font-size: 12px !important; vertical-align: 2px; margin-left: 4px; }
 .rz .rz-sum { font-size: 12.5px !important; }
 .rz-branch { border: 1px solid rgba(13,202,240,.35); color: rgba(255,255,255,.7); background: transparent; }
 .rz-branch:hover { color: #fff; border-color: #0dcaf0; background: rgba(13,202,240,.1); }
@@ -269,14 +269,16 @@ arsort($weekMinutes);
     box-shadow: 0 0 0 1px rgba(13,202,240,.25) inset; }
 
 .rz-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
-.rz-dow { font-weight: 700; font-size: 14px; letter-spacing: -.01em; }
+.rz-dow { font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
 .rz-dow span { font-weight: 600; opacity: .85; }
-.rz-date { font-size: 14px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rz-date { font-size: 17px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rz-today-pill { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
     padding: 2px 7px; border-radius: 999px; background: #0dcaf0; color: #04222a; }
 
-.rz-hours { display: flex; align-items: center; gap: 6px; font-size: 11px;
-    color: rgba(255,255,255,.42); margin-bottom: 10px; }
+.rz-hours { display: flex; align-items: center; justify-content: center; gap: 7px;
+    font-size: 15px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,.78); margin: 2px 0 12px; }
+.rz-hours i { font-size: 13px; color: rgba(255,255,255,.4); }
 
 .rz-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .rz-chip { position: relative; display: flex; align-items: flex-start; gap: 8px; padding: 7px 8px;
@@ -284,34 +286,34 @@ arsort($weekMinutes);
     border: 1px solid color-mix(in srgb, var(--c) 34%, transparent); }
 .rz-chip.is-mine { border-color: color-mix(in srgb, var(--c) 70%, transparent);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent); }
-.rz-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--c); flex: none; margin-top: 4px; }
+.rz-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--c); flex: none; margin-top: 4px; }
 .rz-chip-body { min-width: 0; flex: 1; }
-.rz-name { font-size: 12.5px; font-weight: 600; line-height: 1.25;
+.rz-name { font-size: 15px; font-weight: 600; line-height: 1.25;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rz-you { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
     padding: 1px 5px; border-radius: 999px; background: rgba(255,255,255,.16); vertical-align: 1px; }
-.rz-time { font-size: 12px; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.78); }
-.rz-role { font-size: 10.5px; color: rgba(255,255,255,.38); margin-left: 4px; }
-.rz-note { font-size: 11px; color: rgba(255,255,255,.5); margin-top: 2px; word-break: break-word; }
+.rz-time { font-size: 14.5px; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.78); }
+.rz-role { font-size: 12.5px; color: rgba(255,255,255,.38); margin-left: 4px; }
+.rz-note { font-size: 13px; color: rgba(255,255,255,.5); margin-top: 2px; word-break: break-word; }
 
 .rz-acts { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0;
     padding: 1px; border-radius: 8px; background: rgba(20,20,22,.85); transition: opacity .15s ease; }
 .rz-chip:hover .rz-acts, .rz-chip:focus-within .rz-acts { opacity: 1; }
 @media (hover: none) { .rz-acts { opacity: 1; } }
-.rz-ico { background: none; border: 0; padding: 3px 5px; border-radius: 7px; font-size: 11px;
+.rz-ico { background: none; border: 0; padding: 4px 6px; border-radius: 7px; font-size: 13px;
     color: rgba(255,255,255,.55); cursor: pointer; }
 .rz-ico:hover { background: rgba(255,255,255,.12); color: #fff; }
 .rz-del:hover { background: rgba(255,69,58,.22); color: #ff7b72; }
 
-.rz-empty { font-size: 11.5px; color: rgba(255,255,255,.3); padding: 6px 0 10px; }
+.rz-empty { font-size: 14px; color: rgba(255,255,255,.3); padding: 6px 0 10px; }
 .rz-add { margin-top: auto; width: 100%; display: inline-flex; align-items: center; justify-content: center;
-    gap: 7px; padding: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    gap: 7px; padding: 9px; font-size: 15px; font-weight: 600; cursor: pointer;
     border-radius: 10px; border: 1px dashed rgba(255,255,255,.22);
     background: transparent; color: rgba(255,255,255,.72); transition: all .18s ease; }
 .rz-add:hover { border-color: #0dcaf0; color: #0dcaf0; background: rgba(13,202,240,.09); }
 .rz-add.is-set { border-style: solid; border-color: rgba(255,255,255,.16); background: rgba(255,255,255,.05); }
 .rz-locked { margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 8px; font-size: 11.5px; color: rgba(255,255,255,.28); }
+    padding: 9px; font-size: 14px; color: rgba(255,255,255,.28); }
 
 .rz-sum { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px;
     font-size: 12.5px; background: color-mix(in srgb, var(--c) 14%, transparent);
