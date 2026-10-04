@@ -73,9 +73,13 @@ function afxShiftCanEditOthers(): bool
 /** Pobočky, do kterých přihlášený vidí. */
 function afxShiftVisibleBranches(): array
 {
-    // „Demo servis" (kód DEMO) je účet pro kontrolu v App Store, ne prodejna
+    // „Demo servis" (kód DEMO) není prodejna — ostatním se neukazuje. Vlastní
+    // pobočku ale vidí i ten, kdo na ní je: účet apple.review, kterým Apple
+    // kontroluje buildy iOS appky, by jinak v Rozpisu dostal hlášku „nemáš
+    // přidělenou pobočku", a nefunkční obrazovka je důvod k zamítnutí.
+    $mine = (int)getCurrentStaffBranchId();
     $all = array_values(array_filter(getBranches(true),
-        static fn($b) => strtoupper((string)($b['code'] ?? '')) !== 'DEMO'));
+        static fn($b) => strtoupper((string)($b['code'] ?? '')) !== 'DEMO' || (int)$b['id'] === $mine));
     if (function_exists('isBranchGlobalViewer') && isBranchGlobalViewer()) { return $all; }
     $mine = (int)getCurrentStaffBranchId();
     return array_values(array_filter($all, static fn($b) => (int)$b['id'] === $mine));
