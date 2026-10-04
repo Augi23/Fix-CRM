@@ -171,12 +171,17 @@ const AFX_SHIFT_ROLE_LABEL = [
  */
 function afxShiftOpeningHours(int $branchId): array
 {
+    global $pdo;
     static $cache = [];
     if (isset($cache[$branchId])) { return $cache[$branchId]; }
+    // Čte se z DB napřímo: getBranches() sloupec opening_hours NEVYBÍRÁ,
+    // takže přes něj by tu vždy vyšlo prázdno.
     $raw = '';
-    foreach (getBranches(false) as $b) {
-        if ((int)$b['id'] === $branchId) { $raw = (string)($b['opening_hours'] ?? ''); break; }
-    }
+    try {
+        $st = $pdo->prepare('SELECT opening_hours FROM branches WHERE id = ?');
+        $st->execute([$branchId]);
+        $raw = (string)$st->fetchColumn();
+    } catch (Throwable $e) { $raw = ''; }
     $days = ['po' => 0, 'út' => 1, 'ut' => 1, 'st' => 2, 'čt' => 3, 'ct' => 3,
              'pá' => 4, 'pa' => 4, 'so' => 5, 'ne' => 6];
     $out = [];
