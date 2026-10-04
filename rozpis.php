@@ -105,13 +105,10 @@ arsort($weekMinutes);
             $mine    = null;
             foreach ($list as $e) { if ((int)$e['tech_id'] === $meTech) { $mine = $e; break; } }
         ?>
-        <section class="rz-day<?php echo $isToday ? ' is-today' : ''; ?><?php echo $isPast ? ' is-past' : ''; ?>">
+        <section class="rz-day<?php echo $isToday ? ' is-today' : ''; ?><?php echo $isPast ? ' is-past' : ''; ?>" data-label="<?php echo e($dayNames[$i] . ' ' . date('j. n.', strtotime($d))); ?>">
             <header class="rz-day-head">
-                <div>
-                    <div class="rz-dow"><?php echo $dayShort[$i]; ?><span class="d-none d-xl-inline"><?php echo mb_substr($dayNames[$i], 2); ?></span></div>
-                    <div class="rz-date"><?php echo date('j. n.', strtotime($d)); ?></div>
-                </div>
-                <?php if ($isToday): ?><span class="rz-today-pill">dnes</span><?php endif; ?>
+                <div class="rz-dow"><?php echo $dayShort[$i]; ?><span class="d-none d-xl-inline"><?php echo mb_substr($dayNames[$i], 2); ?></span><?php if ($isToday): ?> <span class="rz-today-pill">dnes</span><?php endif; ?></div>
+                <div class="rz-date"><?php echo date('j. n.', strtotime($d)); ?></div>
             </header>
 
             <?php if (!empty($hours[$i])): ?>
@@ -252,28 +249,29 @@ arsort($weekMinutes);
 .rz .rz-you { font-size: 9.5px !important; }
 .rz .rz-role { font-size: 10.5px !important; }
 .rz .rz-dow span { font-size: inherit !important; }
-.rz .rz-today-pill { font-size: 10px !important; }
+.rz .rz-dow .rz-today-pill { font-size: 10px !important; vertical-align: 2px; margin-left: 4px; }
 .rz .rz-sum { font-size: 12.5px !important; }
 .rz-branch { border: 1px solid rgba(13,202,240,.35); color: rgba(255,255,255,.7); background: transparent; }
 .rz-branch:hover { color: #fff; border-color: #0dcaf0; background: rgba(13,202,240,.1); }
 .rz-branch.is-active { background: #0dcaf0; border-color: #0dcaf0; color: #04222a; font-weight: 700; }
-.rz-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
+.rz-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 @media (max-width: 1400px) { .rz-week { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 992px)  { .rz-week { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px)  { .rz-week { grid-template-columns: minmax(0, 1fr); } }
 
 .rz-day { display: flex; flex-direction: column; min-height: 190px; padding: 12px;
     border: 1px solid rgba(255,255,255,.10); border-radius: 16px;
-    background: rgba(255,255,255,.035); transition: border-color .2s ease, background .2s ease; }
+    /* plný tmavý podklad — tečkované pozadí CRM přes něj neprosvítá */
+    background: rgba(28,28,30,.94); transition: border-color .2s ease, background .2s ease; }
 .rz-day:hover { border-color: rgba(255,255,255,.2); }
-.rz-day.is-past { opacity: .55; }
-.rz-day.is-today { border-color: rgba(13,202,240,.55); background: rgba(13,202,240,.07);
+.rz-day.is-past > * { opacity: .5; }
+.rz-day.is-today { border-color: rgba(13,202,240,.55); background: rgb(22,34,38);
     box-shadow: 0 0 0 1px rgba(13,202,240,.25) inset; }
 
-.rz-day-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+.rz-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
 .rz-dow { font-weight: 700; font-size: 14px; letter-spacing: -.01em; }
 .rz-dow span { font-weight: 600; opacity: .85; }
-.rz-date { font-size: 12px; color: rgba(255,255,255,.45); font-variant-numeric: tabular-nums; }
+.rz-date { font-size: 14px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rz-today-pill { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
     padding: 2px 7px; border-radius: 999px; background: #0dcaf0; color: #04222a; }
 
@@ -380,7 +378,7 @@ arsort($weekMinutes);
         b.addEventListener('click', function () {
             var day = b.closest('.rz-day');
             open({ date: b.dataset.date, id: b.dataset.id, tech: b.dataset.tech,
-                   day: day ? day.querySelector('.rz-dow').textContent + ' ' + day.querySelector('.rz-date').textContent : '',
+                   day: day ? day.dataset.label : '',
                    from: b.dataset.from, to: b.dataset.to, note: b.dataset.note,
                    hours: (day && day.querySelector('.rz-hours')) ? day.querySelector('.rz-hours').textContent : '' });
         });
