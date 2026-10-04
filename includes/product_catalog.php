@@ -766,8 +766,10 @@ function afxProductAssemble(array $in): array {
     if ($generace !== '') $sd[] = 'Generace: ' . $generace;
     // AppleFix NENÍ plátce DPH — zvláštní režim podle §90 zákona o DPH může uplatnit
     // jen plátce, u neplátce by to bylo nepravdivé tvrzení (oprava 30.9.2026).
-    // Věta jde i do feedů pro Heureku a Zboží.cz, proto musí být přesná.
-    $sd[] = 'Použité zboží — neplátce DPH, cena je konečná';
+    // Věta se přidává VŠEM kusům, i novým doplňkům (ochranná skla, obaly), takže
+    // nesmí tvrdit nic o stavu zboží — ten je vedle v „Stav:" a v parametrech.
+    // Jde i do feedů pro Heureku a Zboží.cz, proto musí být přesná (4.10.2026).
+    $sd[] = 'Neplátce DPH — cena je konečná';
     $shortDesc = implode(' | ', $sd);
 
     $stockVal = $sold ? '0' : '1';

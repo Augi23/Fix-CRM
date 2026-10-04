@@ -87,7 +87,7 @@ foreach ($rows as $p) {
                 $bat !== '' ? 'Kondice baterie: ' . $bat : '',
                 $p['capacity'] ? 'Úložiště: ' . $p['capacity'] : '',
                 $p['color'] ? 'Barva: ' . $p['color'] : '',
-            ])) . ' | Použité zboží — neplátce DPH, cena je konečná',
+            ])) . ' | Neplátce DPH — cena je konečná',
             'PRIDANO' => !empty($p['added_at']) ? date('Y-m-d H:i', strtotime((string)$p['added_at'])) : '',
             'PCR_VYSLEDEK' => (string)($p['pcr_result'] ?? ''),
         ];

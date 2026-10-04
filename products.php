@@ -1134,7 +1134,7 @@ $(document).on('click', '.product-label-btn', function () {
         if ($rocnik.value) out.push('Ročník: ' + $rocnik.value);
         if (t.gen && $gen.value) out.push('Generace: ' + $gen.value);
         // Neplátce DPH — žádný §90 (musí souhlasit s afxProductAssemble()).
-        out.push('Použité zboží — neplátce DPH, cena je konečná');
+        out.push('Neplátce DPH — cena je konečná');
         return out.join(' | ');
     }
     function refreshPreview() {
