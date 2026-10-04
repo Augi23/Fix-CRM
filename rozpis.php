@@ -246,6 +246,14 @@ arsort($weekMinutes);
 </div>
 
 <style>
+/* fix-crm-v2.css nastavuje p, span, label… na 18px !important pro celé CRM.
+   V kompaktní kartě rozpisu by to rozbilo řádek (odznak „ty" i role přetekly),
+   proto si tyhle drobné texty drží velikost samy. */
+.rz .rz-you { font-size: 9.5px !important; }
+.rz .rz-role { font-size: 10.5px !important; }
+.rz .rz-dow span { font-size: inherit !important; }
+.rz .rz-today-pill { font-size: 10px !important; }
+.rz .rz-sum { font-size: 12.5px !important; }
 .rz-branch { border: 1px solid rgba(13,202,240,.35); color: rgba(255,255,255,.7); background: transparent; }
 .rz-branch:hover { color: #fff; border-color: #0dcaf0; background: rgba(13,202,240,.1); }
 .rz-branch.is-active { background: #0dcaf0; border-color: #0dcaf0; color: #04222a; font-weight: 700; }
@@ -288,7 +296,8 @@ arsort($weekMinutes);
 .rz-role { font-size: 10.5px; color: rgba(255,255,255,.38); margin-left: 4px; }
 .rz-note { font-size: 11px; color: rgba(255,255,255,.5); margin-top: 2px; word-break: break-word; }
 
-.rz-acts { display: flex; gap: 2px; opacity: 0; transition: opacity .15s ease; }
+.rz-acts { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0;
+    padding: 1px; border-radius: 8px; background: rgba(20,20,22,.85); transition: opacity .15s ease; }
 .rz-chip:hover .rz-acts, .rz-chip:focus-within .rz-acts { opacity: 1; }
 @media (hover: none) { .rz-acts { opacity: 1; } }
 .rz-ico { background: none; border: 0; padding: 3px 5px; border-radius: 7px; font-size: 11px;
@@ -356,7 +365,7 @@ arsort($weekMinutes);
             tech.dataset.orig = tech.value;
         }
         var del = document.getElementById('rzDelete');
-        del.classList.toggle('d-none', !o.id);
+        del.classList.toggle('d-none', !(Number(o.id) > 0));
         del.dataset.id = o.id || 0;
         modal().show();
     };
