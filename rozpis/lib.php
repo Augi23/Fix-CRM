@@ -73,7 +73,9 @@ function afxShiftCanEditOthers(): bool
 /** Pobočky, do kterých přihlášený vidí. */
 function afxShiftVisibleBranches(): array
 {
-    $all = getBranches(true);
+    // „Demo servis" (kód DEMO) je účet pro kontrolu v App Store, ne prodejna
+    $all = array_values(array_filter(getBranches(true),
+        static fn($b) => strtoupper((string)($b['code'] ?? '')) !== 'DEMO'));
     if (function_exists('isBranchGlobalViewer') && isBranchGlobalViewer()) { return $all; }
     $mine = (int)getCurrentStaffBranchId();
     return array_values(array_filter($all, static fn($b) => (int)$b['id'] === $mine));

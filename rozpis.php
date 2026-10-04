@@ -6,6 +6,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'rozpis/lib.php';
+$afxPageTitle = 'Rozpis služeb';
 require_once 'includes/header.php';
 
 afxShiftEnsureSchema();
@@ -24,7 +25,7 @@ if (!$branches) {
 $branchId = (int)($_GET['b'] ?? 0);
 if (!$branchId || !afxShiftCanSeeBranch($branchId)) { $branchId = (int)$branches[0]['id']; }
 
-$monday   = afxShiftMonday((string)($_GET['t'] ?? date('Y-m-d')));
+$monday   = afxShiftMonday((string)($_GET['t'] ?? date('Y-m-d', strtotime('+1 day'))));
 $days     = afxShiftWeekDays($monday);
 $entries  = afxShiftEntries($branchId, $days[0], $days[6]);
 $staff    = afxShiftStaff($branchId);
@@ -67,7 +68,8 @@ arsort($weekMinutes);
             <?php if (count($branches) > 1): ?>
             <div class="btn-group btn-group-sm" role="group" aria-label="Pobočka">
                 <?php foreach ($branches as $b): ?>
-                    <a class="btn <?php echo (int)$b['id'] === $branchId ? 'btn-info' : 'btn-outline-info'; ?>"
+                    <a class="btn rz-branch<?php echo (int)$b['id'] === $branchId ? ' is-active' : ''; ?>"
+                       <?php echo (int)$b['id'] === $branchId ? 'aria-current="page"' : ''; ?>
                        href="<?php echo e($link(['b' => (int)$b['id'], 't' => $monday])); ?>">
                         <?php echo e(crmBranchShortLabel((int)$b['id'])); ?>
                     </a>
@@ -244,6 +246,9 @@ arsort($weekMinutes);
 </div>
 
 <style>
+.rz-branch { border: 1px solid rgba(13,202,240,.35); color: rgba(255,255,255,.7); background: transparent; }
+.rz-branch:hover { color: #fff; border-color: #0dcaf0; background: rgba(13,202,240,.1); }
+.rz-branch.is-active { background: #0dcaf0; border-color: #0dcaf0; color: #04222a; font-weight: 700; }
 .rz-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 1400px) { .rz-week { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 992px)  { .rz-week { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -311,6 +316,8 @@ arsort($weekMinutes);
 <script>
 (function () {
     var CSRF = '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>';
+    var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
     var BRANCH = <?php echo (int)$branchId; ?>;
     var form = document.getElementById('rzForm');
     var modalEl = document.getElementById('rzModal');
@@ -344,7 +351,10 @@ arsort($weekMinutes);
         document.getElementById('rzNote').value = o.note || '';
         document.getElementById('rzHint').textContent = o.hours ? ('Otevřeno ' + o.hours) : '';
         var tech = document.getElementById('rzTech');
-        if (tech && o.tech) { tech.value = String(o.tech); }
+        if (tech) {
+            if (o.tech) { tech.value = String(o.tech); }
+            tech.dataset.orig = tech.value;
+        }
         var del = document.getElementById('rzDelete');
         del.classList.toggle('d-none', !o.id);
         del.dataset.id = o.id || 0;
@@ -376,6 +386,14 @@ arsort($weekMinutes);
         });
     });
 
+    var techSel = document.getElementById('rzTech');
+    if (techSel) {
+        techSel.addEventListener('change', function () {
+            var del = document.getElementById('rzDelete');
+            if (techSel.value !== techSel.dataset.orig) { del.classList.add('d-none'); }
+            else if (Number(del.dataset.id) > 0) { del.classList.remove('d-none'); }
+        });
+    }
     document.getElementById('rzDelete').addEventListener('click', function () {
         var b = this;
         showConfirm('Smazat tenhle zápis?', function () {
