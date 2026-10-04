@@ -1994,6 +1994,17 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(function () { beep(false); posToast(false, 'Síťová chyba při hledání kódu.'); });
     }
 
+    // Sken z fyzické čtečky v Android appce (Zebra TC27 → DataWedge). Appka nejdřív
+    // zkusí window.afxHandleScan(kód): stránka, která sken umí zpracovat sama,
+    // vrátí true. Platí stejné pojistky jako u čtečky „na klávesnici" níže.
+    window.afxHandleScan = function (code) {
+        if (locked || document.getElementById('posShiftGate')) { return false; }
+        code = String(code || '').trim();
+        if (code.length < 2) { return false; }
+        handleScan(code);
+        return true;
+    };
+
     document.addEventListener('keydown', function (e) {
         if (locked || document.getElementById('posShiftGate')) { scanBuf = ''; return; }
         // Pole s HESLEM je pro čtečku tabu: heuristika „strojové tempo + Enter" by
