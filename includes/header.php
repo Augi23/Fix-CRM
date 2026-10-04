@@ -526,6 +526,10 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
         <a class="afx-cell <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php">
             <i class="fas fa-comments"></i><small>Chat</small>
         </a>
+        <?php /* Rozpis služeb vidí VŠICHNI zaměstnanci — zapisují se do něj sami */ ?>
+        <a class="afx-cell <?php echo $current_page == 'rozpis.php' ? 'active' : ''; ?>" href="rozpis.php">
+            <i class="fas fa-calendar-days"></i><small>Rozpis</small>
+        </a>
         <a class="afx-cell <?php echo in_array($current_page, ['dokumenty.php', 'dokument.php'], true) ? 'active' : ''; ?>" href="dokumenty.php">
             <i class="fas fa-file-signature"></i><small>Dokumenty</small>
         </a>
@@ -602,6 +606,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <a class="afx-sheet-link <?php echo in_array($current_page, ['reports.php', 'history.php'], true) ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line"></i><?php echo __('reports'); ?></a>
             <?php /* Chat vidí VŠICHNI zaměstnanci (dřív omylem jen vedení) */ ?>
             <a class="afx-sheet-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php"><i class="fas fa-comments"></i>Chat</a>
+            <a class="afx-sheet-link <?php echo $current_page == 'rozpis.php' ? 'active' : ''; ?>" href="rozpis.php"><i class="fas fa-calendar-days"></i>Rozpis</a>
             <a class="afx-sheet-link <?php echo in_array($current_page, ['dokumenty.php', 'dokument.php'], true) ? 'active' : ''; ?>" href="dokumenty.php"><i class="fas fa-file-signature"></i>Dokumenty</a>
             <a class="afx-sheet-link <?php echo $current_page == 'navody.php' ? 'active' : ''; ?>" href="navody.php"><i class="fas fa-graduation-cap"></i>Návody</a>
             <a class="afx-sheet-link <?php echo $current_page == 'settings.php' ? 'active' : ''; ?>" href="settings.php"><i class="fas <?php echo $afxIsManager ? 'fa-cog' : 'fa-user-circle'; ?>"></i><?php echo __('settings'); ?></a>
