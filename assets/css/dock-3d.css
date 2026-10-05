@@ -43,15 +43,15 @@
 .afx-dock::after {
   content: "";
   position: absolute; z-index: 0;
-  left: 4px; right: 4px; top: 68px; height: 20px;
-  border-radius: 0 0 6px 6px;
-  background: linear-gradient(180deg, rgba(255,255,255,.13) 0%, rgba(255,255,255,.05) 100%);
+  left: 4px; right: 4px; top: 68px; height: 13px;   /* nízká, jemná hrana — jen pro drobné popisky */
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,.03) 100%);
   backdrop-filter: blur(18px) saturate(170%);
   -webkit-backdrop-filter: blur(18px) saturate(170%);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.55),          /* jasná linka lomu skla */
-    inset 0 -1px 0 rgba(255,255,255,.10),
-    0 8px 18px rgba(0,0,0,.35);
+    inset 0 1px 0 rgba(255,255,255,.42),          /* vlasová světlá linka lomu */
+    inset 0 -1px 0 rgba(255,255,255,.06),
+    0 6px 14px rgba(0,0,0,.28);
   pointer-events: none;
 }
 
@@ -112,10 +112,11 @@
 
 /* ── popisek = nápis na přední hraně desky ── */
 .afx-dock .afx-cell small {
-  height: 20px; line-height: 20px;
+  height: 13px; line-height: 13px;
   margin-top: 4px;                       /* 60 + mezera 4 + 4 = 68 px = začátek přední hrany */
   font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  font-size: 8px; font-weight: 400; letter-spacing: .02em;
+  /* !important: fix-crm-v2.css natvrdo vnucuje všem <small> 12px !important */
+  font-size: 8px !important; font-weight: 400; letter-spacing: .02em;
   color: inherit;
 }
 .afx-dock .afx-cell:hover { color: #fff; }
@@ -139,7 +140,9 @@
   z-index: 3;
   min-width: 17px; height: 17px; padding: 0 5px;
   border: 0; border-radius: 999px;
-  font: 600 10px/17px "SF Pro Text", -apple-system, sans-serif;
+  /* !important: fix-crm-v2.css vnucuje všem <span> velké písmo s !important */
+  font-family: "SF Pro Text", -apple-system, sans-serif;
+  font-size: 10px !important; font-weight: 600; line-height: 17px !important;
   text-align: center;
   box-shadow: 0 1px 3px rgba(0,0,0,.35);
 }
@@ -186,15 +189,18 @@ html[data-lg-theme="light"] .afx-dock::before {
   background: linear-gradient(180deg, rgba(255,255,255,.35) 0%, rgba(255,255,255,.75) 100%);
 }
 html[data-lg-theme="light"] .afx-dock::after {
-  background: linear-gradient(180deg, rgba(255,255,255,.70) 0%, rgba(235,238,243,.62) 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,.72) 0%, rgba(240,242,246,.60) 100%);
   box-shadow:
     inset 0 1px 0 #ffffff,
-    inset 0 -1px 0 rgba(0,0,0,.08),
-    0 8px 18px rgba(30,40,60,.16);
+    inset 0 -1px 0 rgba(0,0,0,.06),
+    0 6px 14px rgba(30,40,60,.12);
 }
-html[data-lg-theme="light"] .afx-dock .afx-cell { color: rgba(20,24,32,.72); text-shadow: none; }
-html[data-lg-theme="light"] .afx-dock .afx-cell:hover,
-html[data-lg-theme="light"] .afx-dock .afx-cell.active { color: #0b0f16; }
+/* Barva přímo na popisku: liquid-glass.css barví ve světlém motivu všechny odkazy
+   modře (!important, vysoká specificita) — na <small> uvnitř odkazu ale nedosáhne. */
+html[data-lg-theme="light"] .afx-dock .afx-cell { text-shadow: none; }
+html[data-lg-theme="light"] .afx-dock .afx-cell small { color: rgba(20,24,32,.72); }
+html[data-lg-theme="light"] .afx-dock .afx-cell:hover small,
+html[data-lg-theme="light"] .afx-dock .afx-cell.active small { color: #0b0f16; }
 html[data-lg-theme="light"] .afx-dock .afx-cell i {
   filter:
     drop-shadow(0 1px 0 var(--t3))
@@ -202,10 +208,10 @@ html[data-lg-theme="light"] .afx-dock .afx-cell i {
     drop-shadow(0 5px 5px rgba(20,30,50,.22));
   -webkit-box-reflect: below 2px linear-gradient(transparent 58%, rgba(255,255,255,.5));
 }
-html[data-lg-theme="light"] .afx-dock .afx-cell.act-blue   { color: #0a6fd1; }
-html[data-lg-theme="light"] .afx-dock .afx-cell.act-orange { color: #c25f08; }
-html[data-lg-theme="light"] .afx-dock .afx-cell.act-green  { color: #0b8a5a; }
-html[data-lg-theme="light"] .afx-dock .afx-cell.act-purple { color: #7a33c9; }
+html[data-lg-theme="light"] .afx-dock .afx-cell.act-blue small   { color: #0a6fd1; }
+html[data-lg-theme="light"] .afx-dock .afx-cell.act-orange small { color: #c25f08; }
+html[data-lg-theme="light"] .afx-dock .afx-cell.act-green small  { color: #0b8a5a; }
+html[data-lg-theme="light"] .afx-dock .afx-cell.act-purple small { color: #7a33c9; }
 html[data-lg-theme="light"] .afx-dock .afx-cell.active::after { background: rgba(20,24,32,.75); box-shadow: none; }
 html[data-lg-theme="light"] .afx-dock .afx-div {
   background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.18), rgba(0,0,0,0));
@@ -216,7 +222,7 @@ html[data-lg-theme="light"] .afx-dock .afx-div {
   .afx-dock { padding-left: 14px; padding-right: 14px; gap: 2px; }
   .afx-dock .afx-cell { min-width: 58px; padding: 0 2px; }
   .afx-dock .afx-cell i { width: 40px; height: 38px; font-size: 27px; }
-  .afx-dock .afx-cell small { margin-top: 8px; font-size: 7.5px; }   /* ikona 38 px → popisek opět od 68 px */
+  .afx-dock .afx-cell small { margin-top: 8px; font-size: 7.5px !important; }   /* ikona 38 px → popisek opět od 68 px */
 }
 
 /* ── bez animací (nastavení systému) ── */

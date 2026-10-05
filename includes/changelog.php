@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.87.4',
+        'date' => '2026-10-05',
+        'time' => '14:32',
+        'title' => 'Horní menu: drobné popisky naostro, nižší a jemnější přední hrana',
+        'items' => [
+            'Popisky sekcí mají opravdu <b>8 px</b>. Dřív je starší pravidlo stylů natvrdo zvětšovalo na 12 px, takže se zmenšení v CRM vůbec neprojevilo. Stejně tak odznaky počtů (Zakázky, Reklamace) jsou zpátky drobné.',
+            'Přední hrana poličky je <b>nižší (13 px) a jemnější</b>: vlasová světlá linka v místě lomu, průsvitnější sklo a měkčí stín.',
+            'Ve světlém motivu už popisky nejsou modré (barvilo je pravidlo pro odkazy), jsou tmavě šedé a rychlé akce mají své barvy.',
+        ],
+    ],
+    [
         'version' => '3.87.3',
         'date' => '2026-10-05',
         'time' => '14:18',
