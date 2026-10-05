@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.89.1',
+        'date' => '2026-10-05',
+        'time' => '19:57',
+        'title' => 'Horní menu: velikost podle šířky monitoru',
+        'items' => [
+            'Horní menu se zvětšuje podle šířky okna: běžné notebooky a monitory (např. MacBook Pro 16") o 18 %, ultraširoké monitory od 2200 px o 40 % a od 2800 px (např. 3440 × 1440) o 60 %. Na menších obrazovkách do 1440 px zůstává o 5 %, ať se vejde.',
+        ],
+    ],
+    [
         'version' => '3.89.0',
         'date' => '2026-10-05',
         'time' => '19:52',

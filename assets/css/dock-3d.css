@@ -235,5 +235,8 @@ html[data-lg-theme="light"] .afx-dock .afx-div {
 
 /* ── velikost doku (v3.89.0): celé menu o kus větší, poměry zůstávají ──
    zoom zvětší ikony, desku i popisky najednou, takže geometrie poličky sedí */
-.afx-dock { zoom: 1.12; }
+.afx-dock { zoom: 1.18; }   /* běžné notebooky/monitory (např. MacBook Pro 16" = 1728 px) */
 @media (max-width: 1440px) { .afx-dock { zoom: 1.05; } }
+/* ultraširoké monitory (např. 3440 × 1440): menu by bylo malé uprostřed obří plochy */
+@media (min-width: 2200px) { .afx-dock { zoom: 1.4; } }
+@media (min-width: 2800px) { .afx-dock { zoom: 1.6; } }
