@@ -93,6 +93,7 @@ Klientský portál (odděleně): `klient/*` (zejména `klient/dashboard.php`).
 - Nové oprávnění: `includes/functions.php` (`getAvailablePermissions`, implicit perms) + UI v `settings.php`
 - Změna status flow: `view_order.php` (next status map), `api/update_order_full.php`, helpery status labelů v `includes/functions.php`
 - Úprava notifikací: `includes/functions.php` + `tg_webhook.php` + `api/fixer_send.php`
+- Chytrá upozornění (rozpis směn, pokladna, lhůty, sklad…): `upozorneni/lib.php` (pravidla `afxNotifyRules()`, doručení `afxNotifyDeliver()`, plánovač `afxNotifyRun()`), UI `upozorneni.php`, akce `upozorneni/api.php`, tik `upozorneni/cron.php` (CLI) a `upozorneni/tick.php?key=` (externí cron). Nové pravidlo = položka v `afxNotifyRules()` + funkce `afxNotifyRule…()` + řádek v `afxNotifyRun()`. Test: `php scripts/upozorneni_test.php`. Zvuky (`afx_shift|info|warn|urgent|done|cash`) generuje `scripts/generate_notify_sounds.py` → web `assets/sounds/notify/*.m4a`, iOS appka `*.caf` v bundlu, Android `res/raw/*.ogg`. Android appka si bere `api/notify_poll.php?app=android&smart_since=<id>` (položky + plán připomínek).
 
 ## 8) Aktuální provozní poznámky
 

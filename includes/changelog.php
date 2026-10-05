@@ -11,6 +11,25 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.88.0',
+        'date' => '2026-10-05',
+        'time' => '12:00',
+        'title' => 'Chytrá upozornění: připomínky směn, hlídání rozpisu, pokladny, zakázek, reklamací a skladu',
+        'items' => [
+            '<b>Rozpis: na jeden den se může zapsat víc lidí a časy se můžou překrývat.</b> Opraveno: když vedení přidávalo dalšího člověka a v nabídce zůstal vybraný někdo, kdo už na směně byl, jeho čas se potichu přepsal a vypadalo to, že dalšího přidat nejde. Teď jsou už zapsaní lidé v nabídce zašedlí, vedení má u každého dne vždy tlačítko „Přidat člověka“ (i když je zapsané samo) a úprava zápisu s jiným jménem zápis převede, místo aby vznikl druhý.',
+            '<b>Rozpis hlídá pokrytí celé otvírací doby:</b> pruh pod otvírací dobou ukazuje, kdy je na prodejně nikdo / jeden / víc lidí. Dialog zápisu má časovou osu dne s kolegy, sám předvyplní chybějící čas (třeba Pavel 10–14 → nabídne 14–19), tlačítka „Doplnit 14:00–19:00“ a živě ukazuje, jestli bude po uložení pokrytá celá otvírací doba.',
+            '<b>Upozornění v appce na iPhonu i Androidu se zvukem:</b> vlastní sada elegantních zvuků AppleFix — <i>Směna začíná</i>, <i>Informace</i>, <i>Pozor</i>, <i>Naléhavé</i>, <i>Vyřešeno</i> a <i>Pokladna</i>. Každý typ upozornění poznáš po zvuku. Připomínka směny a naléhavé věci na iPhonu projdou i přes režim Soustředění. Android si připomínky směn naplánuje dopředu, takže zazní přesně včas i bez signálu. Klepnutí na upozornění otevře rovnou stránku, které se týká. Zvuky si můžeš poslechnout na stránce Upozornění. (Potřeba appka iOS 1.3.0 / Android 1.4.0.)',
+            'Nová stránka <b>Upozornění</b> (zvoneček v horní liště → „Upozornění a jejich nastavení“, v mobilu v menu, tlačítko v Rozpisu). Upozornění chodí do CRM (číslo na zvonečku + vyskakovací okno), na <b>Telegram</b> (s tlačítkem „Otevřít v CRM“, v noci potichu), do <b>appky</b> (push), volitelně <b>e-mailem</b> a u kritických věcí i <b>SMS</b>.',
+            '<b>Rozpis služeb:</b> připomínka před začátkem směny (předstih si každý nastaví sám, s kolegy na směně, otvírací dobou a krátkým briefingem pobočky), večerní „zítra jdeš do práce“, upozornění vedení a manažerovi, když na zítřek <b>nikdo není zapsaný</b> (kontrola ve 14:00 a 20:00, s návrhem, kdo v ten den obvykle chodí, a výzvou zaměstnancům „zapiš se do půlnoci“), ranní kontrola dneška, hlídání děr v otvírací době, týdenní výhled s varováním před přetížením a změny rozpisu na poslední chvíli (včetně „vyřešeno“, když se někdo zapíše).',
+            '<b>Nástup na směnu:</b> kdo se po začátku směny nepřihlásí do CRM ani nepřevezme pokladnu, dostane jemné připomenutí, později vedení — i s informací, jestli je na pobočce někdo jiný.',
+            '<b>Pokladna:</b> upozornění, když po začátku směny nikdo nepřevzal pokladnu, a když po konci směny chybí uzávěrka.',
+            '<b>Další hlídače:</b> zakázky bez pohybu (technik svoje, manažer pobočku, vedení souhrn), hotové zakázky nevyzvednuté přes 14 dní (s telefonem klienta), reklamace blízko zákonné lhůty 30 dní, faktury po splatnosti, díly pod minimální zásobou (jen když přibude něco nového) a selhaná záloha CRM.',
+            'Rozpis rovnou ukazuje stav každého dne: <b>Pokryto</b>, <b>Chybí 10:00–12:00</b> nebo červeně <b>Nikdo zapsaný</b>.',
+            'Vedení (admin, Boss) na stránce Upozornění zapíná pravidla, mění časy a kanály, spustí kontrolu <b>nanečisto</b> (ukáže, co by se teď poslalo) a vidí log všeho odeslaného. Každá zpráva se pošle jen jednou.',
+            'Technicky: kontrola běží sama z otevřeného CRM i z tiskového agenta pobočky. Pro spolehlivé ranní připomínky přidej cron <code>* * * * * php …/upozorneni/cron.php</code>, nebo externí cron na <code>upozorneni/tick.php?key=…</code> (adresa je na stránce Upozornění). Test: <code>php scripts/upozorneni_test.php</code>.',
+        ],
+    ],
+    [
         'version' => '3.86.1',
         'date' => '2026-10-02',
         'time' => '15:30',

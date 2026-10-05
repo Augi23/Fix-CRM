@@ -233,6 +233,12 @@ function pushToTokens(array $tokens, string $title, string $body, array $opts = 
     ];
     if (isset($opts['badge']))     $aps['badge'] = (int)$opts['badge'];
     if (!empty($opts['thread']))   $aps['thread-id'] = (string)$opts['thread'];
+    // iOS 15+: 'time-sensitive' projde i přes režim Soustředění (appka má oprávnění
+    // com.apple.developer.usernotifications.time-sensitive; bez něj iOS doručí jako 'active')
+    if (!empty($opts['interruption']) && in_array($opts['interruption'], ['passive', 'active', 'time-sensitive'], true)) {
+        $aps['interruption-level'] = (string)$opts['interruption'];
+    }
+    if (isset($opts['relevance'])) $aps['relevance-score'] = max(0.0, min(1.0, (float)$opts['relevance']));
     apnsSend($tokens, $aps, $opts['data'] ?? [], $opts['collapse'] ?? null);
 }
 

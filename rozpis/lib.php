@@ -216,10 +216,18 @@ function afxShiftOpeningHours(int $branchId): array
 }
 
 /**
- * Uloží (nebo přepíše) zápis. Vrací [ok, zpráva].
+ * Uloží zápis. Vrací [ok, zpráva].
  * Kontroly jsou TADY, ne v UI — na endpoint se dá poslat cokoli.
+ *
+ * $entryId = 0 → NOVÝ zápis. Na den se může zapsat libovolně lidí a jejich časy
+ * se můžou překrývat; jeden člověk má ale na den jeden zápis. Když už zapsaný
+ * je, vrátí se chyba — dřív se jeho čas potichu přepsal (vedení vybralo
+ * v dialogu omylem někoho, kdo už na směně byl, a vypadalo to, že „dalšího
+ * přidat nejde").
+ * $entryId > 0 → ÚPRAVA existujícího zápisu (čas, poznámka, případně přepsání
+ * na jiného člověka — ten pak na ten den nesmí mít vlastní zápis).
  */
-function afxShiftSave(int $branchId, int $techId, string $date, string $from, string $to, string $note): array
+function afxShiftSave(int $branchId, int $techId, string $date, string $from, string $to, string $note, int $entryId = 0): array
 {
     global $pdo;
     afxShiftEnsureSchema();
@@ -233,9 +241,9 @@ function afxShiftSave(int $branchId, int $techId, string $date, string $from, st
     if (!$open && !afxShiftCanEditOthers()) { return [false, $why]; }
 
     // zaměstnanec musí patřit na tu pobočku (jinak by si šlo přidat kohokoli)
-    $ok = false;
-    foreach (afxShiftStaff($branchId) as $s) { if ((int)$s['id'] === $techId) { $ok = true; break; } }
-    if (!$ok) { return [false, 'Tenhle člověk na téhle pobočce není.']; }
+    $name = '';
+    foreach (afxShiftStaff($branchId) as $s) { if ((int)$s['id'] === $techId) { $name = (string)$s['name']; break; } }
+    if ($name === '') { return [false, 'Tenhle člověk na téhle pobočce není.']; }
 
     $t = static function (string $v): ?string {
         return preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', trim($v)) ? trim($v) . ':00' : null;
@@ -243,19 +251,87 @@ function afxShiftSave(int $branchId, int $techId, string $date, string $from, st
     $f = $t($from); $u = $t($to);
     if ($f === null || $u === null) { return [false, 'Zadej čas ve tvaru 10:00.']; }
     if ($u <= $f) { return [false, 'Konec musí být po začátku.']; }
+    $note = mb_substr(trim($note), 0, 120);
+    $span = static fn(array $r) => substr((string)$r['time_from'], 0, 5) . '–' . substr((string)$r['time_to'], 0, 5);
 
+    $existing = afxShiftFind($branchId, $techId, $date);   // zápis vybraného člověka na ten den
+
+    // ── úprava existujícího zápisu ──
+    if ($entryId > 0) {
+        $row = afxShiftById($entryId);
+        if (!$row || (int)$row['branch_id'] !== $branchId || (string)$row['work_date'] !== $date) {
+            return [false, 'Zápis nenalezen — načti stránku znovu.'];
+        }
+        if ((int)$row['tech_id'] !== $me && !afxShiftCanEditOthers()) { return [false, 'Upravit můžeš jen svůj zápis.']; }
+        if ($existing && (int)$existing['id'] !== $entryId) {
+            return [false, $name . ' už má na tenhle den vlastní zápis (' . $span($existing) . '). Uprav ten.'];
+        }
+        try {
+            $pdo->prepare('UPDATE shift_plan SET tech_id = ?, time_from = ?, time_to = ?, note = ?, updated_at = NOW() WHERE id = ?')
+                ->execute([$techId, $f, $u, $note, $entryId]);
+        } catch (Throwable $e) {
+            error_log('afxShiftSave update: ' . $e->getMessage());
+            return [false, 'Uložení selhalo.'];
+        }
+        $new = afxShiftById($entryId);
+        if ((int)$row['tech_id'] !== $techId) {
+            // přepsáno na jiného člověka: původnímu směna odpadla, novému přibyla
+            afxShiftNotify($row, null);
+            afxShiftNotify(null, $new);
+        } else {
+            afxShiftNotify($row, $new);
+        }
+        return [true, 'Uloženo.'];
+    }
+
+    // ── nový zápis ──
+    if ($existing) {
+        return [false, ($techId === $me ? 'Na tenhle den už jsi zapsaný/á' : $name . ' už je na tenhle den zapsaný/á')
+            . ' (' . $span($existing) . '). Čas změníš tužkou u jména.'];
+    }
     try {
         $pdo->prepare('INSERT INTO shift_plan (branch_id, tech_id, work_date, time_from, time_to, note, created_by)
-                       VALUES (?,?,?,?,?,?,?)
-                       ON DUPLICATE KEY UPDATE time_from=VALUES(time_from), time_to=VALUES(time_to),
-                                               note=VALUES(note), updated_at=NOW()')
-            ->execute([$branchId, $techId, $date, $f, $u, mb_substr(trim($note), 0, 120),
-                       (string)($_SESSION['full_name'] ?? '')]);
+                       VALUES (?,?,?,?,?,?,?)')
+            ->execute([$branchId, $techId, $date, $f, $u, $note, (string)($_SESSION['full_name'] ?? '')]);
     } catch (Throwable $e) {
         error_log('afxShiftSave: ' . $e->getMessage());
-        return [false, 'Uložení selhalo.'];
+        // souběh dvou zápisů téhož člověka (UNIQUE) → srozumitelná hláška
+        return [false, str_contains($e->getMessage(), 'Duplicate') ? $name . ' už je na tenhle den zapsaný/á.' : 'Uložení selhalo.'];
     }
+    afxShiftNotify(null, afxShiftFind($branchId, $techId, $date));
     return [true, 'Zapsáno.'];
+}
+
+/** Zápis podle id. */
+function afxShiftById(int $id): ?array
+{
+    global $pdo;
+    try {
+        $st = $pdo->prepare('SELECT s.*, t.name AS tech_name FROM shift_plan s LEFT JOIN technicians t ON t.id = s.tech_id WHERE s.id = ?');
+        $st->execute([$id]);
+        return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Throwable $e) { return null; }
+}
+
+/** Zápis člověka na den (pro porovnání před/po změně). */
+function afxShiftFind(int $branchId, int $techId, string $date): ?array
+{
+    global $pdo;
+    try {
+        $st = $pdo->prepare('SELECT s.*, t.name AS tech_name FROM shift_plan s LEFT JOIN technicians t ON t.id = s.tech_id
+                             WHERE s.branch_id = ? AND s.tech_id = ? AND s.work_date = ?');
+        $st->execute([$branchId, $techId, $date]);
+        return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Throwable $e) { return null; }
+}
+
+/** Předá změnu chytrým upozorněním (dotčený zaměstnanec, vedení u změn na poslední chvíli). */
+function afxShiftNotify(?array $old, ?array $new): void
+{
+    try {
+        require_once dirname(__DIR__) . '/upozorneni/lib.php';
+        afxNotifyShiftChanged($old, $new, afxShiftCurrentTechId(), trim((string)($_SESSION['full_name'] ?? '')));
+    } catch (Throwable $e) { error_log('afxShiftNotify: ' . $e->getMessage()); }
 }
 
 /** Smaže zápis. Vrací [ok, zpráva]. */
@@ -279,5 +355,6 @@ function afxShiftDelete(int $id): array
 
     try { $pdo->prepare('DELETE FROM shift_plan WHERE id = ?')->execute([$id]); }
     catch (Throwable $e) { return [false, 'Smazání selhalo.']; }
+    afxShiftNotify($row, null);
     return [true, 'Zápis smazán.'];
 }

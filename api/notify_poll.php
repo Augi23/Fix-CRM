@@ -16,6 +16,10 @@ if (!isset($_SESSION['user_id'])) {
 // místo pro odpálení automatické zálohy (každých 15 minut, na pozadí).
 crmBackupMaybeSchedule();
 
+// Chytrá upozornění (rozpis služeb, pokladna, lhůty…) — kontrola pravidel max 1× za minutu
+require_once __DIR__ . '/../upozorneni/lib.php';
+afxNotifyMaybeSchedule();
+
 // Měření aktivního času v systému (statistiky: hodiny Bosse/adminů = práce na CRM)
 crmTrackStaffActivity();
 
@@ -66,8 +70,28 @@ try {
     }
 } catch (Throwable $e) {}
 
+// nepřečtená chytrá upozornění → číslo na zvonečku + toast s nejnovějším
+$smartKeys = afxNotifyMyKeys();
+[$smartUnread, $smartLatest] = afxNotifyUnread($smartKeys);
+
+// Nativní appka (Android): ?smart_since=<id> → nová upozornění k zobrazení se
+// zvukem; ?app=android → navíc plán připomínek směn na 36 h (appka je ukáže
+// přesně včas sama, i když zrovna nemá signál nebo spí na pozadí).
+$smartExtra = [];
+// kanál „Appka" vypnutý vedením nebo osobně → appka nic nehlásí (jen se posune výchozí bod)
+$smartAppOn = !empty(afxNotifyConfig()['global']['ch_push']) && !empty(afxNotifyPrefs(afxNotifyMyKey())['ch_push']);
+if (isset($_GET['smart_since'])) {
+    $smartExtra['smart_last_id'] = afxNotifyLastId($smartKeys);
+    $smartExtra['smart_items'] = $smartAppOn ? afxNotifyItemsSince($smartKeys, max(0, (int)$_GET['smart_since'])) : [];
+}
+if (($_GET['app'] ?? '') === 'android') {
+    $smartExtra['smart_schedule'] = $smartAppOn ? afxNotifyAppSchedule(afxNotifyMyKey(), new DateTimeImmutable()) : [];
+}
+
 echo json_encode([
     'ok' => true,
+    'smart_unread' => $smartUnread,
+    'smart_latest' => $smartLatest,
     // aktuální CSRF token — dlouho otevřené záložky si jím obnovují meta tag,
     // aby akce nepadaly na „neplatný bezpečnostní token"
     'csrf' => (string)($_SESSION['csrf_token'] ?? ''),
@@ -79,4 +103,4 @@ echo json_encode([
     'orders_badge' => $ordersBadge,
     'complaints_badge' => $complaintsBadge,
     'procurement_badge' => $procurementBadge,
-]);
+] + $smartExtra);
