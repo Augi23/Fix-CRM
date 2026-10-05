@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.87.2',
+        'date' => '2026-10-05',
+        'time' => '14:15',
+        'title' => 'Horní menu ve stylu Docku z macOS',
+        'items' => [
+            'Polička je z <b>matného průsvitného skla</b> jako Dock v macOS: rozmaže, co je pod ní, a v místě lomu má jemnou světlou linku. Ve světlém motivu je z bílého skla.',
+            'Popisky jsou menší a psané písmem SF Pro. Ikony mají jemnější hloubku a měkčí stín, odznaky počtů mají tvar jako v macOS a aktivní stránku ukazuje decentní tečka pod ikonou.',
+        ],
+    ],
+    [
         'version' => '3.87.1',
         'date' => '2026-10-05',
         'time' => '14:04',
