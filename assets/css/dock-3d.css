@@ -115,14 +115,14 @@
   height: 20px; line-height: 20px;
   margin-top: 4px;                       /* 60 + mezera 4 + 4 = 68 px = začátek přední hrany */
   font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  font-size: 9px; font-weight: 500; letter-spacing: .015em;
+  font-size: 8px; font-weight: 400; letter-spacing: .02em;
   color: inherit;
 }
 .afx-dock .afx-cell:hover { color: #fff; }
 
 /* ── aktivní stránka: svítící tečka na desce pod ikonou (jako běžící aplikace) ── */
 .afx-dock .afx-cell.active { color: #fff; }
-.afx-dock .afx-cell.active small { font-weight: 600; }
+.afx-dock .afx-cell.active small { font-weight: 500; }
 .afx-dock .afx-cell.active::after {
   /* na buňce, ne na ikoně — jinak by tečku obarvila hloubka ikony (filter) */
   content: "";
@@ -216,7 +216,7 @@ html[data-lg-theme="light"] .afx-dock .afx-div {
   .afx-dock { padding-left: 14px; padding-right: 14px; gap: 2px; }
   .afx-dock .afx-cell { min-width: 58px; padding: 0 2px; }
   .afx-dock .afx-cell i { width: 40px; height: 38px; font-size: 27px; }
-  .afx-dock .afx-cell small { margin-top: 8px; font-size: 8.5px; }   /* ikona 38 px → popisek opět od 68 px */
+  .afx-dock .afx-cell small { margin-top: 8px; font-size: 7.5px; }   /* ikona 38 px → popisek opět od 68 px */
 }
 
 /* ── bez animací (nastavení systému) ── */

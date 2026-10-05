@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.87.3',
+        'date' => '2026-10-05',
+        'time' => '14:18',
+        'title' => 'Horní menu: drobnější popisky',
+        'items' => [
+            'Popisky sekcí v horním menu jsou ještě menší (8 px) a v tenčím řezu písma. Aktivní stránka má popisek o stupeň výraznější.',
+        ],
+    ],
+    [
         'version' => '3.87.2',
         'date' => '2026-10-05',
         'time' => '14:15',
