@@ -1992,6 +1992,27 @@ $(document).on('change', '#pricelistRepair', function () {
     });
 }());
 
+/* Zvuky chytrých upozornění — stejná sada jako v iOS a Android appce
+   (assets/sounds/notify/afx_*.m4a, generuje scripts/generate_notify_sounds.py).
+   Když prohlížeč zvuk ještě nepovolí (bez interakce se stránkou), zahraje se
+   syntetizovaný tón afxChime, který si upozornění podrží do prvního kliknutí. */
+window.afxIsNativeApp = function () {
+    return !!(window.AFXNative || (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.afxCreds));
+};
+window.afxSmartSound = function (name) {
+    var ok = { shift: 1, info: 1, warn: 1, urgent: 1, done: 1, cash: 1 };
+    if (!ok[name]) { name = 'info'; }
+    try {
+        var a = new Audio('assets/sounds/notify/afx_' + name + '.m4a');
+        a.volume = name === 'urgent' ? 1 : 0.85;
+        var p = a.play();
+        if (p && p.catch) {
+            p.catch(function () { if (window.afxChime) { window.afxChime(name === 'urgent' || name === 'warn' ? 'assign' : 'status'); } });
+        }
+        return a;
+    } catch (e) { return null; }
+};
+
 /* Poller: nová zakázka / změna stavu → zvuk + živá počítadla v doku.
    Stav v localStorage (afx_notify_state) — první karta, která změnu uvidí,
    ji „zarezervuje", takže víc otevřených karet nehraje vícekrát. */
@@ -2050,6 +2071,9 @@ $(document).on('change', '#pricelistRepair', function () {
             if (Number(latest.id) <= seen) return;
             try { localStorage.setItem('afx_smart_seen', String(latest.id)); } catch (e) {}
             if (location.pathname.indexOf('upozorneni.php') !== -1) return;
+            // V nativní appce (iOS/Android) upozornění ukáže a zazvoní systém —
+            // webový toast by byl druhý banner a druhý zvuk.
+            if (window.afxIsNativeApp()) return;
             var old = document.querySelector('.afx-smart-toast');
             if (old) old.remove();
             var icons = { urgent: 'fa-triangle-exclamation', warn: 'fa-circle-exclamation', info: 'fa-bell' };
@@ -2066,7 +2090,7 @@ $(document).on('change', '#pricelistRepair', function () {
             var close = function () { t.classList.add('is-out'); setTimeout(function () { t.remove(); }, 320); };
             t.querySelector('.st-x').addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); close(); });
             document.body.appendChild(t);
-            if (window.afxChime) { try { window.afxChime(lvl === 'info' ? 'status' : 'order'); } catch (e) {} }
+            window.afxSmartSound(latest.sound || (lvl === 'info' ? 'info' : lvl));
             setTimeout(close, lvl === 'urgent' ? 30000 : 12000);
         }
 

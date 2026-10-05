@@ -260,6 +260,35 @@ try {
         echo "  (reklamace bez sloupce technician_id — přeskočeno)\n";
     }
 
+    head('Appka: zvuky, položky, plán připomínek');
+    ok('zvuk podle typu', afxNotifySound('shift_reminder', 'info') === 'shift' && afxNotifySound('pos_open', 'warn') === 'cash'
+        && afxNotifySound('shift_gap', 'warn') === 'warn' && afxNotifySound('orders_stale', 'info') === 'info'
+        && afxNotifySound('shift_uncovered', 'urgent') === 'urgent');
+    $kA = 'tech:' . $T['ZZ Alfa'];
+    $last = afxNotifyLastId([$kA]);
+    afxNotifyDeliver($alfa, 'pos_open', 'appka1', 'Pokladna', 'text', ['now' => at('2031-03-04 10:20'), 'level' => 'warn', 'url' => 'pokladna.php']);
+    $items = afxNotifyItemsSince([$kA], $last);
+    ok('appka dostane nové upozornění se zvukem a ref', count($items) === 1 && $items[0]['sound'] === 'cash'
+        && $items[0]['ref'] === 'pos_open|appka1' && $items[0]['url'] === 'pokladna.php', json_encode($items, JSON_UNESCAPED_UNICODE));
+    ok('od posledního id už nic nového', afxNotifyItemsSince([$kA], afxNotifyLastId([$kA])) === []);
+    afxNotifySavePrefs($kA, ['reminder_minutes' => '', 'evening_before' => 1, 'ch_telegram' => 1, 'ch_push' => 1]);
+    $plan = afxNotifyAppSchedule($kA, at('2031-03-03 18:00'));
+    $rem = array_values(array_filter($plan, static fn($x) => str_starts_with($x['ref'], 'shift_reminder|')));
+    ok('plán: připomínka úterní směny přesně 60 min předem', $rem && $rem[0]['at'] === at('2031-03-04 09:00')->getTimestamp()
+        && $rem[0]['ref'] === 'shift_reminder|' . $alfaTue . '|2031-03-04|10:00' && $rem[0]['title'] === 'Směna ti začíná za 60 min',
+        json_encode($plan, JSON_UNESCAPED_UNICODE));
+    ok('plán: večerní zpráva v 19:00 se stejným ref jako ze serveru', (bool)array_filter($plan, static fn($x) =>
+        $x['ref'] === 'shift_evening|' . $T['ZZ Alfa'] . '|2031-03-04' && $x['at'] === at('2031-03-03 19:00')->getTimestamp()));
+    // server pak pošle totéž → stejný ref (appka ho podruhé neukáže)
+    afxNotifyDryRun(false);
+    afxNotifyRuleShiftReminder(at('2031-03-04 09:00'));
+    $srv = array_values(array_filter(afxNotifyItemsSince([$kA], 0, 50), static fn($x) => $x['rule'] === 'shift_reminder'));
+    ok('server pošle připomínku se stejným ref jako plán appky', $srv && $srv[count($srv) - 1]['ref'] === $rem[0]['ref'] && $srv[count($srv) - 1]['sound'] === 'shift',
+        json_encode($srv, JSON_UNESCAPED_UNICODE));
+    afxNotifySavePrefs($kA, ['muted' => ['shift_reminder', 'shift_evening'], 'evening_before' => 1, 'ch_push' => 1]);
+    ok('ztlumené připomínky appka neplánuje', afxNotifyAppSchedule($kA, at('2031-03-03 18:00')) === []);
+    afxNotifySavePrefs($kA, ['evening_before' => 1, 'ch_telegram' => 1, 'ch_push' => 1]);
+
     head('Plánovač');
     $res = afxNotifyRun(at('2031-03-04 09:05'), true);
     ok('průchod nanečisto doběhne a vrátí položky', isset($res['items']) && is_array($res['counts']) && $res['sent'] >= 1, json_encode($res['counts'] ?? $res));

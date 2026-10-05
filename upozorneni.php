@@ -79,7 +79,7 @@ $ago = static function (string $dt) use ($now): string {
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <span class="un-pill <?php echo ($me && $me['telegram']) ? 'ok' : 'off'; ?>"><i class="fab fa-telegram"></i>Telegram <?php echo ($me && $me['telegram']) ? 'propojen' : 'nepropojen'; ?></span>
-                <span class="un-pill <?php echo $pushOn ? 'ok' : 'off'; ?>"><i class="fas fa-mobile-screen"></i>Appka <?php echo $pushOn ? 'zapnutá' : 'nenastavená'; ?></span>
+                <span class="un-pill ok" title="<?php echo $pushOn ? 'iPhone: push přes APNs · Android: appka se ptá sama' : 'Android: appka se ptá sama · iPhone: chybí APNs klíč (Nastavení → Integrace)'; ?>"><i class="fas fa-mobile-screen"></i>Appka <?php echo $pushOn ? 'iOS + Android' : 'Android'; ?></span>
                 <?php if ($canManage): ?>
                 <span class="un-pill <?php echo ($lastRun && strtotime($lastRun) > time() - 600) ? 'ok' : 'warn'; ?>" title="Poslední kontrola pravidel">
                     <i class="fas fa-heart-pulse"></i><?php echo $lastRun ? 'Kontrola ' . e($ago($lastRun)) : 'Zatím neběželo'; ?></span>
@@ -135,7 +135,7 @@ $ago = static function (string $dt) use ($now): string {
                     <div class="un-chan-grid mb-3">
                         <?php foreach ([
                             ['ch_telegram', 'fab fa-telegram', 'Telegram', $me && $me['telegram'] ? 'propojený' : 'chybí propojení', $tgOn && !empty($cfg['global']['ch_telegram'])],
-                            ['ch_push', 'fas fa-mobile-screen', 'Appka', $pushOn ? 'push notifikace' : 'nenastaveno', $pushOn && !empty($cfg['global']['ch_push'])],
+                            ['ch_push', 'fas fa-mobile-screen', 'Appka', 'iPhone i Android, se zvukem', !empty($cfg['global']['ch_push'])],
                             ['ch_email', 'fas fa-envelope', 'E-mail', ($me['email'] ?? '') !== '' ? (string)$me['email'] : 'bez e-mailu', !empty($cfg['global']['ch_email'])],
                             ['ch_sms', 'fas fa-comment-sms', 'SMS', 'jen kritické věci', !empty($cfg['global']['ch_sms'])],
                         ] as [$k, $ico, $lbl, $hint, $avail]): ?>
@@ -186,6 +186,21 @@ $ago = static function (string $dt) use ($now): string {
                     </div>
                 </form>
                 <?php endif; ?>
+            </section>
+
+            <section class="glass-panel border-secondary p-3 p-md-4 mb-4">
+                <h5 class="mb-1"><i class="fas fa-music me-2 text-info"></i>Zvuky upozornění</h5>
+                <div class="un-note mb-3">Vlastní sada AppleFix — stejné zvuky zní v appce na iPhonu i Androidu a tady v CRM. Každý typ upozornění poznáš po zvuku, aniž bys koukal na telefon.</div>
+                <div class="un-sounds">
+                    <?php foreach (AFX_NOTIFY_SOUNDS as $sk => [$sl, $sd]): ?>
+                    <button type="button" class="un-sound snd-<?php echo e($sk); ?>" data-sound="<?php echo e($sk); ?>" aria-label="Přehrát zvuk: <?php echo e($sl); ?>">
+                        <span class="un-sound-play"><i class="fas fa-play"></i></span>
+                        <span class="un-sound-txt"><b><?php echo e($sl); ?></b><small><?php echo e($sd); ?></small></span>
+                        <span class="un-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                    </button>
+                    <?php endforeach; ?>
+                </div>
+                <div class="un-note mt-3"><i class="fas fa-mobile-screen me-1"></i>V appce potřebuješ verzi <b>iOS 1.3.0</b> / <b>Android 1.4.0</b> nebo novější. Na Androidu si hlasitost a vibrace jednotlivých typů můžeš doladit v Nastavení telefonu → Aplikace → AppleFix CRM → Oznámení.</div>
             </section>
 
             <section class="glass-panel border-secondary p-3 p-md-4">
@@ -275,7 +290,7 @@ $ago = static function (string $dt) use ($now): string {
                     </div>
                     <?php foreach ([
                         ['ch_telegram', 'Telegram', $tgOn ? 'bot je nastavený' : 'chybí token bota (Nastavení → Integrace)'],
-                        ['ch_push', 'Push do appky', $pushOn ? 'APNs je nastavené' : 'APNs klíč není nastavený'],
+                        ['ch_push', 'Appka iOS + Android (se zvukem)', $pushOn ? 'iPhone přes APNs, Android sám' : 'Android sám; pro iPhone chybí APNs klíč'],
                         ['ch_email', 'E-mail', 'kdo si ho zapne a má vyplněný e-mail'],
                         ['ch_sms', 'SMS (GoSMS, placené)', 'jen kritické: nikdo na směně'],
                     ] as [$k, $lbl, $hint]): ?>
@@ -468,7 +483,29 @@ $ago = static function (string $dt) use ($now): string {
 .un-run-item b { display: block; }
 .un-run-item div { white-space: pre-line; color: rgba(255,255,255,.65); font-size: 13.5px; margin-top: 4px; }
 .un-run-item small { color: #0dcaf0; font-size: 12.5px; }
-@media (prefers-reduced-motion: reduce) { .un-hero-glow, .un-hero-icon i, .un-item { animation: none; } }
+/* zvuky */
+.un .un-sound-txt b { font-size: 15px !important; } .un .un-sound-txt small { font-size: 12.5px !important; }
+.un-sounds { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+@media (max-width: 480px) { .un-sounds { grid-template-columns: minmax(0,1fr); } }
+.un-sound { --sc: #0dcaf0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; text-align: left;
+    border: 1px solid color-mix(in srgb, var(--sc) 28%, rgba(255,255,255,.08)); background: color-mix(in srgb, var(--sc) 7%, rgba(28,28,30,.8));
+    color: #fff; cursor: pointer; transition: transform .15s ease, border-color .2s ease, background .2s ease; min-width: 0; }
+.un-sound:hover { border-color: color-mix(in srgb, var(--sc) 60%, transparent); transform: translateY(-1px); }
+.un-sound:focus-visible { outline: 2px solid var(--sc); outline-offset: 2px; }
+.un-sound.snd-shift { --sc: #0dcaf0; } .un-sound.snd-info { --sc: #64d2ff; } .un-sound.snd-warn { --sc: #ffd60a; }
+.un-sound.snd-urgent { --sc: #ff453a; } .un-sound.snd-done { --sc: #30d158; } .un-sound.snd-cash { --sc: #bf5af2; }
+.un-sound-play { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 12px;
+    background: var(--sc); color: #0c0c0d; box-shadow: 0 0 16px color-mix(in srgb, var(--sc) 45%, transparent); }
+.un-sound-txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.un-sound-txt small { color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.un-eq { display: flex; align-items: flex-end; gap: 2px; height: 16px; opacity: 0; transition: opacity .2s; }
+.un-eq i { width: 3px; height: 4px; border-radius: 2px; background: var(--sc); }
+.un-sound.is-playing .un-eq { opacity: 1; }
+.un-sound.is-playing .un-eq i { animation: unEq .7s ease-in-out infinite alternate; }
+.un-sound.is-playing .un-eq i:nth-child(2) { animation-delay: .15s; } .un-sound.is-playing .un-eq i:nth-child(3) { animation-delay: .3s; }
+.un-sound.is-playing .un-eq i:nth-child(4) { animation-delay: .45s; }
+@keyframes unEq { from { height: 3px; } to { height: 16px; } }
+@media (prefers-reduced-motion: reduce) { .un-hero-glow, .un-hero-icon i, .un-item, .un-eq i { animation: none !important; } }
 </style>
 
 <script>
@@ -512,6 +549,18 @@ $ago = static function (string $dt) use ($now): string {
     <?php if ($unread && $inbox): ?>
     try { localStorage.setItem('afx_smart_seen', '<?php echo (int)$inbox[0]['id']; ?>'); } catch (e) {}
     <?php endif; ?>
+
+    // ukázka zvuků
+    document.querySelectorAll('.un-sound').forEach(function (b) {
+        b.addEventListener('click', function () {
+            document.querySelectorAll('.un-sound.is-playing').forEach(function (x) { x.classList.remove('is-playing'); });
+            var a = window.afxSmartSound ? window.afxSmartSound(b.dataset.sound) : null;
+            b.classList.add('is-playing');
+            var stop = function () { b.classList.remove('is-playing'); };
+            if (a) { a.addEventListener('ended', stop); a.addEventListener('error', stop); }
+            setTimeout(stop, 2600);
+        });
+    });
 
     // nastavení pro vedení
     var cfgForm = document.getElementById('unConfig');

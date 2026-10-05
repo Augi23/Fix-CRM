@@ -74,6 +74,14 @@ function afxNotifyEnsureSchema(): void
             KEY idx_staff_id (staff_key, id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        // zvuk a ref (klíč bez příjemce) — appka podle nich volí zvuk a nezdvojí
+        // připomínku, kterou si sama naplánovala dopředu
+        $cols = $pdo->query("SHOW COLUMNS FROM smart_notify_inbox")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('sound', $cols, true)) {
+            $pdo->exec("ALTER TABLE smart_notify_inbox ADD COLUMN sound VARCHAR(20) NOT NULL DEFAULT '' AFTER level,
+                        ADD COLUMN ref VARCHAR(190) NOT NULL DEFAULT '' AFTER sound");
+        }
+
         $pdo->exec("CREATE TABLE IF NOT EXISTS smart_notify_prefs (
             staff_key VARCHAR(40) NOT NULL,
             reminder_minutes INT NULL DEFAULT NULL,
@@ -795,6 +803,31 @@ function afxNotifyMyKeys(): array
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   ZVUKY — vlastní sada (scripts/generate_notify_sounds.py), stejná v iOS
+   appce (afx_*.caf v bundlu), Android appce (res/raw/afx_*.ogg) i na webu
+   (assets/sounds/notify/afx_*.m4a). Starší appka bez souborů zahraje výchozí zvuk.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const AFX_NOTIFY_SOUNDS = [
+    // [název, k čemu se používá] — charakter zvuku popisuje generátor
+    'shift'  => ['Směna začíná', 'připomínky směn'],
+    'info'   => ['Informace', 'přehledy a souhrny'],
+    'warn'   => ['Pozor', 'je potřeba jednat'],
+    'urgent' => ['Naléhavé', 'nikdo na směně, lhůta'],
+    'done'   => ['Vyřešeno', 'problém je pryč'],
+    'cash'   => ['Pokladna', 'převzetí a uzávěrka'],
+];
+
+/** Zvuk upozornění podle pravidla a naléhavosti. */
+function afxNotifySound(string $rule, string $level): string
+{
+    if ($level === 'urgent') { return 'urgent'; }
+    if (in_array($rule, ['shift_reminder', 'shift_evening'], true)) { return 'shift'; }
+    if (in_array($rule, ['pos_open', 'pos_close'], true)) { return 'cash'; }
+    return $level === 'warn' ? 'warn' : 'info';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    DORUČENÍ
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -886,6 +919,8 @@ function afxNotifyDeliver(array $r, string $rule, string $dedupe, string $title,
     $url   = (string)($o['url'] ?? '');
     $key   = (string)$r['key'];
     $dkey  = mb_substr($rule . '|' . $dedupe . '|' . $key, 0, 190);
+    $ref   = mb_substr($rule . '|' . $dedupe, 0, 190);
+    $sound = (string)($o['sound'] ?? afxNotifySound($rule, $level));
 
     $prefs = afxNotifyPrefs($key);
     if (in_array($rule, $prefs['muted'], true) && empty($o['force_channels'])) { return false; }
@@ -923,8 +958,8 @@ function afxNotifyDeliver(array $r, string $rule, string $dedupe, string $title,
 
     // 1) upozornění v CRM — vždy (toast + přehled na stránce Upozornění)
     try {
-        $pdo->prepare('INSERT INTO smart_notify_inbox (staff_key, rule, level, title, body, url) VALUES (?,?,?,?,?,?)')
-            ->execute([$key, $rule, $level, mb_substr($title, 0, 190), afxNotifyFormat($body, 'plain'), mb_substr($url, 0, 255)]);
+        $pdo->prepare('INSERT INTO smart_notify_inbox (staff_key, rule, level, sound, ref, title, body, url) VALUES (?,?,?,?,?,?,?,?)')
+            ->execute([$key, $rule, $level, $sound, $ref, mb_substr($title, 0, 190), afxNotifyFormat($body, 'plain'), mb_substr($url, 0, 255)]);
     } catch (Throwable $e) { $errors[] = 'CRM: ' . $e->getMessage(); }
 
     // 2) Telegram
@@ -940,8 +975,15 @@ function afxNotifyDeliver(array $r, string $rule, string $dedupe, string $title,
         try {
             $pushBody = mb_substr(preg_replace('/\s*\n\s*/u', ' · ', afxNotifyFormat($body, 'plain')) ?? '', 0, 220);
             foreach (array_merge([$key], (array)($r['alt_keys'] ?? [])) as $k) {
-                pushToStaff($pdo, $k, ($icon !== '' ? $icon . ' ' : '') . $title, $pushBody,
-                    ['data' => ['url' => $url], 'collapse' => mb_substr($rule . '-' . md5($dedupe), 0, 60)]);
+                pushToStaff($pdo, $k, ($icon !== '' ? $icon . ' ' : '') . $title, $pushBody, [
+                    'sound'    => 'afx_' . $sound . '.caf',
+                    'data'     => ['url' => $url, 'ref' => $ref],
+                    'collapse' => mb_substr($rule . '-' . md5($dedupe), 0, 60),
+                    'thread'   => 'afx-' . (afxNotifyRules()[$rule]['group'] ?? 'crm'),
+                    // připomínka směny a naléhavé věci projdou i přes režim Soustředění
+                    'interruption' => ($level === 'urgent' || $rule === 'shift_reminder') ? 'time-sensitive' : 'active',
+                    'relevance' => $level === 'urgent' ? 1.0 : ($level === 'warn' ? 0.7 : 0.4),
+                ]);
             }
             $sent[] = 'push';
         } catch (Throwable $e) { $errors[] = 'push: ' . $e->getMessage(); }
@@ -1170,13 +1212,66 @@ function afxNotifyColleaguesText(array $dayEntries, int $techId): string
     return $parts ? implode(', ', $parts) : 'nikdo další — jsi tam sám/sama';
 }
 
+/**
+ * Zpráva připomínky směny pro okamžik $at (kdy se zobrazí). Sdílí ji pravidlo
+ * (odeslání ze serveru) i plán pro Android appku, která si připomínku naplánuje
+ * dopředu a ukáže ji přesně včas i bez signálu.
+ * Vrací [ref, titulek, text, url].
+ */
+function afxNotifyShiftReminderMessage(array $e, array $byDay, DateTimeImmutable $at, bool $brief): array
+{
+    $bid = (int)$e['branch_id'];
+    $date = (string)$e['work_date'];
+    $start = afxNotifyAt($date, (string)$e['time_from']);
+    $left = $start ? max(0, (int)round(($start->getTimestamp() - $at->getTimestamp()) / 60)) : 0;
+    $when = $left >= 90 ? ('v ' . afxNotifyHm((string)$e['time_from'])) : ('za ' . $left . ' min');
+    $cov = afxShiftCoverage($bid, $date, $byDay[$bid][$date] ?? []);
+
+    $body = '**' . afxNotifyBranchName($bid) . '** · ' . afxNotifyRelDay($date, $at) . ' '
+          . afxNotifyHm((string)$e['time_from']) . '–' . afxNotifyHm((string)$e['time_to']) . "\n"
+          . 'S tebou: ' . afxNotifyColleaguesText($byDay[$bid][$date] ?? [], (int)$e['tech_id']);
+    if ($cov['text'] !== '') { $body .= "\nOtevřeno " . $cov['text']; }
+    if (trim((string)$e['note']) !== '') { $body .= "\nPoznámka: " . trim((string)$e['note']); }
+    if ($brief) {
+        $b = afxNotifyBranchBrief($bid, $date);
+        if ($b) { $body .= "\n\nNa pobočce: " . implode(' · ', $b); }
+        // je první na směně a pokladnu ještě nikdo nepřevzal?
+        $first = true;
+        foreach ($byDay[$bid][$date] ?? [] as $o) { if ((string)$o['time_from'] < (string)$e['time_from']) { $first = false; break; } }
+        if ($first && $date === $at->format('Y-m-d') && !afxNotifyPosTakenToday($bid, $date)) {
+            $body .= "\n💡 Jdeš první — při příchodu převezmi pokladnu.";
+        }
+    }
+    $ref = 'shift_reminder|' . (int)$e['id'] . '|' . $date . '|' . afxNotifyHm((string)$e['time_from']);
+    return [$ref, 'Směna ti začíná ' . $when, $body, 'rozpis.php?b=' . $bid . '&t=' . $date];
+}
+
+/** Zpráva „zítra jdeš do práce". Vrací [ref, titulek, text, url]. */
+function afxNotifyShiftEveningMessage(array $e, array $byDay): array
+{
+    $bid = (int)$e['branch_id'];
+    $date = (string)$e['work_date'];
+    $body = '**' . afxNotifyDayLabel($date, true) . '** · ' . afxNotifyHm((string)$e['time_from']) . '–'
+          . afxNotifyHm((string)$e['time_to']) . ' · **' . afxNotifyBranchName($bid) . "**\n"
+          . 'S tebou: ' . afxNotifyColleaguesText($byDay[$bid][$date] ?? [], (int)$e['tech_id']);
+    if (trim((string)$e['note']) !== '') { $body .= "\nPoznámka: " . trim((string)$e['note']); }
+    $body .= "\n\nKdyby to nešlo, dej co nejdřív vědět vedení.";
+    return ['shift_evening|' . (int)$e['tech_id'] . '|' . $date, 'Zítra jdeš do práce', $body, 'rozpis.php?b=' . $bid . '&t=' . $date];
+}
+
+/** Ref (deduplikační klíč bez příjemce) → [pravidlo, zbytek klíče]. */
+function afxNotifySplitRef(string $ref): array
+{
+    $p = explode('|', $ref, 2);
+    return [$p[0], $p[1] ?? ''];
+}
+
 function afxNotifyRuleShiftReminder(DateTimeImmutable $now): int
 {
     if (!afxNotifyRuleOn('shift_reminder')) { return 0; }
     $default = (int)afxNotifyParam('shift_reminder', 'minutes');
     $brief = (bool)afxNotifyParam('shift_reminder', 'brief');
-    $today = $now->format('Y-m-d');
-    $rows = afxNotifyShiftsBetween($today, $now->modify('+1 day')->format('Y-m-d'));
+    $rows = afxNotifyShiftsBetween($now->format('Y-m-d'), $now->modify('+1 day')->format('Y-m-d'));
     $byDay = afxNotifyGroupShifts($rows);
     $n = 0;
     foreach ($rows as $e) {
@@ -1187,31 +1282,9 @@ function afxNotifyRuleShiftReminder(DateTimeImmutable $now): int
         $prefs = afxNotifyPrefs($r['key']);
         $min = $prefs['reminder_minutes'] !== null ? (int)$prefs['reminder_minutes'] : $default;
         if ($now < $start->modify('-' . $min . ' minutes')) { continue; }
-
-        $bid = (int)$e['branch_id'];
-        $date = (string)$e['work_date'];
-        $left = (int)round(($start->getTimestamp() - $now->getTimestamp()) / 60);
-        $when = $left >= 90 ? ('v ' . afxNotifyHm((string)$e['time_from'])) : ('za ' . $left . ' min');
-        $cov = afxShiftCoverage($bid, $date, $byDay[$bid][$date] ?? []);
-
-        $body = '**' . afxNotifyBranchName($bid) . '** · ' . afxNotifyRelDay($date, $now) . ' '
-              . afxNotifyHm((string)$e['time_from']) . '–' . afxNotifyHm((string)$e['time_to']) . "\n"
-              . 'S tebou: ' . afxNotifyColleaguesText($byDay[$bid][$date] ?? [], (int)$e['tech_id']);
-        if ($cov['text'] !== '') { $body .= "\nOtevřeno " . $cov['text']; }
-        if (trim((string)$e['note']) !== '') { $body .= "\nPoznámka: " . trim((string)$e['note']); }
-        if ($brief) {
-            $b = afxNotifyBranchBrief($bid, $date);
-            if ($b) { $body .= "\n\nNa pobočce: " . implode(' · ', $b); }
-            // je první na směně a pokladnu ještě nikdo nepřevzal?
-            $first = true;
-            foreach ($byDay[$bid][$date] ?? [] as $o) { if ((string)$o['time_from'] < (string)$e['time_from']) { $first = false; break; } }
-            if ($first && $date === $today && !afxNotifyPosTakenToday($bid, $date)) {
-                $body .= "\n💡 Jdeš první — při příchodu převezmi pokladnu.";
-            }
-        }
-        $dd = (int)$e['id'] . '|' . $date . '|' . afxNotifyHm((string)$e['time_from']);
-        if (afxNotifyDeliver($r, 'shift_reminder', $dd, 'Směna ti začíná ' . $when, $body,
-            ['now' => $now, 'url' => 'rozpis.php?b=' . $bid . '&t=' . $date])) { $n++; }
+        [$ref, $title, $body, $url] = afxNotifyShiftReminderMessage($e, $byDay, $now, $brief);
+        [, $dd] = afxNotifySplitRef($ref);
+        if (afxNotifyDeliver($r, 'shift_reminder', $dd, $title, $body, ['now' => $now, 'url' => $url])) { $n++; }
     }
     return $n;
 }
@@ -1227,14 +1300,9 @@ function afxNotifyRuleShiftEvening(DateTimeImmutable $now): int
     foreach ($rows as $e) {
         $r = afxNotifyRecipient('tech:' . (int)$e['tech_id']);
         if (!$r || empty(afxNotifyPrefs($r['key'])['evening_before'])) { continue; }
-        $bid = (int)$e['branch_id'];
-        $body = '**' . afxNotifyDayLabel($tomorrow, true) . '** · ' . afxNotifyHm((string)$e['time_from']) . '–'
-              . afxNotifyHm((string)$e['time_to']) . ' · **' . afxNotifyBranchName($bid) . "**\n"
-              . 'S tebou: ' . afxNotifyColleaguesText($byDay[$bid][$tomorrow] ?? [], (int)$e['tech_id']);
-        if (trim((string)$e['note']) !== '') { $body .= "\nPoznámka: " . trim((string)$e['note']); }
-        $body .= "\n\nKdyby to nešlo, dej co nejdřív vědět vedení.";
-        if (afxNotifyDeliver($r, 'shift_evening', (int)$e['tech_id'] . '|' . $tomorrow, 'Zítra jdeš do práce', $body,
-            ['now' => $now, 'url' => 'rozpis.php?b=' . $bid . '&t=' . $tomorrow])) { $n++; }
+        [$ref, $title, $body, $url] = afxNotifyShiftEveningMessage($e, $byDay);
+        [, $dd] = afxNotifySplitRef($ref);
+        if (afxNotifyDeliver($r, 'shift_evening', $dd, $title, $body, ['now' => $now, 'url' => $url])) { $n++; }
     }
     return $n;
 }
@@ -1847,7 +1915,7 @@ function afxNotifyShiftChangedNow(?array $old, ?array $new, int $actorTechId, st
             $n += afxNotifyDeliverMany(afxNotifyBranchLeads($bid), 'shift_change', 'solved|' . $bid . '|' . $date . '|' . $tid,
                 'Vyřešeno: ' . afxNotifyRelDay($date, $now) . ' už někdo je — ' . $name,
                 $who . ' se zapsal(a) na ' . afxNotifyDayLabel($date) . ' ' . $span($new) . ".\n" . $state,
-                ['now' => $now, 'url' => $url], ['tech:' . $actorTechId]);
+                ['now' => $now, 'url' => $url, 'sound' => 'done'], ['tech:' . $actorTechId]);
         }
     }
     return $n;
@@ -1979,9 +2047,11 @@ function afxNotifyUnread(array $keys): array
         $st->execute($keys);
         $cnt = (int)$st->fetchColumn();
         if ($cnt === 0) { return [0, null]; }
-        $st = $pdo->prepare("SELECT id, level, title, body, url FROM smart_notify_inbox WHERE staff_key IN ($ph) AND read_at IS NULL ORDER BY id DESC LIMIT 1");
+        $st = $pdo->prepare("SELECT id, rule, level, sound, title, body, url FROM smart_notify_inbox WHERE staff_key IN ($ph) AND read_at IS NULL ORDER BY id DESC LIMIT 1");
         $st->execute($keys);
-        return [$cnt, $st->fetch(PDO::FETCH_ASSOC) ?: null];
+        $row = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        if ($row && (string)$row['sound'] === '') { $row['sound'] = afxNotifySound((string)$row['rule'], (string)$row['level']); }
+        return [$cnt, $row];
     } catch (Throwable $e) { return [0, null]; }
 }
 
@@ -1994,6 +2064,80 @@ function afxNotifyMarkRead(array $keys, int $id = 0): void
         $sql = "UPDATE smart_notify_inbox SET read_at = NOW() WHERE staff_key IN ($ph) AND read_at IS NULL" . ($id > 0 ? ' AND id <= ?' : '');
         $pdo->prepare($sql)->execute($id > 0 ? array_merge($keys, [$id]) : $keys);
     } catch (Throwable $e) { /* nic */ }
+}
+
+/** Nová upozornění v CRM od id $since (pro appku) — nejstarší první, max $limit. */
+function afxNotifyItemsSince(array $keys, int $since, int $limit = 10): array
+{
+    global $pdo;
+    if (!$keys) { return []; }
+    try {
+        $ph = implode(',', array_fill(0, count($keys), '?'));
+        $st = $pdo->prepare("SELECT id, rule, level, sound, ref, title, body, url FROM smart_notify_inbox
+                             WHERE staff_key IN ($ph) AND id > ? ORDER BY id ASC LIMIT " . max(1, min(50, $limit)));
+        $st->execute(array_merge($keys, [$since]));
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { return []; }
+    foreach ($rows as &$r) {
+        $r['id'] = (int)$r['id'];
+        if ((string)$r['sound'] === '') { $r['sound'] = afxNotifySound((string)$r['rule'], (string)$r['level']); }
+    }
+    return $rows;
+}
+
+/** Nejvyšší id upozornění přihlášeného (výchozí bod appky — nic starého nepípne). */
+function afxNotifyLastId(array $keys): int
+{
+    global $pdo;
+    if (!$keys) { return 0; }
+    try {
+        $ph = implode(',', array_fill(0, count($keys), '?'));
+        $st = $pdo->prepare("SELECT MAX(id) FROM smart_notify_inbox WHERE staff_key IN ($ph)");
+        $st->execute($keys);
+        return (int)$st->fetchColumn();
+    } catch (Throwable $e) { return 0; }
+}
+
+/**
+ * Plán připomínek pro appku (Android): připomínky směn a večerní zprávy na
+ * příštích 36 h s hotovým textem a přesným časem. Appka si je naplánuje do
+ * systému a ukáže je přesně včas i bez signálu. Až server totéž upozornění
+ * pošle, nese stejný `ref`, takže se neukáže dvakrát.
+ */
+function afxNotifyAppSchedule(string $key, DateTimeImmutable $now): array
+{
+    $r = afxNotifyRecipient($key);
+    if (!$r || $r['tech_id'] <= 0 || !afxNotifyConfig()['global']['enabled']) { return []; }
+    $p = afxNotifyPrefs($key);
+    $out = [];
+    $rows = afxNotifyShiftsBetween($now->format('Y-m-d'), $now->modify('+2 day')->format('Y-m-d'));
+    $byDay = afxNotifyGroupShifts($rows);
+    $limit = $now->modify('+36 hours');
+    foreach ($rows as $e) {
+        if ((int)$e['tech_id'] !== $r['tech_id']) { continue; }
+        $start = afxNotifyAt((string)$e['work_date'], (string)$e['time_from']);
+        if (!$start || $start <= $now) { continue; }
+        if (afxNotifyRuleOn('shift_reminder') && !in_array('shift_reminder', $p['muted'], true)) {
+            $min = $p['reminder_minutes'] !== null ? (int)$p['reminder_minutes'] : (int)afxNotifyParam('shift_reminder', 'minutes');
+            $at = $start->modify('-' . $min . ' minutes');
+            if ($at > $now && $at < $limit) {
+                [$ref, $title, $body, $url] = afxNotifyShiftReminderMessage($e, $byDay, $at, false);
+                $out[] = ['ref' => $ref, 'at' => $at->getTimestamp(), 'title' => $title,
+                          'body' => afxNotifyFormat($body, 'plain'), 'url' => $url, 'sound' => 'shift', 'level' => 'info'];
+            }
+        }
+        if (afxNotifyRuleOn('shift_evening') && !empty($p['evening_before']) && !in_array('shift_evening', $p['muted'], true)) {
+            $at = afxNotifyAt((new DateTimeImmutable((string)$e['work_date']))->modify('-1 day')->format('Y-m-d'),
+                (string)afxNotifyParam('shift_evening', 'time'));
+            if ($at && $at > $now && $at < $limit) {
+                [$ref, $title, $body, $url] = afxNotifyShiftEveningMessage($e, $byDay);
+                $out[] = ['ref' => $ref, 'at' => $at->getTimestamp(), 'title' => $title,
+                          'body' => afxNotifyFormat($body, 'plain'), 'url' => $url, 'sound' => 'shift', 'level' => 'info'];
+            }
+        }
+    }
+    usort($out, static fn($a, $b) => $a['at'] <=> $b['at']);
+    return array_slice($out, 0, 12);
 }
 
 /**
