@@ -38,7 +38,8 @@ switch ((string)($_POST['action'] ?? '')) {
             (string)($_POST['work_date'] ?? ''),
             (string)($_POST['time_from'] ?? ''),
             (string)($_POST['time_to'] ?? ''),
-            (string)($_POST['note'] ?? '')
+            (string)($_POST['note'] ?? ''),
+            (int)($_POST['entry_id'] ?? 0)      // 0 = nový zápis, jinak úprava existujícího
         );
         if ($ok && function_exists('crmAuditLog')) {
             crmAuditLog('settings.update', ['entity_type' => 'settings',

@@ -289,6 +289,40 @@ try {
     ok('ztlumené připomínky appka neplánuje', afxNotifyAppSchedule($kA, at('2031-03-03 18:00')) === []);
     afxNotifySavePrefs($kA, ['evening_before' => 1, 'ch_telegram' => 1, 'ch_push' => 1]);
 
+    head('Rozpis: víc lidí na den, překryvy, bez tichého přepisu');
+    $_SESSION['role'] = 'admin'; $_SESSION['user_id'] = 1; unset($_SESSION['tech_id']);   // vedení
+    $D = '2031-03-21';                                                                    // pátek (volný týden)
+    [$ok1] = afxShiftSave($b1, $T['ZZ Alfa'], $D, '10:00', '14:00', '');
+    [$ok2] = afxShiftSave($b1, $T['ZZ Gama'], $D, '12:00', '19:00', '');                 // překryv 12–14
+    [$ok3] = afxShiftSave($b1, $T['ZZ Delta'] , $D, '10:00', '12:00', '');               // jiná pobočka
+    ok('na jeden den jde zapsat víc lidí a časy se můžou krýt', $ok1 && $ok2);
+    ok('člověk z jiné pobočky zapsat nejde', !$ok3);
+    $cov = afxShiftCoverage($b1, $D, afxShiftEntries($b1, $D, $D)[$D] ?? []);
+    ok('dva lidé pokryjí celou otvírací dobu 10–19', $cov['count'] === 2 && $cov['gaps'] === [], json_encode($cov['gaps']));
+    [$okDup, $msgDup] = afxShiftSave($b1, $T['ZZ Alfa'], $D, '15:00', '19:00', '');
+    $alfaRow = afxShiftFind($b1, $T['ZZ Alfa'], $D);
+    ok('nový zápis už zapsaného člověka NEpřepíše jeho čas (srozumitelná chyba)', !$okDup && str_contains($msgDup, 'už je na tenhle den zapsaný')
+        && substr($alfaRow['time_from'], 0, 5) === '10:00', $msgDup);
+    [$okEd] = afxShiftSave($b1, $T['ZZ Alfa'], $D, '09:30', '13:00', 'ráno', (int)$alfaRow['id']);
+    $alfaRow = afxShiftFind($b1, $T['ZZ Alfa'], $D);
+    ok('úprava s id změní čas', $okEd && substr($alfaRow['time_from'], 0, 5) === '09:30' && $alfaRow['note'] === 'ráno');
+    [$okMv] = afxShiftSave($b1, $T['ZZ Beta'], $D, '09:30', '13:00', '', (int)$alfaRow['id']);
+    ok('úprava s jiným člověkem zápis převede (nevznikne druhý)', $okMv && !afxShiftFind($b1, $T['ZZ Alfa'], $D)
+        && afxShiftFind($b1, $T['ZZ Beta'], $D) && count(afxShiftEntries($b1, $D, $D)[$D]) === 2);
+    $gamaRow = afxShiftFind($b1, $T['ZZ Gama'], $D);
+    [$okCl, $msgCl] = afxShiftSave($b1, $T['ZZ Beta'], $D, '12:00', '19:00', '', (int)$gamaRow['id']);
+    ok('převod na člověka, který už zápis má, se odmítne', !$okCl && str_contains($msgCl, 'vlastní zápis'), $msgCl);
+    // zaměstnanec: zapisuje jen sebe, ale klidně k ostatním
+    $_SESSION['role'] = 'technician'; $_SESSION['tech_id'] = $T['ZZ Alfa']; $_SESSION['internal_role'] = 'engineer';
+    $_SESSION['user_id'] = 't' . $T['ZZ Alfa']; unset($_SESSION['_perms'], $_SESSION['_perms_rev']);
+    [$okEmp] = afxShiftSave($b1, $T['ZZ Alfa'], '2031-03-22', '10:00', '12:00', '');
+    $_SESSION['tech_id'] = $T['ZZ Beta']; $_SESSION['user_id'] = 't' . $T['ZZ Beta'];
+    [$okEmp2] = afxShiftSave($b1, $T['ZZ Beta'], '2031-03-22', '11:00', '14:00', '');
+    [$okEmp3] = afxShiftSave($b1, $T['ZZ Alfa'], '2031-03-22', '12:00', '14:00', '');
+    ok('zaměstnanci se zapíšou ke kolegovi na stejný den (překryv)', $okEmp && $okEmp2);
+    ok('zaměstnanec nezapíše kolegu', !$okEmp3);
+    $_SESSION = [];
+
     head('Plánovač');
     $res = afxNotifyRun(at('2031-03-04 09:05'), true);
     ok('průchod nanečisto doběhne a vrátí položky', isset($res['items']) && is_array($res['counts']) && $res['sent'] >= 1, json_encode($res['counts'] ?? $res));

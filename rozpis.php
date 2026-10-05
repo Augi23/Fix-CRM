@@ -52,6 +52,25 @@ foreach ($entries as $list) {
     }
 }
 arsort($weekMinutes);
+
+/** Pro dialog zápisu: otvírací doba a kdo je kdy zapsaný (časová osa, návrh díry). */
+$rzDays = [];
+foreach ($days as $i => $d) {
+    $cov = afxShiftCoverage($branchId, $d, $entries[$d] ?? []);
+    $rzDays[$d] = [
+        'open'    => $cov['open'],
+        'hours'   => $cov['hours'],
+        'label'   => $dayNames[$i] . ' ' . date('j. n.', strtotime($d)),
+        'canSelf' => afxShiftDayOpen($d)[0],
+        'entries' => array_map(static fn($e) => [
+            'id' => (int)$e['id'], 'tech' => (int)$e['tech_id'], 'name' => (string)($e['tech_name'] ?? '—'),
+            'from' => substr((string)$e['time_from'], 0, 5), 'to' => substr((string)$e['time_to'], 0, 5),
+            'note' => (string)$e['note'], 'color' => afxShiftColor((int)$e['tech_id']),
+        ], $entries[$d] ?? []),
+    ];
+}
+$rzStaff = array_map(static fn($s) => ['id' => (int)$s['id'], 'name' => (string)$s['name']], $staff);
+
 ?>
 
 <div class="container-fluid px-3 px-md-4 py-4 rz">
@@ -132,6 +151,29 @@ arsort($weekMinutes);
                 <div class="rz-cov is-ok" title="Celá otvírací doba je pokrytá"><i class="fas fa-circle-check"></i>Pokryto</div>
             <?php endif; ?>
 
+            <?php if ($cov['open'] && $cov['hours']):
+                // pruh otvírací doby: kolik lidí je kdy na prodejně (0 / 1 / 2+)
+                [$bo, $bc] = $cov['hours'];
+                $pts = [$bo, $bc];
+                foreach ($list as $e) {
+                    foreach ([afxNotifyTimeToMin((string)$e['time_from']), afxNotifyTimeToMin((string)$e['time_to'])] as $m) {
+                        if ($m !== null && $m > $bo && $m < $bc) { $pts[] = $m; }
+                    }
+                }
+                $pts = array_values(array_unique($pts)); sort($pts);
+            ?>
+                <div class="rz-bar" role="img" aria-label="Obsazení otvírací doby">
+                    <?php for ($k = 0; $k < count($pts) - 1; $k++):
+                        $a = $pts[$k]; $z = $pts[$k + 1]; $n = 0;
+                        foreach ($list as $e) {
+                            $ef = afxNotifyTimeToMin((string)$e['time_from']); $et = afxNotifyTimeToMin((string)$e['time_to']);
+                            if ($ef !== null && $et !== null && $ef <= $a && $et >= $z) { $n++; }
+                        }
+                    ?><span class="rz-seg n<?php echo min($n, 2); ?>" style="flex:<?php echo $z - $a; ?>"
+                          title="<?php echo afxNotifyMinToTime($a) . '–' . afxNotifyMinToTime($z) . ': ' . ($n === 0 ? 'nikdo' : $n . ' ' . ($n === 1 ? 'člověk' : ($n < 5 ? 'lidé' : 'lidí'))); ?>"></span><?php endfor; ?>
+                </div>
+            <?php endif; ?>
+
             <ul class="rz-list">
                 <?php foreach ($list as $e):
                     $isMine = ((int)$e['tech_id'] === $meTech);
@@ -169,16 +211,18 @@ arsort($weekMinutes);
                 <div class="rz-empty"><?php echo $isPast ? 'Nikdo zapsán' : 'Zatím nikdo'; ?></div>
             <?php endif; ?>
 
-            <?php if ($canAdd): ?>
-                <button type="button" class="rz-add<?php echo $mine ? ' is-set' : ''; ?>"
-                        data-date="<?php echo e($d); ?>" data-day="<?php echo e($dayNames[$i] . ' ' . date('j. n.', strtotime($d))); ?>"
-                        data-hours="<?php echo e($hours[$i] ?? ''); ?>"
-                        data-id="<?php echo $mine ? (int)$mine['id'] : 0; ?>"
-                        data-from="<?php echo $mine ? substr((string)$mine['time_from'], 0, 5) : ''; ?>"
-                        data-to="<?php echo $mine ? substr((string)$mine['time_to'], 0, 5) : ''; ?>"
-                        data-note="<?php echo $mine ? e((string)$mine['note']) : ''; ?>">
-                    <i class="fas <?php echo $mine ? 'fa-pen' : 'fa-plus'; ?>"></i>
-                    <?php echo $mine ? 'Upravit svůj čas' : 'Zapsat se'; ?>
+            <?php if ($canOther): ?>
+                <?php /* vedení: přidat můžou kohokoli, i když už někdo zapsaný je (víc lidí naráz, časy se můžou krýt) */ ?>
+                <button type="button" class="rz-add<?php echo $covState === 'ok' ? ' is-set' : ''; ?>" data-date="<?php echo e($d); ?>" data-mode="add">
+                    <i class="fas fa-user-plus"></i><?php echo $covState === 'gap' ? 'Doplnit směnu' : 'Přidat člověka'; ?>
+                </button>
+            <?php elseif ($canAdd && $mine): ?>
+                <button type="button" class="rz-add is-set" data-date="<?php echo e($d); ?>" data-mode="edit" data-id="<?php echo (int)$mine['id']; ?>">
+                    <i class="fas fa-pen"></i>Upravit svůj čas
+                </button>
+            <?php elseif ($canAdd): ?>
+                <button type="button" class="rz-add" data-date="<?php echo e($d); ?>" data-mode="add">
+                    <i class="fas fa-plus"></i><?php echo $covState === 'gap' ? 'Zapsat se na chybějící čas' : 'Zapsat se'; ?>
                 </button>
             <?php else: ?>
                 <div class="rz-locked" title="<?php echo e($why); ?>"><i class="fas fa-lock"></i>Uzavřeno</div>
@@ -219,14 +263,16 @@ arsort($weekMinutes);
                 <input type="hidden" name="work_date" id="rzDate">
                 <input type="hidden" name="entry_id" id="rzEntryId" value="0">
 
+                <!-- časová osa dne: otvírací doba, kdo už je zapsaný, navrhovaný čas -->
+                <div class="rz-tl mb-3" id="rzTimeline" aria-live="polite"></div>
+                <div class="rz-gapchips mb-3" id="rzGaps"></div>
+
                 <?php if ($canOther && $staff): ?>
                 <div class="mb-3">
                     <label class="form-label small" for="rzTech">Zaměstnanec</label>
                     <select class="form-select" name="tech_id" id="rzTech">
                         <?php foreach ($staff as $s): ?>
-                            <option value="<?php echo (int)$s['id']; ?>" <?php echo (int)$s['id'] === $meTech ? 'selected' : ''; ?>>
-                                <?php echo e((string)$s['name']); ?><?php echo (int)$s['id'] === $meTech ? ' (ty)' : ''; ?>
-                            </option>
+                            <option value="<?php echo (int)$s['id']; ?>"><?php echo e((string)$s['name']); ?><?php echo (int)$s['id'] === $meTech ? ' (ty)' : ''; ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -242,7 +288,7 @@ arsort($weekMinutes);
                         <input type="time" class="form-control" name="time_to" id="rzTo" required>
                     </div>
                 </div>
-                <div class="form-text small mt-2" id="rzHint"></div>
+                <div class="rz-sum-live mt-2" id="rzHint"></div>
 
                 <div class="mt-3">
                     <label class="form-label small" for="rzNote">Poznámka <span class="text-white-50">(nepovinné)</span></label>
@@ -251,7 +297,7 @@ arsort($weekMinutes);
                 </div>
             </div>
             <div class="modal-footer border-secondary">
-                <button type="button" class="btn btn-outline-danger me-auto d-none" id="rzDelete"><i class="fas fa-trash me-1"></i>Smazat zápis</button>
+                <button type="button" class="btn btn-outline-danger me-auto" id="rzDelete" style="display:none"><i class="fas fa-trash me-1"></i>Smazat zápis</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zrušit</button>
                 <button type="submit" class="btn btn-info" data-busy="Ukládám…"><i class="fas fa-check me-1"></i>Uložit</button>
             </div>
@@ -336,6 +382,46 @@ arsort($weekMinutes);
     font-size: 12.5px; background: color-mix(in srgb, var(--c) 14%, transparent);
     border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); }
 .rz-sum b { font-variant-numeric: tabular-nums; }
+/* pruh obsazení otvírací doby v kartě dne */
+.rz-bar { display: flex; height: 6px; border-radius: 999px; overflow: hidden; margin: -2px 2px 12px; gap: 1px;
+    background: rgba(255,255,255,.06); }
+.rz-seg { min-width: 2px; }
+.rz-seg.n0 { background: repeating-linear-gradient(135deg, rgba(255,69,58,.75) 0 4px, rgba(255,69,58,.35) 4px 8px); }
+.rz-seg.n1 { background: rgba(48,209,88,.75); }
+.rz-seg.n2 { background: linear-gradient(90deg, #30d158, #0dcaf0); }
+.rz-day.is-past .rz-bar { opacity: .5; }
+
+/* dialog: časová osa dne */
+.rz .rz-tl *, #rzModal .rz-tl * { font-size: 12px !important; }
+#rzModal .rz-gapchips button, #rzModal .rz-sum-live, #rzModal .rz-sum-live * { font-size: 13.5px !important; }
+.rz-tl { position: relative; padding: 10px 12px 6px; border-radius: 14px; background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08); }
+.rz-tl-scale { position: relative; height: 16px; color: rgba(255,255,255,.45); font-variant-numeric: tabular-nums; }
+.rz-tl-scale span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.rz-tl-scale span:first-child { transform: none; } .rz-tl-scale span:last-child { transform: translateX(-100%); }
+.rz-tl-track { position: relative; height: 22px; margin: 3px 0; border-radius: 7px; }
+.rz-tl-open { position: absolute; top: 0; bottom: 0; border-radius: 7px; background: rgba(255,255,255,.06);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.rz-tl-gap { position: absolute; top: 0; bottom: 0; border-radius: 6px;
+    background: repeating-linear-gradient(135deg, rgba(255,69,58,.4) 0 5px, rgba(255,69,58,.15) 5px 10px); }
+.rz-tl-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 6px; display: flex; align-items: center; padding: 0 7px;
+    background: color-mix(in srgb, var(--c) 55%, rgba(20,20,22,.6)); border: 1px solid color-mix(in srgb, var(--c) 80%, transparent);
+    color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rz-tl-bar.is-new { --c: #0dcaf0; background: rgba(13,202,240,.18); border: 1.5px dashed #0dcaf0; color: #8be9ff;
+    transition: left .2s ease, width .2s ease; }
+.rz-tl-bar.is-bad { --c: #ff453a; border-color: #ff453a; background: rgba(255,69,58,.18); color: #ff8a80; }
+.rz-tl-label { color: rgba(255,255,255,.45); margin: 4px 0 2px; }
+.rz-gapchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rz-gapchips:empty { display: none; }
+.rz-gapchips button { border: 1px solid rgba(255,214,10,.45); background: rgba(255,214,10,.10); color: #ffd60a;
+    border-radius: 999px; padding: 5px 12px; font-weight: 600; cursor: pointer; }
+.rz-gapchips button:hover, .rz-gapchips button.is-on { background: #ffd60a; color: #1c1c1e; }
+.rz-sum-live { padding: 8px 12px; border-radius: 11px; line-height: 1.4; }
+.rz-sum-live:empty { display: none; }
+.rz-sum-live.ok { background: rgba(48,209,88,.10); color: #6ee7a0; border: 1px solid rgba(48,209,88,.25); }
+.rz-sum-live.gap { background: rgba(255,214,10,.08); color: #ffd60a; border: 1px solid rgba(255,214,10,.25); }
+.rz-sum-live.bad { background: rgba(255,69,58,.10); color: #ff8a80; border: 1px solid rgba(255,69,58,.3); }
+
 /* chytré pokrytí dne (upozorneni/lib.php → afxShiftCoverage) */
 .rz .rz-cov { font-size: 13px !important; }
 .rz-cov { display: flex; align-items: center; justify-content: center; gap: 6px; margin: -4px 0 10px; padding: 4px 8px;
@@ -370,49 +456,184 @@ arsort($weekMinutes);
             .always(function () { if (btn) { btn.disabled = false; btn.innerHTML = html; } });
     };
 
-    /** „10:00 – 20:00" z otvírací doby → předvyplněné časy, ať se nemusí psát. */
-    var fromHours = function (txt) {
-        var m = (txt || '').match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/);
-        if (!m) { return null; }
-        var pad = function (t) { return t.length === 4 ? '0' + t : t; };
-        return [pad(m[1]), pad(m[2])];
+    var DAYS = <?php echo json_encode($rzDays, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+    var STAFF = <?php echo json_encode($rzStaff, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+    var ME = <?php echo (int)$meTech; ?>;
+    var CAN_OTHER = <?php echo $canOther ? 'true' : 'false'; ?>;
+    var techSel = document.getElementById('rzTech');
+    var fromEl = document.getElementById('rzFrom'), toEl = document.getElementById('rzTo');
+    var cur = null;   // { date, id } právě otevřený dialog
+
+    var toMin = function (t) { var m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+    var toHm = function (m) { m = Math.max(0, Math.min(1440, m)); return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); };
+    var merge = function (iv) {
+        iv = iv.filter(function (x) { return x[1] > x[0]; }).sort(function (a, b) { return a[0] - b[0]; });
+        var out = [];
+        iv.forEach(function (x) { if (out.length && x[0] <= out[out.length - 1][1]) { out[out.length - 1][1] = Math.max(out[out.length - 1][1], x[1]); } else { out.push([x[0], x[1]]); } });
+        return out;
+    };
+    /** Nepokryté úseky otvírací doby [o, c] intervaly iv. */
+    var gapsOf = function (o, c, iv) {
+        var gaps = [], at = o;
+        merge(iv).forEach(function (x) {
+            if (x[1] <= at || x[0] >= c) { return; }
+            if (x[0] > at) { gaps.push([at, Math.min(x[0], c)]); }
+            at = Math.max(at, x[1]);
+        });
+        if (at < c) { gaps.push([at, c]); }
+        return gaps.filter(function (g) { return g[1] - g[0] >= 15; });
+    };
+    var gapsText = function (g) { return g.map(function (x) { return toHm(x[0]) + '–' + toHm(x[1]); }).join(', '); };
+
+    /** Zápisy dne kromě toho, který se právě upravuje. */
+    var others = function () {
+        return (DAYS[cur.date].entries || []).filter(function (e) { return e.id !== cur.id; });
+    };
+
+    /** Časová osa: otvírací doba, kolegové, navrhovaný čas, díry. */
+    var render = function () {
+        var day = DAYS[cur.date], list = others();
+        var f = toMin(fromEl.value), t = toMin(toEl.value);
+        var hours = day.hours;
+        var lo = hours ? hours[0] : 8 * 60, hi = hours ? hours[1] : 20 * 60;
+        list.forEach(function (e) { lo = Math.min(lo, toMin(e.from)); hi = Math.max(hi, toMin(e.to)); });
+        if (f !== null) { lo = Math.min(lo, f); } if (t !== null) { hi = Math.max(hi, t); }
+        lo = Math.floor(lo / 60) * 60; hi = Math.ceil(hi / 60) * 60; if (hi <= lo) { hi = lo + 60; }
+        var pct = function (m) { return ((m - lo) / (hi - lo) * 100).toFixed(2) + '%'; };
+        var w = function (a, b) { return ((b - a) / (hi - lo) * 100).toFixed(2) + '%'; };
+
+        var h = '<div class="rz-tl-scale">';
+        var step = (hi - lo) > 12 * 60 ? 180 : ((hi - lo) > 6 * 60 ? 120 : 60);
+        var ticks = [];
+        for (var m = lo; m <= hi; m += step) { ticks.push(m); }
+        if (ticks[ticks.length - 1] !== hi) {
+            // poslední pravidelná značka moc blízko konci by se s ním překryla
+            if (hi - ticks[ticks.length - 1] < step * 0.6) { ticks.pop(); }
+            ticks.push(hi);
+        }
+        ticks.forEach(function (m) { h += '<span style="left:' + pct(m) + '">' + toHm(m) + '</span>'; });
+        h += '</div>';
+        var iv = list.map(function (e) { return [toMin(e.from), toMin(e.to)]; });
+        var valid = f !== null && t !== null && t > f;
+        // obsazení: kolegové
+        if (list.length) {
+            h += '<div class="rz-tl-label">Už zapsaní</div>';
+            list.forEach(function (e) {
+                h += '<div class="rz-tl-track">' + (hours ? '<div class="rz-tl-open" style="left:' + pct(hours[0]) + ';width:' + w(hours[0], hours[1]) + '"></div>' : '')
+                   + '<div class="rz-tl-bar" style="--c:' + esc(e.color) + ';left:' + pct(toMin(e.from)) + ';width:' + w(toMin(e.from), toMin(e.to)) + '" title="' + esc(e.name + ' ' + e.from + '–' + e.to) + '">'
+                   + esc(e.name.split(' ')[0]) + ' ' + esc(e.from) + '–' + esc(e.to) + '</div></div>';
+            });
+        }
+        // navrhovaný zápis + díry, které po něm zbydou
+        var after = valid ? iv.concat([[f, t]]) : iv;
+        var gaps = hours ? gapsOf(hours[0], hours[1], after) : [];
+        h += '<div class="rz-tl-label">' + (cur.id ? 'Tenhle zápis' : 'Nový zápis') + ' + co zůstane bez obsluhy</div>';
+        h += '<div class="rz-tl-track">' + (hours ? '<div class="rz-tl-open" style="left:' + pct(hours[0]) + ';width:' + w(hours[0], hours[1]) + '"></div>' : '');
+        gaps.forEach(function (g) { h += '<div class="rz-tl-gap" style="left:' + pct(g[0]) + ';width:' + w(g[0], g[1]) + '" title="Bez obsluhy ' + toHm(g[0]) + '–' + toHm(g[1]) + '"></div>'; });
+        if (valid) {
+            h += '<div class="rz-tl-bar is-new" style="left:' + pct(f) + ';width:' + w(f, t) + '">' + toHm(f) + '–' + toHm(t) + '</div>';
+        }
+        h += '</div>';
+        document.getElementById('rzTimeline').innerHTML = h;
+
+        // živé shrnutí
+        var hint = document.getElementById('rzHint');
+        hint.className = 'rz-sum-live';
+        if (!valid) {
+            hint.classList.add('bad'); hint.innerHTML = '<i class="fas fa-circle-exclamation me-1"></i>Konec musí být po začátku.';
+        } else if (!day.open) {
+            hint.classList.add('gap'); hint.innerHTML = '<i class="fas fa-store-slash me-1"></i>V tenhle den má pobočka podle otvírací doby zavřeno.';
+        } else if (!hours) {
+            hint.innerHTML = '';
+        } else {
+            var outside = f < hours[0] || t > hours[1];
+            var together = iv.filter(function (x) { return x[0] < t && x[1] > f; }).length;
+            var extra = (together ? ' Ve stejnou dobu tam ' + (together === 1 ? 'bude ještě 1 kolega' : (together < 5 ? 'budou ještě ' + together + ' kolegové' : 'bude ještě ' + together + ' kolegů')) + '.' : '')
+                      + (outside ? ' Část času je mimo otvírací dobu (' + toHm(hours[0]) + '–' + toHm(hours[1]) + ').' : '');
+            if (gaps.length) {
+                hint.classList.add('gap');
+                hint.innerHTML = '<i class="fas fa-hourglass-half me-1"></i>Po uložení bude pořád bez obsluhy <b>' + gapsText(gaps) + '</b>.' + esc(extra);
+            } else {
+                hint.classList.add('ok');
+                hint.innerHTML = '<i class="fas fa-circle-check me-1"></i>Po uložení bude pokrytá celá otvírací doba ' + toHm(hours[0]) + '–' + toHm(hours[1]) + '.' + esc(extra);
+            }
+        }
+
+        // tlačítka „doplnit díru" — díry BEZ tohohle zápisu (kam se hodí)
+        var before = hours ? gapsOf(hours[0], hours[1], iv) : [];
+        var chips = document.getElementById('rzGaps');
+        chips.innerHTML = before.length ? before.map(function (g) {
+            var on = valid && f === g[0] && t === g[1];
+            return '<button type="button" class="' + (on ? 'is-on' : '') + '" data-f="' + g[0] + '" data-t="' + g[1] + '"><i class="fas fa-wand-magic-sparkles me-1"></i>Doplnit ' + toHm(g[0]) + '–' + toHm(g[1]) + '</button>';
+        }).join('') + (hours && iv.length ? '<button type="button" data-f="' + hours[0] + '" data-t="' + hours[1] + '">Celý den ' + toHm(hours[0]) + '–' + toHm(hours[1]) + '</button>' : '') : '';
+    };
+    document.getElementById('rzGaps').addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-f]');
+        if (!b) { return; }
+        fromEl.value = toHm(+b.dataset.f); toEl.value = toHm(+b.dataset.t);
+        render();
+    });
+    fromEl.addEventListener('input', render);
+    toEl.addEventListener('input', render);
+
+    /** Výběr člověka: kdo už je na den zapsaný, nejde přidat znovu (jen upravit jeho zápis). */
+    var syncTechOptions = function (selected) {
+        if (!techSel) { return; }
+        var booked = {};
+        others().forEach(function (e) { booked[e.tech] = e; });
+        var firstFree = null;
+        Array.prototype.forEach.call(techSel.options, function (o) {
+            var id = +o.value, b = booked[id], s = STAFF.filter(function (x) { return x.id === id; })[0];
+            o.disabled = !!b;
+            o.textContent = (s ? s.name : o.textContent) + (id === ME ? ' (ty)' : '') + (b ? ' — už zapsán/a ' + b.from + '–' + b.to : '');
+            if (!b && firstFree === null) { firstFree = id; }
+        });
+        var want = selected && !booked[selected] ? selected : (ME && !booked[ME] && STAFF.some(function (x) { return x.id === ME; }) ? ME : firstFree);
+        if (want !== null) { techSel.value = String(want); }
+        return firstFree !== null || !!selected;
     };
 
     var open = function (o) {
+        var day = DAYS[o.date];
+        if (!day) { return; }
         form.reset();
+        cur = { date: o.date, id: +(o.id || 0) };
+        var entry = cur.id ? day.entries.filter(function (e) { return e.id === cur.id; })[0] : null;
         document.getElementById('rzDate').value = o.date;
-        document.getElementById('rzEntryId').value = o.id || 0;
-        document.getElementById('rzDay').textContent = o.day || 'Zapsat se';
-        var def = fromHours(o.hours);
-        document.getElementById('rzFrom').value = o.from || (def ? def[0] : '10:00');
-        document.getElementById('rzTo').value = o.to || (def ? def[1] : '18:00');
-        document.getElementById('rzNote').value = o.note || '';
-        document.getElementById('rzHint').textContent = o.hours ? ('Otevřeno ' + o.hours) : '';
-        var tech = document.getElementById('rzTech');
-        if (tech) {
-            if (o.tech) { tech.value = String(o.tech); }
-            tech.dataset.orig = tech.value;
+        document.getElementById('rzEntryId').value = cur.id;
+        document.getElementById('rzDay').textContent = (entry ? 'Upravit — ' : (CAN_OTHER ? 'Přidat na ' : 'Zapsat se — ')) + day.label;
+        document.getElementById('rzNote').value = entry ? entry.note : '';
+        var anyFree = syncTechOptions(entry ? entry.tech : 0);
+        var submit = form.querySelector('button[type=submit]');
+        submit.disabled = (anyFree === false);
+        if (anyFree === false) {
+            document.getElementById('rzHint').className = 'rz-sum-live gap';
+        }
+        if (entry) {
+            fromEl.value = entry.from; toEl.value = entry.to;
+        } else {
+            // návrh: první díra v otvírací době, jinak celá otvírací doba
+            var iv = others().map(function (e) { return [toMin(e.from), toMin(e.to)]; });
+            var g = day.hours ? gapsOf(day.hours[0], day.hours[1], iv) : [];
+            var pick = g.length ? g[0] : (day.hours || [600, 1080]);
+            fromEl.value = toHm(pick[0]); toEl.value = toHm(pick[1]);
         }
         var del = document.getElementById('rzDelete');
-        del.classList.toggle('d-none', !(Number(o.id) > 0));
-        del.dataset.id = o.id || 0;
+        // inline styl: globální CSS tlačítek přebíjí bootstrapové d-none
+        del.style.setProperty('display', cur.id ? '' : 'none', 'important');
+        del.dataset.id = cur.id;
+        render();
+        if (anyFree === false) {
+            document.getElementById('rzHint').innerHTML = '<i class="fas fa-users me-1"></i>Na tenhle den jsou zapsaní už všichni z pobočky. Čas změníš tužkou u jména.';
+        }
         modal().show();
     };
 
     document.querySelectorAll('.rz-add').forEach(function (b) {
-        b.addEventListener('click', function () {
-            open({ date: b.dataset.date, day: b.dataset.day, hours: b.dataset.hours,
-                   id: b.dataset.id, from: b.dataset.from, to: b.dataset.to, note: b.dataset.note });
-        });
+        b.addEventListener('click', function () { open({ date: b.dataset.date, id: b.dataset.mode === 'edit' ? b.dataset.id : 0 }); });
     });
     document.querySelectorAll('.rz-edit').forEach(function (b) {
-        b.addEventListener('click', function () {
-            var day = b.closest('.rz-day');
-            open({ date: b.dataset.date, id: b.dataset.id, tech: b.dataset.tech,
-                   day: day ? day.dataset.label : '',
-                   from: b.dataset.from, to: b.dataset.to, note: b.dataset.note,
-                   hours: (day && day.querySelector('.rz-hours')) ? day.querySelector('.rz-hours').textContent : '' });
-        });
+        b.addEventListener('click', function () { open({ date: b.dataset.date, id: b.dataset.id }); });
     });
     document.querySelectorAll('.rz-del').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -423,15 +644,8 @@ arsort($weekMinutes);
             });
         });
     });
+    if (techSel) { techSel.addEventListener('change', render); }
 
-    var techSel = document.getElementById('rzTech');
-    if (techSel) {
-        techSel.addEventListener('change', function () {
-            var del = document.getElementById('rzDelete');
-            if (techSel.value !== techSel.dataset.orig) { del.classList.add('d-none'); }
-            else if (Number(del.dataset.id) > 0) { del.classList.remove('d-none'); }
-        });
-    }
     document.getElementById('rzDelete').addEventListener('click', function () {
         var b = this;
         showConfirm('Smazat tenhle zápis?', function () {
@@ -443,13 +657,13 @@ arsort($weekMinutes);
 
     form.addEventListener('submit', function (e) {
         e.preventDefault();
-        var tech = document.getElementById('rzTech');
         post({
             action: 'save', branch_id: BRANCH,
-            tech_id: tech ? tech.value : 0,
+            entry_id: cur ? cur.id : 0,
+            tech_id: techSel ? techSel.value : 0,
             work_date: document.getElementById('rzDate').value,
-            time_from: document.getElementById('rzFrom').value,
-            time_to: document.getElementById('rzTo').value,
+            time_from: fromEl.value,
+            time_to: toEl.value,
             note: document.getElementById('rzNote').value
         }, function (r) {
             if (r.success) { location.reload(); } else { showAlert(esc(r.message)); }
