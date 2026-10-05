@@ -1,0 +1,166 @@
+/* ============================================================
+   OKNA A ZÁLOŽKY UVNITŘ STRÁNEK — HIERARCHIE V DUCHU APPLE (v3.88.0)
+   Přání majitele: moderní, elegantní, minimalistické, a hlavně aby byla
+   poznat hierarchie oken nadřazených a podřazených.
+     úroveň 1  hlavní okno          velká karta, světlo nahoře, hluboký měkký stín
+     úroveň 2  podřazené okno       o stupeň světlejší plocha, bez stínu
+     úroveň 3  nejnižší políčko     zapuštěné (inset), jako skupiny v iOS
+     záložky   segmentový přepínač  hlavní = výrazný „jezdec", vnořené = menší a tišší
+   Čím níž v hierarchii, tím menší, plošší a tišší. Vrstva se načítá POSLEDNÍ
+   a !important má proto, že starší vrstvy (liquid-glass, fix-crm-v2) ho mají taky.
+   ============================================================ */
+
+:root {
+  /* skoro neprůhledné: tečkovaný podklad stránky nesmí prosvítat (neklid) */
+  --pm-l1-bg: linear-gradient(180deg, rgba(34,37,44,.94) 0%, rgba(24,26,31,.94) 100%);
+  --pm-l1-border: rgba(255,255,255,.085);
+  --pm-l1-shadow: inset 0 1px 0 rgba(255,255,255,.075), 0 2px 6px rgba(0,0,0,.22), 0 26px 50px -26px rgba(0,0,0,.70);
+  --pm-l2-bg: rgba(255,255,255,.042);
+  --pm-l2-border: rgba(255,255,255,.075);
+  --pm-l2-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+  --pm-l3-bg: rgba(0,0,0,.22);
+  --pm-l3-border: rgba(255,255,255,.05);
+  --pm-l3-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+  --pm-seg-track: rgba(34,37,44,.90);
+  --pm-seg-track-border: rgba(255,255,255,.07);
+  --pm-seg-text: rgba(255,255,255,.62);
+  --pm-seg-text-hover: rgba(255,255,255,.92);
+  --pm-seg-thumb: linear-gradient(180deg, rgba(255,255,255,.19) 0%, rgba(255,255,255,.11) 100%);
+  --pm-seg-thumb-shadow: inset 0 1px 0 rgba(255,255,255,.20), 0 1px 2px rgba(0,0,0,.45), 0 6px 14px -5px rgba(0,0,0,.55);
+  --pm-seg2-track: rgba(255,255,255,.035);
+  --pm-seg2-thumb: rgba(255,255,255,.11);
+  --pm-seg2-thumb-shadow: 0 1px 2px rgba(0,0,0,.35);
+  --pm-accent: #0a84ff;
+}
+html[data-lg-theme="light"] {
+  --pm-l1-bg: #ffffff;
+  --pm-l1-border: rgba(0,0,0,.06);
+  --pm-l1-shadow: 0 1px 2px rgba(16,24,40,.05), 0 18px 38px -20px rgba(16,24,40,.22);
+  --pm-l2-bg: #f4f5f7;
+  --pm-l2-border: rgba(0,0,0,.05);
+  --pm-l2-shadow: none;
+  --pm-l3-bg: #ffffff;
+  --pm-l3-border: rgba(0,0,0,.06);
+  --pm-l3-shadow: 0 1px 2px rgba(16,24,40,.06);
+  --pm-seg-track: rgba(0,0,0,.05);
+  --pm-seg-track-border: rgba(0,0,0,.04);
+  --pm-seg-text: rgba(0,0,0,.58);
+  --pm-seg-text-hover: rgba(0,0,0,.88);
+  --pm-seg-thumb: #ffffff;
+  --pm-seg-thumb-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.04);
+  --pm-seg2-track: rgba(0,0,0,.04);
+  --pm-seg2-thumb: #ffffff;
+  --pm-seg2-thumb-shadow: 0 1px 2px rgba(0,0,0,.10);
+  --pm-accent: #007aff;
+}
+
+/* ── úroveň 1: hlavní okno ── */
+.glass-panel,
+.glass-card,
+.card {
+  background: var(--pm-l1-bg) !important;
+  background-color: transparent !important;
+  border: 1px solid var(--pm-l1-border) !important;
+  border-radius: 22px !important;
+  box-shadow: var(--pm-l1-shadow) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-lg-theme="light"] .glass-panel,
+html[data-lg-theme="light"] .glass-card,
+html[data-lg-theme="light"] .card { background: var(--pm-l1-bg) !important; border: 1px solid var(--pm-l1-border) !important; box-shadow: var(--pm-l1-shadow) !important; }
+/* okna nereagují na najetí myší (dřív modrý okraj) — v Apple stylu se kontejnery nehýbou */
+.glass-panel:hover, .glass-card:hover, .card:hover { border-color: var(--pm-l1-border) !important; }
+
+/* ── úroveň 2: podřazené okno uvnitř hlavního ── */
+:is(.glass-panel, .glass-card, .card) :is(.glass-panel, .glass-card, .card),
+html[data-lg-theme="light"] :is(.glass-panel, .glass-card, .card) :is(.glass-panel, .glass-card, .card) {
+  background: var(--pm-l2-bg) !important;
+  border: 1px solid var(--pm-l2-border) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--pm-l2-shadow) !important;
+}
+:is(.glass-panel, .glass-card, .card) :is(.glass-panel, .glass-card, .card):hover { border-color: var(--pm-l2-border) !important; }
+
+/* ── úroveň 3: nejnižší políčko (zapuštěné) ── */
+:is(.glass-panel, .glass-card, .card) :is(.glass-panel, .glass-card, .card) :is(.glass-panel, .glass-card, .card),
+html[data-lg-theme="light"] :is(.glass-panel, .glass-card, .card) :is(.glass-panel, .glass-card, .card) :is(.glass-panel, .glass-card, .card) {
+  background: var(--pm-l3-bg) !important;
+  border: 1px solid var(--pm-l3-border) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--pm-l3-shadow) !important;
+}
+
+/* hlavičky a patičky karet: bez tmavého pruhu, jen vlasová linka */
+.card-header, .card-footer {
+  background: transparent !important; background-color: transparent !important;
+  border-color: var(--pm-l2-border) !important;
+}
+
+/* ── záložky: segmentový přepínač ── */
+.nav-pills {
+  display: flex !important; flex-wrap: wrap; gap: 2px !important;
+  width: fit-content; max-width: 100%;
+  padding: 4px !important;
+  background: var(--pm-seg-track) !important;
+  border: 1px solid var(--pm-seg-track-border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+.nav-pills .nav-link {
+  display: inline-flex; align-items: center;
+  padding: 7px 14px !important;
+  border: 0 !important; border-radius: 10px !important;
+  background: transparent !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  color: var(--pm-seg-text) !important;
+  font-size: 13px !important; font-weight: 500 !important; letter-spacing: -.005em;
+  transition: color .15s, background-color .15s;
+}
+.nav-pills .nav-link i { opacity: .72; transition: color .15s, opacity .15s; }
+/* odznak v záložce (např. „!" u Systému): fix-crm-v2.css vnucuje všem <span> 18px !important */
+.nav-pills .nav-link .badge {
+  font-size: 10px !important; line-height: 13px !important;
+  padding: 1px 6px !important; border-radius: 6px !important; margin-left: 6px;
+}
+.nav-pills .nav-link:hover { color: var(--pm-seg-text-hover) !important; }
+.nav-pills .nav-link.active {
+  background: var(--pm-seg-thumb) !important;
+  color: var(--pm-seg-text-hover) !important;
+  box-shadow: var(--pm-seg-thumb-shadow) !important;
+  border: 0 !important;
+}
+.nav-pills .nav-link.active i { color: var(--pm-accent) !important; opacity: 1; }
+html[data-lg-theme="light"] .nav-pills .nav-link.active { color: #000 !important; }
+
+/* hlavní lišta záložek je sama .glass-panel — nesmí dostat vzhled karty */
+.nav-pills.glass-panel,
+html[data-lg-theme="light"] .nav-pills.glass-panel {
+  background: var(--pm-seg-track) !important;
+  border: 1px solid var(--pm-seg-track-border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  padding: 4px !important;
+}
+
+/* vnořené záložky (uvnitř okna): menší, tišší, bez dělicí čáry pod nimi */
+:is(.glass-panel, .glass-card, .card, .tab-content) .nav-pills {
+  padding: 3px !important;
+  background: var(--pm-seg2-track) !important;
+  border: 0 !important;
+  border-radius: 11px !important;
+  padding-bottom: 3px !important;
+}
+:is(.glass-panel, .glass-card, .card, .tab-content) .nav-pills .nav-link {
+  padding: 5px 12px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+}
+:is(.glass-panel, .glass-card, .card, .tab-content) .nav-pills .nav-link.active {
+  background: var(--pm-seg2-thumb) !important;
+  box-shadow: var(--pm-seg2-thumb-shadow) !important;
+}
+
+/* nadpisy v oknech: klidnější typografie */
+:is(.glass-panel, .glass-card, .card) :is(h4, h5) { font-weight: 600; letter-spacing: -.01em; }

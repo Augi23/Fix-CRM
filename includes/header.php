@@ -207,6 +207,7 @@ try {
     <link rel="stylesheet" href="assets/css/responsive.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/responsive.css'); ?>">
     <link rel="stylesheet" href="assets/css/crm-shell.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/crm-shell.css'); ?>">
     <link rel="stylesheet" href="assets/css/dock-3d.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/dock-3d.css'); ?>">
+    <link rel="stylesheet" href="assets/css/panels-modern.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/panels-modern.css'); ?>">
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

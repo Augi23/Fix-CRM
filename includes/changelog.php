@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.88.0',
+        'date' => '2026-10-05',
+        'time' => '15:39',
+        'title' => 'Okna a záložky ve stránkách v duchu Apple — poznat hierarchii',
+        'items' => [
+            '<b>Záložky</b> jsou nově segmentový přepínač jako v macOS: jemná dráha, aktivní záložka je vyvýšený „jezdec" se stínem a modrou ikonou. Záložky vnořené v okně jsou menší a tišší.',
+            '<b>Hierarchie oken:</b> hlavní okno je velká karta se světlem nahoře a měkkým stínem, okna v něm jsou o stupeň světlejší plochy bez stínu a nejnižší políčka jsou zapuštěná. Čím níž, tím menší, plošší a tišší.',
+            'Okna jsou téměř neprůhledná, takže přes ně neprosvítá tečkovaný podklad. Při najetí myší se okraj už nebarví modře. Platí pro celé CRM, ve tmavém i světlém motivu.',
+        ],
+    ],
+    [
         'version' => '3.87.4',
         'date' => '2026-10-05',
         'time' => '14:32',
