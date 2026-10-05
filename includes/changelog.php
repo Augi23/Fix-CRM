@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.87.1',
+        'date' => '2026-10-05',
+        'time' => '14:04',
+        'title' => 'Horní menu: polička jako jedna deska',
+        'items' => [
+            'Horní plocha poličky a její přední hrana teď navazují přesně na sebe, ve stejné šířce a s ostrou světlou linkou v místě lomu, takže polička vypadá jako jedna pevná deska.',
+            'Přední hrana je vyšší a popisky se do ní vejdou celé, nepřesahují pod desku. Svítící tečka aktivní stránky sedí na ploše pod ikonou.',
+        ],
+    ],
+    [
         'version' => '3.87.0',
         'date' => '2026-10-05',
         'time' => '13:57',
