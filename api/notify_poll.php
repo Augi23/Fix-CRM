@@ -16,6 +16,10 @@ if (!isset($_SESSION['user_id'])) {
 // místo pro odpálení automatické zálohy (každých 15 minut, na pozadí).
 crmBackupMaybeSchedule();
 
+// Chytrá upozornění (rozpis služeb, pokladna, lhůty…) — kontrola pravidel max 1× za minutu
+require_once __DIR__ . '/../upozorneni/lib.php';
+afxNotifyMaybeSchedule();
+
 // Měření aktivního času v systému (statistiky: hodiny Bosse/adminů = práce na CRM)
 crmTrackStaffActivity();
 
@@ -66,8 +70,13 @@ try {
     }
 } catch (Throwable $e) {}
 
+// nepřečtená chytrá upozornění → číslo na zvonečku + toast s nejnovějším
+[$smartUnread, $smartLatest] = afxNotifyUnread(afxNotifyMyKeys());
+
 echo json_encode([
     'ok' => true,
+    'smart_unread' => $smartUnread,
+    'smart_latest' => $smartLatest,
     // aktuální CSRF token — dlouho otevřené záložky si jím obnovují meta tag,
     // aby akce nepadaly na „neplatný bezpečnostní token"
     'csrf' => (string)($_SESSION['csrf_token'] ?? ''),

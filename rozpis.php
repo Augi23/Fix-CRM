@@ -6,6 +6,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'rozpis/lib.php';
+require_once 'upozorneni/lib.php';
 $afxPageTitle = 'Rozpis služeb';
 require_once 'includes/header.php';
 
@@ -77,6 +78,10 @@ arsort($weekMinutes);
             </div>
             <?php endif; ?>
 
+            <a class="btn btn-sm rz-bell" href="upozorneni.php" title="Připomínky směn a další upozornění">
+                <i class="fas fa-bell me-1"></i>Upozornění
+            </a>
+
             <div class="d-flex align-items-center gap-2">
                 <a class="btn btn-sm btn-outline-light" href="<?php echo e($link(['b' => $branchId, 't' => $prev])); ?>"
                    aria-label="Předchozí týden"><i class="fas fa-chevron-left"></i></a>
@@ -90,6 +95,7 @@ arsort($weekMinutes);
             <span><i class="fas fa-calendar me-1"></i>
                 <?php echo date('j. n.', strtotime($days[0])) . ' – ' . date('j. n. Y', strtotime($days[6])); ?></span>
             <span><i class="fas fa-lock me-1"></i>Zapsat se jde nejpozději do <b>půlnoci předchozího dne</b>.</span>
+            <span><i class="fas fa-bell me-1"></i>Před směnou ti přijde připomínka — předstih si nastavíš v <a href="upozorneni.php" class="link-info">Upozorněních</a>.</span>
             <?php if ($canOther): ?><span class="text-info"><i class="fas fa-user-shield me-1"></i>Jako vedení můžeš zapisovat i za ostatní a po uzávěrce.</span><?php endif; ?>
         </div>
     </div>
@@ -104,8 +110,11 @@ arsort($weekMinutes);
             $isPast  = ($d < $today);
             $mine    = null;
             foreach ($list as $e) { if ((int)$e['tech_id'] === $meTech) { $mine = $e; break; } }
+            // chytré pokrytí: nikdo / díra v otvírací době / zavřeno
+            $cov = afxShiftCoverage($branchId, $d, $list);
+            $covState = !$cov['open'] ? 'closed' : (!$list ? 'empty' : ($cov['gaps'] ? 'gap' : 'ok'));
         ?>
-        <section class="rz-day<?php echo $isToday ? ' is-today' : ''; ?><?php echo $isPast ? ' is-past' : ''; ?>" data-label="<?php echo e($dayNames[$i] . ' ' . date('j. n.', strtotime($d))); ?>">
+        <section class="rz-day<?php echo $isToday ? ' is-today' : ''; ?><?php echo $isPast ? ' is-past' : ''; ?><?php echo (!$isPast && $covState === 'empty') ? ' is-uncovered' : ''; ?>" data-label="<?php echo e($dayNames[$i] . ' ' . date('j. n.', strtotime($d))); ?>">
             <header class="rz-day-head">
                 <div class="rz-dow"><?php echo $dayShort[$i]; ?><span class="d-none d-xl-inline"><?php echo mb_substr($dayNames[$i], 2); ?></span><?php if ($isToday): ?> <span class="rz-today-pill">dnes</span><?php endif; ?></div>
                 <div class="rz-date"><?php echo date('j. n.', strtotime($d)); ?></div>
@@ -113,6 +122,14 @@ arsort($weekMinutes);
 
             <?php if (!empty($hours[$i])): ?>
                 <div class="rz-hours" title="Otvírací doba"><i class="fas fa-store"></i><?php echo e($hours[$i]); ?></div>
+            <?php endif; ?>
+
+            <?php if (!$isPast && $covState === 'empty'): ?>
+                <div class="rz-cov is-empty" title="Na tento den se zatím nikdo nezapsal"><i class="fas fa-user-slash"></i>Nikdo zapsaný</div>
+            <?php elseif (!$isPast && $covState === 'gap'): ?>
+                <div class="rz-cov is-gap" title="Část otvírací doby bez obsluhy"><i class="fas fa-hourglass-half"></i>Chybí <?php echo e(afxNotifyGapsText($cov['gaps'])); ?></div>
+            <?php elseif (!$isPast && $covState === 'ok' && $list): ?>
+                <div class="rz-cov is-ok" title="Celá otvírací doba je pokrytá"><i class="fas fa-circle-check"></i>Pokryto</div>
             <?php endif; ?>
 
             <ul class="rz-list">
@@ -319,6 +336,18 @@ arsort($weekMinutes);
     font-size: 12.5px; background: color-mix(in srgb, var(--c) 14%, transparent);
     border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); }
 .rz-sum b { font-variant-numeric: tabular-nums; }
+/* chytré pokrytí dne (upozorneni/lib.php → afxShiftCoverage) */
+.rz .rz-cov { font-size: 13px !important; }
+.rz-cov { display: flex; align-items: center; justify-content: center; gap: 6px; margin: -4px 0 10px; padding: 4px 8px;
+    border-radius: 999px; font-weight: 650; letter-spacing: -.005em; }
+.rz-cov.is-empty { color: #ff8a80; background: rgba(255,69,58,.14); border: 1px solid rgba(255,69,58,.35); }
+.rz-cov.is-gap { color: #ffd60a; background: rgba(255,214,10,.10); border: 1px solid rgba(255,214,10,.28); }
+.rz-cov.is-ok { color: rgba(48,209,88,.9); background: rgba(48,209,88,.08); border: 1px solid rgba(48,209,88,.2); }
+.rz-day.is-uncovered:not(.is-past) { border-color: rgba(255,69,58,.45); box-shadow: 0 0 0 1px rgba(255,69,58,.15) inset, 0 0 24px rgba(255,69,58,.08); }
+.rz-day.is-uncovered .rz-add { border-color: rgba(255,69,58,.5); color: #ff8a80; }
+.rz-day.is-uncovered .rz-add:hover { background: rgba(255,69,58,.12); color: #fff; }
+.rz-bell { border: 1px solid rgba(255,214,10,.35); color: #ffd60a; background: rgba(255,214,10,.06); }
+.rz-bell:hover { border-color: #ffd60a; color: #1c1c1e; background: #ffd60a; }
 @media (prefers-reduced-motion: reduce) { .rz-day, .rz-add, .rz-acts { transition: none; } }
 </style>
 

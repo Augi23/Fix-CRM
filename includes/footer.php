@@ -65,8 +65,22 @@
         <button type="button" class="btn btn-sm btn-outline-secondary" id="notificationsPanelClose"><i class="fas fa-times"></i></button>
     </div>
     <div class="crm-notifications-list">
+        <?php
+        // Chytrá upozornění (rozpis, pokladna, lhůty…) — nahoře, nepřečtená zvýrazněná
+        $afxSmartItems = function_exists('afxNotifyInbox') ? afxNotifyInbox(afxNotifyMyKeys(), 5) : [];
+        $afxSmartIco = ['urgent' => 'fa-triangle-exclamation', 'warn' => 'fa-circle-exclamation', 'info' => 'fa-bell'];
+        foreach ($afxSmartItems as $sm): ?>
+            <a class="crm-notifications-item text-decoration-none afx-smart-item lvl-<?php echo e((string)$sm['level']); ?><?php echo $sm['read_at'] === null ? ' is-new' : ''; ?>"
+               href="<?php echo e((string)$sm['url'] !== '' ? (string)$sm['url'] : 'upozorneni.php'); ?>">
+                <span class="crm-notifications-icon"><i class="fas <?php echo e($afxSmartIco[(string)$sm['level']] ?? 'fa-bell'); ?>"></i></span>
+                <div class="min-w-0">
+                    <div class="small text-white text-truncate"><?php echo e((string)$sm['title']); ?></div>
+                    <div class="small text-white-75 text-truncate"><?php echo e(str_replace("\n", ' · ', (string)$sm['body'])); ?></div>
+                </div>
+            </a>
+        <?php endforeach; ?>
         <?php $crm_notifs = function_exists('getCrmNotifications') ? getCrmNotifications(15) : []; ?>
-        <?php if (empty($crm_notifs)): ?>
+        <?php if (empty($crm_notifs) && empty($afxSmartItems)): ?>
             <div class="crm-notifications-empty text-center py-5">
                 <i class="fas fa-bell-slash fa-lg mb-2 d-block text-white-50"></i>
                 <div class="small text-white-75"><?php echo __('no_new_notifications'); ?></div>
@@ -84,6 +98,7 @@
         <?php endforeach; endif; ?>
     </div>
     <div class="crm-notifications-foot">
+        <a href="upozorneni.php" class="btn btn-sm btn-outline-info w-100 mb-2"><i class="fas fa-bell me-1"></i> Upozornění a jejich nastavení</a>
         <a href="orders.php" class="btn btn-sm btn-outline-secondary w-100"><i class="fas fa-list me-1"></i> <?php echo __('open_orders'); ?></a>
     </div>
 </div>

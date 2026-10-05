@@ -47,6 +47,7 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) {
         'ucetni_prodej.php',   // prodeje z kasy (záložka Prodej v Účetnictví — dřív chyběla → vracelo to zpět)
         'pokladna.php',        // pokladní kniha (prodejní UI se jí skryje, viz pokladna.php)
         'navody.php',          // návody (Jak fungují platby apod.)
+        'upozorneni.php',      // chytrá upozornění (faktury po splatnosti, vlastní nastavení)
         'settings.php',        // JEN kvůli záložce Uzávěrka — ostatní záložky i akce
                                // hlídá crmCanManageSettings, účetní je neuvidí
     ];
@@ -457,9 +458,18 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             title="Zákaznický displej — druhý monitor" aria-label="Zákaznický displej">
         <i class="fas fa-desktop"></i>
     </button>
+    <?php
+    // Chytrá upozornění (upozorneni/lib.php): počet nepřečtených na zvonečku
+    $afxSmartUnread = 0;
+    try {
+        require_once __DIR__ . '/../upozorneni/lib.php';
+        [$afxSmartUnread] = afxNotifyUnread(afxNotifyMyKeys());
+    } catch (Throwable $e) { $afxSmartUnread = 0; }
+    ?>
     <button class="btn btn-sm crm-v2-icon-btn" type="button" id="notificationsToggle" aria-label="<?php echo e(__('notifications')); ?>">
         <i class="fas fa-bell"></i>
         <span class="crm-v2-alert-dot"></span>
+        <span class="afx-smart-count" id="afxSmartCount"<?php echo $afxSmartUnread ? '' : ' hidden'; ?>><?php echo (int)$afxSmartUnread; ?></span>
     </button>
     <a class="btn btn-sm crm-v2-icon-btn" href="sign_station.php" title="<?php echo e(__('sign_station_link')); ?>" aria-label="<?php echo e(__('sign_station_link')); ?>"><i class="fas fa-pen-nib"></i></a>
     <button class="btn btn-sm crm-v2-icon-btn lg-theme-toggle afx-hide-m" type="button" title="<?php echo e(__('theme_toggle')); ?>" aria-label="<?php echo e(__('theme_toggle')); ?>">
@@ -607,6 +617,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <?php /* Chat vidí VŠICHNI zaměstnanci (dřív omylem jen vedení) */ ?>
             <a class="afx-sheet-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php"><i class="fas fa-comments"></i>Chat</a>
             <a class="afx-sheet-link <?php echo $current_page == 'rozpis.php' ? 'active' : ''; ?>" href="rozpis.php"><i class="fas fa-calendar-days"></i>Rozpis</a>
+            <a class="afx-sheet-link <?php echo $current_page == 'upozorneni.php' ? 'active' : ''; ?>" href="upozorneni.php"><i class="fas fa-bell"></i>Upozornění</a>
             <a class="afx-sheet-link <?php echo in_array($current_page, ['dokumenty.php', 'dokument.php'], true) ? 'active' : ''; ?>" href="dokumenty.php"><i class="fas fa-file-signature"></i>Dokumenty</a>
             <a class="afx-sheet-link <?php echo $current_page == 'navody.php' ? 'active' : ''; ?>" href="navody.php"><i class="fas fa-graduation-cap"></i>Návody</a>
             <a class="afx-sheet-link <?php echo $current_page == 'settings.php' ? 'active' : ''; ?>" href="settings.php"><i class="fas <?php echo $afxIsManager ? 'fa-cog' : 'fa-user-circle'; ?>"></i><?php echo __('settings'); ?></a>

@@ -191,6 +191,7 @@ try {
 
     $newId = (int)$pdo->lastInsertId();
     crmBackupMaybeSchedule();   // zálohy běží i v noci, když chodí jen webové objednávky
+    try { require_once __DIR__ . '/../upozorneni/lib.php'; afxNotifyMaybeSchedule(); } catch (Throwable $e) { /* nic */ }
     crmSyncWebBookingToCalDav($newId);
     // Automaticky založit zákazníka (pokud nový) + zakázku „Přijato" z webové rezervace
     $orderId = crmCreateOrderFromWebBooking($newId);

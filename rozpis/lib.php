@@ -244,6 +244,7 @@ function afxShiftSave(int $branchId, int $techId, string $date, string $from, st
     if ($f === null || $u === null) { return [false, 'Zadej čas ve tvaru 10:00.']; }
     if ($u <= $f) { return [false, 'Konec musí být po začátku.']; }
 
+    $old = afxShiftFind($branchId, $techId, $date);
     try {
         $pdo->prepare('INSERT INTO shift_plan (branch_id, tech_id, work_date, time_from, time_to, note, created_by)
                        VALUES (?,?,?,?,?,?,?)
@@ -255,7 +256,29 @@ function afxShiftSave(int $branchId, int $techId, string $date, string $from, st
         error_log('afxShiftSave: ' . $e->getMessage());
         return [false, 'Uložení selhalo.'];
     }
+    afxShiftNotify($old, afxShiftFind($branchId, $techId, $date));
     return [true, 'Zapsáno.'];
+}
+
+/** Zápis člověka na den (pro porovnání před/po změně). */
+function afxShiftFind(int $branchId, int $techId, string $date): ?array
+{
+    global $pdo;
+    try {
+        $st = $pdo->prepare('SELECT s.*, t.name AS tech_name FROM shift_plan s LEFT JOIN technicians t ON t.id = s.tech_id
+                             WHERE s.branch_id = ? AND s.tech_id = ? AND s.work_date = ?');
+        $st->execute([$branchId, $techId, $date]);
+        return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Throwable $e) { return null; }
+}
+
+/** Předá změnu chytrým upozorněním (dotčený zaměstnanec, vedení u změn na poslední chvíli). */
+function afxShiftNotify(?array $old, ?array $new): void
+{
+    try {
+        require_once dirname(__DIR__) . '/upozorneni/lib.php';
+        afxNotifyShiftChanged($old, $new, afxShiftCurrentTechId(), trim((string)($_SESSION['full_name'] ?? '')));
+    } catch (Throwable $e) { error_log('afxShiftNotify: ' . $e->getMessage()); }
 }
 
 /** Smaže zápis. Vrací [ok, zpráva]. */
@@ -279,5 +302,6 @@ function afxShiftDelete(int $id): array
 
     try { $pdo->prepare('DELETE FROM shift_plan WHERE id = ?')->execute([$id]); }
     catch (Throwable $e) { return [false, 'Smazání selhalo.']; }
+    afxShiftNotify($row, null);
     return [true, 'Zápis smazán.'];
 }

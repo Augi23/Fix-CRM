@@ -2038,6 +2038,38 @@ $(document).on('change', '#pricelistRepair', function () {
             document.body.appendChild(bar);
         }
 
+        // Chytrá upozornění (upozorneni/lib.php): číslo na zvonečku + toast
+        // s nejnovějším nepřečteným. Kterou zprávu už toast ukázal, si pamatuje
+        // localStorage — jinak by vyskakovala při každém ticku a v každé záložce.
+        function smartNotify(count, latest) {
+            var badge = document.getElementById('afxSmartCount');
+            if (badge) { badge.textContent = count; badge.hidden = !(count > 0); }
+            if (!latest || !latest.id) return;
+            var seen = 0;
+            try { seen = parseInt(localStorage.getItem('afx_smart_seen') || '0', 10) || 0; } catch (e) {}
+            if (Number(latest.id) <= seen) return;
+            try { localStorage.setItem('afx_smart_seen', String(latest.id)); } catch (e) {}
+            if (location.pathname.indexOf('upozorneni.php') !== -1) return;
+            var old = document.querySelector('.afx-smart-toast');
+            if (old) old.remove();
+            var icons = { urgent: 'fa-triangle-exclamation', warn: 'fa-circle-exclamation', info: 'fa-bell' };
+            var lvl = icons[latest.level] ? latest.level : 'info';
+            var t = document.createElement('a');
+            t.className = 'afx-smart-toast lvl-' + lvl;
+            t.href = latest.url || 'upozorneni.php';
+            t.setAttribute('role', 'status');
+            t.innerHTML = '<span class="st-ico"><i class="fas ' + icons[lvl] + '"></i></span>'
+                + '<span class="st-body"><span class="st-title"></span><span class="st-text"></span></span>'
+                + '<button type="button" class="st-x" aria-label="Zavřít"><i class="fas fa-xmark"></i></button>';
+            t.querySelector('.st-title').textContent = latest.title || 'Upozornění';
+            t.querySelector('.st-text').textContent = latest.body || '';
+            var close = function () { t.classList.add('is-out'); setTimeout(function () { t.remove(); }, 320); };
+            t.querySelector('.st-x').addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); close(); });
+            document.body.appendChild(t);
+            if (window.afxChime) { try { window.afxChime(lvl === 'info' ? 'status' : 'order'); } catch (e) {} }
+            setTimeout(close, lvl === 'urgent' ? 30000 : 12000);
+        }
+
         function tick() {
             var chatSeen = 0;
             try { chatSeen = parseInt(localStorage.getItem('afx_chat_seen') || '0', 10) || 0; } catch (e) {}
@@ -2055,6 +2087,7 @@ $(document).on('change', '#pricelistRepair', function () {
                     setBadge('reklamace.php', d.complaints_badge, true);
                     setBadge('procurement.php', d.procurement_badge, false);
                     setBadge('chat.php', d.chat_unread || 0, false);
+                    smartNotify(d.smart_unread || 0, d.smart_latest || null);
                     // Nepřečtená zpráva → ikona Chat dýmá bílým glow; po zobrazení chatu
                     // (chat.php si zapíše afx_chat_seen) glow při dalším ticku zhasne.
                     var chatGlow = (d.chat_unread || 0) > 0 && location.pathname.indexOf('chat.php') === -1;

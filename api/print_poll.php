@@ -18,6 +18,9 @@ if ($branch <= 0) {
 }
 
 afxEnsurePrintJobsTable();
+// Agent pobočky se ptá pořád (i ráno, než kdo otevře CRM) → spolehlivý tik
+// pro chytrá upozornění; samotná kontrola běží max 1× za minutu na pozadí.
+try { require_once __DIR__ . '/../upozorneni/lib.php'; afxNotifyMaybeSchedule(); } catch (Throwable $e) { /* tisk má přednost */ }
 // Stopa pro Nastavení → Tisk: kdy se agent pobočky naposledy ozval. Zapisuje se
 // nejvýš jednou za minutu — poller se ptá každé 2 s a zápis při každém dotazu by
 // byl zbytečná zátěž databáze.
