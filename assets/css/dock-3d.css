@@ -232,3 +232,8 @@ html[data-lg-theme="light"] .afx-dock .afx-div {
   .afx-dock .afx-cell:has(+ .afx-cell:hover) i,
   .afx-dock .afx-cell:hover + .afx-cell i { transform: none; }
 }
+
+/* ── velikost doku (v3.89.0): celé menu o kus větší, poměry zůstávají ──
+   zoom zvětší ikony, desku i popisky najednou, takže geometrie poličky sedí */
+.afx-dock { zoom: 1.12; }
+@media (max-width: 1440px) { .afx-dock { zoom: 1.05; } }

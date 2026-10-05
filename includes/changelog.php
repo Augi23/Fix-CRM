@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.89.0',
+        'date' => '2026-10-05',
+        'time' => '19:52',
+        'title' => 'Nová zakázka přehledněji, tmavá dialogová okna, větší horní menu',
+        'items' => [
+            '<b>Nová zakázka — krok Zařízení a problém</b> je kompaktnější: Vzhled / příslušenství je v řádku se S/N, IMEI 2 a heslem, Priorita vlevo vedle nahrávání fotky, Poznámky technika vedle výběru opravy z ceníku a Popis závady přes celou šířku. Okno se vejde na obrazovku i s tlačítky Storno a Další, takže se nemusí posouvat.',
+            'V záhlaví nové zakázky je „Krok 1 ze 3" na středu ve stejném řádku jako nadpis, takže záhlaví je nižší.',
+            '<b>Dialogová okna</b> (nová zakázka, reklamace…) mají tmavé neprůhledné pozadí, stránka pod nimi už neprosvítá a okolí je víc ztlumené.',
+            '<b>Horní menu</b> je o kus větší (o 12 %, na menších monitorech o 5 %).',
+        ],
+    ],
+    [
         'version' => '3.88.0',
         'date' => '2026-10-05',
         'time' => '15:39',

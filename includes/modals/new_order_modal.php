@@ -19,10 +19,11 @@ $crm_order_model_catalog = crmOrderModelCatalog();
         <div class="modal-content glass-card border-secondary text-white shadow-lg">
             <form action="api/add_order.php" method="POST" enctype="multipart/form-data" id="newOrderForm" data-draft-key="new-order">
                 <?php echo csrfField(); ?>
-                <div class="modal-header bg-transparent border-secondary py-3">
-                    <div class="w-100">
-                        <h5 class="modal-title crm-grad-text mb-1"><?php echo __('new_order'); ?></h5>
-                        <div class="crm-wizard-step-label"><?php echo __('step'); ?> <span data-wizard-current>1</span> <?php echo __('of_3'); ?></div>
+                <div class="modal-header bg-transparent border-secondary py-2">
+                    <?php /* „Krok 1 ze 3" na středu ve stejném řádku jako nadpis — nižší záhlaví */ ?>
+                    <div class="w-100 d-flex align-items-center position-relative">
+                        <h5 class="modal-title crm-grad-text mb-0"><?php echo __('new_order'); ?></h5>
+                        <div class="crm-wizard-step-label position-absolute start-50 translate-middle-x mb-0"><?php echo __('step'); ?> <span data-wizard-current>1</span> <?php echo __('of_3'); ?></div>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -194,26 +195,41 @@ $crm_order_model_catalog = crmOrderModelCatalog();
                                         <option value=""><?php echo __('model_placeholder'); ?></option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label class="form-label"><?php echo __('serial'); ?></label>
                                     <input type="text" name="serial_number" class="form-control">
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label class="form-label"><?php echo __('serial_2'); ?></label>
                                     <input type="text" name="serial_number_2" class="form-control">
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-2">
                                     <label class="form-label"><?php echo __('pin'); ?> <span class="text-danger">*</span></label>
                                     <input type="text" name="pin_code" class="form-control" required>
                                 </div>
-                                <div class="col-12">
+                                <div class="col-md-4">
                                     <label class="form-label"><?php echo __('appearance'); ?></label>
                                     <input type="text" name="appearance" class="form-control">
                                 </div>
-                                <div class="col-12">
+                                <?php /* priorita vlevo, foto vpravo — jeden řádek (přání majitele) */ ?>
+                                <div class="col-md-3">
+                                    <label class="form-label"><?php echo __('priority'); ?></label>
+                                    <select name="priority" class="form-select" id="priorityHighModal">
+                                        <?php foreach (getOrderPriorityOptions() as $prioValue => $prioLabel): ?>
+                                            <option value="<?php echo e($prioValue); ?>"<?php echo $prioValue === 'Normal' ? ' selected' : ''; ?>><?php echo $prioValue === 'High' ? '🔥 ' : ''; ?><?php echo e($prioLabel); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-2" id="priorityAdjustWrap" style="display:none;"
+                                     data-label-high="<?php echo e(__('priority_surcharge_label')); ?>"
+                                     data-label-low="<?php echo e(__('priority_discount_label')); ?>">
+                                    <label class="form-label" id="priorityAdjustLabel"><?php echo e(__('priority_surcharge_label')); ?></label>
+                                    <input type="number" name="priority_adjust" id="priorityAdjust" class="form-control" min="0" step="1" placeholder="0">
+                                </div>
+                                <div class="col-md">
                                     <label class="form-label"><i class="fas fa-camera me-1 text-info"></i> <?php echo __('intake_photos_label'); ?></label>
                                     <input type="file" name="files[]" class="form-control" multiple accept="image/*,video/*">
-                                    <div class="form-text"><?php echo __('intake_photos_hint'); ?></div>
+                                    <div class="form-text small"><?php echo __('intake_photos_hint'); ?></div>
                                 </div>
                             </div>
                         </div>
@@ -226,22 +242,21 @@ $crm_order_model_catalog = crmOrderModelCatalog();
                                 <span class="fw-semibold small text-uppercase"><?php echo __('section_problem'); ?></span>
                             </div>
                             <div class="row g-3">
-                                <div class="col-md-3">
-                                    <label class="form-label"><?php echo __('priority'); ?></label>
-                                    <select name="priority" class="form-select" id="priorityHighModal">
-                                        <?php foreach (getOrderPriorityOptions() as $prioValue => $prioLabel): ?>
-                                            <option value="<?php echo e($prioValue); ?>"<?php echo $prioValue === 'Normal' ? ' selected' : ''; ?>><?php echo $prioValue === 'High' ? '🔥 ' : ''; ?><?php echo e($prioLabel); ?></option>
-                                        <?php endforeach; ?>
+                                <div class="col-md-6">
+                                    <label class="form-label"><i class="fas fa-tags me-1 text-info"></i><?php echo __('pricelist_repair'); ?></label>
+                                    <select id="pricelistRepair" class="form-select" disabled style="width:100%;">
+                                        <option value=""><?php echo __('pricelist_repair_ph'); ?></option>
                                     </select>
+                                    <div id="pricelistChosen" class="d-flex flex-wrap gap-2 mt-2"></div>
+                                    <input type="hidden" name="pricelist_items" id="pricelistItems" value="">
                                 </div>
-                                <div class="col-md-3" id="priorityAdjustWrap" style="display:none;"
-                                     data-label-high="<?php echo e(__('priority_surcharge_label')); ?>"
-                                     data-label-low="<?php echo e(__('priority_discount_label')); ?>">
-                                    <label class="form-label" id="priorityAdjustLabel"><?php echo e(__('priority_surcharge_label')); ?></label>
-                                    <input type="number" name="priority_adjust" id="priorityAdjust" class="form-control" min="0" step="1" placeholder="0">
+                                <?php /* poznámky technika vedle výběru z ceníku (přání majitele) */ ?>
+                                <div class="col-md-6">
+                                    <label class="form-label"><?php echo __('notes'); ?> <?php echo __('comment_suffix'); ?></label>
+                                    <textarea name="technician_notes" class="form-control" rows="2" placeholder="<?php echo __('notes_placeholder'); ?>"></textarea>
                                 </div>
                                 <?php if (!empty($order_templates_modal)): ?>
-                                <div class="col-md-<?php echo !empty($order_note_templates_modal) ? '4' : '9'; ?>">
+                                <div class="col-md-<?php echo !empty($order_note_templates_modal) ? '6' : '12'; ?> order-col-tpl">
                                     <label class="form-label"><?php echo __('templates'); ?></label>
                                     <select class="form-select order-template-select" data-target="problem_description">
                                         <option value=""><?php echo __('template_select'); ?></option>
@@ -252,7 +267,7 @@ $crm_order_model_catalog = crmOrderModelCatalog();
                                 </div>
                                 <?php endif; ?>
                                 <?php if (!empty($order_note_templates_modal)): ?>
-                                <div class="col-md-<?php echo !empty($order_templates_modal) ? '5' : '9'; ?>">
+                                <div class="col-md-<?php echo !empty($order_templates_modal) ? '6' : '12'; ?> order-col-tpl">
                                     <label class="form-label"><?php echo __('templates_notes'); ?></label>
                                     <select class="form-select order-template-select" data-target="technician_notes">
                                         <option value=""><?php echo __('template_select'); ?></option>
@@ -263,20 +278,8 @@ $crm_order_model_catalog = crmOrderModelCatalog();
                                 </div>
                                 <?php endif; ?>
                                 <div class="col-12">
-                                    <label class="form-label"><i class="fas fa-tags me-1 text-info"></i><?php echo __('pricelist_repair'); ?></label>
-                                    <select id="pricelistRepair" class="form-select" disabled style="width:100%;">
-                                        <option value=""><?php echo __('pricelist_repair_ph'); ?></option>
-                                    </select>
-                                    <div id="pricelistChosen" class="d-flex flex-wrap gap-2 mt-2"></div>
-                                    <input type="hidden" name="pricelist_items" id="pricelistItems" value="">
-                                </div>
-                                <div class="col-12">
                                     <label class="form-label"><?php echo __('problem'); ?></label>
-                                    <textarea name="problem_description" class="form-control" rows="2" required></textarea>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label"><?php echo __('notes'); ?> <?php echo __('comment_suffix'); ?></label>
-                                    <textarea name="technician_notes" class="form-control" rows="2" placeholder="<?php echo __('notes_placeholder'); ?>"></textarea>
+                                    <textarea name="problem_description" class="form-control" rows="3" required></textarea>
                                 </div>
                             </div>
                         </div>
