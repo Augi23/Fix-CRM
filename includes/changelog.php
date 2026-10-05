@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.87.0',
+        'date' => '2026-10-05',
+        'time' => '13:57',
+        'title' => 'Horní menu jako 3D dok: barevné vystouplé ikony na desce',
+        'items' => [
+            'Horní menu na počítači má nový vzhled podle doku RocketDock: ikony jsou <b>barevné a vystouplé (3D)</b> s leskem, stojí na <b>desce v perspektivě</b> a odráží se v ní. Popisky jsou na přední hraně desky, takže zůstávají čitelné i nad obsahem stránky.',
+            'Při najetí myší se ikona zvětší a sousední trochu taky, jako v doku na Macu. Aktivní stránku ukazuje svítící tečka na desce pod ikonou.',
+            'Ve světlém motivu je deska bílá, v tmavém grafitová. Počty u Zakázek a Reklamací zůstávají nad ikonami, rychlé akce vpravo mají dál své barvy. Kdo má v systému vypnuté animace, nic se mu nezvětšuje.',
+        ],
+    ],
+    [
         'version' => '3.86.1',
         'date' => '2026-10-02',
         'time' => '15:30',
