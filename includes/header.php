@@ -47,6 +47,7 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) {
         'ucetni_prodej.php',   // prodeje z kasy (záložka Prodej v Účetnictví — dřív chyběla → vracelo to zpět)
         'pokladna.php',        // pokladní kniha (prodejní UI se jí skryje, viz pokladna.php)
         'navody.php',          // návody (Jak fungují platby apod.)
+        'search.php',          // výsledky hledání — pro účetní jen účetnictví
         'settings.php',        // JEN kvůli záložce Uzávěrka — ostatní záložky i akce
                                // hlídá crmCanManageSettings, účetní je neuvidí
     ];
@@ -81,32 +82,22 @@ if ($page == 'reports.php') {
 }
 
 $current_page = $page;
-$search_action = 'index.php';
-$search_placeholder = __('search_placeholder');
+// Horní pole hledá všude a všechno (search.php + našeptávač global-search.js, v3.90.0).
+// Výjimka: Účetnictví — v jeho záložkách (a pro roli účetní vždy) hledá jen v účetnictví.
+// Placeholder v poli říká, pro jakou oblast hledání platí; po kliknutí do pole zmizí (global-search.css).
+$search_action = 'search.php';
+$search_scope = 'all';
+$search_placeholder = 'Hledat všude — zakázky, klienti, sklad, produkty, dokumenty…';
 $show_search = true;
-
-if ($current_page == 'orders.php') {
-    $search_action = 'orders.php';
-    $search_placeholder = __('orders') . ' (ID, ' . __('client') . ', ' . __('device_model') . '...)';
-} elseif ($current_page == 'customers.php') {
-    $search_action = 'customers.php';
-    $search_placeholder = __('customers') . ' (ID, ' . __('client') . ', ' . __('phone') . ', ' . __('ico') . '...)';
-} elseif ($current_page == 'inventory.php') {
-    $search_action = 'inventory.php';
-    $search_placeholder = __('inventory') . ' (ID, ' . __('part_name') . ', ' . __('sku') . '...)';
-} elseif ($current_page == 'products.php') {
-    $search_action = 'products.php';
-    $search_placeholder = 'Produkty (název, kód, model...)';
+$__acctSearchPages = ['accounting.php', 'banka.php', 'ucetni_prodej.php', 'ucetni_sestavy.php'];
+if (in_array($current_page, $__acctSearchPages, true) || (function_exists('crmIsAccountant') && crmIsAccountant())
+    || ($current_page === 'search.php' && ($_GET['scope'] ?? '') === 'accounting')) {
+    $search_scope = 'accounting';
+    $search_placeholder = 'Hledat v Účetnictví — faktury, bankovní pohyby, doklady…';
 } elseif ($current_page == 'pokladna.php') {
     $show_search = false;   // kasa má vlastní velké vyhledávání
-} elseif ($current_page == 'settings.php') {
-    if (($_SESSION['role'] ?? '') == 'admin') {
-        $search_action = 'settings.php';
-        $search_placeholder = __('technicians') . '...';
-    } else {
-        $show_search = false;
-    }
 }
+$search_value = $current_page === 'search.php' ? (string)($_GET['search'] ?? ($_GET['q'] ?? '')) : '';
 
 $pageTitleMap = [
     'index.php' => __('dashboard'),
@@ -208,10 +199,12 @@ try {
     <link rel="stylesheet" href="assets/css/crm-shell.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/crm-shell.css'); ?>">
     <link rel="stylesheet" href="assets/css/dock-3d.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/dock-3d.css'); ?>">
     <link rel="stylesheet" href="assets/css/panels-modern.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/panels-modern.css'); ?>">
+    <link rel="stylesheet" href="assets/css/global-search.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/global-search.css'); ?>">
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/main.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/main.js'); ?>"></script>
+    <script src="assets/js/global-search.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/global-search.js'); ?>" defer></script>
     <?php /* Mac: odstranění capture u file inputů — jinak appka „Designed for iPad" padá při otevření foťáku */ ?>
     <script src="assets/js/capture-fix.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/capture-fix.js'); ?>"></script>
     <script src="assets/js/draft.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/draft.js'); ?>"></script>
@@ -431,14 +424,11 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
     <span class="afx-utility-sep"></span>
 
     <?php if ($show_search): ?>
-    <form action="<?php echo $search_action; ?>" method="GET" class="afx-search crm-navbar-search">
+    <form action="<?php echo $search_action; ?>" method="GET" class="afx-search crm-navbar-search" data-scope="<?php echo e($search_scope); ?>" autocomplete="off">
         <div class="input-group">
             <span class="input-group-text"><i class="fas fa-search"></i></span>
-            <?php if ($search_action === 'inventory.php' && (int)($_GET['branch'] ?? 0) > 0): ?>
-                <?php /* sklad je pobočkový — bez ?branch by hledání skončilo na rozcestníku poboček */ ?>
-                <input type="hidden" name="branch" value="<?php echo (int)$_GET['branch']; ?>">
-            <?php endif; ?>
-            <input type="text" name="search" class="form-control" placeholder="<?php echo e($search_placeholder); ?>" value="<?php echo e($_GET['search'] ?? ''); ?>">
+            <?php if ($search_scope === 'accounting'): ?><input type="hidden" name="scope" value="accounting"><?php endif; ?>
+            <input type="text" name="search" class="form-control" placeholder="<?php echo e($search_placeholder); ?>" value="<?php echo e($search_value); ?>" aria-label="<?php echo e($search_placeholder); ?>">
             <span class="input-group-text crm-kbd-hint">⌘K</span>
         </div>
     </form>
@@ -577,10 +567,11 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
     <div class="afx-panel">
         <div class="afx-grab"></div>
         <?php if ($show_search): ?>
-        <form action="<?php echo $search_action; ?>" method="GET" class="afx-sheet-search">
+        <form action="<?php echo $search_action; ?>" method="GET" class="afx-sheet-search" autocomplete="off">
             <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-search"></i></span>
-                <input type="text" name="search" class="form-control" placeholder="<?php echo e($search_placeholder); ?>" value="<?php echo e($_GET['search'] ?? ''); ?>">
+                <?php if ($search_scope === 'accounting'): ?><input type="hidden" name="scope" value="accounting"><?php endif; ?>
+                <input type="text" name="search" class="form-control" placeholder="<?php echo e($search_placeholder); ?>" value="<?php echo e($search_value); ?>">
             </div>
         </form>
         <?php endif; ?>

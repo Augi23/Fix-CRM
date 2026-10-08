@@ -1,0 +1,101 @@
+/* ============================================================
+   GLOBÁLNÍ VYHLEDÁVÁNÍ — okno výsledků ve stylu Spotlight (v3.90.0)
+   ============================================================ */
+
+/* popisek oblasti v poli: vidět vždy, po kliknutí do pole zmizí */
+.crm-navbar-search input[name="search"]::placeholder { transition: color .12s; }
+.crm-navbar-search input[name="search"]:focus::placeholder { color: transparent !important; }
+
+/* pole je v liště absolutně na středu (crm-shell.css) — okno výsledků se k němu váže,
+   position tu proto NEpřepisovat. fix-crm-v2.css vnucuje <span> 18px !important → velikosti s !important */
+@media (max-width: 1199.98px) { form.crm-navbar-search { position: relative; } }
+.afx-spot .afx-spot-t { font-size: 13.5px !important; }
+.afx-spot .afx-spot-s { font-size: 11.5px !important; }
+.afx-spot .afx-spot-m, .afx-spot .afx-spot-count, .afx-spot .afx-spot-keys { font-size: 11px !important; }
+.afx-spot .afx-spot-dym span, .afx-spot .afx-spot-foot span:first-child { font-size: 12.5px !important; }
+
+.afx-spot {
+  position: absolute; z-index: 2000;
+  top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  width: min(680px, calc(100vw - 24px));
+  max-height: min(72vh, 640px); overflow-y: auto; overscroll-behavior: contain;
+  padding: 6px;
+  background: linear-gradient(180deg, rgba(30,32,38,.97), rgba(20,22,26,.97));
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 24px 60px rgba(0,0,0,.55);
+  backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+  font-size: 13px; color: #e8eaee;
+}
+.afx-spot[hidden] { display: none !important; }
+
+.afx-spot-dym {
+  margin: 4px 6px 8px; padding: 8px 10px; border-radius: 10px;
+  background: rgba(10,132,255,.12); color: #cfe4ff; font-size: 12.5px;
+}
+.afx-spot-dym a { color: #5ab0ff; font-weight: 600; text-decoration: none; }
+.afx-spot-dym a:hover { text-decoration: underline; }
+.afx-spot-dym span { color: rgba(207,228,255,.7); }
+
+.afx-spot-group + .afx-spot-group { margin-top: 4px; border-top: 1px solid rgba(255,255,255,.06); padding-top: 4px; }
+.afx-spot-gh {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: rgba(255,255,255,.48);
+}
+.afx-spot-gh i { font-size: 11px; opacity: .8; }
+.afx-spot-count { font-weight: 500; color: rgba(255,255,255,.34); }
+.afx-spot-more { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; color: #5ab0ff !important; text-decoration: none; }
+.afx-spot-more:hover { text-decoration: underline; }
+
+.afx-spot-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 7px 10px; border-radius: 10px;
+  color: inherit !important; text-decoration: none !important;
+}
+.afx-spot-item:hover, .afx-spot-item.is-sel { background: rgba(10,132,255,.85); color: #fff !important; }
+.afx-spot-item:hover .afx-spot-s, .afx-spot-item.is-sel .afx-spot-s,
+.afx-spot-item:hover .afx-spot-m, .afx-spot-item.is-sel .afx-spot-m { color: rgba(255,255,255,.82); }
+.afx-spot-ic {
+  flex: 0 0 28px; width: 28px; height: 28px; border-radius: 8px;
+  display: grid; place-items: center; font-size: 13px; color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 85%, #fff), var(--c));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 1px 2px rgba(0,0,0,.35);
+}
+.afx-spot-txt { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.25; }
+.afx-spot-t { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.afx-spot-s { font-size: 11.5px; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.afx-spot-m { flex: 0 0 auto; font-size: 11px; color: rgba(255,255,255,.42); white-space: nowrap; }
+.afx-spot mark { background: rgba(255,214,10,.28); color: inherit; padding: 0 1px; border-radius: 3px; }
+.afx-spot-item:hover mark, .afx-spot-item.is-sel mark { background: rgba(255,255,255,.28); }
+
+.afx-spot-empty { padding: 22px 10px; text-align: center; color: rgba(255,255,255,.5); }
+.afx-spot-empty i { display: block; font-size: 20px; margin-bottom: 8px; opacity: .6; }
+
+.afx-spot-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 4px; padding: 9px 10px 5px; border-top: 1px solid rgba(255,255,255,.06);
+  color: #5ab0ff !important; text-decoration: none !important; font-weight: 500;
+}
+.afx-spot-keys { color: rgba(255,255,255,.38); font-weight: 400; font-size: 11px; }
+.afx-spot-keys kbd {
+  font: 500 10px/1 -apple-system, sans-serif; padding: 2px 5px; border-radius: 4px;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); color: rgba(255,255,255,.7);
+}
+
+/* světlý motiv */
+html[data-lg-theme="light"] .afx-spot {
+  background: rgba(255,255,255,.97); border-color: rgba(0,0,0,.08); color: #1d1d1f;
+  box-shadow: 0 24px 60px rgba(16,24,40,.22);
+}
+html[data-lg-theme="light"] .afx-spot-gh { color: rgba(0,0,0,.45); }
+html[data-lg-theme="light"] .afx-spot-count { color: rgba(0,0,0,.32); }
+html[data-lg-theme="light"] .afx-spot-s, html[data-lg-theme="light"] .afx-spot-m { color: rgba(0,0,0,.5); }
+html[data-lg-theme="light"] .afx-spot-group + .afx-spot-group,
+html[data-lg-theme="light"] .afx-spot-foot { border-color: rgba(0,0,0,.06); }
+html[data-lg-theme="light"] .afx-spot-dym { background: rgba(0,122,255,.08); color: #0b3a6e; }
+html[data-lg-theme="light"] .afx-spot-dym span { color: rgba(11,58,110,.7); }
+html[data-lg-theme="light"] .afx-spot-empty { color: rgba(0,0,0,.45); }
+html[data-lg-theme="light"] .afx-spot-keys { color: rgba(0,0,0,.4); }
+html[data-lg-theme="light"] .afx-spot-keys kbd { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.1); color: rgba(0,0,0,.6); }
+html[data-lg-theme="light"] .afx-spot mark { background: rgba(255,204,0,.35); }

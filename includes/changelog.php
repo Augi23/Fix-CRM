@@ -11,6 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.90.0',
+        'date' => '2026-10-08',
+        'time' => '15:00',
+        'title' => 'Vyhledávání odevšad a všeho',
+        'items' => [
+            'Horní pole teď hledá <b>všude najednou</b>: zakázky, klienty, reklamace, produkty (i výkupy), servisní díly, dokumenty včetně obsahu výkupních listů, e-shop objednávky, pokladní doklady, nákupy dílů, zaměstnance i stránky nastavení a návody. Výsledky naskakují už při psaní, seskupené podle druhu.',
+            'Fráze funguje přes více údajů najednou — „Kremer iphone" najde zakázku, i když jméno je u klienta a model u zařízení. Nezáleží na diakritice ani velikosti písmen; telefon i kód zakázky jdou napsat jakkoli („+420 732 774 546", „APFAZ 2601594").',
+            'Při překlepu nabídne <b>„Měli jste na mysli…?"</b> rovnou s výsledky; když nic nesedí přesně, ukáže aspoň podobné.',
+            'Ovládání: šipky vybírají, <b>Enter</b> otevře, <b>Esc</b> zavře, <b>⌘K</b> skočí do pole. Enter bez výběru otevře stránku všech výsledků; přesná shoda jednoho kódu rovnou otevře detail. Čtečka kódů funguje jako dřív.',
+            'V záložkách <b>Účetnictví</b> (a pro roli účetní vždy) hledá pole jen v účetnictví — faktury, bankovní pohyby, pokladní doklady.',
+            'V poli je vždy napsané, pro jakou oblast hledání platí; po kliknutí do pole popisek zmizí.',
+        ],
+    ],
+    [
         'version' => '3.89.3',
         'date' => '2026-10-08',
         'time' => '14:58',

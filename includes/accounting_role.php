@@ -184,6 +184,7 @@ function afxAccountantApiGate(): void {
                                                   // POZOR: search_customers.php sem NEPATŘÍ —
                                                   // účetní klientskou databázi procházet nemá,
                                                   // odběratele si v tom okně vyplní ručně
+        'global_search.php',                      // vyhledávání — pro účetní jen účetnictví (v3.90.0)
         'tech_popups.php',                        // footer poller (vrátí prázdno; bez
                                                   // něj by log šuměl 403 každých 20 s)
     ];
