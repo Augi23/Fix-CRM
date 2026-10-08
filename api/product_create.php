@@ -316,14 +316,17 @@ try {
 
     // duplicitní SN → nepřidávat, ukázat existující kus (přesně jako appka)
     if ($code !== $existingCode || $action === 'create') {
-        $dup = $pdo->prepare("SELECT id, title, added_at FROM products WHERE product_code = ?" . ($editId > 0 ? " AND id != ?" : ""));
+        $dup = $pdo->prepare("SELECT id, title, added_at, branch_id, COALESCE(is_vykup,0) AS is_vykup, stock_qty FROM products WHERE product_code = ?" . ($editId > 0 ? " AND id != ?" : ""));
         $dup->execute($editId > 0 ? [$code, $editId] : [$code]);
         $d = $dup->fetch(PDO::FETCH_ASSOC);
         if ($d) {
             http_response_code(409);
-            echo json_encode(['success' => false, 'duplicate' => true,
-                'message' => 'Zařízení se SN/IMEI „' . $code . '" už ve skladové databázi je: '
-                    . $d['title'] . ' (přidáno ' . ($d['added_at'] ? date('d.m.Y', strtotime((string)$d['added_at'])) : '—') . '). Nepřidávám ho znovu.'], JSON_UNESCAPED_UNICODE);
+            // kde kus je: výkup (založil ho výkupní list) má vlastní záložku Výkupy
+            $where = (int)$d['is_vykup'] === 1 ? 'je ve Skladu → Produkty → záložka Výkupy (naskladnil ho výkupní list)' : 'je ve Skladu → Produkty';
+            $existingUrl = 'products.php?branch=' . ((int)$d['branch_id'] ?: 1) . ((int)$d['is_vykup'] === 1 ? '&cat=vykupy' : '') . '&search=' . rawurlencode($code);
+            echo json_encode(['success' => false, 'duplicate' => true, 'existing_url' => $existingUrl,
+                'message' => 'Zařízení se SN/IMEI „' . $code . '" už naskladněné je: '
+                    . $d['title'] . ' (přidáno ' . ($d['added_at'] ? date('d.m.Y', strtotime((string)$d['added_at'])) : '—') . ', skladem ' . (int)$d['stock_qty'] . ' ks) — ' . $where . '. Nepřidávám ho znovu.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
     }

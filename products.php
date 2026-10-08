@@ -82,6 +82,32 @@ $total_stmt->execute($params);
 $total_count = (int)$total_stmt->fetchColumn();
 $total_pages = (int)ceil($total_count / $limit);
 
+// Hledaný kus může být v JINÉ záložce (Výkupy / Příslušenství) nebo na druhé pobočce —
+// např. iPhone založený z výkupního listu je jen ve Výkupech, takže hledání v běžných
+// Produktech vrátilo prázdno, i když kus existuje. Najdi ho a přepni zobrazení tam.
+$gsAltUrl = '';
+if ($search !== '' && $total_count === 0) {
+    try {
+        $alt = $pdo->prepare("SELECT id, branch_id, COALESCE(is_vykup,0) AS is_vykup FROM products
+            WHERE title LIKE ? OR product_code LIKE ? OR model LIKE ? ORDER BY (stock_qty > 0) DESC, id DESC LIMIT 1");
+        $alt->execute(["%$search%", "%$search%", "%$search%"]);
+        if ($a = $alt->fetch(PDO::FETCH_ASSOC)) {
+            $altCat = '';
+            if ((int)$a['is_vykup'] === 1) { $altCat = 'vykupy'; }
+            else {
+                $__ac2 = afxProductAccessoryCond();
+                $isAcc = $pdo->prepare("SELECT COUNT(*) FROM products WHERE id = ? AND " . $__ac2['sql']);
+                $isAcc->execute(array_merge([(int)$a['id']], $__ac2['params']));
+                if ((int)$isAcc->fetchColumn() > 0) { $altCat = 'prislusenstvi'; }
+            }
+            $altBranch = (int)$a['branch_id'] ?: (int)$skladBranch;
+            if ($altCat !== $cat || $altBranch !== (int)$skladBranch) {
+                $gsAltUrl = 'products.php?branch=' . $altBranch . ($altCat !== '' ? '&cat=' . $altCat : '') . '&search=' . rawurlencode($search);
+            }
+        }
+    } catch (Throwable $e) { error_log('products alt search: ' . $e->getMessage()); }
+}
+
 $stmt = $pdo->prepare("SELECT * FROM products" . $where_sql . " ORDER BY added_at DESC, id DESC LIMIT $limit OFFSET $offset");
 $stmt->execute($params);
 $products = $stmt->fetchAll();
@@ -105,6 +131,13 @@ $stats = $statStmt->fetch();
 
 // Import z appky ODSTRANĚN (1.8.2026) — produkty se naskladňují výhradně v CRM.
 ?>
+<?php if ($gsAltUrl !== ''): ?>
+<div class="alert alert-info d-flex align-items-center gap-2">
+    <i class="fas fa-circle-info"></i>
+    <div>Hledaný kus je v jiné záložce nebo na jiné pobočce — přepínám tam… <a href="<?php echo e($gsAltUrl); ?>">Otevřít</a></div>
+</div>
+<script>window.location.replace(<?php echo json_encode($gsAltUrl); ?>);</script>
+<?php endif; ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
@@ -2058,7 +2091,8 @@ $(document).on('click', '.product-label-btn', function () {
                 }
                 if (!d.success) {
                     var m = d.message || 'Uložení selhalo.';
-                    $msg.innerHTML = '<span class="text-danger fw-bold">' + escHtml(m) + '</span>';
+                    $msg.innerHTML = '<span class="text-danger fw-bold">' + escHtml(m) + '</span>'
+                        + (d.duplicate && d.existing_url ? ' <a class="btn btn-sm btn-outline-info ms-2" href="' + escHtml(d.existing_url) + '"><i class="fas fa-arrow-up-right-from-square me-1"></i>Otevřít existující kus</a>' : '');
                     // neplatný token = mezitím proběhlo (od)přihlášení jinde a tahle
                     // záložka je zastaralá — bez jasné hlášky to vypadá jako mrtvé tlačítko
                     if (/token|přihlá/i.test(m)) {

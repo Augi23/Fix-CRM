@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.89.2',
+        'date' => '2026-10-08',
+        'time' => '13:27',
+        'title' => 'Produkty z výkupního listu jdou dohledat a otevřít',
+        'items' => [
+            'Kus naskladněný <b>z výkupního listu</b> je jen v záložce Sklad → Produkty → <b>Výkupy</b>. Hledání na Nástěnce ho našlo, ale odkaz vedl do běžných Produktů, kde se neukázal (prázdná stránka). Odkaz teď otevře správnou záložku i pobočku a u výsledku je napsané „z výkupního listu".',
+            'Když hledání v Produktech nic nenajde, ale kus je v jiné záložce (Výkupy, Příslušenství) nebo na druhé pobočce, CRM se tam samo přepne.',
+            'Při pokusu naskladnit už existující IMEI hláška řekne, kde kus je (třeba že ho naskladnil výkupní list) a přidá tlačítko <b>Otevřít existující kus</b>.',
+        ],
+    ],
+    [
         'version' => '3.89.1',
         'date' => '2026-10-05',
         'time' => '19:57',

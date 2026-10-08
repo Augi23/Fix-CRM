@@ -637,7 +637,7 @@ include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
            Panel se ukáže jen při hledání a jen tomu, kdo na sklad má právo. */
         if ($search !== '' && hasPermission('manage_inventory')):
             $sk_term = "%$search%";
-            $st = $pdo->prepare("SELECT id, title, product_code, price, stock_qty, grade, stock_key
+            $st = $pdo->prepare("SELECT id, title, product_code, price, stock_qty, grade, stock_key, branch_id, COALESCE(is_vykup,0) AS is_vykup
                 FROM products WHERE title LIKE ? OR product_code LIKE ? OR model LIKE ?
                 ORDER BY (stock_qty > 0) DESC, added_at DESC, id DESC LIMIT 8");
             $st->execute([$sk_term, $sk_term, $sk_term]);
@@ -661,11 +661,12 @@ include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
                             <tr>
                                 <td style="width:120px"><span class="badge bg-success">Produkt</span></td>
                                 <td>
-                                    <a class="text-decoration-none" href="products.php?search=<?php echo urlencode((string)$sp['product_code']); ?>"><strong><?php echo e($sp['title']); ?></strong></a>
+                                    <a class="text-decoration-none" href="products.php?branch=<?php echo (int)($sp['branch_id'] ?: 1); ?><?php echo (int)$sp['is_vykup'] === 1 ? '&cat=vykupy' : ''; ?>&search=<?php echo urlencode((string)$sp['product_code']); ?>"><strong><?php echo e($sp['title']); ?></strong></a>
                                     <div class="small text-white-75">
                                         <?php echo e($sp['product_code']); ?>
                                         <?php if (!empty($sp['grade'])): ?> · <?php echo e($sp['grade']); ?><?php endif; ?>
                                         <?php if (!empty($sp['stock_key'])): ?> · <?php echo $sp['stock_key'] === 'karlin' ? 'Karlín' : 'Václavák'; ?><?php endif; ?>
+                                        <?php if ((int)$sp['is_vykup'] === 1): ?> · <span class="text-warning">z výkupního listu (záložka Výkupy)</span><?php endif; ?>
                                     </div>
                                 </td>
                                 <td class="text-nowrap">
