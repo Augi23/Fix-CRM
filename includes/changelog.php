@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.89.3',
+        'date' => '2026-10-08',
+        'time' => '14:58',
+        'title' => 'Bez limitu rozpracovaných zakázek',
+        'items' => [
+            'Technik může mít ve stavu <b>„Provádí se"</b> libovolný počet zakázek najednou — limit 10 rozpracovaných zakázek je zrušený pro všechny.',
+        ],
+    ],
+    [
         'version' => '3.89.2',
         'date' => '2026-10-08',
         'time' => '13:27',
