@@ -24,18 +24,44 @@
       this._resize();
       this._start = performance.now();
       this._reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      // Šetření paměti a grafiky (v3.91.1 — karta na Nástěnce padala „Out of Memory"):
+      // max. ~30 snímků/s a po 2 min bez pohybu myši/klávesnice se animace zastaví
+      // (zůstane poslední snímek); jakákoli aktivita ji plynule rozjede.
+      const IDLE_MS = 120000, FRAME_MS = 33;
+      this._lastAct = performance.now();
+      this._lastDraw = 0;
+      this._paused = false;
       this._tick = (now) => {
-        this._draw((now - this._start) / 1000);
+        this._raf = 0;
+        if (now - this._lastAct > IDLE_MS) { this._paused = true; return; }
+        if (now - this._lastDraw >= FRAME_MS) {
+          this._lastDraw = now;
+          this._draw((now - this._start) / 1000);
+        }
         if (!this._reduced && !this.hasAttribute('static')) {
           this._raf = requestAnimationFrame(this._tick);
         }
       };
+      this._wake = () => {
+        this._lastAct = performance.now();
+        if (this._paused && !this._reduced && !this.hasAttribute('static')) {
+          this._paused = false;
+          if (!this._raf) this._raf = requestAnimationFrame(this._tick);
+        }
+      };
+      ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach((ev) =>
+        window.addEventListener(ev, this._wake, { passive: true, capture: true }));
       this._raf = requestAnimationFrame(this._tick);
     }
 
     disconnectedCallback() {
       cancelAnimationFrame(this._raf);
+      this._raf = 0;
       if (this._ro) this._ro.disconnect();
+      if (this._wake) {
+        ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach((ev) =>
+          window.removeEventListener(ev, this._wake, { capture: true }));
+      }
     }
 
     attributeChangedCallback() {
@@ -78,7 +104,12 @@
 
     _layer(ctx, t, step, rBase, color, maxAlpha, maskBias, lam, amp) {
       const W = this._w, H = this._h;
-      const buckets = new Map();
+      // PAMĚŤ: dřív vznikalo každý snímek ~60 nových Path2D s tisíci kruhů. Jejich
+      // nativní paměť JS garbage collector nevidí → neuklízel a karta Chromu po pár
+      // minutách spadla „Ajaj! Out of Memory". Teď se souřadnice sbírají do polí,
+      // která se mezi snímky znovu používají, a kreslí se rovnou přes ctx.
+      const buckets = this._buckets || (this._buckets = new Map());
+      for (const arr of buckets.values()) arr.length = 0;
       for (let gy = step * 0.5; gy < H + step; gy += step) {
         for (let gx = step * 0.5; gx < W + step; gx += step) {
           const p = (gx / W) * 0.58 + (gy / H) * 0.74;
@@ -91,20 +122,25 @@
           const a = mask * (0.58 + 0.30 * lift + 0.34 * slope) * maxAlpha;
           if (a < 0.012) continue;
           const key = Math.round(a * 60);
-          let path = buckets.get(key);
-          if (!path) { path = new Path2D(); buckets.set(key, path); }
+          let pts = buckets.get(key);
+          if (!pts) { pts = []; buckets.set(key, pts); }
           const depth = 1 + h * amp * 0.022;
           const r = rBase * depth * (0.9 + 0.22 * lift);
           const x = gx + ((gx - W / 2) / (W / 2)) * h * amp;
           const y = gy + ((gy - H / 2) / (H / 2)) * h * amp;
-          path.moveTo(x + r, y);
-          path.arc(x, y, r, 0, TAU);
+          pts.push(x, y, r);
         }
       }
       ctx.fillStyle = color;
-      for (const entry of buckets) {
-        ctx.globalAlpha = entry[0] / 60;
-        ctx.fill(entry[1]);
+      for (const [key, pts] of buckets) {
+        if (!pts.length) continue;
+        ctx.globalAlpha = key / 60;
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i += 3) {
+          ctx.moveTo(pts[i] + pts[i + 2], pts[i + 1]);
+          ctx.arc(pts[i], pts[i + 1], pts[i + 2], 0, TAU);
+        }
+        ctx.fill();
       }
       ctx.globalAlpha = 1;
     }
@@ -120,7 +156,7 @@
       const c = this._canvas;
       if (!c) return;
       if (this.clientWidth !== this._w || this.clientHeight !== this._h) this._resize();
-      const ctx = c.getContext('2d');
+      const ctx = this._ctx || (this._ctx = c.getContext('2d'));
       const t = rawT * this._num('speed', 2);
       const lam = this._num('wavelength', 360);
       const amp = this._num('amplitude', 14);

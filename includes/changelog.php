@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.91.1',
+        'date' => '2026-10-09',
+        'time' => '18:31',
+        'title' => 'Oprava: Chrome po pár minutách padal „Ajaj! Out of Memory"',
+        'items' => [
+            'Animované vlnité pozadí CRM si každý snímek (až 120× za sekundu) vyrábělo tisíce nových kreslicích objektů, jejichž paměť prohlížeč průběžně neuklízel. Karta, která zůstala chvíli ležet (typicky Nástěnka po přihlášení), pak spadla na nedostatek paměti. Pozadí teď kreslí bez nových objektů — vypadá úplně stejně.',
+            'Pozadí se kreslí nejvýš 30× za sekundu a po 2 minutách bez pohybu myši či klávesnice se zastaví; jakýkoli pohyb ho zase rozjede. Šetří to i baterii a grafiku.',
+        ],
+    ],
+    [
         'version' => '3.91.0',
         'date' => '2026-10-09',
         'time' => '18:10',
