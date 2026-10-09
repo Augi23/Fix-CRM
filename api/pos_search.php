@@ -181,6 +181,8 @@ try {
               AND (o.payment_method IS NULL OR o.payment_method = '')
               AND COALESCE(NULLIF(o.final_cost, 0), NULLIF(o.estimated_cost, 0), 0) > 0
               AND NOT EXISTS (SELECT 1 FROM pos_sales ps WHERE ps.order_id = o.id AND ps.status = 'completed')
+              AND NOT EXISTS (SELECT 1 FROM pos_sale_items pi JOIN pos_sales ps2 ON ps2.id = pi.sale_id
+                              WHERE pi.item_type = 'order' AND pi.item_id = o.id AND ps2.status = 'completed')
               AND ($orderCodeSql OR $legacyCodeSql OR o.device_brand LIKE ? OR o.device_model LIKE ?
                    OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)"
               . orderBranchScopeSql('o.branch_id', 'o.technician_id') . "

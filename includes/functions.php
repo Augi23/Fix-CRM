@@ -3447,10 +3447,14 @@ function crmOrderPosSale(int $orderId, ?string $paymentMethod = null): ?array {
     ensurePosTables();
     try {
         $wherePayment = in_array($paymentMethod, ['cash', 'card', 'invoice'], true) ? ' AND payment_method = ?' : '';
-        $st = $pdo->prepare("SELECT id, sale_number, payment_method FROM pos_sales
-            WHERE order_id = ? AND status = 'completed'" . $wherePayment . "
-            ORDER BY id DESC LIMIT 1");
-        $params = [$orderId];
+        // jeden doklad může hradit víc zakázek (v3.91.0): pos_sales.order_id nese jen
+        // první z nich, ostatní jsou v položkách (item_type = 'order')
+        $st = $pdo->prepare("SELECT s.id, s.sale_number, s.payment_method FROM pos_sales s
+            WHERE s.status = 'completed'
+              AND (s.order_id = ? OR EXISTS (SELECT 1 FROM pos_sale_items i
+                    WHERE i.sale_id = s.id AND i.item_type = 'order' AND i.item_id = ?))" . str_replace('payment_method', 's.payment_method', $wherePayment) . "
+            ORDER BY s.id DESC LIMIT 1");
+        $params = [$orderId, $orderId];
         if ($wherePayment !== '') { $params[] = $paymentMethod; }
         $st->execute($params);
         $row = $st->fetch(PDO::FETCH_ASSOC);
@@ -3459,6 +3463,20 @@ function crmOrderPosSale(int $orderId, ?string $paymentMethod = null): ?array {
         error_log('crmOrderPosSale: ' . $e->getMessage());
         return null;
     }
+}
+
+/** Všechny zakázky hrazené dokladem kasy (pos_sales.order_id + položky typu 'order'). */
+function crmPosSaleOrderIds(int $saleId): array {
+    global $pdo;
+    if ($saleId <= 0 || !isset($pdo)) { return []; }
+    $ids = [];
+    try {
+        $st = $pdo->prepare("SELECT order_id FROM pos_sales WHERE id = ? AND order_id IS NOT NULL
+            UNION SELECT item_id FROM pos_sale_items WHERE sale_id = ? AND item_type = 'order' AND item_id > 0");
+        $st->execute([$saleId, $saleId]);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) { if ((int)$id > 0) { $ids[(int)$id] = true; } }
+    } catch (Throwable $e) { error_log('crmPosSaleOrderIds: ' . $e->getMessage()); }
+    return array_keys($ids);
 }
 
 function crmOrderPosReceiptSale(int $orderId): ?array {

@@ -154,10 +154,12 @@ try {
     if (!empty($sale['invoice_id'])) {
         $pdo->prepare("UPDATE invoices SET status = 'cancelled' WHERE id = ?")->execute([(int)$sale['invoice_id']]);
     }
-    if (!empty($sale['order_id'])) {
+    // všechny zakázky dokladu (jeden doklad může hradit víc zakázek, v3.91.0)
+    $cancelOrderIds = crmPosSaleOrderIds($id);
+    if ($cancelOrderIds) {
         ensureOrderPaymentMethodColumn();
-        $pdo->prepare("UPDATE orders SET payment_method = NULL WHERE id = ? AND payment_method IN ('cash','card')")
-            ->execute([(int)$sale['order_id']]);
+        $resetPay = $pdo->prepare("UPDATE orders SET payment_method = NULL WHERE id = ? AND payment_method IN ('cash','card')");
+        foreach ($cancelOrderIds as $coId) { $resetPay->execute([(int)$coId]); }
     }
 
     // Hotovostní prodej: výdej peněz zapsat do pokladního deníku ke DNI STORNA

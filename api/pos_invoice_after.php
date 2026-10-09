@@ -95,14 +95,14 @@ if (!empty($sale['invoice_id'])) {
     $sale['invoice_id'] = null;
 }
 // zakázka nesmí dostat druhou fakturu — Přehledy sčítají vyfakturováno per zakázku
-if (!empty($sale['order_id'])) {
-    $oi = $pdo->prepare("SELECT invoice_number FROM invoices
-                         WHERE order_id = ? AND status <> 'cancelled'
-                           AND COALESCE(invoice_type, 'invoice') = 'invoice' LIMIT 1");
-    $oi->execute([(int)$sale['order_id']]);
+$oi = $pdo->prepare("SELECT invoice_number FROM invoices
+                     WHERE order_id = ? AND status <> 'cancelled'
+                       AND COALESCE(invoice_type, 'invoice') = 'invoice' LIMIT 1");
+foreach (crmPosSaleOrderIds($saleId) as $saOid) {   // všechny zakázky dokladu
+    $oi->execute([(int)$saOid]);
     $onum = (string)($oi->fetchColumn() ?: '');
     if ($onum !== '') {
-        paiFail('K zakázce #' . (int)$sale['order_id'] . ' už faktura existuje (' . $onum . ').', 409);
+        paiFail('K zakázce #' . (int)$saOid . ' už faktura existuje (' . $onum . ').', 409);
     }
 }
 

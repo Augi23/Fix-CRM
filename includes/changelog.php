@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.91.0',
+        'date' => '2026-10-09',
+        'time' => '18:10',
+        'title' => 'Kasa: víc zakázek na jeden doklad',
+        'items' => [
+            'Do košíku v Pokladně jde přidat <b>víc zakázek najednou</b> — klient zaplatí všechny opravy jednou účtenkou, kartou nebo jednou fakturou. Další zakázku přidáš vyhledáním (číslo zakázky nebo příjmení klienta).',
+            'Po zaplacení se platba zapíše ke všem zakázkám v košíku a ty, které čekaly na platbu, se přepnou na Vydáno. Storno dokladu uvolní zase všechny.',
+            'Na fakturu se odběratelem automaticky stane klient zakázek; když zakázky patří různým klientům, kasa požádá o výběr odběratele.',
+            'Limit rozpracovaných zakázek na technika je od verze 3.89.3 zrušený pro všechny.',
+        ],
+    ],
+    [
         'version' => '3.90.0',
         'date' => '2026-10-08',
         'time' => '15:00',

@@ -169,16 +169,19 @@ $cart = array_values($cart);
 usort($cart, static fn(array $a, array $b) => [$a['type'], $a['id']] <=> [$b['type'], $b['id']]);
 
 $orderLines = array_values(array_filter($cart, static fn(array $l): bool => $l['type'] === 'order'));
-if (count($orderLines) > 1) {
-    echo json_encode(['success' => false, 'message' => 'V jednom prodeji může být jen jedna zakázka.']); exit;
-}
+// Víc zakázek jednoho klienta = jeden doklad (v3.91.0). pos_sales.order_id nese
+// první z nich (zpětná kompatibilita), všechny jsou v položkách dokladu.
 // Zakázka na fakturu: fakturu vystaví rovnou kasa (od v3.49.0 JEDINÉ místo,
 // kde se platba zakázky zaznamenává). Bez vybraného zákazníka se odběratelem
 // automaticky stává klient zakázky — obsluha nemusí nic dohledávat.
 if ($orderLines && $isInvoicePay && $customerId <= 0 && trim((string)($in['buyer']['name'] ?? '')) === '') {
     $oc = $pdo->prepare("SELECT customer_id FROM orders WHERE id = ?");
-    $oc->execute([(int)$orderLines[0]['id']]);
-    $customerId = (int)$oc->fetchColumn();
+    $custs = [];
+    foreach ($orderLines as $ol0) { $oc->execute([(int)$ol0['id']]); $custs[(int)$oc->fetchColumn()] = true; }
+    if (count($custs) > 1) {
+        echo json_encode(['success' => false, 'message' => 'Zakázky v košíku patří různým klientům — na fakturu vyber odběratele (komu se fakturuje).'], JSON_UNESCAPED_UNICODE); exit;
+    }
+    $customerId = (int)array_key_first($custs);
 }
 
 $vykupLines = array_values(array_filter($cart, static fn(array $l): bool => $l['type'] === 'vykup'));
@@ -321,6 +324,8 @@ if ($vykupLines) {
 try {
     $saleOrderId = 0;
     $orderCustomerId = 0;
+    $saleOrderIds = [];      // všechny zakázky hrazené tímto dokladem
+    $orderCustomerIds = [];
     $saleOrderBranchId = 0;
     foreach ($cart as $i => $line) {
         if ($line['type'] === 'part') {
@@ -421,9 +426,13 @@ try {
             $cart[$i]['used'] = false;
             $cart[$i]['grade'] = null;
             $cart[$i]['purchase_price'] = null;
-            $saleOrderId = (int)$row['id'];
-            $orderCustomerId = (int)$row['customer_id'];
-            $saleOrderBranchId = (int)($row['branch_id'] ?? 0);
+            $saleOrderIds[] = (int)$row['id'];
+            $orderCustomerIds[(int)$row['customer_id']] = true;
+            if (empty($saleOrderId)) {   // první zakázka (košík je seřazený podle id) nese doklad
+                $saleOrderId = (int)$row['id'];
+                $orderCustomerId = (int)$row['customer_id'];
+                $saleOrderBranchId = (int)($row['branch_id'] ?? 0);
+            }
         } elseif ($line['type'] === 'vykup') {
             // Výplata výkupu: autoritou je VÝKUPNÍ LIST; vyplácenou částku zadává
             // obsluha na kase (výchozí = cena z listu). Kus do skladu založil
@@ -473,7 +482,8 @@ try {
     // ...a nedosazuje se vůbec, když obsluha vyplnila jednorázového odběratele:
     // faktura by pak nesla jeho jméno, ale IČO a adresu klienta zakázky, objevila
     // by se klientovi v portálu a e-mailem by odešla jemu (nález prověrky 25.8.).
-    if ($orderCustomerId > 0 && $customerId <= 0 && $buyer['name'] === '') { $customerId = $orderCustomerId; }
+    // (u víc zakázek jen když patří jednomu klientovi)
+    if ($orderCustomerId > 0 && count($orderCustomerIds) === 1 && $customerId <= 0 && $buyer['name'] === '') { $customerId = $orderCustomerId; }
 
     $total = 0.0;
     foreach ($cart as $line) { $total += $line['price'] * $line['qty']; }
@@ -514,19 +524,22 @@ try {
 
     // Zakázka v košíku: zamknout řádek a znovu ověřit, že ji mezitím nezaplatila
     // druhá kasa nebo výdej z detailu zakázky.
-    if ($saleOrderId > 0) {
+    if ($saleOrderIds) {
         ensureOrderPaymentMethodColumn();
-        $ol = $pdo->prepare("SELECT id, payment_method FROM orders WHERE id = ? FOR UPDATE");
-        $ol->execute([$saleOrderId]);
-        $lockedOrder = $ol->fetch(PDO::FETCH_ASSOC);
-        if (!$lockedOrder) { throw new Exception('Zakázka už neexistuje.'); }
-        if (trim((string)($lockedOrder['payment_method'] ?? '')) !== '' || crmOrderPosSale($saleOrderId)) {
-            throw new Exception('Zakázka už má zaznamenanou platbu nebo účtenku.');
-        }
+        $ol = $pdo->prepare("SELECT id, order_code, payment_method FROM orders WHERE id = ? FOR UPDATE");
         $ivl = $pdo->prepare("SELECT invoice_number FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
-        $ivl->execute([$saleOrderId]);
-        if (($ivlNum = $ivl->fetchColumn()) !== false && $ivlNum !== null) {
-            throw new Exception('K zakázce mezitím vznikla faktura ' . $ivlNum . ' — úhradu zapiš k ní v Účetnictví.');
+        foreach ($saleOrderIds as $soId) {   // vzestupně podle id → stejné pořadí zámků na všech kasách
+            $ol->execute([$soId]);
+            $lockedOrder = $ol->fetch(PDO::FETCH_ASSOC);
+            if (!$lockedOrder) { throw new Exception('Zakázka už neexistuje.'); }
+            $soLabel = trim((string)($lockedOrder['order_code'] ?? '')) ?: ('#' . $soId);
+            if (trim((string)($lockedOrder['payment_method'] ?? '')) !== '' || crmOrderPosSale($soId)) {
+                throw new Exception('Zakázka ' . $soLabel . ' už má zaznamenanou platbu nebo účtenku.');
+            }
+            $ivl->execute([$soId]);
+            if (($ivlNum = $ivl->fetchColumn()) !== false && $ivlNum !== null) {
+                throw new Exception('K zakázce ' . $soLabel . ' mezitím vznikla faktura ' . $ivlNum . ' — úhradu zapiš k ní v Účetnictví.');
+            }
         }
     }
 
@@ -644,19 +657,21 @@ try {
         $pdo->prepare("UPDATE pos_sales SET invoice_id = ? WHERE id = ?")->execute([$invoiceId, $saleId]);
     }
 
-    if ($saleOrderId > 0) {
+    if ($saleOrderIds) {
         $orderPayment = ['card' => 'card', 'invoice' => 'transfer', 'invoice_ico' => 'transfer'][$payment] ?? 'cash';
         $up = $pdo->prepare("UPDATE orders SET payment_method = ? WHERE id = ? AND (payment_method IS NULL OR payment_method = '')");
-        $up->execute([$orderPayment, $saleOrderId]);
-        if ($up->rowCount() === 0) {
-            throw new Exception('Zakázka už má mezitím zaznamenanou platbu.');
-        }
         // doplatek po výdeji: zaplacením se „Vydáno - čeká na platbu" dorovná na plné Vydáno
         $fin = $pdo->prepare("UPDATE orders SET status = 'Vydáno', updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND status = 'Vydáno - čeká na platbu'");
-        $fin->execute([$saleOrderId]);
-        if ($fin->rowCount() > 0) {
-            logOrderStatusChange($saleOrderId, 'Vydáno - čeká na platbu', 'Vydáno');
+        foreach ($saleOrderIds as $soId) {
+            $up->execute([$orderPayment, $soId]);
+            if ($up->rowCount() === 0) {
+                throw new Exception('Zakázka už má mezitím zaznamenanou platbu.');
+            }
+            $fin->execute([$soId]);
+            if ($fin->rowCount() > 0) {
+                logOrderStatusChange($soId, 'Vydáno - čeká na platbu', 'Vydáno');
+            }
         }
     }
 
@@ -725,10 +740,11 @@ crmAuditLog('kasa.sale', [
         . ($buyer['name'] !== '' ? ', odběratel ' . $buyer['name'] . ($buyer['ico'] !== '' ? ' (IČO ' . $buyer['ico'] . ')' : '') : ''),
     'branch_id' => $branchId,
 ]);
-if (!empty($saleOrderId)) {
+foreach ($saleOrderIds ?? [] as $soId) {
     crmAuditLog('order.payment_set', [
-        'entity_type' => 'order', 'entity_id' => (int)$saleOrderId,
-        'summary' => 'Zakázka uhrazena přes Pokladnu dokladem ' . $saleNumber . ' (' . $payLabel . ', ' . formatMoney($total) . ')',
+        'entity_type' => 'order', 'entity_id' => (int)$soId,
+        'summary' => 'Zakázka uhrazena přes Pokladnu dokladem ' . $saleNumber . ' (' . $payLabel . ', ' . formatMoney($total)
+            . (count($saleOrderIds) > 1 ? ', společně s dalšími ' . (count($saleOrderIds) - 1) . ' zakázkami' : '') . ')',
         'branch_id' => $branchId,
     ]);
 }
@@ -752,6 +768,7 @@ echo json_encode([
     'sale_id' => $saleId,
     'sale_number' => $saleNumber,
     'order_id' => !empty($saleOrderId) ? (int)$saleOrderId : null,
+    'order_ids' => array_values($saleOrderIds ?? []),
     'invoice_id' => $invoiceId,
     'invoice_mail' => $invoiceMail,   // '' = faktura nemá kam odejít → nabídnout tisk
     'total' => round($total, 2),

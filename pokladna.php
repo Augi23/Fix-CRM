@@ -1137,6 +1137,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var found = cart.find(function (c) { return cartKey(c) === cartKey(r); });
         if (found) {
             if (found.type === 'vykup') { alert('Tenhle výkup už v košíku je — vyplácí se jen jednou.'); return; }
+            if (found.type === 'order') { alert('Tahle zakázka už v košíku je. Další zakázky klienta přidáš vyhledáním (číslo zakázky nebo příjmení klienta).'); return; }
             if (found.qty + addQty > stock) { alert(r.type === 'manual' ? 'Maximum pro ruční položku je 999 ks.' : 'Skladem je jen ' + stock + ' ks.'); return; }
             found.qty += addQty;
         } else {
