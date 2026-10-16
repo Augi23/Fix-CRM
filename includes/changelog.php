@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.93.1',
+        'date' => '2026-10-16',
+        'time' => '11:35',
+        'title' => 'Zrušena SMS brána GoSMS',
+        'items' => [
+            'Odesílání SMS klientům přes GoSMS.cz (brána třetí strany) je z CRM odstraněné — nastavení v Integracích, testovací SMS i automatická SMS „připraveno k vyzvednutí". Nikdy nebyla zapnutá. SMS bude v budoucnu posílat vlastní telefon s Androidem. E-mail „připraveno k vyzvednutí" chodí dál beze změny.',
+        ],
+    ],
+    [
         'version' => '3.93.0',
         'date' => '2026-10-16',
         'time' => '10:32',
