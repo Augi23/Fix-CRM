@@ -409,12 +409,9 @@ $afxFp = array_values(array_filter(explode(' ', $afxFn)));
 $afxInitials = mb_strtoupper(count($afxFp) >= 2 ? mb_substr($afxFp[0],0,1).mb_substr($afxFp[1],0,1) : mb_substr($afxFn,0,2));
 $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 ?>
-<!-- Pozadí: animovaná „zvlněná halftone síť" — web component <af-wave-bg>
-     (assets/js/af-wave-bg.js, bez závislostí). Responzivní: ResizeObserver + devicePixelRatio,
-     respektuje prefers-reduced-motion (statický snímek) a v neaktivní záložce se pozastaví.
-     Wrapper .crm-bgfx = fixní vrstva přes viewport s podkladem #0C0C0D; obsah leží nad ní. -->
-<div class="crm-bgfx" aria-hidden="true"><af-wave-bg></af-wave-bg></div>
-<script src="assets/js/af-wave-bg.js?v=<?php echo @filemtime(__DIR__ . '/../assets/js/af-wave-bg.js') ?: '1'; ?>"></script>
+<!-- Pozadí: statická „půlnoční modř" (v3.94.0) — jen CSS (.crm-bgfx v crm-shell.css), nic se
+     nepřekresluje. Pohyblivé pozadí <af-wave-bg> zrušeno na přání majitele (16.10.2026). -->
+<div class="crm-bgfx" aria-hidden="true"></div>
 
 <!-- Tenký servisní řádek -->
 <header class="afx-utility">

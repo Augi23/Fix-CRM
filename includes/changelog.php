@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.94.0',
+        'date' => '2026-10-16',
+        'time' => '13:04',
+        'title' => 'Nové klidné pozadí „Půlnoční modř"',
+        'items' => [
+            'Pohyblivé vlnité pozadí CRM je pryč. Nahradilo ho <b>statické pozadí v tmavě modrých tónech</b> s decentní září v rozích — klidnější, přehlednější a bez neustálého překreslování (šetří počítač i baterii, žádné pády Chromu na paměť).',
+            'Světlý režim se nemění.',
+        ],
+    ],
+    [
         'version' => '3.93.2',
         'date' => '2026-10-16',
         'time' => '11:39',

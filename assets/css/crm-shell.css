@@ -82,18 +82,21 @@ html[data-lg-theme="light"] .device-model-lg { color: rgba(30,34,44,.92) !import
 .table tbody tr .dropdown-menu.show { z-index: 1002 !important; }
 
 /* ============================================================
-   2) POZADÍ — animovaná „zvlněná halftone síť" (web component <af-wave-bg>,
-   assets/js/af-wave-bg.js; vkládá header.php do wrapperu .crm-bgfx).
-   Responzivní samo (ResizeObserver + DPR); pod ním solid tmavá #0C0C0D.
+   2) POZADÍ — statická „půlnoční modř" (v3.94.0): tmavě modrý přechod s decentní
+   modrou září vlevo nahoře a azurovou vpravo dole. Čisté CSS, nic se nepřekresluje
+   (dřívější animované <af-wave-bg> zrušeno 16.10.2026).
    ============================================================ */
 html, body {
   background: #04070d !important;
   background-color: #04070d !important;
 }
-/* Vrstva pozadí (wrapper <af-wave-bg> web componenty) — fixní přes viewport,
-   tmavý podklad #0C0C0D dle handoff; komponenta uvnitř se roztáhne absolute inset:0. */
+/* Vrstva pozadí — fixní přes viewport, obsah leží nad ní (pořadí v DOM). */
 .crm-bgfx {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none; background: #0C0C0D;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(65% 55% at 8% -5%, rgba(10,132,255,.22) 0%, rgba(10,132,255,0) 68%),
+    radial-gradient(55% 50% at 100% 105%, rgba(85,212,255,.13) 0%, rgba(85,212,255,0) 70%),
+    linear-gradient(180deg, #0c1220 0%, #080c14 60%, #06080d 100%);
 }
 /* POZOR: #content NESMÍ mít z-index — vytvořil by stacking context a všechna
    popup okna definovaná uvnitř stránek by skončila POD .modal-backdrop (1050,
@@ -449,8 +452,18 @@ th.col-priority, td.col-priority { width: 1%; white-space: nowrap; }
 .cell-status .afx-branch-tag { font-size: 9.5px; padding: .18em .5em; font-weight: 500; }
 .cell-status .afx-branch-tag i { font-size: .9em; }
 
-/* Compositor keep-alive už není potřeba: pozadí <af-wave-bg> kreslí každý snímek
-   přes requestAnimationFrame, takže frame-loop (a s ním pulzy řádků) běží pořád. */
+/* ── Compositor keep-alive (vráceno v3.94.0 se statickým pozadím) ─────────────
+   Chromium občas přestane plánovat snímky pro paint-animace (pulzy řádků přes
+   box-shadow/filter) a ty „zamrznou", dokud uživatel nehne myší. Dřív frame-loop
+   držel animovaný canvas pozadí; teď ho drží neviditelná sub-pixelová transform
+   animace na 2×2 px prvku — běží jen na compositoru, prakticky nic nestojí. */
+@keyframes afxKeepAlive { 0%,100% { transform: translateZ(0); } 50% { transform: translate3d(0, .02px, 0); } }
+/* na vrstvě pozadí — body::after vypíná fix-crm-v2.css (content:none !important) */
+.crm-bgfx::after {
+  content: ""; position: absolute; left: 0; bottom: 0; width: 2px; height: 2px;
+  pointer-events: none; opacity: .01;
+  animation: afxKeepAlive 3s linear infinite;
+}
 
 /* ── Filtr stavů zakázek jako DROPDOWN s obarvenými buňkami (místo roztažených chipů) ── */
 /* Plné (neprůhledné) pozadí buňky — přes prosvítající animované pozadí CRM byly
