@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.91.3',
+        'date' => '2026-10-16',
+        'time' => '09:11',
+        'title' => 'Hledání: „Zobrazit vše" a e-shop objednávky',
+        'items' => [
+            '<b>„Zobrazit vše"</b> u skupiny výsledků teď ukáže všechny výsledky té oblasti stejným hledáním. Dřív vedl na seznam v sekci, který hledá postaru celým textem — víceslovný dotaz (např. „Kremer iphone") tam skončil prázdný. Odkaz se ukáže, jen když je výsledků víc, než se vešlo.',
+            'Klik na <b>e-shop objednávku</b> ve výsledcích otevře na Nástěnce okno objednávek a najede přímo na ni (dřív jen otevřel Nástěnku).',
+            'Prověrka všech oblastí hledání na ostrých datech: žádná chyba, odpověď 70–250 ms.',
+        ],
+    ],
+    [
         'version' => '3.91.2',
         'date' => '2026-10-16',
         'time' => '09:06',

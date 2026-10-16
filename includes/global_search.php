@@ -453,7 +453,7 @@ function gsItem(string $key, array $r): array {
                     'meta' => $date($r['doc_date']), 'url' => 'dokument.php?type=' . rawurlencode((string)$r['doc_type']) . '&id=' . (int)$r['id'], 'codes' => [(string)$r['doc_number']]];
         case 'eshop':
             return ['title' => (string)$r['order_ref'], 'subtitle' => trim(implode(' · ', array_filter([(string)$r['customer_name'], $money($r['total'])]))),
-                    'meta' => trim((string)$r['status'] . ' · ' . $date($r['created_at']), ' ·'), 'url' => 'index.php#eshop', 'codes' => [(string)$r['order_ref']]];
+                    'meta' => trim((string)$r['status'] . ' · ' . $date($r['created_at']), ' ·'), 'url' => 'index.php#eshop-' . rawurlencode((string)$r['order_ref']), 'codes' => [(string)$r['order_ref']]];
         case 'pos':
             return ['title' => 'Doklad ' . (string)$r['sale_number'], 'subtitle' => trim(implode(' · ', array_filter([$name($r), $money($r['total']), (string)$r['seller_name']]))),
                     'meta' => $date($r['created_at']), 'url' => 'print_receipt.php?id=' . (int)$r['id'], 'codes' => [(string)$r['sale_number']]];
@@ -497,19 +497,24 @@ function gsIsCodeQuery(array $tokens): bool {
     return count($tokens) === 1 && preg_match('/\d/', $tokens[0]) && strlen(gsCompact($tokens[0])) >= 3;
 }
 
-function gsRun(PDO $pdo, string $q, string $scope, int $perGroup): array {
+/**
+ * $only = jen jedna oblast (klíč z gsEntities() nebo 'pages') — stránka
+ * „Zobrazit vše" u skupiny; jinak všechny oblasti.
+ */
+function gsRun(PDO $pdo, string $q, string $scope, int $perGroup, string $only = ''): array {
     $parsed = gsParseQuery($q);
     $tokens = $parsed['tokens'];
     $out = ['ok' => true, 'q' => $parsed['q'], 'tokens' => $tokens, 'mode' => 'none', 'suggestion' => null, 'total' => 0, 'groups' => []];
     if (!$tokens) { return $out; }
     $acct = ($scope === 'accounting');
 
-    $run = function (array $toks, string $mode) use ($pdo, $acct, $perGroup) {
+    $run = function (array $toks, string $mode) use ($pdo, $acct, $perGroup, $only) {
         $groups = []; $total = 0;
         foreach (gsEntities() as $key => $def) {
             if (empty($def['both']) && !empty($def['acct']) !== $acct) { continue; }
+            if ($only !== '' && $only !== $key) { continue; }
             $def['key'] = $key;
-            [$rows, $cnt] = gsQueryEntity($pdo, $def, $toks, $mode, max($perGroup * 4, 20));
+            [$rows, $cnt] = gsQueryEntity($pdo, $def, $toks, $mode, $only !== '' ? $perGroup : max($perGroup * 4, 20));
             if (!$rows) { continue; }
             $items = [];
             $compactQ = gsCompact(implode('', $toks));
@@ -530,13 +535,17 @@ function gsRun(PDO $pdo, string $q, string $scope, int $perGroup): array {
             $best = $items[0]['gs_score'] ?? 0;
             $groups[] = ['key' => $key, 'label' => $def['label'], 'icon' => $def['icon'], 'color' => $def['color'],
                          'total' => $cnt, 'items' => array_slice($items, 0, $perGroup), 'best' => $best,
-                         'more_url' => ($def['more'] ?? '') !== ''
+                         // „Zobrazit vše" = všechny výsledky TÉTO oblasti stejným hledáním.
+                         // (Seznam v sekci hledá postaru celým řetězcem — víceslovný dotaz
+                         // jako „Kremer iphone" by tam skončil prázdný.)
+                         'more_url' => 'search.php?search=' . rawurlencode(implode(' ', $toks)) . '&only=' . $key . ($acct ? '&scope=accounting' : ''),
+                         'list_url' => ($def['more'] ?? '') !== ''
                              ? str_replace('__BRANCH__', (string)(function_exists('getCurrentStaffBranchId') ? (int)getCurrentStaffBranchId() : 1), $def['more'])
                                . (str_ends_with($def['more'], '=') ? rawurlencode(implode(' ', $toks)) : '')
                              : ''];
             $total += $cnt;
         }
-        {
+        if ($only === '' || $only === 'pages') {
             $pages = gsSearchPages($toks, $mode);
             if ($acct) {   // v Účetnictví jen jeho stránky a návody
                 $pages = array_values(array_filter($pages, fn($p) => preg_match('~^(accounting|banka|ucetni_|navody)~', $p['url'])));

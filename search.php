@@ -15,12 +15,15 @@ $q = trim((string)($_GET['search'] ?? ($_GET['q'] ?? '')));
 $scope = ((string)($_GET['scope'] ?? '') === 'accounting') ? 'accounting' : 'all';
 if (function_exists('crmIsAccountant') && crmIsAccountant()) { $scope = 'accounting'; }
 
-$res = $q !== '' ? gsRun($pdo, $q, $scope, 50) : ['groups' => [], 'total' => 0, 'mode' => 'none', 'suggestion' => null, 'tokens' => []];
+// „Zobrazit vše" u skupiny → jen ta oblast, ale všechny její výsledky
+$only = preg_replace('/[^a-z]/', '', (string)($_GET['only'] ?? ''));
+if ($only !== '' && $only !== 'pages' && !array_key_exists($only, gsEntities())) { $only = ''; }
+$res = $q !== '' ? gsRun($pdo, $q, $scope, $only !== '' ? 300 : 50, $only) : ['groups' => [], 'total' => 0, 'mode' => 'none', 'suggestion' => null, 'tokens' => []];
 
 // přesná shoda kódu právě u jednoho záznamu → otevřít detail. U čísla zakázky
 // stačí i jeho konec („1645" → APFAZ2601645), když sedí na jedinou zakázku —
 // tak to kolegové znají ze starého hledání v Zakázkách.
-if ($res['mode'] === 'exact') {
+if ($res['mode'] === 'exact' && $only === '') {
     $exact = []; $ends = [];
     foreach ($res['groups'] as $g) {
         foreach ($g['items'] as $it) {
@@ -83,6 +86,7 @@ $hl = function (string $text) use ($tokensF): string {
     <div class="gsr-head">
       <h2><i class="fas fa-magnifying-glass me-2 text-primary"></i><?php echo $scope === 'accounting' ? 'Hledání v Účetnictví' : 'Výsledky hledání'; ?></h2>
       <?php if ($q !== ''): ?><span class="n">„<?php echo e($q); ?>" · <?php echo (int)$res['total']; ?> výsledků</span><?php endif; ?>
+      <?php if ($only !== ''): ?><a class="ms-auto small" href="search.php?search=<?php echo rawurlencode($q); ?><?php echo $scope === 'accounting' ? '&scope=accounting' : ''; ?>"><i class="fas fa-arrow-left me-1"></i>Všechny oblasti</a><?php endif; ?>
     </div>
 
     <?php if (!empty($res['suggestion'])): ?>
@@ -103,7 +107,8 @@ $hl = function (string $text) use ($tokensF): string {
       <div class="glass-panel gsr-group p-0" style="overflow:hidden">
         <div class="gsr-gh"><i class="fas <?php echo e($g['icon']); ?>"></i><?php echo e($g['label']); ?>
           <span style="font-weight:500;opacity:.7"><?php echo (int)$g['total']; ?></span>
-          <?php if (!empty($g['more_url'])): ?><a href="<?php echo e($g['more_url']); ?>">Otevřít v sekci</a><?php endif; ?></div>
+          <?php if ($only === '' && !empty($g['more_url']) && $g['total'] > count($g['items'])): ?><a href="<?php echo e($g['more_url']); ?>">Zobrazit vše (<?php echo (int)$g['total']; ?>)</a>
+          <?php elseif ($only !== '' && !empty($g['list_url'])): ?><a href="<?php echo e($g['list_url']); ?>">Otevřít v sekci</a><?php endif; ?></div>
         <?php foreach ($g['items'] as $it): ?>
           <a class="gsr-item" href="<?php echo e($it['url']); ?>">
             <span class="gsr-ic" style="--c:<?php echo e($g['color']); ?>"><i class="fas <?php echo e($it['icon'] ?? $g['icon']); ?>"></i></span>
@@ -115,7 +120,7 @@ $hl = function (string $text) use ($tokensF): string {
           </a>
         <?php endforeach; ?>
         <?php if ($g['total'] > count($g['items'])): ?>
-          <div class="gsr-s" style="padding:8px 18px 12px">… a dalších <?php echo (int)$g['total'] - count($g['items']); ?><?php echo !empty($g['more_url']) ? ' — zobrazíte je v sekci' : ''; ?>.</div>
+          <div class="gsr-s" style="padding:8px 18px 12px">… a dalších <?php echo (int)$g['total'] - count($g['items']); ?><?php if ($only === '' && !empty($g['more_url'])): ?> — <a href="<?php echo e($g['more_url']); ?>">zobrazit vše</a><?php else: ?> — upřesněte hledání<?php endif; ?>.</div>
         <?php endif; ?>
       </div>
     <?php endforeach; ?>

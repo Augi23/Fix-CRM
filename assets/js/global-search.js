@@ -70,7 +70,7 @@
             (data.groups || []).forEach(function (g) {
                 h += '<div class="afx-spot-group"><div class="afx-spot-gh"><i class="fas ' + esc(g.icon) + '"></i>' + esc(g.label)
                    + '<span class="afx-spot-count">' + (g.total > g.items.length ? g.items.length + ' z ' + g.total : g.total) + '</span>'
-                   + (g.more_url ? '<a class="afx-spot-more" href="' + esc(g.more_url) + '">Zobrazit vše</a>' : '') + '</div>';
+                   + (g.more_url && g.total > g.items.length ? '<a class="afx-spot-more" href="' + esc(g.more_url) + '">Zobrazit vše</a>' : '') + '</div>';
                 g.items.forEach(function (it) {
                     var idx = items.length;
                     items.push(it);

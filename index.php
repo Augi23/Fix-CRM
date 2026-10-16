@@ -343,7 +343,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
         body.innerHTML = d.orders.map(function (o) {
             var lb = [labels[o.status] || 'paid', o.status_label || o.status];
             var items = (o.items || []).map(function (i) { return i.qty + '× ' + i.name; }).join('\n');
-            return '<div class="eshop-modal-row"><div style="min-width:0;">'
+            return '<div class="eshop-modal-row" data-ref="' + esc(o.order_ref) + '"><div style="min-width:0;">'
                 + '<span class="ref">' + esc(o.order_ref) + '</span> <span class="eshop-badge ' + lb[0] + '">' + esc(lb[1]) + '</span>'
 
                 + '<div class="who">' + esc(o.customer) + (o.phone ? ' · ' + esc(o.phone) : '') + ' · ' + esc(o.date) + '</div>'
@@ -392,7 +392,25 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
     }
     tile.addEventListener('click', open);
     tile.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    // odkaz z hledání: index.php#eshop-AFX-XXXX → otevřít okno a najet na objednávku
+    function fromHash() {
+        var m = /^#eshop(?:-(.+))?$/.exec(location.hash || '');
+        if (!m) { return; }
+        var ref = m[1] ? decodeURIComponent(m[1]) : '';
+        var mm = bootstrap.Modal.getOrCreateInstance(document.getElementById('eshopSalesModal'));
+        document.getElementById('eshopSalesBody').innerHTML = '<div class="text-white-50 small">Načítám…</div>';
+        mm.show();
+        (loaded ? Promise.resolve(loaded) : load()).then(function (d) {
+            render(d);
+            if (!ref) { return; }
+            var row = Array.prototype.find.call(document.querySelectorAll('#eshopSalesBody .eshop-modal-row'), function (r) { return r.dataset.ref === ref; });
+            if (row) { row.scrollIntoView({ block: 'center' }); row.style.outline = '2px solid #0a84ff'; row.style.borderRadius = '12px'; }
+        });
+        history.replaceState(null, '', location.pathname + location.search);
+    }
+    window.addEventListener('hashchange', fromHash);
     load();
+    fromHash();
 })();
 </script>
 <?php endif; ?>
