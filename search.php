@@ -17,11 +17,22 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) { $scope = 'account
 
 $res = $q !== '' ? gsRun($pdo, $q, $scope, 50) : ['groups' => [], 'total' => 0, 'mode' => 'none', 'suggestion' => null, 'tokens' => []];
 
-// přesná shoda kódu právě u jednoho záznamu → otevřít detail
+// přesná shoda kódu právě u jednoho záznamu → otevřít detail. U čísla zakázky
+// stačí i jeho konec („1645" → APFAZ2601645), když sedí na jedinou zakázku —
+// tak to kolegové znají ze starého hledání v Zakázkách.
 if ($res['mode'] === 'exact') {
-    $exact = [];
-    foreach ($res['groups'] as $g) { foreach ($g['items'] as $it) { if (($it['gs_score'] ?? 0) >= 100) { $exact[] = $it; } } }
+    $exact = []; $ends = [];
+    foreach ($res['groups'] as $g) {
+        foreach ($g['items'] as $it) {
+            $sc = $it['gs_score'] ?? 0;
+            if ($sc >= 100) { $exact[] = $it; }
+            if ($sc >= 60) { $ends[] = $it; }
+        }
+    }
     if (count($exact) === 1 && ($exact[0]['url'] ?? '#') !== '#') { header('Location: ' . $exact[0]['url']); exit; }
+    if (!$exact && count($ends) === 1 && gsIsCodeQuery($res['tokens'] ?? []) && ($ends[0]['url'] ?? '#') !== '#') {
+        header('Location: ' . $ends[0]['url']); exit;
+    }
 }
 
 require_once 'includes/header.php';

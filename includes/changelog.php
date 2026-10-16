@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.91.2',
+        'date' => '2026-10-16',
+        'time' => '09:06',
+        'title' => 'Hledání: čísla zakázek zase spolehlivě a bez nesmyslů',
+        'items' => [
+            'Výsledky jsou seřazené podle shody, ne podle data: zakázka, jejíž číslo odpovídá hledanému, je vždy první (dřív „930" našlo APFAZ2600930 až za staršími zakázkami, které měly 930 jen v telefonu nebo popisu).',
+            'Číslo zakázky jde napsat jakkoli — <b>„1645"</b>, „2601645", „APFAZ2601645" i „APFAZ 2601645" — a <b>Enter rovnou otevře zakázku</b>, když sedí na jedinou (jako dřív v Zakázkách). Totéž reklamace, účtenky a doklady.',
+            'Při hledání čísla se už nepřimíchávají díly, produkty a klienti, kteří mají ty číslice náhodou v SKU, IMEI nebo telefonu.',
+            'Čísla a kódy se už „neopravují" na jiné (to vracelo cizí zakázky) a u čísel se nezobrazují ani „podobné výsledky".',
+        ],
+    ],
+    [
         'version' => '3.91.1',
         'date' => '2026-10-09',
         'time' => '18:31',

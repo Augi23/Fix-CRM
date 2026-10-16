@@ -118,7 +118,30 @@ function gsQueryEntity(PDO $pdo, array $def, array $tokens, string $mode, int $l
     if (!$conds) { return [[], 0]; }
     $where = $mode === 'any' ? '(' . implode(' OR ', $conds) . ')' : implode(' AND ', $conds);
     if (!empty($def['where'])) { $where .= ' AND (' . $def['where'] . ')'; }
-    $score = $mode === 'any' ? implode(' + ', $scoreParts) : '0';
+    // RELEVANCE (v3.91.2): dřív se řadilo jen podle data — „930" našlo zakázku
+    // APFAZ2600930 až za staršími, které mají 930 jen v telefonu nebo popisu.
+    //   kód přesně = 100 · kód končí dotazem = 60 · kód ho obsahuje = 30
+    //   hlavní údaj (jméno, model, název) obsahuje slovo = 10
+    $rankParts = []; $rankParams = [];
+    foreach ($tokens as $t) {
+        $cmp = gsCompact($t);
+        if (!empty($def['codes']) && $cmp !== '' && (preg_match('/\d/', $cmp) || strlen($cmp) >= 4)) {
+            $cases = [];
+            foreach ($def['codes'] as $c) {
+                $cc = "REGEXP_REPLACE(LOWER(COALESCE($c,'')), '[^0-9a-z]', '')";
+                $cases[] = "CASE WHEN $cc = ? THEN 100 WHEN $cc LIKE ? THEN 60 WHEN $cc LIKE ? THEN 30 ELSE 0 END";
+                array_push($rankParams, $cmp, '%' . $cmp, '%' . $cmp . '%');
+            }
+            $rankParts[] = count($cases) > 1 ? 'GREATEST(' . implode(', ', $cases) . ')' : $cases[0];
+        }
+        if (!empty($def['prim'])) {
+            $prim = 'CONCAT_WS(\' \', ' . implode(', ', array_map(fn($c) => "COALESCE($c,'')", $def['prim'])) . ')';
+            $rankParts[] = "(($prim) COLLATE " . GS_COLL . " LIKE ?) * 10";
+            $rankParams[] = gsLike($t);
+        }
+    }
+    if ($mode === 'any') { $rankParts = array_merge($rankParts, $scoreParts); $rankParams = array_merge($rankParams, $scoreParams); }
+    $score = $rankParts ? implode(' + ', $rankParts) : '0';
     $from = $def['from'];
     $total = 0;
     try {
@@ -126,10 +149,10 @@ function gsQueryEntity(PDO $pdo, array $def, array $tokens, string $mode, int $l
         $st->execute($params);
         $total = (int)$st->fetchColumn();
         if ($total === 0) { return [[], 0]; }
-        $order = ($mode === 'any' ? 'gs_score DESC, ' : '') . ($def['order'] ?? ($def['id'] . ' DESC'));
+        $order = 'gs_score DESC, ' . ($def['order'] ?? ($def['id'] . ' DESC'));
         $sql = "SELECT {$def['select']}, ($score) AS gs_score FROM $from WHERE $where ORDER BY $order LIMIT " . (int)$limit;
         $st = $pdo->prepare($sql);
-        $st->execute($mode === 'any' ? array_merge($scoreParams, $params) : $params);
+        $st->execute(array_merge($rankParams, $params));
         return [$st->fetchAll(PDO::FETCH_ASSOC), $total];
     } catch (Throwable $e) {
         error_log('global_search ' . ($def['key'] ?? '?') . ': ' . $e->getMessage());
@@ -287,6 +310,7 @@ function gsEntities(): array {
                       'o.problem_description', 'o.repair_solution', 'o.technician_notes', 'o.appearance', 'o.shipping_tracking',
                       'c.first_name', 'c.last_name', 'c.company', 'c.phone', 'c.email'],
             'phones' => ['c.phone'], 'codes' => ['o.order_code', 'o.legacy_code', 'o.serial_number', 'o.serial_number_2'],
+            'prim' => ['c.first_name', 'c.last_name', 'c.company', 'o.device_brand', 'o.device_model'],
             'select' => 'o.id, o.order_code, o.legacy_code, o.device_brand, o.device_model, o.status, o.created_at, o.serial_number, c.first_name, c.last_name, c.company, c.phone',
             'more' => 'orders.php?search=',
         ],
@@ -295,6 +319,7 @@ function gsEntities(): array {
             'from' => 'customers c',
             'hay' => ['c.first_name', 'c.last_name', 'c.company', 'c.phone', 'c.email', 'c.ico', 'c.dic', 'c.address'],
             'phones' => ['c.phone'], 'codes' => ['c.ico'],
+            'prim' => ['c.first_name', 'c.last_name', 'c.company'],
             'select' => 'c.id, c.first_name, c.last_name, c.company, c.phone, c.email, c.ico',
             'more' => 'customers.php?search=',
         ],
@@ -304,6 +329,7 @@ function gsEntities(): array {
             'hay' => ['k.complaint_code', 'k.order_code', 'k.device', 'k.serial_number', 'k.complaint_reason', 'k.resolution_text', 'k.phone',
                       'c.first_name', 'c.last_name', 'c.company', 'c.phone', 'c.email'],
             'phones' => ['k.phone', 'c.phone'], 'codes' => ['k.complaint_code', 'k.order_code', 'k.serial_number'],
+            'prim' => ['k.device', 'c.first_name', 'c.last_name'],
             'select' => 'k.id, k.complaint_code, k.order_code, k.device, k.complaint_reason, k.complaint_status, k.created_at, c.first_name, c.last_name',
             'more' => 'reklamace.php?search=',
         ],
@@ -312,6 +338,7 @@ function gsEntities(): array {
             'from' => 'products p',
             'hay' => ['p.title', 'p.product_code', 'p.manufacturer', 'p.model', 'p.capacity', 'p.color', 'p.grade', 'p.eshop_note'],
             'phones' => [], 'codes' => ['p.product_code'],
+            'prim' => ['p.title'],
             'select' => 'p.id, p.title, p.product_code, p.price, p.stock_qty, p.color, p.grade, p.branch_id, COALESCE(p.is_vykup,0) AS is_vykup',
             'more' => 'products.php?search=',   // bez pobočky → products.php sám přepne tam, kde kus je
         ],
@@ -320,6 +347,7 @@ function gsEntities(): array {
             'from' => 'inventory i',
             'hay' => ['i.part_name', 'i.sku', 'i.device_model', 'i.source_supplier'],
             'phones' => [], 'codes' => ['i.sku'],
+            'prim' => ['i.part_name'],
             'select' => 'i.id, i.part_name, i.sku, i.quantity, i.device_model, i.branch_id',
             'more' => 'inventory.php?branch=__BRANCH__&search=',   // sklad dílů je pobočkový — bez branch by skončil na rozcestníku
         ],
@@ -328,6 +356,7 @@ function gsEntities(): array {
             'from' => 'crm_documents d',
             'hay' => ['d.doc_number', 'd.customer_name', 'd.customer_phone', 'd.customer_email', 'd.subject', 'd.payload'],
             'phones' => ['d.customer_phone'], 'codes' => ['d.doc_number'],
+            'prim' => ['d.customer_name', 'd.subject'],
             'select' => 'd.id, d.doc_type, d.doc_number, d.doc_date, d.customer_name, d.subject',
             'more' => 'dokumenty.php?q=',
         ],
@@ -336,6 +365,7 @@ function gsEntities(): array {
             'from' => 'eshop_orders e',
             'hay' => ['e.order_ref', 'e.customer_name', 'e.customer_email', 'e.customer_phone', 'e.items_json', 'e.note', 'e.customer_note', 'e.addr_street', 'e.addr_city'],
             'phones' => ['e.customer_phone'], 'codes' => ['e.order_ref'],
+            'prim' => ['e.customer_name'],
             'select' => 'e.id, e.order_ref, e.status, e.total, e.customer_name, e.created_at',
             'more' => '',
         ],
@@ -462,6 +492,11 @@ function gsVocabSources(): array {
  * Hlavní hledání. Vrací ['ok','q','tokens','mode','suggestion','total','groups'].
  *   mode: 'exact' (všechna slova) | 'suggestion' (opravený dotaz) | 'similar' (část slov) | 'none'
  */
+/** Dotaz je jedno číslo/kód (aspoň 3 znaky, obsahuje číslici). */
+function gsIsCodeQuery(array $tokens): bool {
+    return count($tokens) === 1 && preg_match('/\d/', $tokens[0]) && strlen(gsCompact($tokens[0])) >= 3;
+}
+
 function gsRun(PDO $pdo, string $q, string $scope, int $perGroup): array {
     $parsed = gsParseQuery($q);
     $tokens = $parsed['tokens'];
@@ -520,12 +555,54 @@ function gsRun(PDO $pdo, string $q, string $scope, int $perGroup): array {
     };
 
     [$groups, $total] = $run($tokens, 'all');
-    if ($total > 0) { return array_merge($out, ['mode' => 'exact', 'groups' => $groups, 'total' => $total]); }
+    if ($total > 0) {
+        // Dotaz = jedno číslo/kód („1645", „2601645", „APFAZ2601645"): když ho nějaký
+        // kód zakázky/dokladu obsahuje, ukaž jen tyhle shody — ne díly a klienty,
+        // kteří mají ty číslice náhodou v telefonu, SKU nebo popisu.
+        if (gsIsCodeQuery($tokens)) {
+            $hasCode = false;
+            foreach ($groups as $g) { foreach ($g['items'] as $it) { if (($it['gs_score'] ?? 0) >= 30) { $hasCode = true; break 2; } } }
+            // číslo, kterým KONČÍ číslo zakázky/reklamace („930", „1645") = hledá se
+            // zakázka → zboží a díly s těmi číslicemi v SKU/IMEI jsou jen šum
+            $docKeys = ['orders', 'complaints', 'pos', 'documents', 'eshop', 'invoices', 'bank'];
+            $orderEnd = false;
+            foreach ($groups as $g) {
+                if (!in_array($g['key'], ['orders', 'complaints'], true)) { continue; }
+                foreach ($g['items'] as $it) { if (($it['gs_score'] ?? 0) >= 60) { $orderEnd = true; break 2; } }
+            }
+            if ($orderEnd && ctype_digit($tokens[0]) && strlen($tokens[0]) <= 7) {
+                $groups = array_values(array_filter($groups, fn($g) => in_array($g['key'], $docKeys, true)));
+            }
+            if ($hasCode) {
+                $digits = preg_replace('/\D+/', '', $tokens[0]);
+                $keep = []; $total = 0;
+                foreach ($groups as $g) {
+                    $before = count($g['items']);
+                    $items = array_values(array_filter($g['items'], function ($it) use ($digits) {
+                        if (($it['gs_score'] ?? 0) >= 30) { return true; }
+                        // dlouhé číslo může být i telefon — ten nechat
+                        return strlen($digits) >= 6 && str_contains(preg_replace('/\D+/', '', ($it['title'] ?? '') . ' ' . ($it['subtitle'] ?? '')), $digits);
+                    }));
+                    if (!$items) { continue; }
+                    // část vypadla jako šum → počet = jen skutečné shody (řazeno podle
+                    // relevance, takže za odfiltrovanými už žádná shoda kódu není)
+                    if (count($items) < $before) { $g['total'] = count($items); }
+                    $g['items'] = $items;
+                    $keep[] = $g; $total += $g['total'];
+                }
+                $groups = $keep;
+            }
+        }
+        return array_merge($out, ['mode' => 'exact', 'groups' => $groups, 'total' => $total]);
+    }
 
     // 2) oprava překlepů
     $vocab = gsVocabulary($pdo, gsVocabSources());
     $fixed = []; $changed = false;
     foreach ($tokens as $t) {
+        // čísla a kódy (zakázka, IMEI, telefon) se NEopravují — „oprava" na jiný
+        // kód vracela úplně cizí zakázky (stížnost kolegů 16.10.2026)
+        if (preg_match('/\d/', $t)) { $fixed[] = $t; continue; }
         $c = gsCorrectToken($t, $vocab);
         if ($c !== null && gsFold($c) !== gsFold($t)) { $fixed[] = $c; $changed = true; } else { $fixed[] = $t; }
     }
@@ -535,7 +612,10 @@ function gsRun(PDO $pdo, string $q, string $scope, int $perGroup): array {
             return array_merge($out, ['mode' => 'suggestion', 'suggestion' => implode(' ', $fixed), 'tokens' => $fixed, 'groups' => $groups, 'total' => $total]);
         }
     }
-    // 3) podobné — aspoň část slov (původní i opravená)
+    // 3) podobné — aspoň část slov (původní i opravená). Ne u samotných čísel/kódů:
+    //    „aspoň jedno číslo z dotazu" dávalo nesmyslné výsledky.
+    $wordTokens = array_filter($tokens, fn($t) => !preg_match('/\d/', $t));
+    if (!$wordTokens) { return $out; }
     $any = array_values(array_unique(array_merge($tokens, $changed ? $fixed : [])));
     [$groups, $total] = $run($any, 'any');
     if ($total > 0) {
