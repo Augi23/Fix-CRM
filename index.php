@@ -620,7 +620,7 @@ include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
                                     <?php if(!empty($r['shipping_method'])): ?>
                                         <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars(crmTranslateWebServiceMethod((string)$r['shipping_method'])); ?></div>
                                     <?php endif; ?>
-                                    <?php if($_SESSION['role'] == 'admin' && ($r['extra_expenses'] ?? 0) > 0): ?>
+                                    <?php if(crmIsAdminLevel() && ($r['extra_expenses'] ?? 0) > 0): ?>
                                         <div class="mt-1 small text-danger"><i class="fas fa-minus-circle me-1"></i><?php echo __('extra_expenses'); ?>: <?php echo e($r['extra_expenses']); ?></div>
                                     <?php endif; ?>
                                     <div class="small text-white-75 mt-1">
@@ -817,7 +817,7 @@ include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
         </div>
 
         <!-- Dashboard Right Column (Techs list if Admin) -->
-        <?php if ($_SESSION['role'] == 'admin'): ?>
+        <?php if (crmIsAdminLevel()): ?>
         <div class="card glass-card border-0 mb-4">
             <div class="card-header bg-transparent border-bottom-0">
                 <h5 class="mb-0"><?php echo __('online_techs'); ?></h5>

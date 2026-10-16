@@ -25,7 +25,8 @@ if (!$id) {
 
 try {
     // Get file info and order info to check permissions
-    $stmt = $pdo->prepare("SELECT a.file_path, o.technician_id, o.branch_id 
+    ensureOrderAttachmentUploader();
+    $stmt = $pdo->prepare("SELECT a.order_id, a.file_path, a.file_name, a.uploaded_by_tech, a.uploaded_by_user, o.technician_id, o.branch_id
                            FROM order_attachments a
                            JOIN orders o ON a.order_id = o.id
                            WHERE a.id = ?");
@@ -33,8 +34,13 @@ try {
     $data = $stmt->fetch();
 
     if ($data) {
-        if (!canAccessOrderBranch($data) || (!hasPermission('edit_orders') && ($data['technician_id'] ?? 0) != ($_SESSION['tech_id'] ?? 0))) {
+        // Vlastní fotky smaže každý, cizí (i staré bez známého autora) jen admin a Boss
+        // (majitel 16.10.2026). Dřív šlo přes API smazat cokoli komukoli s edit_orders.
+        if (!crmIsAdminLevel() && !canAccessOrderBranch($data)) {
             throw new Exception(__('access_denied_msg'));
+        }
+        if (!crmCanDeleteAttachment($data)) {
+            throw new Exception('Smazat můžeš jen fotky, které jsi nahrál(a) ty. Cizí fotky maže jen admin nebo Boss.');
         }
 
         $full_path = '../' . $data['file_path'];
@@ -44,6 +50,11 @@ try {
 
         $del = $pdo->prepare("DELETE FROM order_attachments WHERE id = ?");
         $del->execute([$id]);
+        crmAuditLog('order.media_delete', [
+            'entity_type' => 'order', 'entity_id' => (int)$data['order_id'],
+            'summary' => 'Smazána příloha zakázky: ' . (string)($data['file_name'] ?: basename((string)$data['file_path'])),
+            'branch_id' => (int)($data['branch_id'] ?? 0),
+        ]);
         echo json_encode(['success' => true]);
     } else {
         throw new Exception('File not found in database');

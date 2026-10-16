@@ -493,7 +493,7 @@ $__techs     = getActiveTechnicians(true);
                                 <?php if(!empty($order['shipping_method'])): ?>
                                     <div class="mt-1 small text-info"><i class="fas fa-truck me-1"></i><?php echo htmlspecialchars(crmTranslateWebServiceMethod((string)$order['shipping_method'])); ?></div>
                                 <?php endif; ?>
-                                <?php if($_SESSION['role'] == 'admin' && $order['extra_expenses'] > 0): ?>
+                                <?php if(crmIsAdminLevel() && $order['extra_expenses'] > 0): ?>
                                     <div class="mt-1 small text-danger"><i class="fas fa-minus-circle me-1"></i><?php echo __('extra_expenses'); ?>: <?php echo e($order['extra_expenses']); ?></div>
                                 <?php endif; ?>
                                 <div class="small text-white-75 mt-1">
@@ -807,9 +807,9 @@ $(document).ready(function() {
                         mediaHtml += `
                             <div class="col-3 col-md-2" id="media-item-${file.id}">
                                 <div class="card h-100 shadow-sm border position-relative">
-                                    <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-1 line-height-1" style="z-index: 10; font-size: 0.6rem;" onclick="deleteMedia(${file.id})">
+                                    ${file.can_delete ? `<button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 p-1 line-height-1" style="z-index: 10; font-size: 0.6rem;" onclick="deleteMedia(${file.id})">
                                         <i class="fas fa-times"></i>
-                                    </button>
+                                    </button>` : ''}
                                     <div class="ratio ratio-1x1 bg-dark bg-opacity-25 border-secondary overflow-hidden">
                                         ${isVideo ? 
                                             `<div class="w-100 h-100 d-flex align-items-center justify-content-center bg-dark"><i class="fas fa-video text-white"></i></div>` : 

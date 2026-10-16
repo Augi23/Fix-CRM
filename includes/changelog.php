@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.92.0',
+        'date' => '2026-10-16',
+        'time' => '09:16',
+        'title' => 'Práva: Boss = admin, manažer přidává zaměstnance, mazání vlastních fotek',
+        'items' => [
+            '<b>Boss má stejná práva jako administrátor</b> i tam, kde CRM dřív testovalo přímo roli „admin": vícenáklady u zakázek (vidět i upravit), přehled techniků online na Nástěnce, mazání fotek a odemčení uzavřeného účetního období.',
+            '<b>Manažer pobočky přidává nové zaměstnance</b> (Nastavení → Zaměstnanci → Přidat) — vždy na svou pobočku a v roli technik nebo brigádník; vyšší role dál zakládá admin a Boss. V seznamu vidí lidi své pobočky.',
+            '<b>Fotky u zakázky:</b> každý smaže fotky, které sám nahrál; cizí fotky smí mazat jen Boss a admin. CRM si nově u každé fotky pamatuje, kdo ji nahrál. U starších fotek z příjmu zakázky se autor doplnil podle toho, kdo zakázku zakládal; ostatní starší fotky (bez známého autora) maže admin nebo Boss.',
+            'Oprava zabezpečení: smazat přílohu dřív šlo přes rozhraní komukoli (tlačítko jen bylo schované); každé smazání se teď zapisuje do Historie úprav. Vícenáklady už nejde přepsat bez práv admina/Bosse.',
+        ],
+    ],
+    [
         'version' => '3.91.3',
         'date' => '2026-10-16',
         'time' => '09:11',

@@ -130,8 +130,9 @@ foreach ($_FILES['files']['name'] as $key => $name) {
     $path = $upload_dir . $new_name;
 
     if (move_uploaded_file($tmp, $path)) {
-        $stmt = $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$order_id, 'uploads/' . $new_name, $real_type, basename((string)$name)]);
+        [$__upT, $__upU] = crmAttachmentUploader();
+        $stmt = $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name, uploaded_by_tech, uploaded_by_user) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$order_id, 'uploads/' . $new_name, $real_type, basename((string)$name), $__upT, $__upU]);
         $success_count++;
     } else {
         $rejected[] = basename((string)$name) . " (cannot move uploaded file)";

@@ -340,8 +340,9 @@ try {
 
             $new_name = bin2hex(random_bytes(16)) . '.' . $ext;
             if (move_uploaded_file($tmp, $upload_dir . $new_name)) {
-                $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name) VALUES (?, ?, ?, ?)")
-                    ->execute([$order_id, 'uploads/' . $new_name, $real_type, basename($_FILES['files']['name'][$key])]);
+                [$__upT, $__upU] = crmAttachmentUploader();
+                $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name, uploaded_by_tech, uploaded_by_user) VALUES (?, ?, ?, ?, ?, ?)")
+                    ->execute([$order_id, 'uploads/' . $new_name, $real_type, basename($_FILES['files']['name'][$key]), $__upT, $__upU]);
                 $intake_attachment_count++;
             }
         }

@@ -3026,6 +3026,51 @@ function crmCanDeleteOrders(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 
+/** Admin NEBO Boss — Boss má stejná práva jako administrátor (majitel 16.10.2026).
+ *  Používat místo přímého `$_SESSION['role'] == 'admin'`, které Bosse obcházelo. */
+function crmIsAdminLevel(): bool {
+    return ($_SESSION['role'] ?? '') === 'admin' || getCurrentStaffRole() === 'boss' || hasPermission('admin_access');
+}
+
+/**
+ * Kdo nahrál přílohu zakázky (v3.92.0): sloupce uploaded_by_tech / uploaded_by_user.
+ * Při prvním přidání sloupců se u STARÝCH fotek z příjmu zakázky (nahrané do 3 min
+ * od založení) doplní autor podle toho, kdo zakázku založil (created_by_name).
+ */
+function ensureOrderAttachmentUploader(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) { return; }
+    $done = true;
+    try {
+        if ($pdo->query("SHOW COLUMNS FROM order_attachments LIKE 'uploaded_by_tech'")->fetch()) { return; }
+        $pdo->exec("ALTER TABLE order_attachments ADD COLUMN uploaded_by_tech INT NULL DEFAULT NULL, ADD COLUMN uploaded_by_user INT NULL DEFAULT NULL");
+        $pdo->exec("UPDATE order_attachments a
+            JOIN orders o ON o.id = a.order_id
+            JOIN technicians t ON t.name = o.created_by_name
+            SET a.uploaded_by_tech = t.id
+            WHERE a.uploaded_by_tech IS NULL AND a.uploaded_by_user IS NULL
+              AND o.created_by_name IS NOT NULL AND o.created_by_name <> ''
+              AND a.created_at BETWEEN o.created_at - INTERVAL 1 MINUTE AND o.created_at + INTERVAL 3 MINUTE
+              AND (SELECT COUNT(*) FROM technicians t2 WHERE t2.name = o.created_by_name) = 1");
+    } catch (Throwable $e) { error_log('ensureOrderAttachmentUploader: ' . $e->getMessage()); }
+}
+
+/** [uploaded_by_tech, uploaded_by_user] pro právě přihlášeného (do INSERTu přílohy). */
+function crmAttachmentUploader(): array {
+    ensureOrderAttachmentUploader();
+    $tech = (int)($_SESSION['tech_id'] ?? 0);
+    $user = ($_SESSION['role'] ?? '') === 'admin' && is_numeric($_SESSION['user_id'] ?? null) ? (int)$_SESSION['user_id'] : 0;
+    return [$tech > 0 ? $tech : null, $tech > 0 ? null : ($user > 0 ? $user : null)];
+}
+
+/** Smí přihlášený smazat tuto přílohu? Vlastní fotky každý, cizí jen admin a Boss. */
+function crmCanDeleteAttachment(array $att): bool {
+    if (crmIsAdminLevel()) { return true; }
+    $tech = (int)($_SESSION['tech_id'] ?? 0);
+    return $tech > 0 && (int)($att['uploaded_by_tech'] ?? 0) === $tech;
+}
+
 /**
  * Blokace odemykání kasy — PER ÚČET (jen konkrétní osoba), ne per session/kasa:
  * po 10 špatných heslech se na 15 minut zablokuje daný účet (odemčení i login),

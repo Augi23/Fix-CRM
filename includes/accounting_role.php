@@ -300,7 +300,7 @@ function afxAccountingLockMessage($date, string $what = 'doklad'): string {
     return 'Účetní období ' . $obdobi . ' je uzavřené'
         . ($kdo !== '' ? ' (uzavřel ' . $kdo . ')' : '')
         . ' — ' . $what . ' s datem v tomto měsíci už nejde měnit. '
-        . 'Odemknout období může jen administrátor v Nastavení → Uzávěrka období.';
+        . 'Odemknout období může jen administrátor nebo Boss v Nastavení → Uzávěrka období.';
 }
 
 /**
@@ -356,9 +356,12 @@ function afxAccountingCanUnlock(): bool {
     if (($_SESSION['role'] ?? '') === 'admin') {
         return true;                                  // účet z tabulky users = administrátor
     }
-    // Boss a účetní výslovně NE — Boss by prošel přes všemocné hasPermission(),
-    // účetní je z admin práv vyloučená v crmAccountantHasPermission().
-    if (getCurrentStaffRole() === 'boss' || crmIsAccountant()) {
+    // Boss má od 16.10.2026 STEJNÁ práva jako admin (rozhodnutí majitele) — smí
+    // tedy odemknout i uzavřené období. Účetní ne (vyloučená z admin práv).
+    if (getCurrentStaffRole() === 'boss') {
+        return true;
+    }
+    if (crmIsAccountant()) {
         return false;
     }
     // Technik s VÝSLOVNĚ přiděleným admin_access je fakticky administrátor.
@@ -431,7 +434,7 @@ function afxAccountingLockPeriod($year, $month, string $note = ''): array {
 function afxAccountingUnlockPeriod($year, $month, string $reason = ''): array {
     global $pdo;
     if (!afxAccountingCanUnlock()) {
-        return ['ok' => false, 'error' => 'Odemknout uzavřené období smí jen administrátor.'];
+        return ['ok' => false, 'error' => 'Odemknout uzavřené období smí jen administrátor nebo Boss.'];
     }
     $p = afxAccountingNormalizePeriod($year, $month);
     if ($p === null) {

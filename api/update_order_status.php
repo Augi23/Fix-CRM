@@ -195,7 +195,7 @@ try {
     $params[] = $updated_tech_id ?: null;
     $params[] = $target_branch_id;
 
-    if (isset($_REQUEST['extra_expenses']) && ($_SESSION['role'] ?? '') === 'admin') {
+    if (isset($_REQUEST['extra_expenses']) && crmIsAdminLevel()) {
         $sql .= ', extra_expenses = ?';
         $params[] = $_REQUEST['extra_expenses'];
     }

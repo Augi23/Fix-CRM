@@ -16,6 +16,11 @@ if (!function_exists('settingsDebugLog')) {
 
 // Processing before header to avoid header already sent
 $is_admin_check = crmCanManageSettings();
+// Pobočkový MANAŽER smí přidávat zaměstnance — jen na SVOU pobočku a jen v rolích
+// bez vedoucích práv (technik, brigádník). Vyšší role zakládá admin/Boss (16.10.2026).
+$is_branch_manager = !$is_admin_check && getCurrentStaffRole() === 'manager';
+$manager_branch_id = $is_branch_manager ? (int)crmStaffBranchIdStrict() : 0;
+$manager_roles     = ['engineer', 'brigadnik'];
 
 if (isset($_POST['set_lang']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
@@ -169,7 +174,7 @@ if (isset($_POST['update_loyalty']) && $is_admin_check) {
     exit;
 }
 
-if (isset($_POST['add_tech']) && $is_admin_check) {
+if (isset($_POST['add_tech']) && ($is_admin_check || ($is_branch_manager && $manager_branch_id > 0))) {
     settingsDebugLog(['event' => 'add_tech_hit', 'post' => $_POST, 'time' => date('c')]);
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     $name = $_POST['tech_name'];
@@ -178,6 +183,10 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     $spec = $_POST['tech_spec'];
     $role = $_POST['role'] ?? 'engineer';
     $branch_id = (int)(filter_input(INPUT_POST, 'branch_id', FILTER_VALIDATE_INT) ?: 0);
+    if (!$is_admin_check) {   // manažer: pobočka i role se berou ze serveru, ne z formuláře
+        $branch_id = $manager_branch_id;
+        if (!in_array($role, $manager_roles, true)) { $role = 'engineer'; }
+    }
     // Pobočka je POVINNÁ a musí být platná aktivní pobočka (žádný tichý fallback)
     $__branchOk = false;
     foreach (getBranches() as $__b) { if ((int)$__b['id'] === $branch_id) { $__branchOk = true; break; } }
@@ -204,7 +213,9 @@ if (isset($_POST['add_tech']) && $is_admin_check) {
     $stmt->execute([$name, $email, $phone, $spec, $role, $branch_id, $telegramContact['id'], $telegramContact['username'], $username_val, $hashed_password, $pay_by_time_new]);
     crmAuditLog('staff.create', [
         'entity_type' => 'technician', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => $name,
-        'summary' => 'Vytvořen zaměstnanec ' . $name . ' (' . $role . ')' . ($username_val ? ', login @' . $username_val : ''),
+        'summary' => 'Vytvořen zaměstnanec ' . $name . ' (' . $role . ')' . ($username_val ? ', login @' . $username_val : '')
+            . (!$is_admin_check ? ' — přidal manažer pobočky' : ''),
+        'branch_id' => $branch_id,
     ]);
     header("Location: settings.php?tab=staff&tech_added=1");
     exit;
@@ -1414,7 +1425,7 @@ require_once 'includes/header.php';
         <div class="tab-pane fade <?php echo $active_tab == 'staff' ? 'show active' : ''; ?>">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0"><?php echo __('staff_and_techs'); ?></h5>
-                <?php if ($is_admin_user): ?>
+                <?php if ($is_admin_user || ($is_branch_manager && $manager_branch_id > 0)): ?>
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTechModal"><i class="fas fa-plus me-1"></i> <?php echo __('add_btn'); ?></button>
                 <?php endif; ?>
             </div>
@@ -1423,7 +1434,11 @@ require_once 'includes/header.php';
                     <thead class="table-dark"><tr><th><?php echo __('name_col'); ?></th><th><?php echo __('login_col'); ?></th><th><?php echo __('role_col'); ?></th><th>Pobočka</th><th><?php echo __('spec_col'); ?></th><th>Telegram</th><th><?php echo __('status_col'); ?></th><th class="text-end"><?php echo __('actions_col'); ?></th></tr></thead>
                     <tbody>
                         <?php 
-                        $techs_query = $can_view_all_staff ? "SELECT * FROM technicians ORDER BY name ASC" : "SELECT * FROM technicians WHERE id = " . intval($_SESSION['tech_id'] ?? 0);
+                        $techs_query = $can_view_all_staff ? "SELECT * FROM technicians ORDER BY name ASC"
+                            // manažer vidí lidi své pobočky (i ty, které právě přidal)
+                            : ($is_branch_manager && $manager_branch_id > 0
+                                ? "SELECT * FROM technicians WHERE branch_id = " . (int)$manager_branch_id . " OR id = " . intval($_SESSION['tech_id'] ?? 0) . " ORDER BY name ASC"
+                                : "SELECT * FROM technicians WHERE id = " . intval($_SESSION['tech_id'] ?? 0));
                         $techs = $pdo->query($techs_query)->fetchAll();
                         // Admin účty (Správa administrátorů) mají přednost před rolí na kartě
                         // zaměstnance — jinak povýšený admin dál svítil jako Manažer/Technik.
@@ -1665,7 +1680,7 @@ require_once 'includes/header.php';
                 Uzavřený měsíc znamená, že <strong>doklady s datem v tomto měsíci už nejde měnit</strong> —
                 faktury, platby, doklady kasy ani pohyby hotovosti. Zavírá se až po odevzdání přiznání,
                 aby se čísla v CRM nerozešla s tím, co je odevzdané na úřadě.
-                Uzavřít smí vedení i účetní, <strong>odemknout jen administrátor</strong> a každé odemčení jde do historie.
+                Uzavřít smí vedení i účetní, <strong>odemknout jen administrátor nebo Boss</strong> a každé odemčení jde do historie.
                 <span class="ms-2"><a href="ucetni_sestavy.php" class="link-info"><i class="fas fa-file-lines me-1"></i>Podklady pro účetní (sestavy za období)</a></span>
             </div>
 
@@ -1724,7 +1739,7 @@ require_once 'includes/header.php';
                                         </button>
                                     </form>
                                 <?php elseif ($row): ?>
-                                    <span class="text-white-50 small">odemkne jen administrátor</span>
+                                    <span class="text-white-50 small">odemkne jen administrátor nebo Boss</span>
                                 <?php elseif (!$isFuture && $canLock): ?>
                                     <form method="POST" class="d-inline d-flex gap-2 justify-content-end">
                                         <?php echo csrfField(); ?>
@@ -2932,11 +2947,13 @@ require_once 'includes/header.php';
                     <select name="role" class="form-select">
                         <option value="engineer"><?php echo __('role_engineer'); ?></option>
                         <option value="brigadnik">Brigádník</option>
+                        <?php if ($is_admin_user): /* manažer zakládá jen technika/brigádníka */ ?>
                         <option value="manager"><?php echo __('role_manager'); ?></option>
                         <?php /* Účetní = neprovozní role, do zakázek ani skladu se nedostane (viz accounting_role.php) */ ?>
                         <option value="accountant">Účetní</option>
                         <option value="boss">Boss</option>
                         <option value="admin"><?php echo __('role_admin'); ?></option>
+                        <?php endif; ?>
                     </select>
                 </div>
                 <div class="col-md-6 mb-3">
@@ -2945,11 +2962,17 @@ require_once 'includes/header.php';
                 </div>
                 <div class="col-md-12 mb-3">
                     <label class="form-label"><i class="fas fa-store me-1"></i>Pobočka</label>
+                    <?php if ($is_admin_user): ?>
                     <select name="branch_id" class="form-select" required>
                         <?php $__defB = (int)getDefaultBranchId(); foreach ($branches_settings as $branch): ?>
                             <option value="<?php echo (int)$branch['id']; ?>" <?php echo (int)$branch['id'] === $__defB ? 'selected' : ''; ?>><?php echo e($branch['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <?php else: /* manažer: vždy jeho pobočka (server ji stejně vynutí) */ ?>
+                    <?php $__mb = ''; foreach ($branches_settings as $branch) { if ((int)$branch['id'] === (int)$manager_branch_id) { $__mb = (string)$branch['name']; } } ?>
+                    <input type="hidden" name="branch_id" value="<?php echo (int)$manager_branch_id; ?>">
+                    <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo e($__mb ?: ('#' . (int)$manager_branch_id)); ?></div>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="row"><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('email'); ?></label><input type="email" name="tech_email" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('phone_label'); ?></label><input type="text" name="tech_phone" class="form-control"></div></div>

@@ -208,7 +208,8 @@ try {
         // (zakázky z webu mají finální cenu prázdnou → edit padal, dokud se nevyplnila)
         isset($_POST['estimated_cost']) ? crmNumOrNull($_POST['estimated_cost']) : $current['estimated_cost'],
         isset($_POST['final_cost']) ? crmNumOrNull($_POST['final_cost']) : $current['final_cost'],
-        isset($_POST['extra_expenses']) ? (crmNumOrNull($_POST['extra_expenses']) ?? 0) : $current['extra_expenses'],
+        // vícenáklady vidí a mění jen admin a Boss (ostatním se pole ani nezobrazí)
+        (isset($_POST['extra_expenses']) && crmIsAdminLevel()) ? (crmNumOrNull($_POST['extra_expenses']) ?? 0) : $current['extra_expenses'],
         isset($_POST['problem_description']) ? $_POST['problem_description'] : $current['problem_description'],
         // trim + prázdné → NULL (whitespace-only by v tiscích/portálu vypadal jako vyplněný)
         isset($_POST['repair_solution']) ? (trim((string)$_POST['repair_solution']) !== '' ? trim((string)$_POST['repair_solution']) : null) : ($current['repair_solution'] ?? null),
@@ -332,8 +333,9 @@ try {
 
             $new_name = bin2hex(random_bytes(16)) . '.' . $ext;
             if (move_uploaded_file($tmp, $upload_dir . $new_name)) {
-                $stmt_file = $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name) VALUES (?, ?, ?, ?)");
-                $stmt_file->execute([$order_id, 'uploads/' . $new_name, $real_type, basename($name)]);
+                [$__upT, $__upU] = crmAttachmentUploader();
+                $stmt_file = $pdo->prepare("INSERT INTO order_attachments (order_id, file_path, file_type, file_name, uploaded_by_tech, uploaded_by_user) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt_file->execute([$order_id, 'uploads/' . $new_name, $real_type, basename($name), $__upT, $__upU]);
                 $uploaded_count++;
             } else {
                 $rejected[] = basename($name) . " (cannot move uploaded file)";

@@ -486,7 +486,7 @@ $guides['crm'] = [
             '<b>Dlaždice Nepřidělené/Nedokončené:</b> vedení vidí součet obou poboček, ostatní jen svou.',
         ],
         'conditions' => [
-            ['typ' => 'warn', 'text' => 'Mazání zakázek a nastavení systému = <b>jen administrátor</b>. Faktury a účetnictví = <b>administrátor a Boss</b>. Aktualizace systému = <b>vedení</b> (admin, manažer, Boss).'],
+            ['typ' => 'warn', 'text' => '<b>Boss má stejná práva jako administrátor</b> (mazání zakázek, nastavení, účetnictví vč. odemčení uzávěrky). Aktualizace systému = <b>vedení</b> (admin, manažer, Boss). Manažer přidává zaměstnance na svou pobočku. Fotky u zakázky smaže každý svoje, cizí jen admin a Boss.'],
         ],
     ],
 ];

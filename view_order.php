@@ -433,6 +433,7 @@ $complaintPrefill = [
                 </div>
                 <div class="row g-2 mb-4">
                     <?php 
+                    ensureOrderAttachmentUploader();
                     $stmt_files = $pdo->prepare("SELECT * FROM order_attachments WHERE order_id = ? ORDER BY created_at DESC");
                     $stmt_files->execute([$id]);
                     $attachments = $stmt_files->fetchAll();
@@ -445,7 +446,7 @@ $complaintPrefill = [
                     ?>
                         <div class="col-6 col-md-3" id="media-item-<?php echo $file['id']; ?>">
                             <div class="card h-100 shadow-sm border position-relative">
-                                <?php if ($_SESSION['role'] == 'admin'): ?>
+                                <?php if (crmCanDeleteAttachment($file)): /* vlastní fotky každý, cizí admin a Boss */ ?>
                                 <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 z-3 shadow-sm" 
                                         onclick="deleteMedia(<?php echo $file['id']; ?>)" style="padding: 2px 6px; font-size: 10px;">
                                     <i class="fas fa-times"></i>
@@ -770,7 +771,7 @@ $complaintPrefill = [
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>
-                        <?php if ($_SESSION['role'] == 'admin'): ?>
+                        <?php if (crmIsAdminLevel()): ?>
                         <div class="mb-3">
                             <label class="form-label"><?php echo __('extra_expenses'); ?></label>
                             <div class="input-group">
@@ -1921,7 +1922,7 @@ function deleteOrder(id) {
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>
-                        <?php if ($_SESSION['role'] == 'admin'): ?>
+                        <?php if (crmIsAdminLevel()): ?>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('extra_expenses'); ?></label>
                             <div class="input-group">

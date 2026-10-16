@@ -37,9 +37,12 @@ try {
     }
 
     // Fetch attachments
+    ensureOrderAttachmentUploader();
     $stmt = $pdo->prepare("SELECT * FROM order_attachments WHERE order_id = ? ORDER BY created_at DESC");
     $stmt->execute([$id]);
     $attachments = $stmt->fetchAll();
+    foreach ($attachments as &$__a) { $__a['can_delete'] = crmCanDeleteAttachment($__a); }   // vlastní fotky každý, cizí admin a Boss
+    unset($__a);
 
     // Fetch parts
     $stmt = $pdo->prepare("SELECT oi.*, i.part_name FROM order_items oi JOIN inventory i ON oi.inventory_id = i.id WHERE oi.order_id = ?");
@@ -56,7 +59,7 @@ try {
         'order' => $order,
         'attachments' => $attachments,
         'items' => $items,
-        'role' => $_SESSION['role']
+        'role' => crmIsAdminLevel() ? 'admin' : $_SESSION['role']   // Boss = admin (vícenáklady apod.)
     ]);
 
 } catch (Exception $e) {
