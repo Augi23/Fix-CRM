@@ -195,7 +195,7 @@ $guides['crm'] = [
             ['typ' => 'role', 'text' => 'Stav smí měnit <b>každý zaměstnanec</b> u kterékoliv zakázky (od v1.6).'],
             ['typ' => 'warn', 'text' => '<b>„V opravě" vyžaduje technika</b> — nepřiřazená zakázka jde do práce až po výběru technika. Počet přiřazených i současně rozpracovaných zakázek (stav „Provádí se") <b>není omezený</b>.'],
             ['typ' => 'warn', 'text' => 'Po <b>Vydáno</b> se stav zamyká — zpět ho vrátí jen vedení.'],
-            ['typ' => 'info', 'text' => 'Při „Připraveno k převzetí" odejde klientovi e-mail (a SMS, je-li zapnuta) s výzvou k vyzvednutí.'],
+            ['typ' => 'info', 'text' => 'Při „Připraveno k převzetí" odejde klientovi e-mail s výzvou k vyzvednutí.'],
         ],
     ],
     [
@@ -466,7 +466,7 @@ $guides['crm'] = [
         'title' => 'Klientský portál (applefix.help) — co říct klientovi',
         'intro' => 'Klient si sám sleduje stav zakázky online. Hodí se znát, když se ptá „jak se to dozvím?".',
         'steps' => [
-            'Klient dostane e-mail (a SMS, je-li zapnuta) při přijetí, dokončení a s výzvou k vyzvednutí — s odkazem na <b>applefix.help</b>.',
+            'Klient dostane e-mail při přijetí, dokončení a s výzvou k vyzvednutí — s odkazem na <b>applefix.help</b>.',
             'Přihlásí se <b>e-mailem nebo telefonem</b> + <b>PINem zakázky</b> (má ho na zakázkovém listu).',
             'V portálu vidí stav opravy, cenu a podepsané dokumenty.',
         ],
