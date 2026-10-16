@@ -3627,6 +3627,25 @@ function crmOrderPosAmount(array $order): float {
     return round((float)($order['estimated_cost'] ?? 0), 2);
 }
 
+/** Kolik už bylo na zakázku zaplaceno přes Pokladnu (platba předem / dřívější doklady). */
+function crmOrderPosPaidTotal(int $orderId): float {
+    global $pdo;
+    if ($orderId <= 0 || !isset($pdo)) { return 0.0; }
+    try {
+        $st = $pdo->prepare("SELECT COALESCE(SUM(pi.unit_price * pi.quantity), 0) FROM pos_sale_items pi
+            JOIN pos_sales ps ON ps.id = pi.sale_id
+            WHERE pi.item_type = 'order' AND pi.item_id = ? AND ps.status = 'completed'");
+        $st->execute([$orderId]);
+        return round((float)$st->fetchColumn(), 2);
+    } catch (Throwable $e) { error_log('crmOrderPosPaidTotal: ' . $e->getMessage()); return 0.0; }
+}
+
+/** Je zakázka ve stavu, kdy se platí „předem" (ještě není hotová / k vyzvednutí)? */
+function crmOrderIsPrepayStage(string $status): bool {
+    return !isOrderStatusIn($status, 'completed') && !isOrderStatusIn($status, 'uncollected')
+        && !isOrderStatusIn($status, 'collected') && !isOrderStatusIn($status, 'cancelled');
+}
+
 function crmOrderPosItemName(array $order): string {
     $device = trim(preg_replace('/\s+/u', ' ', trim((string)($order['device_brand'] ?? '') . ' ' . (string)($order['device_model'] ?? ''))));
     $code = orderDisplayCode($order);
@@ -6599,6 +6618,26 @@ function crmOrderDeviceMoveTarget(array $order): array {
 
 /** Oranžová pilulka „zařízení je na jiné pobočce" — stejná výška/tvar jako
  *  stavová pilulka; vykreslí se jen když je zařízení mimo domovskou pobočku. */
+/** Sloupec orders.prepaid_at — kdy byla zakázka zaplacená PŘEDEM přes Pokladnu (v3.94.1). */
+function ensureOrderPrepaidColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo) || $pdo->inTransaction()) { return; }
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'prepaid_at'")->fetch()) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN prepaid_at DATETIME NULL DEFAULT NULL");
+        }
+    } catch (Throwable $e) { error_log('ensureOrderPrepaidColumn: ' . $e->getMessage()); }
+}
+
+/** Značka „Zaplaceno předem" vedle stavu zakázky (seznamy, nástěnka, detail). */
+function crmPrepaidPill(array $order): string {
+    if (empty($order['prepaid_at'])) { return ''; }
+    $when = date('j. n. Y H:i', strtotime((string)$order['prepaid_at']));
+    return ' <span class="badge rounded-pill ms-1" style="background:rgba(48,209,88,.16);color:#5be38a;border:1px solid rgba(48,209,88,.35);font-weight:600;" title="Zaplaceno předem v Pokladně ' . e($when) . '"><i class="fas fa-circle-check me-1"></i>Zaplaceno předem</span>';
+}
+
 function crmDeviceLocationPill(array $order): string {
     $dev = (int)($order['device_branch_id'] ?? 0);
     if ($dev <= 0 || $dev === (int)($order['branch_id'] ?? 0)) return '';

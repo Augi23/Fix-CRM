@@ -1089,7 +1089,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 d.results.forEach(function (r) {
                     var el = document.createElement('div');
                     var typeLabel = { part: 'DÍL', product: 'PRODUKT', order: 'ZAKÁZKA', vykup: 'VÝKUP', eshop: 'E-SHOP' }[r.type] || 'POLOŽKA';
-                    var detail = r.type === 'order' ? 'připraveno k úhradě'
+                    var detail = r.type === 'order'
+                        ? (r.order_mode === 'predem' ? 'PLATBA PŘEDEM — podle předpokládané ceny'
+                            : (r.order_mode === 'doplatek' ? 'DOPLATEK — předem zaplaceno ' + fmt(r.paid_before || 0) : 'připraveno k úhradě'))
                         : (r.type === 'vykup' ? 'nevyplacený výkup — VYPLÁCÍME MY'
                         : (r.type === 'eshop' ? ((r.eshop && r.eshop.reason) || 'rezervace čeká na zaplacení') : ('skladem ' + r.stock + ' ks')));
                     el.className = 'pos-hit';
@@ -1111,7 +1113,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // ?q=číslo zakázky — tlačítko „Uhradit v Pokladně" z detailu zakázky předvyhledá
     // zakázku rovnou, obsluha ji jen klikne do košíku a zvolí platbu.
     (function () {
-        var preQ = new URLSearchParams(window.location.search).get('q');
+        <?php
+        // ?order_id= (tlačítko „Zaplatit předem" hned po založení zakázky) → číslo zakázky
+        $__preOrderCode = '';
+        if (!empty($_GET['order_id'])) {
+            try {
+                $__po = $pdo->prepare("SELECT id, order_code, legacy_code FROM orders WHERE id = ?");
+                $__po->execute([(int)$_GET['order_id']]);
+                if ($__por = $__po->fetch(PDO::FETCH_ASSOC)) { $__preOrderCode = orderDisplayCode($__por); }
+            } catch (Throwable $e) {}
+        }
+        ?>
+        var preQ = new URLSearchParams(window.location.search).get('q') || <?php echo json_encode($__preOrderCode, JSON_UNESCAPED_UNICODE); ?>;
         if (preQ) { $search.value = preQ; doSearch(); $search.focus(); }
     })();
 

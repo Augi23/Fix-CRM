@@ -82,6 +82,11 @@ try {
         }
         if ($__amountDue > 0) {
             $__paid = trim((string)($current['payment_method'] ?? '')) !== '';
+            // zaplaceno předem v Pokladně, ale konečná cena vyšla vyšší → zbývá doplatek
+            if ($__paid && function_exists('crmOrderPosPaidTotal')) {
+                $__pp = crmOrderPosPaidTotal((int)$order_id);
+                if ($__pp > 0.009 && $__pp < $__amountDue - 0.009) { $__paid = false; $__needTopUp = true; }
+            }
             try {
                 if (!$__paid) {
                     $__iv = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
@@ -100,6 +105,7 @@ try {
             } catch (Throwable $e) {
                 error_log('update_order_full kontrola platby pred vydejem selhala #' . (int)$order_id . ': ' . $e->getMessage());
             }
+            if (!empty($__needTopUp)) { $__paid = false; }   // doplatek po platbě předem
             if (!$__paid) { $new_status = 'Vydáno - čeká na platbu'; }
         }
     }

@@ -626,7 +626,7 @@ include __DIR__ . '/includes/partials/stat_tiles.php'; ?>
                                     </div>
                                 </td>
                                 <td class="cell-status">
-                                    <?php echo getStatusBadge($r['status']); ?><?php echo crmDeviceLocationPill($r); ?>
+                                    <?php echo getStatusBadge($r['status']); ?><?php echo crmDeviceLocationPill($r); ?><?php echo crmPrepaidPill($r); ?>
                                     <?php if (!empty($r['web_appointment_at'])):
                                         $wbTs = strtotime((string)$r['web_appointment_at']);
                                         $wbToday = $wbTs && date('Y-m-d', $wbTs) === date('Y-m-d');

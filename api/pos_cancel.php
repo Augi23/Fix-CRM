@@ -159,7 +159,14 @@ try {
     if ($cancelOrderIds) {
         ensureOrderPaymentMethodColumn();
         $resetPay = $pdo->prepare("UPDATE orders SET payment_method = NULL WHERE id = ? AND payment_method IN ('cash','card')");
-        foreach ($cancelOrderIds as $coId) { $resetPay->execute([(int)$coId]); }
+        foreach ($cancelOrderIds as $coId) {
+            // zakázka zaplacená předem + doplatek: storno jednoho dokladu nesmí smazat
+            // záznam platby, když na zakázce zůstává jiný platný doklad
+            if (crmOrderPosPaidTotal((int)$coId) > 0.009) { continue; }
+            $resetPay->execute([(int)$coId]);
+            // stornovaná platba předem → značka „Zaplaceno předem" pryč
+            try { $pdo->prepare("UPDATE orders SET prepaid_at = NULL WHERE id = ?")->execute([(int)$coId]); } catch (Throwable $e) { /* sloupec ještě není */ }
+        }
     }
 
     // Hotovostní prodej: výdej peněz zapsat do pokladního deníku ke DNI STORNA

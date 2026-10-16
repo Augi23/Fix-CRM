@@ -125,6 +125,8 @@
           <button type="button" class="btn btn-success btn-lg" id="orderDocSignBtn"><i class="fas fa-pen-nib me-2"></i><?php echo __('order_doc_sign_email'); ?></button>
           <button type="button" class="btn btn-outline-info btn-lg" id="orderDocPrintBtn"><i class="fas fa-print me-2"></i><?php echo __('print'); ?></button>
           <button type="button" class="btn btn-outline-primary btn-lg" id="orderDocEmailBtn"><i class="fas fa-envelope me-2"></i><?php echo __('send_email_to_client'); ?></button>
+          <?php /* platba předem hned po založení (v3.94.1) — odkaz doplní assets/js/order-prepay.js */ ?>
+          <a class="btn btn-outline-success btn-lg" id="orderDocPayBtn" href="pokladna.php" style="display:none"><i class="fas fa-cash-register me-2"></i>Zaplatit předem v Pokladně</a>
         </div>
         <div id="orderDocMsg" class="small mt-3"></div>
       </div>

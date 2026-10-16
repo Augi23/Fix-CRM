@@ -325,6 +325,8 @@ try {
     $saleOrderId = 0;
     $orderCustomerId = 0;
     $saleOrderIds = [];      // všechny zakázky hrazené tímto dokladem
+    $orderPaidBefore = [];   // id → už zaplaceno dřív přes Pokladnu (platba předem)
+    $orderPrepay = [];       // id → platba PŘEDEM (zakázka ještě není hotová)
     $orderCustomerIds = [];
     $saleOrderBranchId = 0;
     foreach ($cart as $i => $line) {
@@ -401,12 +403,17 @@ try {
                 echo json_encode(['success' => false, 'message' => 'Zakázka je na jiné pobočce — účtovat ji smí jen její zaměstnanci.']); exit;
             }
             $rowStatus = (string)($row['status'] ?? '');
-            if (!isOrderStatusIn($rowStatus, 'completed') && !isOrderStatusIn($rowStatus, 'uncollected')
-                && $rowStatus !== 'Vydáno - čeká na platbu') {
-                echo json_encode(['success' => false, 'message' => 'Do Pokladny lze vložit jen zakázku ve stavu Připraveno k převzetí, Nevyzvednuto nebo Vydáno - čeká na platbu.']); exit;
+            // Platit jde i PŘEDEM (klient platí při zadání zakázky, v3.94.1) — jen ne
+            // stornovanou a už plně vydanou (bez „čeká na platbu") zakázku.
+            if (isOrderStatusIn($rowStatus, 'cancelled')
+                || (isOrderStatusIn($rowStatus, 'collected') && $rowStatus !== 'Vydáno - čeká na platbu')) {
+                echo json_encode(['success' => false, 'message' => 'Stornovanou nebo už vydanou zakázku v Pokladně platit nejde.'], JSON_UNESCAPED_UNICODE); exit;
             }
-            if (trim((string)($row['payment_method'] ?? '')) !== '' || crmOrderPosSale((int)$row['id'])) {
-                echo json_encode(['success' => false, 'message' => 'Zakázka už má zaznamenanou platbu nebo účtenku.']); exit;
+            // Už zaplaceno přes Pokladnu (předem) → zbývá jen DOPLATEK rozdílu, když
+            // konečná cena vyšla vyšší. Platba zapsaná jinde (bez dokladu kasy) blokuje.
+            $paidBefore = crmOrderPosPaidTotal((int)$row['id']);
+            if ($paidBefore <= 0.009 && trim((string)($row['payment_method'] ?? '')) !== '') {
+                echo json_encode(['success' => false, 'message' => 'Zakázka už má zaznamenanou platbu.'], JSON_UNESCAPED_UNICODE); exit;
             }
             // existující faktura = pohledávka už běží (vystavená předem z detailu
             // zakázky) — druhý doklad by tržbu zdvojil; úhrada patří k té faktuře
@@ -415,11 +422,16 @@ try {
             if (($ivNum = $iv->fetchColumn()) !== false && $ivNum !== null) {
                 echo json_encode(['success' => false, 'message' => 'K zakázce už existuje faktura ' . $ivNum . ' — úhradu (i hotově/kartou) k ní zapiš v Účetnictví → Banka, nebo fakturu nejdřív stornuj.']); exit;
             }
-            $amount = crmOrderPosAmount($row);
-            if ($amount <= 0) {
-                echo json_encode(['success' => false, 'message' => 'Zakázka nemá částku k úhradě.']); exit;
+            $amount = round(crmOrderPosAmount($row) - $paidBefore, 2);
+            if ($amount <= 0.009) {
+                echo json_encode(['success' => false, 'message' => $paidBefore > 0
+                    ? 'Zakázka je už zaplacená (předem ' . formatMoney($paidBefore) . ').'
+                    : 'Zakázka nemá částku k úhradě — doplň u ní předpokládanou cenu.'], JSON_UNESCAPED_UNICODE); exit;
             }
-            $cart[$i]['name'] = crmOrderPosItemName($row);
+            $cart[$i]['name'] = ($paidBefore > 0 ? 'Doplatek — ' : (crmOrderIsPrepayStage($rowStatus) ? 'Platba předem — ' : ''))
+                . crmOrderPosItemName($row);
+            $orderPaidBefore[(int)$row['id']] = $paidBefore;
+            $orderPrepay[(int)$row['id']] = crmOrderIsPrepayStage($rowStatus);   // platí se dřív, než je hotová
             $cart[$i]['code'] = orderDisplayCode($row);
             $cart[$i]['qty'] = 1;
             $cart[$i]['price'] = $amount;
@@ -519,6 +531,7 @@ try {
     // transakcí (žádný odpis skladu nazmar); RuntimeException doputuje do catch
     // níže a uživatel u kasy dostane srozumitelnou hlášku, ne „databázovou chybu".
     afxAccountingAssertOpen(date('Y-m-d'), 'prodej na kase');
+    if (!empty($orderPrepay)) { ensureOrderPrepaidColumn(); }   // DDL před transakcí (jinak implicitní COMMIT)
 
     $pdo->beginTransaction();
 
@@ -533,8 +546,10 @@ try {
             $lockedOrder = $ol->fetch(PDO::FETCH_ASSOC);
             if (!$lockedOrder) { throw new Exception('Zakázka už neexistuje.'); }
             $soLabel = trim((string)($lockedOrder['order_code'] ?? '')) ?: ('#' . $soId);
-            if (trim((string)($lockedOrder['payment_method'] ?? '')) !== '' || crmOrderPosSale($soId)) {
-                throw new Exception('Zakázka ' . $soLabel . ' už má zaznamenanou platbu nebo účtenku.');
+            // souběh: mezitím ji zaplatila jiná kasa? (u doplatku musí sedět dřív zaplacená částka)
+            if (abs(crmOrderPosPaidTotal($soId) - (float)($orderPaidBefore[$soId] ?? 0)) > 0.009
+                || ((float)($orderPaidBefore[$soId] ?? 0) <= 0.009 && trim((string)($lockedOrder['payment_method'] ?? '')) !== '')) {
+                throw new Exception('Zakázka ' . $soLabel . ' mezitím dostala platbu — obnov Pokladnu a zkus to znovu.');
             }
             $ivl->execute([$soId]);
             if (($ivlNum = $ivl->fetchColumn()) !== false && $ivlNum !== null) {
@@ -665,12 +680,17 @@ try {
             WHERE id = ? AND status = 'Vydáno - čeká na platbu'");
         foreach ($saleOrderIds as $soId) {
             $up->execute([$orderPayment, $soId]);
-            if ($up->rowCount() === 0) {
+            // u doplatku je způsob platby zapsaný už z platby předem — to je v pořádku
+            if ($up->rowCount() === 0 && (float)($orderPaidBefore[$soId] ?? 0) <= 0.009) {
                 throw new Exception('Zakázka už má mezitím zaznamenanou platbu.');
             }
             $fin->execute([$soId]);
             if ($fin->rowCount() > 0) {
                 logOrderStatusChange($soId, 'Vydáno - čeká na platbu', 'Vydáno');
+            }
+            // zaplaceno dřív, než je zakázka hotová → u stavu se ukáže „Zaplaceno předem"
+            if (!empty($orderPrepay[$soId])) {
+                $pdo->prepare("UPDATE orders SET prepaid_at = NOW() WHERE id = ? AND prepaid_at IS NULL")->execute([$soId]);
             }
         }
     }

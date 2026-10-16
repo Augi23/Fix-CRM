@@ -480,7 +480,7 @@ $__techs     = getActiveTechnicians(true);
                                 </div>
                             </td>
                             <td class="cell-status">
-                                <?php echo getStatusBadge($order['status']); ?><?php echo crmDeviceLocationPill($order); ?>
+                                <?php echo getStatusBadge($order['status']); ?><?php echo crmDeviceLocationPill($order); ?><?php echo crmPrepaidPill($order); ?>
                                 <?php if (!empty($order['web_appointment_at'])):
                                     $wbTs = strtotime((string)$order['web_appointment_at']);
                                     $wbToday = $wbTs && date('Y-m-d', $wbTs) === date('Y-m-d');

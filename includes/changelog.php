@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.94.1',
+        'date' => '2026-10-16',
+        'time' => '13:09',
+        'title' => 'Zakázku jde zaplatit předem — hned po založení',
+        'items' => [
+            'Klient může zaplatit zakázku <b>hned při jejím zadání</b>: v okně, které vyskočí po založení zakázky, je tlačítko <b>„Zaplatit předem v Pokladně"</b> (a v detailu rozpracované zakázky „Zaplatit předem …"). Pokladna zakázku rovnou vyhledá a nabídne celou předpokládanou cenu — hotově, kartou i na fakturu.',
+            'Zaplacená zakázka má u stavu zelenou značku <b>„Zaplaceno předem"</b> (v seznamu zakázek, na Nástěnce i v detailu). Při výdeji už se nic neplatí.',
+            'Když konečná cena vyjde vyšší, výdej se označí „Vydáno – čeká na platbu" a Pokladna nabídne jen <b>doplatek</b> rozdílu; detail zakázky ho ukáže tlačítkem „Doplatit". Při nižší konečné ceně detail upozorní na přeplatek k vrácení.',
+            'Storno dokladu platby předem značku „Zaplaceno předem" zase odebere.',
+        ],
+    ],
+    [
         'version' => '3.94.0',
         'date' => '2026-10-16',
         'time' => '13:04',

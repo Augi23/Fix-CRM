@@ -260,7 +260,25 @@ $complaintPrefill = [
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                    <?php echo getStatusBadge($order['status']); ?><?php echo crmDeviceLocationPill($order); ?>
+                    <?php echo getStatusBadge($order['status']); ?><?php echo crmDeviceLocationPill($order); ?><?php echo crmPrepaidPill($order); ?>
+                    <?php
+                    // PLATBA PŘEDEM (v3.94.1): rozpracovaná zakázka bez platby → zaplatit hned v Pokladně
+                    $__ppAmt = crmOrderPosAmount($order);
+                    $__ppPaid = crmOrderPosPaidTotal((int)$order['id']);
+                    $__ppInv = false;
+                    try { $__q = $pdo->prepare("SELECT 1 FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1"); $__q->execute([(int)$order['id']]); $__ppInv = (bool)$__q->fetchColumn(); } catch (Throwable $e) {}
+                    if (crmOrderIsPrepayStage((string)$order['status']) && !$__ppInv && $__ppAmt > 0
+                        && $__ppPaid <= 0.009 && trim((string)($order['payment_method'] ?? '')) === ''): ?>
+                        <a class="btn btn-sm btn-success" href="pokladna.php?q=<?php echo urlencode(orderDisplayCode($order)); ?>" title="Klient platí hned při zadání zakázky — celá předpokládaná cena">
+                            <i class="fas fa-cash-register me-1"></i>Zaplatit předem <?php echo formatMoney($__ppAmt); ?>
+                        </a>
+                    <?php elseif ($__ppPaid > 0.009 && $__ppAmt - $__ppPaid > 0.009 && !$__ppInv): ?>
+                        <a class="btn btn-sm btn-warning" href="pokladna.php?q=<?php echo urlencode(orderDisplayCode($order)); ?>" title="Cena se po platbě předem zvýšila — doplatit rozdíl">
+                            <i class="fas fa-cash-register me-1"></i>Doplatit <?php echo formatMoney($__ppAmt - $__ppPaid); ?>
+                        </a>
+                    <?php elseif ($__ppPaid > 0.009 && $__ppPaid - $__ppAmt > 0.009): ?>
+                        <span class="badge bg-warning text-dark" title="Zaplaceno předem víc, než je konečná cena — rozdíl vrať klientovi (storno a nový doklad v Pokladně)">Přeplatek <?php echo formatMoney($__ppPaid - $__ppAmt); ?></span>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="card-body">

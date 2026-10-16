@@ -168,36 +168,46 @@ try {
         // doplatek po výdeji (nezaplacený výdej ho dostává automaticky, v3.49.0).
         // Plné „Vydáno" se NEnabízí schválně — vytáhlo by stovky historických a
         // importovaných zakázek bez zapsané platby k druhému účtování.
-        $statusSql = orderStatusSqlIn($pdo, 'completed') . "," . orderStatusSqlIn($pdo, 'uncollected')
-            . "," . $pdo->quote('Vydáno - čeká na platbu');
+        // Od v3.94.1 i PLATBA PŘEDEM: jakákoli aktivní zakázka (ne stornovaná, ne plně vydaná)
+        // s částkou; po platbě předem se zakázka nabízí znovu jen s DOPLATKEM rozdílu.
+        $cancelSql = orderStatusSqlIn($pdo, 'cancelled');
+        $collectedSql = orderStatusSqlIn($pdo, 'collected');
+        $paidSql = "(SELECT COALESCE(SUM(pi.unit_price * pi.quantity), 0) FROM pos_sale_items pi
+                     JOIN pos_sales ps2 ON ps2.id = pi.sale_id
+                     WHERE pi.item_type = 'order' AND pi.item_id = o.id AND ps2.status = 'completed')";
         $codeParams = [];
         $orderCodeSql = $codeLikeSql('o.order_code', $codeTerms, $codeParams);
         $legacyCodeSql = $codeLikeSql('o.legacy_code', $codeTerms, $codeParams);
-        $st = $pdo->prepare("SELECT o.id, o.order_code, o.legacy_code, o.device_brand, o.device_model,
-                   o.final_cost, o.estimated_cost, c.first_name, c.last_name, c.company
+        $st = $pdo->prepare("SELECT * FROM (SELECT o.id, o.order_code, o.legacy_code, o.device_brand, o.device_model, o.status,
+                   o.final_cost, o.estimated_cost, o.payment_method, o.updated_at, c.first_name, c.last_name, c.company,
+                   $paidSql AS paid_before
             FROM orders o
             JOIN customers c ON c.id = o.customer_id
-            WHERE o.status IN ($statusSql)
-              AND (o.payment_method IS NULL OR o.payment_method = '')
+            WHERE o.status NOT IN ($cancelSql)
+              AND (o.status NOT IN ($collectedSql) OR o.status = " . $pdo->quote('Vydáno - čeká na platbu') . ")
               AND COALESCE(NULLIF(o.final_cost, 0), NULLIF(o.estimated_cost, 0), 0) > 0
-              AND NOT EXISTS (SELECT 1 FROM pos_sales ps WHERE ps.order_id = o.id AND ps.status = 'completed')
-              AND NOT EXISTS (SELECT 1 FROM pos_sale_items pi JOIN pos_sales ps2 ON ps2.id = pi.sale_id
-                              WHERE pi.item_type = 'order' AND pi.item_id = o.id AND ps2.status = 'completed')
+              AND NOT EXISTS (SELECT 1 FROM invoices iv WHERE iv.order_id = o.id AND iv.status <> 'cancelled')
               AND ($orderCodeSql OR $legacyCodeSql OR o.device_brand LIKE ? OR o.device_model LIKE ?
                    OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)"
-              . orderBranchScopeSql('o.branch_id', 'o.technician_id') . "
-            ORDER BY o.updated_at DESC, o.id DESC LIMIT 10");
+              . orderBranchScopeSql('o.branch_id', 'o.technician_id') . ") x
+            WHERE ((x.payment_method IS NULL OR x.payment_method = '') OR x.paid_before > 0)
+              AND COALESCE(NULLIF(x.final_cost, 0), NULLIF(x.estimated_cost, 0), 0) - x.paid_before > 0.009
+            ORDER BY x.updated_at DESC, x.id DESC LIMIT 10");
         $st->execute(array_merge($codeParams, [$like, $like, $like, $like, $like]));
         foreach ($st->fetchAll() as $r) {
             $cust = trim((string)($r['company'] ?? '')) ?: trim((string)($r['first_name'] ?? '') . ' ' . (string)($r['last_name'] ?? ''));
+            $paidBefore = round((float)$r['paid_before'], 2);
             $results[] = [
                 'type' => 'order',
                 'id' => (int)$r['id'],
                 'name' => crmOrderPosItemName($r) . ($cust !== '' ? ' · ' . $cust : ''),
                 'code' => orderDisplayCode($r),
                 'stock' => 1,
-                'price' => crmOrderPosAmount($r),
+                'price' => round(crmOrderPosAmount($r) - $paidBefore, 2),
                 'used' => false,
+                // pro popisek v kase: platba předem / doplatek / běžná úhrada hotové zakázky
+                'order_mode' => $paidBefore > 0 ? 'doplatek' : (crmOrderIsPrepayStage((string)$r['status']) ? 'predem' : 'hotova'),
+                'paid_before' => $paidBefore,
             ];
         }
     }

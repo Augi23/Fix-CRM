@@ -129,6 +129,11 @@ try {
             : (float)(($current_final !== null && $current_final !== '') ? $current_final : ($current_estimated ?? 0));
         if ($amountDue > 0) {
             $paidAlready = trim((string)($order_data['payment_method'] ?? '')) !== '';
+            // zaplaceno předem v Pokladně, ale konečná cena vyšla vyšší → zbývá doplatek
+            if ($paidAlready && function_exists('crmOrderPosPaidTotal')) {
+                $__pp = crmOrderPosPaidTotal((int)$order_id);
+                if ($__pp > 0.009 && $__pp < $amountDue - 0.009) { $paidAlready = false; $__needTopUp = true; }
+            }
             try {
                 if (!$paidAlready) {
                     $iv = $pdo->prepare("SELECT id FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
@@ -148,6 +153,7 @@ try {
             } catch (Throwable $e) {
                 error_log('update_order_status kontrola platby pred vydejem selhala #' . (int)$order_id . ': ' . $e->getMessage());
             }
+            if (!empty($__needTopUp)) { $paidAlready = false; }   // doplatek po platbě předem
             if (!$paidAlready) { $new_status = 'Vydáno - čeká na platbu'; }
         }
     }
@@ -298,10 +304,16 @@ try {
                     $cm->execute([(int)$order_id]);
                     $already_paid = (bool)$cm->fetchColumn();
                 }
-                if (!$already_paid && function_exists('crmOrderPosSale')) {
-                    $already_paid = (bool)crmOrderPosSale((int)$order_id);
+                if (!$already_paid && function_exists('crmOrderPosPaidTotal')) {
+                    // zaplaceno přes Pokladnu (i předem) — ale jen když pokrývá celou konečnou cenu;
+                    // při vyšší konečné ceně zbývá doplatek → výdej jako „čeká na platbu"
+                    $__posPaid = crmOrderPosPaidTotal((int)$order_id);
+                    if ($__posPaid > 0.009) {
+                        $already_paid = $__posPaid >= $amount - 0.009;
+                        $__posPaidKnown = true;
+                    }
                 }
-                if (!$already_paid) {
+                if (!$already_paid && empty($__posPaidKnown)) {
                     $already_paid = trim((string)($order_data['payment_method'] ?? '')) !== '';
                 }
             }
