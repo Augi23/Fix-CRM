@@ -87,23 +87,7 @@ try {
         }
     }
 
-    // Notify technician about added part
-    $stmt = $pdo->prepare("SELECT o.technician_id, t.telegram_id, i.part_name 
-                           FROM orders o 
-                           LEFT JOIN technicians t ON o.technician_id = t.id 
-                           JOIN inventory i ON i.id = ?
-                           WHERE o.id = ?");
-    $stmt->execute([$inventory_id, $order_id]);
-    $notify = $stmt->fetch();
     
-    if ($notify && $notify['telegram_id']) {
-        $msg = sprintf(__('tg_part_added'), $order_id) . "\n";
-        $msg .= sprintf(__('tg_part_added_detail'), $notify['part_name'], $qty) . "\n";
-        if ($autoProcurementQueued) {
-            $msg .= "I also added the part to procurement automatically because stock is 0 pcs.\n";
-        }
-        sendTelegramNotification($notify['telegram_id'], $msg);
-    }
 
     crmAuditLog('order.item_add', [
         'entity_type' => 'order', 'entity_id' => (int)$order_id,

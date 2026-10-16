@@ -84,11 +84,6 @@ if (isset($_POST['update_apns']) && $is_admin_check) {
 
 if (isset($_POST['update_integrations']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
-    set_setting('tg_bot_token', trim($_POST['tg_bot_token']));
-    set_setting('admin_telegram_id', trim((string)($_POST['admin_telegram_id'] ?? '')));   // přehledy pro admina (users)
-    set_setting('fixer_webhook_url', trim($_POST['fixer_webhook_url'] ?? ''));
-    set_setting('fixer_webhook_secret', trim($_POST['fixer_webhook_secret'] ?? ''));
-    set_setting('fixer_api_token', trim($_POST['fixer_api_token'] ?? ''));
     set_setting('ai_provider', $_POST['ai_provider']);
     set_setting('ai_api_key', trim($_POST['ai_api_key']));
     set_setting('ai_model', $_POST['ai_model']);
@@ -115,17 +110,6 @@ if (isset($_POST['update_integrations']) && $is_admin_check) {
     }
     set_setting('caldav_booking_duration_minutes', (string) max(5, (int)($_POST['caldav_booking_duration_minutes'] ?? 30)));
 
-    if (!empty($_POST['tg_bot_token'])) {
-        $token = trim($_POST['tg_bot_token']);
-        $webhook_url = rtrim((string)get_setting("fixer_webhook_url", "https://admin.applefix.cloud"), "/") . "/tg_webhook.php";
-        $api_url = "https://api.telegram.org/bot" . $token . "/setWebhook?url=" . urlencode($webhook_url) . "&drop_pending_updates=true";
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $api_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_exec($ch);
-        curl_close($ch);
-    }
     crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Změna nastavení — Integrace (API klíče / SMTP / webhooky) — hodnoty se z bezpečnostních důvodů nezaznamenávají']);
     header("Location: settings.php?tab=integrations&updated=1");
     exit;
@@ -185,11 +169,7 @@ if (isset($_POST['add_tech']) && ($is_admin_check || ($is_branch_manager && $man
     $__branchOk = false;
     foreach (getBranches() as $__b) { if ((int)$__b['id'] === $branch_id) { $__branchOk = true; break; } }
     if (!$__branchOk) { header("Location: settings.php?tab=staff&error=branch_required"); exit; }
-    $telegramContact = parseTelegramContactInput($_POST['tech_tg'] ?? '');
-    if (!$telegramContact['valid']) {
-        header("Location: settings.php?tab=staff&error=telegram_contact_invalid");
-        exit;
-    }
+    $telegramContact = ['id' => null, 'username' => null, 'valid' => true];   // Telegram bot odstraněn 16.10.2026
     $username = trim($_POST['tech_username'] ?? '');
     $password = $_POST['tech_password'] ?? '';
 
@@ -250,11 +230,11 @@ if (isset($_POST['edit_tech'])) {
         foreach (getBranches() as $__b) { if ((int)$__b['id'] === $branch_id) { $__branchOk = true; break; } }
         if (!$__branchOk) { header("Location: settings.php?tab=staff&error=branch_required"); exit; }
     }
-    $telegramContact = parseTelegramContactInput($_POST['tech_tg'] ?? '');
-    if (!$telegramContact['valid']) {
-        header("Location: settings.php?tab=staff&error=telegram_contact_invalid");
-        exit;
-    }
+    // Telegram bot odstraněn 16.10.2026 — uložené Telegram údaje se jen nemění
+    $__tgq = $pdo->prepare("SELECT telegram_id, telegram_username FROM technicians WHERE id = ?");
+    $__tgq->execute([(int)$id]);
+    $__tgr = $__tgq->fetch(PDO::FETCH_ASSOC) ?: [];
+    $telegramContact = ['id' => $__tgr['telegram_id'] ?? null, 'username' => $__tgr['telegram_username'] ?? null, 'valid' => true];
     $active = isset($_POST['is_active']) ? 1 : 0;
     $username = trim($_POST['tech_username'] ?? '');
     $password = $_POST['tech_password'] ?? '';
@@ -831,39 +811,7 @@ require_once 'includes/header.php';
                             <div class="small text-white-50 mt-2">Parametry: <code>?in_stock=1</code> (jen skladem) · <code>&amp;updated_since=2026-07-20T00:00:00</code> (inkrementální sync) · <code>&amp;code=…</code> · <code>&amp;limit=&amp;offset=</code>. Ceny jsou s DPH; použité zboží má <code>vat_margin_scheme_90=true</code> (režim §90 — e-shop nevyčísluje DPH). Fotka v poli <code>image</code>, kompletní data v <code>attributes</code>.</div>
                         </div>
                     </div>
-                    <div class="col-md-6 border-end border-secondary">
-                        <h5 class="mb-3 text-info"><i class="fab fa-telegram-plane me-2"></i>Telegram Bot</h5>
-                        <div class="mb-3">
-                            <label class="form-label small text-white-75">API Bot Token</label>
-                            <input type="password" name="tg_bot_token" class="form-control" value="<?php echo htmlspecialchars(get_setting('tg_bot_token')); ?>">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small text-white-75">Telegram administrátora (přehledové notifikace)</label>
-                            <input type="text" name="admin_telegram_id" class="form-control" value="<?php echo htmlspecialchars((string)get_setting('admin_telegram_id', '')); ?>" placeholder="chat ID, např. 123456789">
-                            <div class="form-text small text-white-50">Administrátor není v tabulce zaměstnanců, proto se jeho Telegram nastavuje tady. Prázdné = přehledy admin nedostává.</div>
-                        </div>
-                        <div class="row g-2 mb-3">
-                            <div class="col-12"><label class="form-label small text-white-75">Fixer webhook URL</label><input type="text" name="fixer_webhook_url" class="form-control" value="<?php echo htmlspecialchars(get_setting('fixer_webhook_url', '')); ?>" placeholder="https://your-domain.com"></div>
-                            <div class="col-12"><label class="form-label small text-white-75">Fixer webhook secret</label><input type="text" name="fixer_webhook_secret" class="form-control" value="<?php echo htmlspecialchars(get_setting('fixer_webhook_secret', '')); ?>" placeholder="random-secret"></div>
-                            <div class="col-12"><label class="form-label small text-white-75">Fixer API token</label><input type="text" name="fixer_api_token" class="form-control" value="<?php echo htmlspecialchars(get_setting('fixer_api_token', '')); ?>" placeholder="another-random-secret"></div>
-                        </div>
-                        <div class="glass-panel webhook-status-panel p-3 border-secondary mb-3">
-                            <h6 class="small fw-bold mb-2 text-white"><?php echo __('webhook_status'); ?></h6>
-                            <?php 
-                            $current_token = get_setting('tg_bot_token');
-                            if (!empty($current_token)) {
-                                $api_url = "https://api.telegram.org/bot" . $current_token . "/getWebhookInfo";
-                                $ch = curl_init(); curl_setopt($ch, CURLOPT_URL, $api_url); curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true); $webhook_info = curl_exec($ch); curl_close($ch);
-                                $info = json_decode($webhook_info, true);
-                                if ($info && $info['ok']) {
-                                    $url = $info['result']['url'] ?: __('not_set');
-                                    echo '<div class="small text-break text-white-75"><strong>URL:</strong> ' . htmlspecialchars($url) . '</div>';
-                                } else { echo '<div class="small text-danger">'.__('token_invalid').'</div>'; }
-                            } else { echo '<div class="small text-muted">'.__('token_not_set').'</div>'; }
-                            ?>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
+                    <div class="col-12">
                         <h5 class="mb-3 text-primary"><i class="fas fa-robot me-2"></i><?php echo __('ai_integration'); ?></h5>
                         <div class="mb-3">
                             <label class="form-label small text-white-75"><?php echo __('provider'); ?></label>
@@ -1412,7 +1360,7 @@ require_once 'includes/header.php';
             </div>
             <div class="table-responsive">
                 <table class="table table-dark table-hover align-middle border-secondary">
-                    <thead class="table-dark"><tr><th><?php echo __('name_col'); ?></th><th><?php echo __('login_col'); ?></th><th><?php echo __('role_col'); ?></th><th>Pobočka</th><th><?php echo __('spec_col'); ?></th><th>Telegram</th><th><?php echo __('status_col'); ?></th><th class="text-end"><?php echo __('actions_col'); ?></th></tr></thead>
+                    <thead class="table-dark"><tr><th><?php echo __('name_col'); ?></th><th><?php echo __('login_col'); ?></th><th><?php echo __('role_col'); ?></th><th>Pobočka</th><th><?php echo __('spec_col'); ?></th><th><?php echo __('status_col'); ?></th><th class="text-end"><?php echo __('actions_col'); ?></th></tr></thead>
                     <tbody>
                         <?php 
                         $techs_query = $can_view_all_staff ? "SELECT * FROM technicians ORDER BY name ASC"
@@ -1451,14 +1399,6 @@ require_once 'includes/header.php';
                             </td>
                             <td><span class="badge bg-dark border border-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)($t['branch_id'] ?? 0))); ?></span></td>
                             <td><span class="badge glass-panel text-white border-secondary"><?php echo htmlspecialchars($t['specialization']); ?></span></td>
-                            <td>
-                                <?php if (!empty($t['telegram_id'])): ?>
-                                    <code class="small"><?php echo htmlspecialchars($t['telegram_id']); ?></code>
-                                    <button class="btn btn-link btn-sm p-0 ms-1 text-info" title="<?php echo __('test_notification'); ?>" onclick="testTechTG(<?php echo $t['id']; ?>)"><i class="fab fa-telegram-plane"></i></button>
-                                <?php else: ?>
-                                    <span class="text-muted small"><?php echo __('not_linked'); ?></span>
-                                <?php endif; ?>
-                            </td>
                             <td><?php echo ($t['is_active'] ?? 1) ? '<span class="badge bg-success">'.__('active_status').'</span>' : '<span class="badge bg-secondary">'.__('inactive_status').'</span>'; ?></td>
                             <td class="text-end">
                                 <div class="btn-group btn-group-sm">
@@ -2961,11 +2901,6 @@ require_once 'includes/header.php';
                 </div>
             </div>
             <div class="row"><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('email'); ?></label><input type="email" name="tech_email" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('phone_label'); ?></label><input type="text" name="tech_phone" class="form-control"></div></div>
-            <div class="mb-3">
-                <label class="form-label">Telegram ID nebo @username</label>
-                <input type="text" name="tech_tg" class="form-control" value="" placeholder="<?php echo __('tg_placeholder'); ?>">
-                <div class="form-text small"><?php echo __('tech_tg_hint'); ?></div>
-            </div>
             <hr><h6 class="mb-3"><?php echo __('system_access_header'); ?></h6>
             <div class="row"><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('login_col'); ?></label><input type="text" name="tech_username" class="form-control"></div><div class="col-md-6 mb-3"><label class="form-label"><?php echo __('password_btn'); ?></label><input type="password" name="tech_password" class="form-control"></div></div>
         </div>
@@ -3070,16 +3005,6 @@ require_once 'includes/header.php';
                     <input type="text" name="tech_phone" class="form-control" value="<?php echo htmlspecialchars($t['phone'] ?? ''); ?>">
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Telegram ID nebo @username</label>
-                <div class="input-group">
-                    <input type="text" name="tech_tg" class="form-control" value="<?php echo htmlspecialchars(telegramContactDisplayValue($t['telegram_id'] ?? '', $t['telegram_username'] ?? '')); ?>" placeholder="123456789 nebo @uzivatel">
-                    <?php if ($is_admin_user): ?>
-                    <button class="btn btn-outline-info" type="button" onclick="testTechTG(<?php echo $t['id']; ?>)"><i class="fab fa-telegram-plane"></i></button>
-                    <?php endif; ?>
-                </div>
-                <div class="form-text small"><?php echo __('tg_notification_hint'); ?></div>
-            </div>
             <div class="mb-3"><label class="form-label"><?php echo __('new_password_label'); ?></label><input type="password" name="tech_password" class="form-control" placeholder="<?php echo __('password_placeholder'); ?>"></div>
             <?php if ($is_admin_user): ?>
             <div class="mb-3">
@@ -3166,7 +3091,6 @@ require_once 'includes/header.php';
 <?php endif; ?>
 
 <script>
-function testTechTG(id) { if (!id) return; $.post('api/test_tech_tg.php', {id: id, csrf_token: $('meta[name="csrf-token"]').attr('content')}, function(res) { if (res.success) { showAlert('OK'); } else { showAlert(res.message); } }); }
 function triggerDownload(path, filename) {
     if (!path) return;
     const a = document.createElement('a');

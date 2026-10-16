@@ -92,14 +92,7 @@ try {
 }
 
 // ── Telegram token ────────────────────────────────────────────────────────────
-if (isset($pdo)) {
-    try {
-        $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'tg_bot_token'");
-        $stmt->execute();
-        $token = $stmt->fetchColumn();
-        if ($token) define('TG_BOT_TOKEN', $token);
-    } catch (Exception $e) {}
-}
+// Telegram bot odstraněn 16.10.2026 — konstanta zůstává prázdná kvůli zpětné kompatibilitě
 if (!defined('TG_BOT_TOKEN')) {
     define('TG_BOT_TOKEN', '');
 }

@@ -30,8 +30,8 @@ Fix-CRM — interní CRM pro servis elektroniky **AppleFix**. Live: **https://ad
 | Fakturace | `accounting.php`, `models/InvoiceManager.php` | DPH plátce/neplátce, express i plná, dobropisy, export Pohoda |
 | Reporty | `reports.php` | statistiky techniků, tržby/náklady/zisk, výdělky dle `engineer_rate` |
 | Klient portál | `klient/dashboard.php`, `klient/includes/auth.php` | login číslo zakázky + PIN, klient vidí stav + fotky |
-| Telegram | `tg_webhook.php`, `fixer_chat.php`, `api/fixer_*.php` | obousměrný fixer chat, notifikace, AI bridge |
-| AI | `models/nvidia_ai.php`, `api/telegram_ai.php` | NVIDIA kimi-k2.5 / OpenRouter |
+| Telegram | — | odstraněn 16.10.2026 (v3.93.2) |
+| AI | `models/nvidia_ai.php` | NVIDIA kimi-k2.5 / OpenRouter |
 | IMEI | `api/check_imei.php` | Police.gov.cz + iFreeiCloud |
 | Speciální | `vykup-zarizeni.php`, `zastava.php`, `reklamace.php` | výkup, zástava, reklamace |
 

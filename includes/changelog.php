@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.93.2',
+        'date' => '2026-10-16',
+        'time' => '11:39',
+        'title' => 'Odstraněn Telegram bot',
+        'items' => [
+            'Telegram bot (Fixie / AppleFixerBot) je z CRM odstraněný: notifikace technikům a vedení do Telegramu, příkazy bota, chat CRM↔Telegram, nastavení v Integracích a pole „Telegram" u zaměstnanců.',
+            'O nových a přidělených zakázkách dál informují <b>push notifikace v appce</b> a vyskakovací okno v CRM; klientské e-maily se nemění.',
+        ],
+    ],
+    [
         'version' => '3.93.1',
         'date' => '2026-10-16',
         'time' => '11:35',

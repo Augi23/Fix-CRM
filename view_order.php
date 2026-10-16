@@ -1487,16 +1487,6 @@ function openEditPartModal(item) {
     editModal.show();
 }
 
-function testTechTG(id) {
-    if (!id) return;
-    $.post('api/test_tech_tg.php', {id: id, csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>'}, function(res) {
-        if (res.success) {
-            showAlert('<?php echo __('test_msg_sent'); ?>');
-        } else {
-            showAlert('<?php echo __('error'); ?>: ' + res.message);
-        }
-    });
-}
 
 function deleteMedia(id) {
     if (typeof showConfirm !== 'function') {

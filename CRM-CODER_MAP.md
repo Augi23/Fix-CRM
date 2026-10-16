@@ -58,9 +58,7 @@ Klientský portál (odděleně): `klient/*` (zejména `klient/dashboard.php`).
 - `api/update_invoice.php`
 
 ### Integrace
-- Telegram webhook: `tg_webhook.php`
-- CRM↔Telegram chat: `fixer_chat.php`, `api/fixer_send.php`, `api/fixer_thread.php`
-- Telegram AI bridge: `api/telegram_ai.php`
+- Telegram bot: odstraněn 16.10.2026 (v3.93.2)
 - IMEI check: `api/check_imei.php`
 - Aktualizace přes git: `api/check_updates.php`, `api/run_update.php`
 
@@ -92,7 +90,7 @@ Klientský portál (odděleně): `klient/*` (zejména `klient/dashboard.php`).
 - Nové pole v zakázce: `migrations/*` + `orders.php` + `view_order.php` + `api/add_order.php` + `api/update_order_full.php`
 - Nové oprávnění: `includes/functions.php` (`getAvailablePermissions`, implicit perms) + UI v `settings.php`
 - Změna status flow: `view_order.php` (next status map), `api/update_order_full.php`, helpery status labelů v `includes/functions.php`
-- Úprava notifikací: `includes/functions.php` + `tg_webhook.php` + `api/fixer_send.php`
+- Úprava notifikací: `includes/functions.php` (crmNotifyOrderLifecycleEvent — e-maily, popupy; push v includes/push.php)
 
 ## 8) Aktuální provozní poznámky
 
