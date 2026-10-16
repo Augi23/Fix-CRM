@@ -176,6 +176,7 @@ function afxAccountantApiGate(): void {
     if (strpos($script, '/api/') === false) { return; }   // stránky řeší header.php
     $allowed = [
         'kb_sync.php', 'kb_match.php',            // banka: synchronizace + párování
+        'bank_gpc_import.php',                    // banka: nahrání výpisu GPC (v3.93.0)
         'reauth.php',                             // obnova přihlášení (globální poller)
         'guide_viewed.php',                       // návody: značka přečtení
         'get_invoice_data.php', 'get_invoice_details.php',   // detail faktury (čtení)

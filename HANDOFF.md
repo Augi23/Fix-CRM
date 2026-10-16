@@ -50,7 +50,7 @@ Pobočky: Karlín + Na Příkopě (filtrují zakázky i přiřazení techniků).
 - [ ] `final_cost` se nikdy nenastaví automaticky → reporty počítají tržby z `estimated_cost`. Nastavit při výdeji / z faktury.
 - [ ] Status logika duplikovaná ve 3 souborech (`api/update_order_status.php`, `api/update_order_full.php`, `edit_order.php`) → refaktor do jednoho helperu v `functions.php`.
 - [ ] Export do Pohody neověřený proti reálnému importu.
-- [ ] `sync_from_site.php` nedokumentovaný (co a odkud synchronizuje).
+- [x] `sync_from_site.php` odstraněn (v3.93.0 — výchozí token v kódu, jednorázová synchronizace ze starého webu).
 - [ ] Tichý `catch` u logování změn stavů → audit trail nemusí být úplný.
 
 ### 🟢 Drobnosti

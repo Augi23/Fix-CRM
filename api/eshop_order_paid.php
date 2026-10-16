@@ -102,6 +102,10 @@ switch ($action) {
     case 'cancel':
         $res = afxEshopCancelReservation($orderId, $who, trim((string)($_POST['reason'] ?? '')));
         break;
+    case 'fulfill':
+        // zaplacená objednávka odeslána (číslo zásilky) / předána na prodejně
+        $res = afxEshopMarkFulfilled($orderId, $who, (string)($_POST['method'] ?? 'ship'), (string)($_POST['tracking'] ?? ''));
+        break;
     default:
         echo json_encode(['ok' => false, 'error' => 'Neznámá akce.']); exit;
 }

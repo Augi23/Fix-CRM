@@ -65,10 +65,18 @@ afxEnsureInvoiceEmailColumns();
 afxEnsureInvoiceBranch();
 // Manažer je pobočková role → vidí jen doklady své provozovny. Admin, Boss
 // a účetní vidí obě (účetnictví se vede za firmu, ne za prodejnu).
+// PO SPLATNOSTI (v3.93.0): vystavená faktura, splatnost minula, není celá uhrazená
+$__overdueSql = "i.invoice_type = 'invoice' AND i.status IN ('issued','overdue') AND i.date_due < CURDATE()
+    AND COALESCE(i.paid_amount, 0) < i.total_amount - 0.009";
+$accFilter = (string)($_GET['f'] ?? '') === 'overdue' ? 'overdue' : '';
+$__ov = $pdo->query("SELECT COUNT(*) n, COALESCE(SUM(i.total_amount - COALESCE(i.paid_amount,0)),0) s FROM invoices i
+    WHERE $__overdueSql" . crmInvoiceBranchSql('i.branch_id'))->fetch(PDO::FETCH_ASSOC);
 $stmt = $pdo->query("SELECT i.*, c.first_name, c.last_name, c.company, c.email AS cust_email,
-    (SELECT GROUP_CONCAT(item_name SEPARATOR ', ') FROM invoice_items WHERE invoice_id = i.id) as item_names
+    (SELECT GROUP_CONCAT(item_name SEPARATOR ', ') FROM invoice_items WHERE invoice_id = i.id) as item_names,
+    ($__overdueSql) AS is_overdue, DATEDIFF(CURDATE(), i.date_due) AS overdue_days
     FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id
-    WHERE 1=1" . crmInvoiceBranchSql('i.branch_id') . " ORDER BY i.created_at DESC");
+    WHERE 1=1" . ($accFilter === 'overdue' ? " AND $__overdueSql" : '') . crmInvoiceBranchSql('i.branch_id')
+    . ($accFilter === 'overdue' ? " ORDER BY i.date_due ASC" : " ORDER BY i.created_at DESC"));
 $invoices = $stmt->fetchAll();
 
 // mazat doklady smí jen vedení (§11 zák. 563/1991 — doklad se stornuje, nemaže);
@@ -114,6 +122,16 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
 
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
+        <div class="px-4 pt-3 d-flex align-items-center gap-2 flex-wrap">
+            <a href="accounting.php" class="btn btn-sm <?php echo $accFilter === '' ? 'btn-primary' : 'btn-outline-secondary'; ?>">Všechny faktury</a>
+            <a href="accounting.php?f=overdue" class="btn btn-sm <?php echo $accFilter === 'overdue' ? 'btn-danger' : 'btn-outline-danger'; ?>">
+                <i class="fas fa-hourglass-end me-1"></i>Po splatnosti <span class="badge bg-light text-dark ms-1"><?php echo (int)$__ov['n']; ?></span>
+                <span class="ms-1"><?php echo number_format((float)$__ov['s'], 0, ',', ' '); ?> Kč</span>
+            </a>
+            <?php if ($accFilter === 'overdue'): ?>
+            <span class="small text-white-50">Než pošleš upomínku, nahraj čerstvý výpis v <a href="banka.php">Bance</a> — zaplacené faktury se samy spárují a z přehledu zmizí.</span>
+            <?php endif; ?>
+        </div>
         <ul class="nav nav-pills px-4 pt-3 mb-3" id="accTabs" role="tablist">
             <li class="nav-item">
                 <button class="nav-link active" id="list-tab" data-bs-toggle="tab" data-bs-target="#list-pane" type="button">📜 <?php echo __('all_orders'); ?></button>
@@ -160,7 +178,12 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
                                     <td><?php echo date('d.m.Y', strtotime($inv['date_issue'])); ?></td>
                                     <td><?php echo htmlspecialchars(trim((string)($inv['cust_name_override'] ?: ($inv['company'] ?: trim($inv['first_name'] . ' ' . $inv['last_name'])))) ?: '—'); ?></td>
                                     <td class="small"><?php echo htmlspecialchars($inv['item_names'] ?: '—'); ?></td>
-                                    <td><?php echo getInvoiceStatusBadge($inv['status'], $inv); ?></td>
+                                    <td><?php echo getInvoiceStatusBadge($inv['status'], $inv); ?>
+                                        <?php if (!empty($inv['is_overdue'])): ?>
+                                            <div class="small text-danger mt-1"><i class="fas fa-hourglass-end me-1"></i><?php echo (int)$inv['overdue_days']; ?> dní po splatnosti</div>
+                                            <?php if (!empty($inv['reminded_at'])): ?><div class="small text-warning" title="Počet upomínek: <?php echo (int)($inv['reminder_count'] ?? 0); ?>"><i class="fas fa-bell me-1"></i>upomenuto <?php echo date('j. n.', strtotime((string)$inv['reminded_at'])); ?></div><?php endif; ?>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="fw-bold"><?php echo number_format((float)$inv['total_amount'], 0, ',', ' ') . ' ' . $inv['currency']; ?></td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
@@ -172,6 +195,9 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
                                             <button class="btn btn-outline-info" onclick="exportPohoda(<?php echo $inv['id']; ?>)" title="Pohoda"><i class="fas fa-file-export"></i></button>
                                             <button class="btn btn-outline-secondary" onclick="exportS3(<?php echo $inv['id']; ?>)" title="S3 Money"><i class="fas fa-file-csv"></i></button>
                                             <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('print'); ?> <?php echo __('invoice'); ?>')"><i class="fas fa-print"></i></button>
+                                            <?php if (!empty($inv['is_overdue'])): ?>
+                                            <button class="btn btn-outline-warning" onclick="remindInvoice(<?php echo (int)$inv['id']; ?>, <?php echo htmlspecialchars(json_encode(trim((string)($inv['cust_email_override'] ?: ($inv['cust_email'] ?? ''))), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)$inv['invoice_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)" title="Poslat upomínku"><i class="fas fa-bell"></i></button>
+                                            <?php endif; ?>
                                             <button class="btn btn-outline-success" onclick="emailInvoice(<?php echo $inv['id']; ?>, <?php echo htmlspecialchars(json_encode(trim((string)($inv['cust_email_override'] ?: ($inv['cust_email'] ?? ''))), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)$inv['invoice_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)" title="Odeslat e-mailem"><i class="fas fa-paper-plane"></i></button>
                                             <?php if ($__canDeleteInvoice): ?>
                                             <button class="btn btn-outline-danger" onclick="deleteInvoice(<?php echo $inv['id']; ?>)"><i class="fas fa-trash"></i></button>
@@ -689,6 +715,24 @@ document.addEventListener('DOMContentLoaded', function() {
 /** Odeslání faktury e-mailem (v3.70.0). Adresa se předvyplní z dokladu nebo
  *  z karty klienta a obsluha ji smí přepsat — u faktury bez klienta v CRM je
  *  ruční adresa jediná cesta, jak se doklad k odběrateli dostane. */
+function remindInvoice(id, defaultTo, number) {
+    var to = window.prompt('Poslat UPOMÍNKU k faktuře ' + number + ' po splatnosti — na e-mail:', defaultTo || '');
+    if (to === null) { return; }
+    to = to.trim();
+    if (to === '') { showAlert('Bez e-mailové adresy upomínku poslat nejde.'); return; }
+    fetch('api/invoice_email.php', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>', invoice_id: id, to: to, reminder: 1 })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+        if (j.ok) { showAlert('Upomínka odeslána na <b>' + String(j.to || '').replace(/[<>&"]/g, '') + '</b>.'); setTimeout(function () { location.reload(); }, 1500); }
+        else { showAlert(j.error || j.message || 'Odeslání se nepovedlo.'); }
+    })
+    .catch(function () { showAlert('Síťová chyba — upomínka neodešla.'); });
+}
+
 function emailInvoice(id, defaultTo, number, reloadOnCancel) {
     var konec = function () { if (reloadOnCancel) { location.reload(); } };
     var to = window.prompt('Kam odeslat fakturu ' + (number || ('#' + id)) + '?', defaultTo || '');

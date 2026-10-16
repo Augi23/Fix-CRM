@@ -2491,6 +2491,10 @@ function ensureEshopReservationSchema(): void {
             ['access_point_json', "ALTER TABLE eshop_orders ADD COLUMN access_point_json TEXT NULL DEFAULT NULL"],
             // volná poznámka zákazníka z pokladny e-shopu (v3.77.3) — zvlášť od systémové note
             ['customer_note', "ALTER TABLE eshop_orders ADD COLUMN customer_note TEXT NULL DEFAULT NULL"],
+            // vyřízení zaplacené objednávky (v3.93.0): odesláno s číslem zásilky / předáno na prodejně
+            ['fulfilled_at', "ALTER TABLE eshop_orders ADD COLUMN fulfilled_at DATETIME NULL DEFAULT NULL"],
+            ['fulfill_method', "ALTER TABLE eshop_orders ADD COLUMN fulfill_method VARCHAR(16) NULL DEFAULT NULL"],
+            ['tracking_no', "ALTER TABLE eshop_orders ADD COLUMN tracking_no VARCHAR(64) NULL DEFAULT NULL"],
         ] as [$col, $ddl]) {
             if (!$pdo->query("SHOW COLUMNS FROM eshop_orders LIKE '" . $col . "'")->fetch()) { $pdo->exec($ddl); }
         }
@@ -2557,7 +2561,8 @@ function afxEshopStatusLabel(string $status, string $payId = ''): string {
         case 'collected': return 'Vyzvednuto a zaplaceno na prodejně';
         case 'returned':  return 'Nedoručeno — vráceno na sklad';
         case 'cancelled': return 'Zrušeno — zboží zpět v prodeji';
-        case 'paid':      return 'Zaplaceno';
+        case 'paid':      return 'Zaplaceno — čeká na odeslání / předání';
+        case 'fulfilled': return 'Vyřízeno — odesláno / předáno zákazníkovi';
     }
     return $status;
 }
@@ -2570,7 +2575,46 @@ function afxEshopOrderActions(string $status, string $payId): array {
         'can_ship'   => $status === 'reserved' && $payId === 'dobirka',
         'can_return' => $status === 'shipped',
         'can_cancel' => $status === 'reserved',
+        // zaplacená objednávka se uzavře odesláním (číslo zásilky) nebo předáním na prodejně
+        'can_fulfill' => $status === 'paid',
     ];
+}
+
+/**
+ * ZAPLACENÁ objednávka vyřízena (v3.93.0): zboží odešlo (s číslem zásilky) nebo si ho
+ * zákazník převzal na prodejně. Sklad se nemění — odepsal se už při zaplacení.
+ * $method = 'ship' | 'pickup'. Dřív zaplacené objednávky zůstávaly „Zaplaceno" navždy.
+ */
+function afxEshopMarkFulfilled(int $orderId, string $by = '', string $method = 'ship', string $tracking = ''): array {
+    global $pdo;
+    ensureEshopReservationSchema();
+    $method = $method === 'pickup' ? 'pickup' : 'ship';
+    $tracking = mb_substr(trim((string)preg_replace('/[^\p{L}\p{N} ._\/-]+/u', '', $tracking)), 0, 64);
+    try {
+        $st = $pdo->prepare("SELECT id, order_ref, status, total FROM eshop_orders WHERE id = ?");
+        $st->execute([$orderId]);
+        $o = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$o) { return ['ok' => false, 'error' => 'Objednávka nenalezena.']; }
+        if ((string)$o['status'] !== 'paid') {
+            return ['ok' => false, 'error' => 'Vyřídit jde jen zaplacenou objednávku (' . $o['order_ref'] . ' je „' . afxEshopStatusLabel((string)$o['status']) . '").'];
+        }
+        $up = $pdo->prepare("UPDATE eshop_orders SET status = 'fulfilled', fulfilled_at = NOW(), fulfill_method = ?, tracking_no = ?
+            WHERE id = ? AND status = 'paid'");
+        $up->execute([$method, $tracking !== '' ? $tracking : null, $orderId]);
+        if ($up->rowCount() === 0) { return ['ok' => false, 'error' => 'Objednávku mezitím vyřídil někdo jiný.']; }
+    } catch (Throwable $e) {
+        error_log('afxEshopMarkFulfilled: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'Databázová chyba — objednávka se nezměnila.'];
+    }
+    try {
+        crmAuditLog('eshop.order_fulfilled', [
+            'entity_type' => 'eshop_order', 'entity_id' => $orderId, 'entity_label' => (string)$o['order_ref'],
+            'summary' => 'Objednávka z e-shopu ' . $o['order_ref'] . ' vyřízena — '
+                . ($method === 'pickup' ? 'předána zákazníkovi na prodejně' : 'odeslána' . ($tracking !== '' ? ' (zásilka ' . $tracking . ')' : ''))
+                . ($by !== '' ? ' · ' . $by : ''),
+        ]);
+    } catch (Throwable $e) {}
+    return ['ok' => true, 'error' => '', 'order_ref' => (string)$o['order_ref']];
 }
 
 /**
@@ -2756,7 +2800,7 @@ function afxEshopReturnToStock(int $orderId, string $by = ''): array {
         $rs->execute([$orderId]);
         $back = $pdo->prepare("UPDATE products SET stock_qty = stock_qty + ?, pos_sold_at = NULL, last_sold_at = NULL WHERE id = ?");
         foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) { $back->execute([max(1, (int)$r['qty']), (int)$r['product_id']]); }
-        $fin = $pdo->prepare("UPDATE eshop_orders SET status = 'returned' WHERE id = ? AND status IN ('shipped', 'paid')");
+        $fin = $pdo->prepare("UPDATE eshop_orders SET status = 'returned' WHERE id = ? AND status IN ('shipped', 'paid', 'fulfilled')");
         $fin->execute([$orderId]);
         if ($fin->rowCount() === 0) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Objednávku mezitím vyřídil někdo jiný.']; }
         $pdo->commit();
@@ -3024,6 +3068,109 @@ function crmCanCancelPosSale(): bool {
  *  18.7.2026. */
 function crmCanDeleteOrders(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
+}
+
+/** Posledních 9 číslic telefonu (bez předvolby) — klíč pro hledání duplicitních klientů. */
+function crmPhoneKey(string $phone): string {
+    $d = preg_replace('/\D+/', '', $phone) ?? '';
+    $k = strlen($d) >= 9 ? substr($d, -9) : '';
+    // výplňová čísla (000000000, 111111111, 123456789…) nejsou skutečný telefon
+    if ($k === '' || preg_match('/^(\d)\1+$/', $k) || str_starts_with($k, '0000') || $k === '123456789') { return ''; }
+    return $k;
+}
+
+/** Klienti se stejným telefonem (posledních 9 číslic) nebo e-mailem — kandidáti na sloučení. */
+function crmFindDuplicateCustomers(string $phone, string $email = '', int $excludeId = 0, int $limit = 5): array {
+    global $pdo;
+    $key = crmPhoneKey($phone);
+    $email = strtolower(trim($email));
+    if ($key === '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) { return []; }
+    $conds = []; $params = [];
+    if ($key !== '') { $conds[] = "RIGHT(REGEXP_REPLACE(COALESCE(c.phone,''), '[^0-9]', ''), 9) = ?"; $params[] = $key; }
+    if (filter_var($email, FILTER_VALIDATE_EMAIL)) { $conds[] = "LOWER(TRIM(c.email)) = ?"; $params[] = $email; }
+    $params[] = $excludeId;
+    try {
+        $st = $pdo->prepare("SELECT c.id, c.first_name, c.last_name, c.company, c.phone, c.email,
+                (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS orders_count
+            FROM customers c WHERE (" . implode(' OR ', $conds) . ") AND c.id <> ? ORDER BY orders_count DESC, c.id ASC LIMIT " . (int)$limit);
+        $st->execute($params);
+        return $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { error_log('crmFindDuplicateCustomers: ' . $e->getMessage()); return []; }
+}
+
+/**
+ * SLOUČENÍ KLIENTŮ (v3.93.0): vše z $dropId převede na $keepId a $dropId smaže.
+ *  - zakázky, reklamace, faktury, účtenky, bankovní účty → na ponechaného klienta
+ *  - u faktur slučovaného se PŘED převodem zmrazí odběratel (cust_*_override), aby se
+ *    vystavený doklad nezměnil (tisk bere odběratele z karty klienta, když override chybí)
+ *  - věrnostní body se sečtou, prázdné údaje ponechaného se doplní ze slučovaného
+ * Smí jen admin a Boss. Vrací ['ok'=>bool, 'error'=>string, 'moved'=>[...]].
+ */
+function crmMergeCustomers(int $keepId, int $dropId): array {
+    global $pdo;
+    if ($keepId <= 0 || $dropId <= 0 || $keepId === $dropId) { return ['ok' => false, 'error' => 'Vyber dva různé klienty.']; }
+    if ($pdo->inTransaction()) { return ['ok' => false, 'error' => 'Nelze uvnitř jiné transakce.']; }
+    $moved = [];
+    try {
+        $pdo->beginTransaction();
+        $lk = $pdo->prepare("SELECT * FROM customers WHERE id IN (?, ?) ORDER BY id FOR UPDATE");
+        $lk->execute([min($keepId, $dropId), max($keepId, $dropId)]);
+        $rows = [];
+        foreach ($lk->fetchAll(PDO::FETCH_ASSOC) as $r) { $rows[(int)$r['id']] = $r; }
+        if (!isset($rows[$keepId], $rows[$dropId])) { $pdo->rollBack(); return ['ok' => false, 'error' => 'Klient už neexistuje (možná ho mezitím sloučil někdo jiný).']; }
+        $keep = $rows[$keepId]; $drop = $rows[$dropId];
+        $dropName = trim((string)$drop['company']) !== '' ? (string)$drop['company'] : trim($drop['first_name'] . ' ' . $drop['last_name']);
+
+        // 1) zmrazit odběratele na fakturách slučovaného klienta
+        $pdo->prepare("UPDATE invoices SET
+                cust_name_override    = COALESCE(NULLIF(cust_name_override, ''), ?),
+                cust_address_override = COALESCE(NULLIF(cust_address_override, ''), NULLIF(?, '')),
+                cust_ico_override     = COALESCE(NULLIF(cust_ico_override, ''), NULLIF(?, '')),
+                cust_dic_override     = COALESCE(NULLIF(cust_dic_override, ''), NULLIF(?, ''))
+            WHERE customer_id = ?")
+            ->execute([$dropName, (string)$drop['address'], (string)$drop['ico'], (string)$drop['dic'], $dropId]);
+
+        // 2) převod vazeb
+        foreach (['orders', 'complaints', 'invoices', 'pos_sales'] as $tb) {
+            $u = $pdo->prepare("UPDATE $tb SET customer_id = ? WHERE customer_id = ?");
+            $u->execute([$keepId, $dropId]);
+            $moved[$tb] = $u->rowCount();
+        }
+        // bankovní účty: unikátní (customer_id, account) → duplicitní účet jen smazat
+        try {
+            $pdo->prepare("UPDATE IGNORE customer_bank_accounts SET customer_id = ? WHERE customer_id = ?")->execute([$keepId, $dropId]);
+            $pdo->prepare("DELETE FROM customer_bank_accounts WHERE customer_id = ?")->execute([$dropId]);
+        } catch (Throwable $e) { /* starší DB bez tabulky */ }
+
+        // 3) doplnit prázdné údaje + sečíst body; karta zůstává ponechaného (jinak převzít)
+        $fill = [];
+        foreach (['phone', 'email', 'address', 'ico', 'dic', 'company', 'preferred_language'] as $f) {
+            if (array_key_exists($f, $keep) && trim((string)$keep[$f]) === '' && trim((string)($drop[$f] ?? '')) !== '') { $fill[$f] = $drop[$f]; }
+        }
+        $points = (int)($keep['loyalty_points'] ?? 0) + (int)($drop['loyalty_points'] ?? 0);
+        $takeCard = trim((string)($keep['card_token'] ?? '')) === '' && trim((string)($drop['card_token'] ?? '')) !== '';
+        $pdo->prepare("DELETE FROM customers WHERE id = ?")->execute([$dropId]);   // nejdřív smazat (unikátní card_token)
+        $set = ['loyalty_points = ?']; $vals = [$points];
+        foreach ($fill as $f => $v) { $set[] = "$f = ?"; $vals[] = $v; }
+        if ($takeCard) { $set[] = 'card_token = ?'; $vals[] = $drop['card_token']; $set[] = 'card_created_at = ?'; $vals[] = $drop['card_created_at']; }
+        $vals[] = $keepId;
+        $pdo->prepare("UPDATE customers SET " . implode(', ', $set) . " WHERE id = ?")->execute($vals);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        error_log('crmMergeCustomers: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'Sloučení se nepovedlo (databázová chyba) — nic se nezměnilo.'];
+    }
+    $keepName = trim((string)$keep['company']) !== '' ? (string)$keep['company'] : trim($keep['first_name'] . ' ' . $keep['last_name']);
+    try {
+        crmAuditLog('customer.merge', [
+            'entity_type' => 'customer', 'entity_id' => $keepId, 'entity_label' => $keepName,
+            'summary' => 'Sloučen klient #' . $dropId . ' ' . $dropName . ' (' . (string)$drop['phone'] . ') do #' . $keepId . ' ' . $keepName
+                . ' — zakázky ' . ($moved['orders'] ?? 0) . ', reklamace ' . ($moved['complaints'] ?? 0)
+                . ', faktury ' . ($moved['invoices'] ?? 0) . ', účtenky ' . ($moved['pos_sales'] ?? 0),
+        ]);
+    } catch (Throwable $e) {}
+    return ['ok' => true, 'error' => '', 'moved' => $moved];
 }
 
 /** Admin NEBO Boss — Boss má stejná práva jako administrátor (majitel 16.10.2026).
@@ -6346,7 +6493,7 @@ function crmEnsureOrderInvoice(int $orderId, string $paymentMethod = 'bank_trans
 
 /** Pošle klientovi fakturu e-mailem (HTML = print_invoice.php v embed módu)
  *  + blok „Platba převodem" s QR platbou (SPAYD) jako v e-shopových e-mailech. */
-function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array {
+function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null, bool $reminder = false): array {
     global $pdo;
     afxEnsureInvoiceSupplierColumn();
     $st = $pdo->prepare("SELECT i.*, c.first_name, c.last_name, c.phone, c.address, c.company, c.ico, c.dic, c.email AS cust_email,
@@ -6420,7 +6567,35 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null): array 
         ? ((string)get_setting('ico_supplier_name', '') ?: get_setting('company_name', 'AppleFix'))
         : get_setting('company_name', 'AppleFix');
     $subject = $supName . ' — Faktura ' . (string)$invoice['invoice_number'];
+    if ($reminder) {
+        // UPOMÍNKA (v3.93.0): stejná faktura + zdvořilé upozornění nahoře
+        if ((string)$invoice['status'] === 'paid' || (float)($invoice['paid_amount'] ?? 0) >= (float)$invoice['total_amount'] - 0.009) {
+            return [false, 'Faktura je zaplacená — upomínka nedává smysl.', $to];
+        }
+        $rest = max(0, (float)$invoice['total_amount'] - (float)($invoice['paid_amount'] ?? 0));
+        $subject = $supName . ' — Upomínka: faktura ' . (string)$invoice['invoice_number'] . ' po splatnosti';
+        $notice = '<div style="max-width:840px;margin:0 auto 18px;background:#fff7e6;border:1px solid #f5d38a;border-radius:14px;padding:16px 22px;font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1d1d1f;">'
+            . '<strong>Dobrý den,</strong><br>evidujeme, že faktura <strong>' . e((string)$invoice['invoice_number']) . '</strong> se splatností <strong>'
+            . e(date('d.m.Y', strtotime((string)$invoice['date_due']))) . '</strong> zatím není uhrazená (zbývá <strong>' . e(formatMoney($rest)) . '</strong>). '
+            . 'Prosíme o úhradu podle údajů níže. Pokud jste již zaplatili, považujte prosím tuto zprávu za bezpředmětnou — děkujeme.</div>';
+        $html = (stripos($html, '<body') !== false)
+            ? preg_replace('/(<body[^>]*>)/i', '$1' . $notice, $html, 1)
+            : $notice . $html;
+    }
     [$ok, $msg] = smtpSendMail($to, $subject, $html);
+    if ($ok && $reminder) {
+        try {
+            foreach (['reminded_at' => 'reminded_at DATETIME NULL DEFAULT NULL', 'reminder_count' => 'reminder_count INT NOT NULL DEFAULT 0'] as $__c => $__ddl) {
+                if (!$pdo->query("SHOW COLUMNS FROM invoices LIKE " . $pdo->quote($__c))->fetch()) { $pdo->exec("ALTER TABLE invoices ADD COLUMN " . $__ddl); }
+            }
+            $pdo->prepare("UPDATE invoices SET reminded_at = NOW(), reminder_count = reminder_count + 1 WHERE id = ?")->execute([$invoiceId]);
+            crmAuditLog('invoice.reminder', [
+                'entity_type' => 'invoice', 'entity_id' => $invoiceId, 'entity_label' => (string)$invoice['invoice_number'],
+                'summary' => 'Upomínka k faktuře ' . $invoice['invoice_number'] . ' odeslána na ' . $to,
+            ]);
+        } catch (Throwable $e) { error_log('crmSendInvoiceEmail/reminder: ' . $e->getMessage()); }
+        return [$ok, $msg, $to];
+    }
     if ($ok) {
         // ať je v seznamu faktur vidět, že klient doklad dostal (a kam)
         try {

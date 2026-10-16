@@ -2,6 +2,14 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 
+// Přenastavení Telegram webhooku smí jen admin/Boss (dřív šlo spustit bez přihlášení)
+if (empty($_SESSION['user_id']) || !crmCanManageSettings()) {
+    http_response_code(403);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => false, 'error' => 'forbidden']);
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 
 $baseUrl = rtrim((string)get_setting('fixer_webhook_url', ''), '/');

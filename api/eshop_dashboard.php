@@ -24,11 +24,11 @@ try {
     // Nevyřízené objednávky (rezervace + dobírky na cestě) se do výpisu berou VŽDY,
     // i kdyby byly starší než limit — jinak by zapadly a nikdo by je neuvolnil.
     $cols = "id, order_ref, status, items_json, total, customer_name, customer_phone,
-            pay_id, created_at, collected_at, paid_at, shipped_at, customer_note";
+            pay_id, created_at, collected_at, paid_at, shipped_at, customer_note, fulfilled_at, fulfill_method, tracking_no";
     $st = $pdo->prepare("SELECT $cols FROM eshop_orders
-        WHERE status IN ('reserved', 'shipped')
+        WHERE status IN ('reserved', 'shipped', 'paid')
            OR id IN (SELECT id FROM (SELECT id FROM eshop_orders ORDER BY id DESC LIMIT $limit) t)
-        ORDER BY (status IN ('reserved','shipped')) DESC, id DESC");
+        ORDER BY (status IN ('reserved','shipped','paid')) DESC, id DESC");
     $st->execute();
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
@@ -72,8 +72,13 @@ try {
             'can_ship' => $act['can_ship'],
             'can_return' => $act['can_return'],
             'can_cancel' => $act['can_cancel'],
+            'can_fulfill' => $act['can_fulfill'],
+            // jak dlouho čeká: rezervace od vytvoření, zaplacená na odeslání od zaplacení
             'waiting_days' => (string)$r['status'] === 'reserved'
-                ? (int)floor((time() - strtotime((string)$r['created_at'])) / 86400) : 0,
+                ? (int)floor((time() - strtotime((string)$r['created_at'])) / 86400)
+                : ((string)$r['status'] === 'paid' ? (int)floor((time() - strtotime((string)($r['paid_at'] ?: $r['created_at']))) / 86400) : 0),
+            'tracking_no' => (string)($r['tracking_no'] ?? ''),
+            'fulfill_method' => (string)($r['fulfill_method'] ?? ''),
             'date' => date('j. n. Y H:i', strtotime((string)$r['created_at'])),
             'collected' => !empty($r['collected_at']) ? date('j. n. Y H:i', strtotime((string)$r['collected_at'])) : '',
             'items' => $items,
@@ -84,7 +89,7 @@ try {
     // zaplacené / se vrátilo). Datum prodeje = kdy se objednávka skutečně uzavřela
     // (vyzvednutí/platba/odeslání), ne kdy vznikla — jinak by vyzvednutí z minulého
     // měsíce spadlo do minulého měsíce a dnešní čítač by se nehnul.
-    $sold = "status IN ('paid', 'collected', 'shipped')";
+    $sold = "status IN ('paid', 'collected', 'shipped', 'fulfilled')";
     $when = "COALESCE(collected_at, paid_at, shipped_at, created_at)";
     $today = (int)$pdo->query("SELECT COUNT(*) FROM eshop_orders WHERE $sold AND DATE($when) = CURDATE()")->fetchColumn();
     $month = (int)$pdo->query("SELECT COUNT(*) FROM eshop_orders WHERE $sold AND YEAR($when) = YEAR(CURDATE()) AND MONTH($when) = MONTH(CURDATE())")->fetchColumn();
@@ -92,13 +97,14 @@ try {
     // 'paid' (karta, převod, doplacená dobírka). 'collected' je účtenka v pokladně
     // (sečíst obojí by tržbu zdvojilo) a 'shipped' je dobírka na cestě — nezaplacená.
     $monthTotal = (float)$pdo->query("SELECT COALESCE(SUM(total), 0) FROM eshop_orders
-        WHERE status = 'paid' AND YEAR(COALESCE(paid_at, created_at)) = YEAR(CURDATE())
+        WHERE status IN ('paid', 'fulfilled') AND YEAR(COALESCE(paid_at, created_at)) = YEAR(CURDATE())
           AND MONTH(COALESCE(paid_at, created_at)) = MONTH(CURDATE())")->fetchColumn();
     $reserved = (int)$pdo->query("SELECT COUNT(*) FROM eshop_orders WHERE status = 'reserved'")->fetchColumn();
     $shipped = (int)$pdo->query("SELECT COUNT(*) FROM eshop_orders WHERE status = 'shipped'")->fetchColumn();
+    $toFulfill = (int)$pdo->query("SELECT COUNT(*) FROM eshop_orders WHERE status = 'paid'")->fetchColumn();
 
     echo json_encode(['ok' => true, 'today' => $today, 'month' => $month,
-        'month_total' => round($monthTotal, 2), 'reserved' => $reserved, 'shipped' => $shipped,
+        'month_total' => round($monthTotal, 2), 'reserved' => $reserved, 'shipped' => $shipped, 'to_fulfill' => $toFulfill,
         'orders' => $orders], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     error_log('eshop_dashboard: ' . $e->getMessage());

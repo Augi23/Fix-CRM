@@ -323,6 +323,12 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                     res.style.display = '';
                     res.innerHTML = '<i class="fas fa-truck me-1"></i>' + d.shipped + ' dobírk' + (d.shipped === 1 ? 'a' : 'y') + ' na cestě — čeká na platbu';
                 } else { res.style.display = 'none'; }
+                // zaplacené, ale dosud neodeslané/nepředané — dřív visely „Zaplaceno" navždy
+                if (d.to_fulfill > 0) {
+                    res.style.display = '';
+                    res.innerHTML = (res.innerHTML && res.style.display !== 'none' && (d.reserved > 0 || d.shipped > 0) ? res.innerHTML + ' · ' : '')
+                        + '<i class="fas fa-box me-1"></i>' + d.to_fulfill + ' zaplacen' + (d.to_fulfill === 1 ? 'á čeká' : (d.to_fulfill < 5 ? 'é čekají' : 'ých čeká')) + ' na odeslání';
+                }
                 return d;
             })
             .catch(function () { return null; });
@@ -333,7 +339,7 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             body.innerHTML = '<div class="text-white-50 small">Zatím žádná objednávka z e-shopu.</div>';
             return;
         }
-        var labels = { paid: 'paid', reserved: 'reserved', collected: 'collected', shipped: 'reserved', returned: 'reserved', cancelled: 'reserved' };
+        var labels = { paid: 'reserved', fulfilled: 'collected', reserved: 'reserved', collected: 'collected', shipped: 'reserved', returned: 'reserved', cancelled: 'reserved' };
         var canManage = tile.dataset.canManage === '1';   // akce smí jen vedení (admin/Boss)
         var btn = function (act, o, cls, ic, label) {
             if (!canManage) { return ''; }
@@ -349,12 +355,16 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
                 + '<div class="who">' + esc(o.customer) + (o.phone ? ' · ' + esc(o.phone) : '') + ' · ' + esc(o.date) + '</div>'
                 + '<div class="items">' + esc(items || '—') + '</div>'
                 + (o.customer_note ? '<div class="who" style="white-space:pre-line;overflow-wrap:anywhere;">💬 ' + esc(o.customer_note) + '</div>' : '')
-                + (o.waiting_days > 2 ? '<div class="who" style="color:#ffd479;">čeká už ' + Number(o.waiting_days) + ' dní</div>' : '')
+                + (o.waiting_days > 2 ? '<div class="who" style="color:#ffd479;">' + (o.status === 'paid' ? 'zaplaceno a neodesláno už ' : 'čeká už ') + Number(o.waiting_days) + ' dní</div>' : '')
+                + (o.tracking_no ? '<div class="who"><i class="fas fa-truck me-1"></i>zásilka ' + esc(o.tracking_no) + '</div>' : '')
+                + (o.status === 'fulfilled' && o.fulfill_method === 'pickup' ? '<div class="who"><i class="fas fa-store me-1"></i>předáno na prodejně</div>' : '')
                 + '<div class="d-flex gap-2 flex-wrap mt-2">'
                 + (o.can_ship ? btn('ship', o, 'btn-primary', 'fa-truck', 'Předáno dopravci — odesláno') : '')
                 + (o.can_pay ? btn('paid', o, 'btn-success', 'fa-check', o.status === 'shipped' ? 'Platba od dopravce dorazila' : 'Platba dorazila — uvolnit k odeslání') : '')
                 + (o.can_return ? btn('return', o, 'btn-outline-warning', 'fa-rotate-left', 'Nedoručeno — zpět na sklad') : '')
                 + (o.can_cancel ? btn('cancel', o, 'btn-outline-danger', 'fa-ban', 'Zrušit rezervaci') : '')
+                + (o.can_fulfill ? btn('fulfill-ship', o, 'btn-primary', 'fa-truck', 'Odesláno') : '')
+                + (o.can_fulfill ? btn('fulfill-pickup', o, 'btn-outline-success', 'fa-store', 'Předáno na prodejně') : '')
                 + '</div></div><div class="amt">' + money(o.total || 0) + '</div></div>';
         }).join('');
         // ruční kroky, které nejdou automaticky (platba mimo párování, expedice dobírky,
@@ -363,14 +373,23 @@ $order_note_templates = array_values(array_filter(array_map('trim', preg_split('
             paid: 'Opravdu je objednávka ORDER zaplacená? U převodu se zboží teď odepíše ze skladu k odeslání.',
             ship: 'Předáváš objednávku ORDER dopravci? Zboží se odepíše ze skladu, platba dorazí od dopravce.',
             'return': 'Vrátila se zásilka k objednávce ORDER? Zboží se vrátí na sklad.',
-            cancel: 'Zrušit rezervaci ORDER? Zboží se uvolní zpět do prodeje (na e-shop i kasu).'
+            cancel: 'Zrušit rezervaci ORDER? Zboží se uvolní zpět do prodeje (na e-shop i kasu).',
+            'fulfill-pickup': 'Převzal si zákazník zaplacenou objednávku ORDER na prodejně?'
         };
         body.querySelectorAll('.eshop-act-btn').forEach(function (b) {
             b.addEventListener('click', function () {
                 var act = b.dataset.act;
-                if (!confirm((asks[act] || 'Provést?').replace('ORDER', b.dataset.ref))) { return; }
-                b.disabled = true;
                 var fd = new FormData();
+                if (act === 'fulfill-ship') {
+                    // číslo zásilky je nepovinné (zásilky z PPL v adminu e-shopu se doplní samy)
+                    var tr = prompt('Objednávka ' + b.dataset.ref + ' odeslána. Číslo zásilky (nepovinné):', '');
+                    if (tr === null) { return; }
+                    fd.append('method', 'ship'); fd.append('tracking', tr.trim()); act = 'fulfill';
+                } else if (act === 'fulfill-pickup') {
+                    if (!confirm(asks[act].replace('ORDER', b.dataset.ref))) { return; }
+                    fd.append('method', 'pickup'); act = 'fulfill';
+                } else if (!confirm((asks[act] || 'Provést?').replace('ORDER', b.dataset.ref))) { return; }
+                b.disabled = true;
                 fd.append('order_id', b.dataset.id);
                 fd.append('action', act);
                 fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');

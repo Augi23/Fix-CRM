@@ -227,8 +227,18 @@ if (isset($_POST['edit_tech'])) {
     ensurePayByTimeColumn();
     $id = $_POST['tech_id'];
     
+    // Manažer smí upravit zaměstnance SVÉ pobočky v rolích technik/brigádník (ne sebe
+    // touto cestou, ne vedení): jméno, kontakt, login, heslo, role technik↔brigádník,
+    // aktivní/neaktivní. Pobočku, sazbu a práva dál mění jen admin/Boss (16.10.2026).
+    $mgrEdit = false;
+    if ($is_branch_manager && $manager_branch_id > 0 && (int)$id !== (int)($_SESSION['tech_id'] ?? 0)) {
+        $__ck = $pdo->prepare("SELECT role, branch_id FROM technicians WHERE id = ?");
+        $__ck->execute([(int)$id]);
+        $__ckr = $__ck->fetch(PDO::FETCH_ASSOC);
+        $mgrEdit = $__ckr && (int)$__ckr['branch_id'] === $manager_branch_id && in_array((string)$__ckr['role'], $manager_roles, true);
+    }
     // Security check: technicians can only edit themselves
-    if (!$is_admin_check && $id != ($_SESSION['tech_id'] ?? 0)) {
+    if (!$is_admin_check && !$mgrEdit && $id != ($_SESSION['tech_id'] ?? 0)) {
         header("Location: settings.php?tab=staff&error=unauthorized");
         exit;
     }
@@ -258,8 +268,21 @@ if (isset($_POST['edit_tech'])) {
     // Odměna z času v systému (brigádník) — smí přepnout jen admin
     $pay_by_time = $is_admin_check ? (isset($_POST['pay_by_time']) ? 1 : 0) : null;
 
+    if ($mgrEdit) {
+        $stmt = $pdo->prepare("SELECT role, branch_id, engineer_rate, telegram_id, telegram_username FROM technicians WHERE id = ?");
+        $stmt->execute([$id]);
+        $current = $stmt->fetch();
+        $branch_id = (int)$current['branch_id'];                       // pobočku nemění
+        $engineer_rate = $current['engineer_rate'];                     // sazbu nemění
+        if (!in_array($role, $manager_roles, true)) { $role = (string)$current['role']; }
+        $pay_by_time = $role === 'brigadnik' ? 1 : null;
+        if (trim((string)$name) === '') { header("Location: settings.php?tab=staff&error=unauthorized"); exit; }
+        if (empty($_POST['tech_tg'])) {
+            $telegramContact = ['id' => $current['telegram_id'] ?? null, 'username' => $current['telegram_username'] ?? null, 'valid' => true];
+        }
+    }
     // Re-verify important fields if NOT admin
-    if (!$is_admin_check) {
+    if (!$is_admin_check && !$mgrEdit) {
         $stmt = $pdo->prepare("SELECT role, branch_id, is_active, username, engineer_rate, name, specialization, email, phone, telegram_id, telegram_username FROM technicians WHERE id = ?");
         $stmt->execute([$id]);
         $current = $stmt->fetch();
@@ -283,7 +306,7 @@ if (isset($_POST['edit_tech'])) {
         }
     }
 
-    if (!empty($username) && $is_admin_check) { // Only admin can change username or check it
+    if (!empty($username) && ($is_admin_check || $mgrEdit)) { // Only admin (or branch manager for own staff) can change username
         $stmt = $pdo->prepare("SELECT id FROM technicians WHERE username = ? AND id != ?");
         $stmt->execute([$username, $id]);
         if ($stmt->fetch()) { header("Location: settings.php?tab=staff&error=username_taken"); exit; }
@@ -322,12 +345,14 @@ if (isset($_POST['edit_tech'])) {
     // (relace jinak drží stará práva 8 hodin, viz crmBumpStaffPermsRev). Jen u
     // admina: neadmin si tu mění pouze vlastní kontakt, role/aktivita se přebírá
     // beze změny a zbytečné razítko by nutilo všechny relace znovu číst práva.
-    if ($is_admin_check) {
+    if ($is_admin_check || $mgrEdit) {
         crmBumpStaffPermsRev();
     }
     crmAuditLog('staff.update', [
         'entity_type' => 'technician', 'entity_id' => (int)$id, 'entity_label' => $name,
-        'summary' => 'Upraven zaměstnanec ' . $name . ' (role: ' . $role . ', ' . ($active ? 'aktivní' : 'neaktivní') . ')',
+        'summary' => 'Upraven zaměstnanec ' . $name . ' (role: ' . $role . ', ' . ($active ? 'aktivní' : 'neaktivní') . ')'
+            . ($mgrEdit ? ' — upravil manažer pobočky' : ''),
+        'branch_id' => (int)$branch_id,
     ]);
     settingsDebugLog([
         'event' => 'edit_tech_saved',
@@ -1484,7 +1509,11 @@ require_once 'includes/header.php';
                                     <?php if ($is_admin_user): ?>
                                         <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#permModal<?php echo $t['id']; ?>"><i class="fas fa-shield-alt"></i></button>
                                     <?php endif; ?>
-                                    <?php if ($is_admin_user || (int)$t['id'] === (int)($_SESSION['tech_id'] ?? 0)): ?>
+                                    <?php
+                                    // manažer upraví lidi své pobočky v rolích technik/brigádník
+                                    $__mgrRow = $is_branch_manager && $manager_branch_id > 0 && (int)($t['branch_id'] ?? 0) === $manager_branch_id
+                                        && in_array((string)($t['role'] ?? ''), $manager_roles, true) && (int)$t['id'] !== (int)($_SESSION['tech_id'] ?? 0);
+                                    if ($is_admin_user || $__mgrRow || (int)$t['id'] === (int)($_SESSION['tech_id'] ?? 0)): ?>
                                         <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTechModal<?php echo $t['id']; ?>"><i class="fas fa-edit"></i></button>
                                     <?php endif; ?>
                                     <?php if ($is_admin_user): ?>
@@ -2995,8 +3024,11 @@ require_once 'includes/header.php';
         <input type="hidden" name="edit_tech" value="1">
         <input type="hidden" name="tech_id" value="<?php echo $t['id']; ?>">
         <div class="modal-header border-secondary"><h5 class="modal-title"><?php echo __('edit_title'); ?><?php echo htmlspecialchars($t['name']); ?></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+        <?php $__mgrRow = $is_branch_manager && $manager_branch_id > 0 && (int)($t['branch_id'] ?? 0) === $manager_branch_id
+            && in_array((string)($t['role'] ?? ''), $manager_roles, true) && (int)$t['id'] !== (int)($_SESSION['tech_id'] ?? 0);
+            $__basic = $is_admin_user || $__mgrRow;   /* manažer: jméno, specializace, login, aktivita */ ?>
         <div class="modal-body">
-            <?php if ($is_admin_user): ?>
+            <?php if ($__basic): ?>
             <div class="mb-3">
                 <label class="form-label"><?php echo __('full_name_label'); ?></label>
                 <input type="text" name="tech_name" class="form-control" value="<?php echo htmlspecialchars($t['name']); ?>" required>
@@ -3016,6 +3048,11 @@ require_once 'includes/header.php';
                         <option value="boss" <?php echo ($t['role'] ?? 'engineer') == 'boss' ? 'selected' : ''; ?>>Boss</option>
                         <option value="admin" <?php echo ($t['role'] ?? 'engineer') == 'admin' ? 'selected' : ''; ?>><?php echo __('role_admin'); ?></option>
                     </select>
+                    <?php elseif ($__mgrRow): ?>
+                    <select name="role" class="form-select">
+                        <option value="engineer" <?php echo ($t['role'] ?? 'engineer') == 'engineer' ? 'selected' : ''; ?>><?php echo __('role_engineer'); ?></option>
+                        <option value="brigadnik" <?php echo ($t['role'] ?? 'engineer') == 'brigadnik' ? 'selected' : ''; ?>>Brigádník</option>
+                    </select>
                     <?php else: ?>
                         <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo ($t['role'] ?? 'engineer') == 'admin' ? __('role_admin') : (($t['role'] ?? 'engineer') == 'boss' ? 'Boss' : (($t['role'] ?? 'engineer') == 'accountant' ? 'Účetní' : (($t['role'] ?? 'engineer') == 'manager' ? __('role_manager') : (($t['role'] ?? 'engineer') == 'brigadnik' ? 'Brigádník' : __('role_engineer'))))); ?></div>
                         <input type="hidden" name="role" value="<?php echo htmlspecialchars($t['role'] ?? 'engineer'); ?>">
@@ -3023,7 +3060,7 @@ require_once 'includes/header.php';
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label"><?php echo __('spec_col'); ?></label>
-                    <?php if ($is_admin_user): ?>
+                    <?php if ($__basic): ?>
                         <input type="text" name="tech_spec" class="form-control" value="<?php echo htmlspecialchars($t['specialization'] ?? ''); ?>">
                     <?php else: ?>
                         <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo htmlspecialchars($t['specialization'] ?? ''); ?></div>
@@ -3060,7 +3097,7 @@ require_once 'includes/header.php';
             </div>
             <div class="mb-3">
                 <label class="form-label"><?php echo __('login_col'); ?></label>
-                <?php if ($is_admin_user): ?>
+                <?php if ($__basic): ?>
                     <input type="text" name="tech_username" class="form-control" value="<?php echo htmlspecialchars($t['username'] ?? ''); ?>">
                 <?php else: ?>
                     <div class="form-control bg-dark bg-opacity-25 border-secondary text-white"><?php echo htmlspecialchars($t['username'] ?? ''); ?></div>
@@ -3102,6 +3139,9 @@ require_once 'includes/header.php';
                 <label class="form-check-label" for="payByTime<?php echo $t['id']; ?>">Odměna z času v systému <span class="text-white-50 small">(brigádník — počítají se hodiny, ne zakázky)</span></label>
             </div>
             <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_active" id="isActive<?php echo $t['id']; ?>" <?php echo ($t['is_active'] ?? 1) ? 'checked' : ''; ?>><label class="form-check-label" for="isActive<?php echo $t['id']; ?>"><?php echo __('active_status'); ?></label></div>
+            <?php elseif ($__mgrRow): ?>
+                <input type="hidden" name="engineer_rate" value="<?php echo htmlspecialchars($t['engineer_rate'] ?? 0); ?>">
+                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_active" id="isActive<?php echo $t['id']; ?>" <?php echo ($t['is_active'] ?? 1) ? 'checked' : ''; ?>><label class="form-check-label" for="isActive<?php echo $t['id']; ?>"><?php echo __('active_status'); ?> <span class="text-white-50 small">(vypnutím se zaměstnanec nepřihlásí)</span></label></div>
             <?php else: ?>
                 <input type="hidden" name="engineer_rate" value="<?php echo htmlspecialchars($t['engineer_rate'] ?? 0); ?>">
                 <input type="hidden" name="is_active" value="1">

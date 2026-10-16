@@ -11,6 +11,22 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.93.0',
+        'date' => '2026-10-16',
+        'time' => '10:32',
+        'title' => 'E-shop vyřízení, banka z výpisu, upomínky, sloučení klientů, katalog dílů, úklid',
+        'items' => [
+            '<b>Zaplacené e-shop objednávky jdou uzavřít:</b> nový stav <b>Vyřízeno</b> — tlačítka „Odesláno" (s číslem zásilky) a „Předáno na prodejně" na Nástěnce i v administraci e-shopu. Zásilka vytvořená v adminu e-shopu (PPL, Zásilkovna) objednávku vyřídí sama. Dlaždice ukazuje, kolik zaplacených čeká na odeslání a jak dlouho.',
+            '<b>Banka bez API:</b> v Účetnictví → Banka jde <b>nahrát výpis z KB ve formátu GPC (ABO)</b>. Příchozí platby se samy spárují s fakturami (podle VS) i s e-shop objednávkami; opakované nahrání nic nezdvojí. (KB API je zatím jen v testovacím režimu, ostré napojení vyžaduje registraci u KB.)',
+            '<b>Faktury po splatnosti:</b> v Účetnictví nový přehled „Po splatnosti" (počet a dlužná částka, nejstarší nahoře, kolik dní po splatnosti) a tlačítko <b>Upomínka</b> — klientovi odejde faktura se zdvořilým upozorněním a QR platbou; u faktury je vidět, kdy byla upomenuta.',
+            '<b>Sloučení duplicitních klientů</b> (admin, Boss): Klienti → „Možné duplicity" a panel na kartě klienta. Zakázky, reklamace, faktury, účtenky i věrnostní body přejdou na ponechaného klienta; vystavené faktury si odběratele ponechají beze změny. Při zakládání klienta CRM upozorní, že klient se stejným telefonem už existuje, a nabídne ho použít.',
+            '<b>Sklad dílů:</b> přepínač <b>Skladem / Katalog dodavatelů</b> (katalog ~9 000 karet s 0 ks šlo dřív jen hledat) s filtrem dodavatele. V globálním hledání jsou „Servisní díly skladem" zvlášť a katalog až na konci.',
+            '<b>Manažer</b> teď lidi své pobočky (technik, brigádník) i upraví: jméno, kontakt, login, heslo, role technik↔brigádník a aktivní/neaktivní.',
+            '<b>Hledání:</b> po kliknutí do prázdného pole naposledy hledané dotazy; našeptávač funguje i v mobilním menu; celé telefonní číslo otevře rovnou zakázky toho čísla (jedna = detail).',
+            '<b>Úklid a bezpečnost:</b> odstraněny staré servisní skripty (mj. veřejně dostupný file_finder.php, upload_temp.php, který šel volat bez přihlášení, a sync_from_site.php s výchozím tokenem) a dva soubory se jmény klientů z dávného importu, které šly stáhnout z webu. Přenastavení Telegram webhooku smí jen admin/Boss.',
+        ],
+    ],
+    [
         'version' => '3.92.0',
         'date' => '2026-10-16',
         'time' => '09:16',

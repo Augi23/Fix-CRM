@@ -3,6 +3,50 @@ require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
+// ── Možné duplicity (v3.93.0): klienti se stejným telefonem → sloučit (admin, Boss) ──
+if (isset($_GET['dupes']) && crmIsAdminLevel()) {
+    $__dg = [];
+    try {
+        $__keys = $pdo->query("SELECT RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 9) k FROM customers
+            WHERE LENGTH(REGEXP_REPLACE(COALESCE(phone,''), '[^0-9]', '')) >= 9 GROUP BY k HAVING COUNT(*) > 1 LIMIT 300")->fetchAll(PDO::FETCH_COLUMN);
+        $__keys = array_values(array_filter($__keys, fn($k) => crmPhoneKey((string)$k) !== ''));   // bez výplňových čísel
+        $__q = $pdo->prepare("SELECT c.*, (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) oc,
+                (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) lastc
+            FROM customers c WHERE RIGHT(REGEXP_REPLACE(COALESCE(c.phone,''), '[^0-9]', ''), 9) = ? ORDER BY oc DESC, c.id ASC");
+        foreach ($__keys as $__k) { $__q->execute([$__k]); $__dg[] = $__q->fetchAll(PDO::FETCH_ASSOC); }
+    } catch (Throwable $e) { error_log('customers dupes: ' . $e->getMessage()); }
+    ?>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-clone me-2 text-warning"></i>Možné duplicity klientů <span class="text-white-50 fs-6"><?php echo count($__dg); ?> skupin</span></h2>
+        <a href="customers.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Klienti</a>
+    </div>
+    <div class="alert alert-info small">Klienti se stejným telefonním číslem. Zkontroluj, že jde o stejného člověka, a klikni <b>Sloučit sem</b> u záznamu, který má zůstat — zakázky, reklamace, faktury, účtenky i věrnostní body ostatních na něj přejdou a duplicita se smaže. Vystavené faktury si odběratele ponechají beze změny.</div>
+    <?php if (!$__dg): ?><div class="glass-panel p-4 text-center text-white-50">Žádné duplicity podle telefonu. 🎉</div><?php endif; ?>
+    <?php foreach ($__dg as $__grp): ?>
+    <div class="glass-panel p-3 mb-3">
+        <table class="table table-dark table-sm align-middle mb-0">
+            <thead><tr><th>Klient</th><th>Telefon</th><th>E-mail</th><th>Zakázek</th><th>Poslední</th><th class="text-end"></th></tr></thead>
+            <tbody>
+            <?php foreach ($__grp as $__c): $__nm = trim((string)$__c['company']) !== '' ? $__c['company'] : trim($__c['first_name'] . ' ' . $__c['last_name']); ?>
+                <tr>
+                    <td><a href="edit_customer.php?id=<?php echo (int)$__c['id']; ?>"><?php echo e($__nm ?: '—'); ?></a> <span class="text-white-50 small">#<?php echo (int)$__c['id']; ?></span></td>
+                    <td><?php echo e((string)$__c['phone']); ?></td>
+                    <td class="small"><?php echo e((string)$__c['email']); ?></td>
+                    <td><?php echo (int)$__c['oc']; ?></td>
+                    <td class="small text-white-50"><?php echo $__c['lastc'] ? e(date('j. n. Y', strtotime((string)$__c['lastc']))) : '—'; ?></td>
+                    <td class="text-end">
+                        <?php $__others = array_values(array_filter($__grp, fn($x) => (int)$x['id'] !== (int)$__c['id'])); ?>
+                        <button type="button" class="btn btn-sm btn-outline-warning" onclick="(function(){var ids=<?php echo json_encode(array_map(fn($x) => (int)$x['id'], $__others)); ?>;var go=function(i){if(i>=ids.length){location.reload();return;}var fd=new FormData();fd.append('keep_id',<?php echo (int)$__c['id']; ?>);fd.append('drop_id',ids[i]);fd.append('csrf_token',(document.querySelector('meta[name=csrf-token]')||{}).content||'');fetch('api/customer_merge.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){if(!d.ok){alert(d.error||'Nepovedlo se');location.reload();return;}go(i+1);});};if(confirm('Sloučit '+ids.length+' duplicit do klienta <?php echo e(addslashes($__nm)); ?> (#<?php echo (int)$__c['id']; ?>)? Nejde vrátit.'))go(0);})()"><i class="fas fa-code-merge me-1"></i>Sloučit sem</button>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endforeach; ?>
+    <?php require_once 'includes/footer.php'; exit;
+}
+
 $customers = [];
 if (isset($pdo)) {
     try {
@@ -92,6 +136,9 @@ function customersOrdersStyleDisplayName(array $customer): string
     <div class="d-flex gap-2">
         <?php if(!empty($_GET['search'])): ?>
             <a href="customers.php" class="btn btn-outline-secondary"><?php echo __('reset_search'); ?></a>
+        <?php endif; ?>
+        <?php if (crmIsAdminLevel()): ?>
+        <a href="customers.php?dupes=1" class="btn btn-outline-warning"><i class="fas fa-clone me-2"></i>Možné duplicity</a>
         <?php endif; ?>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
             <i class="fas fa-user-plus me-2"></i> <?php echo __('add_customer'); ?>

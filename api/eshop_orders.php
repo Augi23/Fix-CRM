@@ -54,7 +54,8 @@ if ($where && $params) {
 }
 
 $sql = "SELECT order_ref, status, items_json, total, customer_name, customer_email, customer_phone, note, created_at,
-               pay_id, pay_label, ship_id, ship_label, addr_street, addr_zip, addr_city, access_point_json, customer_note
+               pay_id, pay_label, ship_id, ship_label, addr_street, addr_zip, addr_city, access_point_json, customer_note,
+               fulfilled_at, fulfill_method, tracking_no
         FROM eshop_orders $where ORDER BY id DESC LIMIT $limit OFFSET $offset";
 $st = $pdo->prepare($sql);
 $st->execute($params);
@@ -123,6 +124,9 @@ foreach ($rows as $r) {
         'status_label'   => afxEshopStatusLabel((string)$r['status'], (string)($r['pay_id'] ?? '')),
         'actions'        => afxEshopOrderActions((string)$r['status'], (string)($r['pay_id'] ?? '')),   // co smí admin e-shopu udělat (v3.78.2)
         'pay_id'         => $r['pay_id'] !== null ? (string)$r['pay_id'] : null,
+        'fulfill_method' => $r['fulfill_method'] !== null ? (string)$r['fulfill_method'] : null,   // ship | pickup (v3.93.0)
+        'tracking_no'    => $r['tracking_no'] !== null ? (string)$r['tracking_no'] : null,
+        'fulfilled_at'   => $r['fulfilled_at'] !== null ? (string)$r['fulfilled_at'] : null,
         'pay_label'      => $r['pay_label'] ?: $legacy['pay'],
         'ship_id'        => $r['ship_id'] !== null ? (string)$r['ship_id'] : null,
         'ship_label'     => $r['ship_label'] ?: $legacy['ship'],

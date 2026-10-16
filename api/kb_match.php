@@ -11,6 +11,7 @@ ob_start();
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/kb_api.php';
+require_once '../includes/bank_gpc.php';
 ob_clean();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -75,7 +76,8 @@ try {
     if (!empty($tx['is_reversal'])) { throw new Exception('Storno platby nelze párovat s fakturou.'); }
     if (!in_array((string)$tx['match_status'], ['none', 'review', 'ignored'], true)) { throw new Exception('Pohyb už je spárovaný — nejdřív zruš stávající párování.'); }
     // …a jen pohyb z právě napojeného účtu a prostředí (sandbox nesmí platit ostré faktury)
-    if ((string)$tx['env'] !== kbApiEnv() || (string)$tx['account_id'] !== (string)get_setting('kb_account_id', '')) {
+    [$__scEnv, $__scAcc] = afxBankScope();   // KB API, nebo nahrané výpisy GPC
+    if ((string)$tx['env'] !== $__scEnv || (string)$tx['account_id'] !== $__scAcc) {
         throw new Exception('Pohyb patří k jinému účtu nebo prostředí, než je teď napojené.');
     }
     if (strtoupper((string)$tx['currency']) !== 'CZK') { throw new Exception('Platbu v cizí měně nelze párovat s korunovou fakturou — vyřeš ručně v účetnictví.'); }

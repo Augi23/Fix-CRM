@@ -8,6 +8,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/kb_api.php';
+require_once 'includes/bank_gpc.php';
 
 if ((empty($_SESSION['user_id']) && empty($_SESSION['tech_id']))
     || !(crmCanManageInvoices() || (function_exists('crmCanAccountingRead') && crmCanAccountingRead()))) {
@@ -22,6 +23,10 @@ afxEnsureInvoicePayments();
 $configured = kbApiConfigured();
 $lastSync = (string)get_setting('kb_last_sync_at', '');
 $env = kbApiEnv();
+// zdroj pohybů: nahrané výpisy GPC (dokud není ostré KB API), nebo KB API
+[$bankEnv, $bankAcc] = afxBankScope();
+$gpcMode = $bankAcc === AFX_GPC_ACCOUNT;
+$canImport = crmCanManageInvoices() || (function_exists('crmCanAccountingEdit') && crmCanAccountingEdit());
 
 // zůstatek — jen z lokálních dat (nevolat API při každém zobrazení stránky)
 $fDir = trim((string)($_GET['dir'] ?? ''));
@@ -33,7 +38,7 @@ $per = 60;
 
 // vždy jen AKTUÁLNÍ prostředí a účet — sandbox/starý účet se nesmí míchat do čísel
 $where = ['env = ?', 'account_id = ?'];
-$params = [kbApiEnv(), (string)get_setting('kb_account_id', '')];
+$params = [$bankEnv, $bankAcc];
 if (in_array($fDir, ['in', 'out'], true)) { $where[] = 'direction = ?'; $params[] = $fDir; }
 if ($fMatch === 'matched') { $where[] = "match_status IN ('auto','manual')"; }
 elseif ($fMatch === 'review') { $where[] = "match_status = 'review'"; }
@@ -55,12 +60,12 @@ try {
     $rows = $q->fetchAll(PDO::FETCH_ASSOC);
     $sq = $pdo->prepare("SELECT direction, SUM(amount) s FROM bank_transactions
         WHERE env = ? AND account_id = ? AND booking_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01') GROUP BY direction");
-    $sq->execute([kbApiEnv(), (string)get_setting('kb_account_id', '')]);
+    $sq->execute([$bankEnv, $bankAcc]);
     foreach ($sq->fetchAll() as $r) {
         $sums[(string)$r['direction']] = (float)$r['s'];
     }
     $rq = $pdo->prepare("SELECT COUNT(*) FROM bank_transactions WHERE env = ? AND account_id = ? AND match_status = 'review'");
-    $rq->execute([kbApiEnv(), (string)get_setting('kb_account_id', '')]);
+    $rq->execute([$bankEnv, $bankAcc]);
     $sums['review'] = (int)$rq->fetchColumn();
 } catch (Throwable $e) {}
 $pages = max(1, (int)ceil($total / $per));
@@ -82,14 +87,29 @@ try {
     <h2 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i> <?php echo __('accounting'); ?> <span class="fs-6 text-white-50">Komerční banka<?php echo $env === 'sandbox' ? ' · SANDBOX' : ''; ?></span></h2>
     <div class="d-flex gap-2 align-items-center">
         <a href="navody.php?tab=banka" class="btn btn-sm btn-outline-info" title="Návod: jak funguje párování plateb a co dělat, když platba nesedí"><i class="fas fa-circle-question me-1"></i>Jak fungují platby</a>
+        <?php if ($gpcMode): $__gl = (string)get_setting('bank_gpc_last_import_at', ''); ?>
+        <span class="text-white-50 small">Poslední výpis: <?php echo $__gl !== '' ? date('d.m.Y H:i', strtotime($__gl)) : 'nikdy'; ?></span>
+        <?php else: ?>
         <span class="text-white-50 small">Poslední sync: <?php echo $lastSync !== '' ? date('d.m.Y H:i', strtotime($lastSync)) : 'nikdy'; ?></span>
         <button class="btn btn-info" id="kbSyncBtn" <?php echo $configured ? '' : 'disabled'; ?>><i class="fas fa-rotate me-2"></i>Synchronizovat</button>
+        <?php endif; ?>
+        <?php if ($canImport): ?>
+        <label class="btn btn-success mb-0" title="Výpis stažený z internetového bankovnictví KB ve formátu GPC/ABO — pohyby se uloží a spárují s fakturami podle VS">
+            <i class="fas fa-file-import me-2"></i>Nahrát výpis (GPC)
+            <input type="file" id="gpcFile" accept=".gpc,.abo,.txt,text/plain" hidden>
+        </label>
+        <?php endif; ?>
     </div>
 </div>
 
 <?php require 'includes/accounting_tabs.php'; ?>
 
-<?php if (!$configured): ?>
+<?php if ($gpcMode): ?>
+<div class="alert alert-info small mb-3"><i class="fas fa-file-import me-2"></i>Pohyby se berou z <b>nahraných výpisů (GPC)</b>. Stáhni výpis v internetovém bankovnictví KB ve formátu <b>GPC (ABO)</b> a nahraj ho tlačítkem vpravo nahoře — příchozí platby se samy spárují s fakturami a e-shop objednávkami podle VS. Opakované nahrání téhož výpisu nic nezdvojí.</div>
+<?php elseif (!$configured): ?>
+<div class="alert alert-warning small mb-3"><i class="fas fa-lightbulb me-2"></i>Než bude KB napojená přes API, můžeš pohyby nahrávat ze staženého výpisu: tlačítko <b>Nahrát výpis (GPC)</b> vpravo nahoře.</div>
+<?php endif; ?>
+<?php if (!$configured && !$gpcMode): ?>
 <div class="glass-panel p-4 border-secondary mb-4">
     <h5><i class="fas fa-plug me-2 text-warning"></i>Banka ještě není připojená</h5>
     <p class="text-white-50 mb-2">Napojení na Komerční banku (KB API — přímý přístup k účtu) se nastavuje jednorázově:</p>
@@ -381,4 +401,27 @@ try {
 })();
 </script>
 
+<script>
+(function () {
+    var f = document.getElementById('gpcFile');
+    if (!f) { return; }
+    f.addEventListener('change', function () {
+        if (!f.files || !f.files[0]) { return; }
+        var fd = new FormData();
+        fd.append('file', f.files[0]);
+        fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+        var lbl = f.parentNode; lbl.classList.add('disabled');
+        fetch('api/bank_gpc_import.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d && d.ok) {
+                    alert('Výpis nahrán: ' + d.rows + ' pohybů (nových ' + d.new + ').\nSpárováno faktur: ' + d.matched + ', k prověření: ' + d.review + ', e-shop objednávek: ' + d.eshop + '.');
+                    location.reload();
+                } else { alert((d && d.error) || 'Nahrání se nepovedlo.'); lbl.classList.remove('disabled'); }
+            })
+            .catch(function () { alert('Síťová chyba — výpis se nenahrál.'); lbl.classList.remove('disabled'); });
+        f.value = '';
+    });
+})();
+</script>
 <?php require_once 'includes/footer.php'; ?>

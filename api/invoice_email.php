@@ -66,7 +66,9 @@ if ($to !== '' && !filter_var($to, FILTER_VALIDATE_EMAIL)) {
     echo json_encode(['ok' => false, 'error' => 'Zadaný e-mail nemá platný tvar.']); exit;
 }
 
-[$ok, $msg, $sentTo] = crmSendInvoiceEmail($invoiceId, $to !== '' ? $to : null);
+// upomínku k faktuře po splatnosti posílá jen vedení/účetní z Účetnictví
+$reminder = !empty($in['reminder']) && $__mayInvoices;
+[$ok, $msg, $sentTo] = crmSendInvoiceEmail($invoiceId, $to !== '' ? $to : null, $reminder);
 if (!$ok) {
     // „klient nemá e-mail" → řízený dotaz v UI místo mrtvé chyby (přesná shoda
     // s hláškou crmSendInvoiceEmail — SMTP chyby dotaz vyvolat nesmí)

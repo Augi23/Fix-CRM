@@ -38,12 +38,44 @@
         return out + esc(text.slice(pos));
     }
 
+    /* naposledy hledané (jen v tomto prohlížeči) — ukážou se po kliknutí do prázdného pole */
+    var RECENT_KEY = 'afx_recent_search';
+    function recentGet() {
+        try { var a = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); return Array.isArray(a) ? a.slice(0, 8) : []; }
+        catch (e) { return []; }
+    }
+    function recentAdd(q) {
+        q = String(q || '').trim();
+        if (q.length < 2 || q.length > 80) { return; }
+        try {
+            var a = recentGet().filter(function (x) { return x.toLowerCase() !== q.toLowerCase(); });
+            a.unshift(q);
+            localStorage.setItem(RECENT_KEY, JSON.stringify(a.slice(0, 8)));
+        } catch (e) {}
+    }
+
     function init() {
-        var form = document.querySelector('form.crm-navbar-search');
-        if (!form) { return; }
+        // horní lišta (PC) i výsuvný panel (mobil) — stejný našeptávač
+        document.querySelectorAll('form.crm-navbar-search, form.afx-sheet-search').forEach(initForm);
+        /* ⌘K / Ctrl+K kdykoli zaostří pole */
+        document.addEventListener('keydown', function (e) {
+            if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+                var inp = document.querySelector('form.crm-navbar-search input[name="search"]');
+                if (!inp || !inp.offsetParent) { return; }
+                e.preventDefault();
+                inp.focus();
+                inp.select();
+            }
+        });
+    }
+
+    function initForm(form) {
         var input = form.querySelector('input[name="search"]');
-        if (!input) { return; }
-        var scope = form.getAttribute('data-scope') || 'all';
+        if (!input || input.__afxSpot) { return; }
+        input.__afxSpot = true;
+        if (form.classList.contains('afx-sheet-search')) { form.style.position = 'relative'; }
+        var scope = form.getAttribute('data-scope')
+            || (form.querySelector('input[name="scope"][value="accounting"]') ? 'accounting' : 'all');
         var panel = document.createElement('div');
         panel.className = 'afx-spot';
         panel.hidden = true;
@@ -105,14 +137,35 @@
                 .catch(function () {});
         }
 
+        function showRecent() {
+            var list = recentGet();
+            if (!list.length) { panel.innerHTML = ''; close(); return; }
+            items = [];
+            var h = '<div class="afx-spot-group"><div class="afx-spot-gh"><i class="fas fa-clock-rotate-left"></i>Naposledy hledané'
+                  + '<a class="afx-spot-more" href="#" data-recent-clear="1">Vymazat</a></div>';
+            list.forEach(function (q) {
+                var idx = items.length;
+                items.push({ url: 'search.php?search=' + encodeURIComponent(q) + (scope === 'accounting' ? '&scope=accounting' : ''), recent: q });
+                h += '<a class="afx-spot-item" role="option" data-idx="' + idx + '" data-recent="' + esc(q) + '" href="#">'
+                   + '<span class="afx-spot-ic" style="--c:#8e8e93"><i class="fas fa-magnifying-glass"></i></span>'
+                   + '<span class="afx-spot-txt"><span class="afx-spot-t">' + esc(q) + '</span></span></a>';
+            });
+            panel.innerHTML = h + '</div>';
+            sel = -1;
+            open();
+        }
+
         input.addEventListener('input', function () {
             var q = input.value.trim();
             clearTimeout(timer);
-            if (q.length < 2) { panel.innerHTML = ''; close(); lastQ = null; return; }
+            if (q.length < 2) { lastQ = null; if (q === '') { showRecent(); } else { panel.innerHTML = ''; close(); } return; }
             if (q === lastQ) { return; }
             timer = setTimeout(function () { lastQ = q; query(q); }, 140);
         });
-        input.addEventListener('focus', function () { if (input.value.trim().length >= 2 && panel.innerHTML) { open(); } });
+        input.addEventListener('focus', function () {
+            if (input.value.trim() === '') { showRecent(); }
+            else if (input.value.trim().length >= 2 && panel.innerHTML) { open(); }
+        });
 
         function move(d) {
             if (!items.length || panel.hidden) { return; }
@@ -129,11 +182,28 @@
             else if (e.key === 'Escape') { close(); input.blur(); }
             else if (e.key === 'Enter' && sel >= 0 && items[sel] && !panel.hidden) {
                 e.preventDefault();
+                if (items[sel].recent) { input.value = items[sel].recent; input.dispatchEvent(new Event('input')); return; }
+                recentAdd(input.value);
                 window.location.href = items[sel].url;
             }
         });
 
         panel.addEventListener('click', function (e) {
+            if (e.target.closest('[data-recent-clear]')) {
+                e.preventDefault();
+                try { localStorage.removeItem(RECENT_KEY); } catch (er) {}
+                panel.innerHTML = ''; close(); return;
+            }
+            var r = e.target.closest('[data-recent]');
+            if (r) {
+                e.preventDefault();
+                input.value = r.getAttribute('data-recent');
+                input.dispatchEvent(new Event('input'));
+                input.focus();
+                return;
+            }
+            // klik na výsledek / „Zobrazit vše" → zapamatovat dotaz
+            if (e.target.closest('a.afx-spot-item, a.afx-spot-more, a.afx-spot-foot')) { recentAdd(input.value); }
             var a = e.target.closest('[data-dym]');
             if (a) {
                 e.preventDefault();
@@ -148,15 +218,7 @@
         /* Enter bez výběru → všechny výsledky (search.php; v Účetnictví se skrytým scope=accounting).
            name="search" zůstává — váže se na něj oprava skenů z čtečky (main.js). */
         form.setAttribute('action', 'search.php');
-
-        /* ⌘K / Ctrl+K kdykoli zaostří pole */
-        document.addEventListener('keydown', function (e) {
-            if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
-                e.preventDefault();
-                input.focus();
-                input.select();
-            }
-        });
+        form.addEventListener('submit', function () { recentAdd(input.value); });
     }
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }

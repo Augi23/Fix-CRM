@@ -84,6 +84,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <a href="<?php echo e($backUrl); ?>" class="btn btn-outline-secondary"><?php echo __('back'); ?></a>
 </div>
 
+<?php
+// stejný telefon / e-mail u jiného klienta → nabídnout sloučení (admin, Boss)
+$__dupes = crmIsAdminLevel() ? crmFindDuplicateCustomers((string)($customer['phone'] ?? ''), (string)($customer['email'] ?? ''), (int)$id, 5) : [];
+if ($__dupes): ?>
+    <div class="alert alert-warning d-flex flex-column gap-2">
+        <div><i class="fas fa-clone me-2"></i><b>Možná duplicita</b> — stejný telefon nebo e-mail má i:</div>
+        <?php foreach ($__dupes as $__d): $__dn = trim((string)$__d['company']) !== '' ? $__d['company'] : trim($__d['first_name'] . ' ' . $__d['last_name']); ?>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="edit_customer.php?id=<?php echo (int)$__d['id']; ?>" class="fw-semibold"><?php echo e($__dn ?: '—'); ?></a>
+            <span class="small"><?php echo e((string)$__d['phone']); ?> · <?php echo e((string)$__d['email']); ?> · <?php echo (int)$__d['orders_count']; ?> zakázek</span>
+            <button type="button" class="btn btn-sm btn-outline-dark ms-auto" onclick="afxMergeCustomers(<?php echo (int)$id; ?>, <?php echo (int)$__d['id']; ?>, 'Sloučit klienta „<?php echo e(addslashes($__dn)); ?>“ DO tohoto klienta? Jeho zakázky, reklamace, faktury, účtenky i body přejdou sem a záznam se smaže. Nejde vrátit.')"><i class="fas fa-code-merge me-1"></i>Sloučit sem</button>
+        </div>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
 <?php if ($success): ?>
     <div class="alert alert-success"><?php echo $success; ?></div>
     <script>window.afxDraft && afxDraft.clearKey('customer-<?php echo (int)$id; ?>');</script>

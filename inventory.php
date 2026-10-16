@@ -27,13 +27,21 @@ $max_price = $_GET['max_price'] ?? '';
 $f_model = trim((string)($_GET['model'] ?? ''));
 $f_location = (string)($_GET['location'] ?? '');   // id umístění | 'none' = neumístěné
 
-// Real-stock base condition: only stocked items (manually added, received, or with quantity).
-$where_clauses = [inventoryStockedWhereSql()];
+// Pohled: 'skladem' (výchozí) = skutečné zásoby pobočky; 'katalog' = katalog dodavatelů
+// (~9 000 karet s 0 ks z importů — sdílený pro obě pobočky, dřív v seznamu vůbec nešel prohlížet).
+$inv_view = (string)($_GET['view'] ?? '') === 'katalog' ? 'katalog' : 'skladem';
 $params = [];
-
-// Pobočková izolace — vždy jen zásoby vybrané pobočky.
-$where_clauses[] = "inventory.branch_id = ?";
-$params[] = $skladBranch;
+if ($inv_view === 'katalog') {
+    $where_clauses = ['NOT ' . inventoryStockedWhereSql()];
+    $f_supplier = preg_replace('/[^a-z0-9._-]/i', '', (string)($_GET['supplier'] ?? ''));
+    if ($f_supplier !== '') { $where_clauses[] = "source_supplier = ?"; $params[] = $f_supplier; }
+} else {
+    // Real-stock base condition: only stocked items (manually added, received, or with quantity).
+    $where_clauses = [inventoryStockedWhereSql()];
+    // Pobočková izolace — vždy jen zásoby vybrané pobočky.
+    $where_clauses[] = "inventory.branch_id = ?";
+    $params[] = $skladBranch;
+}
 
 if (!empty($search)) {
     // hledá i v součástkách uvnitř dílů-dárců (jen nevyjmuté) — „displej" najde
@@ -159,11 +167,35 @@ function invLocationOptionsHtml(array $allLocations, string $selected, array $po
 </div>
 
 <?php require 'includes/inventory_tabs.php'; ?>
+<?php
+$__cntStock = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE branch_id = " . (int)$skladBranch . " AND " . inventoryStockedWhereSql())->fetchColumn();
+$__cntCat   = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE NOT " . inventoryStockedWhereSql())->fetchColumn();
+$__suppliers = $inv_view === 'katalog' ? $pdo->query("SELECT source_supplier, COUNT(*) n FROM inventory WHERE NOT " . inventoryStockedWhereSql() . " AND source_supplier IS NOT NULL AND source_supplier <> '' GROUP BY source_supplier ORDER BY n DESC")->fetchAll(PDO::FETCH_ASSOC) : [];
+$__vq = function (array $extra) use ($skladBranch, $search) {
+    return 'inventory.php?' . http_build_query(array_merge(['branch' => (int)$skladBranch], $search !== '' ? ['search' => $search] : [], $extra));
+};
+?>
+<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+    <ul class="nav nav-pills mb-0">
+        <li class="nav-item"><a class="nav-link <?php echo $inv_view === 'skladem' ? 'active' : ''; ?>" href="<?php echo e($__vq([])); ?>"><i class="fas fa-boxes me-2"></i>Skladem <span class="badge bg-secondary ms-1"><?php echo $__cntStock; ?></span></a></li>
+        <li class="nav-item"><a class="nav-link <?php echo $inv_view === 'katalog' ? 'active' : ''; ?>" href="<?php echo e($__vq(['view' => 'katalog'])); ?>"><i class="fas fa-book-open me-2"></i>Katalog dodavatelů <span class="badge bg-secondary ms-1"><?php echo number_format($__cntCat, 0, ',', ' '); ?></span></a></li>
+    </ul>
+    <?php if ($inv_view === 'katalog' && $__suppliers): ?>
+    <select class="form-select form-select-sm w-auto" onchange="location.href=this.value" aria-label="Dodavatel">
+        <option value="<?php echo e($__vq(['view' => 'katalog'])); ?>">Všichni dodavatelé</option>
+        <?php foreach ($__suppliers as $__s): ?>
+        <option value="<?php echo e($__vq(['view' => 'katalog', 'supplier' => $__s['source_supplier']])); ?>" <?php echo ($f_supplier ?? '') === $__s['source_supplier'] ? 'selected' : ''; ?>><?php echo e($__s['source_supplier']); ?> (<?php echo (int)$__s['n']; ?>)</option>
+        <?php endforeach; ?>
+    </select>
+    <span class="text-white-50 small">Karty z katalogů dodavatelů — 0 ks u nás; tlačítkem Naskladnit se z karty stane skladová položka.</span>
+    <?php endif; ?>
+</div>
 
 <div class="collapse mb-4 <?php echo (!empty($search) || !empty($min_price) || !empty($max_price) || $f_model !== '' || $f_location !== '') ? 'show' : ''; ?>" id="filterPanel">
     <div class="card card-body shadow-sm">
         <form action="inventory.php" method="GET" class="row g-3">
             <input type="hidden" name="branch" value="<?php echo (int)$skladBranch; ?>">
+            <?php if ($inv_view === 'katalog'): ?><input type="hidden" name="view" value="katalog"><?php if (!empty($f_supplier)): ?><input type="hidden" name="supplier" value="<?php echo e($f_supplier); ?>"><?php endif; ?><?php endif; ?>
             <div class="col-md-4">
                 <label class="form-label small"><?php echo __('search_sku_placeholder'); ?></label>
                 <input type="text" name="search" class="form-control form-control-sm" value="<?php echo htmlspecialchars($search); ?>" placeholder="<?php echo __('name_or_sku'); ?>">

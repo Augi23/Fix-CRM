@@ -23,6 +23,16 @@ $res = $q !== '' ? gsRun($pdo, $q, $scope, $only !== '' ? 300 : 50, $only) : ['g
 // přesná shoda kódu právě u jednoho záznamu → otevřít detail. U čísla zakázky
 // stačí i jeho konec („1645" → APFAZ2601645), když sedí na jedinou zakázku —
 // tak to kolegové znají ze starého hledání v Zakázkách.
+// Celé telefonní číslo → rovnou zakázky toho čísla (jedna = detail, víc = seznam);
+// karta klienta zůstává ve výsledcích, když zakázky nemá.
+$__digits = preg_replace('/\D+/', '', $q);
+if ($only === '' && $res['mode'] === 'exact' && !preg_match('/\p{L}/u', $q) && strlen($__digits) >= 9 && strlen($__digits) <= 14) {
+    foreach ($res['groups'] as $g) {
+        if ($g['key'] !== 'orders' || empty($g['items'])) { continue; }
+        if ((int)$g['total'] === 1) { header('Location: ' . $g['items'][0]['url']); exit; }
+        header('Location: search.php?search=' . rawurlencode($q) . '&only=orders'); exit;
+    }
+}
 if ($res['mode'] === 'exact' && $only === '') {
     $exact = []; $ends = [];
     foreach ($res['groups'] as $g) {

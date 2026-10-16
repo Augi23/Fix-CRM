@@ -343,8 +343,9 @@ function gsEntities(): array {
             'more' => 'products.php?search=',   // bez pobočky → products.php sám přepne tam, kde kus je
         ],
         'inventory' => [
-            'label' => 'Servisní díly', 'icon' => 'fa-boxes', 'color' => '#a2845e', 'id' => 'i.id',
+            'label' => 'Servisní díly skladem', 'icon' => 'fa-boxes', 'color' => '#a2845e', 'id' => 'i.id',
             'from' => 'inventory i',
+            'where' => '(i.is_stocked = 1 OR i.quantity > 0)',   // skutečné zásoby; katalog dodavatelů je zvlášť níž
             'hay' => ['i.part_name', 'i.sku', 'i.device_model', 'i.source_supplier'],
             'phones' => [], 'codes' => ['i.sku'],
             'prim' => ['i.part_name'],
@@ -395,6 +396,17 @@ function gsEntities(): array {
             'more' => 'settings.php?tab=staff',
         ],
         // ── jen v Účetnictví ──
+        // katalog dodavatelů až na konec provozních oblastí — skutečné zásoby mají přednost
+        'catalog' => [
+            'label' => 'Katalog dodavatelů', 'icon' => 'fa-boxes', 'color' => '#8e8e93', 'id' => 'i.id',
+            'from' => 'inventory i',
+            'where' => 'NOT (i.is_stocked = 1 OR i.quantity > 0)',   // ~9 000 karet s 0 ks z importů
+            'hay' => ['i.part_name', 'i.sku', 'i.device_model', 'i.source_supplier'],
+            'phones' => [], 'codes' => ['i.sku'],
+            'prim' => ['i.part_name'],
+            'select' => 'i.id, i.part_name, i.sku, i.quantity, i.device_model, i.branch_id, i.source_supplier',
+            'more' => 'inventory.php?branch=__BRANCH__&view=katalog&search=',
+        ],
         'invoices' => [
             'acct' => true,
             'label' => 'Faktury', 'icon' => 'fa-file-invoice-dollar', 'color' => '#32d74b', 'id' => 'f.id',
@@ -444,8 +456,9 @@ function gsItem(string $key, array $r): array {
                     'url' => 'products.php?branch=' . ((int)$r['branch_id'] ?: 1) . ((int)$r['is_vykup'] === 1 ? '&cat=vykupy' : '') . '&search=' . rawurlencode((string)$r['product_code']),
                     'codes' => [(string)$r['product_code']]];
         case 'inventory':
+        case 'catalog':
             return ['title' => (string)$r['part_name'], 'subtitle' => trim(implode(' · ', array_filter([(string)$r['sku'], (string)$r['device_model']]))),
-                    'meta' => (int)$r['quantity'] . ' ks', 'url' => 'edit_inventory.php?id=' . (int)$r['id'], 'codes' => [(string)$r['sku']]];
+                    'meta' => $key === 'catalog' ? 'katalog' . (!empty($r['source_supplier']) ? ' · ' . $r['source_supplier'] : '') : (int)$r['quantity'] . ' ks', 'url' => 'edit_inventory.php?id=' . (int)$r['id'], 'codes' => [(string)$r['sku']]];
         case 'documents':
             $types = ['vykup' => 'Výkupní list', 'zastava' => 'Zástavní smlouva'];
             return ['title' => ($types[$r['doc_type']] ?? 'Dokument') . ' ' . (string)$r['doc_number'],
