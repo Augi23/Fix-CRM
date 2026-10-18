@@ -462,7 +462,7 @@ try {
                                             <?php endif; ?>
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-8xx)"><i class="fas fa-tag"></i></button>
                                             <button type="button" class="btn btn-white border text-danger product-label-btn" data-id="<?php echo (int)$p['id']; ?>" data-akce="1" title="Štítek AKCE — cenovka červeně (jen s černo-červenou rolí DK-22251!)"><i class="fas fa-fire"></i></button>
-                                            <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vrátit do skladu' : 'Zapůjčeno / komisní prodej'; ?>"><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i></button>
+                                            <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vráceno — vrátit kus do skladu' : 'Zapůjčit / komisní prodej'; ?>"><?php if (productIsLoaned($p)): ?><i class="fas fa-rotate-left" style="color:#8B5CF6"></i><span class="ms-1" style="color:#8B5CF6;font-size:12px;font-weight:600">Vráceno</span><?php else: ?><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i><?php endif; ?></button>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>
                                             <button type="button" class="btn btn-white border tr-add-btn" data-type="product" data-id="<?php echo (int)$p['id']; ?>" data-name="<?php echo e($p['title']); ?>" title="Přesun na druhou pobočku"><i class="fas fa-right-left text-info"></i></button>
                                             <button type="button" class="btn btn-white border text-danger product-delete-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>
@@ -2362,7 +2362,7 @@ $(document).on('click', '.product-delete-btn', function () {
 $(document).on('click', '.product-loan-btn', function () {
     var d = this.dataset;
     if (d.loaned === '1') {
-        showConfirm('Vrátit „' + escHtml(d.title || '') + '" zpět do skladu? Půjde zase na e-shop.', function () {
+        showConfirm('Kus „' + escHtml(d.title || '') + '" je vrácený? Vrátí se do skladu a půjde zase na e-shop.', function () {
             $.post('api/product_loan.php', { id: d.id, action: 'return', csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>' }, function (res) {
                 if (res.success) { location.reload(); } else { showAlert(res.message || 'Nepovedlo se'); }
             });

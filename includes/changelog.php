@@ -18,6 +18,7 @@ $entries = [
         'items' => [
             'Při zapůjčení kusu ze skladu (Sklad → <i class="fas fa-hand-holding-heart"></i> Zapůjčeno) pole <b>„Komu"</b> našeptává <b>klienty z databáze</b> podle jména i telefonu. Vybraný klient se se zápůjčkou propojí; jde napsat i jméno mimo databázi.',
             'Propojená zápůjčka se ukáže <b>v kartě klienta</b> (fialový rámeček „Klient má zapůjčeno" — co, od kdy, kolik dní, poznámka), <b>v detailu jeho zakázky</b> u klienta a v <b>seznamu klientů</b> značkou „Zapůjčeno". Ve skladu je jméno klienta odkazem na jeho kartu.',
+            '<b>Vrácení jedním klikem:</b> u každého zapůjčeného kusu v kartě klienta i v detailu zakázky je tlačítko <b>„Vráceno"</b> — kus se vrátí do skladu (a zase na e-shop). Ve Skladu má zapůjčený kus místo ikony jasné tlačítko „Vráceno".',
             'Dosavadní zápůjčky se s klientem propojily samy tam, kde jméno přesně sedí na jednoho klienta v databázi.',
             'Když se zapůjčený kus prodá v Pokladně (komisní prodej / klient si ho koupí), zápůjčka se ukončí.',
         ],

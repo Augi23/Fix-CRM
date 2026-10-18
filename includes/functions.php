@@ -2230,24 +2230,43 @@ function crmCustomerLoans(int $customerId): array {
 
 /** Upozornění „Klient má zapůjčeno" — seznam kusů s odkazem do skladu. */
 function crmCustomerLoansBox(int $customerId, bool $compact = false): string {
+    static $scriptDone = false;
     $loans = crmCustomerLoans($customerId);
     if (!$loans) return '';
+    $canManage = crmCanManageProducts();
     $items = '';
     foreach ($loans as $l) {
         $from = strtotime((string)$l['loan_at']);
         $days = $from ? (int)floor((time() - $from) / 86400) : null;
         $daysTxt = $days === null ? '' : ' · ' . $days . "\u{00A0}" . ($days === 1 ? 'den' : ($days >= 2 && $days <= 4 ? 'dny' : 'dní'));
         $url = 'products.php?avail=loan&branch=' . (int)$l['branch_id'] . '&search=' . rawurlencode((string)($l['product_code'] ?: $l['title']));
-        $items .= '<li class="mb-1"><a href="' . e($url) . '" class="fw-semibold text-reset">' . e((string)$l['title']) . '</a>'
+        // vrácení jedním klikem — jen vedení pobočky, které kus patří (stejná pravidla jako ve Skladu)
+        $btn = ($canManage && crmCanModifyBranchStock((int)$l['branch_id']))
+            ? '<button type="button" class="btn btn-sm text-white flex-shrink-0" style="background:#8B5CF6;font-size:12px;padding:2px 10px" onclick="afxLoanReturn(this,' . (int)$l['id'] . ')" title="Klient kus vrátil — vrátit do skladu"><i class="fas fa-rotate-left me-1"></i>Vráceno</button>'
+            : '';
+        $items .= '<li class="d-flex align-items-start justify-content-between gap-2 py-1" style="border-top:1px solid rgba(139,92,246,.2)" data-loan-title="' . e((string)$l['title']) . '">'
+            . '<div><a href="' . e($url) . '" class="fw-semibold text-reset">' . e((string)$l['title']) . '</a>'
             . ' <span class="small text-white-75">' . ($from ? 'od ' . date('j.n.Y', $from) : '') . $daysTxt
             . (trim((string)$l['loan_note']) !== '' ? ' · ' . e((string)$l['loan_note']) : '')
             . (!$compact && trim((string)$l['loan_by']) !== '' ? ' · zapsal(a) ' . e((string)$l['loan_by']) : '')
-            . '</span></li>';
+            . '</span></div>' . $btn . '</li>';
     }
     $n = count($loans);
-    return '<div class="afx-loan-box' . ($compact ? ' afx-loan-box--compact' : '') . '" style="border:1px solid rgba(139,92,246,.45);background:rgba(139,92,246,.12);border-radius:12px;padding:' . ($compact ? '8px 12px' : '12px 16px') . ';margin-bottom:' . ($compact ? '.5rem' : '1rem') . '">'
+    $html = '<div class="afx-loan-box' . ($compact ? ' afx-loan-box--compact' : '') . '" style="border:1px solid rgba(139,92,246,.45);background:rgba(139,92,246,.12);border-radius:12px;padding:' . ($compact ? '8px 12px' : '12px 16px') . ';margin-bottom:' . ($compact ? '.5rem' : '1rem') . '">'
         . '<div class="fw-semibold mb-1" style="color:#C4B5FD"><i class="fas fa-hand-holding-heart me-2"></i>Klient má zapůjčeno: ' . $n . ' zařízení</div>'
-        . '<ul class="mb-0 ps-3" style="font-size:' . ($compact ? '12.5px' : '13.5px') . '">' . $items . '</ul></div>';
+        . '<ul class="list-unstyled mb-0" style="font-size:' . ($compact ? '12.5px' : '13.5px') . '">' . $items . '</ul></div>';
+    if ($canManage && !$scriptDone) {
+        $scriptDone = true;
+        $html .= '<script>function afxLoanReturn(btn,id){var li=btn.closest("li"),t=(li?li.getAttribute("data-loan-title"):"").replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});'
+            . 'var go=function(){btn.disabled=true;var fd=new FormData();fd.append("id",id);fd.append("action","return");fd.append("csrf_token",' . json_encode((string)($_SESSION['csrf_token'] ?? '')) . ');'
+            . 'fetch("api/product_loan.php",{method:"POST",body:fd,credentials:"same-origin"}).then(function(r){return r.json();}).then(function(d){'
+            . 'if(!d.success){btn.disabled=false;(window.showAlert||alert)(d.message||"Nepovedlo se");return;}'
+            . 'var box=btn.closest(".afx-loan-box");li.remove();if(box&&!box.querySelector("li")){box.remove();}else if(box){var h=box.querySelector("div");if(h)h.lastChild.nodeValue="Klient má zapůjčeno: "+box.querySelectorAll("li").length+" zařízení";}'
+            . '}).catch(function(){btn.disabled=false;(window.showAlert||alert)("Vrácení selhalo — obnov stránku a zkus to znovu.");});};'
+            . 'var msg="Klient vrátil „"+t+"“? Kus se vrátí do skladu a půjde zase na e-shop.";'
+            . 'if(window.showConfirm){showConfirm(msg,go);}else if(confirm(msg)){go();}}</script>';
+    }
+    return $html;
 }
 
 /** Je kus zapůjčený / v komisi? (řádek z products) */
