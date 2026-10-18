@@ -132,57 +132,227 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
 ?>
 
 <style>
-/* Kasa — velké dotykové ovládání, liquid glass akcenty ladí s dokem (.afx-cell.act-*) */
-.pos-search { font-size: 17px; padding: 13px 16px; border-radius: 14px; }
-.pos-results { max-height: 380px; overflow-y: auto; }
-.pos-hit { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; cursor: pointer; transition: background .13s; }
-.pos-hit:hover { background: rgba(0,163,255,.12); }
-.pos-hit .nm { font-weight: 600; }
-.pos-hit .cd { font-size: 11.5px; color: rgba(255,255,255,.5); }
-.pos-hit .pr { margin-left: auto; font-weight: 700; white-space: nowrap; }
-.pos-type { font-size: 10px; font-weight: 700; letter-spacing: .05em; border-radius: 7px; padding: 2px 7px; white-space: nowrap; }
-.pos-type.part { background: rgba(0,163,255,.18); color: #6fd0ff; }
-.pos-type.product { background: rgba(48,209,88,.16); color: #6fe08d; }
-.pos-type.manual { background: rgba(255,159,10,.16); color: #ffc46b; }
-.pos-type.order { background: rgba(191,90,242,.18); color: #d9a7ff; }
-.pos-type.vykup { background: rgba(255,69,58,.16); color: #ff8f88; }
-.pos-type.expense { background: rgba(255,159,10,.20); color: #ffb84d; }
-.pos-type.eshop { background: rgba(48,209,88,.18); color: #7ce39a; }
-.pos-eshop-bar { display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding:10px 12px;
-    border-radius:12px; background:rgba(48,209,88,.12); border:1px solid rgba(48,209,88,.35); font-size:13.5px; }
-.pos-eshop-bar b { color:#9fe7b6; }
-.pos-eshop-bar .drop { margin-left:auto; background:none; border:1px solid rgba(255,255,255,.3); color:#ffd1d1;
-    border-radius:8px; padding:3px 10px; font-size:12px; font-weight:700; cursor:pointer; }
-.pos-manual { padding-bottom: 13px; margin-bottom: 13px; border-bottom: 1px solid rgba(255,255,255,.10); }
-.pos-manual .form-control { font-size: 15.5px; padding: 10px 12px; }
-.pos-manual .btn { font-weight: 700; white-space: nowrap; }
-/* Košík = hlavní plocha kasy — všechno velké a čitelné jako na skutečné pokladně */
-.pos-cart td { vertical-align: middle; padding: 12px 8px; }
-.pos-cart thead th { font-size: 15.5px; font-weight: 700; color: rgba(255,255,255,.75) !important; text-transform: uppercase; letter-spacing: .04em; }
-.pos-item-name { font-size: 16px; font-weight: 600; line-height: 1.25; }
-.pos-item-code { font-size: 12.5px; color: rgba(255,255,255,.5); }
-.pos-cart input.pos-qty, .pos-cart input.pos-price { font-size: 18px; font-weight: 600; text-align: center; padding: 9px 6px; }
-.pos-line-total { font-size: 18px; font-weight: 700; white-space: nowrap; }
-.pos-remove { font-size: 26px; line-height: 1; padding: 6px 10px; border: 0; background: none; color: #ff5f57; cursor: pointer; transition: transform .12s, color .12s; }
-.pos-remove:hover { color: #ff2d21; transform: scale(1.18); }
-.pos-total { font-size: 58px; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
-.pos-total-label { font-size: 22px; font-weight: 600; }
-.pos-pay { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
-  flex: 1; padding: 19px 10px; border-radius: 19px; border: 0; cursor: pointer; font-weight: 700; font-size: 15.5px;
-  background: rgba(255,255,255,.05); color: #a7b1c2; box-shadow: inset 0 0 0 1px rgba(255,255,255,.09);
-  transition: background .16s, color .16s, box-shadow .16s; }
-.pos-pay i { font-size: 25px; }
-.pos-pay.sel-cash { color: #6fe08d; background: rgba(48,209,88,.16); box-shadow: inset 0 0 0 1px rgba(48,209,88,.4), 0 0 16px rgba(48,209,88,.22); text-shadow: 0 0 12px rgba(48,209,88,.5); }
-.pos-pay.sel-card { color: #5fd2ff; background: rgba(0,163,255,.18); box-shadow: inset 0 0 0 1px rgba(0,163,255,.45), 0 0 16px rgba(0,163,255,.25); text-shadow: 0 0 12px rgba(95,210,255,.5); }
-.pos-pay.sel-invoice { color: #ffc46b; background: rgba(255,159,10,.15); box-shadow: inset 0 0 0 1px rgba(255,159,10,.42), 0 0 16px rgba(255,159,10,.22); text-shadow: 0 0 12px rgba(255,159,10,.5); }
-.pos-pay.sel-invoice_ico { color: #d9a7ff; background: rgba(191,90,242,.15); box-shadow: inset 0 0 0 1px rgba(191,90,242,.42), 0 0 16px rgba(191,90,242,.22); text-shadow: 0 0 12px rgba(191,90,242,.5); }
-.pos-finish { width: 100%; padding: 20px; border: 0; border-radius: 19px; font-size: 19px; font-weight: 700;
-  color: #eaf6ff; background: linear-gradient(135deg, rgba(0,163,255,.34), rgba(90,200,250,.22));
-  box-shadow: inset 0 0 0 1px rgba(0,163,255,.5), 0 8px 26px rgba(0,120,210,.28); cursor: pointer; transition: filter .15s, transform .12s; }
-.pos-finish:hover { filter: brightness(1.15); }
-.pos-finish:active { transform: scale(.985); }
-.pos-finish:disabled { opacity: .45; cursor: not-allowed; }
-.pos-empty { color: rgba(255,255,255,.4); text-align: center; padding: 34px 0; font-size: 15.5px; }
+/* ══ POKLADNA v2 (3.95.0) — prodej nahoře ve 3 krocích, kniha a pohyby dole v záložkách ══
+   Dotykové cíle min. 44 px, jeden sloupec na telefonu, košík vpravo „přilepený" na PC. */
+.pos-app { --pos-card: rgba(20,22,28,.94) !important; --pos-card2: rgba(255,255,255,.035); --pos-line: rgba(255,255,255,.08) !important;
+  --pos-fg: #fff !important; --pos-fg2: rgba(255,255,255,.64); --pos-fg3: rgba(255,255,255,.42); --pos-soft: rgba(255,255,255,.055) !important;
+  --pos-accent: #0A84FF !important; --pos-ok: #30D158 !important; --pos-warn: #FF9F0A !important; --pos-bad: #FF453A !important; --pos-vio: #BF5AF2 !important; }
+html[data-lg-theme="light"] .pos-app { --pos-card: #ffffff !important; --pos-card2: rgba(0,0,0,.025); --pos-line: rgba(0,0,0,.09) !important;
+  --pos-fg: #111 !important; --pos-fg2: rgba(0,0,0,.62); --pos-fg3: rgba(0,0,0,.45); --pos-soft: rgba(0,0,0,.045) !important;
+  --pos-ok: #1f9d45 !important; --pos-warn: #c26a00 !important; --pos-bad: #d70015 !important; --pos-vio: #8e3fc0 !important; }
+.pos-app { color: var(--pos-fg) !important; }
+/* CRM má globálně span/small/label/.btn/.form-control na 18 px (!important) — kasa si drží vlastní stupnici */
+.pos-app .small, .pos-app .form-label, .pos-cust label { font-size: 13px !important; }
+.pos-app .badge { font-size: 11.5px !important; }
+.pos-app .form-control, .pos-app .form-select { font-size: 15px !important; }
+.pos-app .btn { font-size: 14.5px !important; }
+.pos-top-actions .btn span { font-size: 14.5px !important; }
+.pos-pay > span { font-size: 15.5px !important; line-height: 1.2 !important; }
+.pos-eshop-bar span { font-size: 13.5px !important; }
+.pos-feed-row .btn { font-size: 13px !important; }
+.pos-feed-row .d { font-size: 14px !important; }
+.pos-mbar .lbl, .pos-mbar .lbl span { font-size: 12px !important; }
+.pos-done code { font-size: 13px !important; }
+.pos-cust .select2-container, .pos-cust .select2-selection__rendered { font-size: 15px !important; }
+.pos-card { background: var(--pos-card) !important; border: 1px solid var(--pos-line) !important; border-radius: 18px !important; padding: 18px !important; }
+
+/* ── horní lišta: název + směna · hotovost a dnešní tržby · akce ── */
+.pos-top { display: flex !important; align-items: center !important; gap: 14px 22px !important; flex-wrap: wrap !important; margin-bottom: 16px !important; }
+.pos-top-title { display: flex !important; align-items: center !important; gap: 12px !important; min-width: 0 !important; }
+.pos-top-ico { width: 44px !important; height: 44px !important; border-radius: 13px !important; display: grid !important; place-items: center !important; font-size: 19px !important;
+  color: #fff !important; background: linear-gradient(135deg, #0A84FF, #5AC8FA) !important; flex: 0 0 auto !important; }
+.pos-top h2 { font-size: 24px !important; font-weight: 700 !important; margin: 0 !important; letter-spacing: -.02em !important; line-height: 1.1 !important; }
+.pos-shift { font-size: 13px !important; color: var(--pos-fg2) !important; margin-top: 2px !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+.pos-shift .dot { width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--pos-ok) !important; box-shadow: 0 0 0 3px rgba(48,209,88,.2) !important; }
+.pos-shift.off .dot { background: var(--pos-warn) !important; box-shadow: 0 0 0 3px rgba(255,159,10,.2) !important; }
+.pos-kpis { display: flex !important; gap: 8px !important; flex-wrap: wrap !important; flex: 1 1 auto !important; }
+.pos-kpi { background: var(--pos-soft) !important; border: 1px solid var(--pos-line) !important; border-radius: 12px !important; padding: 7px 13px !important; line-height: 1.2 !important; min-width: 112px !important; }
+.pos-kpi span { display: block !important; font-size: 11.5px !important; color: var(--pos-fg3) !important; text-transform: uppercase !important; letter-spacing: .05em !important; font-weight: 600 !important; }
+.pos-kpi b { font-size: 17px !important; font-weight: 700 !important; white-space: nowrap !important; }
+.pos-kpi.main { background: rgba(48,209,88,.10) !important; border-color: rgba(48,209,88,.32) !important; }
+.pos-kpi.main.neg { background: rgba(255,69,58,.10) !important; border-color: rgba(255,69,58,.35) !important; }
+.pos-kpi.main b { font-size: 19px !important; color: var(--pos-ok) !important; }
+.pos-kpi.main.neg b { color: var(--pos-bad) !important; }
+.pos-top-actions { display: flex !important; gap: 8px !important; flex-wrap: wrap !important; margin-left: auto !important; }
+.pos-top-actions .btn { min-height: 40px !important; border-radius: 11px !important; font-weight: 600 !important; display: inline-flex !important; align-items: center !important; gap: 6px !important; }
+html[data-lg-theme="light"] .pos-top-actions .btn { opacity: 1 !important; filter: none !important; }
+html[data-lg-theme="light"] .pos-top-actions .btn-outline-success { color: #1a7f37 !important; border-color: rgba(26,127,55,.45) !important; background: rgba(52,199,89,.10) !important; }
+html[data-lg-theme="light"] .pos-top-actions .btn-outline-warning { color: #a35400 !important; border-color: rgba(194,106,0,.45) !important; background: rgba(255,159,10,.12) !important; }
+html[data-lg-theme="light"] .pos-top-actions .btn-warning { color: #3d2400 !important; background: #FFB340 !important; border-color: #FFB340 !important; }
+.pos-top-actions .pos-more { color: var(--pos-fg) !important; border-color: var(--pos-line) !important; background: var(--pos-soft) !important; }
+.pos-top-actions .dropdown-menu { border-radius: 12px !important; padding: 6px !important; }
+.pos-top-actions .dropdown-item { border-radius: 8px !important; padding: 9px 12px !important; }
+
+/* ── prodejní plocha ── */
+.pos-grid { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(360px, 460px) !important; grid-template-rows: auto 1fr !important; gap: 18px !important; align-items: start !important; }
+.pos-col-add { grid-column: 1 !important; grid-row: 1 !important; min-width: 0 !important; }
+.pos-col-lower { grid-column: 1 !important; grid-row: 2 !important; min-width: 0 !important; }
+.pos-col-cart { grid-column: 2 !important; grid-row: 1 / span 2 !important; position: sticky !important; top: calc(var(--topbar-h, 52px) + 12px) !important;
+  max-height: calc(100vh - var(--topbar-h, 52px) - 24px) !important; overflow-y: auto !important; overscroll-behavior: contain !important; border-radius: 18px !important; }
+.pos-col-cart::-webkit-scrollbar { width: 6px; } .pos-col-cart::-webkit-scrollbar-thumb { background: rgba(127,127,127,.35); border-radius: 3px; }
+.pos-step { display: flex !important; align-items: center !important; gap: 10px !important; font-size: 17px !important; font-weight: 700 !important; margin-bottom: 12px !important; }
+.pos-step-n { width: 26px !important; height: 26px !important; border-radius: 50% !important; display: grid !important; place-items: center !important; font-size: 13.5px !important; font-weight: 800 !important;
+  background: var(--pos-accent) !important; color: #fff !important; flex: 0 0 auto !important; }
+.pos-step .muted { font-weight: 500 !important; font-size: 13px !important; color: var(--pos-fg3) !important; }
+
+.pos-search-wrap { position: relative !important; }
+.pos-search-wrap > i { position: absolute !important; left: 16px !important; top: 50% !important; transform: translateY(-50%) !important; font-size: 18px !important; color: var(--pos-fg3) !important; pointer-events: none !important; }
+.pos-search-wrap input.pos-search { width: 100% !important; font-size: 18px !important; padding: 15px 16px 15px 46px !important; border-radius: 14px !important; min-height: 56px !important; }
+.pos-scan-hint { display: flex !important; align-items: center !important; gap: 6px !important; font-size: 12.5px !important; color: var(--pos-fg3) !important; margin: 8px 2px 0 !important; }
+.pos-results { max-height: 420px !important; overflow-y: auto !important; margin-top: 8px !important; }
+.pos-results:empty { display: none !important; }
+.pos-hit { display: flex !important; align-items: center !important; gap: 12px !important; padding: 11px 12px !important; border-radius: 12px !important; cursor: pointer !important; transition: background .12s !important; min-height: 56px !important; }
+.pos-hit + .pos-hit { border-top: 1px solid var(--pos-line) !important; }
+.pos-hit:hover, .pos-hit:active { background: rgba(10,132,255,.12) !important; }
+.pos-hit .nm { font-weight: 600 !important; font-size: 15px !important; line-height: 1.25 !important; }
+.pos-hit .cd { font-size: 12px !important; color: var(--pos-fg3) !important; margin-top: 1px !important; }
+.pos-hit .pr { margin-left: auto !important; font-weight: 700 !important; font-size: 16px !important; white-space: nowrap !important; }
+.pos-hit .add { flex: 0 0 auto !important; width: 34px !important; height: 34px !important; border-radius: 50% !important; display: grid !important; place-items: center !important;
+  background: rgba(10,132,255,.16) !important; color: #5fb4ff !important; font-size: 14px !important; }
+.pos-type { font-size: 10px !important; font-weight: 800 !important; letter-spacing: .05em !important; border-radius: 7px !important; padding: 3px 7px !important; white-space: nowrap !important; flex: 0 0 auto !important; }
+.pos-type.part { background: rgba(0,163,255,.18) !important; color: #6fd0ff !important; }
+.pos-type.product { background: rgba(48,209,88,.16) !important; color: #6fe08d !important; }
+.pos-type.manual { background: rgba(255,159,10,.16) !important; color: #ffc46b !important; }
+.pos-type.order { background: rgba(191,90,242,.18) !important; color: #d9a7ff !important; }
+.pos-type.vykup { background: rgba(255,69,58,.16) !important; color: #ff8f88 !important; }
+.pos-type.expense { background: rgba(255,159,10,.20) !important; color: #ffb84d !important; }
+.pos-type.eshop { background: rgba(48,209,88,.18) !important; color: #7ce39a !important; }
+html[data-lg-theme="light"] .pos-type.part { color: #0068b3 !important; } html[data-lg-theme="light"] .pos-type.product { color: #1e7e38 !important; }
+html[data-lg-theme="light"] .pos-type.order { color: #7a2fae !important; } html[data-lg-theme="light"] .pos-type.vykup { color: #c0392b !important; }
+html[data-lg-theme="light"] .pos-type.eshop { color: #1e7e38 !important; } html[data-lg-theme="light"] .pos-type.manual,
+html[data-lg-theme="light"] .pos-type.expense { color: #a35400 !important; }
+
+/* dlaždice „jiné akce" — otevírají panel pod sebou (vždy jen jeden) */
+.pos-tiles-label { font-size: 12px !important; text-transform: uppercase !important; letter-spacing: .06em !important; font-weight: 700 !important; color: var(--pos-fg3) !important; margin: 18px 2px 8px !important; }
+.pos-tiles { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; }
+.pos-tile { display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 3px !important; text-align: left !important; padding: 12px 13px !important; min-height: 76px !important;
+  border-radius: 14px !important; border: 1px solid var(--pos-line) !important; background: var(--pos-card2) !important; color: var(--pos-fg) !important; cursor: pointer !important;
+  transition: background .14s, border-color .14s !important; font-family: inherit !important; }
+.pos-tile i { font-size: 18px !important; margin-bottom: 3px !important; }
+.pos-tile b { font-size: 14px !important; font-weight: 700 !important; line-height: 1.2 !important; }
+.pos-tile small { font-size: 11.5px !important; color: var(--pos-fg3) !important; line-height: 1.25 !important; }
+.pos-tile:hover { background: var(--pos-soft) !important; }
+.pos-tile.t-manual i { color: #ffc46b !important; } .pos-tile.t-eshop i { color: #6fe08d !important; }
+.pos-tile.t-vykup i { color: #ff8f88 !important; } .pos-tile.t-expense i { color: #ffb84d !important; }
+.pos-tile.active { border-color: var(--pos-accent) !important; background: rgba(10,132,255,.12) !important; box-shadow: inset 0 0 0 1px var(--pos-accent) !important; }
+.pos-panel { margin-top: 10px !important; padding: 12px !important; border-radius: 14px !important; background: var(--pos-card2) !important; border: 1px solid var(--pos-line) !important; }
+.pos-panel .form-control { font-size: 16px !important; padding: 11px 12px !important; min-height: 46px !important; }
+.pos-panel .btn { min-height: 46px !important; font-weight: 700 !important; white-space: nowrap !important; }
+.pos-panel-title { font-size: 13px !important; font-weight: 600 !important; color: var(--pos-fg2) !important; margin-bottom: 8px !important; }
+
+/* ── košík ── */
+.pos-cart-head { display: flex !important; align-items: center !important; gap: 10px !important; margin-bottom: 6px !important; }
+.pos-cart-head .pos-step { margin-bottom: 0 !important; }
+.pos-count { font-size: 12px !important; font-weight: 700 !important; padding: 2px 8px !important; border-radius: 99px !important; background: var(--pos-soft) !important; color: var(--pos-fg2) !important; }
+.pos-clear { margin-left: auto !important; background: none !important; border: 0 !important; color: var(--pos-fg3) !important; font-size: 13px !important; padding: 6px 8px !important; border-radius: 8px !important; cursor: pointer !important; }
+.pos-clear:hover { color: var(--pos-bad) !important; background: rgba(255,69,58,.08) !important; }
+.pos-eshop-bar { display: none !important; align-items: center !important; gap: 10px !important; flex-wrap: wrap !important; margin: 8px 0 !important; padding: 10px 12px !important;
+  border-radius: 12px !important; background: rgba(48,209,88,.12) !important; border: 1px solid rgba(48,209,88,.35) !important; font-size: 13.5px !important; }
+.pos-eshop-bar b { color: #9fe7b6 !important; }
+html[data-lg-theme="light"] .pos-eshop-bar b { color: #1e7e38 !important; }
+.pos-eshop-bar .drop { margin-left: auto !important; background: none !important; border: 1px solid var(--pos-line) !important; color: var(--pos-bad) !important;
+  border-radius: 8px !important; padding: 4px 10px !important; font-size: 12px !important; font-weight: 700 !important; cursor: pointer !important; }
+.pos-lines { margin: 0 !important; padding: 0 !important; }
+.pos-line { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; gap: 8px 10px !important; padding: 12px 0 !important; border-top: 1px solid var(--pos-line) !important; }
+.pos-line:first-child { border-top: 0 !important; }
+.pos-item-name { font-size: 15.5px !important; font-weight: 600 !important; line-height: 1.25 !important; word-break: break-word !important; }
+.pos-item-code { font-size: 12px !important; color: var(--pos-fg3) !important; margin-top: 2px !important; }
+.pos-remove { width: 36px !important; height: 36px !important; border: 0 !important; border-radius: 10px !important; background: none !important; color: var(--pos-fg3) !important; font-size: 16px !important; cursor: pointer !important; }
+.pos-remove:hover { background: rgba(255,69,58,.12) !important; color: var(--pos-bad) !important; }
+.pl-ctrl { grid-column: 1 / -1 !important; display: flex !important; align-items: center !important; gap: 10px !important; flex-wrap: wrap !important; }
+.pl-qty { display: inline-flex !important; align-items: center !important; border: 1px solid var(--pos-line) !important; border-radius: 12px !important; overflow: hidden !important; background: var(--pos-card2) !important; }
+.pl-qty button { width: 40px !important; height: 42px !important; border: 0 !important; background: none !important; color: var(--pos-fg) !important; font-size: 15px !important; cursor: pointer !important; }
+.pl-qty button:hover:not(:disabled) { background: var(--pos-soft) !important; }
+.pl-qty button:disabled { opacity: .3 !important; cursor: default !important; }
+.pl-qty input.pos-qty { width: 46px !important; height: 42px !important; border: 0 !important; border-radius: 0 !important; background: none !important; text-align: center !important; font-size: 17px !important; font-weight: 700 !important; padding: 0 !important; color: var(--pos-fg) !important; -moz-appearance: textfield !important; }
+.pl-qty input.pos-qty::-webkit-outer-spin-button, .pl-qty input.pos-qty::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; }
+.pl-price { display: inline-flex !important; align-items: center !important; gap: 6px !important; font-size: 12px !important; color: var(--pos-fg3) !important; }
+.pl-price input.pos-price { width: 104px !important; height: 42px !important; text-align: right !important; font-size: 16px !important; font-weight: 600 !important; border-radius: 12px !important; padding: 0 10px !important; }
+.pl-price input[readonly] { opacity: .75 !important; }
+.pos-line-total { margin-left: auto !important; font-size: 18px !important; font-weight: 700 !important; white-space: nowrap !important; }
+.pos-line-total.neg { color: var(--pos-bad) !important; }
+.pos-empty { color: var(--pos-fg3) !important; text-align: center !important; padding: 26px 8px 22px !important; font-size: 15px !important; }
+.pos-empty i { display: block !important; font-size: 30px !important; margin-bottom: 10px !important; opacity: .55 !important; }
+.pos-empty small { display: block !important; margin-top: 3px !important; font-size: 12.5px !important; }
+
+.pos-sum { display: flex !important; justify-content: space-between !important; align-items: baseline !important; gap: 10px !important; padding: 14px 0 4px !important; margin-top: 6px !important; border-top: 1px solid var(--pos-line) !important; }
+.pos-total-label { font-size: 17px !important; font-weight: 600 !important; color: var(--pos-fg2) !important; }
+.pos-total { font-size: 46px !important; font-weight: 800 !important; letter-spacing: -.03em !important; line-height: 1 !important; white-space: nowrap !important; }
+.pos-total.neg { color: var(--pos-bad) !important; }
+.pos-paystep { margin-top: 16px !important; }
+.pos-pay-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+.pos-pay { display: flex !important; align-items: center !important; gap: 12px !important; padding: 13px 14px !important; min-height: 62px !important; border-radius: 14px !important; border: 0 !important; cursor: pointer !important;
+  font-weight: 700 !important; font-size: 15.5px !important; text-align: left !important; font-family: inherit !important;
+  background: var(--pos-card2) !important; color: var(--pos-fg) !important; box-shadow: inset 0 0 0 1px var(--pos-line) !important; transition: background .14s, box-shadow .14s !important; }
+.pos-pay i { font-size: 21px !important; width: 26px !important; text-align: center !important; color: var(--pos-fg3) !important; }
+.pos-pay small { display: block !important; font-size: 11px !important; font-weight: 500 !important; color: var(--pos-fg3) !important; margin-top: 1px !important; }
+.pos-pay:hover { background: var(--pos-soft) !important; }
+.pos-pay.is-off { opacity: .55 !important; }
+.pos-pay.sel-cash { background: rgba(48,209,88,.15) !important; box-shadow: inset 0 0 0 2px var(--pos-ok) !important; } .pos-pay.sel-cash i { color: var(--pos-ok) !important; }
+.pos-pay.sel-card { background: rgba(10,132,255,.15) !important; box-shadow: inset 0 0 0 2px var(--pos-accent) !important; } .pos-pay.sel-card i { color: var(--pos-accent) !important; }
+.pos-pay.sel-invoice { background: rgba(255,159,10,.14) !important; box-shadow: inset 0 0 0 2px var(--pos-warn) !important; } .pos-pay.sel-invoice i { color: var(--pos-warn) !important; }
+.pos-pay.sel-invoice_ico { background: rgba(191,90,242,.14) !important; box-shadow: inset 0 0 0 2px var(--pos-vio) !important; } .pos-pay.sel-invoice_ico i { color: var(--pos-vio) !important; }
+.pos-cust { margin-top: 12px !important; padding: 12px !important; border-radius: 14px !important; background: var(--pos-card2) !important; border: 1px solid var(--pos-line) !important; }
+.pos-finish { width: 100% !important; margin-top: 14px !important; padding: 18px !important; min-height: 64px !important; border: 0 !important; border-radius: 16px !important; font-size: 19px !important; font-weight: 800 !important;
+  color: #fff !important; background: linear-gradient(135deg, #0A84FF, #34AADC) !important; box-shadow: 0 10px 28px rgba(10,132,255,.32) !important;
+  cursor: pointer !important; transition: filter .15s, transform .12s, opacity .15s !important; font-family: inherit !important; }
+.pos-finish:hover { filter: brightness(1.08) !important; }
+.pos-finish:active { transform: scale(.985) !important; }
+.pos-finish:disabled { opacity: .38 !important; cursor: not-allowed !important; box-shadow: none !important; filter: grayscale(.4) !important; }
+.pos-finish-hint { text-align: center !important; font-size: 12.5px !important; color: var(--pos-fg3) !important; margin-top: 8px !important; min-height: 18px !important; }
+.pos-done { margin-top: 14px !important; border-color: rgba(48,209,88,.45) !important; background: rgba(48,209,88,.08) !important; }
+.pos-done .btn { min-height: 44px !important; border-radius: 11px !important; font-weight: 600 !important; }
+
+/* ── spodní část: záložky Dnešní pohyby / Pokladní kniha ── */
+.pos-lower { margin-top: 0 !important; }
+.pos-col-lower > .alert { margin-bottom: 12px !important; }
+.pos-tabs { display: inline-flex !important; gap: 4px !important; padding: 4px !important; border-radius: 13px !important; background: var(--pos-soft) !important; border: 1px solid var(--pos-line) !important; margin-bottom: 12px !important; flex-wrap: wrap !important; }
+.pos-tab { border: 0 !important; background: none !important; color: var(--pos-fg2) !important; font-weight: 600 !important; font-size: 14px !important; padding: 9px 16px !important; border-radius: 10px !important; cursor: pointer !important; min-height: 40px !important; font-family: inherit !important; }
+.pos-tab.active { background: var(--pos-card) !important; color: var(--pos-fg) !important; box-shadow: 0 1px 4px rgba(0,0,0,.25) !important; }
+.pos-tab .n { font-size: 11.5px !important; font-weight: 700 !important; margin-left: 4px !important; padding: 1px 7px !important; border-radius: 99px !important; background: var(--pos-soft) !important; }
+.pos-feed-row { display: grid !important; grid-template-columns: 52px 112px minmax(0, 1fr) auto !important; align-items: center !important; gap: 10px !important; padding: 9px 4px !important; border-top: 1px solid var(--pos-line) !important; font-size: 14px !important; }
+.pos-feed-row:first-child { border-top: 0 !important; }
+.pos-feed-row .t { color: var(--pos-fg3) !important; font-variant-numeric: tabular-nums !important; }
+.pos-feed-row .a { font-weight: 700 !important; text-align: right !important; white-space: nowrap !important; }
+.pos-feed-row .d { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.pos-feed-row .d small { color: var(--pos-fg3) !important; font-size: 12.5px !important; margin-left: 4px !important; }
+.pos-feed-row .x { display: flex !important; gap: 6px !important; justify-content: flex-end !important; }
+.pos-feed-row .x .btn { min-width: 34px !important; min-height: 32px !important; }
+.pos-feed-row.storno { opacity: .5 !important; } .pos-feed-row.storno .a { text-decoration: line-through !important; }
+.pos-feed-empty { color: var(--pos-fg3) !important; padding: 18px 4px !important; font-size: 14px !important; }
+
+/* ── mobil: spodní lišta s částkou → skok k platbě ── */
+.pos-mbar { display: none !important; }
+@media (max-width: 1199.98px) { .pos-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (max-width: 1080px) and (min-width: 992px) {
+  /* tablet na šířku: dole je tab bar CRM — košík ho nesmí podjet, ať je „Dokončit prodej" vždy vidět */
+  .pos-col-cart { max-height: calc(100vh - var(--topbar-h, 52px) - 110px) !important; }
+}
+@media (max-width: 991.98px) {
+  .pos-grid { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: none !important; }
+  .pos-col-add, .pos-col-cart, .pos-col-lower { grid-column: 1 !important; grid-row: auto !important; }
+  .pos-col-cart { position: static !important; max-height: none !important; overflow: visible !important; }
+  .pos-mbar { position: fixed !important; left: 10px !important; right: 10px !important; bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important; /* nad spodním tab barem CRM */ z-index: 1040 !important; align-items: center !important; gap: 12px !important;
+    padding: 10px 10px 10px 16px !important; border-radius: 16px !important; background: rgba(16,18,24,.96) !important; border: 1px solid rgba(255,255,255,.14) !important;
+    box-shadow: 0 12px 34px rgba(0,0,0,.45) !important; color: #fff !important; }
+  .pos-mbar.show { display: flex !important; }
+  .pos-mbar .lbl { font-size: 12px !important; color: rgba(255,255,255,.6) !important; line-height: 1.1 !important; }
+  .pos-mbar b { font-size: 21px !important; display: block !important; }
+  .pos-mbar button { margin-left: auto !important; border: 0 !important; border-radius: 12px !important; padding: 12px 18px !important; font-weight: 700 !important; font-size: 15.5px !important; color: #fff !important; background: #0A84FF !important; }
+  .pos-app.has-mbar { padding-bottom: 84px !important; }
+}
+@media (max-width: 575.98px) {
+  .pos-card { padding: 14px !important; border-radius: 16px !important; }
+  .pos-top-actions { width: 100% !important; display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; margin-left: 0 !important; }
+  .pos-top-actions .dropdown, .pos-top-actions .dropdown > .btn { width: 100% !important; }
+  .pos-top-actions .btn { flex-direction: column !important; justify-content: center !important; gap: 2px !important; padding: 7px 4px !important; min-height: 56px !important; line-height: 1.1 !important; }
+  .pos-top-actions .btn span, .pos-top-actions .btn .lbl { font-size: 11.5px !important; text-align: center !important; }
+  .pos-kpi { flex: 1 1 calc(50% - 8px) !important; min-width: 0 !important; }
+  .pos-total { font-size: 38px !important; }
+  .pos-pay { min-height: 58px !important; padding: 11px 12px !important; font-size: 14.5px !important; }
+  .pos-feed-row { grid-template-columns: 44px minmax(0, 1fr) auto !important; }
+  .pos-feed-row .d { grid-column: 1 / -1 !important; grid-row: 2 !important; white-space: normal !important; }
+}
 /* Zámek kasy po nečinnosti — plné překrytí, pod ním nejde nic dělat ani číst */
 /* ── LCD displej platby hotově — font staré kalkulačky (DSEG7, sedmisegmentovky) ── */
 @font-face { font-family: 'DSEG7'; src: url('assets/fonts/DSEG7Classic-Bold.woff2') format('woff2'); font-display: block; }
@@ -252,98 +422,237 @@ $cbCanEdit = crmCanManageInvoices();   // počáteční zůstatek a storna = jen
 .pos-toast.err { display: flex; background: rgba(150,40,40,.96); border: 1px solid rgba(255,122,122,.5); }
 </style>
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <h2 class="mb-0"><i class="fas fa-cash-register me-2 text-info"></i>Pokladna</h2>
-    <span class="text-white-50 small">Dnes: hotově <strong><?php echo formatMoney($todaySums['cash']); ?></strong>
-        · kartou <strong><?php echo formatMoney($todaySums['card']); ?></strong>
-        · fakturou s.r.o. <strong><?php echo formatMoney($todaySums['invoice']); ?></strong>
-        <?php if ($todaySums['invoice_ico'] > 0 || afxIcoSupplier()['ready']): ?> · fakturou IČO <strong><?php echo formatMoney($todaySums['invoice_ico']); ?></strong><?php endif; ?>
-        <?php if ($cashIn > 0): ?> · vklady <strong class="text-success"><?php echo formatMoney($cashIn); ?></strong><?php endif; ?>
-        <?php if ($cashOut > 0): ?> · výdaje <strong class="text-warning">−<?php echo formatMoney($cashOut); ?></strong><?php endif; ?>
-        · <span title="Počáteční zůstatek pokladny (<?php echo e(formatMoney((float)$cbRegister['opening_balance'])); ?> k <?php echo e(date('j. n. Y', strtotime((string)$cbRegister['opening_date']))); ?>) + všechny příjmy − výdaje. Dnešní pohyb: <?php echo e(formatMoney($cashToday)); ?>">stav hotovosti <strong class="<?php echo $cashState < 0 ? 'text-danger' : 'text-success'; ?>"><?php echo formatMoney($cashState); ?></strong></span>
-        </span>
-    <div class="d-flex gap-2">
-        <?php if (crmCanViewHistory()): ?>
-        <a href="history.php?tab=kasa" class="btn btn-sm btn-info"><i class="fas fa-clock-rotate-left me-1"></i>Historie Pokladny</a>
-        <?php endif; ?>
+<div class="pos-app" id="posApp">
+<!-- ── HORNÍ LIŠTA: kdo má kasu · kolik je v ní · dnešní tržby · akce ── -->
+<div class="pos-top">
+    <div class="pos-top-title">
+        <span class="pos-top-ico"><i class="fas fa-cash-register"></i></span>
+        <div>
+            <h2>Pokladna</h2>
+            <?php if ($shift && $shiftMine): ?>
+                <div class="pos-shift"><span class="dot"></span>Směna: <strong><?php echo e($shift['opened_by'] ?? ($_SESSION['full_name'] ?? '')); ?></strong> · od <?php echo e(date('H:i', strtotime((string)$shift['opened_at']))); ?></div>
+            <?php elseif ($shift): ?>
+                <div class="pos-shift off"><span class="dot"></span>Kasu má převzatou <?php echo e($shift['opened_by']); ?></div>
+            <?php else: ?>
+                <div class="pos-shift off"><span class="dot"></span>Pokladna není převzatá</div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php $__todayInvoices = $todaySums['invoice'] + $todaySums['invoice_ico']; ?>
+    <div class="pos-kpis">
+        <div class="pos-kpi main<?php echo $cashState < 0 ? ' neg' : ''; ?>"
+             title="Počáteční zůstatek pokladny (<?php echo e(formatMoney((float)$cbRegister['opening_balance'])); ?> k <?php echo e(date('j. n. Y', strtotime((string)$cbRegister['opening_date']))); ?>) + všechny příjmy − výdaje. Dnešní pohyb: <?php echo e(formatMoney($cashToday)); ?><?php echo $cashIn > 0 ? ' · vklady ' . e(formatMoney($cashIn)) : ''; ?><?php echo $cashOut > 0 ? ' · výdaje −' . e(formatMoney($cashOut)) : ''; ?>">
+            <span>V kase hotově</span><b><?php echo formatMoney($cashState); ?></b>
+        </div>
+        <div class="pos-kpi"><span>Dnes hotově</span><b><?php echo formatMoney($todaySums['cash']); ?></b></div>
+        <div class="pos-kpi"><span>Dnes kartou</span><b><?php echo formatMoney($todaySums['card']); ?></b></div>
+        <div class="pos-kpi" title="Faktura s.r.o. <?php echo e(formatMoney($todaySums['invoice'])); ?><?php echo ($todaySums['invoice_ico'] > 0 || afxIcoSupplier()['ready']) ? ' · Faktura IČO ' . e(formatMoney($todaySums['invoice_ico'])) : ''; ?>"><span>Dnes fakturou</span><b><?php echo formatMoney($__todayInvoices); ?></b></div>
+    </div>
+
+    <div class="pos-top-actions">
         <?php if (crmCanUsePos()): ?>
-        <button type="button" class="btn btn-sm btn-outline-success" onclick="posCashMove('in')"><i class="fas fa-arrow-down me-1"></i>Vklad</button>
-        <button type="button" class="btn btn-sm btn-outline-warning" onclick="posCashMove('out')"><i class="fas fa-arrow-up me-1"></i>Výběr</button>
+        <button type="button" class="btn btn-outline-success" onclick="posCashMove('in')" title="Vložit hotovost do kasy"><i class="fas fa-arrow-down"></i><span class="lbl">Vklad</span></button>
+        <button type="button" class="btn btn-outline-warning" onclick="posCashMove('out')" title="Vybrat hotovost z kasy"><i class="fas fa-arrow-up"></i><span class="lbl">Výběr</span></button>
         <?php endif; ?>
-        <?php if ($cbCanEdit): ?>
-        <button type="button" class="btn btn-sm btn-outline-info" onclick="posOpeningBalance()" title="Napočítanou hotovost zapíšeš jako počátek — od něj se počítá celý stav pokladny"><i class="fas fa-scale-balanced me-1"></i>Nastavit počáteční zůstatek</button>
-        <?php endif; ?>
-        <button type="button" class="btn btn-sm btn-outline-light" onclick="posTestReceipt(this)" title="Vytiskne zkušební účtenku na termotiskárně u pokladny"><i class="fas fa-receipt me-1"></i>Test účtenky</button>
+        <div class="dropdown">
+            <button type="button" class="btn btn-outline-secondary pos-more" data-bs-toggle="dropdown" aria-expanded="false" title="Další možnosti"><i class="fas fa-ellipsis"></i><span class="lbl">Další</span></button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <?php if (crmCanViewHistory()): ?>
+                <li><a class="dropdown-item" href="history.php?tab=kasa"><i class="fas fa-clock-rotate-left me-2"></i>Historie Pokladny</a></li>
+                <?php endif; ?>
+                <li><button type="button" class="dropdown-item" onclick="posShowTab('book', true)"><i class="fas fa-book-open me-2"></i>Pokladní kniha</button></li>
+                <?php if ($cbCanEdit): ?>
+                <li><button type="button" class="dropdown-item" onclick="posOpeningBalance()"><i class="fas fa-scale-balanced me-2"></i>Nastavit počáteční zůstatek</button></li>
+                <?php endif; ?>
+                <li><hr class="dropdown-divider"></li>
+                <li><button type="button" class="dropdown-item" onclick="posTestReceipt(this)"><i class="fas fa-receipt me-2"></i>Test tiskárny účtenek</button></li>
+            </ul>
+        </div>
         <?php if ($shift && $shiftMine): ?>
-        <button type="button" class="btn btn-sm btn-warning" onclick="shiftCloseOpenModal()" title="Spočítej hotovost, zapiš stav a předej pokladnu"><i class="fas fa-lock me-1"></i>Uzavřít / předat pokladnu</button>
-        <span class="small text-white-50 align-self-center">převzato <?php echo e(date('H:i', strtotime((string)$shift['opened_at']))); ?></span>
+        <button type="button" class="btn btn-warning" onclick="shiftCloseOpenModal()" title="Spočítej hotovost, zapiš stav a předej pokladnu"><i class="fas fa-lock"></i><span class="lbl">Uzavřít směnu</span></button>
         <?php endif; ?>
     </div>
 </div>
 
-<?php if (!empty($todayFeed)): ?>
-<div class="glass-panel p-2 px-3 border-secondary mb-3">
-    <div class="small text-white-50 mb-1"><i class="fas fa-receipt me-1"></i>Dnešní transakce — prodeje i pohyby hotovosti</div>
-    <div class="d-flex flex-column gap-1">
-        <?php foreach ($todayFeed as $f): if ($f['kind'] === 'sale'):
-            $sale = $f['row'];
-            $storno = (string)$sale['status'] === 'cancelled';
-            $pm = (string)$sale['payment_method'];
-            // záporná prodejka = výplata z kasy (výkup, výdaj) — pokladní kniha ji
-            // vede jako výdej, ať to tady neříká něco jiného
-            $vydej = (float)$sale['total'] < 0;
-            $pmLabel = $vydej ? 'Výdej z kasy' : ($posPayLabels[$pm] ?? $pm);
-            $pmClass = $vydej ? 'text-warning' : ($pm === 'cash' ? 'text-success' : ($pm === 'card' ? 'text-info' : 'text-primary'));
-        ?>
-        <div class="d-flex align-items-center gap-2 small<?php echo $storno ? ' opacity-50' : ''; ?>">
-            <span class="<?php echo $storno ? 'text-white-50' : $pmClass; ?>" style="min-width:86px;">
-                <strong<?php echo $storno ? ' style="text-decoration:line-through;"' : ''; ?>><?php echo formatMoney((float)$sale['total']); ?></strong>
-            </span>
-            <span><?php echo e($pmLabel); ?>
-                <span class="text-white-50"><?php echo e((string)$sale['sale_number']); ?></span>
-                <?php if ($storno): ?><span class="badge bg-danger bg-opacity-25 text-danger ms-1">storno</span><?php endif; ?>
-                <?php if (!empty($sale['order_id'])): ?><a class="text-info text-decoration-none ms-1" href="view_order.php?id=<?php echo (int)$sale['order_id']; ?>">zakázka</a><?php endif; ?>
-            </span>
-            <span class="ms-auto d-flex align-items-center gap-2">
-                <?php if (!empty($sale['invoice_id']) && function_exists('crmCanUseInvoices') && crmCanUseInvoices()): ?>
-                <a class="btn btn-sm btn-outline-light py-0 px-1" target="_blank" title="Faktura"
-                   href="print_invoice.php?id=<?php echo (int)$sale['invoice_id']; ?>"><i class="fas fa-file-invoice-dollar"></i></a>
-                <?php endif; ?>
-                <?php /* Vystavit smí vedení/manažer/účetní kdykoli, obsluha kasy dnešní
-                         prodej své prodejny — server hlídá totéž (api/pos_invoice_after.php). */ ?>
-                <?php if (!$storno && empty($sale['invoice_id']) && (float)$sale['total'] > 0
-                          && !in_array((string)$sale['payment_method'], ['invoice', 'invoice_ico'], true)
-                          && (crmCanUseInvoices() || crmCanUsePos())): ?>
-                <button type="button" class="btn btn-sm btn-outline-success py-0 px-1" title="Vystavit fakturu k tomuto prodeji"
-                    onclick="afxInvoiceAfterSale(<?php echo (int)$sale['id']; ?>, <?php echo htmlspecialchars(json_encode((string)$sale['sale_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode(formatMoney((float)$sale['total']), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)$pmLabel, JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)"><i class="fas fa-file-invoice-dollar"></i></button>
-                <?php endif; ?>
-                <?php if (!$storno): ?>
-                <button type="button" class="btn btn-sm btn-outline-light py-0 px-1" title="Dotisk účtenky"
-                    onclick="window.posReprintReceipt ? window.posReprintReceipt(<?php echo (int)$sale['id']; ?>) : window.open('print_receipt.php?id=<?php echo (int)$sale['id']; ?>&format=58&auto=1', '_blank')"><i class="fas fa-receipt"></i></button>
-                <?php endif; ?>
-                <span class="text-white-50"><?php echo e(date('H:i', strtotime((string)$sale['created_at']))); ?><?php if (!empty($sale['seller_name'])): ?> · <?php echo e((string)$sale['seller_name']); ?><?php endif; ?></span>
-            </span>
+<?php if (crmCanUsePos()): ?>
+<div class="pos-grid">
+    <!-- ── KROK 1: přidat do košíku ── -->
+    <section class="pos-col-add">
+        <div class="pos-card">
+            <div class="pos-step"><span class="pos-step-n">1</span>Přidej do košíku</div>
+            <div class="pos-search-wrap">
+                <i class="fas fa-magnifying-glass"></i>
+                <input type="search" id="posSearch" class="form-control pos-search" placeholder="Produkt, díl, číslo zakázky nebo příjmení klienta…" autocomplete="off" enterkeyhint="search">
+            </div>
+            <div class="pos-scan-hint"><i class="fas fa-barcode"></i>Čtečka čárových kódů funguje kdykoli — stačí pípnout, položka se přidá sama.</div>
+            <div id="posResults" class="pos-results"></div>
+
+            <div class="pos-tiles-label">Další možnosti</div>
+            <div class="pos-tiles">
+                <button type="button" class="pos-tile t-manual" id="posManualTile" data-panel="posManualForm"><i class="fas fa-pen-to-square"></i><b>Ruční položka</b><small>zboží mimo sklad</small></button>
+                <button type="button" class="pos-tile t-eshop" id="posEshopBtn" data-panel="posEshopPanel"><i class="fas fa-cart-shopping"></i><b>Rezervace e-shopu</b><small>vyzvednutí a platba</small></button>
+                <button type="button" class="pos-tile t-vykup" id="posVykupBtn" data-panel="posVykupPanel"><i class="fas fa-hand-holding-dollar"></i><b>Výplata výkupu</b><small>vyplácíme klientovi</small></button>
+                <button type="button" class="pos-tile t-expense" id="posExpenseBtn" data-panel="posExpenseForm"><i class="fas fa-money-bill-transfer"></i><b>Výdaj z kasy</b><small>záloha, drobný nákup</small></button>
+            </div>
+
+            <form id="posManualForm" class="pos-panel" style="display:none;">
+                <div class="pos-panel-title">Ruční položka — zboží nebo služba, která není ve skladu</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-xl">
+                        <input type="text" id="posManualName" class="form-control" maxlength="255" placeholder="Název" autocomplete="off">
+                    </div>
+                    <div class="col-4 col-md-3 col-xl-2">
+                        <input type="number" id="posManualQty" class="form-control text-center" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Počet kusů">
+                    </div>
+                    <div class="col-8 col-md-4 col-xl-3">
+                        <input type="text" id="posManualPrice" class="form-control text-center" inputmode="decimal" placeholder="Cena za kus">
+                    </div>
+                    <div class="col-12 col-md-auto">
+                        <button type="submit" class="btn btn-success w-100"><i class="fas fa-plus me-1"></i>Přidat</button>
+                    </div>
+                </div>
+            </form>
+            <div id="posEshopPanel" class="pos-results pos-panel" style="display:none;"></div>
+            <div id="posVykupPanel" class="pos-results pos-panel" style="display:none;"></div>
+            <form id="posExpenseForm" class="pos-panel" style="display:none;">
+                <div class="pos-panel-title">Výdaj z kasy — vždy hotově, markuje se samostatně</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-xl">
+                        <input type="text" id="posExpenseName" class="form-control" maxlength="255" placeholder="Účel — např. záloha Khalil, nákup drogerie" autocomplete="off">
+                    </div>
+                    <div class="col-7 col-md-4 col-xl-3">
+                        <input type="text" id="posExpensePrice" class="form-control text-center" inputmode="decimal" placeholder="Částka Kč">
+                    </div>
+                    <div class="col-5 col-md-auto">
+                        <button type="submit" class="btn btn-warning w-100"><i class="fas fa-minus me-1"></i>Přidat</button>
+                    </div>
+                </div>
+            </form>
         </div>
-        <?php else:
-            $m = $f['row'];
-            $isOut = $m['direction'] === 'out';
-            $purposeLabels = ['vykup' => 'Výkup', 'vklad' => 'Vklad', 'vyber' => 'Výběr', 'zakazka' => 'Zakázka'];
-            $pl = $purposeLabels[(string)$m['purpose']] ?? ucfirst((string)$m['purpose']);
-        ?>
-        <div class="d-flex align-items-center gap-2 small">
-            <span class="<?php echo $isOut ? 'text-warning' : 'text-success'; ?>" style="min-width:86px;"><strong><?php echo ($isOut ? '−' : '+') . formatMoney((float)$m['amount']); ?></strong></span>
-            <span><?php echo e($pl); ?><?php if (!empty($m['ref_label'])): ?>
-                <?php if ($m['ref_type'] === 'document'): ?> <a class="text-info text-decoration-none" href="dokument.php?type=vykup&id=<?php echo (int)$m['ref_id']; ?>"><?php echo e((string)$m['ref_label']); ?></a>
-                <?php else: ?> <?php echo e((string)$m['ref_label']); ?><?php endif; ?>
-            <?php endif; ?></span>
-            <?php if (!empty($m['note'])): ?><span class="text-white-50 text-truncate" style="max-width:340px;"><?php echo e((string)$m['note']); ?></span><?php endif; ?>
-            <span class="text-white-50 ms-auto"><?php echo e(date('H:i', strtotime((string)$m['created_at']))); ?><?php if (!empty($m['created_by'])): ?> · <?php echo e((string)$m['created_by']); ?><?php endif; ?></span>
+    </section>
+
+    <!-- ── KROK 2 + 3: košík a platba ── -->
+    <section class="pos-col-cart" id="posCartCol">
+        <div class="pos-card">
+            <div class="pos-cart-head">
+                <div class="pos-step"><span class="pos-step-n">2</span>Košík</div>
+                <span class="pos-count" id="posCartCount">0</span>
+                <button type="button" class="pos-clear" id="posCartClear" style="display:none;"><i class="fas fa-trash-can me-1"></i>Vysypat</button>
+            </div>
+            <div id="posEshopBar" class="pos-eshop-bar">
+                <i class="fas fa-cart-shopping" style="color:#7ce39a;"></i>
+                <span>Vyzvednutí objednávky <b id="posEshopRef">—</b> <span class="text-white-50" id="posEshopWho"></span></span>
+                <button type="button" class="drop" id="posEshopDrop">Odpojit</button>
+            </div>
+            <div id="posCartBody" class="pos-lines"></div>
+            <div id="posCartEmpty" class="pos-empty"><i class="fas fa-basket-shopping"></i>Košík je prázdný<small>Vyhledej zboží vlevo nebo pípni čtečkou.</small></div>
+
+            <div class="pos-sum">
+                <span class="pos-total-label">Celkem</span>
+                <span class="pos-total" id="posTotal">0 Kč</span>
+            </div>
+
+            <div class="pos-paystep" id="posPayStep">
+                <div class="pos-step"><span class="pos-step-n">3</span>Způsob platby</div>
+                <div class="pos-pay-grid">
+                    <button type="button" class="pos-pay" data-pay="cash"><i class="fas fa-money-bill-wave"></i><span>Hotově<small>spočítá, kolik vrátit</small></span></button>
+                    <button type="button" class="pos-pay" data-pay="card"><i class="fas fa-credit-card"></i><span>Kartou<small>na platebním terminálu</small></span></button>
+                    <button type="button" class="pos-pay" data-pay="invoice"><i class="fas fa-file-invoice"></i><span>Faktura s.r.o.<small>převodem, s QR</small></span></button>
+                    <button type="button" class="pos-pay<?php echo afxIcoSupplier()['ready'] ? '' : ' is-off'; ?>" data-pay="invoice_ico"><i class="fas fa-file-signature"></i><span>Faktura IČO<small><?php echo afxIcoSupplier()['ready'] ? 'převodem, OSVČ' : 'zatím neaktivní'; ?></small></span></button>
+                </div>
+
+                <div id="posCustomerWrap" class="pos-cust" style="display:none;">
+                    <label class="form-label small mb-1" style="color:var(--pos-fg2)">Odběratel faktury — u zakázky můžeš nechat prázdné (faktura půjde na jejího klienta).</label>
+                    <select id="posCustomer" class="form-select" style="width:100%;"></select>
+                    <?php /* jednorázový odběratel (v3.59.0): fakturu jde vystavit bez zakládání klienta —
+                             údaje se uloží JEN na fakturu (cust_*_override), do CRM klientů se nic nepřidá */ ?>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" id="posAdhocOn">
+                        <label class="form-check-label small" for="posAdhocOn" style="color:var(--pos-fg2)">
+                            Odběratel není v CRM — vyplnit ručně (nezakládá klienta)
+                        </label>
+                    </div>
+                    <div id="posAdhocWrap" class="mt-2" style="display:none;">
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <input type="text" class="form-control" id="posAdhocName" maxlength="190"
+                                       placeholder="Název firmy nebo jméno a příjmení *">
+                            </div>
+                            <div class="col-12">
+                                <textarea class="form-control" id="posAdhocAddr" rows="2" maxlength="400"
+                                          placeholder="Adresa (ulice, město, PSČ)"></textarea>
+                            </div>
+                            <div class="col-7">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="posAdhocIco" maxlength="12" inputmode="numeric" placeholder="IČO">
+                                    <button class="btn btn-outline-info" type="button" id="posAdhocAres" title="Načíst z ARESu">ARES</button>
+                                </div>
+                            </div>
+                            <div class="col-5">
+                                <input type="text" class="form-control" id="posAdhocDic" maxlength="20" placeholder="DIČ">
+                            </div>
+                            <div class="col-12">
+                                <input type="email" class="form-control" id="posAdhocEmail" maxlength="190" placeholder="E-mail (pro zaslání faktury)">
+                            </div>
+                        </div>
+                        <div class="small mt-2" style="color:var(--pos-fg3)">
+                            <i class="fas fa-circle-info me-1"></i>Povinný je <strong>jen název / jméno</strong>. IČO a DIČ jen u firmy.
+                            Údaje se uloží jen na fakturu, klient v CRM nevzniká. Bez e-mailu se faktura po prodeji <strong>vytiskne</strong>.
+                        </div>
+                    </div>
+                    <?php /* varování o chybějícím účtu dle VÝSTAVCE zvolené faktury —
+                             text plní JS podle payment (invoice → s.r.o., invoice_ico → OSVČ) */ ?>
+                    <div class="alert alert-danger border-0 py-2 mt-2 mb-0" id="posAccWarn" style="font-size:.85rem;display:none;">
+                        <i class="fas fa-triangle-exclamation me-1"></i>
+                        <strong>Chybí číslo účtu <span id="posAccWarnWho"></span></strong> — faktura se vystaví bez platebních
+                        údajů a bez QR platby, zákazník nebude mít kam zaplatit. Doplň ho v <strong>Účetnictví → Nastavení</strong>.
+                    </div>
+                </div>
+
+                <button type="button" class="pos-finish" id="posFinish" disabled><i class="fas fa-check me-2"></i>Dokončit prodej</button>
+                <div class="pos-finish-hint" id="posFinishHint">Přidej položku do košíku.</div>
+            </div>
         </div>
-        <?php endif; endforeach; ?>
-    </div>
+
+        <div class="pos-card pos-done" id="posDone" style="display:none;">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="fas fa-check-circle text-success fs-3"></i>
+                <div><strong class="fs-5">Prodáno</strong><div class="small" style="color:var(--pos-fg2)">doklad <code id="posDoneNumber"></code></div></div>
+            </div>
+            <div id="posDoneChange" class="alert alert-warning border-0 py-2" style="display:none;font-size:1.25rem;">
+                <i class="fas fa-coins me-1"></i> Vrátit zákazníkovi: <strong id="posDoneChangeVal"></strong>
+            </div>
+            <div id="posDoneProductNote" class="alert alert-info border-0 py-2 small" style="display:none;">
+                <i class="fas fa-check me-1"></i> Sklad CRM odečten automaticky — produkt zůstane vyprodaný i po dalším nahrání souboru z naskladňovací appky.
+            </div>
+            <div id="posDoneInvoiceNote" class="alert alert-warning border-0 py-2 small" style="display:none;">
+                <i class="fas fa-print me-1"></i> Odběratel nemá e-mail — fakturu <strong>vytiskni</strong> tlačítkem
+                „Faktura". Poslat ji jde i tak: „Fakturu e-mailem" se na adresu zeptá.
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-light" id="posDoneReceipt"><i class="fas fa-print me-1"></i> Účtenka znovu</button>
+                <button type="button" class="btn btn-warning" id="posDoneInvoice" style="display:none;"><i class="fas fa-file-invoice me-1"></i> Faktura</button>
+                <button type="button" class="btn btn-info" id="posDoneInvoiceMail" style="display:none;"><i class="fas fa-envelope me-1"></i> Fakturu e-mailem</button>
+                <button type="button" class="btn btn-primary ms-auto" id="posDoneNew"><i class="fas fa-plus me-1"></i> Nový prodej</button>
+            </div>
+        </div>
+    </section>
+
+<!-- mobil / tablet na výšku: částka vždy na očích, klepnutím skok k platbě -->
+<div class="pos-mbar" id="posMbar">
+    <div><span class="lbl">Celkem · <span id="posMbarCount">0</span> pol.</span><b id="posMbarTotal">0 Kč</b></div>
+    <button type="button" onclick="document.getElementById('posPayStep').scrollIntoView({behavior:'smooth', block:'start'})">K platbě <i class="fas fa-arrow-down ms-1"></i></button>
+</div>
+
+<?php else: ?>
+<!-- Role účetní: jen pokladní kniha (níže) — prodej, směny a hotovost jsou provozní -->
+<div class="pos-card mb-3 small" style="color:var(--pos-fg2)">
+    <i class="fas fa-eye me-1"></i>Pokladna je pro tebe jen ke čtení — prodej a pohyby hotovosti dělá provoz.
 </div>
 <?php endif; ?>
 
+<div class="pos-col-lower">
 <?php
 // ── Upozornění na zákonný limit hotovosti (270 000 Kč, zák. 254/2004 Sb.) ──
 // Limit platí na JEDNU platbu mezi týmž plátcem a příjemcem za den, ne na denní
@@ -380,8 +689,84 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
 </div>
 <?php endif; ?>
 
+<!-- ── SPODNÍ ČÁST: Dnešní pohyby / Pokladní kniha (záložky) ── -->
+<?php
+// Kniha se otevře rovnou, když se do ní filtruje (období / pobočka) nebo když kasa není k prodeji (účetní).
+$posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GET['cb_branch']) || !crmCanUsePos()) ? 'book' : 'feed';
+?>
+<div class="pos-lower" id="posLower">
+    <div class="pos-tabs" role="tablist">
+        <button type="button" class="pos-tab<?php echo $posDefaultTab === 'feed' ? ' active' : ''; ?>" data-tab="feed" role="tab"><i class="fas fa-receipt me-1"></i>Dnešní pohyby<span class="n"><?php echo count($todayFeed); ?></span></button>
+        <button type="button" class="pos-tab<?php echo $posDefaultTab === 'book' ? ' active' : ''; ?>" data-tab="book" role="tab"><i class="fas fa-book-open me-1"></i>Pokladní kniha</button>
+    </div>
+
+    <div class="pos-card" id="posTabFeed"<?php echo $posDefaultTab === 'feed' ? '' : ' hidden'; ?>>
+        <?php if (empty($todayFeed)): ?>
+            <div class="pos-feed-empty"><i class="fas fa-mug-hot me-2"></i>Dnes zatím žádný prodej ani pohyb hotovosti.</div>
+        <?php else: ?>
+        <div>
+        <?php foreach ($todayFeed as $f): if ($f['kind'] === 'sale'):
+            $sale = $f['row'];
+            $storno = (string)$sale['status'] === 'cancelled';
+            $pm = (string)$sale['payment_method'];
+            // záporná prodejka = výplata z kasy (výkup, výdaj) — pokladní kniha ji
+            // vede jako výdej, ať to tady neříká něco jiného
+            $vydej = (float)$sale['total'] < 0;
+            $pmLabel = $vydej ? 'Výdej z kasy' : ($posPayLabels[$pm] ?? $pm);
+            $pmClass = $vydej ? 'text-warning' : ($pm === 'cash' ? 'text-success' : ($pm === 'card' ? 'text-info' : 'text-primary'));
+        ?>
+            <div class="pos-feed-row<?php echo $storno ? ' storno' : ''; ?>">
+                <span class="t"><?php echo e(date('H:i', strtotime((string)$sale['created_at']))); ?></span>
+                <span class="a <?php echo $storno ? '' : $pmClass; ?>"><?php echo formatMoney((float)$sale['total']); ?></span>
+                <span class="d"><?php echo e($pmLabel); ?>
+                    <small><?php echo e((string)$sale['sale_number']); ?><?php if (!empty($sale['seller_name'])): ?> · <?php echo e((string)$sale['seller_name']); ?><?php endif; ?></small>
+                    <?php if ($storno): ?><span class="badge bg-danger bg-opacity-25 text-danger ms-1">storno</span><?php endif; ?>
+                    <?php if (!empty($sale['order_id'])): ?><a class="text-info text-decoration-none ms-1 small" href="view_order.php?id=<?php echo (int)$sale['order_id']; ?>">zakázka</a><?php endif; ?>
+                </span>
+                <span class="x">
+                    <?php if (!empty($sale['invoice_id']) && function_exists('crmCanUseInvoices') && crmCanUseInvoices()): ?>
+                    <a class="btn btn-sm btn-outline-light py-0 px-2" target="_blank" title="Faktura"
+                       href="print_invoice.php?id=<?php echo (int)$sale['invoice_id']; ?>"><i class="fas fa-file-invoice-dollar"></i></a>
+                    <?php endif; ?>
+                    <?php /* Vystavit smí vedení/manažer/účetní kdykoli, obsluha kasy dnešní
+                             prodej své prodejny — server hlídá totéž (api/pos_invoice_after.php). */ ?>
+                    <?php if (!$storno && empty($sale['invoice_id']) && (float)$sale['total'] > 0
+                              && !in_array((string)$sale['payment_method'], ['invoice', 'invoice_ico'], true)
+                              && (crmCanUseInvoices() || crmCanUsePos())): ?>
+                    <button type="button" class="btn btn-sm btn-outline-success py-0 px-2" title="Vystavit fakturu k tomuto prodeji"
+                        onclick="afxInvoiceAfterSale(<?php echo (int)$sale['id']; ?>, <?php echo htmlspecialchars(json_encode((string)$sale['sale_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode(formatMoney((float)$sale['total']), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)$pmLabel, JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)"><i class="fas fa-file-invoice-dollar"></i></button>
+                    <?php endif; ?>
+                    <?php if (!$storno): ?>
+                    <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" title="Dotisk účtenky"
+                        onclick="window.posReprintReceipt ? window.posReprintReceipt(<?php echo (int)$sale['id']; ?>) : window.open('print_receipt.php?id=<?php echo (int)$sale['id']; ?>&format=58&auto=1', '_blank')"><i class="fas fa-receipt"></i></button>
+                    <?php endif; ?>
+                </span>
+            </div>
+        <?php else:
+            $m = $f['row'];
+            $isOut = $m['direction'] === 'out';
+            $purposeLabels = ['vykup' => 'Výkup', 'vklad' => 'Vklad', 'vyber' => 'Výběr', 'zakazka' => 'Zakázka'];
+            $pl = $purposeLabels[(string)$m['purpose']] ?? ucfirst((string)$m['purpose']);
+        ?>
+            <div class="pos-feed-row">
+                <span class="t"><?php echo e(date('H:i', strtotime((string)$m['created_at']))); ?></span>
+                <span class="a <?php echo $isOut ? 'text-warning' : 'text-success'; ?>"><?php echo ($isOut ? '−' : '+') . formatMoney((float)$m['amount']); ?></span>
+                <span class="d"><?php echo e($pl); ?><?php if (!empty($m['ref_label'])): ?>
+                    <?php if ($m['ref_type'] === 'document'): ?> <a class="text-info text-decoration-none" href="dokument.php?type=vykup&id=<?php echo (int)$m['ref_id']; ?>"><?php echo e((string)$m['ref_label']); ?></a>
+                    <?php else: ?> <?php echo e((string)$m['ref_label']); ?><?php endif; ?>
+                <?php endif; ?>
+                    <small><?php if (!empty($m['note'])): ?><?php echo e((string)$m['note']); ?> · <?php endif; ?><?php echo e((string)($m['created_by'] ?? '')); ?></small>
+                </span>
+                <span class="x"></span>
+            </div>
+        <?php endif; endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <div id="posTabBook"<?php echo $posDefaultTab === 'book' ? '' : ' hidden'; ?>>
 <!-- ── Pokladní kniha (analytika 211): počáteční zůstatek → pohyby → konečný zůstatek ── -->
-<div class="glass-panel p-3 border-secondary mb-3">
+<div class="pos-card">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <strong><i class="fas fa-book-open me-2 text-info"></i>Pokladní kniha — <?php echo e($cbBranchName); ?></strong>
         <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
@@ -513,6 +898,11 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
     <?php endif; ?>
     <?php endif; ?>
 </div>
+    </div><!-- /posTabBook -->
+</div><!-- /pos-lower -->
+</div><!-- /pos-col-lower -->
+<?php if (crmCanUsePos()): ?></div><!-- /pos-grid --><?php endif; ?>
+</div><!-- /pos-app -->
 
 <!-- Počáteční zůstatek pokladny — inventarizace hotovosti (jen vedení) -->
 <?php if ($cbCanEdit): ?>
@@ -660,6 +1050,19 @@ function posCashDocStorno(docId, docNumber) {
         .catch(function () { alert('Chyba spojení'); });
 }
 
+/* Záložky dole: Dnešní pohyby / Pokladní kniha (scroll=true → posunout na ně, např. z menu Další) */
+function posShowTab(tab, scroll) {
+    document.querySelectorAll('.pos-tab').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
+    var feed = document.getElementById('posTabFeed'), book = document.getElementById('posTabBook');
+    if (feed) feed.hidden = tab !== 'feed';
+    if (book) book.hidden = tab !== 'book';
+    if (scroll) { var l = document.getElementById('posLower'); if (l) l.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.pos-tab');
+    if (b) { posShowTab(b.dataset.tab, false); }
+});
+
 document.addEventListener('DOMContentLoaded', function () {
     var f = document.getElementById('posOpeningForm');
     if (!f) { return; }
@@ -679,181 +1082,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-
-<?php if (crmCanUsePos()): ?>
-<div class="row g-4">
-    <!-- ── vyhledávání ── -->
-    <div class="col-lg-6">
-        <div class="glass-panel p-3 border-secondary">
-            <form id="posManualForm" class="pos-manual">
-                <label class="form-label small text-white-50 mb-2"><i class="fas fa-pen-to-square me-1 text-success"></i> Ruční položka mimo sklad</label>
-                <div class="row g-2 align-items-end">
-                    <div class="col-12 col-xl">
-                        <input type="text" id="posManualName" class="form-control" maxlength="255" placeholder="Název produktu" autocomplete="off">
-                    </div>
-                    <div class="col-5 col-md-3 col-xl-2">
-                        <input type="number" id="posManualQty" class="form-control text-center" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Počet kusů">
-                    </div>
-                    <div class="col-7 col-md-4 col-xl-3">
-                        <input type="text" id="posManualPrice" class="form-control text-center" inputmode="decimal" placeholder="Cena/ks">
-                    </div>
-                    <div class="col-12 col-md-auto">
-                        <button type="submit" class="btn btn-success w-100"><i class="fas fa-plus me-1"></i>Přidat</button>
-                    </div>
-                </div>
-            </form>
-            <div class="d-flex align-items-center gap-2 flex-wrap mt-1 mb-2">
-                <button type="button" id="posVykupBtn" class="btn btn-outline-danger btn-sm"><i class="fas fa-hand-holding-dollar me-1"></i>Výplata výkupu</button>
-                <span class="small text-white-50">záporná položka z výkupního listu — čistá výplata, nebo protiúčet za naše zboží</span>
-            </div>
-            <div id="posVykupPanel" class="pos-results mb-2" style="display:none;"></div>
-            <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-                <button type="button" id="posEshopBtn" class="btn btn-outline-success btn-sm"><i class="fas fa-cart-shopping me-1"></i>Rezervace e-shopu</button>
-                <span class="small text-white-50">objednávka s platbou při vyzvednutí — teprve tady se prodá a zaplatí</span>
-            </div>
-            <div id="posEshopPanel" class="pos-results mb-2" style="display:none;"></div>
-            <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-                <button type="button" id="posExpenseBtn" class="btn btn-outline-warning btn-sm"><i class="fas fa-money-bill-transfer me-1"></i>Výdaj z kasy</button>
-                <span class="small text-white-50">záporná položka volným textem — záloha zaměstnanci, drobný nákup (drogerie…); vždy hotově</span>
-            </div>
-            <form id="posExpenseForm" class="pos-manual" style="display:none;">
-                <div class="row g-2 align-items-end">
-                    <div class="col-12 col-xl">
-                        <input type="text" id="posExpenseName" class="form-control" maxlength="255" placeholder="Účel — např. záloha Khalil, nákup drogerie" autocomplete="off">
-                    </div>
-                    <div class="col-7 col-md-4 col-xl-3">
-                        <input type="text" id="posExpensePrice" class="form-control text-center" inputmode="decimal" placeholder="Částka Kč">
-                    </div>
-                    <div class="col-12 col-md-auto">
-                        <button type="submit" class="btn btn-warning w-100"><i class="fas fa-minus me-1"></i>Přidat výdaj</button>
-                    </div>
-                </div>
-            </form>
-            <label class="form-label small text-white-50 mb-2"><i class="fas fa-search me-1"></i> Najdi produkt, díl nebo hotovou zakázku · <i class="fas fa-barcode me-1"></i>USB čtečka funguje kdykoli — stačí pípnout kód</label>
-            <input type="text" id="posSearch" class="form-control pos-search" placeholder="iPhone 13, displej, číslo zakázky…" autocomplete="off">
-            <div id="posResults" class="pos-results mt-2"></div>
-        </div>
-    </div>
-
-    <!-- ── košík + platba ── -->
-    <div class="col-lg-6">
-        <div class="glass-panel p-3 border-secondary">
-            <strong class="d-block mb-2 fs-5"><i class="fas fa-shopping-basket me-2 text-white-50"></i>Košík</strong>
-            <div id="posEshopBar" class="pos-eshop-bar">
-                <i class="fas fa-cart-shopping" style="color:#7ce39a;"></i>
-                <span>Vyzvednutí objednávky <b id="posEshopRef">—</b> <span class="text-white-50" id="posEshopWho"></span></span>
-                <button type="button" class="drop" id="posEshopDrop">Odpojit</button>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-dark align-middle mb-2 pos-cart">
-                    <thead>
-                        <tr class="text-white-50"><th>Položka</th><th style="width:92px;">Ks</th><th style="width:132px;">Cena/ks</th><th class="text-end">Celkem</th><th style="width:44px;"></th></tr>
-                    </thead>
-                    <tbody id="posCartBody"></tbody>
-                </table>
-            </div>
-            <div id="posCartEmpty" class="pos-empty">Košík je prázdný — vyhledej zboží vlevo.</div>
-
-            <div class="d-flex justify-content-between align-items-center my-3">
-                <span class="text-white-50 pos-total-label">Celkem</span>
-                <span class="pos-total" id="posTotal">0 Kč</span>
-            </div>
-
-            <div class="d-flex gap-2 mb-3">
-                <button type="button" class="pos-pay" data-pay="cash"><i class="fas fa-money-bill-wave"></i>Hotově</button>
-                <button type="button" class="pos-pay" data-pay="card"><i class="fas fa-credit-card"></i>Kartou<span class="small" style="font-size:10px;opacity:.7;">terminál zvlášť</span></button>
-                <button type="button" class="pos-pay" data-pay="invoice"><i class="fas fa-file-invoice"></i>Faktura s.r.o.</button>
-                <button type="button" class="pos-pay" data-pay="invoice_ico"><i class="fas fa-file-signature"></i>Faktura IČO</button>
-            </div>
-
-            <div id="posCustomerWrap" class="mb-3" style="display:none;">
-                <label class="form-label small text-white-50 mb-1">Zákazník z CRM — u zakázky můžeš nechat prázdné (faktura půjde na jejího klienta). Kdo v CRM není, se vyplní níž ručně.</label>
-                <select id="posCustomer" class="form-select" style="width:100%;"></select>
-                <?php /* jednorázový odběratel (v3.59.0): fakturu jde vystavit bez zakládání klienta —
-                         údaje se uloží JEN na fakturu (cust_*_override), do CRM klientů se nic nepřidá */ ?>
-                <div class="small text-white-50 mt-2">
-                    <i class="fas fa-lightbulb me-1"></i>Doprodej zákazníkovi, který fakturu nechce? Zvol
-                    <strong>Hotově</strong> nebo <strong>Kartou</strong> — účtenka odběratele vyplňovat nemusí.
-                </div>
-                <div class="form-check form-switch mt-2">
-                    <input class="form-check-input" type="checkbox" id="posAdhocOn">
-                    <label class="form-check-label small text-white-50" for="posAdhocOn">
-                        Odběratel není v CRM — vyplnit ručně (nezakládá klienta)
-                    </label>
-                </div>
-                <div id="posAdhocWrap" class="mt-2" style="display:none;">
-                    <div class="row g-2">
-                        <div class="col-12">
-                            <input type="text" class="form-control" id="posAdhocName" maxlength="190"
-                                   placeholder="Název firmy nebo jméno a příjmení *">
-                        </div>
-                        <div class="col-12">
-                            <textarea class="form-control" id="posAdhocAddr" rows="2" maxlength="400"
-                                      placeholder="Adresa (ulice, město, PSČ)"></textarea>
-                        </div>
-                        <div class="col-6 col-md-4">
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="posAdhocIco" maxlength="12" inputmode="numeric" placeholder="IČO">
-                                <button class="btn btn-outline-info" type="button" id="posAdhocAres" title="Načíst z ARESu">ARES</button>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <input type="text" class="form-control" id="posAdhocDic" maxlength="20" placeholder="DIČ">
-                        </div>
-                        <div class="col-12 col-md-5">
-                            <input type="email" class="form-control" id="posAdhocEmail" maxlength="190" placeholder="E-mail (pro zaslání faktury)">
-                        </div>
-                    </div>
-                    <div class="small text-white-50 mt-2">
-                        <i class="fas fa-circle-info me-1"></i>Povinný je <strong>jen název / jméno</strong> — daňový doklad
-                        musí mít odběratele. IČO a DIČ vyplňuj jen u firmy, adresu podle přání zákazníka.
-                        Údaje se uloží jen na fakturu, klient v CRM nevzniká. Bez e-mailu se faktura po prodeji
-                        <strong>vytiskne</strong> tlačítkem „Faktura".
-                    </div>
-                </div>
-                <?php /* varování o chybějícím účtu dle VÝSTAVCE zvolené faktury —
-                         text plní JS podle payment (invoice → s.r.o., invoice_ico → OSVČ) */ ?>
-                <div class="alert alert-danger border-0 py-2 mt-2 mb-0" id="posAccWarn" style="font-size:.85rem;display:none;">
-                    <i class="fas fa-triangle-exclamation me-1"></i>
-                    <strong>Chybí číslo účtu <span id="posAccWarnWho"></span></strong> — faktura se vystaví bez platebních
-                    údajů a bez QR platby, zákazník nebude mít kam zaplatit. Doplň ho v <strong>Účetnictví → Nastavení</strong>.
-                </div>
-            </div>
-
-            <button type="button" class="pos-finish" id="posFinish" disabled><i class="fas fa-check me-2"></i>Dokončit prodej</button>
-        </div>
-
-        <div class="glass-panel p-3 border-secondary mt-3" id="posDone" style="display:none;">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="fas fa-check-circle text-success fs-4"></i>
-                <strong>Prodáno — doklad <code id="posDoneNumber"></code></strong>
-            </div>
-            <div id="posDoneChange" class="alert alert-warning border-0 py-2" style="display:none;font-size:1.15rem;">
-                <i class="fas fa-coins me-1"></i> Vrátit zákazníkovi: <strong id="posDoneChangeVal"></strong>
-            </div>
-            <div id="posDoneProductNote" class="alert alert-info border-0 py-2 small" style="display:none;">
-                <i class="fas fa-check me-1"></i> Sklad CRM odečten automaticky — produkt zůstane vyprodaný i po dalším nahrání souboru z naskladňovací appky.
-            </div>
-            <div id="posDoneInvoiceNote" class="alert alert-warning border-0 py-2 small" style="display:none;">
-                <i class="fas fa-print me-1"></i> Odběratel nemá e-mail — fakturu <strong>vytiskni</strong> tlačítkem
-                „Faktura". Poslat ji jde i tak: „Fakturu e-mailem" se na adresu zeptá.
-            </div>
-            <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn btn-info" id="posDoneReceipt"><i class="fas fa-print me-1"></i> Účtenka</button>
-                <button type="button" class="btn btn-warning" id="posDoneInvoice" style="display:none;"><i class="fas fa-file-invoice me-1"></i> Faktura</button>
-                <button type="button" class="btn btn-info" id="posDoneInvoiceMail" style="display:none;"><i class="fas fa-envelope me-1"></i> Fakturu e-mailem (QR platba)</button>
-                <button type="button" class="btn btn-outline-light ms-auto" id="posDoneNew"><i class="fas fa-plus me-1"></i> Nový prodej</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<?php else: ?>
-<!-- Role účetní: jen pokladní kniha (výše) — prodej, směny a hotovost jsou provozní -->
-<div class="glass-panel p-3 border-secondary mb-3 small text-white-50">
-    <i class="fas fa-eye me-1"></i>Pokladna je pro tebe jen ke čtení — prodej a pohyby hotovosti dělá provoz.
-</div>
-<?php endif; ?>
 
 <?php if (crmCanUsePos() && (!$shift || !$shiftMine)): ?>
 <!-- ── PŘEVZETÍ POKLADNY — overlay přes celou kasu, dokud směnu někdo nedrží ── -->
@@ -1097,7 +1325,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     el.className = 'pos-hit';
                     el.innerHTML = '<span class="pos-type ' + r.type + '">' + typeLabel + '</span>'
                         + '<div><div class="nm">' + esc(r.name) + '</div><div class="cd">' + esc(r.code || '') + ' · ' + detail + '</div></div>'
-                        + '<span class="pr">' + fmt(r.type === 'eshop' && r.eshop ? r.eshop.total : r.price) + '</span>';
+                        + '<span class="pr">' + fmt(r.type === 'eshop' && r.eshop ? r.eshop.total : r.price) + '</span>'
+                        + '<span class="add"><i class="fas fa-' + (r.type === 'eshop' ? 'arrow-right' : 'plus') + '"></i></span>';
                     el.addEventListener('click', function () {
                         if (r.type === 'eshop') { if (r.eshop) { window.__afxEshopLoad(r.eshop); } return; }
                         addToCart(r);
@@ -1352,27 +1581,67 @@ document.addEventListener('DOMContentLoaded', function () {
     function render() {
         $body.innerHTML = '';
         cart.forEach(function (c, i) {
-            var tr = document.createElement('tr');
+            var row = document.createElement('div');
+            row.className = 'pos-line';
             var lockedOrder = c.type === 'order';
             var lockedVykup = c.type === 'vykup';
             var lockedExpense = c.type === 'expense';
+            var qtyLocked = lockedOrder || lockedVykup || lockedExpense;
             var qtyAttrs = lockedOrder ? ' readonly title="Zakázka se účtuje vždy jako 1 ks"'
                 : (lockedVykup ? ' readonly title="Výkup se vyplácí vždy jako 1 ks"'
                 : (lockedExpense ? ' readonly title="Výdaj z kasy je vždy jedna položka"' : ''));
             var priceAttrs = lockedOrder ? ' readonly title="Cena zakázky se bere z detailu zakázky"'
                 : (eshopOrderId > 0 ? ' readonly title="Cena z objednávky e-shopu — zákazník platí, za co objednal"' : '');
-            tr.innerHTML = '<td><div class="pos-item-name">' + esc(c.name) + '</div><div class="pos-item-code">' + esc(c.code || '') + '</div></td>'
-                + '<td><input type="number" class="form-control pos-qty" min="1" max="' + (c.type === 'manual' ? 999 : c.stock) + '" value="' + c.qty + '" onchange="posQty(' + i + ', this.value)"' + qtyAttrs + '></td>'
-                + '<td><input type="text" class="form-control pos-price" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"' + priceAttrs + '></td>'
-                + '<td class="text-end pos-line-total">' + fmt(c.price * c.qty) + '</td>'
-                + '<td><button type="button" class="pos-remove" onclick="posRemove(' + i + ')" title="Smazat položku z košíku"><i class="fas fa-times"></i></button></td>';
-            $body.appendChild(tr);
+            var maxQty = c.type === 'manual' ? 999 : c.stock;
+            var lineTotal = c.price * c.qty;
+            row.innerHTML = '<div><div class="pos-item-name">' + esc(c.name) + '</div><div class="pos-item-code">' + esc(c.code || '') + '</div></div>'
+                + '<button type="button" class="pos-remove" onclick="posRemove(' + i + ')" title="Odebrat z košíku" aria-label="Odebrat"><i class="fas fa-xmark"></i></button>'
+                + '<div class="pl-ctrl">'
+                +   '<div class="pl-qty">'
+                +     '<button type="button" onclick="posQty(' + i + ', ' + (c.qty - 1) + ')" aria-label="Ubrat kus"' + (qtyLocked || c.qty <= 1 ? ' disabled' : '') + '><i class="fas fa-minus"></i></button>'
+                +     '<input type="number" class="pos-qty" min="1" max="' + maxQty + '" value="' + c.qty + '" inputmode="numeric" onchange="posQty(' + i + ', this.value)"' + qtyAttrs + '>'
+                +     '<button type="button" onclick="posQty(' + i + ', ' + (c.qty + 1) + ')" aria-label="Přidat kus"' + (qtyLocked || c.qty >= maxQty ? ' disabled' : '') + '><i class="fas fa-plus"></i></button>'
+                +   '</div>'
+                +   '<label class="pl-price">× <input type="text" class="form-control pos-price" inputmode="decimal" value="' + c.price + '" onchange="posPrice(' + i + ', this.value)"' + priceAttrs + ' aria-label="Cena za kus"> Kč</label>'
+                +   '<span class="pos-line-total' + (lineTotal < 0 ? ' neg' : '') + '">' + fmt(lineTotal) + '</span>'
+                + '</div>';
+            $body.appendChild(row);
         });
         $empty.style.display = cart.length ? 'none' : '';
-        $total.textContent = fmt(total());
+        var t = total();
+        $total.textContent = fmt(t);
+        $total.classList.toggle('neg', t < 0);
+        var pieces = cart.reduce(function (n, c) { return n + c.qty; }, 0);
+        document.getElementById('posCartCount').textContent = pieces + ' ks';
+        document.getElementById('posCartClear').style.display = cart.length ? '' : 'none';
+        // mobil: plovoucí lišta s částkou (jen když je co platit)
+        var mbar = document.getElementById('posMbar');
+        if (mbar) {
+            document.getElementById('posMbarTotal').textContent = fmt(t);
+            document.getElementById('posMbarCount').textContent = cart.length;
+            mbar.classList.toggle('show', cart.length > 0 && !payStepInView);
+            document.getElementById('posApp').classList.toggle('has-mbar', cart.length > 0);
+        }
         updateFinish();
         afxCdMirror();
     }
+    // lišta „K platbě" zmizí, jakmile je platba na obrazovce (jinak by zakrývala tlačítko Dokončit)
+    var payStepInView = false;
+    if ('IntersectionObserver' in window && document.getElementById('posPayStep')) {
+        new IntersectionObserver(function (es) {
+            payStepInView = es[0].isIntersecting;
+            var mb = document.getElementById('posMbar');
+            if (mb) { mb.classList.toggle('show', cart.length > 0 && !payStepInView); }
+        }, { threshold: 0.15 }).observe(document.getElementById('posPayStep'));
+    }
+    // Vysypat košík (i odpojit vyzvedávanou objednávku e-shopu)
+    document.getElementById('posCartClear').addEventListener('click', function () {
+        if (!cart.length) return;
+        if (!confirm('Vysypat celý košík (' + cart.length + ' pol.)?')) return;
+        cart = [];
+        if (eshopOrderId > 0) { eshopBar(null); }
+        render();
+    });
 
     /* ── Zákaznický displej: zrcadlení košíku na druhý monitor ──
        Debounce 400 ms (render běží při každé změně množství/ceny). Prázdný
@@ -1594,7 +1863,18 @@ document.addEventListener('DOMContentLoaded', function () {
         $finish.disabled = !ok;
         $finish.innerHTML = t < 0
             ? '<i class="fas fa-hand-holding-dollar me-2"></i>Vyplatit ' + fmt(Math.abs(t))
-            : '<i class="fas fa-check me-2"></i>Dokončit prodej';
+            : '<i class="fas fa-check me-2"></i>Dokončit prodej' + (cart.length ? ' · ' + fmt(t) : '');
+        // nápověda pod tlačítkem: proč ještě nejde dokončit (místo tichého zašednutí)
+        var hint = '';
+        if (!cart.length) hint = 'Přidej položku do košíku.';
+        else if (payment === '') hint = 'Vyber způsob platby.';
+        else if (isInvPay && !$('#posCustomer').val() && !adhocData() && !hasOrder) hint = 'Vyber odběratele faktury (nebo ho vyplň ručně).';
+        else if (payment === 'invoice_ico' && !ICO_SUPPLIER_READY) hint = 'Faktura IČO není aktivní — zvol jinou platbu.';
+        else if ((t < 0 || hasExpense) && payment !== 'cash') hint = 'Výplata a výdaj z kasy jdou jen hotově.';
+        else if (eshopOrderId > 0 && isInvPay) hint = 'Objednávku z e-shopu zaplať hotově nebo kartou.';
+        else if (payment === 'cash' && t > 0) hint = 'Po kliknutí zadáš, kolik zákazník dal — kasa spočítá, kolik vrátit.';
+        var $hint = document.getElementById('posFinishHint');
+        if ($hint) { $hint.textContent = hint; }
     }
 
     // ── dokončení ──
@@ -2115,6 +2395,32 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .catch(function () { $lockErr.textContent = 'Síťová chyba — zkus to znovu.'; });
     });
+
+    // ── dlaždice „Další možnosti": vždy otevřený jen jeden panel, aktivní dlaždice zvýrazněná ──
+    var tiles = Array.prototype.slice.call(document.querySelectorAll('.pos-tile[data-panel]'));
+    function tilePanel(t) { return document.getElementById(t.dataset.panel); }
+    function syncTiles() {
+        tiles.forEach(function (t) { var p = tilePanel(t); t.classList.toggle('active', !!p && p.style.display !== 'none'); });
+    }
+    tiles.forEach(function (t) {
+        // capture: zavřít ostatní panely dřív, než vlastní handler dlaždice přepne ten svůj
+        t.addEventListener('click', function () {
+            tiles.forEach(function (o) { if (o !== t) { var p = tilePanel(o); if (p) p.style.display = 'none'; } });
+        }, true);
+        var p = tilePanel(t);
+        if (p && window.MutationObserver) { new MutationObserver(syncTiles).observe(p, { attributes: true, attributeFilter: ['style'] }); }
+    });
+    // ruční položka nemá vlastní handler — přepíná se tady
+    document.getElementById('posManualTile').addEventListener('click', function () {
+        var show = $manualForm.style.display === 'none';
+        $manualForm.style.display = show ? '' : 'none';
+        if (show) { setTimeout(function () { $manualName.focus(); }, 40); }
+    });
+
+    // na PC rovnou do vyhledávání (čtečka funguje i bez toho); na dotykovém zařízení ne — vyskočila by klávesnice
+    if (!window.matchMedia('(pointer: coarse)').matches && !$search.value && !document.getElementById('posShiftGate')) {
+        setTimeout(function () { $search.focus({ preventScroll: true }); }, 120);
+    }
 
     render();
 })();

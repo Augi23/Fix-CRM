@@ -11,6 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.95.0',
+        'date' => '2026-10-18',
+        'time' => '18:00',
+        'title' => 'Nový vzhled Pokladny — prodej na první pohled, ve 3 krocích',
+        'items' => [
+            '<b>Prodej je hned nahoře</b> — dřív se k němu muselo scrollovat přes dnešní pohyby a pokladní knihu. Kasa vede obsluhu ve 3 očíslovaných krocích: <b>1 Přidej do košíku → 2 Košík → 3 Způsob platby</b>.',
+            'Horní lišta ukáže na první pohled, <b>kdo má směnu</b>, <b>kolik je v kase hotově</b> a dnešní tržby hotově / kartou / fakturou. Vklad, Výběr a Uzavřít směnu jsou jedním klikem, méně častá nastavení v menu „Další".',
+            'Ruční položka, Rezervace e-shopu, Výplata výkupu a Výdaj z kasy jsou přehledné <b>dlaždice</b> — otevře se vždy jen jedna.',
+            'Košík: velká tlačítka <b>−/+</b> pro počet kusů, cena upravitelná přímo v řádku, tlačítko <b>Vysypat</b>. Pod tlačítkem „Dokončit prodej" je nápověda, <b>co ještě chybí</b> (např. vybrat platbu nebo odběratele faktury).',
+            'Na PC zůstává košík s platbou vpravo stále na očích; vlevo pod vyhledáváním jsou <b>Dnešní pohyby</b> a <b>Pokladní kniha</b> v záložkách.',
+            'Na <b>tabletu a telefonu</b> je kasa v jednom sloupci s velkými dotykovými prvky; dole plovoucí lišta s částkou a tlačítkem <b>K platbě</b>. Funguje ve světlém i tmavém režimu.',
+        ],
+    ],
+    [
         'version' => '3.94.2',
         'date' => '2026-10-18',
         'time' => '16:50',
