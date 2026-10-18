@@ -1,0 +1,300 @@
+<!--
+  APPLEFIX — lišta „Ceník oprav pro můj: [model]" (web applefix.cz, WordPress)
+
+  Vkládá se celý tento blok (style + script) do patičky webu — tam, kde je
+  dnes stará verze (hledej „applefix-detect-bar" v Elementor → Vlastní kód,
+  ve WPCode / Code Snippets, nebo v patičce šablony). Starou verzi nahradit,
+  ne přidat vedle.
+
+  Jak funguje:
+   1) Pozná, jestli je návštěvník na iPhonu, nebo iPadu.
+   2) Podle velikosti displeje (a čipu, když ho prohlížeč prozradí) odhadne model.
+   3) Vykreslí spodní lištu s odkazem na ceník oprav daného modelu.
+      Když má stejný displej víc modelů, nabídne šipkou i ty ostatní.
+   4) MacBook se neřeší (Apple v Safari hardware skrývá).
+
+  Oprava 10/2026: iPhone v režimu „Žádat o verzi pro počítač" (a některé
+  vestavěné prohlížeče aplikací) se hlásí jako Mac s dotykem — stejně jako
+  iPad. Stará verze ho proto označila za iPad. Teď rozhoduje i velikost
+  displeje: kratší strana pod 600 px = iPhone, jinak iPad.
+
+  Konfigurace = URL_BASE + (volitelně) SLUG_OVERRIDES.
+-->
+
+<style>
+  #applefix-detect-bar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 99999;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 44px 10px 14px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    background: #f3f3f5;
+    border-top: 1px solid #d8d8dc;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    font: 14px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #1d1d1f;
+    box-sizing: border-box;
+  }
+  #applefix-detect-bar a {
+    color: #0071e3; font-weight: 600; text-decoration: none;
+  }
+  #applefix-detect-bar a:hover { text-decoration: underline; }
+  #applefix-detect-bar .afx-close {
+    position: absolute; right: 8px; top: 6px;   /* nahoře, ať neposkakuje po rozbalení modelů */
+    width: 28px; height: 28px; border: 0; border-radius: 50%;
+    background: transparent; font-size: 18px; line-height: 1; cursor: pointer;
+    color: #6e6e73;
+  }
+  #applefix-detect-bar .afx-close:hover { background: rgba(0,0,0,0.06); }
+  #applefix-detect-bar .afx-more {
+    border: 1px solid #c7c7cc; border-radius: 999px; background: #fff;
+    font: inherit; font-size: 12px; color: #1d1d1f; padding: 2px 9px; cursor: pointer;
+  }
+  #applefix-detect-bar .afx-alts {
+    display: none; flex-basis: 100%; justify-content: center; flex-wrap: wrap; gap: 6px; padding-top: 6px;
+  }
+  #applefix-detect-bar.afx-open .afx-alts { display: flex; }
+  #applefix-detect-bar .afx-alts a {
+    background: #fff; border: 1px solid #d8d8dc; border-radius: 999px; padding: 4px 10px; font-size: 13px;
+  }
+  @media (max-width: 380px) { #applefix-detect-bar { font-size: 13px; padding: 9px 40px 9px 10px; } }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  // ====================================================================
+  //  URL pattern:  https://applefix.cz/servis-online/?selected=repairs/Apple/{slug}
+  // ====================================================================
+  var URL_BASE = 'https://applefix.cz/servis-online/?selected=repairs/Apple/';
+
+  // Slug-overrides — pouze pro modely, kde název ≠ URL segment.
+  var SLUG_OVERRIDES = {
+    'iPhone SE (3rd)': 'iPhone-SE-2022',
+    'iPhone SE (2nd)': 'iPhone-SE-2020'
+    // sem případně dopiš iPad overrides, např. 'iPad Pro 11 M4': 'iPad-Pro-11-2024'
+  };
+
+  function urlForModel(model) {
+    var slug = SLUG_OVERRIDES[model] || model.replace(/\s+/g, '-');
+    return URL_BASE + slug;
+  }
+
+  // ====================================================================
+  //  Detekce typu zařízení
+  // ====================================================================
+  function shortSide() {
+    return Math.min(screen.width, screen.height);
+  }
+
+  // Safari v režimu „verze pro počítač" (iPad od iPadOS 13 vždy, iPhone na
+  // vyžádání a v některých aplikacích) se hlásí jako Mac. Od skutečného Macu
+  // ho odliší dotyk, iPhone od iPadu velikost displeje (iPhone < 600 px,
+  // nejmenší iPad mini má 744 px).
+  function isTouchMac() {
+    return /Macintosh/.test(navigator.userAgent || '') && (navigator.maxTouchPoints || 0) > 1;
+  }
+
+  function isiPhone() {
+    if (/iPhone|iPod/i.test(navigator.userAgent || '')) return true;
+    return isTouchMac() && shortSide() < 600;
+  }
+
+  function isiPad() {
+    if (/iPad/i.test(navigator.userAgent || '')) return true;
+    return isTouchMac() && shortSide() >= 600;
+  }
+
+  // ====================================================================
+  //  iPhone — SCREEN tabulka (CSS px, min × max @ DPR)
+  //  Pořadí kandidátů = pořadí nabídky (první je hlavní odhad).
+  // ====================================================================
+  var IPHONE_SCREEN_TABLE = {
+    '440x956@3':  ['iPhone 17 Pro Max', 'iPhone 16 Pro Max'],
+    '402x874@3':  ['iPhone 17 Pro', 'iPhone 16 Pro'],
+    '393x852@3':  ['iPhone 17', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro'],
+    '430x932@3':  ['iPhone 15 Pro Max', 'iPhone 14 Pro Max', 'iPhone 15 Plus', 'iPhone 16 Plus'],
+    '428x926@3':  ['iPhone 14 Plus', 'iPhone 13 Pro Max', 'iPhone 12 Pro Max'],
+    '390x844@3':  ['iPhone 14', 'iPhone 13 Pro', 'iPhone 13', 'iPhone 12 Pro', 'iPhone 12'],
+    '414x896@2':  ['iPhone 11', 'iPhone XR'],
+    '414x896@3':  ['iPhone 11 Pro Max', 'iPhone XS Max'],
+    '375x812@3':  ['iPhone 11 Pro', 'iPhone XS', 'iPhone X', 'iPhone 13 mini', 'iPhone 16e', 'iPhone SE (3rd)'],
+    '360x780@3':  ['iPhone 12 mini'],
+    '375x667@2':  ['iPhone SE (3rd)', 'iPhone SE (2nd)', 'iPhone 8', 'iPhone 7'],
+    '414x736@3':  ['iPhone 8 Plus', 'iPhone 7 Plus']
+  };
+
+  var IPHONE_GPU_MAP = {
+    'A19 Pro': ['iPhone 17 Pro', 'iPhone 17 Pro Max'],
+    'A19':     ['iPhone 17', 'iPhone Air'],
+    'A18 Pro': ['iPhone 16 Pro', 'iPhone 16 Pro Max'],
+    'A18':     ['iPhone 16', 'iPhone 16 Plus', 'iPhone 16e'],
+    'A17 Pro': ['iPhone 15 Pro', 'iPhone 15 Pro Max'],
+    'A16':     ['iPhone 14 Pro', 'iPhone 14 Pro Max', 'iPhone 15', 'iPhone 15 Plus'],
+    'A15':     ['iPhone 13', 'iPhone 13 mini', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
+                'iPhone 14', 'iPhone 14 Plus', 'iPhone SE (3rd)'],
+    'A14':     ['iPhone 12', 'iPhone 12 mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max'],
+    'A13':     ['iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max', 'iPhone SE (2nd)'],
+    'A12':     ['iPhone XS', 'iPhone XS Max', 'iPhone XR'],
+    'A11':     ['iPhone 8', 'iPhone 8 Plus', 'iPhone X'],
+    'A10':     ['iPhone 7', 'iPhone 7 Plus']
+  };
+
+  // ====================================================================
+  //  iPad — SCREEN tabulka (CSS px, portrait, min × max @ DPR)
+  // ====================================================================
+  var IPAD_SCREEN_TABLE = {
+    // 12.9"/13" Pro + 13" Air
+    '1024x1366@2': ['iPad Pro 13 M4', 'iPad Pro 12.9 M2', 'iPad Pro 12.9 M1',
+                    'iPad Pro 12.9 A12Z', 'iPad Pro 12.9 A12X',
+                    'iPad Air 13 M3', 'iPad Air 13 M2'],
+    // 11" Pro
+    '834x1194@2':  ['iPad Pro 11 M4', 'iPad Pro 11 M2', 'iPad Pro 11 M1',
+                    'iPad Pro 11 A12Z', 'iPad Pro 11 A12X'],
+    // 10.5" Pro / Air 3
+    '834x1112@2':  ['iPad Pro 10.5', 'iPad Air 3'],
+    // 10.9"/11" — iPad 10/11, Air 11 M2/M3, Air 4/5
+    '820x1180@2':  ['iPad 11 (A16)', 'iPad 10', 'iPad Air 11 M3', 'iPad Air 11 M2',
+                    'iPad Air 5', 'iPad Air 4'],
+    // 10.2"
+    '810x1080@2':  ['iPad 9', 'iPad 8', 'iPad 7'],
+    // 9.7"
+    '768x1024@2':  ['iPad mini 5', 'iPad mini 4', 'iPad 6', 'iPad 5', 'iPad Pro 9.7'],
+    // 8.3" mini
+    '744x1133@2':  ['iPad mini 7', 'iPad mini 6']
+  };
+
+  var IPAD_GPU_MAP = {
+    'M4':      ['iPad Pro 11 M4', 'iPad Pro 13 M4'],
+    'M3':      ['iPad Air 11 M3', 'iPad Air 13 M3'],
+    'M2':      ['iPad Pro 11 M2', 'iPad Pro 12.9 M2', 'iPad Air 11 M2', 'iPad Air 13 M2'],
+    'M1':      ['iPad Pro 11 M1', 'iPad Pro 12.9 M1', 'iPad Air 5'],
+    'A17 Pro': ['iPad mini 7'],
+    'A16':     ['iPad 11 (A16)'],
+    'A15':     ['iPad mini 6'],
+    'A14':     ['iPad Air 4', 'iPad 10'],
+    'A13':     ['iPad 9'],
+    'A12Z':    ['iPad Pro 11 A12Z', 'iPad Pro 12.9 A12Z'],
+    'A12X':    ['iPad Pro 11 A12X', 'iPad Pro 12.9 A12X'],
+    'A12':     ['iPad Air 3', 'iPad mini 5'],
+    'A10X':    ['iPad Pro 10.5', 'iPad Pro 12.9 2nd gen'],
+    'A9':      ['iPad mini 4', 'iPad Pro 9.7']
+  };
+
+  // ====================================================================
+  //  Pomocné funkce: GPU + zúžení kandidátů
+  // ====================================================================
+  function getGPURenderer() {
+    try {
+      var c = document.createElement('canvas');
+      var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+      if (!gl) return null;
+      var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      if (!dbg) return null;
+      return gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || null;
+    } catch (e) { return null; }
+  }
+
+  // Vrací seznam kandidátů, nejpravděpodobnější první. Safari čip obvykle
+  // neprozradí („Apple GPU"), pak zůstanou všechny modely se stejným displejem.
+  function narrow(candidates, gpuMap) {
+    if (candidates.length <= 1) return candidates;
+    var gpu = getGPURenderer();
+    if (gpu) {
+      var chips = Object.keys(gpuMap); // od nejnovějšího (A19 Pro, A19, A18 Pro…)
+      for (var i = 0; i < chips.length; i++) {
+        var chip = chips[i];
+        // přesná shoda na "A18 Pro" musí předbíhat "A18"
+        if ((' ' + gpu + ' ').indexOf(' ' + chip + ' ') !== -1) {
+          var inter = candidates.filter(function (m) { return gpuMap[chip].indexOf(m) !== -1; });
+          if (inter.length >= 1) return inter;
+        }
+      }
+    }
+    return candidates;
+  }
+
+  function lookup(screenTable, gpuMap) {
+    var w = shortSide();
+    var h = Math.max(screen.width, screen.height);
+    var dpr = Math.round(window.devicePixelRatio || 1);
+    var candidates = screenTable[w + 'x' + h + '@' + dpr];
+    if (!candidates || !candidates.length) return null;
+    return narrow(candidates, gpuMap);
+  }
+
+  // ====================================================================
+  //  Hlavní detekce → seznam modelů (první = hlavní odhad), nebo null
+  // ====================================================================
+  function detectModels() {
+    if (isiPhone()) return lookup(IPHONE_SCREEN_TABLE, IPHONE_GPU_MAP);
+    if (isiPad())   return lookup(IPAD_SCREEN_TABLE, IPAD_GPU_MAP) || ['iPad'];
+    return null;
+  }
+
+  // ====================================================================
+  //  Render sticky lišty
+  // ====================================================================
+  function modelLink(model) {
+    var a = document.createElement('a');
+    a.href = urlForModel(model);
+    a.textContent = model;
+    return a;
+  }
+
+  function renderBar(models) {
+    if (document.getElementById('applefix-detect-bar')) return;
+    var model = models[0];
+
+    var bar = document.createElement('div');
+    bar.id = 'applefix-detect-bar';
+    bar.appendChild(document.createTextNode('Ceník oprav pro můj: '));
+    bar.appendChild(modelLink(model));
+
+    // stejný displej má víc modelů → nabídnout i ostatní
+    if (models.length > 1) {
+      var more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'afx-more';
+      more.textContent = 'jiný model ▾';
+      more.setAttribute('aria-expanded', 'false');
+      var alts = document.createElement('div');
+      alts.className = 'afx-alts';
+      for (var i = 1; i < models.length; i++) alts.appendChild(modelLink(models[i]));
+      more.addEventListener('click', function () {
+        var open = bar.classList.toggle('afx-open');
+        more.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      bar.appendChild(more);
+      bar.appendChild(alts);
+    }
+
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'afx-close';
+    close.setAttribute('aria-label', 'Zavřít');
+    close.textContent = '×';
+    close.addEventListener('click', function () {
+      bar.parentNode && bar.parentNode.removeChild(bar);
+      try { sessionStorage.setItem('applefix-bar-closed', '1'); } catch (e) {}
+    });
+    bar.appendChild(close);
+
+    document.body.appendChild(bar);
+  }
+
+  function init() {
+    try { if (sessionStorage.getItem('applefix-bar-closed') === '1') return; } catch (e) {}
+    var models = detectModels();
+    if (models && models.length) renderBar(models);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
