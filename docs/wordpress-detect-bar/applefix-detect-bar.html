@@ -12,8 +12,11 @@
    3) Vykreslí tenkou jednořádkovou lištu hned pod hlavičkou webu (.af-nav)
       s odkazem na ceník oprav daného modelu. Obsah stránky posune o výšku
       lišty, takže nic nepřekryje.
-      Lišta se ukáže JEN když je model jistý (jediný kandidát). Když má
-      stejný displej víc modelů a prohlížeč neprozradí čip, nezobrazí se nic.
+      iPhone ani iPad webu přesný model neprozradí (Safari skrývá i čip),
+      proto se ukáže NEJPRAVDĚPODOBNĚJŠÍ model s daným displejem = první
+      v seznamu tabulky. Pořadí v tabulce = pořadí pravděpodobnosti
+      (nejčastější v servisu první); kdo chce, upraví ho přímo tam.
+      Neznámá velikost displeje = lišta se nezobrazí.
    4) MacBook se neřeší (Apple v Safari hardware skrývá).
 
   Oprava 10/2026: iPhone v režimu „Žádat o verzi pro počítač" (a některé
@@ -123,17 +126,17 @@
   //  iPhone — SCREEN tabulka (CSS px, min × max @ DPR)
   // ====================================================================
   var IPHONE_SCREEN_TABLE = {
-    '440x956@3':  ['iPhone 17 Pro Max', 'iPhone 16 Pro Max'],
-    '402x874@3':  ['iPhone 17 Pro', 'iPhone 16 Pro'],
-    '393x852@3':  ['iPhone 17', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro'],
+    '440x956@3':  ['iPhone 16 Pro Max', 'iPhone 17 Pro Max'],
+    '402x874@3':  ['iPhone 16 Pro', 'iPhone 17 Pro', 'iPhone 17'],
+    '393x852@3':  ['iPhone 15', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 14 Pro'],
     '430x932@3':  ['iPhone 15 Pro Max', 'iPhone 14 Pro Max', 'iPhone 15 Plus', 'iPhone 16 Plus'],
-    '428x926@3':  ['iPhone 14 Plus', 'iPhone 13 Pro Max', 'iPhone 12 Pro Max'],
-    '390x844@3':  ['iPhone 14', 'iPhone 13 Pro', 'iPhone 13', 'iPhone 12 Pro', 'iPhone 12'],
+    '428x926@3':  ['iPhone 13 Pro Max', 'iPhone 12 Pro Max', 'iPhone 14 Plus'],
+    '390x844@3':  ['iPhone 13', 'iPhone 14', 'iPhone 12', 'iPhone 13 Pro', 'iPhone 12 Pro', 'iPhone 16e'],
     '414x896@2':  ['iPhone 11', 'iPhone XR'],
     '414x896@3':  ['iPhone 11 Pro Max', 'iPhone XS Max'],
-    '375x812@3':  ['iPhone 11 Pro', 'iPhone XS', 'iPhone X', 'iPhone 13 mini', 'iPhone 16e', 'iPhone SE (3rd)'],
-    '360x780@3':  ['iPhone 12 mini'],
-    '375x667@2':  ['iPhone SE (3rd)', 'iPhone SE (2nd)', 'iPhone 8', 'iPhone 7'],
+    '375x812@3':  ['iPhone 11 Pro', 'iPhone XS', 'iPhone X', 'iPhone 13 mini', 'iPhone 12 mini'],
+    '360x780@3':  ['iPhone 12 mini', 'iPhone 13 mini'],
+    '375x667@2':  ['iPhone SE (2nd)', 'iPhone SE (3rd)', 'iPhone 8', 'iPhone 7'],
     '414x736@3':  ['iPhone 8 Plus', 'iPhone 7 Plus']
   };
 
@@ -158,23 +161,23 @@
   // ====================================================================
   var IPAD_SCREEN_TABLE = {
     // 12.9"/13" Pro + 13" Air
-    '1024x1366@2': ['iPad Pro 13 M4', 'iPad Pro 12.9 M2', 'iPad Pro 12.9 M1',
-                    'iPad Pro 12.9 A12Z', 'iPad Pro 12.9 A12X',
-                    'iPad Air 13 M3', 'iPad Air 13 M2'],
+    '1024x1366@2': ['iPad Pro 12.9 M1', 'iPad Pro 12.9 M2', 'iPad Pro 12.9 A12Z',
+                    'iPad Pro 12.9 A12X', 'iPad Pro 13 M4',
+                    'iPad Air 13 M2', 'iPad Air 13 M3'],
     // 11" Pro
-    '834x1194@2':  ['iPad Pro 11 M4', 'iPad Pro 11 M2', 'iPad Pro 11 M1',
-                    'iPad Pro 11 A12Z', 'iPad Pro 11 A12X'],
+    '834x1194@2':  ['iPad Pro 11 M1', 'iPad Pro 11 M2', 'iPad Pro 11 A12Z',
+                    'iPad Pro 11 A12X', 'iPad Pro 11 M4'],
     // 10.5" Pro / Air 3
     '834x1112@2':  ['iPad Pro 10.5', 'iPad Air 3'],
     // 10.9"/11" — iPad 10/11, Air 11 M2/M3, Air 4/5
-    '820x1180@2':  ['iPad 11 (A16)', 'iPad 10', 'iPad Air 11 M3', 'iPad Air 11 M2',
-                    'iPad Air 5', 'iPad Air 4'],
+    '820x1180@2':  ['iPad 10', 'iPad Air 4', 'iPad Air 5', 'iPad 11 (A16)',
+                    'iPad Air 11 M2', 'iPad Air 11 M3'],
     // 10.2"
     '810x1080@2':  ['iPad 9', 'iPad 8', 'iPad 7'],
     // 9.7"
-    '768x1024@2':  ['iPad mini 5', 'iPad mini 4', 'iPad 6', 'iPad 5', 'iPad Pro 9.7'],
+    '768x1024@2':  ['iPad 6', 'iPad 5', 'iPad mini 5', 'iPad mini 4', 'iPad Pro 9.7'],
     // 8.3" mini
-    '744x1133@2':  ['iPad mini 7', 'iPad mini 6']
+    '744x1133@2':  ['iPad mini 6', 'iPad mini 7']
   };
 
   var IPAD_GPU_MAP = {
@@ -238,13 +241,13 @@
   }
 
   // ====================================================================
-  //  Hlavní detekce → model, jen když je jistý; jinak null (nic nezobrazit)
+  //  Hlavní detekce → nejpravděpodobnější model, nebo null (nic nezobrazit)
   // ====================================================================
   function detectModel() {
     var c = null;
     if (isiPhone())    c = lookup(IPHONE_SCREEN_TABLE, IPHONE_GPU_MAP);
     else if (isiPad()) c = lookup(IPAD_SCREEN_TABLE, IPAD_GPU_MAP);
-    return (c && c.length === 1) ? c[0] : null;
+    return (c && c.length) ? c[0] : null;
   }
 
   // ====================================================================
