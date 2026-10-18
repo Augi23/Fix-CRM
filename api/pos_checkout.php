@@ -532,6 +532,7 @@ try {
     // níže a uživatel u kasy dostane srozumitelnou hlášku, ne „databázovou chybu".
     afxAccountingAssertOpen(date('Y-m-d'), 'prodej na kase');
     if (!empty($orderPrepay)) { ensureOrderPrepaidColumn(); }   // DDL před transakcí (jinak implicitní COMMIT)
+    ensureProductsLoanColumns();                                  // loan_customer_id (prodej zapůjčeného kusu zápůjčku ukončí)
 
     $pdo->beginTransaction();
 
@@ -586,7 +587,11 @@ try {
             $mineQty = $eshopOrderId > 0 ? (int)($eshopRes[(int)$line['id']] ?? 0) : 0;
             $u = $pdo->prepare("UPDATE products
                 SET stock_qty = stock_qty - ?, pos_sold_at = IF(stock_qty = 0, NOW(), pos_sold_at),
-                    last_sold_at = NOW()
+                    last_sold_at = NOW(),
+                    -- prodaný poslední kus (komisní prodej / klient si zapůjčený kus koupil) už není zápůjčka
+                    loan_to = IF(stock_qty = 0, NULL, loan_to), loan_note = IF(stock_qty = 0, NULL, loan_note),
+                    loan_by = IF(stock_qty = 0, NULL, loan_by), loan_customer_id = IF(stock_qty = 0, NULL, loan_customer_id),
+                    loan_at = IF(stock_qty = 0, NULL, loan_at)
                 WHERE id = ? AND stock_qty >= ? AND stock_qty - COALESCE(reserved_qty, 0) + ? >= ?");
             $u->execute([$line['qty'], $line['id'], $line['qty'], $mineQty, $line['qty']]);
             if ($u->rowCount() === 0) {

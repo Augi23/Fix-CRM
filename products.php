@@ -212,7 +212,12 @@ try {
         <input type="hidden" id="loanProductId">
         <div class="mb-3">
           <label class="form-label small">Komu <span class="text-danger">*</span></label>
-          <input type="text" class="form-control" id="loanTo" placeholder="např. Štěpán Říčan" maxlength="120">
+          <div class="position-relative">
+            <input type="text" class="form-control" id="loanTo" placeholder="začni psát jméno nebo telefon klienta…" maxlength="120" autocomplete="off">
+            <input type="hidden" id="loanCustomerId">
+            <div id="loanToSuggest" class="list-group position-absolute w-100 shadow" style="z-index:1060; top:100%; max-height:260px; overflow-y:auto; display:none"></div>
+          </div>
+          <div class="form-text small" id="loanToHint">Vyber klienta z databáze — zápůjčka se pak ukáže v jeho kartě. Jde napsat i jméno mimo databázi.</div>
         </div>
         <div class="mb-2">
           <label class="form-label small">Důvod zapůjčení / poznámka</label>
@@ -383,7 +388,7 @@ try {
                                     <td>
                                         <?php if (productIsLoaned($p)): ?>
                                             <span class="badge" style="background:#8B5CF6" title="<?php echo e(($p['loan_to'] ?? '') . (!empty($p['loan_at']) ? ' · od ' . date('j.n.Y', strtotime($p['loan_at'])) : '') . (!empty($p['loan_note']) ? ' · ' . $p['loan_note'] : '')); ?>">Zapůjčeno/Komisní prod.</span>
-                                            <div class="small text-white-75 mt-1"><i class="fas fa-user-tag me-1"></i><?php echo e($p['loan_to'] ?? ''); ?></div>
+                                            <div class="small text-white-75 mt-1"><i class="fas fa-user-tag me-1"></i><?php if ((int)($p['loan_customer_id'] ?? 0) > 0): ?><a href="edit_customer.php?id=<?php echo (int)$p['loan_customer_id']; ?>" class="text-reset" title="Otevřít kartu klienta"><?php echo e($p['loan_to'] ?? ''); ?></a><?php else: ?><?php echo e($p['loan_to'] ?? ''); ?><?php endif; ?></div>
                                         <?php elseif ((int)$p['stock_qty'] > 1): ?>
                                             <span class="badge bg-success">Skladem <?php echo (int)$p['stock_qty']; ?> ks</span>
                                         <?php elseif ((int)$p['stock_qty'] > 0): ?>
@@ -428,7 +433,7 @@ try {
                                                 <div class="fst-italic text-white-75" style="font-size:12px;line-height:1.4;">důvod nevyplněn</div>
                                             <?php endif; ?>
                                             <?php if (trim((string)($p['loan_to'] ?? '')) !== ''): ?>
-                                                <div style="font-size:11.5px;line-height:1.4;margin-top:.15rem;"><i class="fas fa-user-tag me-1" style="color:#8B5CF6"></i><?php echo e($p['loan_to']); ?></div>
+                                                <div style="font-size:11.5px;line-height:1.4;margin-top:.15rem;"><i class="fas fa-user-tag me-1" style="color:#8B5CF6"></i><?php if ((int)($p['loan_customer_id'] ?? 0) > 0): ?><a href="edit_customer.php?id=<?php echo (int)$p['loan_customer_id']; ?>" class="text-reset" title="Otevřít kartu klienta"><?php echo e($p['loan_to']); ?></a><?php else: ?><?php echo e($p['loan_to']); ?><?php endif; ?></div>
                                             <?php endif; ?>
                                             <?php
                                                 $loanFrom = strtotime((string)$p['loan_at']);
@@ -2368,8 +2373,48 @@ $(document).on('click', '.product-loan-btn', function () {
     document.getElementById('loanProductTitle').textContent = d.title || '';
     document.getElementById('loanTo').value = d.to || '';
     document.getElementById('loanNote').value = d.note || '';
+    loanSetCustomer(0);
     new bootstrap.Modal(document.getElementById('productLoanModal')).show();
 });
+// Našeptávač klientů z databáze (api/search_customers.php) — výběr uloží vazbu na klienta,
+// ruční přepsání jména vazbu zruší (zůstane jen volné jméno)
+var loanSugTimer = null, loanSugSeq = 0;
+function loanSetCustomer(id, label) {
+    document.getElementById('loanCustomerId').value = id > 0 ? id : '';
+    var h = document.getElementById('loanToHint');
+    h.innerHTML = id > 0
+        ? '<i class="fas fa-link me-1" style="color:#8B5CF6"></i>Propojeno s klientem <b>' + escHtml(label || '') + '</b> — zápůjčka se ukáže v jeho kartě.'
+        : 'Vyber klienta z databáze — zápůjčka se pak ukáže v jeho kartě. Jde napsat i jméno mimo databázi.';
+}
+function loanHideSuggest() { var b = document.getElementById('loanToSuggest'); b.style.display = 'none'; b.innerHTML = ''; }
+$(document).on('input', '#loanTo', function () {
+    loanSetCustomer(0);
+    var q = this.value.trim();
+    clearTimeout(loanSugTimer);
+    if (q.length < 2) { loanHideSuggest(); return; }
+    loanSugTimer = setTimeout(function () {
+        var seq = ++loanSugSeq;
+        $.getJSON('api/search_customers.php', { q: q }, function (d) {
+            if (seq !== loanSugSeq) return;
+            var box = document.getElementById('loanToSuggest'), res = (d && d.results) || [];
+            if (!res.length) { loanHideSuggest(); return; }
+            box.innerHTML = res.slice(0, 10).map(function (r) {
+                return '<button type="button" class="list-group-item list-group-item-action py-2 loan-sug" data-id="' + r.id + '" data-name="' + escHtml(r.name || r.text) + '">'
+                    + '<div class="fw-semibold">' + escHtml(r.name || r.text) + '</div>'
+                    + (r.phone ? '<div class="small text-muted">' + escHtml(r.phone) + '</div>' : '') + '</button>';
+            }).join('');
+            box.style.display = 'block';
+        });
+    }, 220);
+});
+$(document).on('mousedown', '.loan-sug', function (e) {
+    e.preventDefault();
+    document.getElementById('loanTo').value = this.dataset.name;
+    loanSetCustomer(parseInt(this.dataset.id, 10), this.dataset.name);
+    loanHideSuggest();
+});
+$(document).on('blur', '#loanTo', function () { setTimeout(loanHideSuggest, 150); });
+$(document).on('keydown', '#loanTo', function (e) { if (e.key === 'Escape') { loanHideSuggest(); e.stopPropagation(); } });
 $(document).on('click', '#loanSaveBtn', function () {
     var to = document.getElementById('loanTo').value.trim();
     if (!to) { showAlert('Vyplň, komu je kus zapůjčen.'); return; }
@@ -2377,6 +2422,7 @@ $(document).on('click', '#loanSaveBtn', function () {
     $.post('api/product_loan.php', {
         id: document.getElementById('loanProductId').value, action: 'lend', loan_to: to,
         loan_note: document.getElementById('loanNote').value.trim(),
+        loan_customer_id: document.getElementById('loanCustomerId').value || 0,
         csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>'
     }, function (res) {
         if (res.success) { location.reload(); }

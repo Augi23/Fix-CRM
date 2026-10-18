@@ -99,6 +99,7 @@ if ($__dupes): ?>
         <?php endforeach; ?>
     </div>
 <?php endif; ?>
+<?php echo crmCustomerLoansBox((int)$id); /* zapůjčené kusy ze skladu */ ?>
 <?php if ($success): ?>
     <div class="alert alert-success"><?php echo $success; ?></div>
     <script>window.afxDraft && afxDraft.clearKey('customer-<?php echo (int)$id; ?>');</script>

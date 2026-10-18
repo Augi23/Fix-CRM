@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.94.2',
+        'date' => '2026-10-18',
+        'time' => '16:50',
+        'title' => 'Zapůjčené zařízení je vidět v kartě klienta',
+        'items' => [
+            'Při zapůjčení kusu ze skladu (Sklad → <i class="fas fa-hand-holding-heart"></i> Zapůjčeno) pole <b>„Komu"</b> našeptává <b>klienty z databáze</b> podle jména i telefonu. Vybraný klient se se zápůjčkou propojí; jde napsat i jméno mimo databázi.',
+            'Propojená zápůjčka se ukáže <b>v kartě klienta</b> (fialový rámeček „Klient má zapůjčeno" — co, od kdy, kolik dní, poznámka), <b>v detailu jeho zakázky</b> u klienta a v <b>seznamu klientů</b> značkou „Zapůjčeno". Ve skladu je jméno klienta odkazem na jeho kartu.',
+            'Dosavadní zápůjčky se s klientem propojily samy tam, kde jméno přesně sedí na jednoho klienta v databázi.',
+            'Když se zapůjčený kus prodá v Pokladně (komisní prodej / klient si ho koupí), zápůjčka se ukončí.',
+        ],
+    ],
+    [
         'version' => '3.94.1',
         'date' => '2026-10-16',
         'time' => '13:09',

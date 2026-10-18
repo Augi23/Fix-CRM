@@ -299,6 +299,7 @@ $complaintPrefill = [
                                 <span class="afx-internal-chip ms-2" title="Interní zakázka — není pro veřejného klienta"><i class="fas fa-screwdriver-wrench"></i>Interní</span>
                             <?php endif; ?>
                         </p>
+                        <?php echo crmCustomerLoansBox((int)($order['customer_id'] ?? 0), true); /* klient má zapůjčený kus ze skladu */ ?>
                         <?php
                             $order_phone_href = normalizePhoneForTel($order['phone'] ?? '');
                             $order_email_href = normalizeEmailForMailto($order['email'] ?? '');

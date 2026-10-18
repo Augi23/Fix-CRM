@@ -97,6 +97,14 @@ if (isset($pdo)) {
             while ($row = $c_stmt->fetch()) {
                 $order_counts[$row['customer_id']] = (int)$row['cnt'];
             }
+            // zapůjčené kusy ze skladu (fialová značka u jména)
+            $loan_counts = [];
+            try {
+                ensureProductsLoanColumns();
+                $l_stmt = $pdo->prepare("SELECT loan_customer_id, COUNT(*) AS cnt FROM products WHERE loan_at IS NOT NULL AND loan_customer_id IN ($placeholders) GROUP BY loan_customer_id");
+                $l_stmt->execute($customer_ids);
+                while ($row = $l_stmt->fetch()) { $loan_counts[(int)$row['loan_customer_id']] = (int)$row['cnt']; }
+            } catch (Throwable $e) { }
         }
 
     } catch (PDOException $e) { }
@@ -185,6 +193,9 @@ function customersOrdersStyleDisplayName(array $customer): string
                                         <small class="text-muted">(Firma)</small>
                                     <?php endif; ?>
                                 </strong>
+                                <?php if (!empty($loan_counts[(int)$customer['id']])): ?>
+                                    <a href="edit_customer.php?id=<?php echo (int)$customer['id']; ?>" class="badge text-decoration-none ms-1" style="background:#8B5CF6" title="Klient má zapůjčený kus ze skladu"><i class="fas fa-hand-holding-heart me-1"></i>Zapůjčeno<?php echo $loan_counts[(int)$customer['id']] > 1 ? ' ' . (int)$loan_counts[(int)$customer['id']] . '×' : ''; ?></a>
+                                <?php endif; ?>
                                 <?php if (($customer['customer_type'] ?? 'private') === 'company' && $companyName !== '' && $companyName !== $primaryName): ?>
                                     <div class="small text-muted">Firma: <?php echo e($companyName); ?></div>
                                 <?php endif; ?>

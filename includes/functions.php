@@ -2191,13 +2191,63 @@ function ensureProductsLoanColumns(): void {
             'loan_at'   => "ALTER TABLE products ADD COLUMN loan_at DATETIME NULL DEFAULT NULL",
             'loan_note' => "ALTER TABLE products ADD COLUMN loan_note VARCHAR(255) NULL DEFAULT NULL",
             'loan_by'   => "ALTER TABLE products ADD COLUMN loan_by VARCHAR(120) NULL DEFAULT NULL",
+            // klient z databáze, kterému je kus zapůjčen (NULL = jen volné jméno v loan_to)
+            'loan_customer_id' => "ALTER TABLE products ADD COLUMN loan_customer_id INT NULL DEFAULT NULL, ADD INDEX idx_products_loan_customer (loan_customer_id)",
         ];
         foreach ($add as $col => $ddl) {
             if (!$pdo->query("SHOW COLUMNS FROM products LIKE '" . $col . "'")->fetch()) {
                 $pdo->exec($ddl);
+                // dosavadní zápůjčky (jen jméno textem) jednorázově propojit s klientem —
+                // jen když jméno sedí přesně na JEDNOHO klienta, jinak zůstanou nepropojené
+                if ($col === 'loan_customer_id') {
+                    $pdo->exec("UPDATE products p
+                        JOIN (SELECT p2.id AS pid, MIN(c.id) AS cid, COUNT(*) AS n
+                                FROM products p2
+                                JOIN customers c
+                                  ON LOWER(TRIM(p2.loan_to)) IN (LOWER(TRIM(CONCAT_WS(' ', c.first_name, c.last_name))),
+                                                                LOWER(TRIM(CONCAT_WS(' ', c.last_name, c.first_name))))
+                               WHERE p2.loan_at IS NOT NULL AND TRIM(p2.loan_to) LIKE '% %'
+                               GROUP BY p2.id) m ON m.pid = p.id AND m.n = 1
+                        SET p.loan_customer_id = m.cid");
+                }
             }
         }
     } catch (Throwable $e) { error_log('ensureProductsLoanColumns: ' . $e->getMessage()); }
+}
+
+/** Kusy ze skladu, které má klient právě zapůjčené (karta klienta, detail zakázky). */
+function crmCustomerLoans(int $customerId): array {
+    global $pdo;
+    if ($customerId <= 0 || !isset($pdo)) return [];
+    ensureProductsLoanColumns();
+    try {
+        $st = $pdo->prepare("SELECT id, title, product_code, branch_id, loan_to, loan_at, loan_note, loan_by
+                               FROM products WHERE loan_customer_id = ? AND loan_at IS NOT NULL ORDER BY loan_at DESC");
+        $st->execute([$customerId]);
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) { error_log('crmCustomerLoans: ' . $e->getMessage()); return []; }
+}
+
+/** Upozornění „Klient má zapůjčeno" — seznam kusů s odkazem do skladu. */
+function crmCustomerLoansBox(int $customerId, bool $compact = false): string {
+    $loans = crmCustomerLoans($customerId);
+    if (!$loans) return '';
+    $items = '';
+    foreach ($loans as $l) {
+        $from = strtotime((string)$l['loan_at']);
+        $days = $from ? (int)floor((time() - $from) / 86400) : null;
+        $daysTxt = $days === null ? '' : ' · ' . $days . "\u{00A0}" . ($days === 1 ? 'den' : ($days >= 2 && $days <= 4 ? 'dny' : 'dní'));
+        $url = 'products.php?avail=loan&branch=' . (int)$l['branch_id'] . '&search=' . rawurlencode((string)($l['product_code'] ?: $l['title']));
+        $items .= '<li class="mb-1"><a href="' . e($url) . '" class="fw-semibold text-reset">' . e((string)$l['title']) . '</a>'
+            . ' <span class="small text-white-75">' . ($from ? 'od ' . date('j.n.Y', $from) : '') . $daysTxt
+            . (trim((string)$l['loan_note']) !== '' ? ' · ' . e((string)$l['loan_note']) : '')
+            . (!$compact && trim((string)$l['loan_by']) !== '' ? ' · zapsal(a) ' . e((string)$l['loan_by']) : '')
+            . '</span></li>';
+    }
+    $n = count($loans);
+    return '<div class="afx-loan-box' . ($compact ? ' afx-loan-box--compact' : '') . '" style="border:1px solid rgba(139,92,246,.45);background:rgba(139,92,246,.12);border-radius:12px;padding:' . ($compact ? '8px 12px' : '12px 16px') . ';margin-bottom:' . ($compact ? '.5rem' : '1rem') . '">'
+        . '<div class="fw-semibold mb-1" style="color:#C4B5FD"><i class="fas fa-hand-holding-heart me-2"></i>Klient má zapůjčeno: ' . $n . ' zařízení</div>'
+        . '<ul class="mb-0 ps-3" style="font-size:' . ($compact ? '12.5px' : '13.5px') . '">' . $items . '</ul></div>';
 }
 
 /** Je kus zapůjčený / v komisi? (řádek z products) */

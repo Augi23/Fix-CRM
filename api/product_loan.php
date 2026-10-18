@@ -30,6 +30,7 @@ $id     = (int)($_POST['id'] ?? 0);
 $action = (string)($_POST['action'] ?? '');
 $to     = trim((string)($_POST['loan_to'] ?? ''));
 $note   = trim((string)($_POST['loan_note'] ?? ''));
+$custId = (int)($_POST['loan_customer_id'] ?? 0);   // vybraný klient z našeptávače (0 = jen volné jméno)
 
 if ($id <= 0) { echo json_encode(['success' => false, 'message' => 'Chybí produkt.']); exit; }
 
@@ -52,14 +53,19 @@ if ($action === 'lend') {
     if ($to === '') { echo json_encode(['success' => false, 'message' => 'Vyplň, komu je kus zapůjčen.']); exit; }
     $who = trim((string)($_SESSION['full_name'] ?? $_SESSION['user_name']
         ?? $_SESSION['tech_name'] ?? $_SESSION['username'] ?? ''));
-    $up = $pdo->prepare("UPDATE products SET loan_to = ?, loan_note = ?, loan_by = ?, loan_at = NOW(), updated_at = NOW() WHERE id = ?");
-    $up->execute([mb_substr($to, 0, 120), mb_substr($note, 0, 255), mb_substr($who, 0, 120), $id]);
+    if ($custId > 0) {
+        $cs = $pdo->prepare("SELECT id FROM customers WHERE id = ?");
+        $cs->execute([$custId]);
+        if (!$cs->fetchColumn()) $custId = 0;
+    }
+    $up = $pdo->prepare("UPDATE products SET loan_to = ?, loan_note = ?, loan_by = ?, loan_customer_id = ?, loan_at = NOW(), updated_at = NOW() WHERE id = ?");
+    $up->execute([mb_substr($to, 0, 120), mb_substr($note, 0, 255), mb_substr($who, 0, 120), $custId > 0 ? $custId : null, $id]);
     echo json_encode(['success' => true, 'state' => 'loaned', 'loan_to' => $to,
                       'message' => 'Označeno jako zapůjčené: ' . $to], JSON_UNESCAPED_UNICODE); exit;
 }
 
 if ($action === 'return') {
-    $up = $pdo->prepare("UPDATE products SET loan_to = NULL, loan_note = NULL, loan_by = NULL, loan_at = NULL, updated_at = NOW() WHERE id = ?");
+    $up = $pdo->prepare("UPDATE products SET loan_to = NULL, loan_note = NULL, loan_by = NULL, loan_at = NULL, loan_customer_id = NULL, updated_at = NOW() WHERE id = ?");
     $up->execute([$id]);
     echo json_encode(['success' => true, 'state' => 'returned',
                       'message' => 'Kus je zpět ve skladu.'], JSON_UNESCAPED_UNICODE); exit;
