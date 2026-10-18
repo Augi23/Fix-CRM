@@ -9,8 +9,10 @@
   Jak funguje:
    1) Pozná, jestli je návštěvník na iPhonu, nebo iPadu.
    2) Podle velikosti displeje (a čipu, když ho prohlížeč prozradí) odhadne model.
-   3) Vykreslí spodní lištu s odkazem na ceník oprav daného modelu.
-      Když má stejný displej víc modelů, nabídne šipkou i ty ostatní.
+   3) Vykreslí tenkou jednořádkovou lištu hned pod hlavičkou webu (.af-nav)
+      s odkazem na ceník oprav daného modelu. Obsah stránky posune o výšku
+      lišty, takže nic nepřekryje. Když má stejný displej víc modelů,
+      nabídne šipkou i ty ostatní (rozbalí se pod lištou).
    4) MacBook se neřeší (Apple v Safari hardware skrývá).
 
   Oprava 10/2026: iPhone v režimu „Žádat o verzi pro počítač" (a některé
@@ -18,47 +20,78 @@
   iPad. Stará verze ho proto označila za iPad. Teď rozhoduje i velikost
   displeje: kratší strana pod 600 px = iPhone, jinak iPad.
 
+  10/2026: lišta přesunuta ze spodku obrazovky nahoru pod hlavičku
+  (tenký řádek ve stylu hlavičky).
+
   Konfigurace = URL_BASE + (volitelně) SLUG_OVERRIDES.
 -->
 
 <style>
+  /* Tenký řádek pod pevnou hlavičkou webu (.af-nav, výška --nav-h = 64px).
+     z-index pod hlavičkou (1000) i pod rozbaleným mobilním menu (1001),
+     takže otevřené menu lištu překryje. */
+  :root { --afx-dbar-h: 36px; }
   #applefix-detect-bar {
     position: fixed;
-    left: 0; right: 0; bottom: 0;
-    z-index: 99999;
-    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px;
-    padding: 10px 44px 10px 14px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-    background: #f3f3f5;
-    border-top: 1px solid #d8d8dc;
-    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
-    font: 14px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    color: #1d1d1f;
+    top: var(--nav-h, 64px); left: 0; right: 0;
+    z-index: 999;
+    height: var(--afx-dbar-h);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 0 44px 0 16px;
+    background: #0a0a0a;                 /* neprůhledné — backdrop-filter na fixed prvku v iOS Safari glitchuje */
+    border-bottom: 1px solid rgba(255,255,255,.10);
+    font: 13px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Arial, sans-serif;
+    color: #a1a1a6;
     box-sizing: border-box;
+    white-space: nowrap;
+    animation: afxDbarIn .35s cubic-bezier(.16,1,.3,1) both;
   }
-  #applefix-detect-bar a {
-    color: #0071e3; font-weight: 600; text-decoration: none;
+  @keyframes afxDbarIn { from { transform: translateY(-100%); opacity: 0; } to { transform: none; opacity: 1; } }
+  #applefix-detect-bar .afx-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  #applefix-detect-bar .afx-label { flex: none; }
+  #applefix-detect-bar .afx-model {
+    color: #f5f5f7; font-weight: 600; text-decoration: none;
+    overflow: hidden; text-overflow: ellipsis; min-width: 0;
   }
-  #applefix-detect-bar a:hover { text-decoration: underline; }
+  #applefix-detect-bar .afx-model::after { content: " \203A"; color: #2997ff; font-weight: 600; }
+  #applefix-detect-bar .afx-model:hover { color: #2997ff; }
+  #applefix-detect-bar .afx-more {
+    flex: none;
+    border: 1px solid rgba(255,255,255,.18); border-radius: 999px; background: transparent;
+    font: inherit; font-size: 12px; color: #a1a1a6; padding: 4px 9px; cursor: pointer;
+  }
+  #applefix-detect-bar .afx-more:hover, #applefix-detect-bar.afx-open .afx-more { color: #f5f5f7; border-color: rgba(255,255,255,.35); }
   #applefix-detect-bar .afx-close {
-    position: absolute; right: 8px; top: 6px;   /* nahoře, ať neposkakuje po rozbalení modelů */
-    width: 28px; height: 28px; border: 0; border-radius: 50%;
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 30px; height: 30px; border: 0; border-radius: 50%;
     background: transparent; font-size: 18px; line-height: 1; cursor: pointer;
     color: #6e6e73;
   }
-  #applefix-detect-bar .afx-close:hover { background: rgba(0,0,0,0.06); }
-  #applefix-detect-bar .afx-more {
-    border: 1px solid #c7c7cc; border-radius: 999px; background: #fff;
-    font: inherit; font-size: 12px; color: #1d1d1f; padding: 2px 9px; cursor: pointer;
-  }
+  #applefix-detect-bar .afx-close:hover { color: #f5f5f7; background: rgba(255,255,255,.08); }
+  /* další modely se stejným displejem — rozbalí se pod lištou */
   #applefix-detect-bar .afx-alts {
-    display: none; flex-basis: 100%; justify-content: center; flex-wrap: wrap; gap: 6px; padding-top: 6px;
+    display: none;
+    position: absolute; top: 100%; left: 0; right: 0;
+    flex-wrap: wrap; justify-content: center; gap: 8px;
+    padding: 10px 16px 12px;
+    background: #0a0a0a; border-bottom: 1px solid rgba(255,255,255,.10);
+    box-shadow: 0 14px 30px -12px rgba(0,0,0,.6);
+    white-space: normal;
   }
   #applefix-detect-bar.afx-open .afx-alts { display: flex; }
   #applefix-detect-bar .afx-alts a {
-    background: #fff; border: 1px solid #d8d8dc; border-radius: 999px; padding: 4px 10px; font-size: 13px;
+    color: #f5f5f7; text-decoration: none; font-size: 13px; font-weight: 500;
+    border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 7px 12px;
   }
-  @media (max-width: 380px) { #applefix-detect-bar { font-size: 13px; padding: 9px 40px 9px 10px; } }
+  #applefix-detect-bar .afx-alts a:hover { border-color: #2997ff; color: #2997ff; }
+  /* obsah stránky posunout o výšku lišty, ať nic nepřekryje */
+  html.afx-dbar body.applefix { padding-top: calc(var(--nav-h, 64px) + var(--afx-dbar-h)); }
+  html.afx-dbar section[id] { scroll-margin-top: calc(var(--nav-h, 64px) + var(--afx-dbar-h) + 16px); }
+  @media (max-width: 380px) {
+    #applefix-detect-bar { gap: 8px; padding-left: 12px; font-size: 12px; }
+    #applefix-detect-bar .afx-label-long { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { #applefix-detect-bar { animation: none; } }
 </style>
 
 <script>
@@ -237,28 +270,43 @@
   // ====================================================================
   //  Render sticky lišty
   // ====================================================================
-  function modelLink(model) {
+  function modelLink(model, cls) {
     var a = document.createElement('a');
     a.href = urlForModel(model);
     a.textContent = model;
+    if (cls) a.className = cls;
     return a;
+  }
+
+  function removeBar(bar) {
+    bar.parentNode && bar.parentNode.removeChild(bar);
+    document.documentElement.classList.remove('afx-dbar');
   }
 
   function renderBar(models) {
     if (document.getElementById('applefix-detect-bar')) return;
-    var model = models[0];
 
     var bar = document.createElement('div');
     bar.id = 'applefix-detect-bar';
-    bar.appendChild(document.createTextNode('Ceník oprav pro můj: '));
-    bar.appendChild(modelLink(model));
+    bar.setAttribute('role', 'region');
+    bar.setAttribute('aria-label', 'Ceník oprav pro vaše zařízení');
+
+    // jeden řádek: „Ceník oprav pro váš  iPhone 15 Pro Max ›  [jiný ▾]“
+    var row = document.createElement('div');
+    row.className = 'afx-row';
+    var label = document.createElement('span');
+    label.className = 'afx-label';
+    label.innerHTML = 'Ceník oprav<span class="afx-label-long"> pro váš</span>';
+    row.appendChild(label);
+    row.appendChild(modelLink(models[0], 'afx-model'));
+    bar.appendChild(row);
 
     // stejný displej má víc modelů → nabídnout i ostatní
     if (models.length > 1) {
       var more = document.createElement('button');
       more.type = 'button';
       more.className = 'afx-more';
-      more.textContent = 'jiný model ▾';
+      more.textContent = 'jiný ▾';
       more.setAttribute('aria-expanded', 'false');
       var alts = document.createElement('div');
       alts.className = 'afx-alts';
@@ -277,11 +325,12 @@
     close.setAttribute('aria-label', 'Zavřít');
     close.textContent = '×';
     close.addEventListener('click', function () {
-      bar.parentNode && bar.parentNode.removeChild(bar);
+      removeBar(bar);
       try { sessionStorage.setItem('applefix-bar-closed', '1'); } catch (e) {}
     });
     bar.appendChild(close);
 
+    document.documentElement.classList.add('afx-dbar');
     document.body.appendChild(bar);
   }
 
