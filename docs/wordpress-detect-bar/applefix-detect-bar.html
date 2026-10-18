@@ -11,8 +11,9 @@
    2) Podle velikosti displeje (a čipu, když ho prohlížeč prozradí) odhadne model.
    3) Vykreslí tenkou jednořádkovou lištu hned pod hlavičkou webu (.af-nav)
       s odkazem na ceník oprav daného modelu. Obsah stránky posune o výšku
-      lišty, takže nic nepřekryje. Když má stejný displej víc modelů,
-      nabídne šipkou i ty ostatní (rozbalí se pod lištou).
+      lišty, takže nic nepřekryje.
+      Lišta se ukáže JEN když je model jistý (jediný kandidát). Když má
+      stejný displej víc modelů a prohlížeč neprozradí čip, nezobrazí se nic.
    4) MacBook se neřeší (Apple v Safari hardware skrývá).
 
   Oprava 10/2026: iPhone v režimu „Žádat o verzi pro počítač" (a některé
@@ -55,12 +56,6 @@
   }
   #applefix-detect-bar .afx-model::after { content: " \203A"; color: #2997ff; font-weight: 600; }
   #applefix-detect-bar .afx-model:hover { color: #2997ff; }
-  #applefix-detect-bar .afx-more {
-    flex: none;
-    border: 1px solid rgba(255,255,255,.18); border-radius: 999px; background: transparent;
-    font: inherit; font-size: 12px; color: #a1a1a6; padding: 4px 9px; cursor: pointer;
-  }
-  #applefix-detect-bar .afx-more:hover, #applefix-detect-bar.afx-open .afx-more { color: #f5f5f7; border-color: rgba(255,255,255,.35); }
   #applefix-detect-bar .afx-close {
     position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
     width: 30px; height: 30px; border: 0; border-radius: 50%;
@@ -68,22 +63,6 @@
     color: #6e6e73;
   }
   #applefix-detect-bar .afx-close:hover { color: #f5f5f7; background: rgba(255,255,255,.08); }
-  /* další modely se stejným displejem — rozbalí se pod lištou */
-  #applefix-detect-bar .afx-alts {
-    display: none;
-    position: absolute; top: 100%; left: 0; right: 0;
-    flex-wrap: wrap; justify-content: center; gap: 8px;
-    padding: 10px 16px 12px;
-    background: #0a0a0a; border-bottom: 1px solid rgba(255,255,255,.10);
-    box-shadow: 0 14px 30px -12px rgba(0,0,0,.6);
-    white-space: normal;
-  }
-  #applefix-detect-bar.afx-open .afx-alts { display: flex; }
-  #applefix-detect-bar .afx-alts a {
-    color: #f5f5f7; text-decoration: none; font-size: 13px; font-weight: 500;
-    border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 7px 12px;
-  }
-  #applefix-detect-bar .afx-alts a:hover { border-color: #2997ff; color: #2997ff; }
   /* obsah stránky posunout o výšku lišty, ať nic nepřekryje */
   html.afx-dbar body.applefix { padding-top: calc(var(--nav-h, 64px) + var(--afx-dbar-h)); }
   html.afx-dbar section[id] { scroll-margin-top: calc(var(--nav-h, 64px) + var(--afx-dbar-h) + 16px); }
@@ -142,7 +121,6 @@
 
   // ====================================================================
   //  iPhone — SCREEN tabulka (CSS px, min × max @ DPR)
-  //  Pořadí kandidátů = pořadí nabídky (první je hlavní odhad).
   // ====================================================================
   var IPHONE_SCREEN_TABLE = {
     '440x956@3':  ['iPhone 17 Pro Max', 'iPhone 16 Pro Max'],
@@ -230,8 +208,9 @@
     } catch (e) { return null; }
   }
 
-  // Vrací seznam kandidátů, nejpravděpodobnější první. Safari čip obvykle
-  // neprozradí („Apple GPU"), pak zůstanou všechny modely se stejným displejem.
+  // Vrací kandidáty, které sedí na displej (a na čip, když ho prohlížeč
+  // prozradí). Safari čip obvykle neprozradí („Apple GPU"), pak zůstanou
+  // všechny modely se stejným displejem.
   function narrow(candidates, gpuMap) {
     if (candidates.length <= 1) return candidates;
     var gpu = getGPURenderer();
@@ -259,12 +238,13 @@
   }
 
   // ====================================================================
-  //  Hlavní detekce → seznam modelů (první = hlavní odhad), nebo null
+  //  Hlavní detekce → model, jen když je jistý; jinak null (nic nezobrazit)
   // ====================================================================
-  function detectModels() {
-    if (isiPhone()) return lookup(IPHONE_SCREEN_TABLE, IPHONE_GPU_MAP);
-    if (isiPad())   return lookup(IPAD_SCREEN_TABLE, IPAD_GPU_MAP) || ['iPad'];
-    return null;
+  function detectModel() {
+    var c = null;
+    if (isiPhone())    c = lookup(IPHONE_SCREEN_TABLE, IPHONE_GPU_MAP);
+    else if (isiPad()) c = lookup(IPAD_SCREEN_TABLE, IPAD_GPU_MAP);
+    return (c && c.length === 1) ? c[0] : null;
   }
 
   // ====================================================================
@@ -283,7 +263,7 @@
     document.documentElement.classList.remove('afx-dbar');
   }
 
-  function renderBar(models) {
+  function renderBar(model) {
     if (document.getElementById('applefix-detect-bar')) return;
 
     var bar = document.createElement('div');
@@ -291,33 +271,15 @@
     bar.setAttribute('role', 'region');
     bar.setAttribute('aria-label', 'Ceník oprav pro vaše zařízení');
 
-    // jeden řádek: „Ceník oprav pro váš  iPhone 15 Pro Max ›  [jiný ▾]“
+    // jeden řádek: „Ceník oprav pro váš  iPhone 12 mini ›  ×“
     var row = document.createElement('div');
     row.className = 'afx-row';
     var label = document.createElement('span');
     label.className = 'afx-label';
     label.innerHTML = 'Ceník oprav<span class="afx-label-long"> pro váš</span>';
     row.appendChild(label);
-    row.appendChild(modelLink(models[0], 'afx-model'));
+    row.appendChild(modelLink(model, 'afx-model'));
     bar.appendChild(row);
-
-    // stejný displej má víc modelů → nabídnout i ostatní
-    if (models.length > 1) {
-      var more = document.createElement('button');
-      more.type = 'button';
-      more.className = 'afx-more';
-      more.textContent = 'jiný ▾';
-      more.setAttribute('aria-expanded', 'false');
-      var alts = document.createElement('div');
-      alts.className = 'afx-alts';
-      for (var i = 1; i < models.length; i++) alts.appendChild(modelLink(models[i]));
-      more.addEventListener('click', function () {
-        var open = bar.classList.toggle('afx-open');
-        more.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-      bar.appendChild(more);
-      bar.appendChild(alts);
-    }
 
     var close = document.createElement('button');
     close.type = 'button';
@@ -336,8 +298,8 @@
 
   function init() {
     try { if (sessionStorage.getItem('applefix-bar-closed') === '1') return; } catch (e) {}
-    var models = detectModels();
-    if (models && models.length) renderBar(models);
+    var model = detectModel();
+    if (model) renderBar(model);
   }
 
   if (document.readyState === 'loading') {
