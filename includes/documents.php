@@ -594,7 +594,7 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
         $h .= '<label>' . e($L($f['l'])) . '</label>';
         if ($mode === 'form') {
             $h .= $isArea
-                ? '<textarea class="dinput" name="' . e($name) . '" rows="2">' . e($val) . '</textarea>'
+                ? '<textarea class="dinput" name="' . e($name) . '" rows="1">' . e($val) . '</textarea>'
                 : '<input type="text" class="dinput" name="' . e($name) . '" value="' . e($val) . '">';
         } else {
             $h .= '<div class="dvalue">' . ($val !== '' ? nl2br(e($val)) : '&nbsp;') . '</div>';
@@ -662,7 +662,8 @@ function crmRenderDocumentSheet(string $type, array $values, string $lang, strin
     // „Přidat fotky / vyfotit" (na telefonu otevře rovnou foťák).
     $photos = $overridePhotos !== null ? $overridePhotos : ($docId > 0 ? crmGetDocumentMedia($docId) : []);
     if ($photos || $mode === 'form') {
-        $h .= '<div class="block"><h3>' . e($L('photo_documentation')) . '</h3><div class="photos">';
+        // prázdná fotodokumentace se na papír netiskne (jen ubírala místo → přetékání na 2. list)
+        $h .= '<div class="block block--photos' . ($photos ? '' : ' is-empty') . '"><h3>' . e($L('photo_documentation')) . '</h3><div class="photos">';
         foreach ($photos as $ph) {
             $h .= '<span class="photo-item">';
             $h .= '<img src="' . e((string)$ph['src']) . '" alt="foto">';
@@ -797,9 +798,37 @@ function crmDocumentSheetCss(): string {
         .foot .foot-line { font-size: 10px; color: var(--muted); font-weight: 300; margin-top: 4px; letter-spacing: 0.02em; }
         @page { size: A4 portrait; margin: 0; }
         @media print {
-            body { background: #fff !important; padding: 0 !important; }
-            .sheet { box-shadow: none; border-radius: 0; max-width: none; width: 210mm; }
-            .dinput { border-bottom: 1px solid #9aa1ab; }
+            /* Doklad se MUSÍ vejít na jednu A4 i v Safari (přidává si vlastní okraje a záhlaví,
+               margin: 0 ignoruje) — kompaktní tisk s rezervou (v3.95.2). */
+            html, body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
+            .sheet { box-shadow: none; border-radius: 0; max-width: 190mm; width: auto; margin: 0 auto; font-size: 11.5px; line-height: 1.38; }
+            .accent-bar { height: 3px; }
+            .doc-head { padding: 5mm 4mm 0; }
+            .doc-head img { height: 28px; }
+            .doc-code { font-size: 20px; }
+            .head-sep { margin: 8px 4mm 0; }
+            .body { padding: 6px 4mm 2mm; }
+            .doc-title { font-size: 19px; margin-bottom: 5px; }
+            .block { margin: 5px 0; padding: 6px 12px 5px; border-radius: 9px; break-inside: avoid; }
+            .block h3 { font-size: 10.5px; margin: 0 0 3px; }
+            .fgrid { gap: 2px 14px; }
+            .dfield label { font-size: 7.5px; margin-bottom: 0; }
+            .dinput { border-bottom: 1px solid #9aa1ab; padding: 0 0 2px; resize: none; overflow: hidden; }
+            textarea.dinput { min-height: 0; }
+            .dvalue { min-height: 15px; padding: 0 0 2px; }
+            .block--photos.is-empty { display: none !important; }
+            .photos { gap: 5px; }
+            .photos img { width: 72px; height: 72px; border-radius: 7px; }
+            .fineprint { margin-top: 7px; padding-top: 6px; font-size: 8px; line-height: 1.4; }
+            .fineprint li { margin-bottom: 1px; }
+            .sign { margin-top: 10px; gap: 30px; break-inside: avoid; }
+            .sign .slot { padding-top: 4px; font-size: 9.5px; }
+            .sign .slot:not(.signed) { margin-top: 30px; }
+            .sign .slot.signed .sig-img { max-height: 36px; margin-bottom: 0; }
+            .sign .slot.signed .sigline { padding-top: 4px; }
+            .sign .slot.signed .sig-at { font-size: 8px; margin-top: 1px; }
+            .foot { margin-top: 7px; padding-top: 5px; padding-bottom: 0; }
+            .foot .foot-line { margin-top: 2px; }
         }
 CSS;
 }

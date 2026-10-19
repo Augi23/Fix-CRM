@@ -14,10 +14,11 @@ $entries = [
         'version' => '3.95.2',
         'date' => '2026-10-19',
         'time' => '14:30',
-        'title' => 'Zakázkový list se vejde na jednu A4',
+        'title' => 'Zakázkový a výkupní list se vejdou na jednu A4',
         'items' => [
             'Zakázkový list se při tisku vejde na <b>jeden list A4 na výšku</b> — podpisy už nepřetékají na druhý papír (ani v Safari, který si přidává vlastní okraje).',
             'Podpis při <b>příjmu do opravy</b> a při <b>převzetí hotové zakázky</b> jsou vedle sebe; tisk je kompaktnější, text podmínek beze změny.',
+            '<b>Výkupní list</b> (i zástava) se také vejde na jednu A4: kompaktnější tisk, textová pole (stav věci, příslušenství) mají výšku podle obsahu a prázdná „Fotodokumentace" se na papír netiskne.',
         ],
     ],
     [

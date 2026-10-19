@@ -288,11 +288,24 @@ $pageTitle = __($cfg['title_key'], $lang);
     // Tisk = HNED systémové tiskové okno (výběr tiskárny). Dřív se nejdřív čekalo na
     // uložení a když neprošlo (chybějící údaj, síť), okno se vůbec neotevřelo — obsluha
     // pak „nemohla vytisknout". Uložení teď běží souběžně; tiskne se to, co je na obrazovce.
+    // Textová pole (stav věci, příslušenství, poznámka) na výšku obsahu — prázdné řádky
+    // navíc a táhlo zbytečně natahovaly doklad přes jednu A4 (v3.95.2).
+    function fitAreas() {
+        document.querySelectorAll('textarea.dinput').forEach(function (t) {
+            t.style.height = 'auto';
+            t.style.height = Math.max(t.scrollHeight, 22) + 'px';   // rows=1 + výška obsahu
+        });
+    }
+    document.addEventListener('input', function (e) { if (e.target && e.target.matches && e.target.matches('textarea.dinput')) fitAreas(); });
+    window.addEventListener('beforeprint', fitAreas);
+    fitAreas();
+
     document.getElementById('btnPrint').onclick = function () {
         var missing = docMissingFields();
         if (missing.length && !confirm('Doklad není kompletní — chybí:\n\n· ' + missing.join('\n· ')
                 + '\n\nOpravdu tisknout takhle?')) { return; }
         save().catch(function (e) { toast('⚠️ Vytištěno, ale neuloženo: ' + e.message, false); });
+        fitAreas();
         window.print();
     };
 
