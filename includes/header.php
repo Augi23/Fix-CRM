@@ -466,9 +466,6 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <li><a class="dropdown-item <?php echo $currentLang === 'ru' ? 'active' : ''; ?>" href="set_language.php?lang=ru&amp;redirect=<?php echo rawurlencode($langRedirect); ?>"><?php echo __('lang_ru'); ?> (RU)</a></li>
         </ul>
     </div>
-    <?php /* Přepnout zaměstnance (sdílený počítač na recepci) — odhlásí jen tento počítač;
-             převzatá pokladna zůstává tomu, kdo ji převzal (v3.95.3) */ ?>
-    <a href="logout.php?switch=1" class="btn btn-sm crm-v2-icon-btn afx-switch-user afx-hide-m" title="Přepnout zaměstnance — odhlásí jen tento počítač, převzatá pokladna zůstává"><i class="fas fa-user-group"></i></a>
     <a href="logout.php" class="btn btn-outline-danger btn-sm afx-logout afx-hide-m" title="<?php echo __('logout'); ?>"><i class="fas fa-sign-out-alt"></i></a>
     <span class="afx-user" title="<?php echo e($afxFn); ?> · <?php echo e($roleLabel ?: __('role_employee')); ?>">
         <span class="afx-avatar"><?php echo e($afxInitials); ?></span>
@@ -617,7 +614,6 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
                 <a class="btn btn-outline-secondary btn-sm <?php echo $currentLang === 'en' ? 'active' : ''; ?>" href="set_language.php?lang=en&amp;redirect=<?php echo rawurlencode($langRedirect); ?>">EN</a>
                 <a class="btn btn-outline-secondary btn-sm <?php echo $currentLang === 'ru' ? 'active' : ''; ?>" href="set_language.php?lang=ru&amp;redirect=<?php echo rawurlencode($langRedirect); ?>">RU</a>
             </span>
-            <a class="btn btn-outline-secondary btn-sm" href="logout.php?switch=1"><i class="fas fa-user-group me-1"></i>Přepnout zaměstnance</a>
             <a class="btn btn-outline-danger btn-sm" href="logout.php"><i class="fas fa-sign-out-alt me-1"></i><?php echo __('logout'); ?></a>
         </div>
     </div>

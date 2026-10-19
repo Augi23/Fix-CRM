@@ -1126,7 +1126,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </form>
                 <div class="mt-2">
                     <a href="index.php" class="lk-other me-3">Odejít bez převzetí pokladny</a>
-                    <a href="logout.php?switch=1" class="lk-other">Přihlásit jiného zaměstnance →</a>
+                    <a href="logout.php" class="lk-other">Přihlásit jiného zaměstnance →</a>
                 </div>
             </div>
 
@@ -1214,33 +1214,6 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
 </div>
 
-<!-- ── Odhlášení s převzatou pokladnou: uzavřít / jen odhlásit / zůstat (v3.95.3) ── -->
-<style>#posLogoutModal .btn { white-space: normal !important; text-align: left !important; font-size: 15.5px !important; }
-#posLogoutModal .btn span.pl-sub { font-size: 12.5px !important; font-weight: 400 !important; opacity: .85; margin-top: 2px; }
-#posLogoutModal .btn span { font-size: 15.5px !important; }</style>
-<div class="modal fade" id="posLogoutModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark text-white border-secondary">
-            <div class="modal-header border-secondary">
-                <h5 class="modal-title"><i class="fas fa-cash-register me-2 text-info"></i>Máš převzatou pokladnu</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="mb-3">Končíš směnu, nebo se jen na chvíli odhlašuješ (např. kolega zadá na tomhle počítači zakázku)?</p>
-                <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-warning text-start py-2" id="posLogoutClose">
-                        <span class="d-flex align-items-start gap-2"><i class="fas fa-lock mt-1"></i><span><span class="d-block fw-bold">Končím — uzavřít pokladnu</span><span class="d-block pl-sub">spočítat hotovost, zapsat stav a odhlásit</span></span></span>
-                    </button>
-                    <a class="btn btn-outline-info text-start py-2" href="logout.php?switch=1">
-                        <span class="d-flex align-items-start gap-2"><i class="fas fa-user-group mt-1"></i><span><span class="d-block fw-bold">Jen se odhlásit</span><span class="d-block pl-sub">pokladna zůstane převzatá na tebe — nikdo jiný ji obsluhovat nemůže</span></span></span>
-                    </a>
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Zůstat přihlášený</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- ── UZÁVĚRKA POKLADNY — modal (z tlačítka i z pokusu o odhlášení) ── -->
 <div class="modal fade" id="shiftCloseModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -1275,7 +1248,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="lk-err" id="posLockErr"></div>
             <button type="submit" class="lk-btn"><i class="fas fa-unlock me-2"></i>Odemknout</button>
         </form>
-        <a href="logout.php?switch=1" class="lk-other">Přihlásit jiného zaměstnance →</a>
+        <a href="logout.php" class="lk-other">Přihlásit jiného zaměstnance →</a>
     </div>
 </div>
 
@@ -2243,25 +2216,9 @@ document.addEventListener('DOMContentLoaded', function () {
             function () { btn.disabled = false; alert('Zkušební účtenka odeslána na tiskárnu tohoto počítače.'); });
     };
 
-    // odhlášení s převzatou pokladnou → nejdřív připomenout uzávěrku
-    // Odhlášení s převzatou pokladnou: uzávěrka NENÍ povinná — na sdíleném Macu na recepci
-    // se často jen přepíná zaměstnanec (zadá novou zakázku). Pokladna zůstane převzatá
-    // a obsluhovat ji smí dál jen držitel směny (v3.95.3).
-    if (shiftMine) {
-        document.querySelectorAll('a[href$="logout.php"]').forEach(function (a) {
-            a.addEventListener('click', function (ev) {
-                ev.preventDefault();
-                var m = document.getElementById('posLogoutModal');
-                m.dataset.href = a.href;
-                bootstrap.Modal.getOrCreateInstance(m).show();
-            });
-        });
-        document.getElementById('posLogoutClose').addEventListener('click', function () {
-            var m = document.getElementById('posLogoutModal');
-            bootstrap.Modal.getOrCreateInstance(m).hide();
-            setTimeout(function () { shiftCloseOpenModal(m.dataset.href || 'logout.php'); }, 250);
-        });
-    }
+    // Odhlášení s převzatou pokladnou NIKDO neblokuje (v3.95.4): pokladna zůstává převzatá
+    // na držitele směny a obsluhovat ji smí jen on — přihlásit se může kdokoli jiný
+    // (např. zadat zakázku na Macu na recepci), jen bez přístupu ke kase.
 
     // ── USB čtečka čárových kódů — funguje KDEKOLI na stránce ──
     // Čtečka je klávesnice, která „napíše" kód strojovým tempem (10–40 ms/znak)

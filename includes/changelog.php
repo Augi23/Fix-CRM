@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.95.4',
+        'date' => '2026-10-19',
+        'time' => '15:10',
+        'title' => 'Odhlášení s převzatou pokladnou: jen běžné tlačítko Odhlásit',
+        'items' => [
+            'Zrušené tlačítko „Přepnout zaměstnance" i okno s volbami při odhlášení z Pokladny — stačí <b>běžné tlačítko Odhlásit</b>, které už nic neblokuje ani nenutí k uzávěrce.',
+            'Převzatá pokladna zůstává na tom, kdo ji převzal. Přihlásit se na stejném počítači může kterýkoli jiný zaměstnanec (např. zadat zakázku na recepci), ale <b>do Pokladny nemá přístup</b> — uvidí „Pokladnu má převzatou …" a markovat nemůže (hlídá i server).',
+        ],
+    ],
+    [
         'version' => '3.95.3',
         'date' => '2026-10-19',
         'time' => '14:45',
