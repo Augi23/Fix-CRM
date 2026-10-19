@@ -14,10 +14,13 @@ $entries = [
         'version' => '3.95.1',
         'date' => '2026-10-19',
         'time' => '10:45',
-        'title' => 'Detail zakázky: číslo zakázky velkým písmem',
+        'title' => 'Detail zakázky: velké číslo zakázky a přehledný pravý sloupec',
         'items' => [
-            'V hlavičce detailu zakázky je vlevo <b>velké číslo zakázky</b> (pod ním model a datum vytvoření) — klepnutím se zkopíruje do schránky.',
-            'Tlačítka Upravit zakázku, Smazat a Reklamace jsou přesunutá <b>vpravo</b>, nad stav zakázky.',
+            'V hlavičce je vlevo <b>velké číslo zakázky</b> a hned za ním <b>stav</b> (pod tím model a datum vytvoření). Klepnutím na číslo se zkopíruje do schránky.',
+            'Pravý sloupec je seřazený podle práce se zakázkou: <b>Upravit / Smazat / Reklamace</b> úplně nahoře (s malým kódem pro skener) → <b>Další krok</b> (velké tlačítko posunu stavu, předání technikovi, přesun na pobočku) → <b>Platba a faktura</b> → <b>Doprava / Výdej</b> → <b>Doklady a podpisy</b> → <b>Stav, technik a cena</b>.',
+            '<b>Platba a faktura</b> je teď nahoře místo schované dole: cena opravy a jasný stav — <i>zaplaceno</i> (kolik, jak, doklad, dotisk účtenky, dodatečná faktura), <i>vystavená faktura</i> (číslo, stav, splatnost, Zobrazit / E-mailem / Upravit v Účetnictví), nebo tlačítko <i>Uhradit v Pokladně</i> / <i>Zaplatit předem</i>.',
+            'Zrušený starý formulář „expresní faktury", který jako číslo faktury nabízel interní číslo zakázky (např. 2843) mimo fakturační řadu. Faktura k zakázce se vystavuje v Pokladně („Faktura s.r.o." — správná řada, QR platba), k už zaplacené zakázce tlačítkem „Vystavit fakturu".',
+            'Odstraněné duplicity (dvě tlačítka na zakázkový list, zbytečné texty) a výjimečné „Naskladnit jako díl" přesunuto úplně dolů.',
         ],
     ],
     [

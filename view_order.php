@@ -218,6 +218,7 @@ $complaintPrefill = [
                         <div class="ord-head-code" role="button" tabindex="0" title="<?php echo __('order'); ?> — klepnutím zkopíruješ číslo"
                              onclick="(function(el){var t=el.dataset.code;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){el.classList.add('copied');setTimeout(function(){el.classList.remove('copied');},1200);}).catch(function(){});})(this)"
                              data-code="<?php echo e(orderDisplayCode($order)); ?>"><?php echo e(orderDisplayCode($order)); ?><i class="fas fa-check ord-head-copied"></i></div>
+                        <span class="ord-head-status"><?php echo getStatusBadge($order['status']); ?><?php echo crmDeviceLocationPill($order); ?><?php echo crmPrepaidPill($order); ?></span>
                         <div class="ord-head-sub">
                             <?php echo htmlspecialchars($order['device_model']); ?>
                             <span class="ord-head-date">· <?php echo __('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?></span>
@@ -246,46 +247,6 @@ $complaintPrefill = [
                         <?php endif; ?>
                     </div>
                 </div>
-                <div class="d-flex flex-column align-items-end gap-2 ms-auto ord-head-side">
-                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end ord-head-actions">
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editOrderFullModal">
-                        <i class="fas fa-edit me-1"></i> <?php echo __('edit_order_btn'); ?>
-                    </button>
-                    <?php if(crmCanDeleteOrders()): ?>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteOrder(<?php echo $order['id']; ?>)">
-                        <i class="fas fa-trash me-1"></i> <?php echo __('delete'); ?>
-                    </button>
-                    <?php endif; ?>
-                    <?php /* Reklamace k této zakázce: otevře globální modal „Nová reklamace"
-                             předvyplněný ze zakázky (klient, zařízení, SN, číslo zakázky). */ ?>
-                    <button type="button" class="btn btn-sm fw-semibold text-nowrap" style="background:#f97316;color:#fff"
-                            title="<?php echo e(__('order_create_complaint_title')); ?>"
-                            onclick='openComplaintForOrder(<?php echo json_encode($complaintPrefill, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP); ?>)'>
-                        <i class="fas fa-rotate-left me-1"></i> <?php echo __('order_create_complaint_btn'); ?>
-                    </button>
-                </div>
-                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                    <?php echo getStatusBadge($order['status']); ?><?php echo crmDeviceLocationPill($order); ?><?php echo crmPrepaidPill($order); ?>
-                    <?php
-                    // PLATBA PŘEDEM (v3.94.1): rozpracovaná zakázka bez platby → zaplatit hned v Pokladně
-                    $__ppAmt = crmOrderPosAmount($order);
-                    $__ppPaid = crmOrderPosPaidTotal((int)$order['id']);
-                    $__ppInv = false;
-                    try { $__q = $pdo->prepare("SELECT 1 FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1"); $__q->execute([(int)$order['id']]); $__ppInv = (bool)$__q->fetchColumn(); } catch (Throwable $e) {}
-                    if (crmOrderIsPrepayStage((string)$order['status']) && !$__ppInv && $__ppAmt > 0
-                        && $__ppPaid <= 0.009 && trim((string)($order['payment_method'] ?? '')) === ''): ?>
-                        <a class="btn btn-sm btn-success" href="pokladna.php?q=<?php echo urlencode(orderDisplayCode($order)); ?>" title="Klient platí hned při zadání zakázky — celá předpokládaná cena">
-                            <i class="fas fa-cash-register me-1"></i>Zaplatit předem <?php echo formatMoney($__ppAmt); ?>
-                        </a>
-                    <?php elseif ($__ppPaid > 0.009 && $__ppAmt - $__ppPaid > 0.009 && !$__ppInv): ?>
-                        <a class="btn btn-sm btn-warning" href="pokladna.php?q=<?php echo urlencode(orderDisplayCode($order)); ?>" title="Cena se po platbě předem zvýšila — doplatit rozdíl">
-                            <i class="fas fa-cash-register me-1"></i>Doplatit <?php echo formatMoney($__ppAmt - $__ppPaid); ?>
-                        </a>
-                    <?php elseif ($__ppPaid > 0.009 && $__ppPaid - $__ppAmt > 0.009): ?>
-                        <span class="badge bg-warning text-dark" title="Zaplaceno předem víc, než je konečná cena — rozdíl vrať klientovi (storno a nový doklad v Pokladně)">Přeplatek <?php echo formatMoney($__ppPaid - $__ppAmt); ?></span>
-                    <?php endif; ?>
-                </div>
-                </div>
             </div>
 <style>
 /* Hlavička zakázky: velké číslo vlevo, akce + stav vpravo (v3.95.1) */
@@ -300,6 +261,10 @@ html[data-lg-theme="light"] .ord-head-code { color: #111 !important; }
 html[data-lg-theme="light"] .ord-head-sub { color: rgba(0,0,0,.72) !important; }
 html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord-head-date { color: rgba(0,0,0,.5) !important; }
 .ord-head-main { min-width: 0; flex: 1 1 340px; }
+.ord-head-main > div:last-child { display: flex; flex-wrap: wrap; align-items: center; column-gap: 14px; row-gap: 4px; }
+.ord-head-main > div:last-child > .ord-head-sub, .ord-head-main > div:last-child > div:not(.ord-head-code) { flex-basis: 100%; }
+.ord-head-status { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ord-head-status .badge { font-size: 15px !important; padding: 7px 12px !important; }
 @media (max-width: 575.98px) { .ord-head-code { font-size: 27px !important; } .ord-head-side { align-items: flex-start !important; margin-left: 0 !important; width: 100%; } .ord-head-actions { justify-content: flex-start !important; } }
 </style>
             <div class="card-body">
@@ -591,49 +556,190 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
         </div>
     </div>
 
-    <div class="col-md-4">
-        <!-- Čárový kód zakázky (Code128): X-9100 i mobil přes náš skener → otevře tuto zakázku. Nahoře v pravém sloupci. -->
-        <div class="card glass-card border-0 mb-4 order-barcode-card">
-            <div class="card-body text-center py-3">
-                <div class="text-white-75 small mb-2"><i class="fas fa-barcode me-1"></i> <?php echo __('scan_to_open_order'); ?></div>
-                <div id="orderBarcode" style="display:inline-block; background:#fff; padding:8px 10px; border-radius:8px; line-height:0;"></div>
+    <div class="col-md-4 ord-side">
+        <?php /* ══ PRAVÝ SLOUPEC (v3.95.1) — seřazený podle toho, jak se se zakázkou pracuje:
+                 Akce → Další krok → Platba a faktura → Výdej → Doklady a podpisy → Ruční úpravy ══ */ ?>
+
+        <!-- ── Akce se zakázkou + kód pro skener ── -->
+        <div class="card glass-card border-0 mb-3 ord-card">
+            <div class="card-body">
+                <div class="ord-top-actions">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editOrderFullModal">
+                        <i class="fas fa-edit me-1"></i> <?php echo __('edit_order_btn'); ?>
+                    </button>
+                    <?php if(crmCanDeleteOrders()): ?>
+                    <button class="btn btn-outline-danger" onclick="deleteOrder(<?php echo $order['id']; ?>)">
+                        <i class="fas fa-trash me-1"></i> <?php echo __('delete'); ?>
+                    </button>
+                    <?php endif; ?>
+                    <?php /* Reklamace k této zakázce: otevře globální modal „Nová reklamace"
+                             předvyplněný ze zakázky (klient, zařízení, SN, číslo zakázky). */ ?>
+                    <button type="button" class="btn fw-semibold text-nowrap" style="background:#f97316;color:#fff"
+                            title="<?php echo e(__('order_create_complaint_title')); ?>"
+                            onclick='openComplaintForOrder(<?php echo json_encode($complaintPrefill, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP); ?>)'>
+                        <i class="fas fa-rotate-left me-1"></i> <?php echo __('order_create_complaint_btn'); ?>
+                    </button>
+                </div>
+                <!-- Čárový kód zakázky (Code128): X-9100 i mobil přes náš skener → otevře tuto zakázku -->
+                <div class="ord-barcode">
+                    <div id="orderBarcode"></div>
+                    <div class="ord-barcode-hint"><i class="fas fa-barcode me-1"></i><?php echo __('scan_to_open_order'); ?></div>
+                </div>
             </div>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
         <script>
         (function() {
             var box = document.getElementById('orderBarcode');
-            if (!box || typeof window.JsBarcode !== 'function') { if (box) box.style.display = 'none'; return; }
+            if (!box || typeof window.JsBarcode !== 'function') { if (box) box.parentNode.style.display = 'none'; return; }
             try {
                 var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 box.appendChild(svg);
-                JsBarcode(svg, '<?php echo e(orderDisplayCode($order)); ?>', { format: 'CODE128', displayValue: true, fontSize: 14, margin: 0, height: 56, width: 2 });
-            } catch (e) { box.style.display = 'none'; }
+                JsBarcode(svg, '<?php echo e(orderDisplayCode($order)); ?>', { format: 'CODE128', displayValue: false, margin: 0, height: 38, width: 1.6 });
+            } catch (e) { box.parentNode.style.display = 'none'; }
         })();
         </script>
 
-        <div class="card glass-card border-0 mb-4">
-            <div class="card-header bg-transparent border-bottom-0">
-                <h5 class="mb-0"><?php echo __('actions'); ?></h5>
-            </div>
+        <!-- ── Další krok: hlavní tlačítko posunu stavu ── -->
+        <div class="card glass-card border-0 mb-3 ord-card">
             <div class="card-body">
-                <?php if ($show_shipping): ?>
-                <!-- Doprava / Výdej — přímo v Akcích, NAD tlačítkem „Označit jako vydané".
-                     Pozn.: #shippingForm nesmí být vnořený do #statusForm (nevalidní HTML),
-                     proto stojí samostatně před ním; všechna JS ID zůstávají. -->
-                <div class="order-shipping-inline mb-1">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="mb-0"><i class="fas fa-truck me-2 text-info"></i><?php echo __('shipping'); ?></h6>
-                        <?php if(isOrderStatusIn($order['status'], 'collected')): ?>
-                            <span class="badge bg-success small"><?php echo __('collected'); ?></span>
+                <div class="ord-card-title"><i class="fas fa-forward-step"></i>Další krok</div>
+                <?php if (($order['status'] ?? '') === 'Přijato z RepairPluginu'): ?>
+                <?php /* Onboard: klient z webové rezervace (RepairPlugin) fyzicky dorazil →
+                         stejná automatika jako po ručním založení: tisk štítku + okno
+                         zakázkového listu s podpisem (openOrderDocChoice). */ ?>
+                <div class="d-grid mb-2">
+                    <button type="button" class="btn btn-info fw-semibold" id="onboardClientBtn"
+                        onclick="var b=this;b.disabled=true;try{printOrderLabel(<?php echo (int)$order['id']; ?>);}catch(e){}setTimeout(function(){openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>');b.disabled=false;},450);">
+                        <i class="fas fa-user-check me-2"></i>Onboard zákazníka
+                    </button>
+                    <div class="small text-white-50 mt-1 text-center">vytiskne štítek a otevře podpis / zakázkový list</div>
+                </div>
+                <?php endif; ?>
+                <div class="d-grid gap-2">
+                    <?php if ($next_status): ?>
+                        <?php
+                        // barva + ikona pulzujícího tlačítka podle CÍLOVÉHO stavu
+                        $__pulseCls = ['V opravě' => 'afx-status-pulse--progress', 'Připraveno k převzetí' => 'afx-status-pulse--completed', 'Vydáno' => 'afx-status-pulse--collected'][$next_status] ?? '';
+                        $__pulseIco = ['V opravě' => 'fa-play', 'Připraveno k převzetí' => 'fa-check', 'Vydáno' => 'fa-box-open'][$next_status] ?? 'fa-arrow-right';
+                        ?>
+                        <button type="button" class="btn btn-success afx-status-pulse ord-next-btn <?php echo $__pulseCls; ?>" id="nextStatusBtn" data-next-status="<?php echo $next_status; ?>">
+                            <i class="fas <?php echo $__pulseIco; ?> me-2"></i><?php echo $next_label ?: __('next_step'); ?>
+                        </button>
+                    <?php else: ?>
+                        <div class="text-white-75 small"><i class="fas fa-flag-checkered me-1"></i><?php echo __('no_next_step'); ?></div>
+                    <?php endif; ?>
+                    <?php if ($can_handoff): ?>
+                    <?php /* „uvolnit dalšímu technikovi" — dokončení řeší hlavní tlačítko výše */ ?>
+                    <button type="button" class="btn btn-sm btn-outline-info" onclick="afxReleaseOrder()" title="<?php echo e(__('handoff_release_hint')); ?>"><i class="fas fa-share me-1"></i><?php echo __('handoff_release'); ?></button>
+                    <?php endif; ?>
+                    <?php
+                    /* Přesun zařízení mezi pobočkami: tlačítko vždy nabízí OPAČNOU
+                       pobočku, než kde zařízení fyzicky je (návrat domů pilulku zruší). */
+                    [$__mvId, $__mvShort] = crmOrderDeviceMoveTarget($order);
+                    if ($__mvId > 0):
+                    ?>
+                    <button type="button" class="btn btn-sm btn-outline-warning" id="moveDeviceBtn"
+                        onclick="afxMoveDevice(<?php echo (int)$order['id']; ?>, this)">
+                        <i class="fas fa-truck-arrow-right me-1"></i>Přesunout zařízení na <?php echo e($__mvShort); ?>
+                    </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Platba a faktura (dřív schovaná úplně dole) ── -->
+        <?php
+        ensureOrderPaymentMethodColumn();
+        $__pm = (string)($order['payment_method'] ?? '');
+        $__st = (string)($order['status'] ?? '');
+        $__amt = crmOrderPosAmount($order);
+        $__paid = crmOrderPosPaidTotal((int)$order['id']);
+        $__posNajde = isOrderStatusIn($__st, 'completed') || isOrderStatusIn($__st, 'uncollected') || $__st === 'Vydáno - čeká na platbu';
+        $__prepayStage = crmOrderIsPrepayStage($__st);
+        $__inv = null;
+        try {
+            $__ivq = $pdo->prepare("SELECT * FROM invoices WHERE order_id = ? AND status <> 'cancelled' ORDER BY id DESC LIMIT 1");
+            $__ivq->execute([(int)$order['id']]);
+            $__inv = $__ivq->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Throwable $e) { $__inv = null; }
+        $__sale = ($__paid > 0.009 || $__pm !== '') ? crmOrderPosSale((int)$order['id']) : null;
+        $__pmLabel = ['cash' => 'hotově', 'card' => 'kartou', 'transfer' => 'převodem', 'invoice' => 'fakturou', 'invoice_ico' => 'fakturou (IČO)'];
+        $__posUrl = 'pokladna.php?q=' . urlencode(orderDisplayCode($order));
+        ?>
+        <div class="card glass-card border-0 mb-3 ord-card">
+            <div class="card-body">
+                <div class="ord-card-title"><i class="fas fa-money-bill-wave"></i>Platba a faktura</div>
+                <div class="ord-price">
+                    <span><?php echo ((float)($order['final_cost'] ?? 0) > 0) ? 'Cena opravy' : 'Předpokládaná cena'; ?></span>
+                    <b><?php echo formatMoney($__amt); ?></b>
+                </div>
+
+                <?php if ($__inv): $__pi = afxInvoicePaymentInfo($__inv); ?>
+                    <div class="ord-pay-state">
+                        <i class="fas fa-file-invoice-dollar text-info"></i>
+                        <div>Faktura <strong><?php echo e((string)$__inv['invoice_number']); ?></strong>
+                            <span class="badge ms-1 <?php echo $__inv['status'] === 'paid' ? 'bg-success' : 'bg-warning text-dark'; ?>"><?php echo $__pi['partial'] ? 'částečně zaplaceno' : e(__($__inv['status'])); ?></span>
+                            <div class="ord-pay-note"><?php echo formatMoney((float)$__inv['total_amount']); ?><?php if ($__pi['partial']): ?> · zbývá <?php echo formatMoney($__pi['remaining']); ?><?php endif; ?> · splatnost <?php echo e(date('j. n. Y', strtotime((string)$__inv['date_due']))); ?></div>
+                        </div>
+                    </div>
+                    <div class="ord-btn-row">
+                        <button type="button" class="btn btn-sm btn-outline-light" onclick="openUniversalPreview('print_invoice.php?id=<?php echo (int)$__inv['id']; ?>', '<?php echo __('invoice'); ?> <?php echo e((string)$__inv['invoice_number']); ?>')"><i class="fas fa-eye me-1"></i>Zobrazit</button>
+                        <?php if (crmCanUseInvoices()): ?>
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="afxOrderInvoiceMail(<?php echo (int)$__inv['id']; ?>, this)"><i class="fas fa-envelope me-1"></i>E-mailem</button>
+                        <a class="btn btn-sm btn-outline-secondary" href="accounting.php?edit_invoice=<?php echo (int)$__inv['id']; ?>"><i class="fas fa-pen me-1"></i>Upravit</a>
                         <?php endif; ?>
                     </div>
-                    <form id="shippingForm">
-                        <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
-                        <div class="mb-2">
+                    <?php if ($__inv['status'] !== 'paid'): ?><div class="ord-pay-note mt-2">Úhradu převodem spáruje Účetnictví → Banka; hotově nebo kartou ji zapiš k faktuře v Účetnictví.</div><?php endif; ?>
+                <?php elseif ($__paid > 0.009 || $__pm !== ''): ?>
+                    <div class="ord-pay-state ok">
+                        <i class="fas fa-circle-check"></i>
+                        <div>Zaplaceno<?php echo $__paid > 0.009 ? ' ' . formatMoney($__paid) : ''; ?><?php echo $__pm !== '' ? ' ' . e($__pmLabel[$__pm] ?? $__pm) : ''; ?>
+                            <?php if (!empty($order['prepaid_at'])): ?><div class="ord-pay-note">předem, <?php echo e(date('j. n. Y H:i', strtotime((string)$order['prepaid_at']))); ?></div><?php endif; ?>
+                            <?php if ($__sale): ?><div class="ord-pay-note">doklad <?php echo e((string)$__sale['sale_number']); ?></div><?php endif; ?>
+                        </div>
+                    </div>
+                    <?php if ($__paid > 0.009 && $__amt - $__paid > 0.009): ?>
+                        <a class="btn btn-warning w-100 mt-2" href="<?php echo e($__posUrl); ?>"><i class="fas fa-cash-register me-2"></i>Doplatit <?php echo formatMoney($__amt - $__paid); ?></a>
+                    <?php elseif ($__paid > 0.009 && $__paid - $__amt > 0.009): ?>
+                        <div class="alert alert-warning border-0 py-2 px-3 mt-2 mb-0 small">Přeplatek <strong><?php echo formatMoney($__paid - $__amt); ?></strong> — vrať klientovi (storno a nový doklad v Pokladně).</div>
+                    <?php endif; ?>
+                    <?php if ($__sale && crmCanUsePos()): ?>
+                    <div class="ord-btn-row mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-light" onclick="openUniversalPreview('print_receipt.php?id=<?php echo (int)$__sale['id']; ?>&format=58&auto=1', 'Účtenka <?php echo e((string)$__sale['sale_number']); ?>')"><i class="fas fa-receipt me-1"></i>Účtenka</button>
+                        <?php if (empty($__inv) && (crmCanUseInvoices() || crmCanUsePos()) && !in_array((string)$__sale['payment_method'], ['invoice', 'invoice_ico'], true)): ?>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="afxInvoiceAfterSale(<?php echo (int)$__sale['id']; ?>, <?php echo htmlspecialchars(json_encode((string)$__sale['sale_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode(formatMoney($__paid), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)($__pmLabel[(string)$__sale['payment_method']] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)"><i class="fas fa-file-invoice-dollar me-1"></i>Vystavit fakturu</button>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+                <?php elseif ($__amt <= 0): ?>
+                    <div class="ord-pay-note">Bez částky k úhradě (0 Kč) — reklamace / záruka se neplatí.</div>
+                <?php elseif ($__posNajde): ?>
+                    <a class="btn btn-success w-100 ord-pay-btn" href="<?php echo e($__posUrl); ?>"><i class="fas fa-cash-register me-2"></i>Uhradit v Pokladně</a>
+                    <div class="ord-pay-note mt-1">Hotově, kartou nebo fakturou — v Pokladně se vystaví i faktura s QR platbou.</div>
+                <?php elseif ($__prepayStage): ?>
+                    <a class="btn btn-outline-success w-100" href="<?php echo e($__posUrl); ?>"><i class="fas fa-cash-register me-2"></i>Zaplatit předem <?php echo formatMoney($__amt); ?></a>
+                    <div class="ord-pay-note mt-1">Klient může zaplatit hned. Když konečná cena vyjde vyšší, při výdeji se doplatí jen rozdíl.</div>
+                <?php else: ?>
+                    <div class="ord-pay-note">Bez záznamu platby. Pro dodatečnou úhradu přepni stav na <strong>„Vydáno - čeká na platbu"</strong> — pak zakázku najde Pokladna.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if ($show_shipping): ?>
+        <!-- ── Výdej / doprava (jen u hotové zakázky) ── -->
+        <div class="card glass-card border-0 mb-3 ord-card">
+            <div class="card-body">
+                <div class="ord-card-title d-flex align-items-center"><i class="fas fa-truck"></i><?php echo __('shipping'); ?>
+                    <?php if(isOrderStatusIn($order['status'], 'collected')): ?><span class="badge bg-success ms-auto"><?php echo __('collected'); ?></span><?php endif; ?>
+                </div>
+                <form id="shippingForm">
+                    <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
+                    <div class="row g-2">
+                        <div class="col-12">
                             <label class="form-label mb-1"><?php echo __('shipping_method'); ?></label>
                             <select name="shipping_method" class="form-select">
-                                <option value="" <?php echo empty($order['shipping_method']) ? 'selected' : ''; ?>>-- <?php echo __('not_found'); ?> --</option>
+                                <option value="" <?php echo empty($order['shipping_method']) ? 'selected' : ''; ?>>— vyber —</option>
                                 <option value="Self Pickup" <?php echo $order['shipping_method'] == 'Self Pickup' ? 'selected' : ''; ?>><?php echo __('self_pickup'); ?></option>
                                 <option value="Zasilkovna" <?php echo $order['shipping_method'] == 'Zasilkovna' ? 'selected' : ''; ?>>Zásilkovna</option>
                                 <option value="Ceska Posta" <?php echo $order['shipping_method'] == 'Ceska Posta' ? 'selected' : ''; ?>><?php echo __('czech_post'); ?></option>
@@ -643,417 +749,278 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
                                 <option value="Courier" <?php echo $order['shipping_method'] == 'Courier' ? 'selected' : ''; ?>><?php echo __('courier'); ?></option>
                             </select>
                         </div>
-                        <div id="shippingDetails" class="<?php echo in_array($order['shipping_method'], ['Self Pickup', 'Courier', '']) ? 'd-none' : ''; ?>">
-                            <div class="mb-2">
-                                <label class="form-label mb-1"><?php echo __('shipping_tracking'); ?></label>
-                                <input type="text" name="shipping_tracking" class="form-control" value="<?php echo htmlspecialchars($order['shipping_tracking'] ?? ''); ?>" placeholder="<?php echo __('tracking_placeholder'); ?>">
-                            </div>
+                        <div class="col-12 <?php echo in_array($order['shipping_method'], ['Self Pickup', 'Courier', '']) ? 'd-none' : ''; ?>" id="shippingDetails">
+                            <label class="form-label mb-1"><?php echo __('shipping_tracking'); ?></label>
+                            <input type="text" name="shipping_tracking" class="form-control" value="<?php echo htmlspecialchars($order['shipping_tracking'] ?? ''); ?>" placeholder="<?php echo __('tracking_placeholder'); ?>">
                         </div>
-                        <div class="mb-2">
+                        <div class="col-12">
                             <label class="form-label mb-1"><?php echo __('shipping_date'); ?></label>
                             <input type="datetime-local" name="shipping_date" class="form-control" value="<?php echo $order['shipping_date'] ? date('Y-m-d\TH:i', strtotime($order['shipping_date'])) : ''; ?>">
                         </div>
-                        <button type="submit" class="btn btn-outline-primary btn-sm w-100"><?php echo __('save'); ?></button>
-                    </form>
-                    <?php /* Od v3.49.0 se platba zakázky zaznamenává VÝHRADNĚ přes
-                             Pokladnu (hotově / kartou / na fakturu) — dřívější select
-                             „Platba při výdeji" zrušen na přání majitele. Tlačítko se
-                             ukazuje JEN u zakázek, které kasa opravdu najde (stavy z
-                             pos_search) — jinde by vedlo na „nic nenalezeno". */ ?>
-                    <?php
-                    ensureOrderPaymentMethodColumn();
-                    $__pm = (string)($order['payment_method'] ?? '');
-                    $__st = (string)($order['status'] ?? '');
-                    $__amt = (float)(($order['final_cost'] ?? 0) ?: ($order['estimated_cost'] ?? 0));
-                    $__posNajde = isOrderStatusIn($__st, 'completed') || isOrderStatusIn($__st, 'uncollected') || $__st === 'Vydáno - čeká na platbu';
-                    $__invNum = '';
-                    if ($__pm === '') {
-                        try {
-                            $__ivq = $pdo->prepare("SELECT invoice_number FROM invoices WHERE order_id = ? AND status <> 'cancelled' LIMIT 1");
-                            $__ivq->execute([(int)$order['id']]);
-                            $__invNum = (string)($__ivq->fetchColumn() ?: '');
-                        } catch (Throwable $e) { $__invNum = ''; }
-                    }
-                    ?>
-                    <div class="mb-2 mt-2">
-                        <label class="form-label mb-1"><i class="fas fa-money-bill-wave me-1 text-success"></i>Platba</label>
-                        <?php if ($__pm !== ''): ?>
-                            <div class="text-white-75 small py-1">
-                                <i class="fas fa-check-circle text-success me-1"></i>
-                                Zaznamenáno: <strong><?php echo ['cash' => 'hotově', 'card' => 'kartou', 'transfer' => 'převodem'][$__pm] ?? e($__pm); ?></strong>
-                            </div>
-                        <?php elseif ($__invNum !== ''): ?>
-                            <div class="text-white-75 small py-1">
-                                <i class="fas fa-file-invoice me-1 text-info"></i>
-                                Vystavena faktura <strong><?php echo e($__invNum); ?></strong> — úhradu (i hotově/kartou) zapiš k faktuře v <strong>Účetnictví → Banka</strong>.
-                            </div>
-                        <?php elseif ($__amt <= 0): ?>
-                            <div class="text-white-50 small py-1">Bez částky k úhradě (0 Kč) — reklamace/záruka se neplatí.</div>
-                        <?php elseif ($__posNajde): ?>
-                            <a class="btn btn-success btn-sm w-100" href="pokladna.php?q=<?php echo urlencode(orderDisplayCode($order)); ?>">
-                                <i class="fas fa-cash-register me-2"></i>Uhradit v Pokladně
-                            </a>
-                            <div class="text-white-50 mt-1" style="font-size:.72rem;">Hotově, kartou i na fakturu — zakázka bude v Pokladně rovnou vyhledaná.</div>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary btn-sm w-100 mt-2"><?php echo __('save'); ?></button>
+                    <div class="ord-pay-note mt-1">Bez vyplnění se při výdeji doplní „Osobní odběr".</div>
+                </form>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- ── Doklady, tisk a podpisy ── -->
+        <div class="card glass-card border-0 mb-3 ord-card">
+            <div class="card-body">
+                <div class="ord-card-title"><i class="fas fa-print"></i>Doklady a podpisy</div>
+                <div class="ord-doc-list">
+                    <button type="button" onclick="openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-file-lines text-primary"></i><span>Zakázkový list<small>tisk · e-mail · podpis</small></span></button>
+                    <button type="button" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-eye text-info"></i><span>Náhled zakázkového listu</span></button>
+                    <button type="button" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-tools text-warning"></i><span><?php echo __('work_order'); ?></span></button>
+                    <button type="button" onclick="printOrderLabel(<?php echo (int)$order['id']; ?>)"><i class="fas fa-barcode text-info"></i><span><?php echo __('print_label'); ?></span></button>
+                </div>
+                <div class="ord-sigs">
+                    <?php foreach (['prijem' => __('sign_reception'), 'vydej' => __('sign_pickup')] as $sigT => $sigLabel): $sig = $orderSignatures[$sigT] ?? null; ?>
+                    <div class="d-flex align-items-center justify-content-between" id="sigRow-<?php echo $sigT; ?>">
+                        <span class="small"><i class="fas fa-signature me-2 text-info"></i><?php echo e($sigLabel); ?></span>
+                        <?php if ($sig): ?>
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success"><i class="fas fa-check me-1"></i><?php echo date('j.n. H:i', strtotime((string)$sig['signed_at'])); ?></span>
                         <?php else: ?>
-                            <div class="text-white-50 small py-1">
-                                Bez záznamu platby. Pro dodatečnou úhradu přepni stav na
-                                <strong>„Vydáno - čeká na platbu"</strong> — pak zakázku najde Pokladna.
-                            </div>
+                            <span class="d-inline-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="afxSignOrder('<?php echo $sigT; ?>')"><i class="fas fa-pen-nib me-1"></i><?php echo __('sign_btn'); ?></button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" title="<?php echo __('sign_station_send'); ?>" onclick="afxSignRemote('<?php echo $sigT; ?>', this)"><i class="fas fa-tablet-screen-button"></i></button>
+                            </span>
                         <?php endif; ?>
                     </div>
-                    <hr class="border-secondary my-3">
+                    <?php endforeach; ?>
                 </div>
-                <?php else: ?>
-                    <div class="text-white-75 small mb-2"><?php echo __('shipping_available_after_completed'); ?></div>
-                <?php endif; ?>
+            </div>
+        </div>
 
-                <?php /* Naskladnit zařízení ze zakázky jako díl na sklad dílů — jen admin a Boss.
-                         Zařízení, které se nevrací klientovi (neopravitelné, výkup) → 1 ks na sklad. */ ?>
-                <?php if (hasPermission('admin_access')): ?>
-                <div class="mb-3">
-                    <button type="button" class="btn btn-outline-warning btn-sm w-100" id="stockAsPartBtn">
-                        <i class="fas fa-boxes-stacked me-2"></i><?php echo __('stock_as_part'); ?>
-                    </button>
-                    <div class="text-white-50 mt-1" style="font-size:.72rem;"><?php echo __('stock_as_part_hint'); ?></div>
-                </div>
-                <?php endif; ?>
-
+        <!-- ── Ruční úpravy: technik, stav, cena (statusForm — submit → potvrzovací okno) ── -->
+        <div class="card glass-card border-0 mb-3 ord-card">
+            <div class="card-body">
+                <div class="ord-card-title"><i class="fas fa-sliders"></i>Stav, technik a cena</div>
                 <form id="statusForm">
                     <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
                     <input type="hidden" name="ui_lang" value="<?php echo e($ui_lang); ?>">
-                    <?php if ($can_handoff): ?>
-                    <?php /* Jen „uvolnit dalšímu technikovi" — dokončení řeší hlavní zelené
-                             tlačítko níže (dřív tu bylo druhé tlačítko na tutéž akci = matoucí). */ ?>
-                    <div class="border border-info border-opacity-50 rounded-3 p-2 mb-2">
-                        <div class="small text-white-75 mb-2"><i class="fas fa-people-arrows me-1 text-info"></i><?php echo __('handoff_release_hint'); ?></div>
-                        <div class="d-grid">
-                            <button type="button" class="btn btn-sm btn-outline-info" onclick="afxReleaseOrder()"><i class="fas fa-share me-1"></i><?php echo __('handoff_release'); ?></button>
-                        </div>
+                    <div class="mb-2">
+                        <label class="form-label mb-1"><?php echo __('technician'); ?></label>
+                        <?php /* Od 1.6.0: technika smí u zakázky nastavit KAŽDÝ zaměstnanec —
+                                 select nabízí všechny aktivní techniky a „bez technika" (0 → NULL). */ ?>
+                        <select name="technician_id" class="form-select">
+                            <option value="0" <?php echo empty($order['technician_id']) ? 'selected' : ''; ?>>— bez technika —</option>
+                            <?php $techs = getActiveTechnicians(true); foreach($techs as $t): ?>
+                            <option value="<?php echo $t['id']; ?>" <?php echo $order['technician_id'] == $t['id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($t['name']); ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
-                    <?php endif; ?>
-                    <?php if (($order['status'] ?? '') === 'Přijato z RepairPluginu'): ?>
-                    <?php /* Onboard: klient z webové rezervace (RepairPlugin) fyzicky dorazil →
-                             stejná automatika jako po ručním založení: tisk štítku + okno
-                             zakázkového listu s podpisem (openOrderDocChoice). */ ?>
-                    <div class="d-grid mb-2">
-                        <button type="button" class="btn btn-info fw-semibold" id="onboardClientBtn"
-                            onclick="var b=this;b.disabled=true;try{printOrderLabel(<?php echo (int)$order['id']; ?>);}catch(e){}setTimeout(function(){openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>');b.disabled=false;},450);">
-                            <i class="fas fa-user-check me-2"></i>Onboard zákazníka
-                        </button>
-                        <div class="small text-white-50 mt-1 text-center">vytiskne štítek a otevře podpis / zakázkový list</div>
+                    <div class="mb-2">
+                        <label class="form-label mb-1 d-flex justify-content-between align-items-center">
+                            <span><?php echo __('status'); ?></span>
+                            <span class="text-white-75 small">
+                                <span id="display_updated_at"><?php echo date('d.m.Y H:i', strtotime($order['updated_at'])); ?></span>
+                                <a href="javascript:void(0)" class="ms-1 text-primary" data-bs-toggle="modal" data-bs-target="#editOrderDatesModal" title="<?php echo __('edit'); ?>">
+                                    <i class="fas fa-calendar-alt"></i>
+                                </a>
+                            </span>
+                        </label>
+                        <select name="status" class="form-select">
+                            <?php foreach (getOrderStatusOptions(false, (string)($order['status'] ?? '')) as $statusValue => $statusLabel): ?>
+                                <option value="<?php echo e($statusValue); ?>" <?php if($order['status'] === $statusValue) echo 'selected'; ?>><?php echo e($statusLabel); ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
-                    <?php endif; ?>
-                    <div class="d-grid gap-2 mb-2">
-                        <?php if ($next_status): ?>
-                            <?php
-                            // barva + ikona pulzujícího tlačítka podle CÍLOVÉHO stavu
-                            $__pulseCls = ['V opravě' => 'afx-status-pulse--progress', 'Připraveno k převzetí' => 'afx-status-pulse--completed', 'Vydáno' => 'afx-status-pulse--collected'][$next_status] ?? '';
-                            $__pulseIco = ['V opravě' => 'fa-play', 'Připraveno k převzetí' => 'fa-check', 'Vydáno' => 'fa-box-open'][$next_status] ?? 'fa-arrow-right';
-                            ?>
-                            <button type="button" class="btn btn-success afx-status-pulse <?php echo $__pulseCls; ?>" id="nextStatusBtn" data-next-status="<?php echo $next_status; ?>">
-                                <i class="fas <?php echo $__pulseIco; ?> me-2"></i><?php echo $next_label ?: __('next_step'); ?>
-                            </button>
-                        <?php else: ?>
-                            <div class="text-white-75 small"><?php echo __('no_next_step'); ?></div>
-                        <?php endif; ?>
-                    </div>
-
-                    <?php if (!$show_invoice && crmCanUseInvoices()): ?>
-                        <div class="text-white-75 small mb-2"><?php echo __('invoice_available_after_completed'); ?></div>
-                    <?php endif; ?>
-
-                    <div id="actionsAdvanced">
-                        <div class="mb-3">
-                            <label class="form-label"><?php echo __('technician'); ?></label>
-                            <?php /* Od 1.6.0: technika smí u zakázky nastavit KAŽDÝ zaměstnanec —
-                                     select je vždy povolený, nabízí všechny aktivní techniky
-                                     a volbu „bez technika" (value=0 → endpoint uloží NULL). */ ?>
-                            <select name="technician_id" class="form-select mb-2">
-                                <option value="0" <?php echo empty($order['technician_id']) ? 'selected' : ''; ?>>— bez technika —</option>
-                                <?php $techs = getActiveTechnicians(true); foreach($techs as $t): ?>
-                                <option value="<?php echo $t['id']; ?>" <?php echo $order['technician_id'] == $t['id'] ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($t['name']); ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label d-flex justify-content-between align-items-center">
-                                <span><?php echo __('status'); ?></span>
-                                <span class="text-white-75 small">
-                                    <span id="display_updated_at"><?php echo date('d.m.Y H:i', strtotime($order['updated_at'])); ?></span>
-                                    <a href="javascript:void(0)" class="ms-1 text-primary" data-bs-toggle="modal" data-bs-target="#editOrderDatesModal" title="<?php echo __('edit'); ?>">
-                                        <i class="fas fa-calendar-alt"></i>
-                                    </a>
-                                </span>
-                            </label>
-                            <select name="status" class="form-select mb-2">
-                                <?php foreach (getOrderStatusOptions(false, (string)($order['status'] ?? '')) as $statusValue => $statusLabel): ?>
-                                    <option value="<?php echo e($statusValue); ?>" <?php if($order['status'] === $statusValue) echo 'selected'; ?>><?php echo e($statusLabel); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <?php
-                            /* Přesun zařízení mezi pobočkami: tlačítko vždy nabízí OPAČNOU
-                               pobočku, než kde zařízení fyzicky je (návrat domů pilulku zruší). */
-                            [$__mvId, $__mvShort] = crmOrderDeviceMoveTarget($order);
-                            if ($__mvId > 0):
-                            ?>
-                            <button type="button" class="btn btn-sm btn-outline-warning w-100" id="moveDeviceBtn"
-                                onclick="afxMoveDevice(<?php echo (int)$order['id']; ?>, this)">
-                                <i class="fas fa-truck-arrow-right me-1"></i>Přesunout zařízení na <?php echo e($__mvShort); ?>
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label"><?php echo __('work_cost'); ?></label>
+                    <div class="row g-2 mb-2">
+                        <div class="<?php echo crmIsAdminLevel() ? 'col-6' : 'col-12'; ?>">
+                            <label class="form-label mb-1"><?php echo __('work_cost'); ?></label>
                             <div class="input-group">
                                 <input type="number" step="1" name="final_cost" class="form-control" value="<?php echo (int)round((float)($order['final_cost'] ?? $order['estimated_cost'] ?? 0)); ?>">
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>
                         <?php if (crmIsAdminLevel()): ?>
-                        <div class="mb-3">
-                            <label class="form-label"><?php echo __('extra_expenses'); ?></label>
+                        <div class="col-6">
+                            <label class="form-label mb-1"><?php echo __('extra_expenses'); ?></label>
                             <div class="input-group">
                                 <input type="number" name="extra_expenses" class="form-control" step="1" value="<?php echo (int)round((float)($order['extra_expenses'] ?? 0)); ?>">
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>
                         <?php endif; ?>
-                        <button type="submit" class="btn btn-success w-100 mb-2"><?php echo __('update_status'); ?></button>
-                        <button type="button" class="btn btn-outline-primary w-100 mb-2" onclick="openUniversalPreview('print_order.php?id=<?php echo $order['id']; ?>', '<?php echo __('order_header'); ?> <?php echo e(orderDisplayCode($order)); ?>')">
-                            <i class="fas fa-file-lines me-2"></i> <?php echo __('view_order_sheet'); ?>
-                        </button>
-                        <div class="border border-secondary border-opacity-50 rounded-3 p-2">
-                            <div class="small text-white-75 mb-2"><i class="fas fa-print me-2"></i><?php echo __('print'); ?></div>
-                            <?php /* „A4 faktura" odstraněna — dělala totéž co velké tlačítko
-                                     „Zobrazit zakázkový list" výše (stejný náhled print_order.php). */ ?>
-                            <div class="d-grid gap-1">
-                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openOrderDocChoice(<?php echo (int)$order['id']; ?>, '<?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-paper-plane me-2 text-primary"></i><?php echo __('order_sheet_print_email'); ?></button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_workshop.php?id=<?php echo $order['id']; ?>', '<?php echo __('work_order'); ?> <?php echo e(orderDisplayCode($order)); ?>')"><i class="fas fa-tools me-2 text-warning"></i><?php echo __('work_order'); ?></button>
-                                <?php if ($orderCashReceipt && crmCanUsePos()): ?>
-                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="openUniversalPreview('print_receipt.php?id=<?php echo (int)$orderCashReceipt['id']; ?>&format=58&auto=1', 'Účtenka <?php echo e((string)$orderCashReceipt['sale_number']); ?>')"><i class="fas fa-receipt me-2 text-success"></i>Dotisk účtenky <?php echo e((string)$orderCashReceipt['sale_number']); ?></button>
-                                <?php endif; ?>
-                                <button type="button" class="btn btn-sm btn-outline-secondary text-start" onclick="printOrderLabel(<?php echo (int)$order['id']; ?>)"><i class="fas fa-barcode me-2 text-info"></i><?php echo __('print_label'); ?></button>
-                            </div>
-                        </div>
-
-                        <div class="mt-3 pt-3 border-top border-secondary">
-                            <div class="small text-white-75 mb-2"><i class="fas fa-signature me-2 text-info"></i><?php echo __('client_signature'); ?></div>
-                            <?php foreach (['prijem' => __('sign_reception'), 'vydej' => __('sign_pickup')] as $sigT => $sigLabel): $sig = $orderSignatures[$sigT] ?? null; ?>
-                            <div class="d-flex align-items-center justify-content-between mb-2" id="sigRow-<?php echo $sigT; ?>">
-                                <span class="small"><?php echo e($sigLabel); ?></span>
-                                <?php if ($sig): ?>
-                                    <span class="badge bg-success bg-opacity-25 text-success border border-success"><i class="fas fa-check me-1"></i><?php echo date('j.n. H:i', strtotime((string)$sig['signed_at'])); ?></span>
-                                <?php else: ?>
-                                    <span class="d-inline-flex gap-1">
-                                        <button type="button" class="btn btn-sm btn-outline-info" onclick="afxSignOrder('<?php echo $sigT; ?>')"><i class="fas fa-pen-nib me-1"></i><?php echo __('sign_btn'); ?></button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" title="<?php echo __('sign_station_send'); ?>" onclick="afxSignRemote('<?php echo $sigT; ?>', this)"><i class="fas fa-tablet-screen-button"></i></button>
-                                    </span>
-                                <?php endif; ?>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <?php if (!empty($techTimes)): ?>
-                        <div class="mt-3 pt-3 border-top border-secondary">
-                            <div class="small text-white-75 mb-2"><i class="fas fa-stopwatch me-2 text-info"></i><?php echo __('tech_time_title'); ?></div>
-                            <?php foreach ($techTimes as $tt): ?>
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <span class="small"><?php echo e($tt['tech_name']); ?><?php if ((int)$tt['running'] === 1): ?> <i class="fas fa-circle text-success ms-1" style="font-size:7px;" title="běží"></i><?php endif; ?></span>
-                                <span class="small fw-bold font-monospace"><?php echo e(formatWorkDuration((int)$tt['minutes'])); ?></span>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <?php endif; ?>
-                        <script>
-                        /* Přesun zařízení na druhou pobočku (device_branch_id) — toast + reload,
-                           ať se hned překreslí oranžová pilulka i text tlačítka. */
-                        function afxMoveDevice(orderId, btn) {
-                            if (btn) { btn.disabled = true; }
-                            var fd = new FormData();
-                            fd.append('id', orderId);
-                            fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
-                            fetch('api/move_order_device.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-                                .then(function (r) { return r.json(); })
-                                .then(function (j) {
-                                    if (!j.ok) { throw new Error(j.error || 'Přesun selhal'); }
-                                    if (window.afxLabelToast) { afxLabelToast('📦 Zařízení přesunuto na ' + (j.moved_to_label || 'druhou pobočku'), true); }
-                                    setTimeout(function () { location.reload(); }, 600);
-                                })
-                                .catch(function (e) {
-                                    if (btn) { btn.disabled = false; }
-                                    if (window.afxLabelToast) { afxLabelToast('⚠️ ' + e.message, false); } else { alert(e.message); }
-                                });
-                        }
-                        function afxReleaseOrder() {
-                            showConfirm('<?php echo __('handoff_confirm'); ?>', function () {
-                                var fd = new FormData();
-                                fd.append('order_id', '<?php echo (int)$order['id']; ?>');
-                                fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
-                                fetch('api/release_order.php', { method: 'POST', body: fd })
-                                    .then(function (r) { return r.json(); })
-                                    .then(function (j) { if (j.ok) { location.reload(); } else { alert(j.error || 'Chyba'); } })
-                                    .catch(function () { alert('Chyba spojení'); });
-                            });
-                        }
-                        window.AFX_SIGN_L10N = { clear: '<?php echo __('sign_clear'); ?>', cancel: '<?php echo __('cancel'); ?>', save: '<?php echo __('sign_save'); ?>' };
-                        function afxSignRemote(type, btn) {
-                            var $row = $(btn).closest('.d-flex');
-                            var fd = new FormData();
-                            fd.append('action', 'create');
-                            fd.append('order_id', '<?php echo (int)$order['id']; ?>');
-                            fd.append('sig_type', type);
-                            fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
-                            fetch('api/request_signature.php', { method: 'POST', body: fd })
-                                .then(function (r) { return r.json(); })
-                                .then(function (j) {
-                                    if (!j.ok) { alert(j.error || 'Chyba'); return; }
-                                    var reqId = j.request_id;
-                                    var $wait = $('<span class="small text-info"><i class="fas fa-tablet-screen-button me-1"></i><?php echo __('sign_station_waiting'); ?> <a href="javascript:void(0)" class="text-white-75">✕</a></span>');
-                                    // dřív .last().parent().find('.d-inline-flex') hledalo POTOMKY tlačítkového spanu → nic → stav se nezobrazil
-                                    $row.find('span.d-inline-flex').first().replaceWith($wait);
-                                    var iv = setInterval(function () {
-                                        fetch('api/request_signature.php?check=' + reqId, { cache: 'no-store' })
-                                            .then(function (r) { return r.json(); })
-                                            .then(function (c) {
-                                                if (c.status === 'done') { clearInterval(iv); location.reload(); }
-                                                if (c.status === 'cancelled' || c.status === 'missing') { clearInterval(iv); location.reload(); }
-                                            }).catch(function () {});
-                                    }, 3000);
-                                    $wait.find('a').on('click', function () {
-                                        clearInterval(iv);
-                                        var cf = new FormData();
-                                        cf.append('action', 'cancel');
-                                        cf.append('request_id', reqId);
-                                        cf.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
-                                        fetch('api/request_signature.php', { method: 'POST', body: cf }).finally(function () { location.reload(); });
-                                    });
-                                });
-                        }
-                        function afxSignOrder(type) {
-                            afxSignaturePad({
-                                title: type === 'prijem' ? '<?php echo __('sign_pad_title_reception'); ?>' : '<?php echo __('sign_pad_title_pickup'); ?>',
-                                subtitle: '<?php echo e(orderDisplayCode($order)); ?> · <?php echo e(trim(($order['first_name'] ?? '') . ' ' . ($order['last_name'] ?? ''))); ?> · <?php echo e(trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? ''))); ?>',
-                                terms: type === 'prijem' ? '<?php echo __('sign_terms_reception'); ?>' : '<?php echo __('sign_terms_pickup'); ?>',
-                                onSave: function (dataUrl) {
-                                    var fd = new FormData();
-                                    fd.append('order_id', '<?php echo (int)$order['id']; ?>');
-                                    fd.append('sig_type', type);
-                                    fd.append('image', dataUrl);
-                                    fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
-                                    fetch('api/save_signature.php', { method: 'POST', body: fd })
-                                        .then(function (r) { return r.json(); })
-                                        .then(function (j) {
-                                            if (j.ok) { location.reload(); }
-                                            else { alert(j.error || 'Chyba'); }
-                                        })
-                                        .catch(function () { alert('Chyba spojení'); });
-                                }
-                            });
-                        }
-                        </script>
                     </div>
+                    <button type="submit" class="btn btn-outline-success w-100"><i class="fas fa-floppy-disk me-1"></i>Uložit změny</button>
                 </form>
             </div>
         </div>
 
-        <!-- Express Invoice Block -->
-        <?php if ($show_invoice): 
-            // Fetch existing invoice for this order (first one)
-            $stmt_inv = $pdo->prepare("SELECT * FROM invoices WHERE order_id = ? ORDER BY created_at DESC LIMIT 1");
-            $stmt_inv->execute([$id]);
-            $existing_invoice = $stmt_inv->fetch();
-            
-            // Fetch invoice item if exists
-            $invoice_item_name = __('repair_service') . ' #' . $order['id'];
-            if ($existing_invoice) {
-                $stmt_item = $pdo->prepare("SELECT item_name FROM invoice_items WHERE invoice_id = ? LIMIT 1");
-                $stmt_item->execute([$existing_invoice['id']]);
-                $inv_item = $stmt_item->fetch();
-                if ($inv_item && !empty($inv_item['item_name'])) {
-                    $invoice_item_name = $inv_item['item_name'];
-                }
-            }
-        ?>
-        <div class="card glass-card border-0 mb-4">
-            <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2 text-success"></i><?php echo __('invoice'); ?></h5>
-                <?php if($existing_invoice): $__pi = afxInvoicePaymentInfo($existing_invoice); ?>
-                    <span class="badge <?php echo $existing_invoice['status'] == 'paid' ? 'bg-success' : ($__pi['partial'] ? 'bg-warning text-dark' : 'bg-warning text-white'); ?>">
-                        <?php echo $__pi['partial'] ? 'Částečně zaplaceno' : __($existing_invoice['status']); ?>
-                    </span>
-                    <?php if ($__pi['partial']): ?>
-                        <span class="small text-white-50 ms-1">zbývá <?php echo formatMoney($__pi['remaining']); ?></span>
-                    <?php endif; ?>
-                <?php endif; ?>
-            </div>
+        <?php if (!empty($techTimes)): ?>
+        <div class="card glass-card border-0 mb-3 ord-card">
             <div class="card-body">
-                <form id="expressInvoiceForm">
-                    <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
-                    <input type="hidden" name="invoice_id" value="<?php echo $existing_invoice['id'] ?? ''; ?>">
-                    
-                    <div class="mb-3">
-                        <label class="form-label"><?php echo __('invoice_number'); ?></label>
-                        <input type="text" name="invoice_number" class="form-control" value="<?php echo $existing_invoice['invoice_number'] ?? $order['id']; ?>" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><?php echo __('item_description'); ?></label>
-                        <input type="text" name="item_name" class="form-control" value="<?php echo htmlspecialchars($invoice_item_name); ?>" required>
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="form-label"><?php echo __('date_issue'); ?></label>
-                            <input type="date" name="date_issue" class="form-control" value="<?php echo $existing_invoice ? $existing_invoice['date_issue'] : date('Y-m-d'); ?>" required>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label"><?php echo __('date_due'); ?></label>
-                            <input type="date" name="date_due" class="form-control" value="<?php echo $existing_invoice ? $existing_invoice['date_due'] : date('Y-m-d', strtotime('+14 days')); ?>" required>
-                        </div>
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="form-label"><?php echo __('status'); ?></label>
-                            <select name="status" class="form-select">
-                                <option value="draft" <?php echo ($existing_invoice['status'] ?? '') == 'draft' ? 'selected' : ''; ?>><?php echo __('status_draft'); ?></option>
-                                <option value="issued" <?php echo ($existing_invoice['status'] ?? 'issued') == 'issued' ? 'selected' : ''; ?>><?php echo __('status_issued'); ?></option>
-                                <option value="paid" <?php echo ($existing_invoice['status'] ?? '') == 'paid' ? 'selected' : ''; ?>><?php echo __('status_paid'); ?></option>
-                                <option value="overdue" <?php echo ($existing_invoice['status'] ?? '') == 'overdue' ? 'selected' : ''; ?>><?php echo __('status_overdue'); ?></option>
-                                <option value="cancelled" <?php echo ($existing_invoice['status'] ?? '') == 'cancelled' ? 'selected' : ''; ?>><?php echo __('status_cancelled'); ?></option>
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label"><?php echo __('payment_method'); ?></label>
-                            <select name="payment_method" class="form-select">
-                                <option value="bank_transfer" <?php echo ($existing_invoice['payment_method'] ?? 'bank_transfer') == 'bank_transfer' ? 'selected' : ''; ?>><?php echo __('bank_transfer'); ?></option>
-                                <option value="cash" <?php echo ($existing_invoice['payment_method'] ?? '') == 'cash' ? 'selected' : ''; ?>><?php echo __('cash'); ?></option>
-                                <option value="card" <?php echo ($existing_invoice['payment_method'] ?? '') == 'card' ? 'selected' : ''; ?>><?php echo __('card'); ?></option>
-                                <option value="cod" <?php echo ($existing_invoice['payment_method'] ?? '') == 'cod' ? 'selected' : ''; ?>><?php echo __('cod'); ?></option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><?php echo __('total_to_pay'); ?></label>
-                        <div class="input-group">
-                            <input type="number" name="total_amount" class="form-control" step="0.01" value="<?php echo $existing_invoice ? $existing_invoice['total_amount'] : (int)round((float)($order['final_cost'] ?: $order['estimated_cost'])); ?>" required>
-                            <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn <?php echo $existing_invoice ? 'btn-primary' : 'btn-success'; ?> flex-grow-1">
-                            <i class="fas fa-<?php echo $existing_invoice ? 'save' : 'plus'; ?> me-2"></i>
-                            <?php echo $existing_invoice ? __('save') : __('create_invoice'); ?>
-                        </button>
-                        <?php if($existing_invoice): ?>
-                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $existing_invoice['id']; ?>', '<?php echo __('invoice'); ?> #<?php echo $existing_invoice['invoice_number']; ?>')" class="btn btn-outline-secondary" title="<?php echo __('print'); ?>">
-                            <i class="fas fa-print"></i>
-                        </a>
-                        <?php endif; ?>
-                    </div>
-                </form>
+                <div class="ord-card-title"><i class="fas fa-stopwatch"></i><?php echo __('tech_time_title'); ?></div>
+                <?php foreach ($techTimes as $tt): ?>
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="small"><?php echo e($tt['tech_name']); ?><?php if ((int)$tt['running'] === 1): ?> <i class="fas fa-circle text-success ms-1" style="font-size:7px;" title="běží"></i><?php endif; ?></span>
+                    <span class="small fw-bold font-monospace"><?php echo e(formatWorkDuration((int)$tt['minutes'])); ?></span>
+                </div>
+                <?php endforeach; ?>
             </div>
         </div>
         <?php endif; ?>
+
+        <?php /* Naskladnit zařízení ze zakázky jako díl na sklad dílů — jen admin a Boss
+                 (neopravitelné, výkup) → 1 ks na sklad. Výjimečná akce, proto úplně dole. */ ?>
+        <?php if (hasPermission('admin_access')): ?>
+        <button type="button" class="btn btn-sm btn-outline-warning w-100 mb-3" id="stockAsPartBtn" title="<?php echo e(__('stock_as_part_hint')); ?>">
+            <i class="fas fa-boxes-stacked me-2"></i><?php echo __('stock_as_part'); ?>
+        </button>
+        <?php endif; ?>
+
+                        <script>
+        /* Přesun zařízení na druhou pobočku (device_branch_id) — toast + reload,
+           ať se hned překreslí oranžová pilulka i text tlačítka. */
+        function afxMoveDevice(orderId, btn) {
+            if (btn) { btn.disabled = true; }
+            var fd = new FormData();
+            fd.append('id', orderId);
+            fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+            fetch('api/move_order_device.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    if (!j.ok) { throw new Error(j.error || 'Přesun selhal'); }
+                    if (window.afxLabelToast) { afxLabelToast('📦 Zařízení přesunuto na ' + (j.moved_to_label || 'druhou pobočku'), true); }
+                    setTimeout(function () { location.reload(); }, 600);
+                })
+                .catch(function (e) {
+                    if (btn) { btn.disabled = false; }
+                    if (window.afxLabelToast) { afxLabelToast('⚠️ ' + e.message, false); } else { alert(e.message); }
+                });
+        }
+        function afxReleaseOrder() {
+            showConfirm('<?php echo __('handoff_confirm'); ?>', function () {
+                var fd = new FormData();
+                fd.append('order_id', '<?php echo (int)$order['id']; ?>');
+                fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                fetch('api/release_order.php', { method: 'POST', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (j) { if (j.ok) { location.reload(); } else { alert(j.error || 'Chyba'); } })
+                    .catch(function () { alert('Chyba spojení'); });
+            });
+        }
+        window.AFX_SIGN_L10N = { clear: '<?php echo __('sign_clear'); ?>', cancel: '<?php echo __('cancel'); ?>', save: '<?php echo __('sign_save'); ?>' };
+        function afxSignRemote(type, btn) {
+            var $row = $(btn).closest('.d-flex');
+            var fd = new FormData();
+            fd.append('action', 'create');
+            fd.append('order_id', '<?php echo (int)$order['id']; ?>');
+            fd.append('sig_type', type);
+            fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+            fetch('api/request_signature.php', { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    if (!j.ok) { alert(j.error || 'Chyba'); return; }
+                    var reqId = j.request_id;
+                    var $wait = $('<span class="small text-info"><i class="fas fa-tablet-screen-button me-1"></i><?php echo __('sign_station_waiting'); ?> <a href="javascript:void(0)" class="text-white-75">✕</a></span>');
+                    // dřív .last().parent().find('.d-inline-flex') hledalo POTOMKY tlačítkového spanu → nic → stav se nezobrazil
+                    $row.find('span.d-inline-flex').first().replaceWith($wait);
+                    var iv = setInterval(function () {
+                        fetch('api/request_signature.php?check=' + reqId, { cache: 'no-store' })
+                            .then(function (r) { return r.json(); })
+                            .then(function (c) {
+                                if (c.status === 'done') { clearInterval(iv); location.reload(); }
+                                if (c.status === 'cancelled' || c.status === 'missing') { clearInterval(iv); location.reload(); }
+                            }).catch(function () {});
+                    }, 3000);
+                    $wait.find('a').on('click', function () {
+                        clearInterval(iv);
+                        var cf = new FormData();
+                        cf.append('action', 'cancel');
+                        cf.append('request_id', reqId);
+                        cf.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                        fetch('api/request_signature.php', { method: 'POST', body: cf }).finally(function () { location.reload(); });
+                    });
+                });
+        }
+        function afxSignOrder(type) {
+            afxSignaturePad({
+                title: type === 'prijem' ? '<?php echo __('sign_pad_title_reception'); ?>' : '<?php echo __('sign_pad_title_pickup'); ?>',
+                subtitle: '<?php echo e(orderDisplayCode($order)); ?> · <?php echo e(trim(($order['first_name'] ?? '') . ' ' . ($order['last_name'] ?? ''))); ?> · <?php echo e(trim(($order['device_brand'] ?? '') . ' ' . ($order['device_model'] ?? ''))); ?>',
+                terms: type === 'prijem' ? '<?php echo __('sign_terms_reception'); ?>' : '<?php echo __('sign_terms_pickup'); ?>',
+                onSave: function (dataUrl) {
+                    var fd = new FormData();
+                    fd.append('order_id', '<?php echo (int)$order['id']; ?>');
+                    fd.append('sig_type', type);
+                    fd.append('image', dataUrl);
+                    fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                    fetch('api/save_signature.php', { method: 'POST', body: fd })
+                        .then(function (r) { return r.json(); })
+                        .then(function (j) {
+                            if (j.ok) { location.reload(); }
+                            else { alert(j.error || 'Chyba'); }
+                        })
+                        .catch(function () { alert('Chyba spojení'); });
+                }
+            });
+        }
+        </script>
+        <script>
+        /* Faktura zakázky e-mailem (stejné API jako v Pokladně) */
+        function afxOrderInvoiceMail(invoiceId, btn, to) {
+            if (btn) btn.disabled = true;
+            fetch('api/invoice_email.php', {
+                method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ csrf_token: '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>', invoice_id: invoiceId, to: to || '' })
+            }).then(function (r) { return r.json(); }).then(function (j) {
+                if (btn) btn.disabled = false;
+                if (j.ok) { showAlert('✉️ Faktura odeslána na ' + j.to); return; }
+                if (j.need_email) { var m = prompt('Klient nemá uložený e-mail. Kam fakturu poslat?'); if (m) afxOrderInvoiceMail(invoiceId, btn, m.trim()); return; }
+                showAlert(j.error || 'Odeslání selhalo.');
+            }).catch(function () { if (btn) btn.disabled = false; showAlert('Síťová chyba — e-mail neodešel.'); });
+        }
+        </script>
+<style>
+/* Pravý sloupec detailu zakázky (v3.95.1) */
+.ord-side > .card { height: auto !important; }   /* style.css: .row > [class*=col-] > .card { height:100% } by každou kartu natáhl na výšku sloupce */
+.ord-side .ord-card .card-body { padding: 16px 18px !important; }
+.ord-card-title { font-size: 13px !important; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: rgba(255,255,255,.55); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.ord-card-title i { color: #5fb4ff; }
+.ord-top-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
+.ord-top-actions .btn { min-height: 44px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; font-size: 14.5px !important; padding: 8px 10px !important; }
+.ord-top-actions .btn i { margin-right: 6px !important; }
+.ord-barcode { margin-top: 12px; display: flex; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+#orderBarcode { background: #fff; padding: 6px 8px; border-radius: 8px; line-height: 0; flex: 0 0 auto; }
+#orderBarcode svg { max-width: 190px; height: auto; }
+.ord-barcode-hint { font-size: 12px !important; color: rgba(255,255,255,.5); line-height: 1.35; }
+.ord-next-btn { min-height: 56px; font-size: 17px !important; font-weight: 700; }
+.ord-price { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.ord-price span { font-size: 14px !important; color: rgba(255,255,255,.6); }
+.ord-price b { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.ord-pay-state { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.ord-pay-state > i { font-size: 18px; margin-top: 2px; }
+.ord-pay-state.ok { background: rgba(48,209,88,.10); border-color: rgba(48,209,88,.35); }
+.ord-pay-state.ok > i { color: #30D158; }
+.ord-pay-note { font-size: 12.5px !important; color: rgba(255,255,255,.55); line-height: 1.4; }
+.ord-pay-btn { min-height: 48px; font-weight: 700; }
+.ord-btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.ord-btn-row .btn { flex: 1 1 auto; }
+.ord-doc-list { display: grid; gap: 6px; }
+.ord-doc-list button { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 11px;
+  border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); color: inherit; font-size: 15px; cursor: pointer; }
+.ord-doc-list button:hover { background: rgba(10,132,255,.10); border-color: rgba(10,132,255,.35); }
+.ord-doc-list button i { width: 20px; text-align: center; }
+.ord-doc-list button span { font-size: 15px !important; }
+.ord-doc-list small { display: block; font-size: 12px !important; color: rgba(255,255,255,.5); }
+.ord-sigs { display: grid; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+.ord-sigs .small { font-size: 14px !important; text-transform: none !important; letter-spacing: 0 !important; }
+.ord-sigs .btn { font-size: 13px !important; }
+.ord-side .form-label { font-size: 13px !important; color: rgba(255,255,255,.6); }
+.ord-side .form-label span, .ord-side .form-label a { font-size: 13px !important; }
+.ord-side .ord-card .card-body .small, .ord-side .ord-card .card-body span.small, .ord-side .ord-card .card-body div.small { font-size: 14px !important; text-transform: none !important; letter-spacing: 0 !important; font-weight: 500 !important; }
+.ord-side .ord-card .badge { font-size: 12.5px !important; padding: 5px 9px !important; font-weight: 700 !important; }
+.ord-side .ord-card .btn-sm, .ord-side .ord-btn-row .btn { font-size: 14px !important; padding: 7px 10px !important; }
+html[data-lg-theme="light"] .ord-card-title, html[data-lg-theme="light"] .ord-price span, html[data-lg-theme="light"] .ord-pay-note,
+html[data-lg-theme="light"] .ord-barcode-hint, html[data-lg-theme="light"] .ord-doc-list small, html[data-lg-theme="light"] .ord-side .form-label { color: rgba(0,0,0,.55) !important; }
+html[data-lg-theme="light"] .ord-pay-state, html[data-lg-theme="light"] .ord-doc-list button { background: rgba(0,0,0,.03); border-color: rgba(0,0,0,.1); }
+html[data-lg-theme="light"] .ord-barcode, html[data-lg-theme="light"] .ord-sigs { border-color: rgba(0,0,0,.1); }
+</style>
     </div>
 </div>
 
@@ -1174,27 +1141,6 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
 
 <script>
 $(document).ready(function() {
-    // Express Invoice Form
-    $('#expressInvoiceForm').on('submit', function(e) {
-        e.preventDefault();
-        const btn = $(this).find('button[type="submit"]');
-        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> <?php echo __("saving"); ?>...');
-        
-        $.post('api/create_express_invoice.php', $(this).serialize(), function(res) {
-            if(res.success) {
-                // Just reload to show updated invoice status and amounts
-                location.reload();
-            } else {
-                btn.prop('disabled', false).html('<i class="fas fa-plus me-2"></i><?php echo __("create_invoice"); ?>');
-                showAlert('<?php echo __("error"); ?>: ' + res.message);
-            }
-        }).fail(function(xhr) {
-            btn.prop('disabled', false).html('<i class="fas fa-plus me-2"></i><?php echo __("create_invoice"); ?>');
-            const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : '<?php echo __("error"); ?>';
-            showAlert(msg);
-        });
-    });
-
     // „Vzít díl skenem QR" — ozbrojí tuto zakázku (30 min), pak stačí naskenovat QR na regálu
     $('#qrTakePartBtn').on('click', function () {
         var btn = this;
@@ -2010,4 +1956,6 @@ function deleteOrder(id) {
 </div>
 
 
+<?php /* okno Vystavit fakturu k prodeji (karta Platba a faktura) */ ?>
+<?php require_once 'includes/modals/invoice_after_sale_modal.php'; ?>
 <?php require_once 'includes/footer.php'; ?>

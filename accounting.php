@@ -571,6 +571,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (invModalEl) {
         invModal = new bootstrap.Modal(invModalEl);
     }
+    // ?edit_invoice=ID (tlačítko Upravit u faktury v detailu zakázky) -> rovnou otevřít úpravu
+    const __editInv = parseInt(new URLSearchParams(location.search).get('edit_invoice') || '0', 10);
+    if (__editInv > 0 && typeof editInvoice === 'function') { setTimeout(function () { editInvoice(__editInv); }, 150); }
 
     // ── vyhledávání klienta (v3.69.0) ───────────────────────────────────────
     // Dřív pole zapínala globální inicializace $('.select2') v main.js — BEZ
