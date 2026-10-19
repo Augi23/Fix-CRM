@@ -174,6 +174,9 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
         .sig { flex: 1; }
         .sig .line { border-top: 1.4px solid var(--ink); margin-top: 40px; padding-top: 7px;
                      font-size: 10.5px; color: var(--muted); text-align: center; }
+        .sign-row { display: flex; gap: 14px; margin-top: 16px; }
+        .sign-row .pickup { flex: 1; margin-top: 0; display: flex; flex-direction: column; }
+        .sign-row .sig { margin-top: auto; }
         .pickup { margin-top: 24px; padding: 15px 18px 16px; background: var(--soft);
                   border: 1px solid var(--line); border-radius: 14px; }
         .pickup h3 { margin: 0; font-size: 13.5px; font-weight: 800; letter-spacing: -0.01em; }
@@ -190,12 +193,37 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
         /* Vynutit A4 na výšku (bez tohoto se orientace řídila výchozím nastavením tiskárny → tisklo na šířku) */
         @page { size: A4 portrait; margin: 0; }
         @media print {
-            body { background: #fff; padding: 0; font-size: 12px; }
-            .sheet { box-shadow: none; border-radius: 0; max-width: none; width: 210mm; }
-            .pad { padding: 11mm 13mm 10mm; }
+            /* Celý list se MUSÍ vejít na jednu A4 i v Safari, který si přidává vlastní okraje
+               a záhlaví/zápatí (ignoruje margin: 0) — proto kompaktní tisk s rezervou (~255 mm obsahu). */
+            html, body { background: #fff; padding: 0; margin: 0; font-size: 11.5px; line-height: 1.4; }
+            .sheet { box-shadow: none; border-radius: 0; max-width: 190mm; width: auto; margin: 0 auto; break-inside: avoid; page-break-inside: avoid; }
+            .pad { padding: 6mm 4mm 2mm; }
+            .accent-bar { height: 3px; }
+            .head img { height: 28px; }
+            .doc h1 { font-size: 21px; }
+            .head-sep { margin-top: 10px; }
+            .cols { margin-top: 10px; gap: 10px; }
+            .panel { padding: 10px 13px; border-radius: 10px; }
+            .panel .title { margin-bottom: 6px; }
+            .client .name { font-size: 18px; }
+            .client .contact { margin-top: 5px; font-size: 11.5px; line-height: 1.55; }
+            .kv td { padding: 3.5px 0; }
+            .kv .v { font-size: 12px; }
+            .kv .v.price { font-size: 14px; }
+            .note { margin-top: 6px; padding: 5px 8px; }
+            .legal { margin-top: 10px; padding-top: 8px; font-size: 7.6px; line-height: 1.42; }
+            .legal p { margin: 0 0 5px; }
+            .sign-row { margin-top: 8px; gap: 10px; break-inside: avoid; page-break-inside: avoid; }
+            .pickup { padding: 9px 12px 10px; border-radius: 10px; }
+            .pickup h3 { font-size: 12px; }
+            .pickup .sub { font-size: 9.5px; margin-top: 1px; }
+            .sig .sig-img { height: 32px; margin-bottom: -6px; }
+            .sig .line { margin-top: 26px; padding-top: 4px; font-size: 9.5px; }
+            .sig .sig-img + .line { margin-top: 0; }
+            .foot { margin-top: 8px; padding-top: 6px; }
+            .foot .foot-line { margin-top: 2px; }
             .accent-bar, .panel.client, .pickup, .note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-print { display: none !important; }
-            .legal { font-size: 8px; }
         }
     </style>
 </head>
@@ -265,20 +293,21 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
             <p><?php echo _l('ord_terms_p2'); ?></p>
         </div>
 
-        <div class="sigs">
-            <div class="sig"></div>
-            <div class="sig">
-                <?php if ($__sigs['prijem']): ?><img class="sig-img" src="<?php echo $__sigs['prijem']['img']; ?>" alt="podpis"><?php endif; ?>
-                <div class="line"><?php echo _l('ord_customer_signature'); ?></div>
-                <?php if ($__sigs['prijem']): ?><div class="sig-at"><?php echo _l('ord_signed_electronically'); ?> <?php echo e(date('j. n. Y H:i', strtotime($__sigs['prijem']['at']))); ?></div><?php endif; ?>
+        <?php /* Podpisy VEDLE SEBE (v3.95.2): příjem do opravy | převzetí hotové zakázky —
+                 dřív pod sebou a na A4 přetékaly na druhý list. */ ?>
+        <div class="sign-row">
+            <div class="pickup">
+                <h3><?php echo _l('sign_reception'); ?></h3>
+                <?php if (($target_lang ?? 'cs') === 'cs'): ?><div class="sub">Souhlasím s podmínkami výše a předávám zařízení do opravy.</div><?php endif; ?>
+                <div class="sig">
+                    <?php if ($__sigs['prijem']): ?><img class="sig-img" src="<?php echo $__sigs['prijem']['img']; ?>" alt="podpis"><?php endif; ?>
+                    <div class="line"><?php echo _l('ord_customer_signature'); ?></div>
+                    <?php if ($__sigs['prijem']): ?><div class="sig-at"><?php echo _l('ord_signed_electronically'); ?> <?php echo e(date('j. n. Y H:i', strtotime($__sigs['prijem']['at']))); ?></div><?php endif; ?>
+                </div>
             </div>
-        </div>
-
-        <div class="pickup">
-            <h3><?php echo _l('sign_pickup'); ?></h3>
-            <div class="sub"><?php echo _l('ord_pickup_confirm_sub'); ?></div>
-            <div class="sigs">
-                <div class="sig"></div>
+            <div class="pickup">
+                <h3><?php echo _l('sign_pickup'); ?></h3>
+                <div class="sub"><?php echo _l('ord_pickup_confirm_sub'); ?></div>
                 <div class="sig">
                     <?php if ($__sigs['vydej']): ?><img class="sig-img" src="<?php echo $__sigs['vydej']['img']; ?>" alt="podpis"><?php endif; ?>
                     <div class="line"><?php echo _l('ord_customer_signature'); ?></div>

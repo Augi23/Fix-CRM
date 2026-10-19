@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.95.2',
+        'date' => '2026-10-19',
+        'time' => '14:30',
+        'title' => 'Zakázkový list se vejde na jednu A4',
+        'items' => [
+            'Zakázkový list se při tisku vejde na <b>jeden list A4 na výšku</b> — podpisy už nepřetékají na druhý papír (ani v Safari, který si přidává vlastní okraje).',
+            'Podpis při <b>příjmu do opravy</b> a při <b>převzetí hotové zakázky</b> jsou vedle sebe; tisk je kompaktnější, text podmínek beze změny.',
+        ],
+    ],
+    [
         'version' => '3.95.1',
         'date' => '2026-10-19',
         'time' => '10:45',
