@@ -394,6 +394,9 @@ if (!empty($_POST['ajax'])) {
                     <div class="alert alert-danger small mb-4"><?php echo e($error); ?></div>
                 <?php endif; ?>
 
+                <?php if (!empty($_GET['switched']) && empty($error)): ?>
+                    <div class="alert alert-info small mb-4"><i class="fas fa-user-group me-1"></i>Předchozí zaměstnanec je na tomto počítači odhlášený — přihlas se svým účtem. Převzatá pokladna zůstává tomu, kdo ji převzal.</div>
+                <?php endif; ?>
                 <form method="POST" class="login-form">
                     <?php echo csrfField(); ?>
                     <input type="hidden" name="login" value="1">

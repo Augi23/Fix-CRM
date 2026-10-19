@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.95.3',
+        'date' => '2026-10-19',
+        'time' => '14:45',
+        'title' => 'Přepnutí zaměstnance na sdíleném počítači (recepce)',
+        'items' => [
+            'V horní liště je nové tlačítko <b><i class="fas fa-user-group"></i> Přepnout zaměstnance</b> (na telefonu v menu). Odhlásí <b>jen tento počítač</b> — telefon a appka dotyčného zůstanou přihlášené — a kolega se hned může přihlásit, např. zadat novou zakázku na Macu na recepci.',
+            'Odhlášení z Pokladny s převzatou směnou už nenutí k uzávěrce: okno nabídne <b>Končím — uzavřít pokladnu</b>, <b>Jen se odhlásit</b> (pokladna zůstane převzatá) nebo Zůstat. Stejně funguje „Přihlásit jiného zaměstnance" na zamčené kase.',
+            'Pokladnu i dál obsluhuje <b>jen ten, kdo ji má převzatou</b> — přihlášený kolega uvidí „Pokladnu má převzatou …" a markovat nemůže (hlídá to i server).',
+        ],
+    ],
+    [
         'version' => '3.95.2',
         'date' => '2026-10-19',
         'time' => '14:30',
