@@ -205,36 +205,23 @@ $complaintPrefill = [
 <div class="row">
     <div class="col-md-8">
         <div class="card glass-card border-0 mb-4">
-            <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-center py-3">
-                <div class="d-flex align-items-center">
+            <div class="card-header bg-transparent border-bottom-0 d-flex justify-content-between align-items-start flex-wrap gap-3 py-3">
+                <div class="d-flex align-items-start gap-3 ord-head-main">
                     <?php 
                         $back_url = $_GET['return'] ?? "javascript:history.back()";
                     ?>
-                    <a href="<?php echo $back_url; ?>" class="btn btn-outline-secondary btn-sm me-2" title="<?php echo __('back'); ?>">
+                    <a href="<?php echo $back_url; ?>" class="btn btn-outline-secondary btn-sm mt-1" title="<?php echo __('back'); ?>">
                         <i class="fas fa-arrow-left"></i>
                     </a>
-                    <button class="btn btn-sm btn-primary me-2" data-bs-toggle="modal" data-bs-target="#editOrderFullModal">
-                        <i class="fas fa-edit me-1"></i> <?php echo __('edit_order_btn'); ?>
-                    </button>
-                    <?php if(crmCanDeleteOrders()): ?>
-                    <button class="btn btn-sm btn-outline-danger me-2" onclick="deleteOrder(<?php echo $order['id']; ?>)">
-                        <i class="fas fa-trash me-1"></i> <?php echo __('delete'); ?>
-                    </button>
-                    <?php endif; ?>
-                    <?php /* Reklamace k této zakázce: otevře globální modal „Nová reklamace"
-                             předvyplněný ze zakázky (klient, zařízení, SN, číslo zakázky). */ ?>
-                    <button type="button" class="btn btn-sm me-3 fw-semibold text-nowrap" style="background:#f97316;color:#fff"
-                            title="<?php echo e(__('order_create_complaint_title')); ?>"
-                            onclick='openComplaintForOrder(<?php echo json_encode($complaintPrefill, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP); ?>)'>
-                        <i class="fas fa-rotate-left me-1"></i> <?php echo __('order_create_complaint_btn'); ?>
-                    </button>
                     <div>
-                        <h5 class="mb-0">
-                            <?php echo __('order'); ?> <?php echo e(orderDisplayCode($order)); ?> - <?php echo htmlspecialchars($order['device_model']); ?>
-                            <span class="text-white-75 fw-normal ms-2" style="font-size: 0.9rem;">
-                                (<?php echo __('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?>)
-                            </span>
-                        </h5>
+                        <?php /* Číslo zakázky velkým písmem (v3.95.1) — klepnutím se zkopíruje */ ?>
+                        <div class="ord-head-code" role="button" tabindex="0" title="<?php echo __('order'); ?> — klepnutím zkopíruješ číslo"
+                             onclick="(function(el){var t=el.dataset.code;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){el.classList.add('copied');setTimeout(function(){el.classList.remove('copied');},1200);}).catch(function(){});})(this)"
+                             data-code="<?php echo e(orderDisplayCode($order)); ?>"><?php echo e(orderDisplayCode($order)); ?><i class="fas fa-check ord-head-copied"></i></div>
+                        <div class="ord-head-sub">
+                            <?php echo htmlspecialchars($order['device_model']); ?>
+                            <span class="ord-head-date">· <?php echo __('created'); ?>: <?php echo date('d.m.Y H:i', strtotime($order['created_at'])); ?></span>
+                        </div>
                         <?php if (($__legacyCode = trim((string)($order['legacy_code'] ?? ''))) !== ''): ?>
                             <div class="mt-1" style="font-size:.9rem; color:rgba(255,255,255,.72);"><i class="fas fa-clock-rotate-left me-1" style="font-size:.8rem;"></i>(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
                         <?php endif; ?>
@@ -259,6 +246,24 @@ $complaintPrefill = [
                         <?php endif; ?>
                     </div>
                 </div>
+                <div class="d-flex flex-column align-items-end gap-2 ms-auto ord-head-side">
+                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end ord-head-actions">
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editOrderFullModal">
+                        <i class="fas fa-edit me-1"></i> <?php echo __('edit_order_btn'); ?>
+                    </button>
+                    <?php if(crmCanDeleteOrders()): ?>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteOrder(<?php echo $order['id']; ?>)">
+                        <i class="fas fa-trash me-1"></i> <?php echo __('delete'); ?>
+                    </button>
+                    <?php endif; ?>
+                    <?php /* Reklamace k této zakázce: otevře globální modal „Nová reklamace"
+                             předvyplněný ze zakázky (klient, zařízení, SN, číslo zakázky). */ ?>
+                    <button type="button" class="btn btn-sm fw-semibold text-nowrap" style="background:#f97316;color:#fff"
+                            title="<?php echo e(__('order_create_complaint_title')); ?>"
+                            onclick='openComplaintForOrder(<?php echo json_encode($complaintPrefill, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP); ?>)'>
+                        <i class="fas fa-rotate-left me-1"></i> <?php echo __('order_create_complaint_btn'); ?>
+                    </button>
+                </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                     <?php echo getStatusBadge($order['status']); ?><?php echo crmDeviceLocationPill($order); ?><?php echo crmPrepaidPill($order); ?>
                     <?php
@@ -280,7 +285,23 @@ $complaintPrefill = [
                         <span class="badge bg-warning text-dark" title="Zaplaceno předem víc, než je konečná cena — rozdíl vrať klientovi (storno a nový doklad v Pokladně)">Přeplatek <?php echo formatMoney($__ppPaid - $__ppAmt); ?></span>
                     <?php endif; ?>
                 </div>
+                </div>
             </div>
+<style>
+/* Hlavička zakázky: velké číslo vlevo, akce + stav vpravo (v3.95.1) */
+.ord-head-code { font-size: 34px !important; font-weight: 800 !important; letter-spacing: .01em !important; line-height: 1.05 !important;
+  color: var(--fg1, #fff) !important; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; font-variant-numeric: tabular-nums; }
+.ord-head-code:hover { color: #5fd2ff !important; }
+.ord-head-copied { font-size: 18px !important; color: #30D158; opacity: 0; transition: opacity .2s; }
+.ord-head-code.copied .ord-head-copied { opacity: 1; }
+.ord-head-sub { font-size: 15px !important; color: rgba(255,255,255,.78) !important; margin-top: 4px; line-height: 1.35; }
+.ord-head-sub span, .ord-head-date { font-size: 14px !important; color: rgba(255,255,255,.55) !important; }
+html[data-lg-theme="light"] .ord-head-code { color: #111 !important; }
+html[data-lg-theme="light"] .ord-head-sub { color: rgba(0,0,0,.72) !important; }
+html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord-head-date { color: rgba(0,0,0,.5) !important; }
+.ord-head-main { min-width: 0; flex: 1 1 340px; }
+@media (max-width: 575.98px) { .ord-head-code { font-size: 27px !important; } .ord-head-side { align-items: flex-start !important; margin-left: 0 !important; width: 100%; } .ord-head-actions { justify-content: flex-start !important; } }
+</style>
             <div class="card-body">
                 <div class="row g-3 mb-4 order-summary-hl">
                     <div class="col-md-6">

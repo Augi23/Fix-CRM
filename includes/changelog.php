@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.95.1',
+        'date' => '2026-10-19',
+        'time' => '10:45',
+        'title' => 'Detail zakázky: číslo zakázky velkým písmem',
+        'items' => [
+            'V hlavičce detailu zakázky je vlevo <b>velké číslo zakázky</b> (pod ním model a datum vytvoření) — klepnutím se zkopíruje do schránky.',
+            'Tlačítka Upravit zakázku, Smazat a Reklamace jsou přesunutá <b>vpravo</b>, nad stav zakázky.',
+        ],
+    ],
+    [
         'version' => '3.95.0',
         'date' => '2026-10-18',
         'time' => '18:00',
