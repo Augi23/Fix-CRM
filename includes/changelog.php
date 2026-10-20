@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.97.2',
+        'date' => '2026-10-20',
+        'time' => '23:55',
+        'title' => 'Nástěnka: přepínač poboček pro admina a Bosse, barevné řádky zakázek',
+        'items' => [
+            'Admin a Boss mají pod datem přepínač <b>Obě pobočky · Karlín · Na Příkopě</b>. Po výběru pobočky se peníze dne, tok zakázek, úkoly Na řadě, tým i seznam zakázek přepočítají jen pro ni. Volba vydrží do odhlášení. Ostatní zaměstnanci přepínač nemají a vidí dál jen svou pobočku.',
+            'Řádky v seznamu zakázek na Nástěnce mají zase <b>barvu podle stavu</b> (proužek vlevo i podbarvení), stejně jako v Zakázkách. Vydané se nebarví, importované jsou šedé.',
+        ],
+    ],
+    [
         'version' => '3.97.1',
         'date' => '2026-10-20',
         'time' => '23:30',

@@ -36,6 +36,11 @@ html[data-lg-theme="light"] .dsh {
 .dsh-date { font-size: 30px !important; font-weight: 800 !important; letter-spacing: -.02em !important; line-height: 1.15 !important; }
 .dsh-scope { display: inline-flex !important; align-items: center !important; gap: 6px !important; margin-top: 6px !important; padding: 3px 10px !important; border-radius: 999px !important;
     background: var(--d-card2) !important; border: 1px solid var(--d-line) !important; font-size: 12.5px !important; font-weight: 700 !important; color: var(--d-fg2) !important; }
+/* admin/Boss: přepínač Obě pobočky / Karlín / Na Příkopě */
+.dsh-scopes { display: flex !important; gap: 6px !important; flex-wrap: wrap !important; margin-top: 6px !important; }
+.dsh-scopes .dsh-scope { margin-top: 0 !important; min-height: 30px !important; padding: 3px 12px !important; cursor: pointer !important; transition: background .12s ease !important; }
+.dsh-scopes .dsh-scope:hover { background: var(--d-card) !important; color: var(--d-fg) !important; }
+.dsh-scopes .dsh-scope.is-on { background: color-mix(in srgb, var(--d-blue) 20%, transparent) !important; border-color: color-mix(in srgb, var(--d-blue) 55%, transparent) !important; color: var(--d-fg) !important; }
 .dsh-actions { display: flex !important; gap: 8px !important; flex-wrap: wrap !important; }
 .dsh-act { display: inline-flex !important; align-items: center !important; gap: 8px !important; min-height: 44px !important; padding: 0 16px !important; border-radius: 14px !important;
     background: var(--d-card) !important; border: 1px solid var(--d-line) !important; color: var(--d-fg) !important; font-size: 14.5px !important; font-weight: 700 !important;
@@ -147,11 +152,46 @@ a.dsh-kpi:hover, .dsh-kpi--eshop:hover { background: var(--d-card2) !important; 
 .dsh-olist-more { margin: 8px 6px 0 !important; }
 .dsh-o { position: relative !important; display: grid !important; grid-template-columns: 130px minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.1fr) 92px 36px !important;
     gap: 12px !important; align-items: center !important; padding: 10px 12px !important; border-radius: 12px !important; border: 1px solid transparent !important; }
-.dsh-o:hover { background: var(--d-card2) !important; border-color: var(--d-line) !important; }
 .dsh-o--stock { grid-template-columns: minmax(0,1fr) auto 110px !important; padding-right: 12px !important; }
-.dsh-o.is-legacy { opacity: .6 !important; }
+/* Řádek nese barvu stavu jako seznam zakázek (liquid-glass.css .order-row--status-*):
+   syté pozadí + proužek vlevo. „Vydáno" se nebarví, importované = šedé. */
+.dsh-o { --sc: transparent !important; --sb: transparent !important; background: var(--sb) !important; box-shadow: inset 4px 0 0 var(--sc) !important; }
+.dsh-o.s-new { --sc: #3b82f6 !important; --sb: rgba(59,130,246,.42) !important; }
+.dsh-o.s-pending { --sc: #f97316 !important; --sb: rgba(249,115,22,.40) !important; }
+.dsh-o.s-progress { --sc: #8b5cf6 !important; --sb: rgba(139,92,246,.42) !important; }
+.dsh-o.s-waiting { --sc: #ef4444 !important; --sb: rgba(239,68,68,.44) !important; }
+.dsh-o.s-completed { --sc: #4ade80 !important; --sb: rgba(74,222,128,.36) !important; }
+.dsh-o.s-uncollected { --sc: #eab308 !important; --sb: rgba(234,179,8,.36) !important; }
+.dsh-o.s-repairplugin { --sc: #d946ef !important; --sb: rgba(192,38,211,.42) !important; }
+.dsh-o.s-handoff { --sc: #22d3ee !important; --sb: rgba(34,211,238,.30) !important; }
+.dsh-o.s-cancelled { --sc: #9ca3af !important; --sb: rgba(156,163,175,.28) !important; }
+.dsh-o.s-default { --sc: #94a3b8 !important; --sb: rgba(148,163,184,.24) !important; }
+.dsh-o.s-collected { --sc: transparent !important; --sb: transparent !important; }
+.dsh-o.is-legacy { --sb: rgba(44,47,54,.60) !important; }
+html[data-lg-theme="light"] .dsh-o.s-new { --sb: #E8F0FE !important; }
+html[data-lg-theme="light"] .dsh-o.s-pending { --sb: #FEEFE3 !important; }
+html[data-lg-theme="light"] .dsh-o.s-progress { --sb: #F0EBFE !important; }
+html[data-lg-theme="light"] .dsh-o.s-waiting { --sb: #FDEBEB !important; }
+html[data-lg-theme="light"] .dsh-o.s-completed { --sb: #E9FBEE !important; }
+html[data-lg-theme="light"] .dsh-o.s-uncollected { --sb: #FBF4DC !important; }
+html[data-lg-theme="light"] .dsh-o.s-repairplugin { --sb: #F8E9FB !important; }
+html[data-lg-theme="light"] .dsh-o.s-handoff { --sb: #E4F9FD !important; }
+html[data-lg-theme="light"] .dsh-o.s-cancelled { --sb: #F0F1F3 !important; }
+html[data-lg-theme="light"] .dsh-o.s-default { --sb: #F1F3F6 !important; }
+html[data-lg-theme="light"] .dsh-o.is-legacy { --sb: #E9EAEC !important; }
+.dsh-o:hover { filter: brightness(1.12) !important; }
+html[data-lg-theme="light"] .dsh-o:hover { filter: brightness(.97) !important; }
+.dsh-olist { gap: 6px !important; }
+.dsh-o-code em, .dsh-o-who em, .dsh-o-st em, .dsh-o-prob { color: var(--d-fg2) !important; }
+.dsh-o:not(.s-collected):not(.is-legacy) .dsh-o-code em, .dsh-o:not(.s-collected):not(.is-legacy) .dsh-o-who em,
+.dsh-o:not(.s-collected):not(.is-legacy) .dsh-o-st em, .dsh-o:not(.s-collected):not(.is-legacy) .dsh-o-prob { color: rgba(255,255,255,.82) !important; }
+html[data-lg-theme="light"] .dsh-o .dsh-o-code em, html[data-lg-theme="light"] .dsh-o .dsh-o-who em,
+html[data-lg-theme="light"] .dsh-o .dsh-o-st em, html[data-lg-theme="light"] .dsh-o .dsh-o-prob { color: var(--d-fg2) !important; }
+.dsh-o .dsh-call { background: rgba(0,0,0,.28) !important; color: #7ce39a !important; }
+html[data-lg-theme="light"] .dsh-o .dsh-call { background: rgba(255,255,255,.75) !important; color: var(--d-green) !important; }
+.dsh-o-st .badge { font-size: 12px !important; padding: 4px 9px !important; }
 .dsh-o.is-stale .dsh-o-code b::after { content: "" !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important;
-    background: var(--d-orange) !important; margin-left: 6px !important; vertical-align: middle !important; }
+    background: #ffd479 !important; margin-left: 6px !important; vertical-align: middle !important; }
 .dsh-o-code, .dsh-o-who, .dsh-o-st { display: flex !important; flex-direction: column !important; min-width: 0 !important; gap: 2px !important; }
 .dsh-o-code b { font-size: 14.5px !important; font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important; letter-spacing: -.01em !important; }
 .dsh-o-code em, .dsh-o-who em, .dsh-o-st em { font-size: 12.5px !important; color: var(--d-fg2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }

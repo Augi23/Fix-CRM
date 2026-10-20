@@ -49,20 +49,27 @@ function crmDashDevice(array $r): string {
     return trim($brand . ' ' . $model);
 }
 
-function crmDashboardBuild(PDO $pdo): array {
-    $global = isBranchGlobalViewer();
-    $myBranch = (int)getCurrentStaffBranchId();
+/** Admin/Boss si může nástěnku přepnout na jednu pobočku ($pick = id pobočky, 0 = obě).
+ *  Ostatním se $pick ignoruje — vidí vždy jen svou pobočku. */
+function crmDashboardBuild(PDO $pdo, int $pick = 0): array {
+    $canPick = isBranchGlobalViewer();
+    $allBranches = crmDashBranches();
+    $pick = ($canPick && isset($allBranches[$pick])) ? $pick : 0;
+    // „global" níže = pohled přes obě pobočky; s vybranou pobočkou se počítá jako pobočkový
+    $global = $canPick && $pick === 0;
+    $myBranch = $pick ?: (int)getCurrentStaffBranchId();
     $tid = (int)($_SESSION['tech_id'] ?? 0);
-    $branches = crmDashBranches();
+    $branches = $allBranches;
     if (!$global) {
-        $branches = [$myBranch => getBranchLabel($myBranch) ?: ($branches[$myBranch] ?? '')];
+        $branches = [$myBranch => getBranchLabel($myBranch) ?: ($allBranches[$myBranch] ?? '')];
     }
     ensureOrdersSourceColumn();
     $noLeg = " AND o.source <> 'legacy'";
-    $scope = orderBranchScopeSql('o.branch_id', 'o.technician_id');
+    $scope = $pick ? ' AND o.branch_id = ' . $pick : orderBranchScopeSql('o.branch_id', 'o.technician_id');
     $in = fn(string $k) => orderStatusSqlIn($pdo, $k);
     $D = [
         'global' => $global, 'my_branch' => $myBranch, 'tech_id' => $tid,
+        'can_pick' => $canPick, 'pick' => $pick, 'all_branches' => $allBranches,
         'branches' => $branches,
         'scope_label' => $global ? 'Obě pobočky' : crmDashBranchShort(getBranchLabel($myBranch)),
     ];

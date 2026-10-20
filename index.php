@@ -12,7 +12,11 @@ crmMailSortMaybeSchedule();
 // Grafy a dlouhodobá čísla patří do Přehledů (reports.php), sem ne.
 // Data skládá includes/dashboard_data.php (tam jsou i pravidla viditelnosti poboček).
 require_once __DIR__ . '/includes/dashboard_data.php';
-$D = crmDashboardBuild($pdo);
+// Admin/Boss: přepínač Obě pobočky / jedna pobočka — volba se drží po dobu přihlášení
+if (isBranchGlobalViewer() && isset($_GET['branch'])) {
+    $_SESSION['dsh_branch'] = max(0, (int)$_GET['branch']);
+}
+$D = crmDashboardBuild($pdo, isBranchGlobalViewer() ? (int)($_SESSION['dsh_branch'] ?? 0) : 0);
 $__mt = $D['money_total'];
 $__showSplit = $D['global'] && count($D['money']) > 1;
 
@@ -24,6 +28,7 @@ $search = trim($_GET['search'] ?? '');
 $where_clauses = [];
 $params = [];
 addOrderBranchScope($where_clauses, $params, 'o');
+if ($D['pick'] > 0) { $where_clauses[] = 'o.branch_id = ?'; $params[] = $D['pick']; }
 if ($search !== '') {
     $searchTerm = "%$search%";
     $where_clauses[] = '(o.order_code LIKE ? OR o.legacy_code LIKE ? OR o.id LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.phone LIKE ? OR o.device_model LIKE ? OR o.problem_description LIKE ? OR o.serial_number LIKE ? OR o.serial_number_2 LIKE ?'
@@ -87,7 +92,7 @@ $dshOrderRow = function (array $r) {
     $internal = crmIsInternalCustomer($r['customer_id'] ?? 0);
     $amount = (float)($r['final_cost'] ?: $r['estimated_cost']);
     ob_start(); ?>
-    <div class="dsh-o<?php echo $legacy ? ' is-legacy' : ''; ?><?php echo $staleCls ? ' is-stale' : ''; ?>"<?php echo $staleTitle ? ' title="' . e($staleTitle) . '"' : ''; ?>>
+    <div class="dsh-o <?php echo $legacy ? 'is-legacy' : 's-' . e($tok); ?><?php echo $staleCls ? ' is-stale' : ''; ?>"<?php echo $staleTitle ? ' title="' . e($staleTitle) . '"' : ''; ?>>
         <a class="dsh-o-link" href="view_order.php?id=<?php echo (int)$r['id']; ?>" aria-label="Zakázka <?php echo e(orderDisplayCode($r)); ?>"></a>
         <div class="dsh-o-code">
             <b><?php echo e(orderDisplayCode($r)); ?></b>
@@ -99,7 +104,7 @@ $dshOrderRow = function (array $r) {
         </div>
         <div class="dsh-o-prob"><?php echo e((string)($r['problem_description'] ?? '')); ?></div>
         <div class="dsh-o-st">
-            <b class="dsh-pill t-<?php echo e($tok); ?>"><?php echo e(getOrderStatusLabel((string)$r['status'])); ?></b>
+            <?php echo getStatusBadge($r['status']); ?>
             <?php if (($r['priority'] ?? '') === 'High'): ?><b class="dsh-pill t-urgent"><i class="fas fa-bolt"></i> Spěchá</b><?php endif; ?>
             <?php if (!empty($r['prepaid_at'])): ?><b class="dsh-pill t-completed"><i class="fas fa-circle-check"></i> Zaplaceno</b><?php endif; ?>
             <em><?php echo !empty($r['tech_name']) ? '<i class="fas fa-user-gear"></i> ' . e($r['tech_name']) : '<i class="fas fa-user-plus"></i> bez technika'; ?><?php if (isBranchGlobalViewer() && !empty($r['branch_id'])): ?> · <?php echo e(crmDashBranchShort(getBranchLabel((int)$r['branch_id']))); ?><?php endif; ?></em>
@@ -351,7 +356,16 @@ $dshOrderRow = function (array $r) {
         <div class="dsh-hello">
             <div class="dsh-greet"><?php echo e($__greet); ?><?php echo $__me !== '' ? ', ' . e($__me) : ''; ?></div>
             <h1 class="dsh-date"><?php echo e(mb_convert_case($__dayNames[(int)date('w')], MB_CASE_TITLE, 'UTF-8') . ' ' . date('j') . '. ' . $__monNames[(int)date('n') - 1]); ?></h1>
+            <?php if ($D['can_pick'] && count($D['all_branches']) > 1): ?>
+            <nav class="dsh-scopes" aria-label="Pobočka">
+                <a class="dsh-scope<?php echo $D['pick'] === 0 ? ' is-on' : ''; ?>" href="index.php?branch=0"><i class="fas fa-store"></i> Obě pobočky</a>
+                <?php foreach ($D['all_branches'] as $__bid => $__bn): ?>
+                <a class="dsh-scope<?php echo $D['pick'] === (int)$__bid ? ' is-on' : ''; ?>" href="index.php?branch=<?php echo (int)$__bid; ?>"><?php echo e(crmDashBranchShort($__bn)); ?></a>
+                <?php endforeach; ?>
+            </nav>
+            <?php else: ?>
             <div class="dsh-scope"><i class="fas fa-store"></i> <?php echo e($D['scope_label']); ?></div>
+            <?php endif; ?>
         </div>
         <div class="dsh-actions" role="toolbar" aria-label="Rychlé akce">
             <button type="button" class="dsh-act is-primary" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus"></i><b>Nová zakázka</b></button>
