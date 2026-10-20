@@ -353,6 +353,11 @@ try {
             $st->execute([$line['id']]);
             $row = $st->fetch();
             if (!$row) { echo json_encode(['success' => false, 'message' => 'Produkt už neexistuje.']); exit; }
+            // skladový kus v interní opravě („Reklamace") se neprodává, dokud zakázka neskončí
+            $__rep = crmStockRepairOrders([(int)$line['id']])[(int)$line['id']] ?? null;
+            if ($__rep) {
+                echo json_encode(['success' => false, 'message' => '„' . $row['title'] . '" je v opravě (interní zakázka ' . $__rep['code'] . ') — prodat ho jde až po jejím dokončení.'], JSON_UNESCAPED_UNICODE); exit;
+            }
             // Kus rezervovaný objednávkou z e-shopu (platba při vyzvednutí) se nesmí
             // prodat někomu jinému — online zákazník by přišel k prázdnému regálu.
             // Volných kusů je stock_qty − reserved_qty; rezervaci vyzvedne jen prodej

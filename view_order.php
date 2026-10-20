@@ -226,6 +226,19 @@ $complaintPrefill = [
                         <?php if (($__legacyCode = trim((string)($order['legacy_code'] ?? ''))) !== ''): ?>
                             <div class="mt-1" style="font-size:.9rem; color:rgba(255,255,255,.72);"><i class="fas fa-clock-rotate-left me-1" style="font-size:.8rem;"></i>(<?php echo __('ord_prev_code'); ?> <?php echo e($__legacyCode); ?>)</div>
                         <?php endif; ?>
+                        <?php /* Interní oprava skladového kusu (tlačítko Reklamace ve Skladu, v3.96.0) */ ?>
+                        <?php if ((int)($order['stock_product_id'] ?? 0) > 0):
+                            $__sp = null;
+                            try { $__spq = $pdo->prepare("SELECT id, title, product_code, branch_id FROM products WHERE id = ?"); $__spq->execute([(int)$order['stock_product_id']]); $__sp = $__spq->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Throwable $e) {}
+                            $__spOpen = !isOrderStatusIn((string)$order['status'], 'terminal'); ?>
+                        <div class="small mt-1" style="color:#ffb340;">
+                            <i class="fas fa-warehouse me-1"></i>Skladový kus:
+                            <?php if ($__sp): ?>
+                                <a style="color:#ffb340;" class="fw-semibold" href="products.php?avail=&branch=<?php echo (int)$__sp['branch_id']; ?>&search=<?php echo rawurlencode((string)($__sp['product_code'] ?: $__sp['title'])); ?>"><?php echo e((string)$__sp['title']); ?></a>
+                            <?php else: ?>#<?php echo (int)$order['stock_product_id']; ?> (už není ve skladu)<?php endif; ?>
+                            <span class="text-white-75">· <?php echo $__spOpen ? 'do dokončení opravy stažen z prodeje' : 'oprava hotová, kus je zpět v prodeji'; ?></span>
+                        </div>
+                        <?php endif; ?>
                         <?php if ($orderComplaints): ?>
                         <div class="small mt-1" style="color:#fdba74;">
                             <i class="fas fa-rotate-left me-1"></i><?php echo __('order_complaints_line'); ?>:

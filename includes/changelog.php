@@ -11,6 +11,18 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.96.0',
+        'date' => '2026-10-20',
+        'time' => '13:30',
+        'title' => 'Interní zakázka na zařízení ze skladu + tlačítko Reklamace ve Skladu',
+        'items' => [
+            'Nová zakázka → <b>Interní zakázka</b>: v kroku Zařízení se objeví <b>„Zařízení ze skladu"</b>. Vybereš kus (podle modelu, IMEI nebo sériového čísla) a doplní se typ, značka, model, sériové číslo i stav — nic se nepřepisuje ručně.',
+            'Ve <b>Skladu</b> má každý kus tlačítko <b><i class="fas fa-rotate-left"></i> Reklamace</b> pro případ, že zařízení na prodej potřebuje ještě něco opravit: otevře průvodce rovnou jako interní zakázku s tímto kusem.',
+            'Kus v opravě se <b>neprodává</b> — zmizí z e-shopu a Pokladna ho nenabídne ani neprodá. Ve Skladu má oranžovou značku <b>„V opravě · číslo zakázky"</b> a v detailu zakázky je odkaz zpět na kus.',
+            'Jakmile je zakázka hotová (Připraveno / Vydáno), zrušená nebo smazaná, kus se do prodeje <b>vrátí sám</b> — nic se nemusí přepínat.',
+        ],
+    ],
+    [
         'version' => '3.95.4',
         'date' => '2026-10-19',
         'time' => '15:10',

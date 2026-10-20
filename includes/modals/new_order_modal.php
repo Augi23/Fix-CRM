@@ -162,6 +162,18 @@ $crm_order_model_catalog = crmOrderModelCatalog();
                                 <span class="fw-semibold small text-uppercase"><?php echo __('section_device'); ?></span>
                             </div>
                             <div class="row g-3">
+                                <?php if (crmInternalCustomerId() > 0): ?>
+                                <?php /* Interní zakázka (v3.96.0): zařízení přímo ze skladu — vyplní typ, značku,
+                                         model, S/N a vzhled; kus se na dobu opravy přestane prodávat. */ ?>
+                                <div class="col-12" id="stockDeviceWrap" hidden>
+                                    <div class="stock-device-box">
+                                        <label class="form-label mb-1"><i class="fas fa-warehouse me-1 text-warning"></i>Zařízení ze skladu <span class="text-white-50 fw-normal">(interní zakázka)</span></label>
+                                        <select id="stockDeviceSelect" style="width:100%;"></select>
+                                        <input type="hidden" name="stock_product_id" id="stockProductId" value="">
+                                        <div class="form-text small" id="stockDeviceHint">Vyber kus ze skladu — doplní se typ, značka, model, sériové číslo a stav. Po dobu opravy se kus nebude prodávat na e-shopu ani v Pokladně.</div>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
                                 <div class="col-md-3">
                                     <label class="form-label"><?php echo __('device_type'); ?></label>
                                     <select name="device_type" class="form-select select2-device-type" style="width: 100%;" required>
@@ -375,6 +387,105 @@ $crm_order_model_catalog = crmOrderModelCatalog();
                         btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-warning');
                         setTimeout(function () { btn.classList.add('btn-outline-secondary'); btn.classList.remove('btn-warning'); }, 900);
                     });
+                }());
+                </script>
+                <?php endif; ?>
+                <?php if (crmInternalCustomerId() > 0): ?>
+                <style>
+                #newOrderModal .stock-device-box { border: 1px solid rgba(255,159,10,.45); background: rgba(255,159,10,.08); border-radius: 12px; padding: 10px 12px; }
+                #newOrderModal .stock-device-box.is-set { border-color: rgba(48,209,88,.5); background: rgba(48,209,88,.08); }
+                </style>
+                <script>
+                /* Interní zakázka ze skladu (v3.96.0):
+                   • výběr kusu ze skladu se ukáže jen u interního klienta,
+                   • po výběru vyplní typ, značku, model (nejbližší z katalogu), S/N a vzhled,
+                   • window.afxStockReklamace(id) — tlačítko „Reklamace" ve Skladu: otevře průvodce
+                     jako interní zakázku s předvybraným kusem. */
+                (function () {
+                    if (typeof window.jQuery === 'undefined') return;
+                    var $ = window.jQuery;
+                    var INTERNAL_ID = '<?php echo (int)crmInternalCustomerId(); ?>';
+                    var $m = function () { return $('#newOrderModal'); };
+
+                    function setSelect($sel, value) {
+                        if (!$sel.length || !value) return;
+                        if (!$sel.find('option').filter(function () { return this.value === value; }).length) {
+                            $sel.append(new Option(value, value, false, false));
+                        }
+                        $sel.val(value).trigger('change');
+                    }
+                    function bestModel(title) {
+                        var t = String(title || '').toLowerCase(), best = '';
+                        $m().find('[name="device_model"] option').each(function () {
+                            var v = String(this.value || ''); if (!v) return;
+                            var lv = v.toLowerCase();
+                            if ((t === lv || t.indexOf(lv + ' ') === 0) && lv.length > best.length) best = v;
+                        });
+                        return best || String(title || '');
+                    }
+                    function applyStock(item) {
+                        var f = item && item.prefill; if (!f) return;
+                        var $modal = $m();
+                        $('#stockProductId').val(item.id);
+                        setSelect($modal.find('[name="device_type"]'), f.device_type);
+                        setSelect($modal.find('[name="device_brand"]'), f.device_brand);
+                        setSelect($modal.find('[name="device_model"]'), bestModel(f.device_model));
+                        var sn = $modal.find('[name="serial_number"]'); if (f.serial_number && !sn.val()) sn.val(f.serial_number);
+                        var ap = $modal.find('[name="appearance"]'); if (!ap.val()) ap.val(f.appearance || '');
+                        var pr = $modal.find('[name="problem_description"]');
+                        if (!String(pr.val() || '').trim()) pr.val('Reklamace skladového kusu ' + (item.code ? '(' + item.code + ') ' : '') + '— ');
+                        $('#stockDeviceWrap .stock-device-box').addClass('is-set');
+                        $('#stockDeviceHint').html('<i class="fas fa-check text-success me-1"></i>Propojeno se skladem: <b>' + $('<span>').text(item.title).html()
+                            + '</b> — po dobu opravy se kus nebude prodávat. Po dokončení (Připraveno / Vydáno) se do prodeje vrátí sám.');
+                    }
+                    function clearStock() {
+                        $('#stockProductId').val('');
+                        $('#stockDeviceWrap .stock-device-box').removeClass('is-set');
+                        var $s = $('#stockDeviceSelect'); if ($s.data('select2')) { $s.val(null).trigger('change.select2'); }
+                    }
+                    function syncVisible() {
+                        var isInt = String($m().find('select[name="customer_id"]').val() || '') === INTERNAL_ID;
+                        $('#stockDeviceWrap').prop('hidden', !isInt);
+                        if (!isInt) clearStock();
+                    }
+                    function initSelect() {
+                        var $s = $('#stockDeviceSelect');
+                        if (!$s.length || $s.data('select2')) return;
+                        $s.select2({
+                            dropdownParent: $m(), width: '100%', allowClear: true,
+                            placeholder: 'Hledat ve skladu — model, IMEI / sériové číslo…', minimumInputLength: 0,
+                            ajax: {
+                                url: 'api/stock_device_search.php', dataType: 'json', delay: 250,
+                                data: function (p) { return { q: p.term || '' }; },
+                                processResults: function (d) { return { results: (d && d.results) || [] }; }
+                            }
+                        }).on('select2:select', function (e) { applyStock(e.params.data); })
+                          .on('select2:clear', clearStock);
+                    }
+                    $(document).on('shown.bs.modal', '#newOrderModal', function () { initSelect(); syncVisible(); });
+                    $(document).on('change', '#newOrderModal select[name="customer_id"]', syncVisible);
+
+                    window.afxStockReklamace = function (productId) {
+                        var el = document.getElementById('newOrderModal'); if (!el || !window.bootstrap) return;
+                        var go = function () {
+                            el.removeEventListener('shown.bs.modal', go);
+                            var b = document.getElementById('internalOrderBtn'); if (b) b.click();
+                            $.getJSON('api/stock_device_search.php', { id: productId }, function (d) {
+                                var it = d && d.results && d.results[0];
+                                if (!it) { (window.showAlert || alert)('Kus ve skladu nebyl nalezen.'); return; }
+                                if (it.in_repair) { (window.showAlert || alert)('Tento kus už je v opravě — zakázka ' + it.in_repair.code + '.'); return; }
+                                initSelect();
+                                var $s = $('#stockDeviceSelect');
+                                $s.append(new Option(it.text, it.id, true, true)).trigger('change.select2');
+                                syncVisible();
+                                applyStock(it);
+                                var next = el.querySelector('[data-wizard-next]');
+                                if (next && !next.hidden) next.click();   // rovnou na krok Zařízení a závada
+                            });
+                        };
+                        el.addEventListener('shown.bs.modal', go);
+                        bootstrap.Modal.getOrCreateInstance(el).show();
+                    };
                 }());
                 </script>
                 <?php endif; ?>

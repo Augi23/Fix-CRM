@@ -64,6 +64,7 @@ $where = []; $params = [];
 if ($code !== '')       { $where[] = 'product_code = ?'; $params[] = $code; }
 $where[] = 'loan_at IS NULL';   // zapůjčené / v komisi nejsou naše k prodeji
 $where[] = 'hide_eshop = 0';    // checkbox „Nezobrazovat na e-shopu" v naskladnění
+$where[] = 'NOT ' . crmStockRepairOpenSql('products.id');   // skladový kus v interní opravě („Reklamace") se neprodává
 // DOSTUPNOST = sklad − rezervace z e-shopu (platba při vyzvednutí): rezervovaný
 // kus na prodejně fyzicky leží, ale nikdo jiný si ho koupit nesmí.
 if ($inStockOnly)       { $where[] = '(stock_qty - COALESCE(reserved_qty, 0)) > 0'; }

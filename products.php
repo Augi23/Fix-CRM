@@ -111,6 +111,8 @@ if ($search !== '' && $total_count === 0) {
 $stmt = $pdo->prepare("SELECT * FROM products" . $where_sql . " ORDER BY added_at DESC, id DESC LIMIT $limit OFFSET $offset");
 $stmt->execute($params);
 $products = $stmt->fetchAll();
+// skladové kusy v interní opravě (tlačítko Reklamace, v3.96.0) — nejsou k prodeji, dokud zakázka neskončí
+$__repairMap = crmStockRepairOrders(array_column($products, 'id'));
 
 // Sloupec „Zápůjčka“ se ukazuje jen když dává smysl — při filtru Zapůjčeno,
 // nebo když je na stránce aspoň jeden zapůjčený kus. Jinak by v široké tabulce
@@ -400,6 +402,9 @@ try {
                                         <?php endif; ?>
                                         <?php /* rezervace z e-shopu: kus fyzicky leží na prodejně, ale je zamluvený
                                                  objednávkou s platbou při vyzvednutí — prodat ho smí jen ta objednávka */ ?>
+                                        <?php if (!empty($__repairMap[(int)$p['id']])): $__rep = $__repairMap[(int)$p['id']]; ?>
+                                            <div class="small mt-1"><a href="view_order.php?id=<?php echo (int)$__rep['id']; ?>" class="badge text-decoration-none" style="background:#FF9F0A;color:#1a1000" title="Interní zakázka na opravu — kus se do dokončení neprodává (e-shop ani Pokladna)"><i class="fas fa-screwdriver-wrench me-1"></i>V opravě · <?php echo e($__rep['code']); ?></a></div>
+                                        <?php endif; ?>
                                         <?php if ((int)($p['reserved_qty'] ?? 0) > 0): ?>
                                             <div class="small mt-1" style="color:#ffd479;" title="Objednávka z e-shopu s platbou při vyzvednutí — zaplatí se na kase přes „Rezervace e-shopu“"><i class="fas fa-clock me-1"></i>rezervováno pro e-shop<?php echo (int)$p['reserved_qty'] > 1 ? ' (' . (int)$p['reserved_qty'] . ' ks)' : ''; ?></div>
                                         <?php endif; ?>
@@ -463,6 +468,11 @@ try {
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-8xx)"><i class="fas fa-tag"></i></button>
                                             <button type="button" class="btn btn-white border text-danger product-label-btn" data-id="<?php echo (int)$p['id']; ?>" data-akce="1" title="Štítek AKCE — cenovka červeně (jen s černo-červenou rolí DK-22251!)"><i class="fas fa-fire"></i></button>
                                             <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vráceno — vrátit kus do skladu' : 'Zapůjčit / komisní prodej'; ?>"><?php if (productIsLoaned($p)): ?><i class="fas fa-rotate-left" style="color:#8B5CF6"></i><span class="ms-1" style="color:#8B5CF6;font-size:12px;font-weight:600">Vráceno</span><?php else: ?><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i><?php endif; ?></button>
+                                            <?php if (!empty($__repairMap[(int)$p['id']])): ?>
+                                            <a class="btn btn-white border" href="view_order.php?id=<?php echo (int)$__repairMap[(int)$p['id']]['id']; ?>" title="V opravě — otevřít interní zakázku <?php echo e($__repairMap[(int)$p['id']]['code']); ?>"><i class="fas fa-screwdriver-wrench" style="color:#FF9F0A"></i></a>
+                                            <?php elseif (crmInternalCustomerId() > 0 && (int)$p['stock_qty'] > 0): ?>
+                                            <button type="button" class="btn btn-white border" onclick="window.afxStockReklamace && afxStockReklamace(<?php echo (int)$p['id']; ?>)" title="Reklamace — kus potřebuje před prodejem opravit: založí interní zakázku a stáhne ho z prodeje"><i class="fas fa-rotate-left" style="color:#f97316"></i><span class="ms-1" style="color:#f97316;font-size:12px;font-weight:600">Reklamace</span></button>
+                                            <?php endif; ?>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>
                                             <button type="button" class="btn btn-white border tr-add-btn" data-type="product" data-id="<?php echo (int)$p['id']; ?>" data-name="<?php echo e($p['title']); ?>" title="Přesun na druhou pobočku"><i class="fas fa-right-left text-info"></i></button>
                                             <button type="button" class="btn btn-white border text-danger product-delete-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" title="<?php echo __('delete'); ?>"><i class="fas fa-trash"></i></button>

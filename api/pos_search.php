@@ -99,6 +99,8 @@ try {
                 GROUP BY vykup_product_id) vdx ON vdx.vykup_product_id = p.id
             LEFT JOIN crm_documents vd ON vd.id = vdx.doc_id";
     $branchSqlP = str_replace('branch_id', 'p.branch_id', $branchSql);
+    // skladový kus v interní opravě („Reklamace", v3.96.0) se v kase nenabízí
+    $branchSqlP = ' AND NOT ' . crmStockRepairOpenSql('p.id') . $branchSqlP;
     // 'stock' pro UI = DOSTUPNOST (sklad − rezervace e-shopu): jinak by kasa
     // nabízela „skladem 14 ks" u zboží, kde je 12 volných, a checkout by to
     // odmítl až po naskládání košíku.

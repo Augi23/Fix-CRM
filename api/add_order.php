@@ -184,6 +184,27 @@ if (!$customer_id || !$device_model || $pin_code === '') {
 // Fotky při příjmu jsou doporučené, ne povinné — zakázka jde založit i bez nich
 // (na přání majitele zrušeno potvrzovací okno i blokace; 26. 8. 2026).
 
+// Skladový kus (v3.96.0): jen u INTERNÍ zakázky — „Reklamace" vlastního zařízení na prodej.
+// Na dobu opravy se kus přestane nabízet (e-shop, Pokladna) — viz crmStockRepairOpenSql.
+$stock_product_id = (int)($_POST['stock_product_id'] ?? 0);
+if ($stock_product_id > 0) {
+    ensureOrderStockProductColumn();   // DDL — před transakcí
+    if (!crmIsInternalCustomer($customer_id)) {
+        $stock_product_id = 0;         // u běžného klienta se vazba na sklad nepoužije
+    } else {
+        $__sp = $pdo->prepare("SELECT id, title FROM products WHERE id = ?");
+        $__sp->execute([$stock_product_id]);
+        $__spRow = $__sp->fetch(PDO::FETCH_ASSOC);
+        if (!$__spRow) {
+            afxOrderFail('Skladový kus nenalezen', 'Vybrané zařízení ze skladu už neexistuje. Vyberte ho znovu, nebo zakázku založte bez vazby na sklad.');
+        }
+        $__spOpen = crmStockRepairOrders([$stock_product_id])[$stock_product_id] ?? null;
+        if ($__spOpen) {
+            afxOrderFail('Kus už je v opravě', 'Zařízení „' . $__spRow['title'] . '" už má otevřenou interní zakázku ' . $__spOpen['code'] . '. Pokračujte v ní, nebo ji nejdřív dokončete.');
+        }
+    }
+}
+
 if (!canAssignTechnicianToOrder($technician_id, $branch_id)) {
     afxOrderFail(
         'Vybraný technik nejde přiřadit',
@@ -244,6 +265,9 @@ try {
                 $created_by_name !== '' ? $created_by_name : null
             ]);
             $order_id = (int)$pdo->lastInsertId();
+            if ($stock_product_id > 0) {
+                $pdo->prepare("UPDATE orders SET stock_product_id = ? WHERE id = ?")->execute([$stock_product_id, $order_id]);
+            }
             break;
         } catch (PDOException $ePdo) {
             // 1062 = duplicitní klíč; na tabulce orders je unikátní jen order_code
@@ -386,7 +410,8 @@ try {
         crmAuditLog('order.create', [
             'entity_type' => 'order', 'entity_id' => $order_id,
             'entity_label' => ($new_order_code ?: ('#' . $order_id)),
-            'summary' => 'Vytvořena zakázka ' . ($new_order_code ?: ('#' . $order_id)) . ($__dev !== '' ? ' — ' . $__dev : ''),
+            'summary' => 'Vytvořena zakázka ' . ($new_order_code ?: ('#' . $order_id)) . ($__dev !== '' ? ' — ' . $__dev : '')
+                . ($stock_product_id > 0 ? ' (interní oprava skladového kusu #' . $stock_product_id . ' — stažen z prodeje)' : ''),
             'branch_id' => $branch_id ?? null,
         ]);
 

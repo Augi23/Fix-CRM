@@ -2269,6 +2269,79 @@ function crmCustomerLoansBox(int $customerId, bool $compact = false): string {
     return $html;
 }
 
+/* ── SKLADOVÝ KUS V OPRAVĚ (v3.96.0) ─────────────────────────────────────────
+   Interní zakázka může nést vazbu na kus ze skladu (orders.stock_product_id) — např.
+   „Reklamace" skladového iPhonu, který před prodejem potřebuje opravit. Stav „v opravě"
+   se NEUKLÁDÁ u produktu, ale počítá se z otevřené zakázky (stav mimo skupinu
+   terminal = hotovo/vydáno/zrušeno). Dokončením, zrušením i smazáním zakázky se kus
+   sám vrátí do prodeje — žádný příznak, který by mohl zůstat viset. */
+
+/** Sloupec orders.stock_product_id (DDL — volat MIMO transakci). */
+function ensureOrderStockProductColumn(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM orders LIKE 'stock_product_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN stock_product_id INT NULL DEFAULT NULL, ADD INDEX idx_orders_stock_product (stock_product_id)");
+        }
+    } catch (Throwable $e) { error_log('ensureOrderStockProductColumn: ' . $e->getMessage()); }
+}
+
+/** SQL podmínka „kus je právě v opravě" pro výraz s id produktu (např. 'p.id'). */
+function crmStockRepairOpenSql(string $productIdExpr): string {
+    global $pdo;
+    ensureOrderStockProductColumn();
+    return "EXISTS (SELECT 1 FROM orders o_sr WHERE o_sr.stock_product_id = " . $productIdExpr
+        . " AND o_sr.status NOT IN (" . orderStatusSqlIn($pdo, 'terminal') . "))";
+}
+
+/** Otevřené opravy skladových kusů: [product_id => ['id'=>…, 'code'=>…, 'status'=>…]]. */
+function crmStockRepairOrders(array $productIds): array {
+    global $pdo;
+    $ids = array_values(array_filter(array_map('intval', $productIds)));
+    if (!$ids || !isset($pdo)) return [];
+    ensureOrderStockProductColumn();
+    try {
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $st = $pdo->prepare("SELECT id, order_code, legacy_code, status, stock_product_id FROM orders
+            WHERE stock_product_id IN ($in) AND status NOT IN (" . orderStatusSqlIn($pdo, 'terminal') . ") ORDER BY id DESC");
+        $st->execute($ids);
+        $out = [];
+        foreach ($st as $r) {
+            $pid = (int)$r['stock_product_id'];
+            if (!isset($out[$pid])) { $out[$pid] = ['id' => (int)$r['id'], 'code' => orderDisplayCode($r), 'status' => (string)$r['status']]; }
+        }
+        return $out;
+    } catch (Throwable $e) { error_log('crmStockRepairOrders: ' . $e->getMessage()); return []; }
+}
+
+/** Předvyplnění zakázky z kusu ve skladu: typ zařízení, značka, model, S/N, vzhled. */
+function crmStockDevicePrefill(array $p): array {
+    $title = trim((string)($p['title'] ?? ''));
+    $t = mb_strtolower($title . ' ' . (string)($p['model'] ?? ''));
+    $type = 'Other';
+    if (preg_match('/iphone|galaxy|pixel|xiaomi|redmi|honor|huawei|motorola|oneplus|telefon|smartphone/u', $t)) $type = 'Phone';
+    elseif (preg_match('/ipad|\btab\b|tablet/u', $t)) $type = 'Tablet';
+    elseif (preg_match('/macbook|notebook|laptop|thinkpad|latitude|xps|zenbook|vivobook/u', $t)) $type = 'Notebook';
+    elseif (preg_match('/imac|mac ?mini|mac ?studio|mac ?pro\b|\bpc\b/u', $t)) $type = 'PC';
+    $mfr = trim((string)($p['manufacturer'] ?? ''));
+    $brand = ($mfr !== '' && !preg_match('/^(mag ?safe|no name|bez obalu|case)$/i', $mfr)) ? $mfr
+        : (preg_match('/iphone|ipad|mac|apple watch|airpods/u', $t) ? 'Apple' : '');
+    $code = trim((string)($p['product_code'] ?? ''));
+    $serial = ($code !== '' && !preg_match('/^afx-/i', $code)) ? $code : '';
+    $grade = trim((string)($p['grade'] ?? ''));
+    $appear = 'Skladový kus' . ($grade !== '' ? ', stav ' . $grade : '') . (trim((string)($p['battery'] ?? '')) !== '' ? ', baterie ' . trim((string)$p['battery']) : '');
+    return [
+        'device_type' => $type,
+        'device_brand' => $brand,
+        'device_model' => preg_replace('/^apple\s+/iu', '', $title),   // katalog modelů je bez „Apple“
+        'serial_number' => $serial,
+        'appearance' => $appear,
+    ];
+}
+
 /** Je kus zapůjčený / v komisi? (řádek z products) */
 function productIsLoaned(array $p): bool {
     return trim((string)($p['loan_at'] ?? '')) !== '';
