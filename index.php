@@ -78,11 +78,6 @@ $__greet = $__h < 10 ? 'Dobré ráno' : ($__h < 18 ? 'Dobrý den' : 'Dobrý več
 $__me = trim((string)($_SESSION['full_name'] ?? ''));
 
 $dshMoney = fn($v) => number_format((float)$v, 0, ',', ' ') . ' Kč';
-$dshTrend = function (?int $p, string $vs) {
-    if ($p === null) { return ''; }
-    $cls = $p > 0 ? 'up' : ($p < 0 ? 'down' : '');
-    return '<b class="dsh-trend ' . $cls . '">' . ($p > 0 ? '↑ ' : ($p < 0 ? '↓ ' : '')) . abs($p) . ' %</b> <em>' . e($vs) . '</em>';
-};
 /** Řádek zakázky (Moje / Nejnovější) — stejné údaje jako seznam zakázek, ale kompaktně. */
 $dshOrderRow = function (array $r) {
     [$staleCls, $staleTitle] = orderStaleRowAttrs($r);
@@ -102,7 +97,6 @@ $dshOrderRow = function (array $r) {
             <b><?php echo $internal ? '<i class="fas fa-screwdriver-wrench"></i> Interní' : e(trim($r['first_name'] . ' ' . $r['last_name'])); ?></b>
             <em><?php echo e(crmDashDevice($r)); ?></em>
         </div>
-        <div class="dsh-o-prob"><?php echo e((string)($r['problem_description'] ?? '')); ?></div>
         <div class="dsh-o-st">
             <?php echo getStatusBadge($r['status']); ?>
             <?php if (($r['priority'] ?? '') === 'High'): ?><b class="dsh-pill t-urgent"><i class="fas fa-bolt"></i> Spěchá</b><?php endif; ?>
@@ -117,7 +111,7 @@ $dshOrderRow = function (array $r) {
     <?php return ob_get_clean();
 };
 ?>
-<link rel="stylesheet" href="assets/css/dashboard.css?v=3.97.0">
+<link rel="stylesheet" href="assets/css/dashboard.css?v=3.98.0">
 <?php if (crmCanManageProducts()): ?>
 <style>
 .eshop-modal-row{display:flex;gap:12px;padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.04);
@@ -350,176 +344,161 @@ $dshOrderRow = function (array $r) {
 })();
 </script>
 <?php endif; ?>
+<?php
+/* Nástěnka v2.1 (3.98.0) — zjednodušené rozvržení: 4 čísla dne, jeden pruh
+   „V servisu", krátký seznam Na řadě (podrobnosti až po rozkliknutí). */
+$__flowTotal = array_sum(array_column($D['flow'], 'n'));
+$__drawers = array_sum(array_map(fn($m) => (float)($m['drawer'] ?? 0), $D['money']));
+$__monDat = ['lednu', 'únoru', 'březnu', 'dubnu', 'květnu', 'červnu', 'červenci', 'srpnu', 'září', 'říjnu', 'listopadu', 'prosinci'];
+$__prevMon = $__monDat[((int)date('n') + 10) % 12];
+$__split = function (string $k) use ($D, $__showSplit, $dshMoney) {
+    if (!$__showSplit) { return ''; }
+    return ' title="' . e(implode(' · ', array_map(fn($m) => $m['name'] . ' ' . $dshMoney($m[$k]), $D['money']))) . '"';
+};
+$__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $one : ($n >= 2 && $n <= 4 ? $few : $many);
+?>
 <div class="dsh">
-    <?php /* ── 1) Den + rychlé akce ── */ ?>
-    <section class="dsh-hero">
+    <header class="dsh-top">
         <div class="dsh-hello">
-            <div class="dsh-greet"><?php echo e($__greet); ?><?php echo $__me !== '' ? ', ' . e($__me) : ''; ?></div>
             <h1 class="dsh-date"><?php echo e(mb_convert_case($__dayNames[(int)date('w')], MB_CASE_TITLE, 'UTF-8') . ' ' . date('j') . '. ' . $__monNames[(int)date('n') - 1]); ?></h1>
-            <?php if ($D['can_pick'] && count($D['all_branches']) > 1): ?>
-            <nav class="dsh-scopes" aria-label="Pobočka">
-                <a class="dsh-scope<?php echo $D['pick'] === 0 ? ' is-on' : ''; ?>" href="index.php?branch=0"><i class="fas fa-store"></i> Obě pobočky</a>
-                <?php foreach ($D['all_branches'] as $__bid => $__bn): ?>
-                <a class="dsh-scope<?php echo $D['pick'] === (int)$__bid ? ' is-on' : ''; ?>" href="index.php?branch=<?php echo (int)$__bid; ?>"><?php echo e(crmDashBranchShort($__bn)); ?></a>
-                <?php endforeach; ?>
-            </nav>
-            <?php else: ?>
-            <div class="dsh-scope"><i class="fas fa-store"></i> <?php echo e($D['scope_label']); ?></div>
-            <?php endif; ?>
+            <div class="dsh-greet"><?php echo e($__greet); ?><?php echo $__me !== '' ? ', ' . e(explode(' ', $__me)[0]) : ''; ?><?php if (!$D['can_pick']): ?> · <?php echo e($D['scope_label']); ?><?php endif; ?></div>
         </div>
+        <?php if ($D['can_pick'] && count($D['all_branches']) > 1): ?>
+        <nav class="dsh-seg" aria-label="Pobočka">
+            <a class="<?php echo $D['pick'] === 0 ? 'is-on' : ''; ?>" href="index.php?branch=0">Obě pobočky</a>
+            <?php foreach ($D['all_branches'] as $__bid => $__bn): ?>
+            <a class="<?php echo $D['pick'] === (int)$__bid ? 'is-on' : ''; ?>" href="index.php?branch=<?php echo (int)$__bid; ?>"><?php echo e(crmDashBranchShort($__bn)); ?></a>
+            <?php endforeach; ?>
+        </nav>
+        <?php endif; ?>
         <div class="dsh-actions" role="toolbar" aria-label="Rychlé akce">
-            <button type="button" class="dsh-act is-primary" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus"></i><b>Nová zakázka</b></button>
-            <a class="dsh-act" href="pokladna.php"><i class="fas fa-cash-register"></i><b>Pokladna</b></a>
-            <a class="dsh-act" href="dokument.php?type=vykup" target="_blank" rel="noopener"><i class="fas fa-file-signature"></i><b>Výkup</b></a>
-            <a class="dsh-act" href="dokument.php?type=zastava" target="_blank" rel="noopener"><i class="fas fa-file-contract"></i><b>Zástava</b></a>
-            <button type="button" class="dsh-act" data-dsh-imei><i class="fas fa-shield-halved"></i><b>Kontrola IMEI</b></button>
+            <button type="button" class="dsh-btn is-primary" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus"></i>Nová zakázka</button>
+            <a class="dsh-btn" href="pokladna.php">Pokladna</a>
+            <a class="dsh-btn" href="dokument.php?type=vykup" target="_blank" rel="noopener">Výkup</a>
+            <a class="dsh-btn" href="dokument.php?type=zastava" target="_blank" rel="noopener">Zástava</a>
+            <button type="button" class="dsh-btn" data-dsh-imei>Kontrola IMEI</button>
+        </div>
+    </header>
+
+    <?php /* ── Čtyři čísla dne. Rozpad po pobočkách je v bublině (najetí myší). ── */ ?>
+    <section class="dsh-stats" aria-label="Dnes">
+        <div class="dsh-stat"<?php echo $__split('done_sum'); ?>>
+            <div class="dsh-stat-l">Tržba dnes</div>
+            <div class="dsh-stat-v"><?php echo $dshMoney($__mt['done_sum']); ?></div>
+            <div class="dsh-stat-s">včera <?php echo $dshMoney($__mt['done_yday']); ?></div>
+        </div>
+        <a class="dsh-stat" href="pokladna.php"<?php echo $__split('pos_sum'); ?>>
+            <div class="dsh-stat-l">Pokladna dnes</div>
+            <div class="dsh-stat-v"><?php echo $dshMoney($__mt['pos_sum']); ?></div>
+            <div class="dsh-stat-s">v kase <?php echo $dshMoney($__drawers); ?></div>
+        </a>
+        <div class="dsh-stat"<?php echo $__split('month'); ?>>
+            <div class="dsh-stat-l">Tento měsíc</div>
+            <div class="dsh-stat-v"><?php echo $dshMoney($__mt['month']); ?></div>
+            <div class="dsh-stat-s"><?php if ($D['month_pace'] !== null): ?><b class="<?php echo $D['month_pace'] >= 0 ? 'up' : 'down'; ?>"><?php echo ($D['month_pace'] > 0 ? '+' : '') . $D['month_pace']; ?> %</b> proti <?php echo e($__prevMon); ?><?php else: ?>z hotových zakázek<?php endif; ?></div>
+        </div>
+        <div class="dsh-stat">
+            <div class="dsh-stat-l">Zakázky dnes</div>
+            <div class="dsh-stat-v"><?php echo (int)$__mt['done_n']; ?> <em><?php echo $__plural((int)$__mt['done_n'], 'hotová', 'hotové', 'hotových'); ?></em></div>
+            <div class="dsh-stat-s"><?php echo (int)$D['new_today']; ?> <?php echo $__plural((int)$D['new_today'], 'nově přijatá', 'nově přijaté', 'nově přijatých'); ?></div>
         </div>
     </section>
 
-    <?php /* ── 2) Peníze dne — admin/Boss obě pobočky s rozpadem, ostatní jen svou ── */ ?>
-    <section class="dsh-kpis">
-        <div class="dsh-kpi">
-            <div class="dsh-kpi-label">Tržba dnes</div>
-            <div class="dsh-kpi-value"><?php echo $dshMoney($__mt['done_sum']); ?></div>
-            <div class="dsh-kpi-sub"><?php echo (int)$__mt['done_n']; ?> <?php echo $__mt['done_n'] === 1 ? 'hotová zakázka' : ($__mt['done_n'] >= 2 && $__mt['done_n'] <= 4 ? 'hotové zakázky' : 'hotových zakázek'); ?>
-                <?php echo $D['day_trend'] !== null ? ' · ' . $dshTrend($D['day_trend'], 'vs včera') : ''; ?></div>
-            <?php if ($__showSplit): ?><div class="dsh-split">
-                <?php foreach ($D['money'] as $m): ?><div><em><?php echo e($m['name']); ?></em><b><?php echo $dshMoney($m['done_sum']); ?></b></div><?php endforeach; ?>
-            </div><?php endif; ?>
+    <?php /* ── V servisu: jeden pruh poměrů + legenda (klik = seznam s filtrem) ── */ ?>
+    <section class="dsh-flow" aria-label="Zakázky v servisu">
+        <div class="dsh-flow-h">
+            <div><b><?php echo (int)$__flowTotal; ?></b> <?php echo $__plural((int)$__flowTotal, 'zakázka', 'zakázky', 'zakázek'); ?> v servisu</div>
+            <a href="orders.php">Všechny zakázky <i class="fas fa-arrow-right"></i></a>
         </div>
-        <div class="dsh-kpi">
-            <div class="dsh-kpi-label">Pokladna dnes</div>
-            <div class="dsh-kpi-value"><?php echo $dshMoney($__mt['pos_sum']); ?></div>
-            <div class="dsh-kpi-sub">hotově <?php echo $dshMoney($__mt['pos_cash']); ?> · kartou <?php echo $dshMoney($__mt['pos_card']); ?><?php echo $__mt['pos_other'] > 0 ? ' · fakturou ' . $dshMoney($__mt['pos_other']) : ''; ?></div>
-            <div class="dsh-split dsh-kasa">
-                <?php foreach ($D['money'] as $m):
-                    $__sh = $m['shift'];
-                    $__old = $__sh && strtotime($__sh['at']) < strtotime('today'); ?>
-                <div class="<?php echo !$__sh ? 'is-off' : ($__old ? 'is-warn' : ''); ?>">
-                    <em><?php echo $__showSplit ? e($m['name']) . ' · ' : ''; ?><?php if ($__sh): ?><i class="fas fa-user-lock"></i> <?php echo e($__sh['by']); ?> od <?php echo e(date($__old ? 'j. n.' : 'H:i', strtotime($__sh['at']))); ?><?php else: ?>kasa nepřevzatá<?php endif; ?></em>
-                    <b title="Hotovost v kase podle pokladní knihy"><?php echo $m['drawer'] !== null ? $dshMoney($m['drawer']) : '—'; ?></b>
-                </div>
-                <?php endforeach; ?>
-            </div>
+        <div class="dsh-bar" role="img" aria-label="Rozložení zakázek podle stavu">
+            <?php foreach ($D['flow'] as $f): if ($f['n'] <= 0) { continue; } ?>
+            <a class="t-<?php echo e($f['tone']); ?>" style="flex-grow:<?php echo (int)$f['n']; ?>" href="orders.php?filter=<?php echo urlencode($f['filter']); ?>" title="<?php echo e($f['label'] . ': ' . $f['n']); ?>"></a>
+            <?php endforeach; ?>
         </div>
-        <div class="dsh-kpi">
-            <div class="dsh-kpi-label">Tento měsíc</div>
-            <div class="dsh-kpi-value"><?php echo $dshMoney($__mt['month']); ?></div>
-            <div class="dsh-kpi-sub"><?php echo $D['month_pace'] !== null ? $dshTrend($D['month_pace'], 'vs stejné dny minulého měsíce') : 'tržba z hotových zakázek'; ?></div>
-            <div class="dsh-split">
-                <?php if ($__showSplit): foreach ($D['money'] as $m): ?><div><em><?php echo e($m['name']); ?></em><b><?php echo $dshMoney($m['month']); ?></b></div><?php endforeach; endif; ?>
-                <div title="Zálohy nejsou tržba — výnos vzniká až dokončením zakázky."><em>Přijato na fakturách<?php echo $D['advance_month'] > 0 ? ' (z toho zálohy ' . $dshMoney($D['advance_month']) . ')' : ''; ?></em><b><?php echo $dshMoney($D['received_month']); ?></b></div>
-            </div>
+        <div class="dsh-legend">
+            <?php foreach ($D['flow'] as $f): ?>
+            <a class="t-<?php echo e($f['tone']); ?><?php echo $f['n'] === 0 ? ' is-zero' : ''; ?>" href="orders.php?filter=<?php echo urlencode($f['filter']); ?>">
+                <i aria-hidden="true"></i><?php echo e($f['label']); ?> <b><?php echo (int)$f['n']; ?></b><?php if ($f['leg'] > 0): ?> <small title="Importované (staré) zakázky ze zakazkovylist.cz — v čísle nejsou">(<?php echo (int)$f['leg']; ?>)</small><?php endif; ?>
+            </a>
+            <?php endforeach; ?>
         </div>
-        <?php if (crmCanManageProducts()): ?>
-        <div class="dsh-kpi dsh-kpi--eshop" id="eshopTile" role="button" tabindex="0" title="Klikni pro objednávky z e-shopu"
-             data-can-manage="<?php echo crmCanDeleteOrders() ? '1' : '0'; ?>">
-            <div class="dsh-kpi-label">E-shop dnes</div>
-            <div class="dsh-kpi-value"><b id="eshopTileToday">–</b> <em>prodáno</em></div>
-            <div class="dsh-kpi-sub"><b id="eshopTileMonth">–</b> tento měsíc · <b id="eshopTileSum">–</b></div>
-            <div class="dsh-kpi-note" id="eshopTileRes" style="display:none;"></div>
-            <div class="dsh-kpi-more">Objednávky <i class="fas fa-chevron-right"></i></div>
-        </div>
-        <?php else: ?>
-        <a class="dsh-kpi" href="orders.php">
-            <div class="dsh-kpi-label">Přijato dnes</div>
-            <div class="dsh-kpi-value"><?php echo (int)$D['new_today']; ?> <em>zakázek</em></div>
-            <div class="dsh-kpi-sub">nové zakázky od rána</div>
-        </a>
-        <?php endif; ?>
     </section>
-
-    <?php /* ── 3) Tok zakázek — kde co stojí (klik = seznam s filtrem) ── */ ?>
-    <nav class="dsh-flow" aria-label="Zakázky podle stavu">
-        <?php foreach ($D['flow'] as $i => $f): ?>
-        <a class="dsh-step t-<?php echo e($f['tone']); ?><?php echo $f['n'] === 0 ? ' is-zero' : ''; ?>" href="orders.php?filter=<?php echo urlencode($f['filter']); ?>">
-            <b class="dsh-step-n"><?php echo (int)$f['n']; ?></b>
-            <em class="dsh-step-l"><?php echo e($f['label']); ?></em>
-            <?php if ($f['leg'] > 0): ?><em class="dsh-step-leg" title="Importované (staré) zakázky ze zakazkovylist.cz — v hlavním čísle nejsou">(<?php echo (int)$f['leg']; ?>)</em><?php endif; ?>
-        </a>
-        <?php endforeach; ?>
-        <?php if ($D['new_today'] > 0 && crmCanManageProducts()): ?>
-        <div class="dsh-flow-today"><i class="fas fa-arrow-trend-up"></i> dnes přijato <b><?php echo (int)$D['new_today']; ?></b></div>
-        <?php endif; ?>
-    </nav>
 
     <div class="dsh-grid">
         <div class="dsh-main">
-            <?php /* ── 4) Na řadě — úkoly, které čekají na člověka ── */ ?>
-            <section class="dsh-card dsh-tasks">
-                <header class="dsh-card-h">
-                    <h2><i class="fas fa-list-check"></i> Na řadě</h2>
-                    <em><?php echo $D['tasks'] ? 'seřazeno podle naléhavosti' : ''; ?></em>
-                </header>
-                <?php if (!$D['tasks']): ?>
-                    <div class="dsh-empty"><i class="fas fa-circle-check"></i> Všechno vyřízeno — nic nečeká.</div>
-                <?php endif; ?>
-                <?php foreach ($D['tasks'] as $ti => $t):
-                    $__rows = $t['rows'] ?? [];
-                    $__open = $ti < 2 && $__rows && $t['key'] !== 'forgotten'; ?>
-                <details class="dsh-task t-<?php echo e($t['tone']); ?>"<?php echo $__open ? ' open' : ''; ?><?php echo !empty($t['eshop']) ? ' data-eshop-open' : ''; ?>>
-                    <summary>
-                        <i class="fas <?php echo e($t['icon']); ?> dsh-task-ic"></i>
-                        <div class="dsh-task-t"><b><?php echo e($t['title']); ?></b><em><?php echo e($t['hint']); ?></em></div>
-                        <b class="dsh-task-n"><?php echo (int)$t['count']; ?></b>
-                        <i class="fas fa-chevron-down dsh-task-chev"></i>
+            <?php /* ── Na řadě: jeden řádek = jeden druh úkolu, podrobnosti po rozkliknutí ── */ ?>
+            <section class="dsh-card dsh-todo">
+                <h2 class="dsh-h">Na řadě</h2>
+                <?php if (!$D['tasks']): ?><div class="dsh-empty">Všechno vyřízeno, nic nečeká.</div><?php endif; ?>
+                <?php foreach ($D['tasks'] as $t): $__rows = $t['rows'] ?? []; ?>
+                <?php if (!empty($t['eshop'])): ?>
+                <div class="dsh-todo-i t-<?php echo e($t['tone']); ?>" id="eshopTile" role="button" tabindex="0" data-can-manage="<?php echo crmCanDeleteOrders() ? '1' : '0'; ?>">
+                    <div class="dsh-todo-row">
+                        <b class="dsh-todo-n"><?php echo (int)$t['count']; ?></b>
+                        <div class="dsh-todo-t"><b><?php echo e($t['title']); ?></b> <em><?php echo e($t['hint']); ?><i hidden><i id="eshopTileToday"></i><i id="eshopTileMonth"></i><i id="eshopTileSum"></i><i id="eshopTileRes"></i></i></em></div>
+                        <i class="fas fa-chevron-right dsh-todo-chev"></i>
+                    </div>
+                </div>
+                <?php continue; endif; ?>
+                <details class="dsh-todo-i t-<?php echo e($t['tone']); ?>">
+                    <summary class="dsh-todo-row">
+                        <b class="dsh-todo-n"><?php echo (int)$t['count']; ?></b>
+                        <div class="dsh-todo-t"><b><?php echo e($t['title']); ?></b> <em><?php echo e($t['hint']); ?></em></div>
+                        <i class="fas fa-chevron-down dsh-todo-chev"></i>
                     </summary>
-                    <?php if ($__rows): ?>
-                    <div class="dsh-task-rows">
-                        <?php foreach ($__rows as $ri => $r):
+                    <div class="dsh-todo-list">
+                        <?php foreach (array_slice($__rows, 0, 8) as $r):
                             $__href = $r['href'] ?? ($r['id'] ? 'view_order.php?id=' . (int)$r['id'] : '');
                             $__tel = normalizePhoneForTel($r['phone'] ?? ''); ?>
-                        <div class="dsh-tr<?php echo $ri >= 3 ? ' is-more' : ''; ?><?php echo !empty($r['high']) ? ' is-hot' : ''; ?><?php echo !empty($r['past']) ? ' is-past' : ''; ?>">
+                        <div class="dsh-tr<?php echo !empty($r['past']) ? ' is-past' : ''; ?>">
                             <?php if ($__href): ?><a class="dsh-o-link" href="<?php echo e($__href); ?>" aria-label="Otevřít <?php echo e($r['code'] ?: $r['client']); ?>"></a><?php endif; ?>
-                            <b class="dsh-tr-age"><?php echo e($r['age']); ?></b>
-                            <div class="dsh-tr-main">
-                                <b><?php echo e($r['client'] ?: '—'); ?></b>
-                                <em><?php echo e(trim($r['device'] . ($r['code'] ? ' · ' . $r['code'] : ''), ' ·')); ?></em>
-                            </div>
+                            <em class="dsh-tr-age<?php echo !empty($r['high']) ? ' is-hot' : ''; ?>"><?php echo e($r['age']); ?></em>
+                            <div class="dsh-tr-main"><b><?php echo e($r['client'] ?: '—'); ?></b> <em><?php echo e(trim($r['device'] . ($r['code'] ? ' · ' . $r['code'] : ''), ' ·')); ?></em></div>
                             <em class="dsh-tr-info"><?php echo e($r['info']); ?></em>
-                            <?php if ($__tel !== ''): ?><a class="dsh-call" href="tel:<?php echo e($__tel); ?>" title="Zavolat <?php echo e($r['phone']); ?>" aria-label="Zavolat"><i class="fas fa-phone"></i></a><?php endif; ?>
+                            <?php if ($__tel !== ''): ?><a class="dsh-call" href="tel:<?php echo e($__tel); ?>" title="Zavolat <?php echo e($r['phone']); ?>" aria-label="Zavolat"><i class="fas fa-phone"></i></a><?php else: ?><i></i><?php endif; ?>
                         </div>
                         <?php endforeach; ?>
+                        <?php if ($t['count'] > 8 || !empty($t['link'])): ?>
+                        <div class="dsh-todo-foot">
+                            <?php if (!empty($t['link'])): ?><a href="<?php echo e($t['link']); ?>">Otevřít <?php echo $t['count'] > 8 ? 'všech ' . (int)$t['count'] : 'seznam'; ?> <i class="fas fa-arrow-right"></i></a>
+                            <?php else: ?><em>a dalších <?php echo (int)$t['count'] - 8; ?></em><?php endif; ?>
+                        </div>
+                        <?php endif; ?>
                     </div>
-                    <div class="dsh-task-foot">
-                        <?php if (count($__rows) > 3): ?><button type="button" class="dsh-link" data-dsh-more>Zobrazit další (<?php echo count($__rows) - 3; ?>)</button><?php endif; ?>
-                        <?php if (!empty($t['link'])): ?><a class="dsh-link" href="<?php echo e($t['link']); ?>">Otevřít seznam<?php echo $t['count'] > count($__rows) ? ' (všech ' . (int)$t['count'] . ')' : ''; ?> <i class="fas fa-arrow-right"></i></a>
-                        <?php elseif ($t['count'] > count($__rows)): ?><em>zobrazeno <?php echo count($__rows); ?> z <?php echo (int)$t['count']; ?></em><?php endif; ?>
-                    </div>
-                    <?php endif; ?>
                 </details>
                 <?php endforeach; ?>
             </section>
 
-            <?php /* ── 5) Zakázky — moje práce (technik) / nejnovější / výsledky hledání ── */ ?>
+            <?php /* ── Zakázky: Moje práce (technik) / Nejnovější / výsledky hledání ── */ ?>
             <section class="dsh-card dsh-orders">
-                <header class="dsh-card-h">
+                <div class="dsh-orders-h">
                     <?php if ($search !== '' || $filter_status): ?>
-                        <h2><i class="fas fa-magnifying-glass"></i> <?php echo $filter_status ? e(getOrderStatusLabel($filter_status)) : 'Hledání: ' . e($search); ?></h2>
-                        <a class="dsh-link" href="index.php">Zrušit</a>
+                        <h2 class="dsh-h"><?php echo $filter_status ? e(getOrderStatusLabel($filter_status)) : 'Hledání: ' . e($search); ?></h2>
+                        <a class="dsh-more" href="index.php">Zrušit</a>
                     <?php else: ?>
-                    <div class="dsh-tabs" role="tablist">
-                        <?php if ($D['tech_id'] > 0): ?>
-                        <button type="button" class="dsh-tab is-on" data-dsh-tab="mine" role="tab"><i class="fas fa-user-gear"></i> Moje práce <b><?php echo (int)$D['mine_count']; ?></b></button>
-                        <?php endif; ?>
-                        <button type="button" class="dsh-tab<?php echo $D['tech_id'] > 0 ? '' : ' is-on'; ?>" data-dsh-tab="recent" role="tab"><i class="fas fa-clock-rotate-left"></i> Nejnovější</button>
+                    <?php if ($D['tech_id'] > 0): ?>
+                    <div class="dsh-seg dsh-seg--tabs" role="tablist">
+                        <button type="button" class="is-on" data-dsh-tab="mine" role="tab">Moje práce <small><?php echo (int)$D['mine_count']; ?></small></button>
+                        <button type="button" data-dsh-tab="recent" role="tab">Nejnovější</button>
                     </div>
-                    <a class="dsh-link" href="orders.php">Všechny zakázky <i class="fas fa-arrow-right"></i></a>
+                    <?php else: ?>
+                    <h2 class="dsh-h">Nejnovější zakázky</h2>
                     <?php endif; ?>
-                </header>
+                    <a class="dsh-more" href="orders.php">Všechny zakázky <i class="fas fa-arrow-right"></i></a>
+                    <?php endif; ?>
+                </div>
                 <?php if ($D['tech_id'] > 0 && $search === '' && !$filter_status): ?>
                 <div class="dsh-olist" data-dsh-pane="mine">
-                    <?php foreach (array_slice($D['mine'], 0, 15) as $r) { echo $dshOrderRow($r); } ?>
-                    <?php if (!$D['mine']): ?><div class="dsh-empty"><i class="fas fa-mug-hot"></i> Nemáš přiřazenou žádnou rozpracovanou zakázku.</div><?php endif; ?>
-                    <?php if ($D['mine_count'] > 15): ?><a class="dsh-link dsh-olist-more" href="orders.php?tech=<?php echo (int)$D['tech_id']; ?>">Všech <?php echo (int)$D['mine_count']; ?> mých zakázek <i class="fas fa-arrow-right"></i></a><?php endif; ?>
+                    <?php foreach (array_slice($D['mine'], 0, 12) as $r) { echo $dshOrderRow($r); } ?>
+                    <?php if (!$D['mine']): ?><div class="dsh-empty">Nemáš přiřazenou žádnou rozpracovanou zakázku.</div><?php endif; ?>
+                    <?php if ($D['mine_count'] > 12): ?><a class="dsh-more dsh-olist-more" href="orders.php?tech=<?php echo (int)$D['tech_id']; ?>">Všech <?php echo (int)$D['mine_count']; ?> mých zakázek <i class="fas fa-arrow-right"></i></a><?php endif; ?>
                 </div>
                 <?php endif; ?>
                 <div class="dsh-olist" data-dsh-pane="recent"<?php echo ($D['tech_id'] > 0 && $search === '' && !$filter_status) ? ' hidden' : ''; ?>>
-                    <?php foreach ($recent as $r) { echo $dshOrderRow($r); } ?>
+                    <?php foreach (array_slice($recent, 0, 12) as $r) { echo $dshOrderRow($r); } ?>
                     <?php if (!$recent): ?><div class="dsh-empty"><?php echo __('not_found'); ?></div><?php endif; ?>
                 </div>
             </section>
-
             <?php
             /* Hledání přes index.php?search= najde i SKLAD (kus podle IMEI/kódu/názvu). */
             if ($search !== '' && hasPermission('manage_inventory')):
@@ -535,7 +514,7 @@ $dshOrderRow = function (array $r) {
                 $sk_parts = $st->fetchAll();
                 if ($sk_products || $sk_parts): ?>
             <section class="dsh-card">
-                <header class="dsh-card-h"><h2><i class="fas fa-warehouse"></i> <?php echo __('inventory'); ?></h2></header>
+                <h2 class="dsh-h"><?php echo __('inventory'); ?></h2>
                 <div class="dsh-olist">
                     <?php foreach ($sk_products as $sp): ?>
                     <div class="dsh-o dsh-o--stock">
@@ -559,51 +538,51 @@ $dshOrderRow = function (array $r) {
         </div>
 
         <aside class="dsh-side">
-            <?php /* ── 6) Tým dnes — plán směn, kdo je přihlášený, kdo drží kasu ── */ ?>
             <section class="dsh-card">
-                <header class="dsh-card-h"><h2><i class="fas fa-user-group"></i> Tým dnes</h2></header>
-                <?php if (!$D['team']): ?><div class="dsh-empty">Dnes zatím nikdo přihlášený.</div><?php endif; ?>
-                <div class="dsh-team">
+                <h2 class="dsh-h">Tým dnes</h2>
+                <?php if (!$D['team']): ?><div class="dsh-empty">Zatím nikdo přihlášený.</div><?php endif; ?>
+                <ul class="dsh-team">
                     <?php foreach ($D['team'] as $p): ?>
-                    <div class="dsh-person<?php echo $p['online'] ? ' is-on' : ''; ?>">
+                    <li class="<?php echo $p['online'] ? 'is-on' : ''; ?>">
                         <i class="dsh-dot" aria-hidden="true"></i>
-                        <div><b><?php echo e($p['name']); ?></b>
-                            <em><?php echo $p['plan'] !== '' ? 'směna ' . e($p['plan']) : ($p['online'] ? 'přihlášen(a)' : 'naposledy ' . e($p['seen'])); ?><?php echo $D['global'] ? ' · ' . e(crmDashBranchShort($D['branches'][$p['branch']] ?? getBranchLabel($p['branch']))) : ''; ?></em></div>
-                        <?php if ($p['kasa']): ?><b class="dsh-pill t-completed" title="Má převzatou pokladnu"><i class="fas fa-cash-register"></i> kasa</b><?php endif; ?>
+                        <b><?php echo e($p['name']); ?></b>
+                        <em><?php echo $p['kasa'] ? 'má kasu' : ($p['plan'] !== '' ? $p['plan'] : ($p['online'] ? '' : $p['seen'])); ?></em>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+                <div class="dsh-kasa">
+                    <?php foreach ($D['money'] as $m): $__sh = $m['shift']; $__old = $__sh && strtotime($__sh['at']) < strtotime('today'); ?>
+                    <div class="<?php echo $__old ? 'is-warn' : ''; ?>">
+                        <em>Kasa<?php echo count($D['money']) > 1 ? ' ' . e($m['name']) : ''; ?></em>
+                        <b><?php echo $m['drawer'] !== null ? $dshMoney($m['drawer']) : '—'; ?></b>
                     </div>
                     <?php endforeach; ?>
                 </div>
             </section>
 
-            <section class="dsh-card imei-check-card" id="dshImei">
-                <header class="dsh-card-h"><h2><i class="fas fa-shield-halved"></i> <?php echo __('imei_check_title'); ?></h2></header>
-                <form id="imeiCheckForm" class="dsh-imei">
-                    <input type="text" class="form-control" id="imeiCheckInput" placeholder="<?php echo e(__('imei_input_placeholder')); ?>" inputmode="numeric" autocomplete="off" maxlength="15" aria-label="<?php echo e(__('serial')); ?>">
-                    <button class="dsh-act is-primary" type="submit"><i class="fas fa-search"></i><b><?php echo __('check'); ?></b></button>
+            <section class="dsh-card" id="dshImei">
+                <h2 class="dsh-h"><?php echo __('imei_check_title'); ?></h2>
+                <form id="imeiCheckForm" class="dsh-imei" title="<?php echo e(__('imei_help_text')); ?>">
+                    <input type="text" class="form-control" id="imeiCheckInput" placeholder="IMEI" inputmode="numeric" autocomplete="off" maxlength="15" aria-label="<?php echo e(__('serial')); ?>">
+                    <button class="dsh-btn" type="submit"><?php echo __('check'); ?></button>
                 </form>
-                <div class="dsh-imei-help"><?php echo __('imei_help_text'); ?></div>
                 <div id="imeiCheckResult" class="imei-check-result" aria-live="polite"></div>
             </section>
 
             <?php if ($__web): ?>
             <section class="dsh-card">
-                <header class="dsh-card-h"><h2><i class="fas fa-chart-line"></i> Návštěvnost webů dnes</h2></header>
-                <?php foreach ($__web as $__wk => $__w):
-                    $__tr = $__w['yday'] > 0 ? (int)round((($__w['today'] - $__w['yday']) / $__w['yday']) * 100) : null; ?>
+                <h2 class="dsh-h">Návštěvnost webů dnes</h2>
+                <?php foreach ($__web as $__wk => $__w): ?>
                 <div class="dsh-web crm-stat-web" role="button" tabindex="0" data-web-site="<?php echo e($__wk); ?>" title="Klikni pro posledních 14 dní">
                     <em><?php echo e($__w['label']); ?></em>
                     <b><?php echo (int)$__w['today']; ?></b>
-                    <?php echo $__tr !== null ? $dshTrend($__tr, '') : '<em>—</em>'; ?>
+                    <small>včera <?php echo (int)$__w['yday']; ?></small>
                 </div>
                 <?php endforeach; ?>
             </section>
             <?php endif; ?>
 
-            <a class="dsh-card dsh-stats-link" href="reports.php">
-                <i class="fas fa-chart-pie"></i>
-                <div><b>Statistiky a grafy</b><em>tržby po měsících, technici, pobočky</em></div>
-                <i class="fas fa-chevron-right"></i>
-            </a>
+            <a class="dsh-more dsh-stats-link" href="reports.php">Statistiky a grafy <i class="fas fa-arrow-right"></i></a>
         </aside>
     </div>
 </div>
@@ -620,20 +599,16 @@ $dshOrderRow = function (array $r) {
     tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.dshTab); }); });
     try { var saved = localStorage.getItem('dsh-tab'); if (saved && document.querySelector('[data-dsh-tab="' + saved + '"]')) { show(saved); } } catch (e) {}
 
+    // Na řadě: otevřený je vždy jen jeden úkol, ať seznam zůstane krátký
+    document.querySelectorAll('details.dsh-todo-i').forEach(function (d) {
+        d.addEventListener('toggle', function () {
+            if (!d.open) { return; }
+            document.querySelectorAll('details.dsh-todo-i[open]').forEach(function (o) { if (o !== d) { o.open = false; } });
+        });
+    });
     document.addEventListener('click', function (e) {
-        var more = e.target.closest('[data-dsh-more]');
-        if (more) {
-            var box = more.closest('details');
-            box.querySelectorAll('.dsh-tr.is-more').forEach(function (r) { r.classList.remove('is-more'); });
-            more.remove();
-            return;
-        }
-        // úkol E-shop otevře okno objednávek (stejné jako dlaždice E-shop dnes)
-        var es = e.target.closest('details[data-eshop-open] > summary');
-        if (es) { e.preventDefault(); var tile = document.getElementById('eshopTile'); if (tile) { tile.click(); } return; }
         if (e.target.closest('[data-dsh-imei]')) {
-            var card = document.getElementById('dshImei');
-            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById('dshImei').scrollIntoView({ behavior: 'smooth', block: 'center' });
             setTimeout(function () { document.getElementById('imeiCheckInput').focus(); }, 350);
         }
     });

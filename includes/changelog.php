@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.98.0',
+        'date' => '2026-10-21',
+        'time' => '00:30',
+        'title' => 'Nástěnka přerovnaná: méně údajů, přehled na první pohled',
+        'items' => [
+            'Nahoře jen <b>4 čísla dne</b> v jednom pruhu: tržba dnes (proti včerejšku), pokladna dnes (hotovost v kase), tento měsíc (proti minulému) a zakázky dnes (hotové / nově přijaté). Rozpad po pobočkách se adminovi a Bossovi ukáže po najetí myší, nebo přepínačem poboček.',
+            'Místo pěti velkých prázdných dlaždic je <b>jeden pruh „V servisu"</b>: barevný poměr stavů a pod ním počty. Importované zakázky jsou malým písmem v závorce.',
+            '<b>Na řadě</b> je krátký seznam, jeden řádek na jeden druh úkolu (počet, název, krátká rada). Podrobnosti se ukážou až po rozkliknutí a otevřený je vždy jen jeden. Nově hlídá i <b>neuzavřenou směnu v kase</b>.',
+            'Seznam zakázek je bez sloupce s popisem závady, řádky zůstávají barevné podle stavu. Tým dnes ukazuje i hotovost v kasách. Kontrola IMEI je jen pole a tlačítko.',
+            'Klidnější vzhled: bez přechodů a barevných dlaždic ikon, barva jen tam, kde něco znamená. Upraveno pro počítač, iPad i iPhone (appka AppleFix CRM).',
+        ],
+    ],
+    [
         'version' => '3.97.2',
         'date' => '2026-10-20',
         'time' => '23:55',

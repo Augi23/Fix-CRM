@@ -377,8 +377,23 @@ function crmDashboardBuild(PDO $pdo, int $pick = 0): array {
         } catch (Throwable $e) {}
     }
 
+    // kasa převzatá někdy dřív a od té doby neuzavřená — hotovost nikdo nespočítal
+    $kasaRows = [];
+    foreach ($money as $m) {
+        if ($m['shift'] && strtotime($m['shift']['at']) < strtotime('today')) {
+            $kasaRows[] = ['href' => 'pokladna.php', 'id' => 0, 'code' => '', 'client' => $m['name'] . ' · ' . $m['shift']['by'],
+                'phone' => '', 'device' => 'převzato ' . date('j. n. H:i', strtotime($m['shift']['at'])), 'status' => '',
+                'info' => $m['drawer'] !== null ? number_format((float)$m['drawer'], 0, ',', ' ') . ' Kč v kase' : '',
+                'age' => crmDashAge($m['shift']['at']), 'high' => true, 'branch' => $m['id']];
+        }
+    }
+    if ($kasaRows) {
+        $tasks[] = ['key' => 'kasa', 'tone' => 'orange', 'icon' => 'fa-cash-register', 'title' => 'Neuzavřená směna v kase',
+            'count' => count($kasaRows), 'hint' => 'udělej uzávěrku a spočítej hotovost', 'rows' => $kasaRows, 'link' => 'pokladna.php'];
+    }
+
     // pořadí: co nejvíc hoří nahoru (rezervace dnes vždy první)
-    $rank = ['bookings' => 0, 'unpaid' => 1, 'unassigned' => 2, 'complaints' => 3, 'customer' => 4, 'stale' => 5, 'eshop' => 6, 'procurement' => 7, 'pickup' => 8, 'loans' => 9, 'forgotten' => 10];
+    $rank = ['bookings' => 0, 'kasa' => 1, 'unpaid' => 1, 'unassigned' => 2, 'complaints' => 3, 'customer' => 4, 'stale' => 5, 'eshop' => 6, 'procurement' => 7, 'pickup' => 8, 'loans' => 9, 'forgotten' => 10];
     usort($tasks, fn($a, $b) => ($rank[$a['key']] ?? 99) <=> ($rank[$b['key']] ?? 99));
     $D['tasks'] = $tasks;
 
