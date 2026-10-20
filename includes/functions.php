@@ -2472,7 +2472,7 @@ function afxInvoicePaymentInfo(array $invoice): array {
         'label' => $partial ? ('Zaplaceno ' . formatMoney($paid) . ' z ' . formatMoney($total)) : ''];
 }
 
-/** Objednávky z vlastního e-shopu (applefix.online). E-shop čte sklad z feedu a při
+/** Objednávky z vlastního e-shopu (applefix.click). E-shop čte sklad z feedu a při
  *  dokončení objednávky sem přes api/eshop_sale.php zapíše prodej → CRM odečte kus.
  *  order_ref je UNIQUE = idempotence (opakovaný webhook prodej neodečte dvakrát). */
 function ensureEshopOrdersTable(): void {

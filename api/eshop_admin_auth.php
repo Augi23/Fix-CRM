@@ -1,7 +1,7 @@
 <?php
 /**
  * OVĚŘENÍ PŘIHLÁŠENÍ DO ADMINISTRACE VLASTNÍHO E-SHOPU proti účtům CRM.
- * E-shop (applefix.online) sem server-to-server pošle jméno + heslo zadané v jeho
+ * E-shop (applefix.click) sem server-to-server pošle jméno + heslo zadané v jeho
  * přihlašovacím okně; CRM ověří heslo (stejně jako login.php) a vrátí, zda je to
  * účet s právem do administrace e-shopu. ZÁMĚRNĚ jen dvě role: administrátor a Boss.
  * (Rozhodnutí majitele 21.7.2026: do e-shop adminu smí jen admin a boss.)

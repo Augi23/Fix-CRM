@@ -1,4 +1,4 @@
--- 028: Objednávky z vlastního e-shopu (applefix.online).
+-- 028: Objednávky z vlastního e-shopu (applefix.click).
 -- E-shop čte sklad z api/eshop_feed.php a při dokončení objednávky přes
 -- api/eshop_sale.php zapíše prodej → CRM odečte kus z products.stock_qty.
 -- order_ref je UNIQUE = idempotence (opakovaný webhook neodečte sklad dvakrát).
