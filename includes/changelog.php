@@ -11,6 +11,22 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.97.0',
+        'date' => '2026-10-20',
+        'time' => '23:00',
+        'title' => 'Nová Nástěnka: co je dnes potřeba udělat',
+        'items' => [
+            'Nahoře <b>den a rychlé akce</b>: Nová zakázka, Pokladna, Výkup, Zástava, Kontrola IMEI.',
+            '<b>Peníze dne</b>: tržba z hotových zakázek, prodeje v Pokladně (hotově / kartou / fakturou), hotovost v kase a kdo kasu drží (oranžově, když je směna neuzavřená z dřívějška), tento měsíc proti stejným dnům minulého měsíce. <b>Obě pobočky s rozpadem vidí jen admin a Boss</b>, ostatní výhradně svou pobočku.',
+            '<b>Tok zakázek</b>: Přijato → V opravě → Čeká na díl → Čeká na klienta → K vyzvednutí. Klik otevře seznam s filtrem.',
+            '<b>Na řadě</b> — úkoly seřazené podle naléhavosti: dnešní rezervace z webu, vydané a nezaplacené, bez technika, reklamace s 30denní lhůtou, čekající na vyjádření klienta, dlouho bez pohybu, e-shop k vyřízení, díly k objednání, hotové a nevyzvednuté přes 3 dny, zapůjčená zařízení. Každý řádek má rychlé volání klientovi.',
+            'Zakázky přes 30 dní bez pohybu jsou zvlášť jako <b>Zapomenuté zakázky</b> (vydat, nebo stornovat), aby nezahlcovaly denní úkoly.',
+            'Technik má záložku <b>Moje práce</b> (jeho rozpracované zakázky), vedle <b>Nejnovější</b>.',
+            'Vpravo <b>Tým dnes</b> (plán směn, kdo je přihlášený, kdo má kasu), Kontrola IMEI, návštěvnost webů a odkaz na Statistiky. Grafy po měsících se přesunuly do Přehledů.',
+            'Rozložení pro počítač, iPad i iPhone (appka AppleFix CRM): na telefonu se peníze posouvají prstem a Na řadě je hned pod nimi. Funguje ve světlém i tmavém režimu.',
+        ],
+    ],
+    [
         'version' => '3.96.0',
         'date' => '2026-10-20',
         'time' => '13:30',
