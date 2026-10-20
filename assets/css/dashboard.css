@@ -16,7 +16,10 @@
     display: flex !important; flex-direction: column !important; gap: 20px !important;
     font-size: 15px !important; line-height: 1.4 !important;
     font-variant-numeric: tabular-nums !important;
-    max-width: 1500px !important;
+    max-width: 1500px !important; margin: 0 auto !important; padding-bottom: 72px !important;
+    /* rozložení se řídí skutečnou šířkou nástěnky (container queries), ne oknem:
+       lupa CRM (html zoom) zužuje obsah, ale media queries by ji nepoznaly */
+    container-type: inline-size !important; container-name: dsh !important;
 }
 html[data-lg-theme="light"] .dsh {
     --d-surface: #ffffff !important;
@@ -24,12 +27,14 @@ html[data-lg-theme="light"] .dsh {
     --d-line: rgba(10,20,40,.09) !important;
     --d-fg: #10172a !important;
     --d-fg2: rgba(16,23,42,.64) !important;
-    --d-fg3: rgba(16,23,42,.42) !important;
-    --d-green: #1f9d4c !important; --d-orange: #c96a00 !important; --d-red: #d70015 !important; --d-yellow: #a07800 !important; --d-accent: #0071e3 !important;
+    --d-fg3: rgba(16,23,42,.6) !important;
+    --d-green: #1a7f3c !important; --d-orange: #a85600 !important; --d-red: #d70015 !important; --d-yellow: #8a6800 !important; --d-accent: #0062c9 !important;
 }
 .dsh em { font-style: normal !important; }
 .dsh b { font-weight: 600 !important; }
-.dsh a { color: inherit !important; text-decoration: none !important; }
+/* #dsh: liquid-glass.css barví ve světlém motivu všechny odkazy modře selektorem s vysokou
+   specificitou — id ho přebije */
+#dsh a { color: inherit !important; text-decoration: none !important; }
 .dsh h1, .dsh h2 { margin: 0 !important; color: var(--d-fg) !important; }
 .dsh small { font-size: 12px !important; font-weight: 500 !important; color: var(--d-fg3) !important; }
 
@@ -39,21 +44,27 @@ html[data-lg-theme="light"] .dsh {
 .dsh-date { font-size: 26px !important; font-weight: 700 !important; letter-spacing: -.015em !important; line-height: 1.2 !important; }
 .dsh-greet { margin-top: 2px !important; font-size: 14px !important; color: var(--d-fg2) !important; }
 .dsh-actions { display: flex !important; gap: 8px !important; flex-wrap: wrap !important; }
-.dsh-btn { display: inline-flex !important; align-items: center !important; gap: 8px !important; height: 40px !important; padding: 0 14px !important; border-radius: 10px !important;
+#dsh .dsh-btn { display: inline-flex !important; align-items: center !important; gap: 8px !important; height: 40px !important; padding: 0 14px !important; border-radius: 10px !important;
     background: var(--d-surface) !important; border: 1px solid var(--d-line) !important; color: var(--d-fg) !important; font-size: 14px !important; font-weight: 600 !important;
     cursor: pointer !important; white-space: nowrap !important; }
-.dsh-btn:hover { background: var(--d-hover) !important; }
+#dsh .dsh-btn:hover { background: var(--d-hover) !important; }
 .dsh-btn i { font-size: 13px !important; }
-.dsh-btn.is-primary { background: var(--d-accent) !important; border-color: var(--d-accent) !important; color: #fff !important; }
+#dsh .dsh-btn.is-primary { background: var(--d-accent) !important; border-color: var(--d-accent) !important; color: #fff !important; }
 .dsh-btn.is-primary:hover { filter: brightness(1.08) !important; }
+
+/* Nová zakázka a Pokladna jsou na počítači v horní navigaci — na nástěnce by byly dvakrát.
+   Na mobilu/iPadu (≤1080 px, horní navigace skrytá) zůstávají. */
+/* Skrývá se jen, když je nástěnka opravdu široká: při velké lupě CRM se dok posouvá
+   a rychlé akce v něm mohou být mimo obraz — pak tlačítka na nástěnce zůstanou. */
+@media (min-width: 1081px) { @container dsh (min-width: 1031px) { #dsh .dsh-dup { display: none !important; } } }
 
 /* přepínač (pobočky, záložky) — jednoduchý segmentový ovladač */
 .dsh-seg { display: inline-flex !important; padding: 3px !important; gap: 2px !important; border-radius: 10px !important; background: var(--d-surface) !important; border: 1px solid var(--d-line) !important; }
-.dsh-seg > a, .dsh-seg > button { display: inline-flex !important; align-items: center !important; gap: 6px !important; height: 32px !important; padding: 0 12px !important; border: 0 !important; border-radius: 7px !important;
+#dsh .dsh-seg > a, #dsh .dsh-seg > button { display: inline-flex !important; align-items: center !important; gap: 6px !important; height: 32px !important; padding: 0 12px !important; border: 0 !important; border-radius: 7px !important;
     background: transparent !important; color: var(--d-fg2) !important; font-size: 13.5px !important; font-weight: 600 !important; cursor: pointer !important; white-space: nowrap !important; }
-.dsh-seg > a:hover, .dsh-seg > button:hover { color: var(--d-fg) !important; }
-.dsh-seg > .is-on { background: var(--d-hover) !important; color: var(--d-fg) !important; box-shadow: inset 0 0 0 1px var(--d-line) !important; }
-html[data-lg-theme="light"] .dsh-seg > .is-on { background: #fff !important; box-shadow: 0 1px 2px rgba(0,0,0,.08), inset 0 0 0 1px var(--d-line) !important; }
+#dsh .dsh-seg > a:hover, #dsh .dsh-seg > button:hover { color: var(--d-fg) !important; }
+#dsh .dsh-seg > .is-on { background: var(--d-hover) !important; color: var(--d-fg) !important; box-shadow: inset 0 0 0 1px var(--d-line) !important; }
+html[data-lg-theme="light"] #dsh .dsh-seg > .is-on { background: #fff !important; box-shadow: 0 1px 2px rgba(0,0,0,.08), inset 0 0 0 1px var(--d-line) !important; }
 html[data-lg-theme="light"] .dsh-seg { background: rgba(10,20,40,.04) !important; }
 .dsh-seg small { font-size: 12px !important; }
 
@@ -74,13 +85,13 @@ a.dsh-stat:hover { background: var(--d-hover) !important; }
 .dsh-flow { padding: 16px 22px 14px !important; border-radius: 14px !important; background: var(--d-surface) !important; border: 1px solid var(--d-line) !important; }
 .dsh-flow-h { display: flex !important; justify-content: space-between !important; align-items: baseline !important; gap: 12px !important; font-size: 14px !important; color: var(--d-fg2) !important; }
 .dsh-flow-h b { font-size: 17px !important; color: var(--d-fg) !important; }
-.dsh-flow-h a { font-size: 13.5px !important; font-weight: 600 !important; color: var(--d-accent) !important; }
+#dsh .dsh-flow-h a { font-size: 13.5px !important; font-weight: 600 !important; color: var(--d-accent) !important; }
 .dsh-bar { display: flex !important; gap: 3px !important; height: 10px !important; margin: 12px 0 12px !important; border-radius: 5px !important; overflow: hidden !important; background: var(--d-hover) !important; }
 .dsh-bar > a { flex-basis: 0 !important; min-width: 6px !important; background: var(--t) !important; }
 .dsh-bar > a:hover { filter: brightness(1.2) !important; }
 .dsh-legend { display: flex !important; flex-wrap: wrap !important; gap: 6px 22px !important; }
-.dsh-legend > a { display: inline-flex !important; align-items: center !important; gap: 7px !important; font-size: 14px !important; color: var(--d-fg2) !important; }
-.dsh-legend > a:hover { color: var(--d-fg) !important; }
+#dsh .dsh-legend > a { display: inline-flex !important; align-items: center !important; gap: 7px !important; font-size: 14px !important; color: var(--d-fg2) !important; }
+#dsh .dsh-legend > a:hover { color: var(--d-fg) !important; }
 .dsh-legend > a i { width: 9px !important; height: 9px !important; border-radius: 3px !important; background: var(--t) !important; }
 .dsh-legend > a b { color: var(--d-fg) !important; font-weight: 650 !important; }
 .dsh-legend > a.is-zero { opacity: .5 !important; }
@@ -92,7 +103,7 @@ a.dsh-stat:hover { background: var(--d-hover) !important; }
 .dsh-main, .dsh-side { display: flex !important; flex-direction: column !important; gap: 20px !important; min-width: 0 !important; }
 .dsh-card { display: block !important; padding: 18px 20px !important; border-radius: 14px !important; background: var(--d-surface) !important; border: 1px solid var(--d-line) !important; }
 .dsh-h { font-size: 16px !important; font-weight: 650 !important; margin-bottom: 10px !important; }
-.dsh .dsh-more { font-size: 13.5px !important; font-weight: 600 !important; color: var(--d-accent) !important; }
+#dsh .dsh-more { font-size: 13.5px !important; font-weight: 600 !important; color: var(--d-accent) !important; }
 .dsh .dsh-more:hover { text-decoration: underline !important; }
 .dsh-empty { padding: 8px 0 !important; color: var(--d-fg2) !important; font-size: 14.5px !important; }
 
@@ -119,13 +130,17 @@ a.dsh-stat:hover { background: var(--d-hover) !important; }
 .dsh-tr-main { min-width: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; font-size: 14px !important; }
 .dsh-tr-main em { margin-left: 6px !important; font-size: 13px !important; color: var(--d-fg3) !important; }
 .dsh-tr-info { font-size: 13px !important; color: var(--d-fg2) !important; white-space: nowrap !important; max-width: 200px !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-.dsh-todo-foot { padding: 6px 6px 0 !important; font-size: 13.5px !important; }
-.dsh-todo-foot a { font-weight: 600 !important; color: var(--d-accent) !important; }
+.dsh-tr.is-more { display: none !important; }
+.dsh-todo-foot { display: flex !important; justify-content: space-between !important; align-items: center !important; gap: 12px !important; padding: 4px 6px 0 !important; font-size: 13.5px !important; }
+.dsh-todo-foot a, .dsh-linkbtn { display: inline-flex !important; align-items: center !important; gap: 6px !important; min-height: 36px !important; }
+.dsh-linkbtn { background: none !important; border: 0 !important; padding: 0 !important; color: var(--d-fg2) !important; font-size: 13.5px !important; font-weight: 600 !important; cursor: pointer !important; }
+.dsh-linkbtn:hover { color: var(--d-fg) !important; }
+#dsh .dsh-todo-foot a { font-weight: 600 !important; color: var(--d-accent) !important; }
 .dsh-todo-foot em { color: var(--d-fg3) !important; }
 .dsh-o-link { position: absolute !important; inset: 0 !important; z-index: 1 !important; border-radius: inherit !important; }
-.dsh-call { position: relative !important; z-index: 2 !important; width: 32px !important; height: 32px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
+#dsh .dsh-call { position: relative !important; z-index: 2 !important; width: 32px !important; height: 32px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
     border-radius: 8px !important; color: var(--d-green) !important; font-size: 13px !important; border: 1px solid var(--d-line) !important; background: var(--d-surface) !important; }
-.dsh-call:hover { background: var(--d-green) !important; color: #fff !important; border-color: var(--d-green) !important; }
+#dsh .dsh-call:hover { background: var(--d-green) !important; color: #fff !important; border-color: var(--d-green) !important; }
 
 /* ── Zakázky: barevné řádky podle stavu (jako .order-row--status-* v Zakázkách) ── */
 .dsh-orders-h { display: flex !important; justify-content: space-between !important; align-items: center !important; gap: 12px !important; margin-bottom: 12px !important; flex-wrap: wrap !important; }
@@ -162,7 +177,7 @@ html[data-lg-theme="light"] .dsh-o.s-cancelled { --sb: #F0F1F3 !important; }
 html[data-lg-theme="light"] .dsh-o.s-default { --sb: #F1F3F6 !important; }
 html[data-lg-theme="light"] .dsh-o.is-legacy { --sb: #E9EAEC !important; }
 .dsh-o-code, .dsh-o-who, .dsh-o-st { display: flex !important; flex-direction: column !important; min-width: 0 !important; gap: 1px !important; }
-.dsh-o-code b { font-size: 14px !important; font-weight: 650 !important; letter-spacing: .01em !important; }
+.dsh-o-code b { font-size: 14px !important; font-weight: 650 !important; letter-spacing: .01em !important; white-space: nowrap !important; }
 .dsh-o-code em, .dsh-o-who em, .dsh-o-st em { font-size: 12.5px !important; color: rgba(255,255,255,.78) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 html[data-lg-theme="light"] .dsh-o .dsh-o-code em, html[data-lg-theme="light"] .dsh-o .dsh-o-who em, html[data-lg-theme="light"] .dsh-o .dsh-o-st em { color: var(--d-fg2) !important; }
 .dsh-o.s-collected .dsh-o-code em, .dsh-o.s-collected .dsh-o-who em, .dsh-o.s-collected .dsh-o-st em { color: var(--d-fg2) !important; }
@@ -171,9 +186,9 @@ html[data-lg-theme="light"] .dsh-o .dsh-o-code em, html[data-lg-theme="light"] .
 .dsh-o-st em { flex-basis: 100% !important; }
 .dsh-o-st .badge { font-size: 12px !important; padding: 4px 9px !important; }
 .dsh-o-amt { font-size: 14.5px !important; font-weight: 650 !important; text-align: right !important; white-space: nowrap !important; }
-.dsh-o .dsh-call { background: rgba(0,0,0,.22) !important; border-color: transparent !important; color: #8ff0ab !important; }
-html[data-lg-theme="light"] .dsh-o .dsh-call { background: rgba(255,255,255,.8) !important; color: var(--d-green) !important; }
-.dsh-o.is-stale .dsh-o-code b::after { content: "" !important; display: inline-block !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; background: #ffd479 !important; margin-left: 6px !important; vertical-align: middle !important; }
+#dsh .dsh-o .dsh-call { background: rgba(0,0,0,.22) !important; border-color: transparent !important; color: #8ff0ab !important; }
+html[data-lg-theme="light"] #dsh .dsh-o .dsh-call { background: rgba(255,255,255,.8) !important; color: var(--d-green) !important; }
+.dsh-o.is-stale .dsh-o-code b::after { content: "" !important; display: inline-block !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; background: #ffd479 !important; margin-left: 4px !important; vertical-align: middle !important; }
 .dsh-o-leg { font-style: normal !important; font-size: 11px !important; font-weight: 600 !important; color: var(--d-fg3) !important; }
 .dsh-o--stock { grid-template-columns: minmax(0,1fr) auto 110px !important; box-shadow: inset 0 0 0 1px var(--d-line) !important; }
 .dsh-pill { display: inline-flex !important; padding: 3px 9px !important; border-radius: 6px !important; font-size: 12px !important; font-weight: 600 !important; background: var(--d-hover) !important; }
@@ -204,55 +219,64 @@ html[data-lg-theme="light"] .dsh-o .dsh-call { background: rgba(255,255,255,.8) 
 .eshop-modal-row{display:flex !important;gap:12px !important;padding:11px 12px !important;border-radius:12px !important;background:rgba(255,255,255,.04) !important;border:1px solid rgba(255,255,255,.09) !important;margin-bottom:8px !important;align-items:flex-start !important;}
 
 /* ── Šířky: menší notebook / iPad na šířku ── */
-@media (max-width: 1280px) {
-    .dsh-grid { grid-template-columns: minmax(0,1fr) 280px !important; }
-    .dsh-stat { padding: 16px 18px !important; }
-    .dsh-stat-v { font-size: 26px !important; }
-    .dsh-o { grid-template-columns: 118px minmax(0,1.2fr) minmax(0,1fr) 88px 32px !important; }
+@container dsh (max-width: 1230px) {
+    #dsh .dsh-grid { grid-template-columns: minmax(0,1fr) 280px !important; }
+    #dsh .dsh-stat { padding: 16px 18px !important; }
+    #dsh .dsh-stat-v { font-size: 26px !important; }
+    #dsh .dsh-o { grid-template-columns: 118px minmax(0,1.2fr) minmax(0,1fr) 88px 32px !important; }
 }
 /* iPad na výšku */
-@media (max-width: 1080px) {
-    .dsh-grid { grid-template-columns: minmax(0,1fr) !important; }
-    .dsh-side { display: grid !important; grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
-    .dsh-stats-link { grid-column: 1 / -1 !important; }
-    .dsh-todo-t em { display: none !important; }
+@container dsh (max-width: 1030px) {
+    #dsh .dsh-grid { grid-template-columns: minmax(0,1fr) !important; }
+    #dsh .dsh-side { display: grid !important; grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+    #dsh .dsh-stats-link { grid-column: 1 / -1 !important; }
+    #dsh .dsh-todo-t em { display: none !important; }
 }
 /* iPhone (i v appce AppleFix CRM) */
-@media (max-width: 767.98px) {
-    .dsh { gap: 14px !important; }
-    .dsh-date { font-size: 23px !important; }
-    .dsh-seg:not(.dsh-seg--tabs) { width: 100% !important; }
-    .dsh-seg:not(.dsh-seg--tabs) > a { flex: 1 1 0 !important; justify-content: center !important; padding: 0 6px !important; }
-    .dsh-actions { flex-wrap: nowrap !important; overflow-x: auto !important; margin: 0 -12px !important; padding: 0 12px 2px !important; scrollbar-width: none !important; -webkit-overflow-scrolling: touch !important; width: calc(100% + 24px) !important; }
-    .dsh-actions::-webkit-scrollbar { display: none !important; }
-    .dsh-btn { flex: 0 0 auto !important; height: 42px !important; }
-    .dsh-stats { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
-    .dsh-stat { padding: 13px 14px !important; }
-    .dsh-stat:nth-child(3) { border-left: 0 !important; }
-    .dsh-stat:nth-child(n+3) { border-top: 1px solid var(--d-line) !important; }
-    .dsh-stat-v { font-size: 21px !important; }
-    .dsh-stat-v em { font-size: 13px !important; }
-    .dsh-stat-s { font-size: 12.5px !important; }
-    .dsh-flow { padding: 14px !important; }
-    .dsh-legend { gap: 6px 16px !important; }
-    .dsh-legend > a { font-size: 13.5px !important; }
-    .dsh-side { display: flex !important; }
-    .dsh-card { padding: 14px !important; }
-    .dsh-todo-row { grid-template-columns: 40px minmax(0,1fr) 16px !important; gap: 10px !important; }
-    .dsh-todo-n { font-size: 17px !important; }
-    .dsh-todo-list { padding-left: 0 !important; }
-    .dsh-tr { grid-template-columns: 50px minmax(0,1fr) 32px !important; }
-    .dsh-tr-info { display: none !important; }
-    .dsh-tr-main em { display: block !important; margin-left: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-    .dsh-o { grid-template-columns: minmax(0,1fr) auto !important; grid-template-areas: "who amt" "code code" "st call" !important; gap: 3px 10px !important; padding: 10px 10px 10px 14px !important; }
-    .dsh-o-code { grid-area: code !important; flex-direction: row !important; gap: 8px !important; align-items: baseline !important; }
-    .dsh-o-code b { font-size: 12.5px !important; font-weight: 600 !important; }
-    .dsh-o-who { grid-area: who !important; }
-    .dsh-o-amt { grid-area: amt !important; }
-    .dsh-o-st { grid-area: st !important; }
-    .dsh-o-st em { flex-basis: auto !important; }
-    .dsh-o .dsh-call { grid-area: call !important; align-self: end !important; }
-    .dsh-o--stock { grid-template-areas: "who amt" "st st" !important; }
-    .dsh-seg--tabs { flex: 1 1 auto !important; }
-    .dsh-seg--tabs > button { flex: 1 1 0 !important; justify-content: center !important; }
+/* mobil/iPad: ovladač lupy tu není, rezerva dole by byla zbytečná */
+@media (max-width: 1080px) { .dsh { padding-bottom: 8px !important; } }
+@media (max-width: 767.98px) { .dsh { gap: 14px !important; } }
+@container dsh (max-width: 740px) {
+    #dsh .dsh-date { font-size: 23px !important; }
+    #dsh .dsh-seg:not(.dsh-seg--tabs) { width: 100% !important; }
+    #dsh .dsh-seg:not(.dsh-seg--tabs) > a { flex: 1 1 0 !important; justify-content: center !important; padding: 0 6px !important; }
+    /* tlačítka se zalomí do dvou řádků — vodorovné posouvání skrývalo Kontrolu IMEI */
+    #dsh .dsh-actions { width: 100% !important; flex-wrap: wrap !important; }
+    #dsh .dsh-btn { flex: 1 1 auto !important; justify-content: center !important; height: 44px !important; }
+    #dsh .dsh-btn.is-primary { flex-basis: 100% !important; }
+    /* dotykové cíle aspoň ~40 px */
+    #dsh .dsh-call { width: 40px !important; height: 40px !important; }
+    #dsh .dsh-seg > a, #dsh .dsh-seg > button { height: 40px !important; }
+    #dsh .dsh-legend > a { min-height: 34px !important; }
+    #dsh .dsh-more, #dsh .dsh-flow-h a { display: inline-flex !important; align-items: center !important; min-height: 36px !important; }
+    #dsh .dsh-web { padding: 10px 0 !important; }
+    #dsh .dsh-stats { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+    #dsh .dsh-stat { padding: 13px 14px !important; }
+    #dsh .dsh-stat:nth-child(3) { border-left: 0 !important; }
+    #dsh .dsh-stat:nth-child(n+3) { border-top: 1px solid var(--d-line) !important; }
+    #dsh .dsh-stat-v { font-size: 21px !important; }
+    #dsh .dsh-stat-v em { font-size: 13px !important; }
+    #dsh .dsh-stat-s { font-size: 12.5px !important; }
+    #dsh .dsh-flow { padding: 14px !important; }
+    #dsh .dsh-legend { gap: 6px 16px !important; }
+    #dsh .dsh-legend > a { font-size: 13.5px !important; }
+    #dsh .dsh-side { display: flex !important; }
+    #dsh .dsh-card { padding: 14px !important; }
+    #dsh .dsh-todo-row { grid-template-columns: 40px minmax(0,1fr) 16px !important; gap: 10px !important; }
+    #dsh .dsh-todo-n { font-size: 17px !important; }
+    #dsh .dsh-todo-list { padding-left: 0 !important; }
+    #dsh .dsh-tr { grid-template-columns: 50px minmax(0,1fr) 40px !important; }
+    #dsh .dsh-tr-info { display: none !important; }
+    #dsh .dsh-tr-main em { display: block !important; margin-left: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    #dsh .dsh-o { grid-template-columns: minmax(0,1fr) auto !important; grid-template-areas: "who amt" "code code" "st call" !important; gap: 3px 10px !important; padding: 10px 10px 10px 14px !important; }
+    #dsh .dsh-o-code { grid-area: code !important; flex-direction: row !important; gap: 8px !important; align-items: baseline !important; }
+    #dsh .dsh-o-code b { font-size: 12.5px !important; font-weight: 600 !important; }
+    #dsh .dsh-o-who { grid-area: who !important; }
+    #dsh .dsh-o-amt { grid-area: amt !important; }
+    #dsh .dsh-o-st { grid-area: st !important; }
+    #dsh .dsh-o-st em { flex-basis: auto !important; }
+    #dsh .dsh-o .dsh-call { grid-area: call !important; align-self: end !important; }
+    #dsh .dsh-o--stock { grid-template-areas: "who amt" "st st" !important; }
+    #dsh .dsh-seg--tabs { flex: 1 1 auto !important; }
+    #dsh .dsh-seg--tabs > button { flex: 1 1 0 !important; justify-content: center !important; }
 }

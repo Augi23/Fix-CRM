@@ -149,10 +149,17 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
    vyjme z flexu — pružný oddělovač pak drží pravou skupinu tlačítek na místě.
    Na užších oknech zůstává vpravo (tlouklo by se s dlouhým názvem stránky);
    na mobilu je pole skryté úplně (viz níže). */
-@media (min-width: 1200px) {
+/* v3.99.0: rozhoduje skutečná šířka lišty (container query), ne okno — při lupě CRM
+   (html zoom) je lišta v CSS px užší a vycentrované pole by podlezlo ikony a logo. */
+.afx-utility { container-type: inline-size; container-name: afxbar; }
+@container afxbar (min-width: 1420px) {
   .afx-search { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: clamp(280px, 30vw, 480px); }
   .afx-search .input-group { min-width: 0; width: 100%; }
   .afx-page-title { max-width: 22vw; }  /* dlouhý název stránky nesmí podlézt vycentrované pole */
+}
+@container afxbar (max-width: 1120px) {
+  .afx-page-title { display: none; }
+  .afx-search .input-group { min-width: 170px; }
 }
 
 /* Světlý motiv: lišta je bílá → vyhledávání tmavé, jinak by bílé zmizelo */
@@ -857,3 +864,15 @@ select optgroup,
 #receptionModeBtn.afx-reception-on { color: #35d07f !important; border-color: rgba(53,208,127,.5) !important; }
 #receptionModeBtn.afx-reception-on i { animation: afxReceptionPulse 1.8s ease-in-out infinite; }
 @keyframes afxReceptionPulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* Úzké telefony (iPhone SE/mini, 360–430 px): v liště se nevešel avatar — Podpisová stanice
+   je i v menu (sheet), v liště ji tu vynecháme a mezery zúžíme (v3.99.0) */
+@media (max-width: 430px) {
+  .afx-utility { gap: 8px; padding: 0 12px; }
+  .afx-utility a[href="sign_station.php"] { display: none !important; }
+}
+
+/* Světlý motiv: jméno v liště bylo světle šedé na bílé (v3.99.0) */
+html[data-lg-theme="light"] .afx-user b { color: #2a3342; }
+/* Telefon/tablet: prvek posunutý do obrazu nesmí skončit pod spodním tab barem */
+@media (max-width: 1080px) { html { scroll-padding-bottom: 120px; } }

@@ -11,6 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.99.0',
+        'date' => '2026-10-21',
+        'time' => '02:30',
+        'title' => 'Modernější 3D dok v horním menu + opravy Nástěnky z testů',
+        'items' => [
+            '<b>3D dok zůstává</b> (polička, zvětšení ikon při najetí, tečka u otevřené stránky), jen v současném stylu: ikony jsou <b>aplikační dlaždice</b> jako v macOS/iOS (zaoblený čtverec, barevný přechod, skleněný odlesk, hloubka), polička je skleněná deska. Popisky jsou větší a čitelnější, počty vypadají jako odznaky na iPhonu a nepřečtený chat ukazuje tepající prstenec.',
+            'Nástěnka byla otestovaná na lupě CRM 50–200 %, zoomu prohlížeče, počítačích, iPadech i iPhonech a ve světlém i tmavém režimu. Opraveno: při lupě od 150 % se rozpadaly řádky zakázek. Nástěnka se teď přizpůsobuje své skutečné šířce.',
+            'Opraveno: řádek <b>E-shop k vyřízení</b> neotevíral okno objednávek. V Na řadě už není slepé „a dalších N“: zbytek se rozbalí, nebo vede odkaz do seznamu. Na telefonu už stránka neposkočí při přepnutí úkolu.',
+            'Světlý režim: odkazy na Nástěnce už nejsou modré a šedé texty mají lepší kontrast. Ovladač lupy vlevo dole nezakrývá poslední řádek.',
+            'Na iPhonu se tlačítka nahoře zalomí do dvou řádků (Kontrola IMEI je vidět) a dotykové plochy jsou větší. Na úzkých iPhonech se do horní lišty vejde i avatar.',
+            'Horní lišta: při lupě CRM od 125 % (a na menších noteboocích) už hledací pole nezajíždí pod ikony a logo. Ve světlém režimu je jméno vpravo nahoře čitelné.',
+        ],
+    ],
+    [
         'version' => '3.98.0',
         'date' => '2026-10-21',
         'time' => '00:30',

@@ -209,7 +209,8 @@ $dshOrderRow = function (array $r) {
     </div>
 </div>
 <script>
-(function () {
+// Dlaždice e-shopu je v DOM AŽ ZA tímto skriptem (úkol v „Na řadě") → spustit po načtení stránky.
+document.addEventListener('DOMContentLoaded', function () {
     var tile = document.getElementById('eshopTile');
     if (!tile) return;
     var loaded = null;
@@ -341,7 +342,7 @@ $dshOrderRow = function (array $r) {
     window.addEventListener('hashchange', fromHash);
     load();
     fromHash();
-})();
+});
 </script>
 <?php endif; ?>
 <?php
@@ -357,7 +358,7 @@ $__split = function (string $k) use ($D, $__showSplit, $dshMoney) {
 };
 $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $one : ($n >= 2 && $n <= 4 ? $few : $many);
 ?>
-<div class="dsh">
+<div class="dsh" id="dsh">
     <header class="dsh-top">
         <div class="dsh-hello">
             <h1 class="dsh-date"><?php echo e(mb_convert_case($__dayNames[(int)date('w')], MB_CASE_TITLE, 'UTF-8') . ' ' . date('j') . '. ' . $__monNames[(int)date('n') - 1]); ?></h1>
@@ -372,8 +373,8 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
         </nav>
         <?php endif; ?>
         <div class="dsh-actions" role="toolbar" aria-label="Rychlé akce">
-            <button type="button" class="dsh-btn is-primary" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus"></i>Nová zakázka</button>
-            <a class="dsh-btn" href="pokladna.php">Pokladna</a>
+            <button type="button" class="dsh-btn is-primary dsh-dup" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="fas fa-plus"></i>Nová zakázka</button>
+            <a class="dsh-btn dsh-dup" href="pokladna.php">Pokladna</a>
             <a class="dsh-btn" href="dokument.php?type=vykup" target="_blank" rel="noopener">Výkup</a>
             <a class="dsh-btn" href="dokument.php?type=zastava" target="_blank" rel="noopener">Zástava</a>
             <button type="button" class="dsh-btn" data-dsh-imei>Kontrola IMEI</button>
@@ -447,10 +448,10 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
                         <i class="fas fa-chevron-down dsh-todo-chev"></i>
                     </summary>
                     <div class="dsh-todo-list">
-                        <?php foreach (array_slice($__rows, 0, 8) as $r):
+                        <?php foreach ($__rows as $__ri => $r):
                             $__href = $r['href'] ?? ($r['id'] ? 'view_order.php?id=' . (int)$r['id'] : '');
                             $__tel = normalizePhoneForTel($r['phone'] ?? ''); ?>
-                        <div class="dsh-tr<?php echo !empty($r['past']) ? ' is-past' : ''; ?>">
+                        <div class="dsh-tr<?php echo !empty($r['past']) ? ' is-past' : ''; ?><?php echo $__ri >= 8 ? ' is-more' : ''; ?>">
                             <?php if ($__href): ?><a class="dsh-o-link" href="<?php echo e($__href); ?>" aria-label="Otevřít <?php echo e($r['code'] ?: $r['client']); ?>"></a><?php endif; ?>
                             <em class="dsh-tr-age<?php echo !empty($r['high']) ? ' is-hot' : ''; ?>"><?php echo e($r['age']); ?></em>
                             <div class="dsh-tr-main"><b><?php echo e($r['client'] ?: '—'); ?></b> <em><?php echo e(trim($r['device'] . ($r['code'] ? ' · ' . $r['code'] : ''), ' ·')); ?></em></div>
@@ -458,10 +459,15 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
                             <?php if ($__tel !== ''): ?><a class="dsh-call" href="tel:<?php echo e($__tel); ?>" title="Zavolat <?php echo e($r['phone']); ?>" aria-label="Zavolat"><i class="fas fa-phone"></i></a><?php else: ?><i></i><?php endif; ?>
                         </div>
                         <?php endforeach; ?>
-                        <?php if ($t['count'] > 8 || !empty($t['link'])): ?>
+                        <?php
+                        // Žádná slepá „a dalších N": zbytek načtených se rozbalí na místě,
+                        // a co se nenačetlo, je v seznamu (vlastní odkaz úkolu, jinak Zakázky).
+                        $__link = $t['link'] ?? '';
+                        if ($__link === '' && $t['count'] > count($__rows)) { $__link = 'orders.php'; }
+                        if (count($__rows) > 8 || $__link !== ''): ?>
                         <div class="dsh-todo-foot">
-                            <?php if (!empty($t['link'])): ?><a href="<?php echo e($t['link']); ?>">Otevřít <?php echo $t['count'] > 8 ? 'všech ' . (int)$t['count'] : 'seznam'; ?> <i class="fas fa-arrow-right"></i></a>
-                            <?php else: ?><em>a dalších <?php echo (int)$t['count'] - 8; ?></em><?php endif; ?>
+                            <?php if (count($__rows) > 8): ?><button type="button" class="dsh-linkbtn" data-dsh-more>Zobrazit další (<?php echo count($__rows) - 8; ?>)</button><?php endif; ?>
+                            <?php if ($__link !== ''): ?><a href="<?php echo e($__link); ?>">Otevřít <?php echo $t['count'] > 8 ? 'všech ' . (int)$t['count'] : 'seznam'; ?> <i class="fas fa-arrow-right"></i></a><?php endif; ?>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -478,8 +484,8 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
                     <?php else: ?>
                     <?php if ($D['tech_id'] > 0): ?>
                     <div class="dsh-seg dsh-seg--tabs" role="tablist">
-                        <button type="button" class="is-on" data-dsh-tab="mine" role="tab">Moje práce <small><?php echo (int)$D['mine_count']; ?></small></button>
-                        <button type="button" data-dsh-tab="recent" role="tab">Nejnovější</button>
+                        <button type="button" class="is-on" data-dsh-tab="mine" role="tab" aria-selected="true">Moje práce <small><?php echo (int)$D['mine_count']; ?></small></button>
+                        <button type="button" data-dsh-tab="recent" role="tab" aria-selected="false">Nejnovější</button>
                     </div>
                     <?php else: ?>
                     <h2 class="dsh-h">Nejnovější zakázky</h2>
@@ -599,14 +605,33 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
     tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.dshTab); }); });
     try { var saved = localStorage.getItem('dsh-tab'); if (saved && document.querySelector('[data-dsh-tab="' + saved + '"]')) { show(saved); } } catch (e) {}
 
-    // Na řadě: otevřený je vždy jen jeden úkol, ať seznam zůstane krátký
+    // Na řadě: otevřený je vždy jen jeden úkol, ať seznam zůstane krátký. Zavřením úkolu
+    // NAD tím rozkliknutým by stránka poskočila (na telefonu i o celou obrazovku) —
+    // proto se posun vyrovná, aby rozkliknutý řádek zůstal tam, kde byl pod prstem.
+    function scroller(el) {
+        for (var p = el.parentElement; p; p = p.parentElement) {
+            var oy = getComputedStyle(p).overflowY;
+            if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) { return p; }
+        }
+        return document.scrollingElement || document.documentElement;
+    }
     document.querySelectorAll('details.dsh-todo-i').forEach(function (d) {
         d.addEventListener('toggle', function () {
             if (!d.open) { return; }
+            var sum = d.querySelector('summary');
+            var before = sum.getBoundingClientRect().top;
             document.querySelectorAll('details.dsh-todo-i[open]').forEach(function (o) { if (o !== d) { o.open = false; } });
+            var delta = sum.getBoundingClientRect().top - before;
+            if (Math.abs(delta) > 1) { scroller(d).scrollBy({ top: delta, behavior: 'instant' }); }   // bez animace (Bootstrap má smooth)
         });
     });
     document.addEventListener('click', function (e) {
+        var more = e.target.closest('[data-dsh-more]');
+        if (more) {
+            more.closest('details').querySelectorAll('.dsh-tr.is-more').forEach(function (r) { r.classList.remove('is-more'); });
+            more.remove();
+            return;
+        }
         if (e.target.closest('[data-dsh-imei]')) {
             document.getElementById('dshImei').scrollIntoView({ behavior: 'smooth', block: 'center' });
             setTimeout(function () { document.getElementById('imeiCheckInput').focus(); }, 350);

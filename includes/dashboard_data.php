@@ -243,7 +243,7 @@ function crmDashboardBuild(PDO $pdo, int $pick = 0): array {
             $bucket['unpaid'][] = [$sec, $rowOf($r, $amt > 0 ? formatMoney($amt) : 'vydáno bez platby')];
         }
     }
-    $sortRows = function (array $b, int $limit = 30) {
+    $sortRows = function (array $b, int $limit = 50) {
         usort($b, fn($x, $y) => $y[0] <=> $x[0]);
         return array_map(fn($x) => $x[1], array_slice($b, 0, $limit));
     };

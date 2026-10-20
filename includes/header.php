@@ -535,14 +535,14 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
         <a class="afx-cell act-blue" href="#" data-bs-toggle="modal" data-bs-target="#newOrderModal">
             <i class="fas fa-plus"></i><small><?php echo __('new_order'); ?></small>
         </a>
-        <a class="afx-cell act-orange" href="#" data-bs-toggle="modal" data-bs-target="#newComplaintModal">
+        <a class="afx-cell act-orange" href="#" data-bs-toggle="modal" data-bs-target="#newComplaintModal" title="Nová reklamace" aria-label="Nová reklamace">
             <i class="fas fa-rotate-left"></i><small><?php echo __('complaints'); ?></small>
         </a>
-        <a class="afx-cell act-green <?php echo $current_page == 'nakupni-seznam.php' ? 'active' : ''; ?>" href="nakupni-seznam.php">
+        <a class="afx-cell act-green <?php echo $current_page == 'nakupni-seznam.php' ? 'active' : ''; ?>" href="nakupni-seznam.php" title="<?php echo e(__('shopping_list')); ?>">
             <?php if (!empty($shoppingListBadgeCount) && $shoppingListBadgeCount > 0): ?><span class="afx-badge"><?php echo (int)$shoppingListBadgeCount; ?></span><?php endif; ?>
             <i class="fas fa-cart-shopping"></i><small><?php echo __('shopping_list'); ?></small>
         </a>
-        <a class="afx-cell act-purple <?php echo $current_page == 'pokladna.php' ? 'active' : ''; ?>" href="pokladna.php">
+        <a class="afx-cell act-purple <?php echo $current_page == 'pokladna.php' ? 'active' : ''; ?>" href="pokladna.php" title="Pokladna">
             <i class="fas fa-cash-register"></i><small>Pokladna</small>
         </a>
     </nav>
