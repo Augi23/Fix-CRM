@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '3.97.1',
+        'date' => '2026-10-20',
+        'time' => '23:30',
+        'title' => 'Nástěnka: staré (importované) zakázky odlišené',
+        'items' => [
+            'V toku zakázek (Přijato, V opravě…) je velké číslo jen za <b>nové zakázky z CRM</b>. Importované ze zakazkovylist.cz jsou <b>malým písmem v závorce v rohu</b>, jako dřív na dlaždicích.',
+            'V seznamu zakázek mají importované zakázky u data značku <b>(import)</b> a jsou ztlumené, aby se na první pohled nepletly s novými. Peníze dne ani úkoly Na řadě je nepočítají.',
+        ],
+    ],
+    [
         'version' => '3.97.0',
         'date' => '2026-10-20',
         'time' => '23:00',

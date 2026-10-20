@@ -91,7 +91,7 @@ $dshOrderRow = function (array $r) {
         <a class="dsh-o-link" href="view_order.php?id=<?php echo (int)$r['id']; ?>" aria-label="Zakázka <?php echo e(orderDisplayCode($r)); ?>"></a>
         <div class="dsh-o-code">
             <b><?php echo e(orderDisplayCode($r)); ?></b>
-            <em><?php echo e(date('j. n. H:i', strtotime((string)$r['created_at']))); ?></em>
+            <em><?php echo e(date('j. n. H:i', strtotime((string)$r['created_at']))); ?><?php if ($legacy): ?> <i class="dsh-o-leg" title="Importovaná (stará) zakázka ze zakazkovylist.cz">(import)</i><?php endif; ?></em>
         </div>
         <div class="dsh-o-who">
             <b><?php echo $internal ? '<i class="fas fa-screwdriver-wrench"></i> Interní' : e(trim($r['first_name'] . ' ' . $r['last_name'])); ?></b>
@@ -421,7 +421,7 @@ $dshOrderRow = function (array $r) {
         <a class="dsh-step t-<?php echo e($f['tone']); ?><?php echo $f['n'] === 0 ? ' is-zero' : ''; ?>" href="orders.php?filter=<?php echo urlencode($f['filter']); ?>">
             <b class="dsh-step-n"><?php echo (int)$f['n']; ?></b>
             <em class="dsh-step-l"><?php echo e($f['label']); ?></em>
-            <?php if ($f['leg'] > 0): ?><em class="dsh-step-leg" title="Importované zakázky ze starého systému">+<?php echo (int)$f['leg']; ?> import</em><?php endif; ?>
+            <?php if ($f['leg'] > 0): ?><em class="dsh-step-leg" title="Importované (staré) zakázky ze zakazkovylist.cz — v hlavním čísle nejsou">(<?php echo (int)$f['leg']; ?>)</em><?php endif; ?>
         </a>
         <?php endforeach; ?>
         <?php if ($D['new_today'] > 0 && crmCanManageProducts()): ?>

@@ -81,7 +81,9 @@ a.dsh-kpi:hover, .dsh-kpi--eshop:hover { background: var(--d-card2) !important; 
 .dsh-step.is-zero { opacity: .55 !important; }
 .dsh-step-n { font-size: 24px !important; font-weight: 800 !important; line-height: 1.1 !important; color: var(--d-fg) !important; }
 .dsh-step-l { font-size: 13px !important; font-weight: 700 !important; color: var(--d-fg2) !important; white-space: nowrap !important; }
-.dsh-step-leg { font-size: 11px !important; color: var(--d-fg3) !important; }
+/* importované (staré) zakázky: malým písmem v závorce v rohu, ať se nepletou s novými */
+.dsh-step-leg { position: absolute !important; top: 9px !important; right: 11px !important; font-size: 11.5px !important; font-weight: 600 !important; color: var(--d-fg3) !important; }
+.dsh-o-leg { font-style: normal !important; font-size: 11px !important; font-weight: 600 !important; color: var(--d-fg3) !important; letter-spacing: 0 !important; }
 .dsh .t-blue { --t: var(--d-blue) !important; } .dsh .t-violet { --t: var(--d-violet) !important; } .dsh .t-orange { --t: var(--d-orange) !important; }
 .dsh .t-yellow { --t: var(--d-yellow) !important; } .dsh .t-green { --t: var(--d-green) !important; } .dsh .t-red { --t: var(--d-red) !important; } .dsh .t-gray { --t: var(--d-gray) !important; }
 .dsh-flow-today { display: none !important; }
