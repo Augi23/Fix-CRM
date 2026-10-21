@@ -504,12 +504,26 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
                     <?php endforeach; endif; ?>
                 </div>
 
+                <?php
+                // Objednané díly k této zakázce (nákupní seznam) — ať technik vidí, co je na cestě
+                $__orderReqs = [];
+                try {
+                    $__rq = $pdo->prepare("SELECT item_name, quantity, status, created_at, ordered_at, received_at FROM purchase_requests
+                        WHERE order_id = ? AND status IN ('pending','ordered','received') ORDER BY FIELD(status,'pending','ordered','received'), id DESC LIMIT 12");
+                    $__rq->execute([(int)$order['id']]);
+                    $__orderReqs = $__rq->fetchAll(PDO::FETCH_ASSOC);
+                } catch (Throwable $e) {}
+                ?>
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="mb-0"><?php echo __('parts_used'); ?></h6>
                     <div class="d-flex gap-2 flex-wrap">
-                        <a class="btn btn-sm btn-outline-success" href="procurement.php?order_id=<?php echo $order['id']; ?>">
-                            <i class="fas fa-truck-loading me-1"></i> <?php echo __('add_to_procurement'); ?>
-                        </a>
+                        <?php /* v4.0.0: díl, který není skladem, se objedná rovnou odsud — vedoucí ho
+                                 pak najde na Nákupním seznamu u dodavatele, po příjmu se navěsí sem */ ?>
+                        <?php if (crmCanRequestProcurement()): ?>
+                        <button class="btn btn-sm btn-success" type="button" data-bs-toggle="modal" data-bs-target="#orderReqModal">
+                            <i class="fas fa-cart-plus me-1"></i> Objednat díl
+                        </button>
+                        <?php endif; ?>
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPartModal">
                             <i class="fas fa-plus me-1"></i> <?php echo __('add_part'); ?>
                         </button>
@@ -523,6 +537,24 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php if ($__orderReqs): ?>
+                <div class="ord-reqs mb-3">
+                    <?php foreach ($__orderReqs as $__r):
+                        $__st = (string)$__r['status'];
+                        $__lbl = $__st === 'pending' ? 'čeká na objednání' : ($__st === 'ordered' ? 'objednáno ' . date('j. n.', strtotime((string)($__r['ordered_at'] ?: $__r['created_at']))) : 'dorazilo ' . date('j. n.', strtotime((string)($__r['received_at'] ?: $__r['created_at'])))); ?>
+                    <div class="ord-req is-<?php echo e($__st); ?>"><i class="fas <?php echo $__st === 'received' ? 'fa-box-open' : ($__st === 'ordered' ? 'fa-truck-fast' : 'fa-hourglass-half'); ?>"></i>
+                        <b><?php echo (int)$__r['quantity']; ?>× <?php echo e($__r['item_name']); ?></b><em><?php echo e($__lbl); ?></em></div>
+                    <?php endforeach; ?>
+                </div>
+                <style>
+                .ord-reqs{display:flex;flex-direction:column;gap:6px}
+                .ord-req{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);font-size:14px}
+                html[data-lg-theme="light"] .ord-req{border-color:rgba(10,20,40,.12);background:#fff}
+                .ord-req b{font-weight:600;flex:1 1 auto;min-width:0}
+                .ord-req em{font-style:normal;font-size:12.5px;white-space:nowrap;opacity:.75}
+                .ord-req.is-pending i{color:#f59e0b}.ord-req.is-ordered i{color:#4aa3ff}.ord-req.is-received i{color:#34c759}
+                </style>
+                <?php endif; ?>
                 
                 <div class="table-responsive">
                 <table class="table table-sm border align-middle">
@@ -1068,6 +1100,76 @@ html[data-lg-theme="light"] .ord-barcode, html[data-lg-theme="light"] .ord-sigs 
     </div>
 </div>
 
+<?php if (crmCanRequestProcurement()): ?>
+<!-- Objednat díl k zakázce (v4.0.0) → nákupní seznam, navázáno na zakázku -->
+<div class="modal fade" id="orderReqModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog">
+        <div class="modal-content glass-card border-secondary text-white">
+            <form id="orderReqForm">
+                <?php echo csrfField(); ?>
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" name="order_id" value="<?php echo (int)$order['id']; ?>">
+                <input type="hidden" name="supplier_key" id="orderReqSupplierKey" value="">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="fas fa-cart-plus me-2 text-success"></i>Objednat díl k zakázce</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2" id="orderReqPickWrap">
+                        <label class="form-label">Díl z katalogu dodavatelů</label>
+                        <select name="inventory_id" id="orderReqPart" class="form-select"></select>
+                        <div class="form-text text-white-75 small">Hledej podle modelu a dílu (např. „13 pro displej"). Nahoře jsou díly skladem u dodavatele a nejlevnější.</div>
+                    </div>
+                    <div class="order-req-info mb-3" id="orderReqInfo" hidden></div>
+                    <div class="mb-3" id="orderReqManual" hidden>
+                        <label class="form-label">Název dílu</label>
+                        <input type="text" name="item_name" class="form-control" placeholder="např. Displej iPhone 13 Pro OLED">
+                        <label class="form-label mt-2">Dodavatel</label>
+                        <select class="form-select" id="orderReqManualSupplier">
+                            <?php foreach (getSupplierCatalogs() as $__sk => $__sc): ?><option value="<?php echo e($__sk); ?>"><?php echo e($__sc['name'] ?? $__sk); ?></option><?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-link btn-sm p-0 mb-3" id="orderReqToggle">Díl v katalogu nenajdu — zadat ručně</button>
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <label class="form-label"><?php echo __('quantity'); ?></label>
+                            <input type="number" name="quantity" class="form-control" value="1" min="1">
+                        </div>
+                        <div class="col-8">
+                            <label class="form-label">Kdy je potřeba</label>
+                            <select name="priority" class="form-select">
+                                <option value="today">Ještě dnes (spěchá)</option>
+                                <option value="this_week" selected>Tento týden</option>
+                                <option value="later">Později</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Poznámka pro vedoucího <span class="text-white-50">(nepovinné)</span></label>
+                        <input type="text" name="notes" class="form-control" placeholder="např. originál, ne kopie">
+                    </div>
+                    <?php if (isOrderStatusIn($status, 'new') || isOrderStatusIn($status, 'in_progress')): ?>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="set_waiting" value="1" id="orderReqWaiting" checked>
+                        <label class="form-check-label" for="orderReqWaiting">Přepnout zakázku na „Čeká na díl"</label>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('cancel'); ?></button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-cart-plus me-1"></i>Objednat</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<style>
+.order-req-info{padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:14px}
+.order-req-info a{color:#7dbbff}
+.oreq-opt b{font-weight:600}.oreq-opt small{display:block;opacity:.7;font-size:12px !important}
+</style>
+<?php endif; ?>
+
 <!-- Modal Upload Media -->
 <div class="modal fade" id="uploadMediaModal" tabindex="-1">
     <div class="modal-dialog">
@@ -1342,6 +1444,66 @@ $(document).ready(function() {
             $('#shippingDetails').addClass('d-none');
         }
     });
+
+    // ── Objednat díl k zakázce (v4.0.0) ──
+    (function () {
+        var $sel = $('#orderReqPart');
+        if (!$sel.length) return;
+        function esc(x) { return $('<div>').text(x == null ? '' : String(x)).html(); }
+        $sel.select2({
+            dropdownParent: $('#orderReqModal'),
+            placeholder: 'Hledej díl… (např. 13 pro displej)',
+            width: '100%',
+            minimumInputLength: 2,
+            ajax: {
+                url: 'api/search_catalog_items.php',
+                dataType: 'json',
+                delay: 250,
+                data: function (p) { return { q: p.term || '', limit: 30, for_order: 1 }; },
+                processResults: function (d) { return { results: d.results || [] }; }
+            },
+            templateResult: function (it) {
+                if (!it.id) return it.text;
+                var price = it.price > 0 ? new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(it.price) + ' Kč' : 'cena neověřena';
+                return $('<div class="oreq-opt"><b>' + esc(it.part_name) + '</b><small>' + esc(it.supplier) + ' · ' + price
+                    + (it.availability ? ' · ' + esc(it.availability) : '') + (it.in_stock_here > 0 ? ' · u nás skladem ' + it.in_stock_here + ' ks' : '') + '</small></div>');
+            },
+            templateSelection: function (it) { return it.part_name ? it.part_name + ' — ' + (it.supplier || '') : it.text; }
+        });
+        $sel.on('select2:select', function (e) {
+            var it = e.params.data;
+            $('#orderReqSupplierKey').val(it.supplier_key || '');
+            var price = it.price > 0 ? new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 0 }).format(it.price) + ' Kč' : 'cena neověřena';
+            $('#orderReqInfo').prop('hidden', false).html('<b>' + esc(it.supplier) + '</b> · ' + price + (it.checked ? ' <span class="text-white-50">(ověřeno ' + esc(it.checked) + ')</span>' : '')
+                + (it.availability ? '<br>' + esc(it.availability) : '')
+                + (it.in_stock_here > 0 ? '<br><span class="text-warning">Pozor: u nás je skladem ' + it.in_stock_here + ' ks — možná ho stačí vzít ze skladu.</span>' : '')
+                + (it.url ? '<br><a href="' + esc(it.url) + '" target="_blank" rel="noopener">Otevřít u dodavatele ↗</a>' : ''));
+        });
+        $('#orderReqToggle').on('click', function () {
+            var manual = $('#orderReqManual').prop('hidden');
+            $('#orderReqManual').prop('hidden', !manual);
+            $('#orderReqPickWrap, #orderReqInfo').prop('hidden', manual);
+            if (manual) { $sel.val(null).trigger('change'); $('#orderReqInfo').html(''); }
+            else { $('#orderReqManual [name=item_name]').val(''); }   // zpět na katalog: ruční název nesmí přepsat vybraný díl
+            $(this).text(manual ? 'Vybrat z katalogu' : 'Díl v katalogu nenajdu — zadat ručně');
+        });
+        $('#orderReqForm').on('submit', function (e) {
+            e.preventDefault();
+            var manual = !$('#orderReqManual').prop('hidden');
+            if (manual) {
+                if (!$.trim($(this).find('[name=item_name]').val())) { showAlert('Napiš název dílu.'); return; }
+                $('#orderReqSupplierKey').val($('#orderReqManualSupplier').val());
+            } else if (!$sel.val()) { showAlert('Vyber díl z katalogu, nebo ho zadej ručně.'); return; }
+            else { $(this).find('[name=item_name]').val(''); }
+            var $b = $(this).find('button[type=submit]').prop('disabled', true);
+            $.post('api/procurement_request.php', $(this).serialize())
+                .done(function (res) {
+                    if (res && res.success) { showAlert('Díl je na nákupním seznamu' + (res.waiting_set ? ', zakázka čeká na díl.' : '.')); setTimeout(function () { location.reload(); }, 700); }
+                    else { $b.prop('disabled', false); showAlert('<?php echo __('error'); ?>: ' + ((res && res.message) || '')); }
+                })
+                .fail(function (x) { $b.prop('disabled', false); var m = ''; try { m = JSON.parse(x.responseText).message; } catch (er) {} showAlert('<?php echo __('error'); ?>: ' + (m || x.status)); });
+        });
+    })();
 
     $('#addPartForm').on('submit', function(e) {
         e.preventDefault();

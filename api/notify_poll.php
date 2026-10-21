@@ -15,6 +15,10 @@ if (!isset($_SESSION['user_id'])) {
 // Poor-man's cron: poller běží každých ~20 s od každého přihlášeného → ideální
 // místo pro odpálení automatické zálohy (každých 15 minut, na pozadí).
 crmBackupMaybeSchedule();
+// … a jednou denně synchronizace cen a dostupnosti v katalozích dodavatelů (v4.0.0)
+crmSupplierSyncMaybeSchedule();
+// … a připomínka vedení k nákupnímu seznamu v 9:00 a ve 14:00
+crmProcurementReminderMaybe();
 
 // Měření aktivního času v systému (statistiky: hodiny Bosse/adminů = práce na CRM)
 crmTrackStaffActivity();

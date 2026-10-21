@@ -11,6 +11,21 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.0.0',
+        'date' => '2026-10-21',
+        'time' => '04:00',
+        'title' => 'Ceny dodavatelů se aktualizují každý den + objednávání dílů rovnou ze zakázky',
+        'items' => [
+            '<b>Denní synchronizace katalogů</b>: každé ráno se katalog každého dodavatele (Mobilnidily, Jablečnédíly, refurb.zone, fixshop, MobileSentrix) projde znovu. Aktualizuje se cena a dostupnost, díly, které dodavatel přestal nabízet, se označí. V Nákupech je tlačítko <b>Synchronizovat teď</b> a přehled poslední kontroly.',
+            'Ceny konečně sedí s webem dodavatele. <b>Cena u dodavatele</b> = cena z webu přepočtená dnešním kurzem ČNB, s DPH a po naší slevě. U MobileSentrix a refurb.zone (ceny na webu jsou bez DPH) se přičítá 21 %. V Nákupech jde u každého dodavatele nastavit <b>naše sleva v %</b> (B2B ceny) a jestli jsou ceny na webu s DPH, nebo bez.',
+            'Opraveno: část položek MobileSentrix měla cenu pořád v eurech, fixshop měl nesmyslné ceny (číslo modelu místo ceny) a dodavatelé si navzájem přepisovali díly se stejným kódem. MobileSentrix se teď prochází celý (všechny Apple díly), ne jen prvních 50 stránek. Ručně upravená prodejní cena dílu se synchronizací nepřepíše.',
+            '<b>Objednat díl</b> v detailu zakázky: technik najde díl napříč všemi dodavateli (hledá i anglické názvy, nahoře díly skladem u dodavatele a nejlevnější), zadá počet a kdy je potřeba. Zakázka se může sama přepnout na „Čeká na díl“. U zakázky je pak vidět, co je objednané a co dorazilo.',
+            '<b>Nákupní seznam po dodavatelích</b>: vedoucí vidí čekající díly seskupené podle dodavatele s cenou, odkazem na produkt a zakázkou. Tlačítkem <b>Otevřít u dodavatele</b> otevře produkty, vloží je do košíku a jedním tlačítkem <b>Vše objednáno</b> je označí jako objednané. Když balík dorazí, tlačítko <b>Vše dorazilo</b> díly naskladní a navěsí na jejich zakázky.',
+            'Když díl dorazí, dostane technik zakázky i ten, kdo díl chtěl, upozornění. Vedení dostane v 9:00 a ve 14:00 připomínku, pokud na seznamu čekají díly k objednání.',
+            'Opraveno: díl přidaný k zakázce, který nebyl skladem, se po příjmu z nákupu přidal na zakázku podruhé. U požadavků technika se teď ukazuje i jeho jméno.',
+        ],
+    ],
+    [
         'version' => '3.99.0',
         'date' => '2026-10-21',
         'time' => '02:30',

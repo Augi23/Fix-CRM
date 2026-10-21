@@ -117,12 +117,34 @@ try {
             'entity_type' => 'procurement', 'entity_id' => (int)$pdo->lastInsertId(), 'entity_label' => $itemName,
             'summary' => 'Požadavek na díl: ' . $itemName . ' (' . $quantity . ' ks)' . ($orderId > 0 ? ', zakázka #' . $orderId : ''),
         ]);
-        echo json_encode(['success' => true, 'message' => 'Request saved.']);
+
+        // „Objednat díl" z detailu zakázky (v4.0.0): technik může rovnou přepnout zakázku
+        // na „Čeká na díl" — jen z rozpracovaných stavů, hotovou/zrušenou nechat být.
+        $waitingSet = false;
+        if ($orderId > 0 && !empty($_POST['set_waiting'])) {
+            $os = $pdo->prepare("SELECT status, order_code FROM orders WHERE id = ? LIMIT 1");
+            $os->execute([$orderId]);
+            $ord = $os->fetch(PDO::FETCH_ASSOC);
+            $cur = (string)($ord['status'] ?? '');
+            if ($ord && (isOrderStatusIn($cur, 'new') || isOrderStatusIn($cur, 'in_progress'))) {
+                $new = getCanonicalOrderStatusByGroup('waiting_parts') ?: 'Čeká na díl';
+                $pdo->prepare("UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([$new, $orderId]);
+                logOrderStatusChange($orderId, $cur, $new);
+                $oc = trim((string)($ord['order_code'] ?? '')) !== '' ? (string)$ord['order_code'] : ('#' . $orderId);
+                crmAuditLog('order.status_change', [
+                    'entity_type' => 'order', 'entity_id' => $orderId, 'entity_label' => $oc,
+                    'summary' => 'Zakázka ' . $oc . ' — stav: ' . $cur . ' → ' . $new . ' (objednán díl)',
+                ]);
+                $waitingSet = true;
+            }
+        }
+        echo json_encode(['success' => true, 'waiting_set' => $waitingSet, 'message' => 'Request saved.']);
         exit;
     }
 
     if ($action === 'update') {
-        if (!hasPermission('procurement_manage')) {
+        // stejné pravidlo jako tlačítka v UI (procurement_manage NEBO admin)
+        if (!crmCanManageProcurement()) {
             throw new Exception('You do not have permission to order or change procurement status.');
         }
 
@@ -135,7 +157,7 @@ try {
 
         $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare("SELECT id, status, inventory_id, quantity, item_name, order_id, order_item_id FROM purchase_requests WHERE id = ? LIMIT 1 FOR UPDATE");
+        $stmt = $pdo->prepare("SELECT id, status, inventory_id, quantity, item_name, order_id, order_item_id, requested_by_key FROM purchase_requests WHERE id = ? LIMIT 1 FOR UPDATE");
         $stmt->execute([$id]);
         $request = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -257,6 +279,31 @@ try {
             'summary' => 'Díl „' . (string)($request['item_name'] ?? ('#' . $id)) . '" — stav nákupu: ' . (string)($request['status'] ?? '') . ' → ' . $status
                 . ((!$wasReceived && $isNowReceived && $inventoryId > 0) ? ' (naskladněno ' . $quantity . ' ks)' : '') . $assignNote,
         ]);
+        // Díl dorazil (v4.0.0): dát vědět tomu, kdo ho chtěl, a technikovi zakázky.
+        if (!$wasReceived && $isNowReceived) {
+            try {
+                require_once __DIR__ . '/../includes/push.php';
+                $title = 'Díl dorazil';
+                $body = (string)($request['item_name'] ?? 'Díl') . ' je na skladě';
+                $url = 'nakupni-seznam.php';
+                $techId = 0;
+                if ($reqOrderId > 0) {
+                    $oq = $pdo->prepare("SELECT order_code, technician_id FROM orders WHERE id = ? LIMIT 1");
+                    $oq->execute([$reqOrderId]);
+                    if ($o = $oq->fetch(PDO::FETCH_ASSOC)) {
+                        $body .= ' — zakázka ' . ((string)$o['order_code'] ?: '#' . $reqOrderId) . ', můžeš pokračovat v opravě';
+                        $techId = (int)$o['technician_id'];
+                        $url = 'view_order.php?id=' . $reqOrderId;
+                    }
+                }
+                $sent = [];
+                $reqKey = (string)($request['requested_by_key'] ?? '');
+                if ($reqKey !== '' && $reqKey !== crmStaffKey()) { pushToStaff($pdo, $reqKey, $title, $body, ['data' => ['url' => $url]]); $sent[$reqKey] = true; }
+                if ($techId > 0 && !isset($sent['tech:' . $techId]) && 'tech:' . $techId !== crmStaffKey()) {
+                    pushToTechnician($pdo, $techId, $title, $body, ['data' => ['url' => $url]]);
+                }
+            } catch (Throwable $e) { error_log('procurement received push: ' . $e->getMessage()); }
+        }
         echo json_encode(['success' => true, 'message' => 'Status updated.']);
         exit;
     }

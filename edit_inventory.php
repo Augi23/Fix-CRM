@@ -73,6 +73,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canEditBranch) {
             WHERE id = ?");
         $update->execute([$part_name, $sku, $quantity, $cost_price, $sale_price, $min_stock,
             $device_model !== '' ? $device_model : null, $location_id > 0 ? $location_id : null, $id]);
+        // ručně změněná prodejní cena dílu z katalogu → denní synchronizace cen dodavatele
+        // ji už nepřepíše (v4.0.0)
+        if (abs((float)$sale_price - (float)$item['sale_price']) >= 0.01 && !empty($item['source_supplier'])) {
+            try { $pdo->prepare("UPDATE inventory SET price_manual = 1 WHERE id = ?")->execute([$id]); } catch (Throwable $e) { /* sloupec ještě není */ }
+        }
         // ruční přepis počtu kusů = korekce → do deníku pohybů (ať inventura sedí)
         if ((int)$quantity !== (int)$item['quantity']) {
             crmLogInventoryMove((int)$id, (int)$quantity - (int)$item['quantity'], 'correction', null, 'Úprava počtu v editaci dílu');

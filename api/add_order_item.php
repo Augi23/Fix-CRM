@@ -77,11 +77,12 @@ try {
     }
     $stmt = $pdo->prepare("INSERT INTO order_items (order_id, inventory_id, quantity, price, stock_deducted) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$order_id, $inventory_id, $qty, $price, $__orderDone ? 1 : 0]);
+    $__orderItemId = (int)$pdo->lastInsertId();
 
     $autoProcurementQueued = false;
     if ((int)($inventory['quantity'] ?? 0) <= 0) {
         try {
-            $autoProcurementQueued = queueProcurementRequestFromOrder((int)$order_id, (int)$inventory_id, $qty, 'Automatically added while inserting into order.');
+            $autoProcurementQueued = queueProcurementRequestFromOrder((int)$order_id, (int)$inventory_id, $qty, 'Automatically added while inserting into order.', $__orderItemId);
         } catch (Throwable $autoQueueError) {
             log_error('Auto procurement queue failed', 'procurement', $autoQueueError->getMessage());
         }

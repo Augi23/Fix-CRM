@@ -4,6 +4,8 @@ require_once 'includes/functions.php';
 require_once 'includes/header.php';
 
 ensureProcurementSchema();
+require_once __DIR__ . '/includes/catalog_sync.php';
+ensureSupplierSyncSchema();   // supplier_price_czk pro odhad ceny objednávky (v4.0.0)
 
 $can_manage  = hasPermission('procurement_manage') || hasPermission('admin_access');
 // Technik smí přidávat na seznam a mazat POUZE svoje čekající položky.
@@ -35,11 +37,15 @@ try {
         SELECT pr.*,
                o.order_code, o.device_brand, o.device_model,
                c.first_name, c.last_name,
-               ru.full_name AS requested_by_name
+               COALESCE(ru.full_name, rt.name) AS requested_by_name,
+               inv.source_url, inv.supplier_availability,
+               CASE WHEN inv.price_synced_at IS NOT NULL THEN inv.supplier_price_czk END AS unit_price   -- jen ověřená cena (staré importy MobileSentrix mají v sale_price eura)
         FROM purchase_requests pr
         LEFT JOIN orders o     ON o.id = pr.order_id
         LEFT JOIN customers c  ON c.id = o.customer_id
         LEFT JOIN users ru     ON ru.id = pr.requested_by
+        LEFT JOIN technicians rt ON pr.requested_by_key = CONCAT('tech:', rt.id)   -- technik (requested_by je NULL)
+        LEFT JOIN inventory inv ON inv.id = pr.inventory_id
         ORDER BY FIELD(pr.status,'pending','ordered','received','cancelled'),
                  FIELD(pr.priority,'today','this_week','later'),
                  pr.created_at DESC
@@ -88,6 +94,8 @@ function slRenderItem(array $r, bool $can_manage, bool $can_request = false, str
                 <div class="sl-item-meta">
                     <?php if ($sku !== ''): ?><button type="button" class="sl-chip sl-chip-copy" data-sl-copy="<?php echo e($sku); ?>" title="<?php echo e(__('copy_sku')); ?>"><i class="fas fa-barcode"></i> <?php echo e($sku); ?> <i class="fas fa-copy sl-copy-ic"></i></button><?php endif; ?>
                     <span class="sl-chip"><i class="fas fa-store"></i> <?php echo e($supplier); ?></span>
+                    <?php if ((float)($r['unit_price'] ?? 0) > 0): ?><span class="sl-chip"><?php echo formatMoney((float)$r['unit_price']); ?><?php echo $qty > 1 ? ' / ks' : ''; ?></span><?php endif; ?>
+                    <?php if (!empty($r['source_url']) && in_array($status, ['pending', 'ordered'], true)): ?><a class="sl-chip sl-chip-link" href="<?php echo e($r['source_url']); ?>" target="_blank" rel="noopener" data-sl-url><i class="fas fa-up-right-from-square"></i> u dodavatele</a><?php endif; ?>
                     <span class="<?php echo slPriorityBadge($priority); ?>"><?php echo slPriorityLabel($priority); ?></span>
                     <?php if ($orderId > 0): ?>
                         <a class="sl-chip sl-chip-link" href="view_order.php?id=<?php echo $orderId; ?>">
@@ -177,7 +185,34 @@ function slRenderItem(array $r, bool $can_manage, bool $can_request = false, str
                 <span class="sl-section-count"><?php echo count($items); ?></span>
             </div>
             <div class="sl-section-body">
+                <?php if ($can_manage && in_array($key, ['pending', 'ordered'], true)):
+                    /* v4.0.0: objednává se po dodavatelích — vedoucí otevře díly na webu dodavatele,
+                       vloží do košíku a celou skupinu jedním tlačítkem označí jako objednanou / doručenou */
+                    $bySup = [];
+                    foreach ($items as $r) { $bySup[(string)$r['supplier_key']][] = $r; }
+                    foreach ($bySup as $sk => $rows):
+                        $sum = 0.0; $priced = 0;
+                        foreach ($rows as $r) { if ((float)($r['unit_price'] ?? 0) > 0) { $sum += (float)$r['unit_price'] * max(1, (int)$r['quantity']); $priced++; } }
+                        $copy = implode("\n", array_map(fn($r) => max(1, (int)$r['quantity']) . "×\t" . trim((string)($r['sku'] ?? '')) . "\t" . (string)$r['item_name'] . (!empty($r['source_url']) ? "\t" . $r['source_url'] : ''), $rows));
+                ?>
+                <div class="sl-sup" data-sl-sup="<?php echo e($sk); ?>">
+                    <div class="sl-sup-head">
+                        <div><b><?php echo e(supplierLabel($sk)); ?></b> <em><?php echo count($rows); ?> <?php echo count($rows) === 1 ? 'položka' : (count($rows) < 5 ? 'položky' : 'položek'); ?><?php echo $priced ? ' · cca ' . formatMoney($sum) . ($priced < count($rows) ? ' (' . (count($rows) - $priced) . '× bez ověřené ceny)' : '') : ''; ?></em></div>
+                        <div class="sl-sup-acts">
+                            <?php if ($key === 'pending'): ?>
+                            <button type="button" class="sl-btn sl-btn-ghost" data-sl-openall title="Otevře stránky dílů u dodavatele (každý v nové kartě) — vložíš je do košíku"><i class="fas fa-up-right-from-square me-1"></i>Otevřít u dodavatele</button>
+                            <button type="button" class="sl-btn sl-btn-ghost" data-sl-copylist="<?php echo e($copy); ?>" title="Počet, SKU, název a odkaz — pro rychlou objednávku / e-mail dodavateli"><i class="fas fa-copy me-1"></i>Kopírovat seznam</button>
+                            <button type="button" class="sl-btn sl-btn-primary" data-sl-bulk="ordered"><i class="fas fa-check me-1"></i>Vše objednáno</button>
+                            <?php else: ?>
+                            <button type="button" class="sl-btn sl-btn-success" data-sl-bulk="received"><i class="fas fa-box-open me-1"></i>Vše dorazilo</button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php foreach ($rows as $r) { slRenderItem($r, $can_manage, $can_request, $my_key); } ?>
+                </div>
+                <?php endforeach; else: ?>
                 <?php foreach ($items as $r) { slRenderItem($r, $can_manage, $can_request, $my_key); } ?>
+                <?php endif; ?>
             </div>
         </section>
     <?php endforeach; ?>
@@ -276,6 +311,18 @@ function slRenderItem(array $r, bool $can_manage, bool $can_request = false, str
 .sl-empty h3 { color: #e8ecf3; font-weight: 700; margin-bottom: 6px; }
 .sl-empty a { color: #7DBEFF; text-decoration: none; }
 
+.sl-sup { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.02); margin-bottom: 14px; }
+.sl-sup-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 2px 4px 6px; }
+.sl-sup-head b { font-size: 1.05rem; }
+.sl-sup-head em { font-style: normal; color: #9aa4b2; font-size: .9rem; margin-left: 6px; }
+.sl-sup-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+html[data-lg-theme="light"] .sl-sup { border-color: rgba(10,20,40,.1); background: #fff; }
+html[data-lg-theme="light"] .sl-chip { color: #2a3342; background: rgba(10,20,40,.05); border-color: rgba(10,20,40,.12); }
+html[data-lg-theme="light"] .sl-chip-soft { color: #5a6475; background: transparent; border-color: transparent; }
+html[data-lg-theme="light"] .sl-chip-link { color: #0062c9; }
+html[data-lg-theme="light"] .sl-btn-ghost { color: #2a3342; background: rgba(10,20,40,.05); border-color: rgba(10,20,40,.14); }
+html[data-lg-theme="light"] .sl-sup-head em, html[data-lg-theme="light"] .sl-subtitle, html[data-lg-theme="light"] .sl-stat-label { color: #5a6475; }
+html[data-lg-theme="light"] .sl-badge-info { color: #0369a1; } html[data-lg-theme="light"] .sl-badge-danger { color: #b91c1c; } html[data-lg-theme="light"] .sl-badge-muted { color: #5a6475; }
 @media (max-width: 640px) {
     .sl-stats { grid-template-columns: 1fr; }
     .sl-item-actions { width: 100%; }
@@ -323,6 +370,53 @@ $(function () {
             try { document.execCommand('copy'); flash(); } catch (e) { window.prompt('<?php echo e(__('copy_sku')); ?>', sku); }
             document.body.removeChild(ta);
         }
+    });
+
+    // ── Objednávka po dodavatelích (v4.0.0) ──
+    // Prohlížeč pustí na jedno kliknutí jen jedno nové okno → každé kliknutí otevře další díl
+    // („Otevřít další 2/5"), ať jdou postupně vložit do košíku u dodavatele.
+    $('.sl-page').on('click', '[data-sl-openall]', function () {
+        var $b = $(this);
+        var links = $b.closest('.sl-sup').find('[data-sl-url]').map(function () { return this.href; }).get();
+        if (!links.length) { alert('U těchto položek chybí odkaz na web dodavatele.'); return; }
+        var i = parseInt($b.data('slNext') || 0, 10);
+        if (i >= links.length) { i = 0; }
+        var w = window.open(links[i], '_blank');
+        if (w) { try { w.opener = null; } catch (e) {} }
+        else { alert('Prohlížeč okno zablokoval — povol vyskakovací okna pro tuto stránku (ikona v adresním řádku), nebo použij odkaz „u dodavatele" u položky.'); return; }
+        i++;
+        $b.data('slNext', i);
+        $b.html('<i class="fas fa-up-right-from-square me-1"></i>' + (i < links.length ? 'Otevřít další (' + (i + 1) + '/' + links.length + ')' : 'Otevřeno vše ✓'));
+    });
+    $('.sl-page').on('click', '[data-sl-copylist]', function () {
+        var txt = String($(this).data('sl-copylist') || ''); var $b = $(this);
+        var done = function () { var o = $b.html(); $b.html('<i class="fas fa-check me-1"></i>Zkopírováno'); setTimeout(function () { $b.html(o); }, 1400); };
+        if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt).then(done).catch(function () { window.prompt('Seznam', txt); }); }
+        else { window.prompt('Seznam', txt); }
+    });
+    $('.sl-page').on('click', '[data-sl-bulk]', function () {
+        var $b = $(this), status = String($b.data('sl-bulk'));
+        var $grp = $b.closest('.sl-sup');
+        var ids = $grp.find('[data-sl-action="' + status + '"]').map(function () { return $(this).data('sl-id'); }).get();
+        if (!ids.length) return;
+        var nItems = ids.length + ' ' + (ids.length === 1 ? 'položku' : (ids.length < 5 ? 'položky' : 'položek'));
+        var q = status === 'ordered' ? 'Označit ' + nItems + ' u dodavatele „' + $grp.find('.sl-sup-head b').text() + '" jako objednané?'
+                                     : (ids.length === 1 ? 'Dorazila položka?' : 'Dorazily všechny ' + nItems + '?') + ' Díly se naskladní a navěsí na své zakázky.';
+        if (!confirm(q)) return;
+        $grp.find('.sl-btn').prop('disabled', true);
+        $b.html('<i class="fas fa-spinner fa-spin me-1"></i>0 / ' + ids.length);
+        var i = 0, fails = [];
+        (function next() {   // jedna po druhé — příjem hýbe skladem i zakázkami, ať se nic neprobíjí
+            if (i >= ids.length) {
+                if (fails.length) { alert('Nepodařilo se: ' + fails.join('\n')); }
+                location.reload(); return;
+            }
+            var id = ids[i++];
+            $.post('api/procurement_request.php', { action: 'update', id: id, status: status })
+                .done(function (res) { if (!res || !res.success) { fails.push('#' + id + ': ' + ((res && res.message) || '?')); } })
+                .fail(function (x) { var m = ''; try { m = JSON.parse(x.responseText).message; } catch (e) {} fails.push('#' + id + ': ' + (m || x.status)); })
+                .always(function () { $b.html('<i class="fas fa-spinner fa-spin me-1"></i>' + i + ' / ' + ids.length); next(); });
+        })();
     });
 
     $('.sl-page').on('click', '[data-sl-action]', function () {

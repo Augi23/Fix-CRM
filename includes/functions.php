@@ -3928,7 +3928,9 @@ function crmEnsureOrderCashReceipt(int $orderId): array {
     }
 }
 
-function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $quantity, string $notes = ''): bool {
+/** $orderItemId = řádek order_items, který už na zakázce je (add_order_item) — uloží se do
+ *  požadavku, aby příjem z nákupu nepřidal díl na zakázku podruhé (oprava v4.0.0). */
+function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $quantity, string $notes = '', ?int $orderItemId = null): bool {
     global $pdo;
 
     if ($orderId <= 0 || $inventoryId <= 0 || $quantity <= 0) {
@@ -3968,17 +3970,25 @@ function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $q
     $sku = trim((string)($inventory['sku'] ?? ''));
     $requestedBy = $_SESSION['user_id'] ?? ($_SESSION['tech_id'] ?? null);
 
-    $stmt = $pdo->prepare("SELECT id, quantity FROM purchase_requests WHERE order_id = ? AND inventory_id = ? AND status = 'pending' LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id, quantity, order_item_id FROM purchase_requests WHERE order_id = ? AND inventory_id = ? AND status = 'pending' LIMIT 1");
     $stmt->execute([$orderId, $inventoryId]);
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($existing) {
+        if ($orderItemId && empty($existing['order_item_id'])) {
+            // Technik díl už objednal („Objednat díl"), teď se TENTÝŽ díl přidal na zakázku →
+            // je to stejný kus: požadavek se jen připojí k řádku zakázky (jinak by příjem přidal
+            // díl na zakázku podruhé a objednalo by se kusů navíc)
+            $pdo->prepare("UPDATE purchase_requests SET order_item_id = ?, quantity = GREATEST(quantity, ?) WHERE id = ?")
+                ->execute([$orderItemId, $quantity, $existing['id']]);
+            return true;
+        }
         $upd = $pdo->prepare("UPDATE purchase_requests SET quantity = quantity + ?, notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes END WHERE id = ?");
         $upd->execute([$quantity, $notes !== '' ? $notes : null, $existing['id']]);
         return true;
     }
 
-    $stmt = $pdo->prepare("INSERT INTO purchase_requests (order_id, supplier_key, inventory_id, item_name, sku, quantity, priority, status, notes, requested_by, requested_by_key) VALUES (?, ?, ?, ?, ?, ?, 'this_week', 'pending', ?, ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO purchase_requests (order_id, supplier_key, inventory_id, item_name, sku, quantity, priority, status, notes, requested_by, requested_by_key, order_item_id) VALUES (?, ?, ?, ?, ?, ?, 'this_week', 'pending', ?, ?, ?, ?)");
     $stmt->execute([
         $orderId,
         $supplierKey,
@@ -3989,6 +3999,7 @@ function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $q
         $notes !== '' ? $notes : null,
         is_numeric($requestedBy) ? (int)$requestedBy : null,
         function_exists('crmStaffKey') ? crmStaffKey() : null,
+        $orderItemId ?: null,
     ]);
 
     return true;
@@ -7332,6 +7343,56 @@ function crmBackupMaybeSchedule(): void {
             set_setting('backup_last_status', 'CHYBA: nelze spustit zálohu (' . ($php === null ? 'php-cli nenalezen' : 'chybí scripts/backup_crm.php') . ')');
         }
     } catch (Throwable $e) { /* záloha nesmí nikdy shodit request */ }
+}
+
+/** Denní synchronizace katalogů dodavatelů (v4.0.0) — stejný „poor-man's cron" jako
+ *  zálohy: levná kontrola z notify_poll; jednou denně po 5:00 spustí na pozadí
+ *  scripts/sync_supplier_catalogs.php (ceny, dostupnost, zmizelé díly). */
+function crmSupplierSyncMaybeSchedule(): void {
+    try {
+        if ((int)date('G') < 5) return;
+        if ((string)get_setting('supplier_sync_day', '') === date('Y-m-d')) return;
+        set_setting('supplier_sync_day', date('Y-m-d'));       // claim (proti souběhu)
+        crmSupplierSyncStart();
+    } catch (Throwable $e) { /* synchronizace nesmí nikdy shodit request */ }
+}
+
+/** Připomínka vedení (v4.0.0): v 9:00 a ve 14:00 (první poll po tom čase), když na
+ *  nákupním seznamu čekají díly k objednání → push manažerům, Bossovi a adminům. */
+function crmProcurementReminderMaybe(): void {
+    global $pdo;
+    try {
+        $h = (int)date('G');
+        $slot = $h >= 14 ? '14' : ($h >= 9 ? '09' : '');
+        if ($slot === '') return;
+        $key = date('Y-m-d') . ' ' . $slot;
+        if ((string)get_setting('procurement_reminder_slot', '') === $key) return;
+        set_setting('procurement_reminder_slot', $key);          // claim (proti souběhu)
+        ensureProcurementSchema();
+        $r = $pdo->query("SELECT COUNT(*) n, SUM(priority = 'today') t, COUNT(DISTINCT supplier_key) s FROM purchase_requests WHERE status = 'pending'")->fetch(PDO::FETCH_ASSOC);
+        $n = (int)($r['n'] ?? 0);
+        if ($n === 0) return;
+        require_once __DIR__ . '/push.php';
+        $body = $n . ' ' . ($n === 1 ? 'díl čeká' : ($n < 5 ? 'díly čekají' : 'dílů čeká')) . ' na objednání'
+            . ((int)$r['s'] > 1 ? ' u ' . (int)$r['s'] . ' dodavatelů' : '')
+            . ((int)$r['t'] > 0 ? ' — ' . (int)$r['t'] . '× spěchá (ještě dnes)' : '');
+        $keys = [];
+        foreach ($pdo->query("SELECT id FROM technicians WHERE is_active = 1 AND role IN ('manager','boss')") as $t) { $keys[] = 'tech:' . (int)$t['id']; }
+        try { foreach ($pdo->query("SELECT id FROM users WHERE role = 'admin'") as $u) { $keys[] = 'user:' . (int)$u['id']; } } catch (Throwable $e) {}
+        foreach (array_unique($keys) as $k) {
+            pushToStaff($pdo, $k, 'Nákupní seznam', $body, ['data' => ['url' => 'nakupni-seznam.php'], 'thread' => 'procurement']);
+        }
+    } catch (Throwable $e) { /* připomínka nesmí shodit request */ }
+}
+
+/** Spustí synchronizaci na pozadí (i tlačítko „Synchronizovat teď"). $skey = jen jeden dodavatel. */
+function crmSupplierSyncStart(string $skey = ''): bool {
+    if (!function_exists('exec')) return false;
+    $php = crmBackupFindBin(['php', 'php8.3', 'php8.2', 'php8.1']);
+    $script = dirname(__DIR__) . '/scripts/sync_supplier_catalogs.php';
+    if ($php === null || !is_file($script)) return false;
+    exec('nohup ' . escapeshellarg($php) . ' ' . escapeshellarg($script) . ($skey !== '' ? ' ' . escapeshellarg($skey) : '') . ' > /dev/null 2>&1 &');
+    return true;
 }
 
 /* ─────────────────────────────  AUDITNÍ HISTORIE  ─────────────────────────────
