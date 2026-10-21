@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.0.1',
+        'date' => '2026-10-21',
+        'time' => '09:30',
+        'title' => 'Ceny dodavatelů přesunuty do Nastavení, karty dodavatelů v Nákupech nahoru',
+        'items' => [
+            'Nastavení cen dodavatelů (DPH, naše sleva, denní synchronizace, Synchronizovat teď) je nově v <b>Nastavení → Dodavatelé</b>. V Nákupech už nepřekáží, zůstalo tam jen malé tlačítko <b>Ceny dodavatelů</b>.',
+            'V Nákupech jsou úplně nahoře karty dodavatelů (čeká / objednáno / přijato, Kopírovat seznam, Přidat), na počítači všech pět vedle sebe.',
+            'Opraveno v Nákupech: na stránce chyběla patička CRM, takže nefungovala hlášení (např. „Seznam zkopírován“) ani tlačítka <b>Nová zakázka</b> a <b>Reklamace</b> v doku. Tlačítka v hlavičce se na tabletu zalomí a neuřízne se „Zpět na zakázky“.',
+        ],
+    ],
+    [
         'version' => '4.0.0',
         'date' => '2026-10-21',
         'time' => '04:00',

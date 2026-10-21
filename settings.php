@@ -641,7 +641,7 @@ if (isset($_POST['delete_greeting']) && crmCanManageSettings()) {
 // Security for technicians
 if (!$is_admin_user) {
     // Systém smí manažer/Boss jen kvůli Aktualizacím; jinak je celý admin-only.
-    $__blocked = in_array($active_tab, ['company', 'loyalty', 'banka'], true)
+    $__blocked = in_array($active_tab, ['company', 'loyalty', 'banka', 'dodavatele'], true)
         || ($active_tab === 'admins' && !hasPermission('manage_passwords'))   // „Správa hesel" (dřív se právo uložilo, ale záložka zůstala zavřená)
         || ($active_tab === 'system' && !crmCanRunUpdates());
     if ($__blocked) { $active_tab = 'staff'; }
@@ -687,6 +687,9 @@ require_once 'includes/header.php';
         </li>
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'banka' ? 'active' : 'text-white-75'; ?>" href="?tab=banka"><i class="fas fa-building-columns me-2"></i>Banka</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active_tab == 'dodavatele' ? 'active' : 'text-white-75'; ?>" href="?tab=dodavatele"><i class="fas fa-truck-field me-2"></i>Dodavatelé</a>
         </li>
         <?php endif; ?>
         <?php /* Uzávěrka období vidí i ÚČETNÍ — proto MIMO blok $is_admin_user. */ ?>
@@ -1241,6 +1244,13 @@ require_once 'includes/header.php';
         </div>
 
         <!-- VĚRNOSTNÍ KARTA TAB -->
+        <!-- DODAVATELÉ: ceny dodavatelů + denní synchronizace katalogů (v4.0.1, přesunuto z Nákupů) -->
+        <?php if ($is_admin_user && $active_tab == 'dodavatele'): ?>
+        <div class="tab-pane fade show active">
+            <?php require_once __DIR__ . '/includes/catalog_sync.php'; require __DIR__ . '/includes/partials/supplier_pricing.php'; ?>
+        </div>
+        <?php endif; ?>
+
         <div class="tab-pane fade <?php echo $active_tab == 'loyalty' ? 'show active' : ''; ?>">
             <?php
                 $lc = crmLoyaltyConfig();
