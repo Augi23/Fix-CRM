@@ -131,6 +131,34 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
 .afx-page-title { color: rgba(255,255,255,.45); font-size: 12.5px; font-weight: 500; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.12); max-width: 32vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .afx-utility-sep { flex: 1; }
 
+/* Kontrola IMEI v liště (v4.1.0): kompaktní pole hned za názvem stránky, výsledek v panelu pod ním */
+.afx-imei { position: relative; display: flex; align-items: center; }
+.afx-imei-form { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px 0 11px; border-radius: 999px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); transition: border-color .15s, background .15s; }
+.afx-imei-form:focus-within { border-color: rgba(10,132,255,.75); background: rgba(10,132,255,.08); }
+.afx-imei-form > i { font-size: 12px; color: rgba(255,255,255,.55); }
+.afx-imei-form input { width: 150px; border: 0; background: transparent; color: #fff; font-size: 12.5px; font-variant-numeric: tabular-nums; outline: none; min-height: 0; padding: 0; }
+.afx-imei-form input::placeholder { color: rgba(255,255,255,.55); }
+.afx-imei-form input:focus { width: 180px; }
+.afx-imei-form button { width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(255,255,255,.12); color: #fff; font-size: 11px;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.afx-imei-form button:hover { background: #0a84ff; }
+.afx-imei-form button:disabled { opacity: .6; cursor: default; }
+.afx-imei-form .spinner-border-sm { width: 12px; height: 12px; border-width: 2px; }
+.afx-imei-pop { position: absolute; top: calc(100% + 10px); left: 0; z-index: 1200; width: 400px; max-width: calc(100vw - 32px); max-height: 70vh; overflow: auto;
+  padding: 12px 14px; border-radius: 14px; background: rgba(16,20,28,.96); border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 18px 48px rgba(0,0,0,.55); font-size: 13.5px; color: #eef2f8; }
+.afx-imei-pop[hidden] { display: none; }
+.afx-imei-pop-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+.afx-imei-pop .alert { font-size: 13px; }
+html[data-lg-theme="light"] .afx-imei-form { background: rgba(0,0,0,.04); border-color: rgba(16,21,29,.25); }
+html[data-lg-theme="light"] .afx-imei-form > i, html[data-lg-theme="light"] .afx-imei-form input::placeholder { color: rgba(16,21,29,.6); }
+html[data-lg-theme="light"] .afx-imei-form input { color: #10151d; }
+html[data-lg-theme="light"] .afx-imei-form button { background: rgba(16,21,29,.12); color: #10151d; }
+html[data-lg-theme="light"] .afx-imei-form button:hover { background: #0071e3; color: #fff; }
+html[data-lg-theme="light"] .afx-imei-pop { background: #fff; color: #10151d; border-color: rgba(16,21,29,.12); box-shadow: 0 18px 48px rgba(20,30,50,.22); }
+html[data-lg-theme="light"] .afx-imei-pop .btn-close { filter: none; }
+
 /* Vyhledávání: bílý obrys + bílé texty (#ffffff) pro lepší viditelnost — přání 20.7.2026 */
 .afx-search { margin: 0; }
 .afx-search .input-group {
@@ -156,6 +184,10 @@ html.sidebar-hidden #content, html.sidebar-hidden #content.crm-v2-content { marg
   .afx-search { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: clamp(280px, 30vw, 480px); }
   .afx-search .input-group { min-width: 0; width: 100%; }
   .afx-page-title { max-width: 22vw; }  /* dlouhý název stránky nesmí podlézt vycentrované pole */
+}
+@container afxbar (max-width: 1280px) {
+  .afx-imei-form input { width: 110px; }
+  .afx-imei-form input:focus { width: 150px; }
 }
 @container afxbar (max-width: 1120px) {
   .afx-page-title { display: none; }

@@ -198,6 +198,7 @@ try {
     <link rel="stylesheet" href="assets/css/responsive.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/responsive.css'); ?>">
     <link rel="stylesheet" href="assets/css/crm-shell.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/crm-shell.css'); ?>">
     <link rel="stylesheet" href="assets/css/dock-3d.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/dock-3d.css'); ?>">
+    <script src="assets/js/imei-check.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/imei-check.js'); ?>" defer></script>
     <link rel="stylesheet" href="assets/css/panels-modern.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/panels-modern.css'); ?>">
     <link rel="stylesheet" href="assets/css/global-search.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/global-search.css'); ?>">
 
@@ -221,6 +222,11 @@ try {
     window.afxCsrf = function () { var m = document.querySelector('meta[name="csrf-token"]'); return m ? m.getAttribute('content') : ''; };
     window.afxCurrentUser = <?php echo json_encode((string)($_SESSION['username'] ?? ''), JSON_UNESCAPED_UNICODE); ?>;
     window.afxCurrentName = <?php echo json_encode((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''), JSON_UNESCAPED_UNICODE); ?>;
+    window.IMEI_I18N = <?php echo json_encode([
+        'title' => __('imei_check_title'), 'checking' => __('checking'), 'imeiMinDigits' => __('imei_min_digits'),
+        'checkCouldNotComplete' => __('check_could_not_complete'), 'policeDb' => __('police_db'), 'resultUnknown' => __('result_unknown'),
+        'resultFound' => __('result_found'), 'resultNotFound' => __('result_not_found'), 'checkFailed' => __('check_failed'), 'serviceId' => __('service_id'),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 
     $(function() {
         $.ajaxSetup({
@@ -420,6 +426,19 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
         <img src="assets/img/logo-black.png" alt="AppleFix">
     </a>
     <span class="afx-page-title"><?php echo e($topbarTitle); ?></span>
+    <?php /* Kontrola IMEI přímo v liště (v4.1.0, přesunuto z karty na Nástěnce) — na každé
+             stránce; výsledek v plovoucím panelu pod polem. Na mobilu/iPadu (≤1080 px) skryto,
+             tam zůstává karta na Nástěnce. */ ?>
+    <?php if (!empty($_SESSION['user_id']) || !empty($_SESSION['tech_id'])): ?>
+    <div class="afx-imei afx-hide-m">
+        <form class="afx-imei-form" data-imei-check data-result="#afxImeiPop" autocomplete="off" title="<?php echo e(__('imei_help_text')); ?>">
+            <i class="fas fa-shield-halved"></i>
+            <input type="text" id="afxImeiInput" placeholder="<?php echo e(__('imei_check_title')); ?>" inputmode="numeric" maxlength="15" aria-label="<?php echo e(__('imei_check_title')); ?>">
+            <button type="submit" aria-label="<?php echo e(__('check')); ?>"><i class="fas fa-arrow-right"></i></button>
+        </form>
+        <div class="afx-imei-pop" id="afxImeiPop" hidden aria-live="polite"></div>
+    </div>
+    <?php endif; ?>
     <span class="afx-utility-sep"></span>
 
     <?php if ($show_search): ?>

@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.1.0',
+        'date' => '2026-10-26',
+        'time' => '11:30',
+        'title' => 'Kontrola IMEI přesunuta do horní lišty',
+        'items' => [
+            '<b>Kontrola IMEI</b> je nově v horní liště hned za názvem stránky, takže je po ruce na každé stránce CRM, ne jen na Nástěnce. Stačí napsat IMEI a dát Enter — výsledek (policejní databáze + iFreeiCloud) se ukáže v panelu pod polem, zavře se křížkem, klávesou Esc nebo kliknutím mimo.',
+            'Na iPadu a iPhonu (kde je lišta úzká) zůstává karta Kontrola IMEI na Nástěnce jako dřív. Tlačítko „Kontrola IMEI“ na Nástěnce na počítači rovnou zaostří pole v liště.',
+        ],
+    ],
+    [
         'version' => '4.0.1',
         'date' => '2026-10-21',
         'time' => '09:30',

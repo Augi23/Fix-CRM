@@ -566,9 +566,10 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
                 </div>
             </section>
 
-            <section class="dsh-card" id="dshImei">
+            <?php /* Kontrola IMEI je od v4.1.0 v horní liště; tahle karta zůstává jen pro mobil/iPad (≤1080 px) */ ?>
+            <section class="dsh-card dsh-imei-card" id="dshImei">
                 <h2 class="dsh-h"><?php echo __('imei_check_title'); ?></h2>
-                <form id="imeiCheckForm" class="dsh-imei" title="<?php echo e(__('imei_help_text')); ?>">
+                <form id="imeiCheckForm" class="dsh-imei" data-imei-check data-result="#imeiCheckResult" title="<?php echo e(__('imei_help_text')); ?>">
                     <input type="text" class="form-control" id="imeiCheckInput" placeholder="IMEI" inputmode="numeric" autocomplete="off" maxlength="15" aria-label="<?php echo e(__('serial')); ?>">
                     <button class="dsh-btn" type="submit"><?php echo __('check'); ?></button>
                 </form>
@@ -633,6 +634,8 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
             return;
         }
         if (e.target.closest('[data-dsh-imei]')) {
+            var top = document.getElementById('afxImeiInput');
+            if (top && top.offsetParent) { window.scrollTo({ top: 0, behavior: 'smooth' }); top.focus(); return; }   // lišta (počítač)
             document.getElementById('dshImei').scrollIntoView({ behavior: 'smooth', block: 'center' });
             setTimeout(function () { document.getElementById('imeiCheckInput').focus(); }, 350);
         }
@@ -640,128 +643,7 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
 })();
 </script>
 
-<script>
-$(document).ready(function() {
-    // OPRAVA 17.7.2026: chyběly deklarace + otevření IMEI_I18N → celý inline blok
-    // padal na SyntaxError a IMEI kontrola na nástěnce vůbec nefungovala.
-    var $imeiInput = $('#imeiCheckInput');
-    var $imeiResult = $('#imeiCheckResult');
-
-    const IMEI_I18N = {
-        checking: <?php echo json_encode(__('checking'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        imeiMinDigits: <?php echo json_encode(__('imei_min_digits'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        checkCouldNotComplete: <?php echo json_encode(__('check_could_not_complete'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        policeDb: <?php echo json_encode(__('police_db'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        resultUnknown: <?php echo json_encode(__('result_unknown'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        resultFound: <?php echo json_encode(__('result_found'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        resultNotFound: <?php echo json_encode(__('result_not_found'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        checkFailed: <?php echo json_encode(__('check_failed'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        serviceId: <?php echo json_encode(__('service_id'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        yesRaw: <?php echo json_encode(__('yes'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        noRaw: <?php echo json_encode(__('no'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
-    };
-
-    function renderImeiResult(type, message, details) {
-        const icon = type === 'success' ? 'check-circle' : type === 'danger' ? 'triangle-exclamation' : 'circle-exclamation';
-        const alertClass = type === 'success'
-            ? 'alert alert-success border-success border-opacity-25 bg-success bg-opacity-10 text-success'
-            : type === 'danger'
-                ? 'alert alert-danger border-danger border-opacity-25 bg-danger bg-opacity-10 text-danger'
-                : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
-
-        const detailHtml = details ? `<div class="small mt-1 opacity-75">${window.escapeHtml(details)}</div>` : '';
-        $imeiResult.html(`<div class="${alertClass} mb-0 py-2"><i class="fas fa-${icon} me-2"></i>${window.escapeHtml(message)}${detailHtml}</div>`);
-    }
-
-    function renderIfreeicloudResult(result) {
-        if (!result) { return ''; }
-        // stav + barva podle výsledku iFreeiCloud (success/warning)
-        var ok = !!result.success;
-        var icon = ok ? 'check-circle' : 'circle-exclamation';
-        var alertClass = ok
-            ? 'alert alert-success border-success border-opacity-25 bg-success bg-opacity-10 text-success'
-            : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
-        var headline = window.escapeHtml(result.headline || (ok ? (result.model || 'OK') : (result.message || '')));
-
-        // detailní pole (model, záruka, IMEI2, sériové…) pokud je vrací API
-        var detailsHtml = '';
-        if (result.details && typeof result.details === 'object') {
-            var rows = Object.keys(result.details).map(function (k) {
-                return '<div class="d-flex justify-content-between small py-1 border-bottom border-opacity-10"><span class="opacity-75">'
-                    + window.escapeHtml(k) + '</span><span class="fw-semibold">' + window.escapeHtml(String(result.details[k])) + '</span></div>';
-            }).join('');
-            if (rows) { detailsHtml = '<div class="mt-2">' + rows + '</div>'; }
-        }
-        var imageHtml = result.image ? '<div class="mt-2 text-center"><img src="' + window.escapeHtml(result.image) + '" alt="" style="max-height:120px;border-radius:8px;"></div>' : '';
-        var message = '';
-
-        const meta = result.service_id !== undefined ? `<div class="small mt-2 opacity-50">${window.escapeHtml(IMEI_I18N.serviceId)}: ${window.escapeHtml(String(result.service_id))}${result.http_code ? ` · HTTP ${window.escapeHtml(String(result.http_code))}` : ''}</div>` : '';
-        const note = (!detailsHtml && !imageHtml && result.summary) ? `<pre class="small mt-2 mb-0 p-2 rounded border border-opacity-25 bg-dark bg-opacity-25 text-white-75" style="white-space: pre-wrap;">${window.escapeHtml(result.summary)}</pre>` : '';
-
-        return `<div class="${alertClass} mb-0 py-2"><div class="fw-semibold mb-1"><i class="fas fa-sim-card me-2"></i>iFreeiCloud</div><div><i class="fas fa-${icon} me-2"></i>${headline}</div>${message}${imageHtml}${detailsHtml}${note}${meta}</div>`;
-    }
-
-    $imeiInput.on('input', function() {
-        this.value = this.value.replace(/\D+/g, '').slice(0, 15);
-    });
-
-    $('#imeiCheckForm').on('submit', function(e) {
-        e.preventDefault();
-
-        const imei = ($imeiInput.val() || '').replace(/\D+/g, '').slice(0, 15);
-        if (imei.length < 14) {
-            renderImeiResult('warning', IMEI_I18N.imeiMinDigits);
-            return;
-        }
-
-        const $btn = $(this).find('button[type="submit"]');
-        const oldHtml = $btn.html();
-        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> ' + window.escapeHtml(IMEI_I18N.checking));
-        $imeiResult.empty();
-
-        $.post('api/check_imei.php', { imei: imei, csrf_token: $('input[name="csrf_token"]').first().val() }, function(res) {
-            $btn.prop('disabled', false).html(oldHtml);
-
-            if (!res || !res.success) {
-                const policeMsg = res && res.police && res.police.message ? res.police.message : (res && res.message ? res.message : IMEI_I18N.checkCouldNotComplete);
-                const warningAlert = `<div class="alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning mb-3 py-2"><div class="fw-semibold mb-1"><i class="fas fa-shield-halved me-2"></i>${window.escapeHtml(IMEI_I18N.policeDb)}</div><div><i class="fas fa-circle-exclamation me-2"></i>${window.escapeHtml(policeMsg)}</div></div>`;
-                $imeiResult.html(warningAlert + renderIfreeicloudResult(res && res.ifreeicloud));
-                return;
-            }
-
-            const policeMessage = res.police && res.police.message ? res.police.message : (res.message || '');
-            let policeType = 'warning';
-            let policeHeadline = IMEI_I18N.resultUnknown;
-            if (res.status === 'found') {
-                policeType = 'danger';
-                policeHeadline = IMEI_I18N.resultFound;
-            } else if (res.status === 'not_found') {
-                policeType = 'success';
-                policeHeadline = IMEI_I18N.resultNotFound;
-            } else if (policeMessage) {
-                policeHeadline = policeMessage;
-            }
-
-            const policeAlert = (() => {
-                const icon = policeType === 'success' ? 'check-circle' : policeType === 'danger' ? 'triangle-exclamation' : 'circle-exclamation';
-                const alertClass = policeType === 'success'
-                    ? 'alert alert-success border-success border-opacity-25 bg-success bg-opacity-10 text-success'
-                    : policeType === 'danger'
-                        ? 'alert alert-danger border-danger border-opacity-25 bg-danger bg-opacity-10 text-danger'
-                        : 'alert alert-warning border-warning border-opacity-25 bg-warning bg-opacity-10 text-warning';
-                const detailHtml = policeMessage ? `<div class="small mt-1 opacity-75">${window.escapeHtml(policeMessage)}</div>` : '';
-                return `<div class="${alertClass} mb-3 py-2"><div class="fw-semibold mb-1"><i class="fas fa-shield-halved me-2"></i>${window.escapeHtml(IMEI_I18N.policeDb)}</div><div><i class="fas fa-${icon} me-2"></i>${window.escapeHtml(policeHeadline)}</div>${detailHtml}</div>`;
-            })();
-
-            const ifreeicloudHtml = renderIfreeicloudResult(res.ifreeicloud);
-            $imeiResult.html(policeAlert + ifreeicloudHtml);
-        }, 'json').fail(function() {
-            $btn.prop('disabled', false).html(oldHtml);
-            renderImeiResult('warning', IMEI_I18N.checkFailed);
-        });
-    });
-});
-</script>
+<?php /* Kontrola IMEI: logika je v assets/js/imei-check.js (v4.1.0) */ ?>
 
 <?php require_once 'includes/footer.php'; ?>
 

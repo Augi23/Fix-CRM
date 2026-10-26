@@ -233,6 +233,8 @@ html[data-lg-theme="light"] #dsh .dsh-o .dsh-call { background: rgba(255,255,255
     #dsh .dsh-todo-t em { display: none !important; }
 }
 /* iPhone (i v appce AppleFix CRM) */
+/* Kontrola IMEI je v horní liště (počítač); karta na nástěnce jen pro mobil/iPad (v4.1.0) */
+@media (min-width: 1081px) { #dsh .dsh-imei-card { display: none !important; } }
 /* mobil/iPad: ovladač lupy tu není, rezerva dole by byla zbytečná */
 @media (max-width: 1080px) { .dsh { padding-bottom: 8px !important; } }
 @media (max-width: 767.98px) { .dsh { gap: 14px !important; } }
