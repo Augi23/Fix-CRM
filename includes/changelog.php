@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.1.2',
+        'date' => '2026-10-26',
+        'time' => '21:30',
+        'title' => 'Kasa: převzetí uprostřed dne už nenafukuje stav; dobropis na papíře; chybový protokol',
+        'items' => [
+            '<b>Oprava stavu kasy při převzetí s přepočtem.</b> Napočítaná hotovost se dosud zapsala jako počáteční zůstatek celého dne a CRM k ní <b>znovu přičetlo dnešní prodeje a výplaty</b> před převzetím — 25. 10. tak kasa v systému vyskočila o 4 100 Kč nad skutečnost a rozdíl se dva dny přenášel uzávěrkami (−6 957 / −7 186 Kč). Nově se stav kasy po převzetí rovná přesně napočítané částce; v historii je vidět napočítáno, dnešní pohyby i dopočtený zůstatek rána.',
+            'Převzetí kasy <b>nenabídne „ANO, souhlasí“</b>, když systém ukazuje zápornou hotovost nebo když poslední uzávěrka (do 24 h) hlásila rozdíl a nikdo ho nesrovnal — obsluha musí zásuvku spočítat a zapsat. Dřív šlo rozdíl −6 957 Kč jedním klikem „odkývat“ dál.',
+            '<b>Dobropis na tisku a v e-mailu</b>: částky se znaménkem minus, „Částka k vrácení“ místo „Celkem k úhradě“, odkaz na opravovanou fakturu s datem a vlastní patička (bez věty o dodacím a záručním listu). E-mail má v předmětu „Dobropis“, upomínka k dobropisu se neodešle.',
+            '<b>Chybový protokol</b> (Nastavení → Systém → Databáze) začal fungovat: tabulka system_errors nikdy neexistovala, chyby padaly jen do logu serveru. Záznamy se ukládají i s detailem; migrace 055 + pojistka za běhu (nikdy uvnitř transakce).',
+            'Smazány nepoužívané fakturační endpointy (create_express_invoice, update_invoice, get_invoice_details), které obcházely číselnou řadu i kontrolu pobočky, a mrtvá funkce pro účtenku k zakázce.',
+        ],
+    ],
+    [
         'version' => '4.1.1',
         'date' => '2026-10-26',
         'time' => '16:30',

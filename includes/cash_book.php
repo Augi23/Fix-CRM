@@ -156,7 +156,7 @@ function afxCashRegisterForBranch(int $branchId, bool $autoCreate = true): array
 }
 
 /** Zápis počátečního zůstatku (inventarizace hotovosti). Vrací ['ok'=>bool,'error'=>string]. */
-function afxCashSetOpeningBalance(int $branchId, float $balance, string $openingDate, string $by = '', string $note = ''): array {
+function afxCashSetOpeningBalance(int $branchId, float $balance, string $openingDate, string $by = '', string $note = '', bool $allowNegative = false): array {
     // počáteční zůstatek datovaný do uzamčeného měsíce by přepsal základ knihy
     // za odevzdané období
     if (function_exists('afxAccountingAssertOpen')) {
@@ -167,7 +167,10 @@ function afxCashSetOpeningBalance(int $branchId, float $balance, string $opening
     if (!$d || $d->format('Y-m-d') !== $openingDate) {
         return ['ok' => false, 'error' => 'Neplatné datum počátečního zůstatku'];
     }
-    if ($balance < 0) { return ['ok' => false, 'error' => 'Počáteční zůstatek nemůže být záporný'] ; }
+    // $allowNegative: převzetí kasy odečítá od napočítané hotovosti dnešní pohyby —
+    // při chybějících penězích může vyjít záporně a i tak je to jediná hodnota,
+    // při které stav kasy sedí na zásuvku (afxPosShiftOpen).
+    if ($balance < 0 && !$allowNegative) { return ['ok' => false, 'error' => 'Počáteční zůstatek nemůže být záporný'] ; }
     if ($balance > 99999999) { return ['ok' => false, 'error' => 'Částka je mimo rozsah'] ; }
     if ($openingDate > date('Y-m-d')) { return ['ok' => false, 'error' => 'Datum nesmí být v budoucnosti'] ; }
 

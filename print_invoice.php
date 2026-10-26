@@ -42,6 +42,19 @@ $target_lang = $target_lang ?? crmCustomerDocLang((string)($invoice['preferred_l
 // majitele — hlavička, banka i QR se berou z ico_supplier_* místo acc_*.
 // $S() = get_setting s přemapováním podle výstavce TOHOTO dokladu.
 $__supIsIco = (string)($invoice['supplier'] ?? 'sro') === 'ico';
+// DOBROPIS (v4.1.2): částky se tisknou se znaménkem minus a místo „Celkem k úhradě"
+// je „Částka k vrácení" — v DB zůstává částka kladná (sestavy a exporty s ní tak počítají),
+// na papíře ale musí být na první pohled jasné, že peníze jdou klientovi, ne od něj.
+$__isCredit = (string)($invoice['invoice_type'] ?? 'invoice') === 'credit_note';
+$__sgn = $__isCredit ? '−' : '';
+$__parentInv = null;
+if ($__isCredit && (int)($invoice['parent_id'] ?? 0) > 0) {
+    try {
+        $__ps = $pdo->prepare("SELECT invoice_number, date_issue FROM invoices WHERE id = ? LIMIT 1");
+        $__ps->execute([(int)$invoice['parent_id']]);
+        $__parentInv = $__ps->fetch() ?: null;
+    } catch (Throwable $e) { $__parentInv = null; }
+}
 $S = function (string $key, string $def = '') use ($__supIsIco) {
     static $map = [
         'acc_company_name' => 'ico_supplier_name', 'acc_address' => 'ico_supplier_address',
@@ -64,7 +77,7 @@ if (!function_exists('_l')) {
 <html lang="<?php echo htmlspecialchars($target_lang); ?>">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo _l('print_title_invoice'); ?> <?php echo $invoice['invoice_number']; ?></title>
+    <title><?php echo $__isCredit ? _l('credit_note') : _l('print_title_invoice'); ?> <?php echo $invoice['invoice_number']; ?></title>
     <style>
         body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #000; margin: 0; padding: 0; background-color: #f5f5f5; }
         .page { width: 210mm; min-height: 297mm; padding: 15mm; margin: 10mm auto; background: white; border: 1px solid #ddd; box-sizing: border-box; box-shadow: 0 0 10px rgba(0,0,0,0.1); position: relative; }
@@ -122,6 +135,11 @@ if (!function_exists('_l')) {
                 <?php /* „daňový doklad" smí vystavit jen plátce DPH — neplátce vystavuje prostou fakturu (v4.1.1) */ ?>
                 <div class="doc-title"><?php echo ($invoice['invoice_type'] == 'credit_note') ? _l('credit_note') : ($is_vat_payer ? _l('inv_tax_document_title') : _l('invoice_title')); ?></div>
                 <div class="doc-number"><?php echo _l('invoice_number'); ?>: <?php echo $invoice['invoice_number']; ?></div>
+                <?php if ($__isCredit && $__parentInv): ?>
+                    <div style="font-size: 11px; color: #444; margin-top: 4px;"><?php echo _l('inv_credit_ref'); ?>:
+                        <strong><?php echo htmlspecialchars((string)$__parentInv['invoice_number']); ?></strong>
+                        (<?php echo date('d.m.Y', strtotime((string)$__parentInv['date_issue'])); ?>)</div>
+                <?php endif; ?>
             </td>
             <td class="text-right">
                 <?php if ($invoice['variable_symbol']): ?>
@@ -308,13 +326,13 @@ if (!function_exists('_l')) {
             <tr>
                 <td><?php echo htmlspecialchars($item['item_name']); ?></td>
                 <td class="text-right"><?php echo $item['quantity'] . ' ' . $item['unit']; ?></td>
-                <td class="text-right"><?php echo number_format($item['price'], 2, ',', ' '); ?></td>
+                <td class="text-right"><?php echo $__sgn . number_format($item['price'], 2, ',', ' '); ?></td>
                 <?php if ($is_vat_payer): ?>
                     <td class="text-right"><?php echo $item['vat_rate']; ?>%</td>
-                    <td class="text-right"><?php echo number_format($subtotal, 2, ',', ' '); ?></td>
-                    <td class="text-right"><?php echo number_format($vat, 2, ',', ' '); ?></td>
+                    <td class="text-right"><?php echo $__sgn . number_format($subtotal, 2, ',', ' '); ?></td>
+                    <td class="text-right"><?php echo $__sgn . number_format($vat, 2, ',', ' '); ?></td>
                 <?php endif; ?>
-                <td class="text-right"><?php echo number_format($line_total, 2, ',', ' '); ?></td>
+                <td class="text-right"><?php echo $__sgn . number_format($line_total, 2, ',', ' '); ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
@@ -335,9 +353,9 @@ if (!function_exists('_l')) {
                 <?php foreach ($vat_summary as $rate => $vals): ?>
                 <tr>
                     <td><?php echo $rate; ?> %</td>
-                    <td class="text-right"><?php echo number_format($vals['base'], 2, ',', ' '); ?></td>
-                    <td class="text-right"><?php echo number_format($vals['vat'], 2, ',', ' '); ?></td>
-                    <td class="text-right"><?php echo number_format($vals['base'] + $vals['vat'], 2, ',', ' '); ?></td>
+                    <td class="text-right"><?php echo $__sgn . number_format($vals['base'], 2, ',', ' '); ?></td>
+                    <td class="text-right"><?php echo $__sgn . number_format($vals['vat'], 2, ',', ' '); ?></td>
+                    <td class="text-right"><?php echo $__sgn . number_format($vals['base'] + $vals['vat'], 2, ',', ' '); ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -349,8 +367,8 @@ if (!function_exists('_l')) {
         <?php endif; ?>
 
         <div class="grand-total-box">
-            <div class="grand-label"><?php echo _l('inv_total_due'); ?></div>
-            <div class="grand-value"><?php echo number_format($invoice['total_amount'], 2, ',', ' ') . ' ' . $invoice['currency']; ?></div>
+            <div class="grand-label"><?php echo $__isCredit ? _l('inv_credit_refund') : _l('inv_total_due'); ?></div>
+            <div class="grand-value"><?php echo $__sgn . number_format($invoice['total_amount'], 2, ',', ' ') . ' ' . $invoice['currency']; ?></div>
         </div>
     </div>
 
@@ -361,7 +379,11 @@ if (!function_exists('_l')) {
         <?php if ($invoice['notes']): ?>
             <p><strong><?php echo _l('inv_note_label'); ?>:</strong> <?php echo nl2br(htmlspecialchars($invoice['notes'])); ?></p>
         <?php endif; ?>
-        <p><?php echo _l('print_title_invoice'); ?> <?php echo _l('inv_footer_legal_note'); ?></p>
+        <?php if ($__isCredit): ?>
+            <p><?php echo _l('inv_credit_footer_note'); ?></p>
+        <?php else: ?>
+            <p><?php echo _l('print_title_invoice'); ?> <?php echo _l('inv_footer_legal_note'); ?></p>
+        <?php endif; ?>
     </div>
 
     <div class="signatures">

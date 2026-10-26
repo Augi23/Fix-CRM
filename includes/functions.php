@@ -3855,98 +3855,6 @@ function crmOrderPosReceiptSale(int $orderId): ?array {
     return crmOrderPosSale($orderId, 'cash');
 }
 
-/** Vystaví idempotentní pokladní účtenku k hotově zaplacené zakázce.
- *  Používá se při výdeji z detailu zakázky; běžný prodej přes Pokladnu si
- *  pos_sales zakládá přímo v api/pos_checkout.php. */
-function crmEnsureOrderCashReceipt(int $orderId): array {
-    global $pdo;
-    if ($orderId <= 0 || !isset($pdo)) { return ['ok' => false, 'error' => 'Chybí zakázka.']; }
-    ensurePosTables();
-    ensureOrderPaymentMethodColumn();
-    if (!function_exists('afxEnsurePosCashColumns') && is_file(__DIR__ . '/receipt58.php')) {
-        require_once __DIR__ . '/receipt58.php';
-    }
-    if (function_exists('afxEnsurePosCashColumns')) { afxEnsurePosCashColumns(); }
-
-    $existing = crmOrderPosReceiptSale($orderId);
-    if ($existing) {
-        return ['ok' => true, 'sale_id' => (int)$existing['id'], 'sale_number' => (string)$existing['sale_number'], 'existing' => true];
-    }
-
-    $ownTx = false;
-    try {
-        $ownTx = !$pdo->inTransaction();
-        if ($ownTx) { $pdo->beginTransaction(); }
-        $st = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.company
-            FROM orders o JOIN customers c ON o.customer_id = c.id
-            WHERE o.id = ? LIMIT 1 FOR UPDATE");
-        $st->execute([$orderId]);
-        $order = $st->fetch(PDO::FETCH_ASSOC);
-        if (!$order) {
-            if ($ownTx) { $pdo->rollBack(); }
-            return ['ok' => false, 'error' => 'Zakázka nenalezena.'];
-        }
-        $existing = crmOrderPosReceiptSale($orderId);
-        if ($existing) {
-            if ($ownTx) { $pdo->commit(); }
-            return ['ok' => true, 'sale_id' => (int)$existing['id'], 'sale_number' => (string)$existing['sale_number'], 'existing' => true];
-        }
-        $amount = crmOrderPosAmount($order);
-        if ($amount <= 0) {
-            if ($ownTx) { $pdo->rollBack(); }
-            return ['ok' => false, 'error' => 'Zakázka nemá částku k úhradě.'];
-        }
-
-        $seller = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
-        $isVat = get_setting('acc_is_vat_payer', '0') == '1';
-        $vatRate = (float)get_setting('acc_vat_rate', '21');
-        $branchId = (int)($order['branch_id'] ?? getCurrentStaffBranchId());
-        $saleNumber = ''; $saleId = 0;
-        $insSale = $pdo->prepare("INSERT INTO pos_sales
-                (sale_number, branch_id, seller_name, customer_id, order_id, payment_method,
-                 total, vat_rate, is_vat_payer, note, cash_received, cash_change)
-            VALUES (?, ?, ?, ?, ?, 'cash', ?, ?, ?, ?, NULL, NULL)");
-        for ($try = 0; $try < 6; $try++) {
-            $saleNumber = generatePosSaleNumber($pdo, $try);
-            try {
-                $insSale->execute([
-                    $saleNumber,
-                    $branchId > 0 ? $branchId : null,
-                    $seller,
-                    (int)$order['customer_id'],
-                    $orderId,
-                    $amount,
-                    $isVat ? $vatRate : 0,
-                    $isVat ? 1 : 0,
-                    'Úhrada zakázky ' . orderDisplayCode($order),
-                ]);
-                $saleId = (int)$pdo->lastInsertId();
-                break;
-            } catch (PDOException $e) {
-                if ((int)($e->errorInfo[1] ?? 0) !== 1062) { throw $e; }
-            }
-        }
-        if ($saleId <= 0) {
-            if ($ownTx) { $pdo->rollBack(); }
-            return ['ok' => false, 'error' => 'Nepodařilo se přidělit číslo účtenky.'];
-        }
-
-        $pdo->prepare("INSERT INTO pos_sale_items
-                (sale_id, item_type, item_id, item_name, item_code, quantity, unit_price,
-                 is_used_goods, grade, purchase_price)
-            VALUES (?, 'order', ?, ?, ?, 1, ?, 0, NULL, NULL)")
-            ->execute([$saleId, $orderId, mb_substr(crmOrderPosItemName($order), 0, 255), mb_substr(orderDisplayCode($order), 0, 64), $amount]);
-        $pdo->prepare("UPDATE orders SET payment_method = 'cash' WHERE id = ?")->execute([$orderId]);
-
-        if ($ownTx) { $pdo->commit(); }
-        return ['ok' => true, 'sale_id' => $saleId, 'sale_number' => $saleNumber, 'existing' => false];
-    } catch (Throwable $e) {
-        if ($ownTx && $pdo->inTransaction()) { $pdo->rollBack(); }
-        error_log('crmEnsureOrderCashReceipt: ' . $e->getMessage());
-        return ['ok' => false, 'error' => 'Účtenku k zakázce se nepodařilo vystavit.'];
-    }
-}
-
 /** $orderItemId = řádek order_items, který už na zakázce je (add_order_item) — uloží se do
  *  požadavku, aby příjem z nákupu nepřidal díl na zakázku podruhé (oprava v4.0.0). */
 function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $quantity, string $notes = '', ?int $orderItemId = null): bool {
@@ -4027,14 +3935,44 @@ function queueProcurementRequestFromOrder(int $orderId, int $inventoryId, int $q
 /**
  * Log System Error
  */
+/** Chybový protokol CRM (Nastavení → Systém → Databáze). Tabulka od začátku chyběla —
+ *  log_error() do ní zapisovala naslepo a vše tiše padalo do error_logu serveru,
+ *  kam se nikdo nedívá. Migrace 055 ji zakládá pro čisté instalace, tahle pojistka
+ *  za běhu. DDL se NIKDY nespouští uvnitř transakce (implicitní COMMIT by potvrdil
+ *  půlku rozpracovaného zápisu) — v tom případě se založení odloží na další volání. (v4.1.2) */
+function afxEnsureSystemErrorsTable(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    if ($pdo->inTransaction()) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS system_errors (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            error_type VARCHAR(50) NOT NULL DEFAULT 'system',
+            message TEXT NOT NULL,
+            details MEDIUMTEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_system_errors_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) { error_log('afxEnsureSystemErrorsTable: ' . $e->getMessage()); }
+}
+
+/** Zápis chyby do protokolu CRM + vždy i do error_logu (ten přežije i chybějící tabulku
+ *  a rollback transakce, ve které se log_error typicky volá z catch bloku). */
 function log_error($message, $type = 'system', $details = '') {
     global $pdo;
+    $detailsStr = is_string($details) ? $details : (string)json_encode($details, JSON_UNESCAPED_UNICODE);
+    error_log('[' . $type . '] ' . $message . ($detailsStr !== '' ? ' | ' . $detailsStr : ''));
+    if (!isset($pdo)) return;
     try {
+        afxEnsureSystemErrorsTable();
         $stmt = $pdo->prepare("INSERT INTO system_errors (error_type, message, details) VALUES (?, ?, ?)");
-        $stmt->execute([$type, $message, $details]);
-    } catch (Exception $e) {
-        // Fallback to file if DB fails
-        error_log("DB Log Failed: " . $message . " | " . $details);
+        $stmt->execute([mb_substr((string)$type, 0, 50), mb_substr((string)$message, 0, 2000),
+            $detailsStr !== '' ? mb_substr($detailsStr, 0, 20000) : null]);
+    } catch (Throwable $e) {
+        // tabulka ještě není (uvnitř transakce) nebo DB nejede — záznam je v error_logu výše
     }
 }
 
@@ -6578,8 +6516,10 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null, bool $r
     $supName = (string)($invoice['supplier'] ?? 'sro') === 'ico'
         ? ((string)get_setting('ico_supplier_name', '') ?: get_setting('company_name', 'AppleFix'))
         : get_setting('company_name', 'AppleFix');
-    $subject = $supName . ' — Faktura ' . (string)$invoice['invoice_number'];
+    $__isCreditDoc = (string)($invoice['invoice_type'] ?? 'invoice') === 'credit_note';
+    $subject = $supName . ($__isCreditDoc ? ' — Dobropis ' : ' — Faktura ') . (string)$invoice['invoice_number'];
     if ($reminder) {
+        if ($__isCreditDoc) { return [false, 'Dobropis se neupomíná — peníze jdou klientovi.', $to]; }
         // UPOMÍNKA (v3.93.0): stejná faktura + zdvořilé upozornění nahoře
         if ((string)$invoice['status'] === 'paid' || (float)($invoice['paid_amount'] ?? 0) >= (float)$invoice['total_amount'] - 0.009) {
             return [false, 'Faktura je zaplacená — upomínka nedává smysl.', $to];

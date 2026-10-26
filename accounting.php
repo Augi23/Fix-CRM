@@ -163,7 +163,7 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
                                 <?php foreach ($invoices as $inv): ?>
                                 <tr>
                                     <td class="fw-bold">
-                                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" class="text-decoration-underline">
+                                        <a href="javascript:void(0)" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo (($inv['invoice_type'] ?? 'invoice') === 'credit_note') ? __('credit_note') : __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" class="text-decoration-underline">
                                             <?php echo htmlspecialchars($inv['invoice_number']); ?>
                                         </a>
                                         <?php if($inv['order_id']): ?>
@@ -184,10 +184,10 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
                                             <?php if (!empty($inv['reminded_at'])): ?><div class="small text-warning" title="Počet upomínek: <?php echo (int)($inv['reminder_count'] ?? 0); ?>"><i class="fas fa-bell me-1"></i>upomenuto <?php echo date('j. n.', strtotime((string)$inv['reminded_at'])); ?></div><?php endif; ?>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="fw-bold"><?php echo number_format((float)$inv['total_amount'], 0, ',', ' ') . ' ' . $inv['currency']; ?></td>
+                                    <td class="fw-bold"><?php echo (($inv['invoice_type'] ?? 'invoice') === 'credit_note' ? '−' : '') . number_format((float)$inv['total_amount'], 0, ',', ' ') . ' ' . $inv['currency']; ?></td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" title="<?php echo __('preview'); ?>"><i class="fas fa-eye"></i></button>
+                                            <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo (($inv['invoice_type'] ?? 'invoice') === 'credit_note') ? __('credit_note') : __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" title="<?php echo __('preview'); ?>"><i class="fas fa-eye"></i></button>
                                             <button class="btn btn-outline-primary" onclick="editInvoice(<?php echo $inv['id']; ?>)" title="<?php echo __('edit'); ?>"><i class="fas fa-edit"></i></button>
                                             <?php /* dobropis jen k faktuře (ne k dobropisu ani stornu) — server to hlídá taky */ ?>
                                             <?php if ($__canCreditNote && ($inv['invoice_type'] ?? 'invoice') !== 'credit_note' && $inv['status'] !== 'cancelled'): ?>
@@ -195,7 +195,7 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
                                             <?php endif; ?>
                                             <button class="btn btn-outline-info" onclick="exportPohoda(<?php echo $inv['id']; ?>)" title="Pohoda"><i class="fas fa-file-export"></i></button>
                                             <button class="btn btn-outline-secondary" onclick="exportS3(<?php echo $inv['id']; ?>)" title="S3 Money"><i class="fas fa-file-csv"></i></button>
-                                            <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('print'); ?> <?php echo __('invoice'); ?>')"><i class="fas fa-print"></i></button>
+                                            <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('print'); ?> <?php echo (($inv['invoice_type'] ?? 'invoice') === 'credit_note') ? __('credit_note') : __('invoice'); ?>')"><i class="fas fa-print"></i></button>
                                             <?php if (!empty($inv['is_overdue'])): ?>
                                             <button class="btn btn-outline-warning" onclick="remindInvoice(<?php echo (int)$inv['id']; ?>, <?php echo htmlspecialchars(json_encode(trim((string)($inv['cust_email_override'] ?: ($inv['cust_email'] ?? ''))), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)$inv['invoice_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)" title="Poslat upomínku"><i class="fas fa-bell"></i></button>
                                             <?php endif; ?>

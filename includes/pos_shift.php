@@ -146,6 +146,12 @@ function afxPosShiftOpen(int $branchId, bool $match, ?float $counted): array {
         }
         $expected = afxCashBalanceAt($branchId, date('Y-m-d'));
         if ($match) {
+            // Záporný „stav podle systému" nemůže souhlasit s obsahem zásuvky — odkývnutí
+            // by jen zafixovalo rozjetou knihu (23. 10. 2026 se tak odsouhlasilo −9 347 Kč).
+            if ($expected < -0.004) {
+                return ['ok' => false, 'error' => 'Systém ukazuje zápornou hotovost (' . number_format($expected, 0, ',', ' ')
+                    . ' Kč) — to souhlasit nemůže. Napočítej zásuvku a zapiš skutečný stav.'];
+            }
             $counted = $expected;
         } else {
             if ($counted === null || !is_finite($counted) || $counted < 0 || $counted > 100000000) {
@@ -154,23 +160,41 @@ function afxPosShiftOpen(int $branchId, bool $match, ?float $counted): array {
             $counted = round($counted, 2);
         }
 
+        $openingSet = null; $todayNet = 0.0;
+        if (!$match && abs($counted - $expected) >= 0.005) {
+            // Počáteční zůstatek je stav zásuvky NA ZAČÁTKU DNE. Částka napočítaná
+            // uprostřed dne ale dnešní pohyby už OBSAHUJE — zapsat ji rovnou jako
+            // počáteční zůstatek znamenalo přičíst dnešní prodeje a výplaty ještě jednou
+            // (25. 10. 2026: přepočet v 17:43 → kasa v systému o 4 100 Kč „bohatší", než
+            // byla; rozdíl se pak dva dny přenášel uzávěrkami). Proto se dnešní pohyby
+            // odečtou: stav kasy po převzetí = přesně napočítaná hotovost. (v4.1.2)
+            $todaySums = afxCashSums($branchId, date('Y-m-d'), date('Y-m-d'));
+            $todayNet = round($todaySums['in'] - $todaySums['out'], 2);
+            $openingSet = round($counted - $todayNet, 2);
+            $res = afxCashSetOpeningBalance($branchId, $openingSet, date('Y-m-d'), $label,
+                'Převzetí pokladny — přepočet: napočítáno ' . number_format($counted, 2, ',', ' ') . ' Kč v ' . date('H:i')
+                . ', pohyby dne do té doby ' . ($todayNet >= 0 ? '+' : '−') . number_format(abs($todayNet), 2, ',', ' ') . ' Kč'
+                . ' (systém ukazoval ' . number_format($expected, 2, ',', ' ') . ' Kč)', true);
+            if (empty($res['ok'])) {
+                return ['ok' => false, 'error' => (string)($res['error'] ?? 'Stav pokladny se nepodařilo zapsat')];
+            }
+        }
+
         $ins = $pdo->prepare("INSERT INTO pos_shifts
                 (branch_id, status, opened_by, opened_by_user, opened_by_tech, opening_expected, opening_counted, opening_match)
             VALUES (?, 'open', ?, ?, ?, ?, ?, ?)");
         $ins->execute([$branchId ?: null, $label, $uid, $tid, $expected, $counted, $match ? 1 : 0]);
         $shiftId = (int)$pdo->lastInsertId();
 
-        if (!$match && abs($counted - $expected) >= 0.005) {
-            // od napočítané částky se dnes odvíjí stav pokladny
-            afxCashSetOpeningBalance($branchId, $counted, date('Y-m-d'), $label,
-                'Převzetí pokladny — přepočet (systém ' . number_format($expected, 2, ',', ' ') . ' Kč)');
-        }
-
         crmAuditLog('kasa.shift_open', [
             'entity_type' => 'pos_shift', 'entity_id' => $shiftId,
             'summary' => 'Převzetí pokladny: systém ' . number_format($expected, 2, ',', ' ') . ' Kč, '
                 . ($match ? 'souhlasí' : 'napočítáno ' . number_format($counted, 2, ',', ' ') . ' Kč (rozdíl '
-                    . number_format($counted - $expected, 2, ',', ' ') . ' Kč)'),
+                    . number_format($counted - $expected, 2, ',', ' ') . ' Kč)')
+                . ($openingSet !== null
+                    ? '; počáteční zůstatek dne ' . number_format($openingSet, 2, ',', ' ') . ' Kč = napočítáno − dnešní pohyby ('
+                        . ($todayNet >= 0 ? '+' : '−') . number_format(abs($todayNet), 2, ',', ' ') . ' Kč)'
+                    : ''),
             'branch_id' => $branchId,
         ]);
         return ['ok' => true, 'shift_id' => $shiftId];

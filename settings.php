@@ -1575,6 +1575,7 @@ require_once 'includes/header.php';
                     <div class="overflow-auto border-secondary glass-panel p-2" style="max-height: 480px; font-family: monospace; font-size: 0.75rem;">
                         <?php
                         try {
+                            if (function_exists('afxEnsureSystemErrorsTable')) { afxEnsureSystemErrorsTable(); }
                             $errors = $pdo->query("SELECT * FROM system_errors ORDER BY created_at DESC LIMIT 50")->fetchAll();
                         } catch (Exception $e) {
                             $errors = [];
@@ -1583,6 +1584,9 @@ require_once 'includes/header.php';
                         foreach ($errors as $err): ?>
                             <div class="text-white border-bottom border-secondary mb-1 pb-1">
                                 <span class="text-danger">[<?php echo $err['created_at']; ?>]</span> <strong><?php echo htmlspecialchars($err['error_type']); ?>:</strong> <?php echo htmlspecialchars($err['message']); ?>
+                                <?php if (!empty($err['details'])): ?>
+                                    <div class="text-white-50 ps-3" style="white-space: pre-wrap; word-break: break-word;"><?php echo htmlspecialchars(mb_substr((string)$err['details'], 0, 400)); ?></div>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>

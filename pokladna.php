@@ -390,10 +390,13 @@ html[data-lg-theme="light"] .pos-eshop-bar b { color: #1e7e38 !important; }
 .lcd-actions .lcd-finish { flex: 1; width: auto; background: #30D158; color: #FFFFFF;
                            box-shadow: none; font-size: 17px; padding: 13px 18px; border-radius: 12px; }
 .lcd-actions .lcd-finish:disabled { opacity: .4; }
-.pos-lock { position: fixed; inset: 0; z-index: 12000; display: none; align-items: center; justify-content: center;
+.pos-lock { position: fixed; inset: 0; z-index: 12000; display: none; align-items: flex-start; justify-content: center;
+  /* overflow + margin:auto na kartě: karta vyšší než obrazovka (lupa 150–200 %, telefon) se dá odscrollovat,
+     dřív se ořízla nahoře i dole a kolečko hýbalo jen stránkou pod overlayem (QA 4.1.2) */
+  overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 0;
   background: rgba(5,8,14,.72); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
 .pos-lock.show { display: flex; }
-.pos-lock-card { width: min(400px, 92vw); background: rgba(14,18,26,.92); border: 1px solid rgba(255,255,255,.12);
+.pos-lock-card { width: min(400px, 92vw); margin: auto; flex: 0 0 auto; background: rgba(14,18,26,.92); border: 1px solid rgba(255,255,255,.12);
   border-radius: 22px; padding: 30px 28px; text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
 .pos-lock-card .lk-icon { font-size: 34px; color: #5fd2ff; margin-bottom: 10px; }
 .pos-lock-card h4 { font-weight: 700; margin-bottom: 4px; }
@@ -919,6 +922,14 @@ $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GE
                         Spočítej hotovost v zásuvce a zapiš ji sem. Od tohoto data a částky se počítá celý stav pokladny —
                         starší pohyby se do zůstatku už nepřičítají (jinak by kasa hlásila peníze dvakrát).
                     </p>
+                    <?php /* stejná past jako u převzetí (v4.1.2): částka je stav na ZAČÁTKU dne, pohyby toho dne se k ní přičtou */ ?>
+                    <div class="alert alert-info border-0 py-2 px-3 small mb-2">
+                        <i class="fas fa-triangle-exclamation me-1"></i><strong>Částka je stav na začátku zvoleného dne</strong> — pohyby toho dne
+                        se k ní přičtou znovu.<?php if (abs($cashToday) >= 0.5): ?> Dnes už kasa měla pohyby za
+                        <strong><?php echo ($cashToday > 0 ? '+' : '−') . e(formatMoney(abs($cashToday))); ?></strong>: pokud zásuvku počítáš teď,
+                        zadej napočítáno <?php echo $cashToday > 0 ? 'minus' : 'plus'; ?> tuhle částku — nebo použij
+                        <em>Převzetí pokladny → NE, přepočítám</em>, které to odečte samo.<?php endif; ?>
+                    </div>
                     <div class="mb-2">
                         <label class="form-label small text-white-50 mb-1">Napočítaná hotovost (Kč)</label>
                         <input type="text" class="form-control" name="balance" inputmode="decimal"
@@ -1158,13 +1169,37 @@ document.addEventListener('DOMContentLoaded', function () {
                         napočítáno <?php echo formatMoney((float)$shiftLast['closing_counted']); ?></div>
                 <?php endif; ?>
             </div>
-            <div class="mb-3"><strong>Souhlasí hotovost v zásuvce?</strong></div>
-            <div class="d-flex gap-2 justify-content-center mb-2">
+            <?php
+            // „ANO, souhlasí" se NENABÍZÍ, když systémový stav nemůže být pravda: záporná
+            // hotovost, nebo poslední uzávěrka (do 24 h) hlásila rozdíl a od té doby ho
+            // nikdo nesrovnal — 26. 10. 2026 se tak rozdíl −6 957 Kč jen odkýval dál. (v4.1.2)
+            $__lastDiff = ($shiftLast && $shiftLast['closing_expected'] !== null)
+                ? round((float)$shiftLast['closing_counted'] - (float)$shiftLast['closing_expected'], 2) : 0.0;
+            $__lastRecent = $shiftLast && !empty($shiftLast['closed_at'])
+                && (time() - strtotime((string)$shiftLast['closed_at'])) < 86400;
+            $__mustRecount = ($cashState < -0.004) || ($__lastRecent && abs($__lastDiff) >= 1);
+            ?>
+            <?php if ($cashState < -0.004): ?>
+                <div class="alert alert-danger bg-transparent border-danger text-start small py-2 px-3 mb-3">
+                    <i class="fas fa-triangle-exclamation me-1"></i><strong>Záporná hotovost podle systému nemůže souhlasit</strong> —
+                    pokladní kniha je rozjetá. Napočítej zásuvku a zapiš skutečný stav; od něj se kniha narovná.
+                </div>
+            <?php elseif ($__lastRecent && abs($__lastDiff) >= 1): ?>
+                <div class="alert alert-warning bg-transparent border-warning text-start small py-2 px-3 mb-3">
+                    <i class="fas fa-triangle-exclamation me-1"></i>Poslední uzávěrka
+                    (<?php echo e($shiftLast['closed_by'] ?? $shiftLast['opened_by']); ?>, <?php echo e(date('j. n. H:i', strtotime((string)$shiftLast['closed_at']))); ?>)
+                    hlásila <strong>rozdíl <?php echo ($__lastDiff > 0 ? '+' : '−') . formatMoney(abs($__lastDiff)); ?></strong>
+                    (napočítáno <?php echo formatMoney((float)$shiftLast['closing_counted']); ?>, systém <?php echo formatMoney((float)$shiftLast['closing_expected']); ?>)
+                    a od té doby ho nikdo nesrovnal. <strong>Napočítej zásuvku a zapiš skutečný stav</strong> — tlačítko „souhlasí" tu teď schválně není.
+                </div>
+            <?php endif; ?>
+            <div class="mb-3"><strong><?php echo $__mustRecount ? 'Kolik je teď v zásuvce?' : 'Souhlasí hotovost v zásuvce?'; ?></strong></div>
+            <div class="d-flex gap-2 justify-content-center mb-2" id="shiftChoiceRow"<?php echo $__mustRecount ? ' style="display:none !important;"' : ''; ?>>
                 <button type="button" class="btn btn-success px-4" onclick="shiftOpen(1)"><i class="fas fa-check me-1"></i>ANO, souhlasí</button>
                 <button type="button" class="btn btn-outline-warning px-4" id="shiftRecountBtn" onclick="document.getElementById('shiftRecount').style.display='';this.style.display='none';"><i class="fas fa-calculator me-1"></i>NE, přepočítám</button>
             </div>
-            <div id="shiftRecount" style="display:none;">
-                <div class="small text-white-50 mb-1">Zapiš, kolik v pokladně reálně je — od této částky se dnes odvíjí stav pokladny:</div>
+            <div id="shiftRecount" style="<?php echo $__mustRecount ? '' : 'display:none;'; ?>">
+                <div class="small text-white-50 mb-1">Zapiš, kolik v pokladně reálně je — stav kasy se nastaví přesně na tuhle částku (dnešní pohyby se znovu nepřičítají):</div>
                 <div class="d-flex gap-2 justify-content-center">
                     <input type="text" class="form-control" id="shiftCounted" inputmode="decimal" placeholder="Skutečná hotovost (Kč)" style="max-width:220px;">
                     <button type="button" class="btn btn-warning" onclick="shiftOpen(0)"><i class="fas fa-pen me-1"></i>Zapsat a převzít</button>
@@ -2045,6 +2080,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var CSRF = '<?php echo $_SESSION['csrf_token'] ?? ''; ?>';
     var shiftMine = <?php echo ($shift && $shiftMine) ? 'true' : 'false'; ?>;
     var shiftExpected = <?php echo json_encode(round((float)$cashState, 2)); ?>;
+    // převzetí bez volby „souhlasí" (záporný stav / nesrovnaný rozdíl z poslední uzávěrky)
+    var shiftMustRecount = <?php echo !empty($__mustRecount) ? 'true' : 'false'; ?>;
 
     function shiftApi(payload, errEl, onOk) {
         fetch('api/pos_shift.php', {
@@ -2101,8 +2138,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (step === 'tkStep3') {
                 // krok 3 vždy od začátku — po návratu z vypršelého hesla by jinak
                 // zůstalo otevřené pole přepočtu i stará chybová hláška
-                var rc = document.getElementById('shiftRecount'); if (rc) { rc.style.display = 'none'; }
-                var rb = document.getElementById('shiftRecountBtn'); if (rb) { rb.style.display = ''; }
+                var rc = document.getElementById('shiftRecount'); if (rc) { rc.style.display = shiftMustRecount ? '' : 'none'; }
+                var rb = document.getElementById('shiftRecountBtn'); if (rb) { rb.style.display = shiftMustRecount ? 'none' : ''; }
                 var ci = document.getElementById('shiftCounted'); if (ci) { ci.value = ''; }
                 var er = document.getElementById('shiftErr'); if (er) { er.textContent = ''; }
             }

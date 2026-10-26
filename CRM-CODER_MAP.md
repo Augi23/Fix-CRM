@@ -52,10 +52,10 @@ Klientský portál (odděleně): `klient/*` (zejména `klient/dashboard.php`).
 
 ### Faktury
 - `api/create_invoice.php`
-- `api/create_express_invoice.php`
 - `api/get_invoice_data.php`
-- `api/get_invoice_details.php`
-- `api/update_invoice.php`
+- `api/pos_invoice_after.php`
+- `api/invoice_email.php`
+- (ruční faktury, editace, dobropis: `accounting_actions.php` → `models/InvoiceManager.php`)
 
 ### Integrace
 - Telegram bot: odstraněn 16.10.2026 (v3.93.2)

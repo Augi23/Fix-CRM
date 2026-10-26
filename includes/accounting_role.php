@@ -179,7 +179,7 @@ function afxAccountantApiGate(): void {
         'bank_gpc_import.php',                    // banka: nahrání výpisu GPC (v3.93.0)
         'reauth.php',                             // obnova přihlášení (globální poller)
         'guide_viewed.php',                       // návody: značka přečtení
-        'get_invoice_data.php', 'get_invoice_details.php',   // detail faktury (čtení)
+        'get_invoice_data.php',                   // podklad faktury k zakázce (čtení)
         'invoice_email.php',                      // odeslání faktury klientovi (v3.70.0)
         'pos_invoice_after.php',                  // dodatečná faktura k prodeji (v3.71.0)
                                                   // POZOR: search_customers.php sem NEPATŘÍ —
