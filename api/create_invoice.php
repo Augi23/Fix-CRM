@@ -44,51 +44,81 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $customer_id = $stmt->fetchColumn();
 
         if (!$customer_id) {
-            throw new Exception('Order or Customer not found');
+            throw new Exception('Zakázka nebo klient nenalezen.');
+        }
+        // k jedné zakázce jedna faktura (stejně jako kasa a auto-faktura) — dřív šlo
+        // z přehledu zakázek vystavit druhou k už vyfakturované zakázce (v4.1.1)
+        $exq = $pdo->prepare("SELECT invoice_number FROM invoices WHERE order_id = ?
+            AND COALESCE(invoice_type, 'invoice') = 'invoice' AND status <> 'cancelled' LIMIT 1");
+        $exq->execute([(int)$order_id]);
+        $exNo = (string)$exq->fetchColumn();
+        if ($exNo !== '') {
+            throw new Exception('K zakázce už existuje faktura ' . $exNo . ' — upravit ji jde v Účetnictví.');
         }
 
         // Číslo faktury: přehled zakázek ho předvyplňuje číslem zakázky — to už může mít
         // expresní faktura z detailu (UNIQUE → „Duplicate entry"). Obsazené nebo prázdné
         // číslo nahradí další volné z řady.
         $invoice_number = trim((string)$invoice_number);
+        $prefix = afxInvoiceSeriesPrefix('acc_invoice_prefix', date('Y'));
         $dupChk = $pdo->prepare("SELECT COUNT(*) FROM invoices WHERE invoice_number = ?");
         $dupChk->execute([$invoice_number]);
+        $numberReplaced = false;
         if ($invoice_number === '' || (int)$dupChk->fetchColumn() > 0) {
-            $invoice_number = afxNextInvoiceNumber($pdo, (string)get_setting('acc_invoice_prefix', date('Y')));
+            $invoice_number = afxNextInvoiceNumber($pdo, $prefix);
+            $numberReplaced = true;
         }
         // Pobočka faktury: bez ní pobočkový manažer fakturu neviděl v seznamu ani na tisku
         // (crmCanSeeInvoiceBranch). Sloupec přidala migrace 054; starší DB → bez pobočky.
         $branchId = function_exists('crmInvoiceBranchForNew') ? crmInvoiceBranchForNew($order_id) : null;
         $hasBranchCol = false;
         try { $hasBranchCol = (bool)$pdo->query("SHOW COLUMNS FROM invoices LIKE 'branch_id'")->fetch(); } catch (Throwable $e) {}
-        $stmt = $pdo->prepare("INSERT INTO invoices (invoice_number, variable_symbol, order_id, customer_id, date_issue, date_tax, date_due, total_amount, is_vat_payer, vat_amount, currency" . ($hasBranchCol ? ", branch_id" : "") . ")
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" . ($hasBranchCol ? ", ?" : "") . ")");
-        $vals = [
-            $invoice_number,
-            $variable_symbol,
-            $order_id,
-            $customer_id,
-            $date_issue,
-            $date_tax,
-            $date_due,
-            $total_amount,
-            $is_vat_payer ? 1 : 0,
-            $vat_amount,
-            $currency
-        ];
-        if ($hasBranchCol) { $vals[] = $branchId; }
-        $stmt->execute($vals);
-        $invoice_id = $pdo->lastInsertId();
+        // stav/typ/způsob platby výslovně (dřív jen DB default) + doklad a položky v jedné
+        // transakci; kolize čísla (souběh s kasou) → další číslo z řady, ne surová SQL chyba
+        $stmt = $pdo->prepare("INSERT INTO invoices (invoice_number, variable_symbol, order_id, customer_id, date_issue, date_tax, date_due, total_amount, is_vat_payer, vat_amount, currency, status, invoice_type, payment_method" . ($hasBranchCol ? ", branch_id" : "") . ")
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'issued', 'invoice', 'bank_transfer'" . ($hasBranchCol ? ", ?" : "") . ")");
+        $pdo->beginTransaction();
+        $invoice_id = 0;
+        for ($try = 0; $try < 6; $try++) {
+            // první opakování čte už uvnitř transakce (čerstvý snapshot) → bez posunu,
+            // další pokusy posouvat, protože snapshot se už nemění
+            if ($try > 0) { $invoice_number = afxNextInvoiceNumber($pdo, $prefix, false, $try - 1); $numberReplaced = true; }
+            // VS = zadaný, pokud číslo zůstalo; po přidělení nového čísla sleduje VS číslo dokladu
+            $vs = (!$numberReplaced && trim((string)$variable_symbol) !== '') ? trim((string)$variable_symbol) : (preg_replace('/\D/', '', $invoice_number) ?: null);
+            $vals = [
+                $invoice_number,
+                $vs,
+                $order_id,
+                $customer_id,
+                $date_issue,
+                $date_tax,
+                $date_due,
+                $total_amount,
+                $is_vat_payer ? 1 : 0,
+                $vat_amount,
+                $currency
+            ];
+            if ($hasBranchCol) { $vals[] = $branchId; }
+            try {
+                $stmt->execute($vals);
+                $invoice_id = (int)$pdo->lastInsertId();
+                break;
+            } catch (PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) !== 1062) { throw $e; }
+            }
+        }
+        if ($invoice_id <= 0) { throw new Exception('Nepodařilo se přidělit číslo faktury — zkus to znovu.'); }
 
-        // Add dynamic items
+        // Add dynamic items (neplátce: sazba 0, ne výchozích 21 % sloupce)
         if (isset($_POST['item_name']) && is_array($_POST['item_name'])) {
-            $stmt_item = $pdo->prepare("INSERT INTO invoice_items (invoice_id, item_name, price) VALUES (?, ?, ?)");
+            $stmt_item = $pdo->prepare("INSERT INTO invoice_items (invoice_id, item_name, price, vat_rate) VALUES (?, ?, ?, ?)");
             foreach ($_POST['item_name'] as $index => $name) {
                 if (empty(trim((string)$name))) continue;
                 $price = (float)($_POST['item_price'][$index] ?? 0);
-                $stmt_item->execute([$invoice_id, $name, $price]);
+                $stmt_item->execute([$invoice_id, $name, $price, $is_vat_payer ? $vat_rate : 0]);
             }
         }
+        $pdo->commit();
 
         crmAuditLog('invoice.create', [
             'entity_type' => 'invoice', 'entity_id' => (int)$invoice_id, 'entity_label' => (string)$invoice_number,
@@ -96,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         ]);
         echo json_encode(['success' => true, 'message' => 'Invoice created', 'id' => $invoice_id]);
     } catch (Exception $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
     }
 } else {

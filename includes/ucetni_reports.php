@@ -235,7 +235,10 @@ function afxUcetniBranchLabel(int $branchId): string {
  */
 function afxUcetniInvoiceBranchSql(int $branchId, string $ordersAlias = 'o'): array {
     if ($branchId <= 0) { return ['', []]; }
-    return [' AND ' . $ordersAlias . '.branch_id = ?', [$branchId]];
+    // Pobočka dokladu je od migrace 054 přímo na faktuře (kasa, ruční faktura bez
+    // zakázky) — filtr jen přes orders.branch_id takové doklady z pobočkových sestav
+    // vynechával (v4.1.1). Zakázka zůstává jako záloha pro starší doklady bez pobočky.
+    return [' AND COALESCE(i.branch_id, ' . $ordersAlias . '.branch_id) = ?', [$branchId]];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

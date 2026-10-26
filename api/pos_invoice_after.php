@@ -50,6 +50,7 @@ afxEnsureInvoiceAdhocBuyer();
 afxEnsureInvoiceEmailColumns();
 afxEnsureInvoiceBranch();
 afxEnsureInvoicePayments();
+afxEnsureInvoiceSupplierColumn();   // uvnitř transakce se v crmPosCreateInvoice přeskočí
 
 $ss = $pdo->prepare("SELECT * FROM pos_sales WHERE id = ? LIMIT 1");
 $ss->execute([$saleId]);

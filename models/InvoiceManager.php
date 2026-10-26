@@ -73,11 +73,41 @@ private function getInvoiceStatusBadge($status) {
         if (function_exists('afxEnsureInvoiceAdhocBuyer')) { afxEnsureInvoiceAdhocBuyer(); }
         if (function_exists('afxEnsureInvoiceEmailColumns')) { afxEnsureInvoiceEmailColumns(); }
         if (function_exists('afxEnsureInvoiceBranch')) { afxEnsureInvoiceBranch(); }
+        if (function_exists('afxEnsureInvoicePayments')) { afxEnsureInvoicePayments(); }
         try {
             $this->pdo->beginTransaction();
 
             $id = !empty($data['id']) ? (int)$data['id'] : null;
-            $invoice_number = $data['invoice_number'] ?? '';
+            $invoice_number = trim((string)($data['invoice_number'] ?? ''));
+            // Číslo dokladu hlídá SERVER (v4.1.1): formulář ho jen předvyplní při otevření,
+            // takže dva otevřené formuláře (nebo starý tab) posílaly totéž číslo a druhé
+            // uložení spadlo surovou SQL chybou „Duplicate entry". Nová faktura s prázdným
+            // nebo už obsazeným číslem dostane další volné z řady; u editace je obsazené
+            // číslo chyba se srozumitelnou hláškou.
+            $prevStatus = null;
+            if ($id) {
+                $ps = $this->pdo->prepare("SELECT status FROM invoices WHERE id = ?");
+                $ps->execute([$id]);
+                $prevStatus = (string)$ps->fetchColumn();
+            }
+            $dupId = 0;
+            if ($invoice_number !== '') {
+                $dup = $this->pdo->prepare("SELECT id FROM invoices WHERE invoice_number = ? LIMIT 1");
+                $dup->execute([$invoice_number]);
+                $dupId = (int)$dup->fetchColumn();
+            }
+            if ($id) {
+                if ($invoice_number === '') {
+                    $this->pdo->rollBack();
+                    return ['success' => false, 'error' => 'Faktura musí mít číslo.'];
+                }
+                if ($dupId > 0 && $dupId !== $id) {
+                    $this->pdo->rollBack();
+                    return ['success' => false, 'error' => 'Číslo ' . $invoice_number . ' už má jiný doklad — zvol jiné číslo.'];
+                }
+            } elseif ($invoice_number === '' || $dupId > 0) {
+                $invoice_number = afxNextInvoiceNumber($this->pdo, afxInvoiceSeriesPrefix('acc_invoice_prefix', date('Y')));
+            }
             $customer_id = (int)($data['customer_id'] ?? 0);
             // faktura pro jednorázového odběratele klienta v CRM nemá — 0 by porušila cizí klíč
             $customer_id = $customer_id > 0 ? $customer_id : null;
@@ -120,6 +150,17 @@ private function getInvoiceStatusBadge($status) {
                     // se hlídá i ten (zamčený aktuální měsíc = vzácný, ale reálný).
                     afxAccountingAssertOpen($payment_date, 'platbu');
                     afxAccountingAssertOpen(date('Y-m-d'), 'platbu');
+                }
+                if ($id && $prevStatus === 'paid' && $status !== 'paid') {
+                    // ruční „odzaplacení" po commitu maže ručně evidované platby k jejich dni
+                    // úhrady — zamčený měsíc hlídat TEĎ, jinak by doklad zůstal uložený jako
+                    // nezaplacený s platbou v evidenci a volající dostal chybu
+                    $pp = $this->pdo->prepare("SELECT DISTINCT paid_on FROM invoice_payments
+                        WHERE invoice_id = ? AND bank_transaction_id IS NULL");
+                    $pp->execute([$id]);
+                    foreach ($pp->fetchAll(PDO::FETCH_COLUMN) as $paidOn) {
+                        afxAccountingAssertOpen($paidOn ?: date('Y-m-d'), 'platbu k faktuře');
+                    }
                 }
             }
 
@@ -204,7 +245,9 @@ private function getInvoiceStatusBadge($status) {
                     $qty = $item['quantity'] ?? ($item['qty'] ?? 1);
                     $unit = $item['unit'] ?? 'ks';
                     $price = $item['price'] ?? 0;
-                    $vatRate = $item['vat_rate'] ?? ($item['vat'] ?? 0);
+                    // neplátce DPH: položky nesou sazbu 0 (formulář má výchozích 21 %) —
+                    // export do Pohody / S3 Money by jinak vykázal DPH, která se nevybírá
+                    $vatRate = $is_vat_payer ? ($item['vat_rate'] ?? ($item['vat'] ?? 0)) : 0;
 
                     $stmt->execute([$invoice_id, $itemName, $qty, $unit, $price, $vatRate]);
                 }
@@ -219,10 +262,15 @@ private function getInvoiceStatusBadge($status) {
                 // evidovaných plateb (hotovost, starší doklady) se stav nesnižuje nikdy.
                 $pc = $this->pdo->prepare("SELECT COUNT(*) FROM invoice_payments WHERE invoice_id = ?");
                 $pc->execute([$invoice_id]);
+                if ($prevStatus === 'paid' && $status !== 'paid') {
+                    // ruční vrácení mezi nezaplacené: smazat ručně evidovanou platbu, jinak
+                    // by ji přepočet níže hned zase „zaplatil" (bankovní platby zůstávají)
+                    afxInvoiceSyncManualStatus((int)$invoice_id, $status, $payment_method);
+                }
                 afxInvoiceRecalcPaid((int)$invoice_id, (int)$pc->fetchColumn() > 0);
                 if ($status === 'paid') { afxInvoiceSyncManualStatus((int)$invoice_id, 'paid', $payment_method); }
             }
-            return ['success' => true, 'id' => $invoice_id];
+            return ['success' => true, 'id' => $invoice_id, 'invoice_number' => $invoice_number];
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             return ['success' => false, 'error' => $e->getMessage()];
@@ -289,7 +337,22 @@ private function getInvoiceStatusBadge($status) {
      */
     public function createCreditNote($invoice_id) {
         $original = $this->getInvoice($invoice_id);
-        if (!$original) return ['success' => false, 'error' => 'Original invoice not found'];
+        if (!$original) return ['success' => false, 'error' => 'Původní faktura nenalezena.'];
+        // Dobropis jen k FAKTUŘE a jen jednou (v4.1.1): tlačítko bylo i u dobropisů a
+        // opakovaný klik vyráběl další a další dobropisy k témuž dokladu.
+        if ((string)($original['invoice_type'] ?? 'invoice') === 'credit_note') {
+            return ['success' => false, 'error' => 'Tohle už je dobropis — dobropis se vystavuje k faktuře.'];
+        }
+        if ((string)($original['status'] ?? '') === 'cancelled') {
+            return ['success' => false, 'error' => 'Faktura je stornovaná, dobropis k ní nemá smysl.'];
+        }
+        $ex = $this->pdo->prepare("SELECT invoice_number FROM invoices
+            WHERE parent_id = ? AND COALESCE(invoice_type, 'invoice') = 'credit_note' AND status <> 'cancelled' LIMIT 1");
+        $ex->execute([(int)$invoice_id]);
+        $exNo = (string)$ex->fetchColumn();
+        if ($exNo !== '') {
+            return ['success' => false, 'error' => 'K faktuře ' . $original['invoice_number'] . ' už existuje dobropis ' . $exNo . '.'];
+        }
         // schéma (DDL) VŽDY před transakcí — uvnitř by udělalo implicitní COMMIT
         if (function_exists('afxEnsureInvoiceBranch')) { afxEnsureInvoiceBranch(); }
 
@@ -303,7 +366,9 @@ private function getInvoiceStatusBadge($status) {
             }
 
             // Check if prefix exists in settings
-            $prefix = get_setting('acc_credit_note_prefix', 'ODD' . date('Y'));
+            $prefix = function_exists('afxInvoiceSeriesPrefix')
+                ? afxInvoiceSeriesPrefix('acc_credit_note_prefix', 'ODD' . date('Y'))
+                : get_setting('acc_credit_note_prefix', 'ODD' . date('Y'));
             // Z MAXIMA řady, ne z počtu: po smazání dobropisu dával COUNT+1 už obsazené
             // číslo (UNIQUE invoice_number → surová SQL chyba u každého dalšího dobropisu).
             if (function_exists('afxNextInvoiceNumber')) {
@@ -354,7 +419,7 @@ private function getInvoiceStatusBadge($status) {
             }
 
             $this->pdo->commit();
-            return ['success' => true, 'id' => $new_id];
+            return ['success' => true, 'id' => $new_id, 'invoice_number' => $new_number];
         } catch (Exception $e) {
             $this->pdo->rollBack();
             return ['success' => false, 'error' => $e->getMessage()];

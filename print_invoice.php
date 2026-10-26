@@ -50,7 +50,11 @@ $S = function (string $key, string $def = '') use ($__supIsIco) {
         'acc_bank_name' => 'ico_supplier_bank_name', 'acc_bank_account' => 'ico_supplier_bank_account',
         'acc_iban' => 'ico_supplier_iban', 'acc_swift' => 'ico_supplier_swift',
     ];
-    return get_setting($__supIsIco && isset($map[$key]) ? $map[$key] : $key, $def);
+    $v = (string)get_setting($__supIsIco && isset($map[$key]) ? $map[$key] : $key, $def);
+    // Sídlo s.r.o.: účetní nastavení (acc_address) bývá prázdné, adresa firmy je v company_address
+    // (Nastavení → Údaje o společnosti). Bez pojistky šly faktury ven BEZ adresy dodavatele (v4.1.1).
+    if ($v === '' && $key === 'acc_address' && !$__supIsIco) { $v = (string)get_setting('company_address', $def); }
+    return $v;
 };
 if (!function_exists('_l')) {
     function _l($key) { global $target_lang; return __($key, $target_lang); }
@@ -115,7 +119,8 @@ if (!function_exists('_l')) {
     <table class="header-table">
         <tr>
             <td>
-                <div class="doc-title"><?php echo ($invoice['invoice_type'] == 'credit_note') ? _l('credit_note') : _l('inv_tax_document_title'); ?></div>
+                <?php /* „daňový doklad" smí vystavit jen plátce DPH — neplátce vystavuje prostou fakturu (v4.1.1) */ ?>
+                <div class="doc-title"><?php echo ($invoice['invoice_type'] == 'credit_note') ? _l('credit_note') : ($is_vat_payer ? _l('inv_tax_document_title') : _l('invoice_title')); ?></div>
                 <div class="doc-number"><?php echo _l('invoice_number'); ?>: <?php echo $invoice['invoice_number']; ?></div>
             </td>
             <td class="text-right">
@@ -134,8 +139,8 @@ if (!function_exists('_l')) {
                 <div class="addr-name"><?php echo htmlspecialchars($S('acc_company_name')); ?></div>
                 <div><?php echo nl2br(htmlspecialchars($S('acc_address'))); ?></div>
                 <div style="margin-top: 10px;">
-                    <strong>IČO:</strong> <?php echo htmlspecialchars($S('acc_ico')); ?><br>
-                    <strong>DIČ:</strong> <?php echo htmlspecialchars($S('acc_dic')); ?>
+                    <strong>IČO:</strong> <?php echo htmlspecialchars($S('acc_ico')); ?>
+                    <?php if (trim($S('acc_dic')) !== ''): ?><br><strong>DIČ:</strong> <?php echo htmlspecialchars($S('acc_dic')); ?><?php endif; ?>
                 </div>
                 <div style="margin-top: 10px; font-size: 9px; color: #666;">
                     <?php echo htmlspecialchars($S('acc_trade_register')); ?>
@@ -207,7 +212,8 @@ if (!function_exists('_l')) {
                 <div class="pay-value"><?php echo date('d.m.Y', strtotime($invoice['date_due'])); ?></div>
             </td>
             <td>
-                <div class="pay-label"><?php echo _l('date_tax'); ?></div>
+                <?php /* DUZP je pojem zákona o DPH — neplátce uvádí jen datum plnění */ ?>
+                <div class="pay-label"><?php echo $is_vat_payer ? _l('date_tax') : _l('date_supply'); ?></div>
                 <div class="pay-value"><?php echo date('d.m.Y', strtotime($invoice['date_tax'])); ?></div>
             </td>
         </tr>

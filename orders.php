@@ -1225,9 +1225,9 @@ $(document).ready(function() {
         
         $.get('api/get_invoice_data.php', {order_id: orderId}, function(res) {
             if (res.success) {
-                // Number and VS are now Order ID
-                $('#invoiceNumber').val(orderId);
-                $('#variableSymbol').val(orderId);
+                // další volné číslo z řady (ne číslo zakázky — to rozbíjelo souvislou řadu, v4.1.1)
+                $('#invoiceNumber').val(res.next_invoice_number || '');
+                $('#variableSymbol').val(res.variable_symbol || res.next_invoice_number || '');
                 $('#dateIssue').val(res.date_issue);
                 $('#dateTax').val(res.date_tax);
                 $('#dateDue').val(res.date_due);

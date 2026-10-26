@@ -11,6 +11,21 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.1.1',
+        'date' => '2026-10-26',
+        'time' => '16:30',
+        'title' => 'Faktury: kontrola a opravy vystavování',
+        'items' => [
+            '<b>Tisk faktury neplátce DPH</b>: doklad se jmenuje „Faktura“ (ne „daňový doklad“), místo DUZP je „Datum plnění“ a prázdný řádek DIČ se netiskne. Adresa sídla s.r.o. se bere z Nastavení → Údaje o společnosti, když v účetním nastavení chybí — faktury dosud odcházely <b>bez adresy dodavatele</b>.',
+            '<b>Číselná řada přechází na nový rok sama</b> (2026… → 2027… od 1. 1.), u faktur s.r.o., OSVČ i dobropisů. Dřív by se po Novém roce číslovalo dál řadou 2026.',
+            '<b>Kolize čísla faktury</b> (dva otevřené formuláře, souběh s kasou) už neshodí uložení surovou SQL chybou — nová faktura dostane další volné číslo, u editace se ukáže srozumitelná hláška. Prodej na kase s fakturou při souběhu dvou kas spolehlivě dostane další číslo v řadě.',
+            '<b>Dobropis</b> jde vystavit jen k faktuře, jen jednou a ne ke stornované faktuře; v seznamu už není tlačítko Dobropis u dobropisů. E-mail s dobropisem neobsahuje QR výzvu k platbě. V Přehledech mají dobropisy vlastní dlaždici (záporně) a nepočítají se do příjmů.',
+            'Faktura ručně vrácená ze „Zaplaceno“ na „Vystaveno“ zůstane vystavená (dřív se hned přepnula zpět na zaplacenou). Smazání faktury smaže i evidované platby a je odmítnuto, dokud k ní existuje dobropis — a odmítnutí (dobropis, zamčený měsíc, práva) se nově ukáže jako hláška, dřív se stránka jen tiše obnovila.',
+            'Faktura z přehledu zakázek se předvyplní dalším číslem řady (ne číslem zakázky) a ukládá se jako vystavená, bankovním převodem; k zakázce, která už fakturu má, druhou nevystaví. Neplátce DPH ukládá položky se sazbou 0 % (dřív 21 % — projevilo by se v exportu do Pohody / S3 Money).',
+            'Pobočkové účetní sestavy zahrnují i faktury z kasy a ruční faktury bez zakázky (filtr pobočky dřív šel jen přes zakázku).',
+        ],
+    ],
+    [
         'version' => '4.1.0',
         'date' => '2026-10-26',
         'time' => '11:30',

@@ -2366,6 +2366,9 @@ function afxEnsureInvoicePayments(): void {
     global $pdo;
     static $done = false;
     if ($done || !isset($pdo)) return;
+    // DDL uvnitř transakce = implicitní COMMIT (rollback by pak nic nevrátil) —
+    // volající si ensure pouští před transakcí, tohle je pojistka (v4.1.1)
+    if ($pdo->inTransaction()) { return; }
     $done = true;
     try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS invoice_payments (
@@ -3403,7 +3406,19 @@ function crmPosUnlockClearFails(string $accountKey): void {
  * všechny letošní faktury. Souběh dvou kas řeší GET_LOCK u volajícího, UNIQUE
  * na invoice_number a opakování při kolizi.
  */
-function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false): string {
+/**
+ * Prefix číselné řady dokladů s AUTOMATICKÝM přechodem na nový rok (v4.1.1).
+ * V Nastavení je uložená konkrétní hodnota ('2026', '92026', 'ODD2026'), takže by se
+ * 1. 1. 2027 dál číslovalo 2026xxxx. Rok uvnitř prefixu se proto vždy nahradí
+ * aktuálním — prefix bez roku (např. 'FV') se nechá, jak je.
+ */
+function afxInvoiceSeriesPrefix(string $settingKey, string $default): string {
+    $p = trim((string)get_setting($settingKey, $default));
+    if ($p === '') { $p = $default; }
+    return preg_replace('/20\d{2}/', date('Y'), $p, 1) ?? $p;
+}
+
+function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false, int $bump = 0): string {
     $seq = 0;
     try {
         // wildcardy v prefixu (kdyby si je někdo uložil v Nastavení) nesmí rozšířit LIKE
@@ -3425,7 +3440,9 @@ function afxNextInvoiceNumber(PDO $pdo, string $prefix, bool $lockRow = false): 
         error_log('afxNextInvoiceNumber: ' . $e->getMessage());
         throw new RuntimeException('Číslo faktury se nepodařilo přidělit — zkus to prosím znovu.');
     }
-    return $prefix . str_pad((string)($seq + 1), 4, '0', STR_PAD_LEFT);
+    // $bump: uvnitř transakce (kasa) čte každé opakování TENTÝŽ snapshot (REPEATABLE
+    // READ) → po kolizi by pořád vracelo stejné číslo. Volající posune o číslo pokusu.
+    return $prefix . str_pad((string)($seq + 1 + max(0, $bump)), 4, '0', STR_PAD_LEFT);
 }
 
 /* ── DVĚ FAKTURAČNÍ IDENTITY (v3.50.0): 'sro' = AppleFix s.r.o. (acc_*),
@@ -3615,7 +3632,7 @@ function afxIcoSupplier(): array {
         'address' => trim((string)get_setting('ico_supplier_address', '')),
         'bank_account' => trim((string)get_setting('ico_supplier_bank_account', '')),
         'is_vat' => get_setting('ico_supplier_is_vat', '0') == '1',
-        'prefix' => trim((string)get_setting('ico_supplier_invoice_prefix', '')) ?: ('9' . date('Y')),
+        'prefix' => afxInvoiceSeriesPrefix('ico_supplier_invoice_prefix', '9' . date('Y')),
     ];
     $s['ready'] = $s['enabled'] && $s['name'] !== '' && $s['ico'] !== '';
     return $s;
@@ -3678,8 +3695,8 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
 
     // vlastní číselná řada OSVČ (výchozí 9RRRR…) — číslice VS se s řadou s.r.o. nepotkají
     $prefix = $supplier === 'ico'
-        ? (trim((string)get_setting('ico_supplier_invoice_prefix', '')) ?: ('9' . date('Y')))
-        : (string)get_setting('acc_invoice_prefix', date('Y'));
+        ? afxInvoiceSeriesPrefix('ico_supplier_invoice_prefix', '9' . date('Y'))
+        : afxInvoiceSeriesPrefix('acc_invoice_prefix', date('Y'));
     $currency = get_setting('currency', 'Kč');
     // ručně zadaný odběratel jde do overridů (tisk/e-mail/účetní sestavy je už umí)
     static $hasEmailCol = null;
@@ -3707,9 +3724,8 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
                 ?, ?, ?, 'issued', 'bank_transfer', NULL, ?, ?, ?" . ($hasBranchCol ? ', ?' : '') . $ovVals . ")");
     $invoiceId = 0;
     // Číslo z MAXIMA řady pod zámkem (stejný vzor jako pokladní doklady):
-    // GET_LOCK proti souběhu dvou kas, UNIQUE klíč + opakování jako pojistka,
-    // kdyby se zámek nepodařilo získat. Žádný posun o $try — FOR UPDATE čte
-    // pokaždé aktuální maximum, takže v řadě nevznikají díry.
+    // GET_LOCK proti souběhu dvou kas, UNIQUE klíč + opakování (s posunem o $try,
+    // viz níže) jako pojistka, kdyby se zámek nepodařilo získat.
     $lockName = 'afx_invoice_number';
     $haveLock = false;
     try {
@@ -3717,7 +3733,10 @@ function crmPosCreateInvoice(PDO $pdo, int $customerId, string $saleNumber, arra
     } catch (Throwable $e) { /* bez zámku to zvládne opakování níže */ }
     try {
         for ($try = 0; $try < 6; $try++) {
-            $number = afxNextInvoiceNumber($pdo, $prefix, true);
+            // $try = posun po kolizi: prodej běží v transakci, takže opakovaný
+            // SELECT MAX vrací pořád totéž číslo (snapshot) — bez posunu by všech
+            // 6 pokusů spadlo na stejném duplicitním čísle a s nimi celý prodej.
+            $number = afxNextInvoiceNumber($pdo, $prefix, true, $try);
             try {
                 $par = [$number, preg_replace('/\D/', '', $number) ?: null, $customerId > 0 ? $customerId : null, $orderId,
                     round($total, 2), round($vatAmount, 2), $isVat ? 1 : 0, $currency, $notes, $supplier];
@@ -6417,7 +6436,7 @@ function crmEnsureOrderInvoice(int $orderId, string $paymentMethod = 'bank_trans
 
         require_once __DIR__ . '/../models/InvoiceManager.php';
         $manager = new InvoiceManager($pdo);
-        $prefix = (string)get_setting('acc_invoice_prefix', date('Y'));
+        $prefix = afxInvoiceSeriesPrefix('acc_invoice_prefix', date('Y'));
         $final_price = (float)($orderData['final_cost'] ?: $orderData['estimated_cost']);
 
         // Číslo z MAXIMA řady a pod zámkem (viz afxNextInvoiceNumber) — COUNT+1
@@ -6450,7 +6469,11 @@ function crmEnsureOrderInvoice(int $orderId, string $paymentMethod = 'bank_trans
                         'vat_rate' => get_setting('acc_vat_rate', '21'),
                     ]],
                 ]);
-                if (!empty($res['success'])) { break; }
+                if (!empty($res['success'])) {
+                    // model mohl při kolizi přidělit jiné číslo — do auditu to skutečné
+                    $inv_number = (string)($res['invoice_number'] ?? '') ?: $inv_number;
+                    break;
+                }
                 // opakovat JEN při kolizi čísla; jiná chyba (zamčené období, práva)
                 // by se opakováním nespravila a jen by spálila dalších pět čísel
                 $err = (string)($res['error'] ?? '');
@@ -6523,8 +6546,10 @@ function crmSendInvoiceEmail(int $invoiceId, ?string $toOverride = null, bool $r
     $html = ob_get_clean();
 
     // QR platba (jen u převodu a nezaplacené faktury) — stejný vzor jako e-shop.
+    // Dobropis = peníze jdou KLIENTOVI, QR výzva k platbě k němu nepatří (v4.1.1).
     if (!in_array((string)$invoice['payment_method'], ['cash', 'card', 'cod'], true)
-        && (string)$invoice['status'] !== 'paid') {
+        && (string)$invoice['status'] !== 'paid'
+        && (string)($invoice['invoice_type'] ?? 'invoice') !== 'credit_note') {
         require_once __DIR__ . '/kb_api.php';
         $spayd = function_exists('afxSpaydForInvoice') ? afxSpaydForInvoice($invoice) : '';
         if ($spayd !== '') {

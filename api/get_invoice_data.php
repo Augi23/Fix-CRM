@@ -39,10 +39,18 @@ try {
         throw new Exception(__('access_denied_msg'));
     }
 
-    $prefix = get_setting('acc_invoice_prefix', date('Y'));
-    $next_num = get_setting('acc_invoice_next_number', '1');
-    // Format: Prefix + 4 digits (e.g. 20260001)
-    $invoice_number = $prefix . str_pad($next_num, 4, '0', STR_PAD_LEFT);
+    // zakázka s fakturou → druhou nevystavovat (modal se zavře s hláškou)
+    $exq = $pdo->prepare("SELECT invoice_number FROM invoices WHERE order_id = ?
+        AND COALESCE(invoice_type, 'invoice') = 'invoice' AND status <> 'cancelled' LIMIT 1");
+    $exq->execute([(int)$order_id]);
+    $exNo = (string)$exq->fetchColumn();
+    if ($exNo !== '') {
+        throw new Exception('K zakázce už existuje faktura ' . $exNo . ' — najdeš ji v Účetnictví.');
+    }
+
+    // další volné číslo z řady s.r.o. (dřív legacy acc_invoice_next_number, které nikdo
+    // neposouval — přehled zakázek pak dosazoval číslo zakázky a rozbíjel řadu)
+    $invoice_number = afxNextInvoiceNumber($pdo, afxInvoiceSeriesPrefix('acc_invoice_prefix', date('Y')));
 
     echo json_encode([
         'success' => true,

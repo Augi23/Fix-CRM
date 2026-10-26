@@ -189,7 +189,8 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
                                         <div class="btn-group btn-group-sm">
                                             <button class="btn btn-outline-dark" onclick="openUniversalPreview('print_invoice.php?id=<?php echo $inv['id']; ?>', '<?php echo __('invoice'); ?> <?php echo $inv['invoice_number']; ?>')" title="<?php echo __('preview'); ?>"><i class="fas fa-eye"></i></button>
                                             <button class="btn btn-outline-primary" onclick="editInvoice(<?php echo $inv['id']; ?>)" title="<?php echo __('edit'); ?>"><i class="fas fa-edit"></i></button>
-                                            <?php if ($__canCreditNote): ?>
+                                            <?php /* dobropis jen k faktuře (ne k dobropisu ani stornu) — server to hlídá taky */ ?>
+                                            <?php if ($__canCreditNote && ($inv['invoice_type'] ?? 'invoice') !== 'credit_note' && $inv['status'] !== 'cancelled'): ?>
                                             <button class="btn btn-outline-warning" onclick="createCreditNote(<?php echo $inv['id']; ?>)" title="<?php echo __('credit_note'); ?>"><i class="fas fa-undo"></i></button>
                                             <?php endif; ?>
                                             <button class="btn btn-outline-info" onclick="exportPohoda(<?php echo $inv['id']; ?>)" title="Pohoda"><i class="fas fa-file-export"></i></button>
@@ -214,8 +215,11 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
             
             <div class="tab-pane fade" id="stats-pane">
                 <?php
+                // dobropisy nejsou příjem — do dlaždic podle stavu nepatří, mají vlastní (v4.1.1)
                 $stats = $pdo->query("SELECT status, COUNT(*) as count, SUM(total_amount) as total FROM invoices i
-                    WHERE 1=1" . crmInvoiceBranchSql('i.branch_id') . " GROUP BY status")->fetchAll();
+                    WHERE COALESCE(i.invoice_type, 'invoice') <> 'credit_note'" . crmInvoiceBranchSql('i.branch_id') . " GROUP BY status")->fetchAll();
+                $cnStats = $pdo->query("SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total FROM invoices i
+                    WHERE COALESCE(i.invoice_type, 'invoice') = 'credit_note' AND i.status <> 'cancelled'" . crmInvoiceBranchSql('i.branch_id'))->fetch();
                 ?>
                 <div class="row g-4">
                     <?php foreach ($stats as $s): ?>
@@ -227,6 +231,15 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
                         </div>
                     </div>
                     <?php endforeach; ?>
+                    <?php if ((int)($cnStats['count'] ?? 0) > 0): ?>
+                    <div class="col-md-3">
+                        <div class="card bg-dark bg-opacity-25 border-0 text-center p-3">
+                            <h6 class="text-muted text-uppercase mb-2"><?php echo __('credit_note'); ?></h6>
+                            <h3 class="mb-0 text-warning">−<?php echo number_format((float)$cnStats['total'], 0, ',', ' '); ?> <small>Kč</small></h3>
+                            <div class="text-primary small mt-1"><?php echo (int)$cnStats['count']; ?> <?php echo __('pieces_short'); ?></div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -445,7 +458,9 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
                         <hr>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('invoice_prefix'); ?></label>
-                            <input type="text" name="acc_invoice_prefix" class="form-control" value="<?php echo get_setting('acc_invoice_prefix', date('Y')); ?>">
+                            <?php /* zobrazit prefix s aktuálním rokem (řada přechází na nový rok sama, v4.1.1) */ ?>
+                            <input type="text" name="acc_invoice_prefix" class="form-control" value="<?php echo htmlspecialchars(afxInvoiceSeriesPrefix('acc_invoice_prefix', date('Y'))); ?>">
+                            <div class="form-text">Rok v prefixu se mění automaticky (2026… → 2027… od 1. 1.).</div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('vat_rate'); ?></label>
@@ -516,7 +531,7 @@ $__canCreditNote = !function_exists('crmCanAccountingEdit') || crmCanAccountingE
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Prefix číselné řady</label>
-                            <input type="text" name="ico_supplier_invoice_prefix" class="form-control" value="<?php echo htmlspecialchars(get_setting('ico_supplier_invoice_prefix', '9' . date('Y'))); ?>">
+                            <input type="text" name="ico_supplier_invoice_prefix" class="form-control" value="<?php echo htmlspecialchars(afxInvoiceSeriesPrefix('ico_supplier_invoice_prefix', '9' . date('Y'))); ?>">
                         </div>
                         <div class="col-12">
                             <div class="form-check">
@@ -688,7 +703,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 // ať se kvůli tomu nemusí hledat řádek v seznamu
                 // adresu vrací server: ruční e-mail odběratele, jinak e-mail z karty klienta
                 var mailTo = (data.email || document.getElementById('inv_cust_email').value || '').trim();
-                var cislo = (document.getElementById('inv_number').value || '').trim();
+                // číslo ze serveru: při kolizi (dva otevřené formuláře) ho model přidělil nové
+                var cislo = (data.invoice_number || document.getElementById('inv_number').value || '').trim();
                 if (data.id) {
                     var odesilam = false;
                     if (invModal) { invModal.hide(); }   // ať se nekupí dvě okna na sobě
@@ -813,8 +829,8 @@ function showNewInvoiceModal() {
     // Návrh čísla z MAXIMA řady s.r.o. (afxNextInvoiceNumber) — dřívější count()+1
     // počítalo VŠECHNY faktury (vč. řady OSVČ a storen) a dělalo díry v řadě
     document.getElementById('inv_number').value = "<?php
-        try { echo e(afxNextInvoiceNumber($pdo, (string)get_setting('acc_invoice_prefix', date('Y')))); }
-        catch (Throwable $e) { echo e(get_setting('acc_invoice_prefix', date('Y')) . str_pad((string)(count($invoices) + 1), 4, '0', STR_PAD_LEFT)); }
+        try { echo e(afxNextInvoiceNumber($pdo, afxInvoiceSeriesPrefix('acc_invoice_prefix', date('Y')))); }
+        catch (Throwable $e) { echo e(afxInvoiceSeriesPrefix('acc_invoice_prefix', date('Y')) . str_pad((string)(count($invoices) + 1), 4, '0', STR_PAD_LEFT)); }
     ?>";
     
     addInvItem();
@@ -963,7 +979,15 @@ function deleteInvoice(id) {
         formData.append('action', 'delete_invoice');
         formData.append('id', id);
         formData.append('csrf_token', '<?php echo $_SESSION['csrf_token'] ?? ''; ?>');
-        fetch('accounting_actions.php', { method: 'POST', body: formData }).then(() => location.reload());
+        // odpověď číst — server smazání odmítá (dobropis, zamčený měsíc, práva) a dřív
+        // se jen tiše obnovila stránka s fakturou pořád v seznamu (v4.1.1)
+        fetch('accounting_actions.php', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.success) { location.reload(); }
+                else { showAlert((data && data.error) || 'Fakturu se nepodařilo smazat.'); }
+            })
+            .catch(() => showAlert('Fakturu se nepodařilo smazat.'));
     });
 }
 

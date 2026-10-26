@@ -87,7 +87,8 @@ switch ($action) {
             }
             if (!empty($result['success'])) {
                 $__isEdit = !empty($_POST['id']);
-                $__invNo = trim((string)($_POST['invoice_number'] ?? '')) ?: ('#' . (int)($result['id'] ?? 0));
+                // číslo bere ze serveru — u kolize/prázdného čísla ho model přidělil sám
+                $__invNo = trim((string)($result['invoice_number'] ?? '')) ?: (trim((string)($_POST['invoice_number'] ?? '')) ?: ('#' . (int)($result['id'] ?? 0)));
                 crmAuditLog($__isEdit ? 'invoice.update' : 'invoice.create', [
                     'entity_type' => 'invoice', 'entity_id' => (int)($result['id'] ?? 0), 'entity_label' => $__invNo,
                     'summary' => ($__isEdit ? 'Upravena faktura ' : 'Vystavena faktura ') . $__invNo
@@ -136,10 +137,20 @@ switch ($action) {
             // číslo faktury pro historii zjistit PŘED smazáním
             $__invNo = '';
             try { $ns = $pdo->prepare("SELECT invoice_number FROM invoices WHERE id = ?"); $ns->execute([$id]); $__invNo = (string)$ns->fetchColumn(); } catch (Throwable $e) {}
+            // faktura s dobropisem: dobropis by zůstal „opravný k ničemu" (parent_id → NULL)
+            $cn = $pdo->prepare("SELECT invoice_number FROM invoices WHERE parent_id = ? AND COALESCE(invoice_type,'invoice') = 'credit_note' LIMIT 1");
+            $cn->execute([$id]);
+            $cnNo = (string)$cn->fetchColumn();
+            if ($cnNo !== '') {
+                echo json_encode(['success' => false, 'error' => 'K faktuře existuje dobropis ' . $cnNo . ' — smaž nejdřív ten.'], JSON_UNESCAPED_UNICODE); break;
+            }
             // vazba z prodeje musí pryč PŘED smazáním dokladu — jinak by prodej
             // navždy ukazoval na neexistující fakturu a nešlo by k němu vystavit novou
             try { $pdo->prepare("UPDATE pos_sales SET invoice_id = NULL WHERE invoice_id = ?")->execute([$id]); }
             catch (Throwable $e) { /* kasa nemusí být nasazená */ }
+            // evidované platby nemají cizí klíč — bez tohoto zůstávaly sirotci v přehledu úhrad
+            try { $pdo->prepare("DELETE FROM invoice_payments WHERE invoice_id = ?")->execute([$id]); }
+            catch (Throwable $e) { /* tabulka nemusí existovat */ }
             $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$id]);
             $pdo->prepare("DELETE FROM invoices WHERE id = ?")->execute([$id]);
             crmAuditLog('invoice.delete', [
@@ -197,7 +208,8 @@ switch ($action) {
         if (!empty($result['success'])) {
             crmAuditLog('invoice.credit_note', [
                 'entity_type' => 'invoice', 'entity_id' => (int)($result['id'] ?? 0),
-                'summary' => 'Vystaven dobropis k faktuře #' . (int)$_POST['id'],
+                'entity_label' => (string)($result['invoice_number'] ?? ''),
+                'summary' => 'Vystaven dobropis ' . (string)($result['invoice_number'] ?? '') . ' k faktuře #' . (int)$_POST['id'],
             ]);
         }
         echo json_encode($result);
