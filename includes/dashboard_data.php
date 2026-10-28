@@ -286,7 +286,7 @@ function crmDashboardBuild(PDO $pdo, int $pick = 0): array {
     };
     $add('unassigned', 'red', 'fa-user-plus', 'Bez technika', 'přiřaď zakázku technikovi', $bucket['unassigned']);
     $add('stale', 'orange', 'fa-hourglass-half', 'Dlouho bez pohybu', 'zakázka stojí déle, než by měla', $bucket['stale']);
-    $add('customer', 'yellow', 'fa-phone', 'Čeká na vyjádření klienta', 'zavolej a domluv cenu / postup', $bucket['customer'], 'orders.php?filter=' . urlencode('Čeká na zákazníka'));
+    $add('customer', 'yellow', 'fa-phone', 'Čeká na vyjádření klienta', 'zavolej a domluv cenu / postup', $bucket['customer'], 'orders.php?filter=' . urlencode('Čeká na zákazníka') . '&group=1');
     $add('pickup', 'green', 'fa-box-open', 'Hotové, nevyzvednuté přes 3 dny', 'připomeň klientovi vyzvednutí', $bucket['pickup'], 'orders.php?filter=' . urlencode('Připraveno k převzetí'));
     $add('unpaid', 'red', 'fa-money-bill-wave', 'Vydáno, ale nezaplaceno', 'dořeš platbu', $bucket['unpaid'], 'orders.php?filter=' . urlencode('Vydáno - čeká na platbu'));
     $add('forgotten', 'gray', 'fa-box-archive', 'Zapomenuté zakázky', 'přes 30 dní bez pohybu — vydej, nebo stornuj', $bucket['forgotten']);

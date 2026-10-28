@@ -576,6 +576,17 @@ function gsRun(PDO $pdo, string $q, string $scope, int $perGroup, string $only =
         return [$groups, $total];
     };
 
+    // FRÁZE NAPŘED (v4.1.3): „17 pro" dřív našlo i „16 Pro" a „MacBook Pro", protože
+    // „17" sedělo na číslo zakázky nebo telefon a „pro" na model. Když víceslovný dotaz
+    // existuje někde jako souvislá fráze, ukážou se jen tyhle shody; hledání po
+    // jednotlivých slovech („iphone 13 novák") zůstává jako další krok, když fráze nikde není.
+    if (count($tokens) >= 2) {
+        [$groups, $total] = $run([implode(' ', $tokens)], 'all');
+        if ($total > 0) {
+            return array_merge($out, ['mode' => 'exact', 'groups' => $groups, 'total' => $total]);
+        }
+    }
+
     [$groups, $total] = $run($tokens, 'all');
     if ($total > 0) {
         // Dotaz = jedno číslo/kód („1645", „2601645", „APFAZ2601645"): když ho nějaký

@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.1.3',
+        'date' => '2026-10-28',
+        'time' => '10:30',
+        'title' => 'Zakázky: filtr stavu je přesný, vyhledávání hledá nejdřív celou frázi',
+        'items' => [
+            '<b>Filtr stavu v přehledu zakázek ukazuje jen zvolený stav</b> (plus jeho staré názvy). „Připraveno k převzetí“ dřív zobrazovalo i Vydáno a Nevyzvednuto, „Vydáno“ i „Vydáno – čeká na platbu“. Dlaždice s počty a pruh na Nástěnce dál otevírají celou skupinu, aby číslo sedělo na výpis.',
+            '<b>Vyhledávání hledá nejdřív celou frázi</b>: „17 pro“ najde iPhone 17 Pro, ne už „16 Pro“ nebo „MacBook Pro“ (dřív se „17“ chytilo na čísle zakázky nebo telefonu a „pro“ na modelu). Hledání po jednotlivých slovech („iphone 13 novák“) zůstává, když fráze nikde není.',
+        ],
+    ],
+    [
         'version' => '4.1.2',
         'date' => '2026-10-26',
         'time' => '21:30',

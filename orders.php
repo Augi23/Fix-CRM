@@ -22,6 +22,8 @@ $offset = ($page - 1) * $limit;
 // FIX #7: Whitelist filter values to prevent unexpected SQL behavior
 $allowed_statuses = getAllowedOrderFilterStatuses();
 $filter_status    = in_array($_GET['filter'] ?? '', $allowed_statuses, true) ? $_GET['filter'] : null;
+// &group=1 = celá skupina stavu (dlaždice s počty); bez něj přesně zvolený stav (v4.1.3)
+$filter_group_mode = $filter_status !== null && !empty($_GET['group']);
 
 $orders       = [];
 $total_orders = 0;
@@ -61,14 +63,10 @@ if (isset($pdo)) {
         }
 
         if ($filter_status) {
-            $filter_group = getOrderStatusGroup($filter_status);
-            if ($filter_group !== null) {
-                $filter_key = $filter_group === 'completed' ? 'done' : $filter_group;
-                $where_clauses[] = 'o.status IN (' . orderStatusSqlIn($pdo, $filter_key) . ')';
-            } else {
-                $where_clauses[] = 'o.status = ?';
-                $sql_params[]    = $filter_status;
-            }
+            // Dřív se vždy bralo celou skupinou a „Připraveno k převzetí" navíc přes 'done'
+            // (= i Vydáno a Nevyzvednuto). Teď přesný stav (+ staré aliasy), skupina jen z dlaždic.
+            $__filterList = getOrderStatusFilterList($filter_status, $filter_group_mode);
+            $where_clauses[] = 'o.status IN (' . implode(',', array_map(static fn($st) => $pdo->quote($st), $__filterList)) . ')';
         }
 
         $where_sql = $where_clauses ? ' WHERE ' . implode(' AND ', $where_clauses) : '';
@@ -163,11 +161,11 @@ if (isset($pdo)) {
                 SUM(status IN (" . orderStatusSqlIn($pdo, 'new') . ") AND source <> 'legacy') as cnt_new,
                 SUM(status IN (" . orderStatusSqlIn($pdo, 'pending_approval') . ") AND source <> 'legacy') as cnt_pending,
                 SUM(status IN (" . orderStatusSqlIn($pdo, 'in_progress') . ") AND source <> 'legacy') as cnt_progress,
-                SUM(status IN (" . orderStatusSqlIn($pdo, 'done') . ") AND source <> 'legacy') as cnt_ready,
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'completed') . ") AND source <> 'legacy') as cnt_ready,
                 SUM(status IN (" . orderStatusSqlIn($pdo, 'new') . ") AND source = 'legacy') as leg_new,
                 SUM(status IN (" . orderStatusSqlIn($pdo, 'pending_approval') . ") AND source = 'legacy') as leg_pending,
                 SUM(status IN (" . orderStatusSqlIn($pdo, 'in_progress') . ") AND source = 'legacy') as leg_progress,
-                SUM(status IN (" . orderStatusSqlIn($pdo, 'done') . ") AND source = 'legacy') as leg_ready
+                SUM(status IN (" . orderStatusSqlIn($pdo, 'completed') . ") AND source = 'legacy') as leg_ready
              FROM orders WHERE 1=1" . $stats_where
         );
         $s->execute($stats_params);
@@ -215,7 +213,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
 
 <div class="row g-3 mb-4">
     <div class="col-12 col-sm-6 col-md-4 col-xl-2">
-        <a href="?filter=<?php echo urlencode('Přijato'); ?>" class="text-decoration-none">
+        <a href="?filter=<?php echo urlencode('Přijato'); ?>&group=1" class="text-decoration-none">
             <div class="card bg-primary bg-opacity-10 border-0 p-3 <?php echo isOrderStatusIn($filter_status, 'new') ? 'ring-2 ring-primary border-primary border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-clipboard-list text-primary fa-2x me-3"></i>
@@ -228,7 +226,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
         </a>
     </div>
     <div class="col-12 col-sm-6 col-md-4 col-xl-2">
-        <a href="?filter=<?php echo urlencode('Čeká na zákazníka'); ?>" class="text-decoration-none">
+        <a href="?filter=<?php echo urlencode('Čeká na zákazníka'); ?>&group=1" class="text-decoration-none">
             <div class="card bg-info bg-opacity-10 border-0 p-3 <?php echo isOrderStatusIn($filter_status, 'pending_approval') ? 'ring-2 ring-info border-info border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-handshake text-info fa-2x me-3"></i>
@@ -241,7 +239,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
         </a>
     </div>
     <div class="col-12 col-sm-6 col-md-4 col-xl-2">
-        <a href="?filter=<?php echo urlencode('V opravě'); ?>" class="text-decoration-none">
+        <a href="?filter=<?php echo urlencode('V opravě'); ?>&group=1" class="text-decoration-none">
             <div class="card bg-warning bg-opacity-10 border-0 p-3 <?php echo isOrderStatusIn($filter_status, 'in_progress') ? 'ring-2 ring-warning border-warning border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-spinner text-warning fa-2x me-3"></i>
@@ -254,8 +252,8 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
         </a>
     </div>
     <div class="col-12 col-sm-6 col-md-4 col-xl-2">
-        <a href="?filter=<?php echo urlencode('Připraveno k převzetí'); ?>" class="text-decoration-none">
-            <div class="card bg-success bg-opacity-10 border-0 p-3 <?php echo (isOrderStatusIn($filter_status, 'done')) ? 'ring-2 ring-success border-success border-1 shadow-sm' : ''; ?>">
+        <a href="?filter=<?php echo urlencode('Připraveno k převzetí'); ?>&group=1" class="text-decoration-none">
+            <div class="card bg-success bg-opacity-10 border-0 p-3 <?php echo (isOrderStatusIn($filter_status, 'completed')) ? 'ring-2 ring-success border-success border-1 shadow-sm' : ''; ?>">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-check-double text-success fa-2x me-3"></i>
                     <div>
@@ -320,7 +318,7 @@ $status_defs = getOrderStatusDefinitions();
 $branch_qs   = ($active_branch_filter > 0 && isBranchGlobalViewer()) ? '&branch_id=' . (int)$active_branch_filter : '';
 $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '';
 $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
-$status_qs   = $filter_status ? '&filter=' . urlencode($filter_status) : '';
+$status_qs   = $filter_status ? '&filter=' . urlencode($filter_status) . ($filter_group_mode ? '&group=1' : '') : '';
 $__techs     = getActiveTechnicians(true);
 ?>
 <?php /* Jedna řada: vlevo „Nová zakázka", vpravo filtry (prohozeno na přání 9.8.2026 —

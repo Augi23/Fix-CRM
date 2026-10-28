@@ -413,12 +413,12 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
         </div>
         <div class="dsh-bar" role="img" aria-label="Rozložení zakázek podle stavu">
             <?php foreach ($D['flow'] as $f): if ($f['n'] <= 0) { continue; } ?>
-            <a class="t-<?php echo e($f['tone']); ?>" style="flex-grow:<?php echo (int)$f['n']; ?>" href="orders.php?filter=<?php echo urlencode($f['filter']); ?>" title="<?php echo e($f['label'] . ': ' . $f['n']); ?>"></a>
+            <a class="t-<?php echo e($f['tone']); ?>" style="flex-grow:<?php echo (int)$f['n']; ?>" href="orders.php?filter=<?php echo urlencode($f['filter']); ?>&group=1" title="<?php echo e($f['label'] . ': ' . $f['n']); ?>"></a>
             <?php endforeach; ?>
         </div>
         <div class="dsh-legend">
             <?php foreach ($D['flow'] as $f): ?>
-            <a class="t-<?php echo e($f['tone']); ?><?php echo $f['n'] === 0 ? ' is-zero' : ''; ?>" href="orders.php?filter=<?php echo urlencode($f['filter']); ?>">
+            <a class="t-<?php echo e($f['tone']); ?><?php echo $f['n'] === 0 ? ' is-zero' : ''; ?>" href="orders.php?filter=<?php echo urlencode($f['filter']); ?>&group=1">
                 <i aria-hidden="true"></i><?php echo e($f['label']); ?> <b><?php echo (int)$f['n']; ?></b><?php if ($f['leg'] > 0): ?> <small title="Importované (staré) zakázky ze zakazkovylist.cz — v čísle nejsou">(<?php echo (int)$f['leg']; ?>)</small><?php endif; ?>
             </a>
             <?php endforeach; ?>

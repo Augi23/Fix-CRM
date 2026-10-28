@@ -954,6 +954,23 @@ function getOrderStatusGroup(string $status): ?string {
     return null;
 }
 
+/**
+ * Stavy, které má ukázat filtr „?filter=<stav>" v přehledu zakázek (v4.1.3).
+ *  - výchozí: PŘESNĚ zvolený stav + jeho staré/cizojazyčné aliasy téže skupiny
+ *    („Připraveno k převzetí" = i Hotovo/Completed, ale už NE Vydáno/Nevyzvednuto,
+ *    které dřív přibalovala skupina 'done'; „Vydáno" už neukazuje „Vydáno - čeká na platbu")
+ *  - $wholeGroup (dlaždice s počty, pruh na Nástěnce): celá skupina stavu, aby číslo
+ *    na dlaždici sedělo na výpis („V opravě" = i externí/autorizovaný servis)
+ */
+function getOrderStatusFilterList(string $status, bool $wholeGroup = false): array {
+    $group = getOrderStatusGroup($status);
+    if ($group === null) { return [$status]; }
+    $list = getOrderStatusList($group);
+    if ($wholeGroup) { return $list; }
+    $canonical = array_keys(array_filter(getOrderStatusDefinitions(), static fn($m) => empty($m['legacy'])));
+    return array_values(array_filter($list, static fn($s) => $s === $status || !in_array($s, $canonical, true)));
+}
+
 function isOrderStatusIn(?string $status, string $key): bool {
     return in_array((string)$status, getOrderStatusList($key), true);
 }
