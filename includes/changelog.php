@@ -18,7 +18,7 @@ $entries = [
         'items' => [
             'Po kliknutí na „Nainstalovat aktualizaci“ se do dlaždice <b>Aktuální verze</b> zapisovalo <b>3.83.0</b> — hlášení o výsledku bralo číslo ze souboru VERSION, který se od verze 3.83.0 nezvyšoval (dlaždice při načtení stránky čte Historii úprav, proto po obnovení stránky bylo číslo zase správně). Výsledek aktualizace se teď čte z Historie úprav staženého kódu, včetně verze „před“ v zápisu do Historie.',
             'Po aktualizaci se zároveň přepíše štítek sestavení (commit) a datum — dřív zůstaly ze starého načtení stránky, takže vedle nové verze stál starý commit.',
-            '<b>Vykřičník u záložky Systém</b> svítí jen tehdy, když je na GitHubu novější verze než nainstalovaná (tak to bylo i dřív, ale uvnitř Systému nic neřeklo proč). Teď má vykřičník nápovědu s číslem verze, svítí i u podzáložky Aktualizace a na ostatních podzáložkách je proužek „Na GitHubu je Verze X (nainstalováno Y)“ s odkazem. Po instalaci zhasne.',
+            '<b>Vykřičník u záložky Systém svítil pořád</b> — globální styl odznaků (display !important) přebíjel jeho schování, takže byl vidět i při „Máte nejnovější verzi“. Teď se schovává obalem, který styl odznaku neovlivní. Vykřičník svítí jen tehdy, když je na GitHubu novější verze než nainstalovaná (uvnitř Systému ale nic neřeklo proč). Teď má vykřičník nápovědu s číslem verze, svítí i u podzáložky Aktualizace a na ostatních podzáložkách je proužek „Na GitHubu je Verze X (nainstalováno Y)“ s odkazem. Po instalaci zhasne.',
         ],
     ],
     [

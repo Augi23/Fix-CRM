@@ -607,7 +607,7 @@ $sysSubnav = function (string $cur) use ($sys_subs_allowed) {
            . '" href="?tab=system&sub=' . $key . '"><i class="fas ' . $it[0] . ' me-2"></i>'
            . htmlspecialchars($it[1])
            // vykřičník i na podzáložce Aktualizace — ať je uvnitř Systému vidět, PROČ svítí záložka
-           . ($key === 'aktualizace' ? ' <span class="badge bg-warning text-dark ms-1 update-badge-sub" style="display:none;">!</span>' : '')
+           . ($key === 'aktualizace' ? ' <span class="update-badge-wrap" hidden><span class="badge bg-warning text-dark ms-1 update-badge-sub">!</span></span>' : '')
            . '</a></li>';
     }
     // Třídění pošty má vlastní stránku (trideni-posty.php) — jen odkaz, admin-only
@@ -723,7 +723,7 @@ require_once 'includes/header.php';
         <?php /* Systém = Integrace + Databáze + Aktualizace. Admin vidí vše; manažer/Boss jen kvůli Aktualizacím. */ ?>
         <?php if ($is_admin_user || crmCanRunUpdates()): ?>
         <li class="nav-item">
-            <a class="nav-link <?php echo $active_tab == 'system' ? 'active' : 'text-white-75'; ?>" href="?tab=system" id="updatesNavLink"><i class="fas fa-server me-2"></i><?php echo __('system_tab'); ?> <span id="updateBadgeNav" class="badge bg-warning text-dark ms-1" style="display:none;">!</span></a>
+            <a class="nav-link <?php echo $active_tab == 'system' ? 'active' : 'text-white-75'; ?>" href="?tab=system" id="updatesNavLink"><i class="fas fa-server me-2"></i><?php echo __('system_tab'); ?> <span class="update-badge-wrap" hidden><span id="updateBadgeNav" class="badge bg-warning text-dark ms-1" title="">!</span></span></a>
         </li>
         <?php endif; ?>
     </ul>
@@ -3200,6 +3200,16 @@ const UPDATE_TRANSLATIONS = {
     build:             '<?php echo __('build'); ?>'
 };
 
+// Vykřičník „nová verze" u záložky Systém a podzáložky Aktualizace. Schovává se
+// atributem hidden na OBALU — samotný .badge má v globálním stylu display !important,
+// takže style.display='none' na něm nefungoval a vykřičník svítil pořád (3. 11. 2026).
+function setUpdateBadges(show, title) {
+    document.querySelectorAll('.update-badge-wrap').forEach(w => {
+        w.hidden = !show;
+        const b = w.querySelector('.badge');
+        if (b) b.title = show ? (title || '') : '';
+    });
+}
 function checkForUpdates(force = false) {
     const btn = document.getElementById('btnCheckUpdates');
     const installBtn = document.getElementById('btnInstallUpdate');
@@ -3259,10 +3269,8 @@ function checkForUpdates(force = false) {
                 </div>`;
                 if (installBtn) installBtn.style.display = 'block';
                 // Show badge (+ proč: nová verze) — na záložce, podzáložce i proužkem na ostatních podzáložkách Systému
-                const badge = document.getElementById('updateBadgeNav');
                 const verTxt = /^\d+\.\d+\.\d+$/.test(String(data.remote_version || '')) ? ('Verze ' + data.remote_version) : 'Nová verze';
-                if (badge) { badge.style.display = 'inline'; badge.title = verTxt + ' je připravená k instalaci (Systém → Aktualizace)'; }
-                document.querySelectorAll('.update-badge-sub').forEach(b => { b.style.display = 'inline'; b.title = verTxt + ' je připravená k instalaci'; });
+                setUpdateBadges(true, verTxt + ' je připravená k instalaci (Systém → Aktualizace)');
                 document.querySelectorAll('.update-banner-sys').forEach(el => {
                     el.style.display = '';
                     const t = el.querySelector('.update-banner-text');
@@ -3276,9 +3284,8 @@ function checkForUpdates(force = false) {
                     <div class="mt-1 text-muted small"><i class="fas fa-code-branch me-1"></i>${UPDATE_TRANSLATIONS.build}: ${escapeHtml(data.build || '')}</div>
                 </div>`;
                 if (installBtn) installBtn.style.display = 'none';
-                const badge = document.getElementById('updateBadgeNav');
-                if (badge) badge.style.display = 'none';
-                document.querySelectorAll('.update-badge-sub, .update-banner-sys').forEach(el => { el.style.display = 'none'; });
+                setUpdateBadges(false, '');
+                document.querySelectorAll('.update-banner-sys').forEach(el => { el.style.display = 'none'; });
             }
 
             // Cache info
@@ -3430,9 +3437,8 @@ function installUpdate() {
                 ${migrationsHtml}
                 <div class="mt-2"><a href="settings.php?tab=updates" class="btn btn-sm btn-outline-light"><i class="fas fa-redo me-1"></i> <?php echo __('reload_btn'); ?></a></div>
             </div>`;
-            const badge = document.getElementById('updateBadgeNav');
-            if (badge) badge.style.display = 'none';
-            document.querySelectorAll('.update-badge-sub, .update-banner-sys').forEach(el => { el.style.display = 'none'; });
+            setUpdateBadges(false, '');
+            document.querySelectorAll('.update-banner-sys').forEach(el => { el.style.display = 'none'; });
             const installBtn = document.getElementById('btnInstallUpdate');
             if (installBtn) installBtn.style.display = 'none';
             // Update the "current version" label only if we actually got a version (never blank it)
