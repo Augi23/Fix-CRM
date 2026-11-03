@@ -648,7 +648,8 @@ function afxCashBookRows(int $branchId, string $from, string $to): array {
         $purposeLabels = ['vykup' => 'Výkup zařízení', 'vklad' => 'Vklad do pokladny',
                           'vyber' => 'Výběr z pokladny', 'zakazka' => 'Úhrada zakázky',
                           'storno' => 'Storno / vratka hotovosti',
-                          'presun_out' => 'Přesun do jiné pokladny', 'presun_in' => 'Přesun z jiné pokladny'];
+                          'presun_out' => 'Přesun do jiné pokladny', 'presun_in' => 'Přesun z jiné pokladny',
+                          'zaloha' => 'Záloha na výplatu'];
         foreach ($st as $r) {
             $detail = trim((string)($r['ref_label'] ?? '') . ' ' . (string)($r['note'] ?? ''));
             $rows[] = [

@@ -323,6 +323,12 @@ function afxUcetniReportDefs(): array {
             'popis' => 'Peníze přijaté před uskutečněním plnění. Záloha není výnos — dokud plnění nenastane, je to závazek.',
             'sirka' => 'landscape',
         ],
+        'zalohy_zamestnanci' => [
+            'nazev' => 'Zálohy zaměstnancům na mzdy',
+            'ikona' => 'fa-hand-holding-dollar',
+            'popis' => 'Hotovost vydaná z kasy zaměstnancům proti výplatě: datum, zaměstnanec, částka, výdajový doklad a zda už byla ze mzdy stržena (vyúčtována). Součty po zaměstnancích.',
+            'sirka' => 'landscape',
+        ],
         'banka' => [
             'nazev' => 'Bankovní pohyby za období',
             'ikona' => 'fa-building-columns',
@@ -336,6 +342,45 @@ function afxUcetniReportDefs(): array {
 // DATA SESTAV
 // Každá funkce vrací ['rows' => [...], 'soucty' => [...], 'pozn' => [řetězce]].
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** 8) Zálohy zaměstnancům na mzdy (staff_advances, v4.3.0). */
+function afxUcetniDataZalohyZam(string $from, string $to, int $branchId): array {
+    $out = ['rows' => [], 'po_zamestnancich' => [], 'soucty' => ['vyplaceno' => 0.0, 'pocet' => 0,
+        'vyuctovano' => 0.0, 'nevyuctovano' => 0.0, 'storno' => 0.0, 'storno_pocet' => 0], 'pozn' => []];
+    if (!afxUcetniTableExists('staff_advances')) {
+        $out['pozn'][] = 'Evidence záloh (staff_advances) v databázi zatím není — sestava je prázdná.';
+        return $out;
+    }
+    $bSql = $branchId > 0 ? ' AND a.branch_id = ?' : '';
+    $bPar = $branchId > 0 ? [$branchId] : [];
+    $docJoin = afxUcetniTableExists('cash_documents') ? 'LEFT JOIN cash_documents d ON d.id = a.cash_doc_id' : '';
+    $docCol = afxUcetniTableExists('cash_documents') ? 'd.doc_number' : "''";
+    $out['rows'] = afxUcetniQuery(
+        "SELECT a.id, a.paid_at, a.amount, a.note, a.status, a.paid_by, a.settled_at, a.settled_by, a.settled_note,
+                a.cancel_reason, a.branch_id, t.name AS zamestnanec, $docCol AS doklad
+         FROM staff_advances a
+         LEFT JOIN technicians t ON t.id = a.technician_id
+         $docJoin
+         WHERE a.paid_at BETWEEN ? AND ?" . $bSql . "
+         ORDER BY t.name ASC, a.paid_at ASC, a.id ASC",
+        array_merge([$from . ' 00:00:00', $to . ' 23:59:59'], $bPar)
+    );
+    foreach ($out['rows'] as $r) {
+        $amt = (float)$r['amount'];
+        if ((string)$r['status'] === 'cancelled') { $out['soucty']['storno'] += $amt; $out['soucty']['storno_pocet']++; continue; }
+        $out['soucty']['vyplaceno'] += $amt; $out['soucty']['pocet']++;
+        if ((string)$r['status'] === 'settled') { $out['soucty']['vyuctovano'] += $amt; } else { $out['soucty']['nevyuctovano'] += $amt; }
+        $k = (string)($r['zamestnanec'] ?? '—');
+        if (!isset($out['po_zamestnancich'][$k])) { $out['po_zamestnancich'][$k] = ['vyplaceno' => 0.0, 'vyuctovano' => 0.0, 'nevyuctovano' => 0.0, 'pocet' => 0]; }
+        $out['po_zamestnancich'][$k]['vyplaceno'] += $amt; $out['po_zamestnancich'][$k]['pocet']++;
+        $out['po_zamestnancich'][$k][(string)$r['status'] === 'settled' ? 'vyuctovano' : 'nevyuctovano'] += $amt;
+    }
+    $out['pozn'][] = 'Záloha je pohledávka za zaměstnancem do okamžiku, kdy se strhne ze mzdy („vyúčtováno“). V pokladní knize je vedená jako výdej (VPD) v den výplaty; tržbu nesnižuje.';
+    if ($out['soucty']['storno_pocet'] > 0) {
+        $out['pozn'][] = 'Stornované zálohy (' . $out['soucty']['storno_pocet'] . ' ks, ' . afxUcetniMoney($out['soucty']['storno']) . ' Kč) jsou v seznamu přeškrtnuté — peníze se vrátily do kasy opačným pohybem a do součtů nevstupují.';
+    }
+    return $out;
+}
 
 /** 1) Kniha vydaných faktur. */
 function afxUcetniDataKniha(string $from, string $to, int $branchId): array {
@@ -762,6 +807,21 @@ function afxUcetniDataKasa(string $from, string $to, int $branchId): array {
                 . 'pobočky nespadají, najdete je ve výběru „všechny provozovny". Pokladní kniha je '
                 . 'připočítává výchozí provozovně (fyzicky prošly její zásuvkou).';
         }
+    }
+
+    // zálohy zaměstnancům (v4.3.0) jdou ze zásuvky jako pohyb deníku — tržbu nemění, účetní o nich musí vědět
+    if (afxUcetniTableExists('staff_advances')) {
+        try {
+            $za = afxUcetniQuery(
+                "SELECT COUNT(*) c, COALESCE(SUM(a.amount), 0) s FROM staff_advances a
+                 WHERE a.status <> 'cancelled' AND a.paid_at BETWEEN ? AND ?" . ($branchId > 0 ? ' AND a.branch_id = ?' : ''),
+                array_merge([$from . ' 00:00:00', $to . ' 23:59:59'], $bPar)
+            );
+            if ((int)($za[0]['c'] ?? 0) > 0) {
+                $out['pozn'][] = 'Zálohy zaměstnancům na mzdy vydané z kasy v období: ' . (int)$za[0]['c'] . ' ks v hodnotě '
+                    . afxUcetniMoney((float)$za[0]['s']) . ' Kč (výdajové doklady; podrobně sestava „Zálohy zaměstnancům na mzdy").';
+            }
+        } catch (Throwable $e) {}
     }
 
     $out['pozn'][] = 'Prodej „na fakturu" není hotovostní tržba — peníze přijdou až úhradou faktury (viz sestava „Přehled úhrad faktur"), aby se stejná částka nezaúčtovala dvakrát.';
@@ -1205,6 +1265,23 @@ function afxUcetniExportSpec(string $key, array $d): array {
                 'Tržba celkem' => [$d['soucty']['celkem'], $money],
                 'Storna (počet)' => [(int)$d['soucty']['storno_pocet'], $int],
                 'Storna (částka)' => [$d['soucty']['storno_castka'], $money],
+            ]];
+
+        case 'zalohy_zamestnanci':
+            return ['rows' => $d['rows'], 'sloupce' => [
+                ['Vyplaceno',   fn($r) => substr((string)$r['paid_at'], 0, 10), $date],
+                ['Zaměstnanec', fn($r) => $r['zamestnanec'], $text],
+                ['Částka',      fn($r) => $r['amount'], $money],
+                ['Poznámka',    fn($r) => $r['note'], $text],
+                ['Doklad',      fn($r) => $r['doklad'], $text],
+                ['Vyplatil',    fn($r) => $r['paid_by'], $text],
+                ['Stav',        fn($r) => ['open' => 'nevyúčtováno', 'settled' => 'vyúčtováno', 'cancelled' => 'storno'][(string)$r['status']] ?? (string)$r['status'], $text],
+                ['Vyúčtováno dne', fn($r) => $r['settled_at'] ? substr((string)$r['settled_at'], 0, 10) : '', $date],
+            ], 'soucty' => [
+                'Vyplaceno celkem (bez storen)' => [$d['soucty']['vyplaceno'], $money],
+                'Počet záloh' => [(int)$d['soucty']['pocet'], $int],
+                'Z toho vyúčtováno' => [$d['soucty']['vyuctovano'], $money],
+                'Z toho nevyúčtováno' => [$d['soucty']['nevyuctovano'], $money],
             ]];
 
         case 'zalohy':

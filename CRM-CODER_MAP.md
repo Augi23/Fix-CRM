@@ -64,6 +64,7 @@ Klientský portál (odděleně): `klient/*` (zejména `klient/dashboard.php`).
 - `api/print_poll.php` — poller agenta na pokladním Macu (token pobočky); převzatá úloha = `pos_sales.receipt_printed_at`
 - `api/pos_cash_move.php` — vklad/výběr, počáteční zůstatek, storno dokladu, `action=transfer` (přesun mezi pokladnami, jen vedení — `crmCanTransferCash()`)
 - `includes/receipt58.php` (`afxReceiptDataForSale`, `afxEnsurePosReceiptColumns`), `includes/receipt_escpos.php` (`afxReceiptBytesForSale`, `afxReceiptAutoPrint`), `includes/cash_book.php`
+- `api/staff_advance.php` + `includes/staff_advances.php` — zálohy na výplaty zaměstnancům (pay / settle / storno / list; tabulka `staff_advances`, pohyb `zaloha`, VPD); přehled v `reports.php` (staff_stats, individual_stats), sestava `zalohy_zamestnanci` v `ucetni_sestavy.php`
 - Výdej zakázky vyžaduje podpis `vydej` (`crmOrderPickupSignatureRequired`, `crmOrderHasSignature`) — hlídá `update_order_status.php` i `update_order_full.php`
 
 ### Integrace

@@ -127,8 +127,10 @@ if (!empty($rows) && isset($pdo)) {
             <?php if (!empty($_GET['search'])): ?><a class="btn btn-outline-secondary" href="reklamace.php">Reset</a><?php endif; ?>
         </form>
 
-        <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle">
+        <div class="table-responsive cmpl-table-wrap">
+            <?php /* v4.3.0: tabulka se vejde na šířku stránky bez vodorovného posuvníku — menší písmo,
+                     pevné procentní šířky sloupců, zalamování dlouhých hodnot, akce pod sebou (viz CSS dole) */ ?>
+            <table class="table table-striped table-hover align-middle cmpl-table">
                 <thead>
                     <tr>
                         <th><?php echo __('code_col'); ?></th>
@@ -184,7 +186,7 @@ if (!empty($rows) && isset($pdo)) {
                             <?php if (!empty($r['serial_number'])): ?><div class="text-white-50 font-monospace" style="font-size:.72rem;"><?php echo e($r['serial_number']); ?></div><?php endif; ?>
                         </td>
                         <?php /* Původní zakázka: proklik + propsaná závada a provedená oprava */ ?>
-                        <td class="small" style="min-width:220px;max-width:300px;">
+                        <td class="small cmpl-order">
                             <?php if (($r['source'] ?? '') === 'client'): ?>
                                 <span class="badge mb-1" style="background:#f97316;color:#fff">Klient</span>
                             <?php endif; ?>
@@ -206,8 +208,8 @@ if (!empty($rows) && isset($pdo)) {
                                 <span class="text-white-50">bez zakázky</span>
                             <?php endif; ?>
                         </td>
-                        <td style="min-width:240px;"><?php echo nl2br(e($r['complaint_reason'] ?? '')); ?></td>
-                        <td class="small text-nowrap">
+                        <td class="small cmpl-reason"><?php echo nl2br(e($r['complaint_reason'] ?? '')); ?></td>
+                        <td class="small cmpl-req">
                             <?php echo !empty($r['requested_resolution']) ? '<span class="badge bg-secondary">' . e((string)$r['requested_resolution']) . '</span>' : '<span class="text-white-50">—</span>'; ?>
                             <?php if (!empty($r['purchase_date'])): ?><div class="text-white-50 mt-1">kou&shy;peno <?php echo e(date('d.m.Y', strtotime((string)$r['purchase_date']))); ?></div><?php endif; ?>
                         </td>
@@ -232,14 +234,14 @@ if (!empty($rows) && isset($pdo)) {
                             <?php else: ?>—<?php endif; ?>
                         </td>
                         <td class="text-nowrap small"><?php echo !empty($r['tech_name']) ? e((string)$r['tech_name']) : '<span class="text-white-50">' . __('cmpl_unassigned') . '</span>'; ?></td>
-                        <td style="min-width:170px;">
+                        <td class="cmpl-status">
                             <select class="form-select form-select-sm complaint-status-select" data-cid="<?php echo (int)$r['id']; ?>">
                                 <?php foreach ($opts as $st): ?>
                                     <option value="<?php echo e($st); ?>" <?php echo $curStatus === $st ? 'selected' : ''; ?>><?php echo e($st === 'Čeká na zákazníka' ? __('status_waiting_customer') : $st); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </td>
-                        <td class="text-nowrap">
+                        <td class="cmpl-actions">
                             <a class="btn btn-sm btn-outline-info" href="view_complaint.php?id=<?php echo (int)$r['id']; ?>" title="<?php echo e(__('cmpl_detail')); ?>">
                                 <i class="fas fa-folder-open"></i>
                             </a>
@@ -278,6 +280,39 @@ tr.complaint-row--new-client:hover { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
     tr.complaint-row--new-client { animation: none; box-shadow: inset 4px 0 0 #f97316; }
 }
+/* ── Seznam reklamací bez vodorovného posuvníku (v4.3.0, požadavek majitele 3. 11. 2026) ──
+   Dřív měly sloupce pevné min-width (220/240/170 px) a nic se nezalamovalo → 11 sloupců se
+   nevešlo ani na 1 900 px. Teď: pevné rozložení s procenty, menší písmo, dlouhé hodnoty
+   se zalomí, stavový select je užší a tři tlačítka akcí jsou pod sebou. */
+.cmpl-table { table-layout: fixed; width: 100%; font-size: .82rem; }
+.cmpl-table th, .cmpl-table td { padding: .5rem .45rem; overflow-wrap: anywhere; word-break: break-word; vertical-align: middle; }
+.cmpl-table th { font-size: .66rem; letter-spacing: .04em; white-space: normal; }
+.cmpl-table td.small, .cmpl-table .small { font-size: .78rem; }
+.cmpl-table td.text-nowrap, .cmpl-table th.text-nowrap { white-space: normal !important; }
+.cmpl-table thead th:nth-child(1)  { width: 6.5%; }   /* kód */
+.cmpl-table thead th:nth-child(2)  { width: 7.5%; }   /* přijato */
+.cmpl-table thead th:nth-child(3)  { width: 10%; }    /* zákazník */
+.cmpl-table thead th:nth-child(4)  { width: 10%; }    /* zařízení */
+.cmpl-table thead th:nth-child(5)  { width: 14%; }    /* původní zakázka */
+.cmpl-table thead th:nth-child(6)  { width: 12.5%; }    /* důvod */
+.cmpl-table thead th:nth-child(7)  { width: 9.5%; }   /* požadavek */
+.cmpl-table thead th:nth-child(8)  { width: 8.5%; }   /* lhůta */
+.cmpl-table thead th:nth-child(9)  { width: 7.5%; }   /* technik */
+/* vnořené „text-nowrap“ (telefon, datum…) se v pevném rozložení musí umět zalomit, jinak přetékají do vedlejšího sloupce */
+.cmpl-table .text-nowrap { white-space: normal !important; }
+/* datum, lhůta a jméno technika se lámou jen mezi slovy (nikdy uprostřed čísla) */
+.cmpl-table td:nth-child(2), .cmpl-table td:nth-child(8), .cmpl-table td:nth-child(9) { overflow-wrap: normal; word-break: normal; }
+.cmpl-table td:nth-child(8) { font-size: .74rem; }
+.cmpl-table thead th:nth-child(10) { width: 10%; }   /* stav */
+.cmpl-table thead th:nth-child(11) { width: 4%; }     /* akce */
+.cmpl-table .badge { white-space: normal; line-height: 1.25; text-align: left; font-size: .72rem; }
+.cmpl-table .cmpl-status .form-select { font-size: .74rem; padding: .25rem 1.4rem .25rem .45rem; background-position: right .35rem center; }
+.cmpl-table .cmpl-actions { padding-left: .2rem; padding-right: .2rem; }
+.cmpl-table .cmpl-actions .btn { display: block; width: 100%; padding: .15rem .25rem; font-size: .72rem; line-height: 1.3; margin: 0 0 3px; }
+.cmpl-table .cmpl-actions .btn:last-child { margin-bottom: 0; }
+/* na široké obrazovce žádný vodorovný posuvník; pod 1100 px zůstává (mobil/tablet na výšku) */
+@media (min-width: 1100px) { .cmpl-table-wrap { overflow-x: visible; } }
+@media (max-width: 1099px) { .cmpl-table { min-width: 1000px; } }
 </style>
 <script>
 (function(){

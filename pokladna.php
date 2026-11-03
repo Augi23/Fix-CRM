@@ -17,6 +17,7 @@ crmMailSortMaybeSchedule();
 require_once 'includes/cash_book.php';
 require_once 'includes/pos_shift.php';
 require_once 'includes/receipt58.php';   // afxEnsurePosReceiptColumns — „bez účtenky“ v dnešních pohybech (v4.2.0)
+require_once 'includes/staff_advances.php'; // zálohy na výplaty zaměstnanců (v4.3.0)
 
 ensurePosTables();
 ensureProductsTable();
@@ -467,6 +468,10 @@ html[data-lg-theme="light"] .pos-eshop-bar b { color: #1e7e38 !important; }
         <?php /* Přesun hotovosti mezi pokladnami poboček („z trezoru do trezoru“, v4.2.0) — jen admin / Boss / manažer */ ?>
         <button type="button" class="btn btn-outline-info" onclick="posCashTransfer()" title="Přesun hotovosti do pokladny jiné pobočky (jen vedení)"><i class="fas fa-right-left"></i><span class="lbl">Přesun</span></button>
         <?php endif; ?>
+        <?php if (crmCanPayStaffAdvance()): ?>
+        <?php /* Zálohy na výplaty zaměstnanců (v4.3.0) — výdej z kasy s evidencí u zaměstnance; jen vedení */ ?>
+        <button type="button" class="btn btn-outline-warning" onclick="posStaffAdvance()" title="Záloha na výplatu zaměstnanci — výdej z kasy s evidencí (jen vedení)"><i class="fas fa-hand-holding-dollar"></i><span class="lbl">Zálohy výplat</span></button>
+        <?php endif; ?>
         <div class="dropdown">
             <button type="button" class="btn btn-outline-secondary pos-more" data-bs-toggle="dropdown" aria-expanded="false" title="Další možnosti"><i class="fas fa-ellipsis"></i><span class="lbl">Další</span></button>
             <ul class="dropdown-menu dropdown-menu-end">
@@ -766,7 +771,8 @@ $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GE
             $m = $f['row'];
             $isOut = $m['direction'] === 'out';
             $purposeLabels = ['vykup' => 'Výkup', 'vklad' => 'Vklad', 'vyber' => 'Výběr', 'zakazka' => 'Zakázka',
-                              'presun_out' => 'Přesun do jiné pokladny', 'presun_in' => 'Přesun z jiné pokladny'];
+                              'presun_out' => 'Přesun do jiné pokladny', 'presun_in' => 'Přesun z jiné pokladny',
+                              'zaloha' => 'Záloha na výplatu'];
             $pl = $purposeLabels[(string)$m['purpose']] ?? ucfirst((string)$m['purpose']);
         ?>
             <div class="pos-feed-row">
@@ -1044,6 +1050,58 @@ $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GE
 </div>
 <?php endif; ?>
 
+<?php if (crmCanPayStaffAdvance()):
+    /* ZÁLOHY NA VÝPLATY (v4.3.0): zaměstnanec + částka + poznámka → výdej z kasy (VPD) a záznam
+       u zaměstnance. Pod formulářem se hned ukáže, co už má vybraný zaměstnanec nevyúčtováno,
+       aby se nevyplácelo podruhé. Manažer vidí jen zaměstnance své pobočky. */
+    $__saTechs = getActiveTechnicians(isBranchGlobalViewer());
+?>
+<div class="modal fade" id="posAdvanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="fas fa-hand-holding-dollar me-2 text-warning"></i>Záloha na výplatu</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zavřít"></button>
+            </div>
+            <form id="posAdvanceForm">
+                <div class="modal-body">
+                    <p class="small text-white-50 mb-3">
+                        Hotovost vydaná zaměstnanci proti výplatě. Odečte se z kasy (výdajový doklad) a zapíše k zaměstnanci —
+                        v Reportech i v podkladech pro účetní je vidět, kolik komu bylo vyplaceno a co už bylo strženo.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label small text-white-50 mb-1">Zaměstnanec</label>
+                        <select class="form-select" name="technician_id" id="posSaTech" required>
+                            <option value="">— vyber —</option>
+                            <?php foreach ($__saTechs as $__t): ?>
+                            <option value="<?php echo (int)$__t['id']; ?>"><?php echo e((string)$__t['name']); ?><?php echo isBranchGlobalViewer() && !empty($__t['branch_name']) ? ' · ' . e((string)$__t['branch_name']) : ''; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div id="posSaOpen" class="small mb-2" style="display:none;"></div>
+                    <div class="mb-2">
+                        <label class="form-label small text-white-50 mb-1">Částka (Kč)</label>
+                        <input type="text" class="form-control form-control-lg" name="amount" id="posSaAmount" inputmode="decimal" placeholder="např. 5000" required autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="form-label small text-white-50 mb-1">Poznámka (nepovinné)</label>
+                        <input type="text" class="form-control" name="note" maxlength="255" placeholder="např. záloha na listopad">
+                    </div>
+                    <div class="alert alert-warning border-0 py-2 px-3 small mt-3 mb-0">
+                        <i class="fas fa-circle-info me-1"></i>Zálohu smí vyplatit jen vedení; strhnout z výplaty („vyúčtovat“) ji pak admin nebo Boss v Reportech → Statistiky jednotlivce.
+                    </div>
+                    <div class="small text-danger mt-2" id="posSaErr" style="display:none;"></div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Zrušit</button>
+                    <button type="submit" class="btn btn-warning" id="posSaSubmit"><i class="fas fa-hand-holding-dollar me-1"></i>Vyplatit zálohu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 /* Vklad/výběr hotovosti — jednoduchý prompt flow (kasa je dotyková, ale tohle je výjimečná akce) */
 function posCashMove(direction) {
@@ -1076,6 +1134,61 @@ function posOpeningBalance() {
     if (!el) { return; }
     new bootstrap.Modal(el).show();
 }
+
+/* Záloha na výplatu zaměstnanci (v4.3.0, jen vedení). Po výběru zaměstnance se načtou
+   jeho nevyúčtované zálohy, ať obsluha vidí, co už dostal. */
+function posStaffAdvance() {
+    var el = document.getElementById('posAdvanceModal');
+    if (!el) { return; }
+    document.getElementById('posSaErr').style.display = 'none';
+    document.getElementById('posSaOpen').style.display = 'none';
+    var sel = document.getElementById('posSaTech');
+    sel.onchange = function () {
+        var box = document.getElementById('posSaOpen');
+        var tid = parseInt(sel.value, 10) || 0;
+        if (!tid) { box.style.display = 'none'; return; }
+        box.style.display = ''; box.className = 'small mb-2 text-white-50'; box.textContent = 'Načítám zálohy…';
+        fetch('api/staff_advance.php?action=list&status=open&technician_id=' + tid, { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j.ok) { box.textContent = j.error || 'Nepodařilo se načíst zálohy.'; return; }
+                if (!j.rows.length) { box.className = 'small mb-2 text-success'; box.innerHTML = '<i class="fas fa-check me-1"></i>Žádná nevyúčtovaná záloha.'; return; }
+                var fmtK = function (v) { return Math.round(v).toLocaleString('cs-CZ') + ' Kč'; };
+                var html = '<div class="text-warning fw-semibold mb-1"><i class="fas fa-triangle-exclamation me-1"></i>Nevyúčtováno celkem ' + fmtK(j.open_total) + ' (' + j.rows.length + '×)</div><ul class="mb-0 ps-3">';
+                j.rows.slice(0, 6).forEach(function (r) {
+                    html += '<li>' + r.paid_at + ' · <b>' + fmtK(r.amount) + '</b>' + (r.note ? ' · ' + r.note.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }) : '') + '</li>';
+                });
+                if (j.rows.length > 6) { html += '<li>… a dalších ' + (j.rows.length - 6) + '</li>'; }
+                box.className = 'small mb-2'; box.innerHTML = html + '</ul>';
+            })
+            .catch(function () { box.textContent = 'Chyba spojení.'; });
+    };
+    new bootstrap.Modal(el).show();
+    setTimeout(function () { sel.focus(); }, 300);
+}
+(function () {
+    var f = document.getElementById('posAdvanceForm');
+    if (!f) { return; }
+    f.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        var btn = document.getElementById('posSaSubmit'), err = document.getElementById('posSaErr');
+        var sel = document.getElementById('posSaTech');
+        var fd = new FormData(f);
+        fd.append('action', 'pay');
+        fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+        var who = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '';
+        if (!confirm('Vyplatit zálohu ' + (document.getElementById('posSaAmount').value || '?') + ' Kč zaměstnanci ' + who + ' z kasy?')) { return; }
+        btn.disabled = true; err.style.display = 'none';
+        fetch('api/staff_advance.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j.ok) { err.textContent = j.error || 'Záloha se nepodařila.'; err.style.display = ''; btn.disabled = false; return; }
+                alert('Vyplacena záloha ' + Math.round(j.amount).toLocaleString('cs-CZ') + ' Kč — ' + j.technician + '.' + (j.doc_number ? '\n\nVýdajový doklad: ' + j.doc_number : ''));
+                location.reload();
+            })
+            .catch(function () { err.textContent = 'Chyba spojení'; err.style.display = ''; btn.disabled = false; });
+    });
+})();
 
 /* Přesun hotovosti mezi pokladnami (v4.2.0, jen vedení) — modal s výběrem obou pokladen. */
 function posCashTransfer() {

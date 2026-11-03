@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.3.0',
+        'date' => '2026-11-03',
+        'time' => '21:00',
+        'title' => 'Kasa: zálohy na výplaty zaměstnancům s evidencí; lístek převzetí ukazuje napočítanou hotovost; reklamace bez posuvníku',
+        'items' => [
+            '<b>Zálohy výplat</b> — nové tlačítko nahoře v Pokladně (jen vedení: admin, Boss, manažer). Vybereš zaměstnance, částku a poznámku; záloha se odečte z kasy (výdajový doklad VPD, pohyb „Záloha na výplatu“ v pokladní knize) a zapíše k zaměstnanci. Hned v okně je vidět, co už má vybraný zaměstnanec nevyúčtováno — nic se nevyplatí dvakrát.',
+            'Reporty → <b>Statistiky zaměstnanců</b> mají nový sloupec Zálohy (vyplaceno v období, kolik zbývá k výplatě po odečtení, nevyúčtované zálohy celkem). <b>Statistiky jednotlivce</b> ukazují karty Vyplaceno / K výplatě po odečtení záloh / Nevyúčtováno a seznam záloh; admin nebo Boss zálohu po stržení ze mzdy označí jako <b>vyúčtovanou</b> (nebo omylem vyplacenou stornuje — peníze se vrátí do kasy).',
+            'Podklady pro účetní: nová sestava <b>„Zálohy zaměstnancům na mzdy“</b> (tisk i Excel) se součty po zaměstnancích; sestava Tržby z pokladny uvádí zálohy v poznámce. Vše se zapisuje do Historie.',
+            '<b>Lístek převzetí / uzávěrky pokladny</b> tiskne velkým písmem <b>skutečně napočítanou hotovost</b>; „podle systému“ a rozdíl jsou pod ní menším písmem. Dřív velkým stálo „kolik má být“ — u lístku o fyzickém stavu zásuvky to bylo to méně důležité číslo.',
+            '<b>Seznam reklamací se vejde na šířku obrazovky</b> bez vodorovného posuvníku (ověřeno od 1 366 px výš): menší písmo, pevné šířky sloupců, dlouhé texty se zalamují, tři tlačítka akcí jsou pod sebou. Na užších displejích (tablet na výšku, mobil) posuvník zůstává.',
+        ],
+    ],
+    [
         'version' => '4.2.0',
         'date' => '2026-11-03',
         'time' => '18:00',

@@ -312,17 +312,23 @@ function crmShiftSlipRaster(array $shift, string $typ, ?array $prev = null, ?arr
     $text(20, $open ? 'PŘEVZETÍ POKLADNY' : 'UZÁVĚRKA POKLADNY', true);
     $cara(4);
     $y += 6;
-    $text(15, 'V KASE MÁ BÝT', false);
-    $text(42, $kc($expected), true, 1.15);   // hlavní částka — VELKÝM
+    // VELKÝM jde SKUTEČNÁ napočítaná hotovost (požadavek majitele 3. 11. 2026, v4.3.0) —
+    // dřív tu velkým stálo „kolik má být“ podle systému, což je u lístku o fyzickém
+    // stavu zásuvky to méně důležité. „ANO, souhlasí“ = napočítáno rovná se systému.
+    $real = $counted !== null ? $counted : $expected;
+    $text(15, $open ? 'NAPOČÍTÁNO V KASE' : 'NAPOČÍTÁNO PŘI UZÁVĚRCE', false);
+    $text(42, $kc($real), true, 1.15);   // hlavní částka — VELKÝM
     $y += 6;
+    $cara(2);
+    $text(14, 'Podle systému: ' . $kc($expected), false);
     if ($counted !== null) {
-        $cara(2);
-        $text(16, 'Napočítáno: ' . $kc($counted), true);
         $diff = round($counted - $expected, 2);
         $text(16, 'Rozdíl: ' . ($diff > 0 ? '+' : '') . $kc($diff), true);
         if ($open && abs($diff) >= 0.005) {
             $text(12, 'Stav pokladny se dnes odvíjí od napočítané částky.', false, 1.25);
         }
+    } else {
+        $text(14, 'Souhlasí se systémem (bez přepočtu).', false);
     }
     if (!$open && !empty($shift['closing_note'])) {
         $text(12, 'Pozn.: ' . $shift['closing_note'], false, 1.25);

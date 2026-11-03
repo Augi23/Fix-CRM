@@ -68,6 +68,7 @@ if ($sestava !== '' && isset($defs[$sestava])) {
             'dobropisy'  => afxUcetniDataDobropisy($period['from'], $period['to'], $branchId),
             'kasa'       => afxUcetniDataKasa($period['from'], $period['to'], $branchId),
             'zalohy'     => afxUcetniDataZalohy($period['from'], $period['to'], $branchId),
+            'zalohy_zamestnanci' => afxUcetniDataZalohyZam($period['from'], $period['to'], $branchId),
             'banka'      => afxUcetniDataBanka($period['from'], $period['to'], $branchId),
             default      => ['rows' => [], 'soucty' => [], 'pozn' => []],
         };
@@ -488,6 +489,63 @@ if ($sestava !== '' && isset($defs[$sestava])) {
                     <?php endforeach; ?>
                     </tbody>
                 </table>
+            <?php }
+            afxUcetniPrintClose($title, $period, $branchId);
+            exit;
+
+        // ── 8) Zálohy zaměstnancům na mzdy (v4.3.0) ──────────────────────────
+        case 'zalohy_zamestnanci':
+            $d = afxUcetniDataZalohyZam($period['from'], $period['to'], $branchId);
+            afxUcetniPrintOpen($title, $period, $branchId, $orient, 'Datum výplaty zálohy');
+            afxUcetniPrintNotes($d['pozn'], 'warn');
+            ?>
+            <div class="report-cards">
+                <div class="report-card"><div class="rp-k">Vyplaceno z kasy</div><div class="rp-v"><?php echo e(afxUcetniMoney($d['soucty']['vyplaceno'])); ?></div><div class="rp-s"><?php echo (int)$d['soucty']['pocet']; ?> záloh</div></div>
+                <div class="report-card"><div class="rp-k">Vyúčtováno (strženo ze mzdy)</div><div class="rp-v rp-pos"><?php echo e(afxUcetniMoney($d['soucty']['vyuctovano'])); ?></div><div class="rp-s">už odečteno z výplaty</div></div>
+                <div class="report-card"><div class="rp-k">Nevyúčtováno</div><div class="rp-v rp-neg"><?php echo e(afxUcetniMoney($d['soucty']['nevyuctovano'])); ?></div><div class="rp-s">pohledávka za zaměstnanci</div></div>
+            </div>
+            <?php if (!$d['rows']) {
+                afxUcetniPrintEmpty('Za zvolené období nebyla vyplacena žádná záloha na výplatu.');
+            } else { ?>
+            <table class="report-table">
+                <thead>
+                    <tr><th>Vyplaceno</th><th>Zaměstnanec</th><th>Poznámka</th><th>Doklad</th><th>Vyplatil</th><th>Stav</th><th class="num">Částka</th></tr>
+                </thead>
+                <tbody>
+                <?php foreach ($d['rows'] as $r): $storno = (string)$r['status'] === 'cancelled'; ?>
+                    <tr<?php echo $storno ? ' class="rp-strike"' : ''; ?>>
+                        <td class="nowrap"><?php echo e(afxUcetniDate(substr((string)$r['paid_at'], 0, 10))); ?> <span class="sub"><?php echo e(substr((string)$r['paid_at'], 11, 5)); ?></span></td>
+                        <td><b><?php echo e((string)($r['zamestnanec'] ?? '—')); ?></b></td>
+                        <td class="sub"><?php echo e((string)($r['note'] ?? '')); ?></td>
+                        <td class="nowrap"><?php echo e((string)($r['doklad'] ?? '') ?: '—'); ?></td>
+                        <td class="sub"><?php echo e((string)($r['paid_by'] ?? '')); ?></td>
+                        <td class="nowrap">
+                            <?php if ($storno): ?><span class="rp-tag">storno</span>
+                            <?php elseif ((string)$r['status'] === 'settled'): ?><span class="rp-tag rp-tag--ok">vyúčtováno <?php echo $r['settled_at'] ? e(afxUcetniDate(substr((string)$r['settled_at'], 0, 10))) : ''; ?></span>
+                            <?php else: ?><span class="rp-tag rp-tag--warn">nevyúčtováno</span><?php endif; ?>
+                        </td>
+                        <td class="num"><?php echo e(afxUcetniMoney($r['amount'])); ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr><td colspan="6">Vyplaceno celkem (bez storen)</td><td class="num"><?php echo e(afxUcetniMoney($d['soucty']['vyplaceno'])); ?></td></tr>
+                </tfoot>
+            </table>
+            <?php if ($d['po_zamestnancich']): ?>
+            <div class="report-section-title">Součty po zaměstnancích</div>
+            <table class="report-table">
+                <thead><tr><th>Zaměstnanec</th><th class="num">Záloh</th><th class="num">Vyplaceno</th><th class="num">Vyúčtováno</th><th class="num">Nevyúčtováno</th></tr></thead>
+                <tbody>
+                <?php foreach ($d['po_zamestnancich'] as $jm => $z): ?>
+                    <tr><td><b><?php echo e($jm); ?></b></td><td class="num"><?php echo (int)$z['pocet']; ?></td>
+                        <td class="num"><?php echo e(afxUcetniMoney($z['vyplaceno'])); ?></td>
+                        <td class="num"><?php echo e(afxUcetniMoney($z['vyuctovano'])); ?></td>
+                        <td class="num"><?php echo e(afxUcetniMoney($z['nevyuctovano'])); ?></td></tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php endif; ?>
             <?php }
             afxUcetniPrintClose($title, $period, $branchId);
             exit;

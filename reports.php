@@ -1,6 +1,8 @@
 <?php
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+require_once 'includes/cash_book.php';        // afxCashDocStorno (storno zálohy z přehledu)
+require_once 'includes/staff_advances.php';   // zálohy na výplaty (v4.3.0)
 require_once 'includes/header.php';
 
 ensureOrderWorkTrackingSchema();
@@ -571,6 +573,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <th class="text-end text-muted small"><?php echo __('parts_cost'); ?></th>
                             <th class="text-end text-muted small"><?php echo __('expenses_label'); ?></th>
                             <th class="text-end"><?php echo __('earned'); ?></th>
+                            <th class="text-end" title="Zálohy na výplatu vyplacené z kasy v období (bez storen); pod tím zbývá k výplatě po jejich odečtení">Zálohy</th>
                             <th class="text-end"><?php echo __('sc_income'); ?></th>
                             <th class="text-center" style="width:60px">%</th>
                         </tr>
@@ -588,7 +591,8 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             'received' => 0, 'in_progress' => 0, 'completed' => 0, 'cancelled' => 0,
                             'work_minutes' => 0,
                             'revenue' => 0, 'parts_cost' => 0, 'expenses' => 0,
-                            'earnings' => 0, 'profit' => 0
+                            'earnings' => 0, 'profit' => 0, 'advances' => 0,
+                            'sys_minutes' => 0   // dřív se nastavovalo PŘED tímhle přepisem pole → Warning „Undefined array key" při prvním += (nález 3. 11. 2026)
                         ];
 
                         foreach ($techs as $t):
@@ -596,7 +600,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                                 $lastBranchId = (int)($t['branch_id'] ?? 0);
                         ?>
                         <tr class="table-secondary text-dark">
-                            <td colspan="10" class="fw-bold"><i class="fas fa-store me-2"></i><?php echo e($t['branch_name'] ?? getBranchLabel($lastBranchId)); ?></td>
+                            <td colspan="11" class="fw-bold"><i class="fas fa-store me-2"></i><?php echo e($t['branch_name'] ?? getBranchLabel($lastBranchId)); ?></td>
                         </tr>
                         <?php
                             endif;
@@ -620,6 +624,9 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             $totals['expenses'] += $s['expenses'];
                             $totals['earnings'] += $s['earnings'];
                             $totals['profit'] += $s['profit'];
+                            // zálohy na výplatu vyplacené v období (v4.3.0) — odečítají se od odměny
+                            $__adv = afxStaffAdvanceSums((int)$t['id'], $start_date, $end_date);
+                            $totals['advances'] += $__adv['period'];
                         ?>
                         <tr>
                             <td>
@@ -639,6 +646,15 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <td class="text-end text-muted small"><?php echo $s['parts_cost'] > 0 ? '-'.formatMoney($s['parts_cost']) : '—'; ?></td>
                             <td class="text-end text-muted small"><?php echo $s['expenses'] > 0 ? '-'.formatMoney($s['expenses']) : '—'; ?></td>
                             <td class="text-end fw-bold text-primary"><?php echo formatMoney($s['earnings']); ?></td>
+                            <td class="text-end text-nowrap">
+                                <?php if ($__adv['period'] > 0.004): ?>
+                                    <span class="text-warning">−<?php echo formatMoney($__adv['period']); ?></span>
+                                    <div class="small text-white-50 text-nowrap" title="Odměna za období po odečtení záloh">k výplatě <?php echo formatMoney($s['earnings'] - $__adv['period']); ?></div>
+                                <?php else: ?><span class="text-white-50">—</span><?php endif; ?>
+                                <?php if ($__adv['open'] > 0.004): ?>
+                                    <div class="small text-danger text-nowrap" title="Nevyúčtované zálohy celkem (i ze starších období)"><i class="fas fa-hourglass-half me-1"></i>nevyúčt. <?php echo formatMoney($__adv['open']); ?></div>
+                                <?php endif; ?>
+                            </td>
                             <td class="text-end text-success fw-bold"><?php echo formatMoney($s['profit']); ?></td>
                             <td class="text-center"><span class="badge bg-secondary"><?php echo formatMoney($s['engineer_rate']); ?>/h</span></td>
                         </tr>
@@ -665,6 +681,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <td class="text-end text-white-50">—</td>
                             <td class="text-end fw-bold text-primary"><?php echo formatMoney($auPay); ?></td>
                             <td class="text-end text-white-50">—</td>
+                            <td class="text-end text-white-50">—</td>
                             <td class="text-center"><span class="badge bg-secondary"><?php echo formatMoney($adminRate); ?>/h</span></td>
                         </tr>
                         <?php endforeach; ?>
@@ -679,6 +696,7 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                             <td class="text-end text-muted small">-<?php echo formatMoney($totals['parts_cost']); ?></td>
                             <td class="text-end text-muted small">-<?php echo formatMoney($totals['expenses']); ?></td>
                             <td class="text-end text-primary"><?php echo formatMoney($totals['earnings']); ?></td>
+                            <td class="text-end text-warning"><?php echo $totals['advances'] > 0.004 ? '−' . formatMoney($totals['advances']) : '—'; ?></td>
                             <td class="text-end text-success"><?php echo formatMoney($totals['profit']); ?></td>
                             <td></td>
                         </tr>
@@ -944,6 +962,93 @@ function getDetailedStats($pdo, $start, $end, $tech_id = null) {
                     </div>
                     <?php endif; ?>
                 </div>
+
+                <?php
+                // ── ZÁLOHY NA VÝPLATU (v4.3.0): co bylo vyplaceno v období, co zbývá po odečtení,
+                //    a seznam nevyúčtovaných záloh se stržením z výplaty (admin/Boss) ──
+                $__advS = afxStaffAdvanceSums((int)$selected_tech_id, $start_date, $end_date);
+                $__advRows = afxStaffAdvancesList(['technician_id' => (int)$selected_tech_id, 'limit' => 60]);
+                $__canSettle = crmCanSettleStaffAdvance();
+                ?>
+                <h5 class="mb-3 mt-5"><i class="fas fa-hand-holding-dollar me-2 text-warning"></i>Zálohy na výplatu</h5>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <div class="card p-3 border shadow-none text-center">
+                            <div class="small text-muted mb-1">Vyplaceno v období</div>
+                            <h3 class="mb-0 text-warning"><?php echo formatMoney($__advS['period']); ?></h3>
+                            <div class="small text-white-50"><?php echo (int)$__advS['period_count']; ?>× z kasy</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3 border shadow-none text-center">
+                            <div class="small text-muted mb-1">K výplatě po odečtení záloh</div>
+                            <h3 class="mb-0 text-primary"><?php echo formatMoney($is['earnings'] - $__advS['period']); ?></h3>
+                            <div class="small text-white-50">odměna <?php echo formatMoney($is['earnings']); ?> − zálohy</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3 border shadow-none text-center">
+                            <div class="small text-muted mb-1">Nevyúčtováno celkem</div>
+                            <h3 class="mb-0 <?php echo $__advS['open'] > 0.004 ? 'text-danger' : 'text-success'; ?>"><?php echo formatMoney($__advS['open']); ?></h3>
+                            <div class="small text-white-50"><?php echo (int)$__advS['open_count']; ?>× čeká na stržení z výplaty</div>
+                        </div>
+                    </div>
+                </div>
+                <?php if ($__advRows): ?>
+                <div class="table-responsive mb-2">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead class="table-dark"><tr><th>Vyplaceno</th><th class="text-end">Částka</th><th>Poznámka</th><th>Doklad</th><th>Vyplatil</th><th>Stav</th><?php if ($__canSettle): ?><th></th><?php endif; ?></tr></thead>
+                        <tbody>
+                        <?php foreach ($__advRows as $__a): $__st = (string)$__a['status']; ?>
+                            <tr class="<?php echo $__st === 'cancelled' ? 'text-white-50 text-decoration-line-through' : ''; ?>">
+                                <td class="text-nowrap"><?php echo e(date('j. n. Y H:i', strtotime((string)$__a['paid_at']))); ?></td>
+                                <td class="text-end fw-bold"><?php echo formatMoney((float)$__a['amount']); ?></td>
+                                <td class="small"><?php echo e((string)($__a['note'] ?? '')); ?></td>
+                                <td class="small text-nowrap"><?php echo e((string)($__a['doc_number'] ?? '') ?: '—'); ?></td>
+                                <td class="small"><?php echo e((string)($__a['paid_by'] ?? '')); ?></td>
+                                <td>
+                                    <?php if ($__st === 'open'): ?><span class="badge bg-danger bg-opacity-25 text-danger border border-danger">nevyúčtováno</span>
+                                    <?php elseif ($__st === 'settled'): ?><span class="badge bg-success bg-opacity-25 text-success border border-success" title="<?php echo e('Strženo ' . ($__a['settled_at'] ? date('j. n. Y', strtotime((string)$__a['settled_at'])) : '') . ($__a['settled_by'] ? ' — ' . $__a['settled_by'] : '') . ($__a['settled_note'] ? ' (' . $__a['settled_note'] . ')' : '')); ?>">vyúčtováno<?php echo $__a['settled_at'] ? ' ' . e(date('j. n.', strtotime((string)$__a['settled_at']))) : ''; ?></span>
+                                    <?php else: ?><span class="badge bg-secondary" title="<?php echo e((string)($__a['cancel_reason'] ?? '')); ?>">storno</span><?php endif; ?>
+                                </td>
+                                <?php if ($__canSettle): ?>
+                                <td class="text-end text-nowrap">
+                                    <?php if ($__st === 'open'): ?>
+                                    <button type="button" class="btn btn-sm btn-outline-success py-0" onclick="afxAdvanceSettle(<?php echo (int)$__a['id']; ?>)" title="Záloha byla stržena z výplaty"><i class="fas fa-check me-1"></i>Vyúčtovat</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0" onclick="afxAdvanceStorno(<?php echo (int)$__a['id']; ?>)" title="Omyl — peníze se vrátí do kasy"><i class="fas fa-ban"></i></button>
+                                    <?php endif; ?>
+                                </td>
+                                <?php endif; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <script>
+                function afxAdvancePost(data, okMsg) {
+                    data.csrf_token = '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>';
+                    $.post('api/staff_advance.php', data, function (j) {
+                        if (j && j.ok) { showAlert(okMsg); setTimeout(function () { location.reload(); }, 700); }
+                        else { showAlert((j && j.error) ? j.error : 'Chyba'); }
+                    }, 'json').fail(function (xhr) {
+                        var m = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : 'Chyba spojení';
+                        showAlert(m);
+                    });
+                }
+                function afxAdvanceSettle(id) {
+                    var note = prompt('Záloha stržena z výplaty — poznámka (např. „výplata za listopad“):');
+                    if (note === null) return;
+                    afxAdvancePost({ action: 'settle', id: id, note: note }, 'Záloha označena jako vyúčtovaná.');
+                }
+                function afxAdvanceStorno(id) {
+                    var reason = prompt('Důvod storna zálohy (peníze se vrátí do kasy opačným pohybem):');
+                    if (reason === null) return;
+                    afxAdvancePost({ action: 'storno', id: id, reason: reason }, 'Záloha stornována, peníze vráceny do kasy.');
+                }
+                </script>
+                <?php else: ?>
+                <p class="small text-white-50 mb-4">Žádná záloha na výplatu zatím nebyla vyplacena.</p>
+                <?php endif; ?>
 
                 <h5 class="mb-3 mt-5"><?php echo __('presence_title'); ?></h5>
                 <p class="small text-white-75 mb-2"><?php echo __('presence_hint'); ?></p>
