@@ -280,35 +280,43 @@ tr.complaint-row--new-client:hover { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
     tr.complaint-row--new-client { animation: none; box-shadow: inset 4px 0 0 #f97316; }
 }
-/* ── Seznam reklamací bez vodorovného posuvníku (v4.3.0, požadavek majitele 3. 11. 2026) ──
+/* ── Seznam reklamací bez vodorovného posuvníku (v4.3.0/4.3.1, požadavek majitele 3. 11. 2026) ──
    Dřív měly sloupce pevné min-width (220/240/170 px) a nic se nezalamovalo → 11 sloupců se
    nevešlo ani na 1 900 px. Teď: pevné rozložení s procenty, menší písmo, dlouhé hodnoty
-   se zalomí, stavový select je užší a tři tlačítka akcí jsou pod sebou. */
-.cmpl-table { table-layout: fixed; width: 100%; font-size: .82rem; }
-.cmpl-table th, .cmpl-table td { padding: .5rem .45rem; overflow-wrap: anywhere; word-break: break-word; vertical-align: middle; }
-.cmpl-table th { font-size: .66rem; letter-spacing: .04em; white-space: normal; }
-.cmpl-table td.small, .cmpl-table .small { font-size: .78rem; }
-.cmpl-table td.text-nowrap, .cmpl-table th.text-nowrap { white-space: normal !important; }
+   se zalomí, stavový select je malý a tři tlačítka akcí jsou pod sebou.
+   POZOR: globální styl (fix-crm-v2.css) má u .table td, .badge i .form-select !important
+   (13,5 px, nowrap, 14 px / 40 px) — proto tu musí být !important taky, jinak se odznak
+   „Posouzení technikem" nezalomí a přeteče do sloupce lhůty (nález 3. 11. 2026). */
+.cmpl-table { table-layout: fixed; width: 100%; }
+.cmpl-table th, .cmpl-table td { padding: .45rem .4rem !important; overflow-wrap: anywhere; word-break: break-word; vertical-align: middle !important; }
+.cmpl-table thead th { font-size: .64rem !important; letter-spacing: .04em; white-space: normal !important; }
+.cmpl-table tbody td { font-size: .76rem !important; line-height: 1.3 !important; }
+.cmpl-table td .small, .cmpl-table td.small, .cmpl-table td .text-white-50 { font-size: .72rem !important; }
+.cmpl-table .text-nowrap { white-space: normal !important; }
 .cmpl-table thead th:nth-child(1)  { width: 6.5%; }   /* kód */
 .cmpl-table thead th:nth-child(2)  { width: 7.5%; }   /* přijato */
 .cmpl-table thead th:nth-child(3)  { width: 10%; }    /* zákazník */
 .cmpl-table thead th:nth-child(4)  { width: 10%; }    /* zařízení */
-.cmpl-table thead th:nth-child(5)  { width: 14%; }    /* původní zakázka */
-.cmpl-table thead th:nth-child(6)  { width: 12.5%; }    /* důvod */
-.cmpl-table thead th:nth-child(7)  { width: 9.5%; }   /* požadavek */
+.cmpl-table thead th:nth-child(5)  { width: 14.5%; }  /* původní zakázka */
+.cmpl-table thead th:nth-child(6)  { width: 14%; }    /* důvod */
+.cmpl-table thead th:nth-child(7)  { width: 9%; }     /* požadavek */
 .cmpl-table thead th:nth-child(8)  { width: 8.5%; }   /* lhůta */
 .cmpl-table thead th:nth-child(9)  { width: 7.5%; }   /* technik */
-/* vnořené „text-nowrap“ (telefon, datum…) se v pevném rozložení musí umět zalomit, jinak přetékají do vedlejšího sloupce */
-.cmpl-table .text-nowrap { white-space: normal !important; }
+.cmpl-table thead th:nth-child(10) { width: 8.5%; }   /* stav */
+.cmpl-table thead th:nth-child(11) { width: 4%; }     /* akce */
 /* datum, lhůta a jméno technika se lámou jen mezi slovy (nikdy uprostřed čísla) */
 .cmpl-table td:nth-child(2), .cmpl-table td:nth-child(8), .cmpl-table td:nth-child(9) { overflow-wrap: normal; word-break: normal; }
-.cmpl-table td:nth-child(8) { font-size: .74rem; }
-.cmpl-table thead th:nth-child(10) { width: 10%; }   /* stav */
-.cmpl-table thead th:nth-child(11) { width: 4%; }     /* akce */
-.cmpl-table .badge { white-space: normal; line-height: 1.25; text-align: left; font-size: .72rem; }
-.cmpl-table .cmpl-status .form-select { font-size: .74rem; padding: .25rem 1.4rem .25rem .45rem; background-position: right .35rem center; }
-.cmpl-table .cmpl-actions { padding-left: .2rem; padding-right: .2rem; }
-.cmpl-table .cmpl-actions .btn { display: block; width: 100%; padding: .15rem .25rem; font-size: .72rem; line-height: 1.3; margin: 0 0 3px; }
+/* lhůta: menší písmo, na jeden řádek */
+.cmpl-table td:nth-child(8), .cmpl-table td:nth-child(8) span { font-size: .7rem !important; white-space: nowrap !important; }
+/* odznaky (Požadavek, NOVÁ, Klient): dvouslovné hodnoty pod sebe, menší */
+.cmpl-table .badge { white-space: normal !important; display: inline-block !important; max-width: 100%; text-align: left;
+    overflow-wrap: normal; word-break: keep-all;   /* lámat jen mezi slovy („NOVÁ" nikdy na „NOV/Á") */
+    font-size: .68rem !important; line-height: 1.25 !important; padding: 2px 6px !important; }
+/* stav: malý select v užším sloupci */
+.cmpl-table .cmpl-status .form-select { font-size: .7rem !important; min-height: 0 !important; height: auto !important;
+    padding: 3px 1.2rem 3px 6px !important; background-position: right .3rem center !important; background-size: 10px 8px !important; }
+.cmpl-table .cmpl-actions { padding-left: .15rem !important; padding-right: .15rem !important; }
+.cmpl-table .cmpl-actions .btn { display: block; width: 100%; padding: .12rem .2rem !important; font-size: .7rem !important; line-height: 1.3 !important; margin: 0 0 3px; min-height: 0 !important; }
 .cmpl-table .cmpl-actions .btn:last-child { margin-bottom: 0; }
 /* na široké obrazovce žádný vodorovný posuvník; pod 1100 px zůstává (mobil/tablet na výšku) */
 @media (min-width: 1100px) { .cmpl-table-wrap { overflow-x: visible; } }
