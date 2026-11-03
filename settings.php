@@ -605,13 +605,24 @@ $sysSubnav = function (string $cur) use ($sys_subs_allowed) {
         $isActive = ($cur === $key);
         echo '<li class="nav-item"><a class="nav-link ' . ($isActive ? 'active' : 'text-white-75')
            . '" href="?tab=system&sub=' . $key . '"><i class="fas ' . $it[0] . ' me-2"></i>'
-           . htmlspecialchars($it[1]) . '</a></li>';
+           . htmlspecialchars($it[1])
+           // vykřičník i na podzáložce Aktualizace — ať je uvnitř Systému vidět, PROČ svítí záložka
+           . ($key === 'aktualizace' ? ' <span class="badge bg-warning text-dark ms-1 update-badge-sub" style="display:none;">!</span>' : '')
+           . '</a></li>';
     }
     // Třídění pošty má vlastní stránku (trideni-posty.php) — jen odkaz, admin-only
     if (in_array('integrace', $sys_subs_allowed, true)) {
         echo '<li class="nav-item"><a class="nav-link text-white-75" href="trideni-posty.php"><i class="fas fa-envelope-open-text me-2"></i>Třídění pošty</a></li>';
     }
     echo '</ul>';
+    // Proužek „nová verze k dispozici" na každé podzáložce Systému (plní JS po kontrole
+    // aktualizací) — vykřičník na záložce svítí JEN když je na GitHubu novější verze;
+    // dřív ale uvnitř Systému nic neřeklo proč, a vypadalo to, že svítí pořád (3. 11. 2026).
+    if ($cur !== 'aktualizace') {
+        echo '<div class="alert alert-warning border-0 bg-warning bg-opacity-10 small py-2 px-3 mb-4 update-banner-sys" style="display:none;">'
+           . '<i class="fas fa-arrow-circle-up me-2 text-warning"></i><span class="update-banner-text"></span> '
+           . '<a href="?tab=system&sub=aktualizace" class="fw-semibold ms-1">Otevřít Aktualizace →</a></div>';
+    }
 };
 
 // Uvítací zvuky při přihlášení (admin)
@@ -3247,9 +3258,16 @@ function checkForUpdates(force = false) {
                     <div class="mt-1 text-muted small"><i class="fas fa-code-branch me-1"></i>${UPDATE_TRANSLATIONS.build}: ${escapeHtml(data.build || '')}</div>
                 </div>`;
                 if (installBtn) installBtn.style.display = 'block';
-                // Show badge
+                // Show badge (+ proč: nová verze) — na záložce, podzáložce i proužkem na ostatních podzáložkách Systému
                 const badge = document.getElementById('updateBadgeNav');
-                if (badge) badge.style.display = 'inline';
+                const verTxt = /^\d+\.\d+\.\d+$/.test(String(data.remote_version || '')) ? ('Verze ' + data.remote_version) : 'Nová verze';
+                if (badge) { badge.style.display = 'inline'; badge.title = verTxt + ' je připravená k instalaci (Systém → Aktualizace)'; }
+                document.querySelectorAll('.update-badge-sub').forEach(b => { b.style.display = 'inline'; b.title = verTxt + ' je připravená k instalaci'; });
+                document.querySelectorAll('.update-banner-sys').forEach(el => {
+                    el.style.display = '';
+                    const t = el.querySelector('.update-banner-text');
+                    if (t) t.textContent = 'Na GitHubu je ' + verTxt + ' (nainstalováno ' + (data.local_version ? 'Verze ' + data.local_version : 'starší') + ') — proto svítí vykřičník u záložky Systém.';
+                });
             } else {
                 statusArea.innerHTML = `<div class="alert alert-success border-0 bg-success bg-opacity-10 small mb-0">
                     <i class="fas fa-check-circle me-2 text-success"></i>
@@ -3260,6 +3278,7 @@ function checkForUpdates(force = false) {
                 if (installBtn) installBtn.style.display = 'none';
                 const badge = document.getElementById('updateBadgeNav');
                 if (badge) badge.style.display = 'none';
+                document.querySelectorAll('.update-badge-sub, .update-banner-sys').forEach(el => { el.style.display = 'none'; });
             }
 
             // Cache info
@@ -3413,6 +3432,7 @@ function installUpdate() {
             </div>`;
             const badge = document.getElementById('updateBadgeNav');
             if (badge) badge.style.display = 'none';
+            document.querySelectorAll('.update-badge-sub, .update-banner-sys').forEach(el => { el.style.display = 'none'; });
             const installBtn = document.getElementById('btnInstallUpdate');
             if (installBtn) installBtn.style.display = 'none';
             // Update the "current version" label only if we actually got a version (never blank it)
