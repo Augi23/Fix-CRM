@@ -107,8 +107,20 @@ if ($exitCode !== 0) {
 
 $newInfo = function_exists('getGitRepoInfo') ? getGitRepoInfo($repoRoot) : $info;
 
-$__vOld = trim((string)@shell_exec('cd ' . escapeshellarg($repoRoot) . ' && git show ' . escapeshellarg(($info['local_commit'] ?? 'HEAD~0') . ':VERSION') . ' 2>/dev/null')) ?: '?';
-$__vNew = function_exists('crmAppVersion') ? trim((string)@file_get_contents($repoRoot . '/VERSION')) : '?';
+// Verze PŘED a PO aktualizaci se čtou z Historie úprav (includes/changelog.php) —
+// stejný zdroj pravdy jako dlaždice na stránce. Dřív se tu četl soubor VERSION,
+// který se při psaní changelogu nezvyšoval (zůstal na 3.83.0), a po každé
+// aktualizaci se tak do „Aktuální verze" zapsalo nesmyslné číslo (3. 11. 2026).
+// crmAppVersion() tady použít NEJDE: changelog se do PHP načetl před git pullem
+// a funkce si výsledek drží — četl by se starý soubor.
+$__verFrom = static function (string $src) use ($repoRoot): string {
+    $v = function_exists('crmVersionFromChangelogSource') ? crmVersionFromChangelogSource($src) : '';
+    return $v !== '' ? $v : '';
+};
+$__vOld = $__verFrom((string)@shell_exec('cd ' . escapeshellarg($repoRoot) . ' && git show ' . escapeshellarg(($info['local_commit'] ?? 'HEAD~0') . ':includes/changelog.php') . ' 2>/dev/null'))
+    ?: (trim((string)@shell_exec('cd ' . escapeshellarg($repoRoot) . ' && git show ' . escapeshellarg(($info['local_commit'] ?? 'HEAD~0') . ':VERSION') . ' 2>/dev/null')) ?: '?');
+$__vNew = $__verFrom((string)@file_get_contents($repoRoot . '/includes/changelog.php'))
+    ?: (trim((string)@file_get_contents($repoRoot . '/VERSION')) ?: '?');
 if (function_exists('crmAuditLog')) {
     crmAuditLog('system.update', [
         'entity_type' => 'system',
@@ -124,6 +136,11 @@ echo json_encode([
     'previous_version' => 'Verze ' . $__vOld,
     'new_version' => 'Verze ' . $__vNew,
     'current_version' => 'Verze ' . $__vNew,
+    // sestavení po aktualizaci — stránka si přepíše i štítek commitu a datum (dřív zůstávaly staré)
+    'local_short' => (string)($newInfo['local_short'] ?? ''),
+    'local_date' => (string)($newInfo['local_date'] ?? ''),
+    'local_date_label' => (!empty($newInfo['local_date']) && function_exists('crmCzechDateTime')) ? crmCzechDateTime((string)$newInfo['local_date']) : '',
+    'branch' => (string)($newInfo['branch'] ?? ''),
     'build' => sprintf('ahead %d / behind %d', (int)($newInfo['ahead_by'] ?? 0), (int)($newInfo['behind_by'] ?? 0)),
     'warning' => $dirtyWarning !== '' ? $dirtyWarning : null,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

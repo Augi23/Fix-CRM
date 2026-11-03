@@ -2686,10 +2686,8 @@ require_once 'includes/header.php';
                                 <div class="glass-panel p-3 text-center border-secondary h-100">
                                     <div class="text-white-75 small"><?php echo __('current_version'); ?></div>
                                     <div class="h4 text-white mb-1" id="localVersion">Verze <?php echo e(crmAppVersion()); ?></div>
-                                    <?php if (!empty($gitInfo['local_date'])): ?>
-                                        <div class="small text-white-75"><i class="far fa-calendar-check me-1 text-info"></i><?php echo e(crmCzechDateTime((string)$gitInfo['local_date'])); ?></div>
-                                    <?php endif; ?>
-                                    <div class="text-muted mt-1" style="font-size:.72rem;" title="technické označení sestavení">
+                                    <div class="small text-white-75" id="localDate"><?php if (!empty($gitInfo['local_date'])): ?><i class="far fa-calendar-check me-1 text-info"></i><?php echo e(crmCzechDateTime((string)$gitInfo['local_date'])); ?><?php endif; ?></div>
+                                    <div class="text-muted mt-1" style="font-size:.72rem;" title="technické označení sestavení" id="localBuild">
                                         <?php echo htmlspecialchars(trim($branchLabel . ' @ ' . $localShort)); ?> · <?php echo !empty($gitInfo['dirty']) ? 'dirty' : 'clean'; ?>
                                     </div>
                                 </div>
@@ -3422,6 +3420,13 @@ function installUpdate() {
                 const lv = document.getElementById('localVersion');
                 if (lv) lv.textContent = newVer;
             }
+            // po aktualizaci přepsat i štítek sestavení a datum commitu (dřív zůstaly ze starého načtení stránky)
+            const lb = document.getElementById('localBuild');
+            if (lb && data.local_short) { lb.textContent = ((data.branch || 'main') + ' @ ' + data.local_short) + ' · clean'; }
+            const ld = document.getElementById('localDate');
+            if (ld && data.local_date_label) { ld.innerHTML = '<i class="far fa-calendar-check me-1 text-info"></i>' + escapeHtml(data.local_date_label); }
+            const rv = document.getElementById('remoteVersion');
+            if (rv && newVer) { rv.textContent = newVer; }
         } else {
             statusArea.innerHTML = `<div class="alert alert-danger border-0 bg-danger bg-opacity-10 small mb-0">
                 <i class="fas fa-exclamation-circle me-2"></i>

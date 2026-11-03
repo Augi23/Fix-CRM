@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.3.1',
+        'date' => '2026-11-03',
+        'time' => '22:00',
+        'title' => 'Aktualizace: po instalaci se ukazuje správná verze',
+        'items' => [
+            'Po kliknutí na „Nainstalovat aktualizaci“ se do dlaždice <b>Aktuální verze</b> zapisovalo <b>3.83.0</b> — hlášení o výsledku bralo číslo ze souboru VERSION, který se od verze 3.83.0 nezvyšoval (dlaždice při načtení stránky čte Historii úprav, proto po obnovení stránky bylo číslo zase správně). Výsledek aktualizace se teď čte z Historie úprav staženého kódu, včetně verze „před“ v zápisu do Historie.',
+            'Po aktualizaci se zároveň přepíše štítek sestavení (commit) a datum — dřív zůstaly ze starého načtení stránky, takže vedle nové verze stál starý commit.',
+        ],
+    ],
+    [
         'version' => '4.3.0',
         'date' => '2026-11-03',
         'time' => '21:00',
