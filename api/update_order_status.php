@@ -36,6 +36,7 @@ ensureOrderRepairSolutionColumn(); // DDL — „Provedená oprava" (povinná p�
 ensureOrderPaymentMethodColumn();  // DDL — před transakcí (dřív až uvnitř)
 ensurePosTables();                 // DDL — před transakcí: výdej se ptá kasy (crmOrderPosSale)
 ensurePosCashMovementsTable();     // DDL — před transakcí: kontrola hotovosti při výdeji
+ensureOrderSignaturesTable();      // DDL — před transakcí: výdej vyžaduje podpis převzetí (v4.2.0)
 
 if (!$order_id || !$new_status) {
     echo json_encode(['success' => false, 'message' => $t('missing_data')]);
@@ -51,7 +52,7 @@ if (!$order_id || !$new_status) {
 try {
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, repair_solution, payment_method, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, repair_solution, payment_method, shipping_method, device_brand, device_model, customer_id, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $order_data = $stmt->fetch();
 
@@ -158,6 +159,42 @@ try {
         }
     }
 
+    // PODPIS KLIENTA PŘI PŘEVZETÍ je podmínkou výdeje (v4.2.0, požadavek majitele:
+    // zakázky končily jako „Vydáno“ bez podpisu — podpis byl zvláštní, nepovinná
+    // karta). Platí při osobním předání (Osobní odběr / doprava nevyplněná);
+    // zařízení odeslané přepravcem klient u pultu nepodepíše. Vedení (admin, Boss)
+    // smí výdej bez podpisu výslovně odůvodnit — zapisuje se do historie zakázky.
+    $__unsignedReason = '';
+    if (isOrderStatusIn($new_status, 'collected') && !isOrderStatusIn($current_status, 'collected')) {
+        $__ship = isset($_POST['shipping_method']) ? (string)$_POST['shipping_method'] : (string)($order_data['shipping_method'] ?? '');
+        if (crmOrderPickupSignatureRequired($__ship) && !crmOrderHasSignature((int)$order_id, 'vydej')) {
+            $__reason = mb_substr(trim((string)($_POST['no_signature_reason'] ?? '')), 0, 200);
+            $__canOverride = crmIsAdminLevel();
+            if ($__reason === '' || !$__canOverride) {
+                $pdo->rollBack();
+                $__oc = trim((string)($order_data['order_code'] ?? '')) !== '' ? (string)$order_data['order_code'] : ('#' . (int)$order_id);
+                $__cust = '';
+                try {
+                    $cq = $pdo->prepare("SELECT TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) FROM customers WHERE id = ?");
+                    $cq->execute([(int)($order_data['customer_id'] ?? 0)]);
+                    $__cust = (string)$cq->fetchColumn();
+                } catch (Throwable $e) {}
+                echo json_encode([
+                    'success' => false,
+                    'code' => 'pickup_signature_required',
+                    'message' => 'Zakázku nejde vydat bez podpisu klienta při převzetí — nechte klienta podepsat (zde nebo na tabletu) a výdej dokončete.',
+                    'order_id' => (int)$order_id,
+                    'order_label' => $__oc,
+                    'customer' => $__cust,
+                    'device' => trim((string)($order_data['device_brand'] ?? '') . ' ' . (string)($order_data['device_model'] ?? '')),
+                    'can_override' => $__canOverride,
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $__unsignedReason = $__reason;
+        }
+    }
+
     $sql = 'UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP';
     $params = [$new_status];
 
@@ -255,6 +292,12 @@ try {
                 'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
                 'summary' => 'Zakázka ' . $__oc . ' — stav: ' . $current_status . ' → ' . $new_status,
             ]);
+            if ($__unsignedReason !== '') {
+                crmAuditLog('order.collected_unsigned', [
+                    'entity_type' => 'order', 'entity_id' => (int)$order_id, 'entity_label' => $__oc,
+                    'summary' => 'Zakázka ' . $__oc . ' vydána BEZ podpisu klienta — důvod: ' . $__unsignedReason,
+                ]);
+            }
         }
 
         if ($status_changed || $technician_changed) {

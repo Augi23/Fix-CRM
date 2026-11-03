@@ -11,6 +11,21 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.2.0',
+        'date' => '2026-11-03',
+        'time' => '18:00',
+        'title' => 'Kasa: účtenka vždy a dohledatelně; výdej zakázky jen s podpisem klienta; přesun hotovosti mezi pokladnami',
+        'items' => [
+            '<b>Účtenka se už nemůže ztratit potichu.</b> O tisku rozhoduje server hned při uložení prodeje: běží-li agent tiskárny u kasy, účtenka jde rovnou do tiskové fronty a kasa jen sleduje, zda si ji tiskárna vzala. Dřív tisk startoval až v prohlížeči jako poslední krok — chyba při obnově obrazovky, appka z TestFlightu (zablokované okno prohlížeče) nebo spící Mac znamenaly prodej uložený a účtenku nikde, bez jediného hlášení.',
+            'Panel „Prodáno“ ukazuje <b>stav tisku</b>: „Tiskne se…“ → „Účtenka vytištěna“, nebo červeně <b>„Účtenka se NEVYTISKLA“</b> s tlačítky Zkusit znovu a Tisk z prohlížeče. „Nový prodej“ bez vytištěné účtenky se musí potvrdit a zapíše se do Historie (Prodej bez vytištěné účtenky). Platí pro všechny způsoby platby (hotově, kartou, faktura).',
+            'Na dokladu se <b>eviduje, kdy a kudy účtenka vyšla</b> (fronta / můstek / prohlížeč); v Dnešních pohybech má doklad bez účtenky štítek „bez účtenky“ a jde dotisknout. Při dotisku se neúspěch hlásí lištou s dotiskem místo tichého zmizení.',
+            'Tiskárna u kasy: úloha ve frontě vydrží 10 minut místo 3 (probuzení Macu); instalační skript nastaví tiskárnu tak, aby vypnutá/uspaná tiskárna nebo došlý papír úlohu <b>nezahodily</b> (vyjede po naběhnutí), a můstek hlásí selhání místo „OK“. Na pokladních Macích je potřeba skript jednou znovu spustit (Nastavení → Tisk → instalační příkaz).',
+            '<b>Vydat zakázku jde jen s podpisem klienta při převzetí.</b> Server výdej bez podpisu odmítne (detail i bleskové „Vydáno“ v seznamu, i editace zakázky) a rovnou nabídne podpis zde nebo na tabletu — po podpisu se výdej sám dokončí. Vedení (admin, Boss) smí vydat bez podpisu jen s uvedeným důvodem, který se zapíše do Historie. Zařízení odeslané přepravcem podpis nevyžaduje.',
+            'Opravy kolem podpisů: podpisová stanice už nehlásí „Podepsáno“, když se podpis neuložil (odhlášená relace); uložení podpisu kontroluje zápis souboru; tlačítko „Podepsat na tabletu“ v okně zakázkového listu u hotové/vydávané zakázky posílá podpis <b>převzetí</b>, ne příjmu (dřív přepsalo podpis z příjmu). Vydaná zakázka bez podpisu převzetí má v detailu červené „chybí!“.',
+            '<b>Přesun hotovosti mezi pokladnami</b> („z trezoru do trezoru“) — tlačítko Přesun v Pokladně jen pro vedení (admin, Boss, manažer): výdej u zdrojové a příjem u cílové pokladny v jedné transakci, ke každému pokladní doklad (VPD/PPD), kontrola, že pokladna tolik má, zápis do Historie. Manažer přesouvá jen ze své pokladny.',
+        ],
+    ],
+    [
         'version' => '4.1.3',
         'date' => '2026-10-28',
         'time' => '10:30',

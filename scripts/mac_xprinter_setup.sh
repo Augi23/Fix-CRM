@@ -32,8 +32,12 @@ if ! lpstat -p xprinter >/dev/null 2>&1; then
         || { [ -f "$GENERIC_PPD" ] && sudo lpadmin -p xprinter -E -v "$URI" -P "$GENERIC_PPD"; } \
         || { echo "❌ Frontu se nepodařilo založit."; exit 1; }
 fi
-lpadmin -p xprinter -o printer-error-policy=abort-job -o printer-is-shared=false 2>/dev/null \
-    || sudo lpadmin -p xprinter -o printer-error-policy=abort-job -o printer-is-shared=false \
+# retry-job (dřív abort-job): vypnutá / uspaná tiskárna nebo došlý papír úlohu
+# NEzahodí — CUPS ji zkouší znovu a účtenka vyjede, jakmile tiskárna naběhne
+# (požadavek majitele 3. 11. 2026: účtenka se nesmí ztratit). Hromadění starých
+# úloh po dlouhém výpadku řeší `cancel -a xprinter`.
+lpadmin -p xprinter -o printer-error-policy=retry-job -o printer-is-shared=false 2>/dev/null \
+    || sudo lpadmin -p xprinter -o printer-error-policy=retry-job -o printer-is-shared=false \
     || true
 cupsenable xprinter 2>/dev/null || sudo cupsenable xprinter 2>/dev/null || true
 cupsaccept xprinter 2>/dev/null || sudo cupsaccept xprinter 2>/dev/null || true
@@ -74,8 +78,19 @@ if [ "$method" != "POST" ] || [ "$clen" -le 0 ] 2>/dev/null; then
     printf 'HTTP/1.1 400 Bad Request\r\n%sConnection: close\r\n\r\n' "$cors"
     exit 0
 fi
-head -c "$clen" | /usr/bin/lp -d xprinter -o raw -s - >/dev/null 2>&1
-printf 'HTTP/1.1 200 OK\r\n%sContent-Type: application/json\r\nConnection: close\r\n\r\n{"ok":true}' "$cors"
+# fronta pozastavená/odmítající (lpstat hlásí „disabled“ / „not accepting“) nebo lp
+# selhalo → 503, kasa přejde na frontu serveru a nahlásí problém; dřív se vracelo
+# 200 vždy a účtenka tiše zmizela
+if /usr/bin/lpstat -p xprinter -a 2>/dev/null | grep -qiE 'disabled|not accepting|rejecting'; then
+    head -c "$clen" >/dev/null
+    printf 'HTTP/1.1 503 Service Unavailable\r\n%sContent-Type: application/json\r\nConnection: close\r\n\r\n{"ok":false,"error":"printer_disabled"}' "$cors"
+    exit 0
+fi
+if head -c "$clen" | /usr/bin/lp -d xprinter -o raw -s - >/dev/null 2>&1; then
+    printf 'HTTP/1.1 200 OK\r\n%sContent-Type: application/json\r\nConnection: close\r\n\r\n{"ok":true}' "$cors"
+else
+    printf 'HTTP/1.1 500 Internal Server Error\r\n%sContent-Type: application/json\r\nConnection: close\r\n\r\n{"ok":false,"error":"lp_failed"}' "$cors"
+fi
 EOS
 chmod 755 "$HOME/Library/AppleFix/xprinter9101.sh"
 
@@ -125,7 +140,8 @@ while true; do
     if [ -n "$TOKEN" ]; then
         CODE=$(curl -s -o "$TMP" -w '%{http_code}' --max-time 8 "https://admin.applefix.cloud/api/print_poll.php?token=$TOKEN" || echo 000)
         if [ "$CODE" = "200" ] && [ -s "$TMP" ]; then
-            /usr/bin/lp -d xprinter -o raw -s "$TMP" >/dev/null 2>&1
+            /usr/bin/lp -d xprinter -o raw -s "$TMP" >/dev/null 2>&1 \
+                || print -r -- "$(date '+%F %T') lp selhalo (úloha z fronty)" >> "$HOME/Library/AppleFix/print.log"
             continue   # ve frontě může čekat další úloha — hned se zeptat znovu
         fi
     fi

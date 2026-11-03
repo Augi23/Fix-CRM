@@ -827,7 +827,11 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
                         <?php if ($sig): ?>
                             <span class="badge bg-success bg-opacity-25 text-success border border-success"><i class="fas fa-check me-1"></i><?php echo date('j.n. H:i', strtotime((string)$sig['signed_at'])); ?></span>
                         <?php else: ?>
-                            <span class="d-inline-flex gap-1">
+                            <span class="d-inline-flex gap-1 align-items-center">
+                                <?php /* v4.2.0: vydaná zakázka bez podpisu převzetí (z doby před vynucením) — ať je to vidět */ ?>
+                                <?php if ($sigT === 'vydej' && isOrderStatusIn($status, 'collected') && crmOrderPickupSignatureRequired((string)($order['shipping_method'] ?? ''))): ?>
+                                    <span class="badge bg-danger" title="Zakázka je vydaná bez podpisu klienta při převzetí">chybí!</span>
+                                <?php endif; ?>
                                 <button type="button" class="btn btn-sm btn-outline-info" onclick="afxSignOrder('<?php echo $sigT; ?>')"><i class="fas fa-pen-nib me-1"></i><?php echo __('sign_btn'); ?></button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary" title="<?php echo __('sign_station_send'); ?>" onclick="afxSignRemote('<?php echo $sigT; ?>', this)"><i class="fas fa-tablet-screen-button"></i></button>
                             </span>
@@ -951,6 +955,40 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
             });
         }
         window.AFX_SIGN_L10N = { clear: '<?php echo __('sign_clear'); ?>', cancel: '<?php echo __('cancel'); ?>', save: '<?php echo __('sign_save'); ?>' };
+        <?php
+        // Zakázka ve fázi výdeje (hotová / nevyzvednutá / vydaná): tlačítko „Podepsat na tabletu“
+        // v okně zakázkového listu posílalo VŽDY podpis příjmu — u výdeje tak přepsalo
+        // podpis z příjmu a podpis převzetí dál chyběl (nález prověrky 3. 11. 2026, v4.2.0).
+        $__pickupStage = isOrderStatusIn($status, 'completed') || isOrderStatusIn($status, 'uncollected') || isOrderStatusIn($status, 'collected');
+        ?>
+        <?php if ($__pickupStage): ?>
+        window.addEventListener('load', function () {
+            var orig = window.openOrderDocChoice;
+            if (typeof orig !== 'function') { return; }
+            window.openOrderDocChoice = function (orderId, code) {
+                orig(orderId, code);
+                var signBtn = document.getElementById('orderDocSignBtn');
+                var msg = document.getElementById('orderDocMsg');
+                if (!signBtn) { return; }
+                signBtn.onclick = function () {
+                    signBtn.disabled = true;
+                    var fd = new FormData();
+                    fd.append('action', 'create');
+                    fd.append('order_id', orderId);
+                    fd.append('sig_type', 'vydej');
+                    fd.append('email_after', '1');
+                    fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                    fetch('api/request_signature.php', { method: 'POST', body: fd })
+                        .then(function (r) { return r.json(); })
+                        .then(function (j) {
+                            if (!j.ok) { if (msg) msg.textContent = j.error || 'Chyba'; signBtn.disabled = false; return; }
+                            if (msg) msg.innerHTML = '✍️ Odesláno na tablet jako <b>podpis převzetí hotové zakázky</b>' + (j.notice === 'no_email' ? ' (klient nemá e-mail — list se jen uloží s podpisem).' : ' — po podpisu se list i s podpisem pošle klientovi e-mailem.');
+                        })
+                        .catch(function () { if (msg) msg.textContent = 'Chyba spojení'; signBtn.disabled = false; });
+                };
+            };
+        });
+        <?php endif; ?>
         function afxSignRemote(type, btn) {
             var $row = $(btn).closest('.d-flex');
             var fd = new FormData();
@@ -1730,6 +1768,8 @@ function showStatusConfirmModal(form) {
             }
 
             btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
+            // v4.2.0: výdej bez podpisu klienta server odmítne → nechat podepsat a dokončit
+            if (res && res.code === 'pickup_signature_required') { modal.modal('hide'); showPickupSignModal(form, res, ''); return; }
             if (res && res.code === 'repair_solution_required') {
                 // Chybí „Provedená oprava" → rovnou nabídnout doplnění a přechod dokončit.
                 modal.modal('hide');
@@ -1779,11 +1819,123 @@ function showRepairSolutionModal(form) {
                 return;
             }
             btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
+            if (res && res.code === 'pickup_signature_required') { m.modal('hide'); showPickupSignModal(form, res, val); return; }
             showAlert('<?php echo __('error'); ?>' + ((res && res.message) ? ': ' + res.message : ''));
         }).fail(function() {
             btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
             showAlert('<?php echo __('error'); ?>');
         });
+    });
+}
+
+/* PODPIS KLIENTA PŘI PŘEVZETÍ jako součást výdeje (v4.2.0). Server výdej bez podpisu
+   odmítne (pickup_signature_required); tady se podpis dožene — na této obrazovce,
+   nebo na podpisovém tabletu — a stavový přechod se pošle znovu. Vedení smí výdej
+   bez podpisu výslovně odůvodnit (zapíše se do historie zakázky). */
+function showPickupSignModal(form, res, repairSolution) {
+    const m = $('#pickupSignModal');
+    const who = [res.order_label, res.customer, res.device].filter(Boolean).join(' · ');
+    $('#pickupSignWho').text(who);
+    $('#pickupSignOverrideWrap').toggle(!!res.can_override);
+    // .d-grid má !important → jQuery hide() by ho nepřebil; přepíná se třída
+    const btnsShow = function () { $('#pickupSignBtns').addClass('d-grid').removeClass('d-none'); $('#pickupSignWait').hide(); };
+    const btnsHide = function () { $('#pickupSignBtns').removeClass('d-grid').addClass('d-none'); $('#pickupSignWait').show(); };
+    btnsShow();
+    $('#pickupSignMsg').hide().text('');
+    m.modal('show');
+    // fokus do okna, ať funguje Escape i klávesnice (jinak zůstane na <body>)
+    m.off('shown.bs.modal').on('shown.bs.modal', function () { $('#pickupSignHere').trigger('focus'); });
+
+    const finish = function (reason) {
+        let __data = form.serialize();
+        if (repairSolution) { __data += '&repair_solution=' + encodeURIComponent(repairSolution); }
+        if (reason) { __data += '&no_signature_reason=' + encodeURIComponent(reason); }
+        $.post('api/update_order_status.php', __data, function(raw) {
+            let r = null;
+            try { r = (typeof raw === 'string') ? JSON.parse(raw) : raw; } catch (e) { r = null; }
+            if (r && r.success) {
+                try {
+                    const note = (reason ? 'Vydáno bez podpisu klienta (důvod zapsán do historie). ' : 'Podpis klienta uložen, zakázka vydána. ') + (r.payment_note || '');
+                    sessionStorage.setItem('afx_payment_note', note.trim());
+                    sessionStorage.setItem('afx_payment_warn', (r.payment_warning || reason) ? '1' : '0');
+                } catch (e) {}
+                location.reload();
+                return;
+            }
+            m.modal('hide');
+            showAlert('<?php echo __('error'); ?>' + ((r && r.message) ? ': ' + r.message : ''));
+        }).fail(function() { m.modal('hide'); showAlert('<?php echo __('error'); ?>'); });
+    };
+
+    // podpis přímo tady (iPad / dotykový displej u pultu)
+    $('#pickupSignHere').off('click').on('click', function() {
+        m.modal('hide');
+        afxSignaturePad({
+            title: '<?php echo __('sign_pad_title_pickup'); ?>',
+            subtitle: who,
+            terms: '<?php echo __('sign_terms_pickup'); ?>',
+            onSave: function (dataUrl) {
+                var fd = new FormData();
+                fd.append('order_id', '<?php echo (int)$order['id']; ?>');
+                fd.append('sig_type', 'vydej');
+                fd.append('image', dataUrl);
+                fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                fetch('api/save_signature.php', { method: 'POST', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (j) {
+                        if (j.ok) { finish(''); }
+                        else { showAlert('Podpis se neuložil: ' + (j.error || 'chyba') + ' — zakázka zůstává nevydaná.'); }
+                    })
+                    .catch(function () { showAlert('Chyba spojení — podpis se neuložil, zakázka zůstává nevydaná.'); });
+            },
+            onCancel: function () { showAlert('Bez podpisu klienta při převzetí zakázku vydat nejde.'); }
+        });
+    });
+
+    // podpis na tabletu: požadavek → čekání → po podpisu dokončit výdej
+    $('#pickupSignTablet').off('click').on('click', function() {
+        var fd = new FormData();
+        fd.append('action', 'create');
+        fd.append('order_id', '<?php echo (int)$order['id']; ?>');
+        fd.append('sig_type', 'vydej');
+        fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+        fetch('api/request_signature.php', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j.ok) { $('#pickupSignMsg').text(j.error || 'Chyba').show(); return; }
+                var reqId = j.request_id;
+                btnsHide();
+                var iv = setInterval(function () {
+                    fetch('api/request_signature.php?check=' + reqId, { cache: 'no-store' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (c) {
+                            if (c.status === 'done') { clearInterval(iv); $('#pickupSignWait').html('<i class="fas fa-check me-1"></i>Podepsáno — dokončuji výdej…'); finish(''); }
+                            else if (c.status === 'cancelled' || c.status === 'missing') {
+                                clearInterval(iv);
+                                btnsShow();
+                                $('#pickupSignMsg').text('Podpis na tabletu neproběhl (zrušeno nebo vypršelo) — zakázka zůstává nevydaná.').show();
+                            }
+                        }).catch(function () {});
+                }, 3000);
+                $('#pickupSignCancel').off('click').on('click', function () {
+                    clearInterval(iv);
+                    var cf = new FormData();
+                    cf.append('action', 'cancel'); cf.append('request_id', reqId);
+                    cf.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                    fetch('api/request_signature.php', { method: 'POST', body: cf }).finally(function () { btnsShow(); });
+                });
+                m.off('hidden.bs.modal').on('hidden.bs.modal', function () { clearInterval(iv); });
+            })
+            .catch(function () { $('#pickupSignMsg').text('Chyba spojení').show(); });
+    });
+
+    // vedení: výdej bez podpisu s důvodem (např. zařízení převzala třetí osoba, klient odmítl)
+    $('#pickupSignOverride').off('click').on('click', function() {
+        const reason = prompt('Důvod výdeje BEZ podpisu klienta (zapíše se do historie zakázky):');
+        if (reason === null) { return; }
+        if (!reason.trim()) { alert('Bez důvodu to nejde.'); return; }
+        m.modal('hide');
+        finish(reason.trim());
     });
 }
 
@@ -1860,6 +2012,40 @@ function deleteOrder(id) {
                 <button type="button" class="btn btn-success px-4" id="confirmStatusBtn">
                     <i class="fas fa-check me-2"></i><?php echo __('confirm'); ?>
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Podpis klienta při převzetí je podmínkou výdeje (v4.2.0) — podpis zde / na tabletu, pak se výdej dokončí -->
+<div class="modal fade" id="pickupSignModal" tabindex="-1">
+    <style>
+    /* tlačítka se zalamují (mobil 375 px je jinak přetékala), čekací řádek drží pohromadě */
+    #pickupSignModal .btn { white-space: normal !important; min-width: 0; }   /* globální .btn má nowrap !important */
+    #pickupSignModal #pickupSignBtns { min-width: 0; }
+    #pickupSignModal #pickupSignWait { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+    </style>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border-info border-2 text-white">
+            <div class="modal-header bg-info bg-opacity-10 border-bottom-0">
+                <h5 class="modal-title"><i class="fas fa-signature me-2 text-info"></i>Podpis klienta při převzetí</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-1">Zakázku nejde vydat bez podpisu klienta. Nechte klienta podepsat převzetí — výdej se pak dokončí sám.</p>
+                <div class="small text-white-75 mb-3" id="pickupSignWho"></div>
+                <div id="pickupSignBtns" class="d-grid gap-2">
+                    <button type="button" class="btn btn-info fw-semibold" id="pickupSignHere"><i class="fas fa-pen-nib me-2"></i>Podepsat zde (na této obrazovce)</button>
+                    <button type="button" class="btn btn-outline-light" id="pickupSignTablet"><i class="fas fa-tablet-screen-button me-2"></i>Poslat na podpisový tablet</button>
+                    <div id="pickupSignOverrideWrap" class="text-center pt-1" style="display:none;">
+                        <button type="button" class="btn btn-sm btn-link text-warning" id="pickupSignOverride">Vydat bez podpisu (jen vedení, s důvodem)</button>
+                    </div>
+                </div>
+                <div id="pickupSignWait" class="text-info small" style="display:none;">
+                    <span class="spinner-border spinner-border-sm"></span><span>Čeká se na podpis na tabletu…</span>
+                    <a href="javascript:void(0)" id="pickupSignCancel" class="text-white-75 text-nowrap">✕ zrušit</a>
+                </div>
+                <div id="pickupSignMsg" class="small text-warning mt-2" style="display:none;"></div>
             </div>
         </div>
     </div>

@@ -3,10 +3,13 @@
      GET ?token=<tajný token pobočky>  →  200 + syrové ESC/POS bajty nejstarší
      čekající úlohy své pobočky, jinak 204 (nic k tisku), 403 (špatný token).
    Bajty vydá jen držiteli tokenu — tiskne tedy pořád jen ten jeden počítač.
-   Úloha starší 3 minut se zahodí (agent byl mimo — starou účtenku už nikdo
-   nečeká a bouře dotisků po výpadku je horší než nic). */
+   Úloha starší 10 minut se zahodí (agent byl mimo — starou účtenku už nikdo
+   nečeká a bouře dotisků po výpadku je horší než nic). Dřív 3 min: probuzení
+   uspaného Macu trvalo déle a účtenka propadla; kasa teď nevytištěnou účtenku
+   hlásí a nabízí dotisk, takže delší okno nic nerozbije. */
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/receipt58.php';   // afxEnsurePosReceiptColumns (stav tisku na dokladu)
 header('Cache-Control: no-store');
 
 $token = trim((string)($_GET['token'] ?? ($_SERVER['HTTP_X_PRINT_TOKEN'] ?? '')));
@@ -30,7 +33,7 @@ try {
 try {
     // pár pokusů: propadnutí přes prošlé úlohy až k první čerstvé
     for ($i = 0; $i < 10; $i++) {
-        $st = $pdo->prepare("SELECT id, payload, created_at FROM pos_print_jobs
+        $st = $pdo->prepare("SELECT id, payload, created_at, sale_id FROM pos_print_jobs
             WHERE branch_id = ? AND taken_at IS NULL ORDER BY id ASC LIMIT 1");
         $st->execute([$branch]);
         $job = $st->fetch(PDO::FETCH_ASSOC);
@@ -41,10 +44,15 @@ try {
         $up->execute([(int)$job['id']]);
         if ($up->rowCount() === 0) { continue; }   // vzal ji souběžný poll — další kolo
 
-        if (strtotime((string)$job['created_at']) < time() - 180) { continue; }   // prošlá → zahodit
+        if (strtotime((string)$job['created_at']) < time() - 600) { continue; }   // prošlá → zahodit
 
         $bytes = base64_decode((string)$job['payload'], true);
         if ($bytes === false || $bytes === '') { continue; }
+        // agent si úlohu bere → pro CRM je účtenka vytištěná (víc o tiskárně server neví)
+        try {
+            $pdo->prepare("UPDATE pos_print_jobs SET printed_at = NOW() WHERE id = ?")->execute([(int)$job['id']]);
+            if ((int)($job['sale_id'] ?? 0) > 0) { afxPosSaleMarkReceiptPrinted((int)$job['sale_id'], 'queue'); }
+        } catch (Throwable $e) { error_log('print_poll mark printed: ' . $e->getMessage()); }
         header('Content-Type: application/octet-stream');
         header('Content-Length: ' . strlen($bytes));
         echo $bytes;

@@ -48,6 +48,7 @@ try {
     ensureOrderRepairSolutionColumn(); // DDL — „Provedená oprava"
     ensurePosTables();                 // DDL — před transakcí: výdej se ptá kasy (crmOrderPosSale)
     ensurePosCashMovementsTable();
+    ensureOrderSignaturesTable();      // DDL — před transakcí: výdej vyžaduje podpis převzetí (v4.2.0)
 
     $pdo->beginTransaction();
 
@@ -107,6 +108,16 @@ try {
             }
             if (!empty($__needTopUp)) { $__paid = false; }   // doplatek po platbě předem
             if (!$__paid) { $new_status = 'Vydáno - čeká na platbu'; }
+        }
+    }
+
+    // Výdej bez podpisu klienta při převzetí neprojde (v4.2.0) — stejné pravidlo
+    // jako v update_order_status.php; v editaci zakázky se podepsat nedá, proto
+    // jen srozumitelná hláška, kam jít (karta Doklady a podpisy v detailu).
+    if (isOrderStatusIn($new_status, 'collected') && !isOrderStatusIn((string)$current['status'], 'collected')) {
+        $__ship = isset($_POST['shipping_method']) ? (string)$_POST['shipping_method'] : (string)($current['shipping_method'] ?? '');
+        if (crmOrderPickupSignatureRequired($__ship) && !crmOrderHasSignature((int)$order_id, 'vydej')) {
+            throw new Exception('Zakázku nejde vydat bez podpisu klienta při převzetí — v detailu zakázky nechte klienta podepsat „Převzetí hotové zakázky“ (zde nebo na tabletu) a pak použijte „Označit jako vydané“.');
         }
     }
 

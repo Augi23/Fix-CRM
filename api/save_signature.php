@@ -73,7 +73,7 @@ if ($isDocument) {
         }
 
         $name = 'sig_doc_' . $documentId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.png';
-        file_put_contents($dir . '/' . $name, $bin);
+        if (file_put_contents($dir . '/' . $name, $bin) === false) { echo json_encode(['ok' => false, 'error' => 'Podpis se nepodařilo uložit na disk']); exit; }
 
         $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
         // uložit i větu, kterou klient nad podpisem viděl (v jazyce dokumentu) — bez ní
@@ -122,7 +122,7 @@ if ($isComplaint) {
         }
 
         $name = 'sig_rk_' . $complaintId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.png';
-        file_put_contents($dir . '/' . $name, $bin);
+        if (file_put_contents($dir . '/' . $name, $bin) === false) { echo json_encode(['ok' => false, 'error' => 'Podpis se nepodařilo uložit na disk']); exit; }
 
         $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
         $pdo->prepare("INSERT INTO complaint_signatures (complaint_id, file_path, requested_by) VALUES (?, ?, ?)")
@@ -160,7 +160,11 @@ try {
     }
 
     $name = 'sig_' . $orderId . '_' . $sigType . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.png';
-    file_put_contents($dir . '/' . $name, $bin);
+    // zápis se KONTROLUJE (v4.2.0): dřív vznikl řádek i bez souboru → zelená fajfka v detailu,
+    // ale na listu ani v portálu podpis nebyl — a výdej by ho teď počítal za platný
+    if (file_put_contents($dir . '/' . $name, $bin) === false || !is_file($dir . '/' . $name)) {
+        echo json_encode(['ok' => false, 'error' => 'Podpis se nepodařilo uložit na disk — zkuste to znovu']); exit;
+    }
 
     $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
     $pdo->prepare("INSERT INTO order_signatures (order_id, sig_type, file_path, requested_by) VALUES (?, ?, ?, ?)")

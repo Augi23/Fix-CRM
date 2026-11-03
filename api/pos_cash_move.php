@@ -4,7 +4,10 @@
                                se rovnou vystaví pokladní doklad PPD/VPD
      action=opening ………………… počáteční zůstatek pokladny (inventarizace) — jen vedení
      action=storno ……………………… storno pokladního dokladu (doklad se nikdy nemaže) — jen vedení
-   Odpověď {ok, …}. Auditováno (kasa.cash_move / kasa.opening_balance / kasa.cash_doc*). */
+     action=transfer ………………… přesun hotovosti mezi pokladnami poboček („z trezoru do trezoru“,
+                               v4.2.0) — jen admin / Boss / manažer; výdej u zdrojové + příjem
+                               u cílové pokladny v jedné transakci, ke každému VPD/PPD
+   Odpověď {ok, …}. Auditováno (kasa.cash_move / kasa.cash_transfer / kasa.opening_balance / kasa.cash_doc*). */
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/cash_book.php';
@@ -30,16 +33,93 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) {
 // Neznámá/prázdná akce = 'move' — větev vklad/výběr níže je fall-through, takže
 // bez normalizace by `action=cokoliv` přeskočil kontrolu uzávěrky (nález prověrky)
 $action = (string)($_POST['action'] ?? 'move');
-if (!in_array($action, ['move', 'opening', 'storno'], true)) { $action = 'move'; }
+if (!in_array($action, ['move', 'opening', 'storno', 'transfer'], true)) { $action = 'move'; }
 $by = trim((string)($_SESSION['full_name'] ?? $_SESSION['username'] ?? ''));
 
 // ── Počáteční zůstatek pokladny ─────────────────────────────────────────────
 // Zásah do účetního základu (od téhle částky se počítá celý stav hotovosti) →
 // jen vedení, stejná citlivost jako faktury.
 // pohyb hotovosti se zapisuje k dnešku — v uzamčeném měsíci nesmí vzniknout
-if ($action === 'move' && function_exists('afxAccountingClosedError')) {
+if (in_array($action, ['move', 'transfer'], true) && function_exists('afxAccountingClosedError')) {
     $err = afxAccountingClosedError(date('Y-m-d'), 'pohyb hotovosti');
     if ($err !== null) { pcm_fail($err, 423); }
+}
+
+// ── Přesun hotovosti mezi pokladnami („z trezoru do trezoru“) ──────────────
+// Jen vedení (admin, Boss, manažer — crmCanTransferCash). Manažer bez pohledu
+// napříč pobočkami přesouvá jen ZE své pokladny. Výdej a příjem vznikají v jedné
+// transakci a odkazují na sebe (ref_type 'cash_transfer', ref_id = protipohyb),
+// takže kniha obou poboček sedí a nic nejde „přesunout“ jen napůl.
+if ($action === 'transfer') {
+    if (!crmCanTransferCash()) { pcm_fail('Přesun hotovosti mezi pokladnami smí jen vedení (admin, Boss, manažer).', 403); }
+    $from = (int)($_POST['from_branch_id'] ?? 0);
+    $to = (int)($_POST['to_branch_id'] ?? 0);
+    if (!isBranchGlobalViewer() || $from <= 0) { $from = (int)getCurrentStaffBranchId(); }
+    $branches = [];
+    foreach (getBranches(true) as $b) { $branches[(int)$b['id']] = (string)$b['name']; }
+    if ($from <= 0 || !isset($branches[$from])) { pcm_fail('Zdrojová pokladna není platná pobočka.'); }
+    if ($to <= 0 || !isset($branches[$to])) { pcm_fail('Vyber cílovou pokladnu (pobočku).'); }
+    if ($from === $to) { pcm_fail('Zdrojová a cílová pokladna jsou stejné — přesun nemá smysl.'); }
+
+    $amount = crmParseAmountCzk((string)($_POST['amount'] ?? ''));
+    if ($amount <= 0) { pcm_fail('Zadej platnou částku'); }
+    if ($amount > 500000) { pcm_fail('Částka je podezřele vysoká'); }
+    // víc, než v pokladně podle CRM je, přesunout nejde — kniha by šla do mínusu
+    $avail = afxCashBalanceAt($from, date('Y-m-d'));
+    if ($avail + 0.005 < $amount) {
+        pcm_fail('V pokladně ' . $branches[$from] . ' je podle CRM jen ' . formatMoney($avail)
+            . ' — víc přesunout nejde. Nesedí-li to se zásuvkou, nejdřív srovnej stav (převzetí pokladny → NE, přepočítám).');
+    }
+    $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200);
+
+    ensurePosCashMovementsTable();
+    try {
+        $pdo->beginTransaction();
+        $ins = $pdo->prepare("INSERT INTO pos_cash_movements (branch_id, direction, amount, purpose, ref_type, ref_label, note, created_by)
+            VALUES (?, ?, ?, ?, 'cash_transfer', ?, ?, ?)");
+        $byDb = $by !== '' ? mb_substr($by, 0, 100) : null;
+        $ins->execute([$from, 'out', $amount, 'presun_out', mb_substr('→ ' . $branches[$to], 0, 40), $note !== '' ? $note : null, $byDb]);
+        $outId = (int)$pdo->lastInsertId();
+        $ins->execute([$to, 'in', $amount, 'presun_in', mb_substr('← ' . $branches[$from], 0, 40), $note !== '' ? $note : null, $byDb]);
+        $inId = (int)$pdo->lastInsertId();
+        $pdo->prepare("UPDATE pos_cash_movements SET ref_id = ? WHERE id = ?")->execute([$inId, $outId]);
+        $pdo->prepare("UPDATE pos_cash_movements SET ref_id = ? WHERE id = ?")->execute([$outId, $inId]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        error_log('pos_cash_move transfer: ' . $e->getMessage());
+        pcm_fail('Chyba serveru — přesun neproběhl.', 500);
+    }
+
+    crmAuditLog('kasa.cash_transfer', [
+        'entity_type' => 'pos_cash_movement', 'entity_id' => $outId,
+        'summary' => 'Přesun hotovosti ' . formatMoney($amount) . ': ' . $branches[$from] . ' → ' . $branches[$to]
+            . ($note !== '' ? ' (' . $note . ')' : ''),
+        'branch_id' => $from,
+    ]);
+
+    // doklady k oběma pohybům (VPD u zdroje, PPD u cíle) — jen papír, v knize
+    // už pohyby jsou (ref_type 'cash_movement' se nesčítá znovu); selhání
+    // dokladu nesmí shodit přesun, peníze už fyzicky putují
+    $docOut = afxCashDocIssue([
+        'branch_id' => $from, 'type' => 'expense', 'amount' => $amount, 'date' => date('Y-m-d'),
+        'purpose' => 'Přesun hotovosti do pokladny ' . $branches[$to] . ($note !== '' ? ' — ' . $note : ''),
+        'counterparty' => 'Pokladna ' . $branches[$to],
+        'issued_by' => $by, 'ref_type' => 'cash_movement', 'ref_id' => $outId, 'note' => $note,
+    ]);
+    $docIn = afxCashDocIssue([
+        'branch_id' => $to, 'type' => 'income', 'amount' => $amount, 'date' => date('Y-m-d'),
+        'purpose' => 'Přesun hotovosti z pokladny ' . $branches[$from] . ($note !== '' ? ' — ' . $note : ''),
+        'counterparty' => 'Pokladna ' . $branches[$from],
+        'issued_by' => $by, 'ref_type' => 'cash_movement', 'ref_id' => $inId, 'note' => $note,
+    ]);
+    echo json_encode([
+        'ok' => true, 'out_id' => $outId, 'in_id' => $inId,
+        'doc_out' => $docOut['ok'] ? $docOut['number'] : '',
+        'doc_in' => $docIn['ok'] ? $docIn['number'] : '',
+        'from' => $branches[$from], 'to' => $branches[$to], 'amount' => $amount,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 if ($action === 'opening') {

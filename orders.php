@@ -1016,6 +1016,9 @@ $(document).ready(function() {
                 showQuickToast(res.payment_note ? res.payment_note : '<?php echo __('updated_success'); ?>', warn ? 'danger' : 'success');
                 // varování si obsluha musí stihnout přečíst → reload až po dojetí toastu
                 setTimeout(() => window.location.reload(), warn ? 5000 : (res.payment_note ? 1600 : 300));
+            } else if (res.code === 'pickup_signature_required') {
+                // v4.2.0: výdej bez podpisu klienta server odmítne → podepsat rovnou tady a dokončit
+                showPickupSignQuick(id, status, btn, res, repairSolution, paymentMethod);
             } else if (res.code === 'repair_solution_required') {
                 // Chybí „Provedená oprava" → doplnit rovnou v okně a přechod dokončit.
                 // Zvolenou platbu MUSÍME protáhnout dál (přednostně tu, kterou vrátil
@@ -1029,6 +1032,35 @@ $(document).ready(function() {
         }, 'json').fail(function() {
             if (btn) btn.prop('disabled', false);
             showQuickToast('<?php echo __('error'); ?>', 'danger');
+        });
+    }
+
+    // Podpis klienta při převzetí přímo ze seznamu (celoobrazovkový pad); po uložení se
+    // bleskové „Vydáno" pošle znovu. Tablet a výdej bez podpisu (vedení) nabízí detail zakázky.
+    function showPickupSignQuick(id, status, btn, res, repairSolution, paymentMethod) {
+        const who = [res.order_label, res.customer, res.device].filter(Boolean).join(' · ');
+        afxSignaturePad({
+            title: '<?php echo __('sign_pad_title_pickup'); ?>',
+            subtitle: who,
+            terms: '<?php echo __('sign_terms_pickup'); ?>',
+            onSave: function (dataUrl) {
+                const fd = new FormData();
+                fd.append('order_id', id);
+                fd.append('sig_type', 'vydej');
+                fd.append('image', dataUrl);
+                fd.append('csrf_token', '<?php echo e($_SESSION['csrf_token'] ?? ''); ?>');
+                fetch('api/save_signature.php', { method: 'POST', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (j) {
+                        if (j.ok) { performQuickStatusUpdate(id, status, btn, repairSolution, paymentMethod); }
+                        else { if (btn) btn.prop('disabled', false); showQuickToast('Podpis se neuložil: ' + (j.error || 'chyba') + ' — zakázka zůstává nevydaná.', 'danger'); }
+                    })
+                    .catch(function () { if (btn) btn.prop('disabled', false); showQuickToast('Chyba spojení — podpis se neuložil.', 'danger'); });
+            },
+            onCancel: function () {
+                if (btn) btn.prop('disabled', false);
+                showQuickToast('Bez podpisu klienta při převzetí zakázku vydat nejde. Podpis na tabletu nabízí detail zakázky.', 'danger');
+            }
         });
     }
 

@@ -313,6 +313,14 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
                 fetch('api/save_signature.php', { method: 'POST', body: fd })
                     .then(function (r) { return r.json(); })
                     .then(function (j) {
+                        // v4.2.0: uložení selhalo (odhlášená relace, plný disk…) → dřív stanice
+                        // přesto ukázala „Podepsáno“ a podpis nikde nebyl. Dokument zůstává
+                        // na obrazovce, klient podepíše znovu.
+                        if (!j || !j.ok) {
+                            alert((j && j.error) ? j.error : 'Podpis se nepodařilo uložit — zkuste to prosím znovu.');
+                            if (j && /Nepřihlášeno|token/i.test(j.error || '')) { location.reload(); }
+                            return;
+                        }
                         hideDocument();
                         // podepsáno → hlídač platnosti už nemá co kontrolovat, ale stanice
                         // zůstává „obsazená", dokud nedoběhne potvrzení (jinak by pod ním
@@ -327,7 +335,7 @@ window.AFX_SIGN_L10N = (function (t) { return { clear: t.clear, cancel: t.not_no
                         doneFlash.style.display = 'flex';
                         setTimeout(function () { doneFlash.style.display = 'none'; stationIdle(); }, 3500);
                     })
-                    .catch(function () { stationIdle(); });
+                    .catch(function () { alert('Chyba spojení — podpis se neuložil, zkuste to prosím znovu.'); });
             },
             onCancel: function () { padHandle = null; /* zpět na dokument, požadavek trvá */ }
         });

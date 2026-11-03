@@ -5,6 +5,9 @@
  *
  * POST JSON { csrf_token, sale_id, drawer?: 1 }   → vytiskne doklad (+ otevře zásuvku)
  * POST JSON { csrf_token, test: 1 }               → zkušební účtenka
+ * POST JSON { csrf_token, job_status: id }        → vzal si agent úlohu z fronty? (kasa čeká na tisk)
+ * POST JSON { csrf_token, mark_printed: sale_id, via } → účtenka šla na papír můstkem / dialogem prohlížeče
+ * POST JSON { csrf_token, skip: sale_id, reason? } → obsluha pokračuje BEZ účtenky (audit)
  * GET  ?preview=1[&id=N]                          → PNG náhled rastru (diagnostika, netiskne)
  */
 ob_start();
@@ -20,43 +23,8 @@ if (!crmCanUsePos()) {
     echo json_encode(['ok' => false, 'error' => __('unauthorized')]); exit;
 }
 
-/** Data účtenky pro prodej z kasy — STEJNÁ stavba jako print_receipt.php?format=58. */
-function afxReceiptDataForSale(int $id, ?int &$branchOut = null): ?array {
-    global $pdo;
-    ensurePosTables();
-    $st = $pdo->prepare("SELECT s.*, c.first_name, c.last_name, c.company, c.ico AS cust_ico, i.invoice_number
-        FROM pos_sales s
-        LEFT JOIN customers c ON s.customer_id = c.id
-        LEFT JOIN invoices i ON s.invoice_id = i.id
-        WHERE s.id = ?");
-    $st->execute([$id]);
-    $sale = $st->fetch(PDO::FETCH_ASSOC);
-    if (!$sale) { return null; }
-    // pobočková hranice stejně jako tisková stránka
-    if (!crmCanViewHistory() && (int)($sale['branch_id'] ?? 0) !== (int)getCurrentStaffBranchId()) { return null; }
-    $it = $pdo->prepare("SELECT * FROM pos_sale_items WHERE sale_id = ? ORDER BY id");
-    $it->execute([$id]);
-    $items = $it->fetchAll(PDO::FETCH_ASSOC);
-
-    // POZOR pobočková past: kontakt VŽDY z pobočky DOKLADU, ne ze session
-    $branchOut = (int)($sale['branch_id'] ?? 0);
-    $bc = crmOrderBranchContact((int)($sale['branch_id'] ?? 0));
-    $custName = trim((string)($sale['company'] ?? '')) ?: trim((string)($sale['first_name'] ?? '') . ' ' . (string)($sale['last_name'] ?? ''));
-    $sale['customer_label'] = $custName;
-    $sale['customer_ico'] = $custName !== '' ? trim((string)($sale['cust_ico'] ?? '')) : '';
-    if ((string)$sale['status'] !== 'cancelled') { $sale['cancelled_at'] = null; }
-    // prodej „na fakturu IČO" prodává OSVČ majitele → hlavička účtenky nese JEJÍ
-    // jméno a IČO (adresa provozovny a kontakt zůstávají — prodejna je stejná)
-    $ico = (string)$sale['payment_method'] === 'invoice_ico' ? afxIcoSupplier() : null;
-    return crmBuildPosReceipt58($sale, $items, [
-        'name' => $ico ? ($ico['name'] ?: get_setting('company_name', 'AppleFix s.r.o.')) : get_setting('company_name', 'AppleFix s.r.o.'),
-        'address' => trim((string)$bc['address']),
-        'ico' => $ico ? $ico['ico'] : trim((string)get_setting('company_ico', '')),
-        'dic' => $ico ? $ico['dic'] : trim((string)get_setting('company_dic', '')),
-        'phone' => (string)$bc['phone'],
-        'web' => trim((string)get_setting('company_web', '')) ?: 'www.applefix.cz',
-    ]);
-}
+// Data účtenky (afxReceiptDataForSale) jsou od v4.2.0 v includes/receipt58.php — sdílí je
+// kasa (automatický tisk hned po prodeji), tohle API i dotisk.
 
 /** Zkušební účtenka — hlavička s adresou POBOČKY, na kterou se tiskne (ať je hned
  *  vidět, jestli má pobočka v Nastavení → Firma vyplněnou správnou adresu). */
@@ -93,6 +61,45 @@ if (!is_array($in) || !validateCsrfToken((string)($in['csrf_token'] ?? ''))) {
 }
 
 try {
+    // ── stav tiskové úlohy (kasa po prodeji čeká, až si ji agent vezme) ──
+    if (isset($in['job_status'])) {
+        $js = afxPrintJobStatus((int)$in['job_status']);
+        echo json_encode(['ok' => true] + $js); exit;
+    }
+    // ── účtenka šla na papír jinudy než frontou (můstek / tiskový dialog) ──
+    if (isset($in['mark_printed'])) {
+        $via = in_array((string)($in['via'] ?? ''), ['bridge', 'browser'], true) ? (string)$in['via'] : 'bridge';
+        $sid = (int)$in['mark_printed'];
+        if ($sid > 0 && afxReceiptDataForSale($sid) !== null) {
+            afxPosSaleMarkReceiptPrinted($sid, $via);
+            // čekající úloha ve frontě by jinak za chvíli vyjela podruhé
+            if ($via === 'bridge') {
+                try { $pdo->prepare("UPDATE pos_print_jobs SET taken_at = NOW() WHERE sale_id = ? AND taken_at IS NULL")->execute([$sid]); }
+                catch (Throwable $e) {}
+            }
+        }
+        echo json_encode(['ok' => true]); exit;
+    }
+    // ── prodej bez účtenky: obsluha to musí výslovně odkývat, zapisuje se do historie ──
+    if (isset($in['skip'])) {
+        $sid = (int)$in['skip'];
+        $sb = 0;
+        $data = $sid > 0 ? afxReceiptDataForSale($sid, $sb) : null;
+        if ($data) {
+            $num = (string)($data['sale_number'] ?? ('#' . $sid));
+            try {
+                $pdo->prepare("UPDATE pos_sales SET receipt_print_via = 'skipped' WHERE id = ? AND receipt_printed_at IS NULL")->execute([$sid]);
+            } catch (Throwable $e) {}
+            crmAuditLog('kasa.receipt_skipped', [
+                'entity_type' => 'pos_sale', 'entity_id' => $sid, 'entity_label' => $num,
+                'summary' => 'Doklad ' . $num . ' — účtenka se NEVYTISKLA, obsluha pokračovala bez ní'
+                    . (trim((string)($in['reason'] ?? '')) !== '' ? ' (' . mb_substr(trim((string)$in['reason']), 0, 160) . ')' : ''),
+                'branch_id' => $sb ?: (int)getCurrentStaffBranchId(),
+            ]);
+        }
+        echo json_encode(['ok' => true]); exit;
+    }
+
     // lístek směny (převzetí/uzávěrka) — velkým písmem kolik má být v kase
     $slip = (string)($in['slip'] ?? '');
     if ($slip === 'shift_open' || $slip === 'shift_close') {
@@ -122,9 +129,9 @@ try {
         $bytes = crmEscposPreamble() . crmEscposReceipt(crmShiftSlipRaster($shift, $slip === 'shift_open' ? 'open' : 'close', $prev, $moves));
         // enqueue = tisková fronta (appka z TestFlightu / Safari nedosáhnou na můstek)
         if (!empty($in['enqueue'])) {
-            $qok = afxPrintJobEnqueue($branch, $bytes);
-            echo json_encode(['ok' => $qok, 'queued' => $qok ? 1 : 0,
-                'error' => $qok ? null : 'Frontu tisku se nepodařilo naplnit.']); exit;
+            $qid = afxPrintJobEnqueue($branch, $bytes, 0, $slip);
+            echo json_encode(['ok' => $qid > 0, 'queued' => $qid > 0 ? 1 : 0, 'job_id' => $qid,
+                'error' => $qid > 0 ? null : 'Frontu tisku se nepodařilo naplnit.']); exit;
         }
         echo json_encode(['ok' => true, 'b64' => base64_encode($bytes)]); exit;
     }
@@ -133,12 +140,15 @@ try {
     // zkušební účtenka: pobočka zvolená adminem v Nastavení, jinak pobočka obsluhy
     $testBranch = (!empty($in['test']) && (int)($in['branch_id'] ?? 0) > 0 && hasPermission('admin_access'))
         ? (int)$in['branch_id'] : 0;
-    $data = !empty($in['test']) ? afxReceiptTestData($testBranch) : afxReceiptDataForSale((int)($in['sale_id'] ?? 0), $saleBranch);
-    if (!$data) { echo json_encode(['ok' => false, 'error' => 'Doklad nenalezen.']); exit; }
-
-    $bytes = crmEscposPreamble();   // tiskárna ve výchozím stavu, i kdyby visela v cizí úloze
-    if (!empty($in['drawer'])) { $bytes .= crmEscposDrawerPulse(); }   // šuplík ještě před tiskem
-    $bytes .= crmEscposReceipt(crmReceiptRaster($data));
+    $saleId = (int)($in['sale_id'] ?? 0);
+    if (!empty($in['test'])) {
+        $bytes = crmEscposPreamble();
+        if (!empty($in['drawer'])) { $bytes .= crmEscposDrawerPulse(); }
+        $bytes .= crmEscposReceipt(crmReceiptRaster(afxReceiptTestData($testBranch)));
+    } else {
+        $bytes = afxReceiptBytesForSale($saleId, !empty($in['drawer']), true, $saleBranch);
+        if ($bytes === null) { echo json_encode(['ok' => false, 'error' => 'Doklad nenalezen.']); exit; }
+    }
 
     // TISKOVÁ FRONTA (enqueue): kasa v appce z TestFlightu (WKWebView) ani Safari
     // nedosáhnou z HTTPS na místní můstek — úloha se uloží na server a poller na
@@ -152,9 +162,14 @@ try {
         $reqBranch = (int)($in['branch_id'] ?? 0);
         if (!empty($in['test']) && $reqBranch > 0 && hasPermission('admin_access')) { $qBranch = $reqBranch; }
         if ($qBranch <= 0) { $qBranch = (int)getCurrentStaffBranchId(); }
-        $qok = afxPrintJobEnqueue($qBranch, $bytes);
-        echo json_encode(['ok' => $qok, 'queued' => $qok ? 1 : 0,
-            'error' => $qok ? null : 'Frontu tisku se nepodařilo naplnit.']); exit;
+        // v4.2.0: fronta pobočky OBSLUHY má přednost — zákazník stojí u kasy, kde se
+        // markuje (doklad k zakázce nese pobočku zakázky, ne kasy). Pobočka dokladu
+        // zůstává zálohou pro obsluhu bez pobočky.
+        if (empty($in['test']) && (int)getCurrentStaffBranchId() > 0) { $qBranch = (int)getCurrentStaffBranchId(); }
+        $qid = afxPrintJobEnqueue($qBranch, $bytes, !empty($in['test']) ? 0 : $saleId, !empty($in['test']) ? 'test' : 'receipt');
+        echo json_encode(['ok' => $qid > 0, 'queued' => $qid > 0 ? 1 : 0, 'job_id' => $qid,
+            'agent_alive' => afxPrintAgentAlive($qBranch),
+            'error' => $qid > 0 ? null : 'Frontu tisku se nepodařilo naplnit.']); exit;
     }
 
     // VÝCHOZÍ REŽIM: server NIC netiskne — vrátí hotové bajty a odešle je až

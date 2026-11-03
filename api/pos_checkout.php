@@ -14,7 +14,8 @@
 ob_start();
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
-require_once '../includes/receipt58.php';   // afxEnsurePosCashColumns (Placeno/Vráceno)
+require_once '../includes/receipt58.php';   // afxEnsurePosCashColumns (Placeno/Vráceno), data účtenky
+require_once '../includes/receipt_escpos.php'; // afxReceiptAutoPrint — účtenka do fronty hned po prodeji (v4.2.0)
 require_once '../includes/pos_shift.php';   // převzetí pokladny — markovat smí jen držitel směny
 ob_clean();
 header('Content-Type: application/json; charset=utf-8');
@@ -307,6 +308,8 @@ ensureProductsPosColumn();
 afxEnsurePosGoodsTaxColumns();
 ensureSkladBranchSchema();
 afxEnsurePosCashColumns();
+afxEnsurePosReceiptColumns();    // receipt_printed_at / receipt_print_via (účtenka na papíře?)
+afxEnsurePrintJobsTable();       // fronta tisku — sale_id (dohledání nevytištěných účtenek)
 afxEnsurePosShiftTable();
 afxEnsurePosPaymentEnum();       // ENUM payment_method musí znát 'invoice_ico'
 afxEnsureInvoiceSupplierColumn(); // faktura nese výstavce (sro|ico)
@@ -779,6 +782,12 @@ foreach ($saleOrderIds ?? [] as $soId) {
     ]);
 }
 
+// ÚČTENKA: rozhoduje server (v4.2.0) — běží-li agent tiskárny u kasy, úloha jde
+// do fronty rovnou odsud a prohlížeč jen sleduje, zda si ji agent vzal. Dřív
+// začínal tisk až v JavaScriptu jako poslední krok a kdykoli se cestou něco
+// pokazilo, prodej byl uložený a účtenka nikde — bez jediného hlášení.
+$receipt = afxReceiptAutoPrint($saleId, $payment === 'cash');
+
 // má faktura kam odejít? UI podle toho poradí tisk místo mailu
 $invoiceMail = '';
 if ($invoiceId) {
@@ -804,4 +813,5 @@ echo json_encode([
     'total' => round($total, 2),
     'cash_change' => $cashChange,   // kolik vrátit zákazníkovi (jen hotově s evidencí)
     'has_product' => $hasProduct,   // UI připomene vyřadit kus v naskladňovací appce
+    'receipt' => $receipt,          // mode queue|client, job_id, agent_alive — kasa podle toho sleduje tisk
 ]);

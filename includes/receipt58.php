@@ -103,6 +103,77 @@ function afxEnsurePosCashColumns(): void {
     } catch (Throwable $e) { error_log('afxEnsurePosCashColumns: ' . $e->getMessage()); }
 }
 
+/** v4.2.0: stav tisku účtenky NA DOKLADU — kdy šla na papír a kudy (queue = agent
+ *  pokladního Macu, bridge = můstek z prohlížeče, browser = tiskový dialog,
+ *  skipped = obsluha výslovně pokračovala bez účtenky). NULL = nevytištěno. */
+function afxEnsurePosReceiptColumns(): void {
+    global $pdo;
+    static $done = false;
+    if ($done || !isset($pdo)) return;
+    if ($pdo->inTransaction()) return;   // DDL = implicitní COMMIT, zkusí se příště
+    $done = true;
+    try {
+        if (!$pdo->query("SHOW COLUMNS FROM pos_sales LIKE 'receipt_printed_at'")->fetch()) {
+            $pdo->exec("ALTER TABLE pos_sales ADD COLUMN receipt_printed_at DATETIME NULL DEFAULT NULL");
+            $pdo->exec("ALTER TABLE pos_sales ADD COLUMN receipt_print_via VARCHAR(16) NULL DEFAULT NULL");
+        }
+    } catch (Throwable $e) { error_log('afxEnsurePosReceiptColumns: ' . $e->getMessage()); }
+}
+
+/**
+ * Data účtenky pro prodej z kasy — STEJNÁ stavba jako print_receipt.php?format=58.
+ * $checkBranch: pobočková hranice jako na tiskové stránce (kdo nevidí napříč, dostane
+ * jen doklad své pobočky; doklad K ZAKÁZCE, ke které má přístup, ale vidí taky —
+ * jinak technik přes pobočky účtenku k „své“ zakázce vůbec nevytiskl). Kasa hned po
+ * prodeji volá s false (server tiskne doklad, který právě sama vystavila).
+ */
+function afxReceiptDataForSale(int $id, ?int &$branchOut = null, bool $checkBranch = true): ?array {
+    global $pdo;
+    ensurePosTables();
+    $st = $pdo->prepare("SELECT s.*, c.first_name, c.last_name, c.company, c.ico AS cust_ico, i.invoice_number
+        FROM pos_sales s
+        LEFT JOIN customers c ON s.customer_id = c.id
+        LEFT JOIN invoices i ON s.invoice_id = i.id
+        WHERE s.id = ?");
+    $st->execute([$id]);
+    $sale = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$sale) { return null; }
+    if ($checkBranch && !crmCanViewHistory() && (int)($sale['branch_id'] ?? 0) !== (int)getCurrentStaffBranchId()) {
+        $okViaOrder = false;
+        if ((int)($sale['order_id'] ?? 0) > 0) {
+            try {
+                $oq = $pdo->prepare("SELECT id, branch_id, technician_id FROM orders WHERE id = ?");
+                $oq->execute([(int)$sale['order_id']]);
+                $orow = $oq->fetch(PDO::FETCH_ASSOC);
+                $okViaOrder = $orow && canAccessOrderBranch($orow);
+            } catch (Throwable $e) { $okViaOrder = false; }
+        }
+        if (!$okViaOrder) { return null; }
+    }
+    $it = $pdo->prepare("SELECT * FROM pos_sale_items WHERE sale_id = ? ORDER BY id");
+    $it->execute([$id]);
+    $items = $it->fetchAll(PDO::FETCH_ASSOC);
+
+    // POZOR pobočková past: kontakt VŽDY z pobočky DOKLADU, ne ze session
+    $branchOut = (int)($sale['branch_id'] ?? 0);
+    $bc = crmOrderBranchContact((int)($sale['branch_id'] ?? 0));
+    $custName = trim((string)($sale['company'] ?? '')) ?: trim((string)($sale['first_name'] ?? '') . ' ' . (string)($sale['last_name'] ?? ''));
+    $sale['customer_label'] = $custName;
+    $sale['customer_ico'] = $custName !== '' ? trim((string)($sale['cust_ico'] ?? '')) : '';
+    if ((string)$sale['status'] !== 'cancelled') { $sale['cancelled_at'] = null; }
+    // prodej „na fakturu IČO" prodává OSVČ majitele → hlavička účtenky nese JEJÍ
+    // jméno a IČO (adresa provozovny a kontakt zůstávají — prodejna je stejná)
+    $ico = (string)$sale['payment_method'] === 'invoice_ico' ? afxIcoSupplier() : null;
+    return crmBuildPosReceipt58($sale, $items, [
+        'name' => $ico ? ($ico['name'] ?: get_setting('company_name', 'AppleFix s.r.o.')) : get_setting('company_name', 'AppleFix s.r.o.'),
+        'address' => trim((string)$bc['address']),
+        'ico' => $ico ? $ico['ico'] : trim((string)get_setting('company_ico', '')),
+        'dic' => $ico ? $ico['dic'] : trim((string)get_setting('company_dic', '')),
+        'phone' => (string)$bc['phone'],
+        'web' => trim((string)get_setting('company_web', '')) ?: 'www.applefix.cz',
+    ]);
+}
+
 /**
  * Složí vstupní pole pro crmRenderReceipt58() z řádků kasy (pos_sales + pos_sale_items).
  *

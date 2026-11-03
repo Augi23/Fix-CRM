@@ -908,3 +908,20 @@ select optgroup,
 html[data-lg-theme="light"] .afx-user b { color: #2a3342; }
 /* Telefon/tablet: prvek posunutý do obrazu nesmí skončit pod spodním tab barem */
 @media (max-width: 1080px) { html { scroll-padding-bottom: 120px; } }
+
+/* ── Podpisový pad (QA 4.2.0): karta je vždy bílá, ale tmavý režim obarvoval
+   outline tlačítka Smazat/Zrušit bíle na bílé → neviditelná. Na mobilu (375 px)
+   se řada tlačítek zalomí místo oříznutí „Uložit podpis“. ── */
+.afx-signpad .btn-outline-secondary,
+html[data-lg-theme="dark"] .afx-signpad .btn-outline-secondary {
+    color: #2b2b30 !important; background: #f1f1f4 !important; border-color: #c6c6cd !important;
+}
+.afx-signpad .btn-outline-secondary:hover { background: #e4e4ea !important; }
+.afx-signpad .btn-success,
+html[data-lg-theme="dark"] .afx-signpad .btn-success { color: #fff !important; background: #1f9d55 !important; border-color: #1f9d55 !important; }
+.afx-signpad .btn-success:disabled { opacity: .45; }
+.afx-signpad-actions { flex-wrap: wrap; row-gap: 8px; }
+.afx-signpad-actions .btn { white-space: normal; }
+@media (max-width: 480px) {
+    .afx-signpad-actions .btn-lg { padding: .5rem .8rem; font-size: 1rem; }
+}

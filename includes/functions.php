@@ -514,6 +514,15 @@ function crmCanIssueInvoices(): bool {
     return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['boss', 'manager'], true);
 }
 
+/** Přesun hotovosti mezi pokladnami poboček („z trezoru do trezoru“, v4.2.0):
+ *  jen vedení — admin, Boss a pobočkový manažer (rozhodnutí majitele 3. 11. 2026).
+ *  Účetní hotovostí nehýbe, běžná obsluha kasy nesmí peníze „přelévat“ jinam. */
+function crmCanTransferCash(): bool {
+    if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) { return false; }
+    if (function_exists('crmIsAccountant') && crmIsAccountant()) { return false; }
+    return hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['boss', 'manager'], true);
+}
+
 /** Kdo se vůbec dostane k fakturám (výpis, vystavení, úprava, tisk, odeslání):
  *  vedení + manažer + role účetní. MAZÁNÍ zůstává crmCanAccountingDelete(). */
 function crmCanUseInvoices(): bool {
@@ -6653,6 +6662,32 @@ function crmGetOrderSignatures(int $orderId): array {
     } catch (Throwable $e) { return []; }
 }
 
+/** Má zakázka uložený podpis daného typu (prijem|vydej) — a existuje i soubor?
+ *  Řádek bez souboru (dřív se zápis PNG nekontroloval) se nepočítá: na listu
+ *  by podpis stejně nebyl. */
+function crmOrderHasSignature(int $orderId, string $sigType): bool {
+    global $pdo;
+    if ($orderId <= 0) return false;
+    try {
+        ensureOrderSignaturesTable();
+        $st = $pdo->prepare("SELECT file_path FROM order_signatures WHERE order_id = ? AND sig_type = ? ORDER BY id DESC LIMIT 1");
+        $st->execute([$orderId, $sigType]);
+        $fp = $st->fetchColumn();
+        if ($fp === false || $fp === null) return false;
+        $abs = __DIR__ . '/../' . ltrim((string)$fp, '/');
+        return is_file($abs) && filesize($abs) > 0;
+    } catch (Throwable $e) { return false; }
+}
+
+/** Vyžaduje výdej zakázky podpis klienta „převzetí hotové zakázky“? (v4.2.0)
+ *  Ano při osobním předání na prodejně (Osobní odběr nebo doprava nevyplněná —
+ *  tu API při výdeji stejně doplní na Osobní odběr). Zařízení ODESLANÉ přepravcem
+ *  (Zásilkovna, PPL, …) klient u pultu nepodepíše — tam se podpis nechce. */
+function crmOrderPickupSignatureRequired(?string $shippingMethod): bool {
+    $m = trim((string)$shippingMethod);
+    return $m === '' || $m === 'Self Pickup';
+}
+
 /** Cenové řádky zakázky — rozpis ceny na zakázkovém listu (oprava, expresní
  *  příplatek, slevy…). Plní je webhook z RepairPluginu (items[]) a wizard CRM
  *  (příplatek/sleva dle priority). Rozpis se tiskne, když jsou aspoň 2 řádky. */
@@ -7521,7 +7556,10 @@ function crmAuditActionLabel(string $action): string {
         'products.import' => 'Import produktů (e-shop)', 'products.delete' => 'Smazání produktu (e-shop)',
         'kasa.sale' => 'Prodej na kase', 'kasa.cancel' => 'Storno prodeje na kase',
         'kasa.cash_move' => 'Pohyb hotovosti v kase',
+        'kasa.cash_transfer' => 'Přesun hotovosti mezi pokladnami',
+        'kasa.receipt_skipped' => 'Prodej bez vytištěné účtenky',
         'kasa.vykup_payout' => 'Výplata výkupu na kase',
+        'order.collected_unsigned' => 'Výdej bez podpisu klienta',
         'order.payment_set' => 'Platba při výdeji',
         'invoice.email' => 'Faktura odeslána e-mailem',
         'banka.sync' => 'Synchronizace banky', 'banka.match' => 'Párování platby s fakturou',
@@ -9584,7 +9622,48 @@ function afxEnsurePrintJobsTable(): void {
             taken_at TIMESTAMP NULL DEFAULT NULL,
             INDEX idx_ppj (branch_id, taken_at, id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // v4.2.0: úloha ví, ke kterému dokladu patří (dohledání nevytištěných účtenek)
+        // a kdy ji agent skutečně převzal k tisku (taken_at = i zahozená prošlá úloha)
+        if (!$pdo->query("SHOW COLUMNS FROM pos_print_jobs LIKE 'sale_id'")->fetch()) {
+            $pdo->exec("ALTER TABLE pos_print_jobs
+                ADD COLUMN sale_id INT NULL DEFAULT NULL,
+                ADD COLUMN kind VARCHAR(20) NOT NULL DEFAULT 'receipt',
+                ADD COLUMN printed_at DATETIME NULL DEFAULT NULL,
+                ADD INDEX idx_ppj_sale (sale_id)");
+        }
     } catch (Throwable $e) { error_log('afxEnsurePrintJobsTable: ' . $e->getMessage()); }
+}
+
+/** Žije agent tiskové fronty pobočky? Poller se ptá každé 2 s a stopu zapisuje
+ *  nejvýš jednou za minutu (print_poll_last_<pobočka>) → „živý“ = ozval se do 2 minut.
+ *  Podle toho kasa volí cestu účtenky: živý agent = fronta (spolehlivá, tiskne i
+ *  z appky/Safari), jinak přímý můstek z prohlížeče + fronta jako záloha. */
+function afxPrintAgentAlive(int $branchId, int $maxAgeSec = 120): bool {
+    if ($branchId <= 0) return false;
+    $last = trim((string)get_setting('print_poll_last_' . $branchId, ''));
+    if ($last === '') return false;
+    $t = strtotime($last);
+    return $t !== false && $t >= time() - $maxAgeSec;
+}
+
+/** Stav tiskové úlohy pro kasu: taken = agent si ji vzal (vytiskl), expired = ležela
+ *  ve frontě moc dlouho a nikdo si ji nevzal (agent neběžel). */
+function afxPrintJobStatus(int $jobId): array {
+    global $pdo;
+    if ($jobId <= 0) return ['found' => false];
+    afxEnsurePrintJobsTable();
+    try {
+        $st = $pdo->prepare("SELECT taken_at, printed_at, created_at FROM pos_print_jobs WHERE id = ?");
+        $st->execute([$jobId]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$r) return ['found' => false];
+        return [
+            'found' => true,
+            'taken' => $r['taken_at'] !== null,
+            'printed' => $r['printed_at'] !== null,
+            'age' => max(0, time() - (int)strtotime((string)$r['created_at'])),
+        ];
+    } catch (Throwable $e) { return ['found' => false]; }
 }
 
 /** Token pobočky pro stahování tiskových úloh (agent na pokladním počítači). */
@@ -9611,20 +9690,34 @@ function afxPrintPollBranchByToken(string $token): int {
     return 0;
 }
 
-/** Zařadí hotové ESC/POS bajty do fronty pobočky (poller je vytiskne). */
-function afxPrintJobEnqueue(int $branchId, string $bytes): bool {
+/** Zařadí hotové ESC/POS bajty do fronty pobočky (poller je vytiskne).
+ *  Vrací id úlohy (kasa podle něj sleduje, jestli si ji agent vzal), 0 = selhalo. */
+function afxPrintJobEnqueue(int $branchId, string $bytes, int $saleId = 0, string $kind = 'receipt'): int {
     global $pdo;
-    if ($branchId <= 0 || $bytes === '') return false;
+    if ($branchId <= 0 || $bytes === '') return 0;
     afxEnsurePrintJobsTable();
     try {
         // úklid: den staré úlohy nikoho nezajímají (a tabulka nenaroste)
         $pdo->exec("DELETE FROM pos_print_jobs WHERE created_at < NOW() - INTERVAL 1 DAY");
-        $st = $pdo->prepare("INSERT INTO pos_print_jobs (branch_id, payload) VALUES (?, ?)");
-        return $st->execute([$branchId, base64_encode($bytes)]);
+        $st = $pdo->prepare("INSERT INTO pos_print_jobs (branch_id, payload, sale_id, kind) VALUES (?, ?, ?, ?)");
+        $st->execute([$branchId, base64_encode($bytes), $saleId > 0 ? $saleId : null, mb_substr($kind, 0, 20)]);
+        return (int)$pdo->lastInsertId();
     } catch (Throwable $e) {
         error_log('afxPrintJobEnqueue: ' . $e->getMessage());
-        return false;
+        return 0;
     }
+}
+
+/** Zapíše k prodejce, že účtenka šla na papír (a kudy: queue / bridge / browser).
+ *  První zápis vyhrává — dotisk už „první vytištění“ nepřepisuje. */
+function afxPosSaleMarkReceiptPrinted(int $saleId, string $via): void {
+    global $pdo;
+    if ($saleId <= 0) return;
+    if (function_exists('afxEnsurePosReceiptColumns')) { afxEnsurePosReceiptColumns(); }
+    try {
+        $pdo->prepare("UPDATE pos_sales SET receipt_printed_at = NOW(), receipt_print_via = ?
+            WHERE id = ? AND receipt_printed_at IS NULL")->execute([mb_substr($via, 0, 16), $saleId]);
+    } catch (Throwable $e) { error_log('afxPosSaleMarkReceiptPrinted: ' . $e->getMessage()); }
 }
 
 /* ── GLOBÁLNÍ ODHLÁŠENÍ (v3.52.3) ──────────────────────────────────────────

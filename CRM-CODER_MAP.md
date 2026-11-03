@@ -57,6 +57,15 @@ Klientský portál (odděleně): `klient/*` (zejména `klient/dashboard.php`).
 - `api/invoice_email.php`
 - (ruční faktury, editace, dobropis: `accounting_actions.php` → `models/InvoiceManager.php`)
 
+### Pokladna (kasa)
+- `api/pos_checkout.php` — dokončení prodeje (jediné místo vzniku `pos_sales`); od 4.2.0 hned po commitu
+  `afxReceiptAutoPrint()` → účtenka do tiskové fronty pobočky obsluhy, odpověď nese `receipt` (mode queue|client, job_id)
+- `api/print_receipt_server.php` — bajty účtenky / fronta (`enqueue`) / `job_status` / `mark_printed` / `skip` (prodej bez účtenky → audit)
+- `api/print_poll.php` — poller agenta na pokladním Macu (token pobočky); převzatá úloha = `pos_sales.receipt_printed_at`
+- `api/pos_cash_move.php` — vklad/výběr, počáteční zůstatek, storno dokladu, `action=transfer` (přesun mezi pokladnami, jen vedení — `crmCanTransferCash()`)
+- `includes/receipt58.php` (`afxReceiptDataForSale`, `afxEnsurePosReceiptColumns`), `includes/receipt_escpos.php` (`afxReceiptBytesForSale`, `afxReceiptAutoPrint`), `includes/cash_book.php`
+- Výdej zakázky vyžaduje podpis `vydej` (`crmOrderPickupSignatureRequired`, `crmOrderHasSignature`) — hlídá `update_order_status.php` i `update_order_full.php`
+
 ### Integrace
 - Telegram bot: odstraněn 16.10.2026 (v3.93.2)
 - IMEI check: `api/check_imei.php`

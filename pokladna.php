@@ -16,6 +16,7 @@ require_once __DIR__ . '/posta/lib.php';
 crmMailSortMaybeSchedule();
 require_once 'includes/cash_book.php';
 require_once 'includes/pos_shift.php';
+require_once 'includes/receipt58.php';   // afxEnsurePosReceiptColumns — „bez účtenky“ v dnešních pohybech (v4.2.0)
 
 ensurePosTables();
 ensureProductsTable();
@@ -72,9 +73,10 @@ try {
 // jen pohyby hotovosti, takže prodej kartou nebo na fakturu jako by neexistoval
 // a obsluha nepoznala, jestli se doklad vůbec uložil.
 $todaySales = [];
+afxEnsurePosReceiptColumns();
 try {
     $ss = $pdo->query("SELECT id, sale_number, payment_method, total, status, invoice_id, order_id,
-                              seller_name, created_at
+                              seller_name, created_at, receipt_printed_at, receipt_print_via
         FROM pos_sales
         WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY"
         . orderBranchScopeSql('branch_id') . " ORDER BY id DESC LIMIT 40");
@@ -178,6 +180,9 @@ html[data-lg-theme="light"] .pos-app { --pos-card: #ffffff !important; --pos-car
 html[data-lg-theme="light"] .pos-top-actions .btn { opacity: 1 !important; filter: none !important; }
 html[data-lg-theme="light"] .pos-top-actions .btn-outline-success { color: #1a7f37 !important; border-color: rgba(26,127,55,.45) !important; background: rgba(52,199,89,.10) !important; }
 html[data-lg-theme="light"] .pos-top-actions .btn-outline-warning { color: #a35400 !important; border-color: rgba(194,106,0,.45) !important; background: rgba(255,159,10,.12) !important; }
+html[data-lg-theme="light"] .pos-top-actions .btn-outline-info { color: #0a5a8a !important; border-color: rgba(10,132,255,.45) !important; background: rgba(10,132,255,.10) !important; }
+.pos-feed-row .badge.rcpt-missing { font-size: 10.5px !important; vertical-align: middle; }
+#posPrintFailBar { top: 12px; z-index: 2000; max-width: 680px; width: calc(100% - 24px); }
 html[data-lg-theme="light"] .pos-top-actions .btn-warning { color: #3d2400 !important; background: #FFB340 !important; border-color: #FFB340 !important; }
 .pos-top-actions .pos-more { color: var(--pos-fg) !important; border-color: var(--pos-line) !important; background: var(--pos-soft) !important; }
 .pos-top-actions .dropdown-menu { border-radius: 12px !important; padding: 6px !important; }
@@ -458,6 +463,10 @@ html[data-lg-theme="light"] .pos-eshop-bar b { color: #1e7e38 !important; }
         <button type="button" class="btn btn-outline-success" onclick="posCashMove('in')" title="Vložit hotovost do kasy"><i class="fas fa-arrow-down"></i><span class="lbl">Vklad</span></button>
         <button type="button" class="btn btn-outline-warning" onclick="posCashMove('out')" title="Vybrat hotovost z kasy"><i class="fas fa-arrow-up"></i><span class="lbl">Výběr</span></button>
         <?php endif; ?>
+        <?php if (crmCanTransferCash()): ?>
+        <?php /* Přesun hotovosti mezi pokladnami poboček („z trezoru do trezoru“, v4.2.0) — jen admin / Boss / manažer */ ?>
+        <button type="button" class="btn btn-outline-info" onclick="posCashTransfer()" title="Přesun hotovosti do pokladny jiné pobočky (jen vedení)"><i class="fas fa-right-left"></i><span class="lbl">Přesun</span></button>
+        <?php endif; ?>
         <div class="dropdown">
             <button type="button" class="btn btn-outline-secondary pos-more" data-bs-toggle="dropdown" aria-expanded="false" title="Další možnosti"><i class="fas fa-ellipsis"></i><span class="lbl">Další</span></button>
             <ul class="dropdown-menu dropdown-menu-end">
@@ -633,6 +642,9 @@ html[data-lg-theme="light"] .pos-eshop-bar b { color: #1e7e38 !important; }
                 <i class="fas fa-print me-1"></i> Odběratel nemá e-mail — fakturu <strong>vytiskni</strong> tlačítkem
                 „Faktura". Poslat ji jde i tak: „Fakturu e-mailem" se na adresu zeptá.
             </div>
+            <?php /* v4.2.0: stav tisku účtenky — „tiskne se“ → „vytištěna“, nebo červeně NEVYTIŠTĚNA s dotiskem.
+                     Dřív se tisk spustil potichu jako poslední krok a selhání nikdo neviděl. */ ?>
+            <div id="posDonePrint" class="alert alert-secondary border-0 py-2 small" style="display:none;"></div>
             <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-outline-light" id="posDoneReceipt"><i class="fas fa-print me-1"></i> Účtenka znovu</button>
                 <button type="button" class="btn btn-warning" id="posDoneInvoice" style="display:none;"><i class="fas fa-file-invoice me-1"></i> Faktura</button>
@@ -739,6 +751,11 @@ $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GE
                     <button type="button" class="btn btn-sm btn-outline-success py-0 px-2" title="Vystavit fakturu k tomuto prodeji"
                         onclick="afxInvoiceAfterSale(<?php echo (int)$sale['id']; ?>, <?php echo htmlspecialchars(json_encode((string)$sale['sale_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode(formatMoney((float)$sale['total']), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode((string)$pmLabel, JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)"><i class="fas fa-file-invoice-dollar"></i></button>
                     <?php endif; ?>
+                    <?php /* v4.2.0: doklad bez zaznamenaného tisku účtenky — štítek ve sloupci akcí (popis
+                             vlevo se na užších šířkách ořezává), hned vedle tlačítka dotisku */ ?>
+                    <?php if (!$storno && abs((float)$sale['total']) >= 0.005 && empty($sale['receipt_printed_at'])): ?>
+                        <span class="badge rcpt-missing bg-danger bg-opacity-25 text-danger" title="<?php echo (string)($sale['receipt_print_via'] ?? '') === 'skipped' ? 'Obsluha pokračovala bez účtenky' : 'Účtenka k tomuto dokladu nebyla vytištěna — dotiskni ji tlačítkem vedle'; ?>"><i class="fas fa-print"></i><span class="d-none d-md-inline ms-1">bez účtenky</span></span>
+                    <?php endif; ?>
                     <?php if (!$storno): ?>
                     <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" title="Dotisk účtenky"
                         onclick="window.posReprintReceipt ? window.posReprintReceipt(<?php echo (int)$sale['id']; ?>) : window.open('print_receipt.php?id=<?php echo (int)$sale['id']; ?>&format=58&auto=1', '_blank')"><i class="fas fa-receipt"></i></button>
@@ -748,7 +765,8 @@ $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GE
         <?php else:
             $m = $f['row'];
             $isOut = $m['direction'] === 'out';
-            $purposeLabels = ['vykup' => 'Výkup', 'vklad' => 'Vklad', 'vyber' => 'Výběr', 'zakazka' => 'Zakázka'];
+            $purposeLabels = ['vykup' => 'Výkup', 'vklad' => 'Vklad', 'vyber' => 'Výběr', 'zakazka' => 'Zakázka',
+                              'presun_out' => 'Přesun do jiné pokladny', 'presun_in' => 'Přesun z jiné pokladny'];
             $pl = $purposeLabels[(string)$m['purpose']] ?? ucfirst((string)$m['purpose']);
         ?>
             <div class="pos-feed-row">
@@ -958,6 +976,74 @@ $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GE
 </div>
 <?php endif; ?>
 
+<?php if (crmCanTransferCash()):
+    /* PŘESUN HOTOVOSTI MEZI POKLADNAMI („z trezoru do trezoru“, v4.2.0) — jen admin / Boss / manažer.
+       Manažer bez pohledu napříč pobočkami přesouvá jen ZE své pokladny. U každé pokladny se
+       ukazuje stav podle CRM, ať je hned vidět, kolik jde přesunout. */
+    $__trBranches = getBranches(true);
+    $__trGlobal = isBranchGlobalViewer();
+    $__trOwn = (int)getCurrentStaffBranchId();
+    $__trBal = [];
+    foreach ($__trBranches as $__b) { try { $__trBal[(int)$__b['id']] = afxCashBalanceAt((int)$__b['id'], date('Y-m-d')); } catch (Throwable $e) { $__trBal[(int)$__b['id']] = 0.0; } }
+?>
+<div class="modal fade" id="posTransferModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="fas fa-right-left me-2 text-info"></i>Přesun hotovosti mezi pokladnami</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zavřít"></button>
+            </div>
+            <form id="posTransferForm">
+                <div class="modal-body">
+                    <p class="small text-white-50 mb-3">
+                        Peníze fyzicky odnášíš z jedné pokladny (trezoru) do druhé. CRM zapíše <strong>výdej</strong> u zdrojové
+                        a <strong>příjem</strong> u cílové pokladny najednou a ke každému vystaví pokladní doklad (VPD / PPD).
+                    </p>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small text-white-50 mb-1">Z pokladny</label>
+                            <select class="form-select" name="from_branch_id" id="posTrFrom" <?php echo $__trGlobal ? '' : 'disabled'; ?>>
+                                <?php foreach ($__trBranches as $__b): if (!$__trGlobal && (int)$__b['id'] !== $__trOwn) continue; ?>
+                                <option value="<?php echo (int)$__b['id']; ?>" data-bal="<?php echo e(number_format($__trBal[(int)$__b['id']] ?? 0, 2, '.', '')); ?>" <?php echo (int)$__b['id'] === $__trOwn ? 'selected' : ''; ?>><?php echo e((string)$__b['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-white-50" id="posTrFromBal"></div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-white-50 mb-1">Do pokladny</label>
+                            <select class="form-select" name="to_branch_id" id="posTrTo" required>
+                                <option value="">— vyber —</option>
+                                <?php foreach ($__trBranches as $__b): ?>
+                                <option value="<?php echo (int)$__b['id']; ?>" data-bal="<?php echo e(number_format($__trBal[(int)$__b['id']] ?? 0, 2, '.', '')); ?>"><?php echo e((string)$__b['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-white-50" id="posTrToBal"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small text-white-50 mb-1">Částka (Kč)</label>
+                        <input type="text" class="form-control form-control-lg" name="amount" inputmode="decimal" placeholder="např. 20000" required autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="form-label small text-white-50 mb-1">Poznámka (nepovinné)</label>
+                        <input type="text" class="form-control" name="note" maxlength="200" placeholder="např. doplnění drobných na Příkopy">
+                    </div>
+                    <div class="alert alert-warning border-0 py-2 px-3 small mt-3 mb-0">
+                        <i class="fas fa-circle-info me-1"></i>Přesun smí jen vedení (admin, Boss, manažer) a zapisuje se do Historie.
+                        Víc, než pokladna podle CRM má, přesunout nejde.
+                    </div>
+                    <div class="small text-danger mt-2" id="posTrErr" style="display:none;"></div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Zrušit</button>
+                    <button type="submit" class="btn btn-info" id="posTrSubmit"><i class="fas fa-right-left me-1"></i>Přesunout</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 /* Vklad/výběr hotovosti — jednoduchý prompt flow (kasa je dotyková, ale tohle je výjimečná akce) */
 function posCashMove(direction) {
@@ -990,6 +1076,49 @@ function posOpeningBalance() {
     if (!el) { return; }
     new bootstrap.Modal(el).show();
 }
+
+/* Přesun hotovosti mezi pokladnami (v4.2.0, jen vedení) — modal s výběrem obou pokladen. */
+function posCashTransfer() {
+    var el = document.getElementById('posTransferModal');
+    if (!el) { return; }
+    var fmtK = function (v) { return (Math.round(parseFloat(v || 0))).toLocaleString('cs-CZ') + ' Kč'; };
+    var from = document.getElementById('posTrFrom'), to = document.getElementById('posTrTo');
+    var refresh = function () {
+        // cílová pokladna nesmí být ta zdrojová (nejdřív srovnat výběr, pak teprve nápovědy)
+        Array.prototype.forEach.call(to.options, function (o) { if (o.value) { o.disabled = o.value === from.value; } });
+        if (to.value === from.value) { to.value = ''; }
+        var fo = from.options[from.selectedIndex], tOpt = to.options[to.selectedIndex];
+        document.getElementById('posTrFromBal').textContent = fo ? ('stav podle CRM: ' + fmtK(fo.dataset.bal)) : '';
+        document.getElementById('posTrToBal').textContent = (tOpt && tOpt.value) ? ('stav podle CRM: ' + fmtK(tOpt.dataset.bal)) : '';
+    };
+    from.onchange = refresh; to.onchange = refresh; refresh();
+    document.getElementById('posTrErr').style.display = 'none';
+    new bootstrap.Modal(el).show();
+}
+(function () {
+    var f = document.getElementById('posTransferForm');
+    if (!f) { return; }
+    f.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        var btn = document.getElementById('posTrSubmit'), err = document.getElementById('posTrErr');
+        var fd = new FormData(f);
+        fd.append('action', 'transfer');
+        // disabled select se do FormData nedostane — zdroj doplnit vždy (server ho u manažera stejně přepíše na jeho pobočku)
+        fd.set('from_branch_id', document.getElementById('posTrFrom').value);
+        fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+        btn.disabled = true; err.style.display = 'none';
+        fetch('api/pos_cash_move.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j.ok) { err.textContent = j.error || 'Přesun se nepodařil.'; err.style.display = ''; btn.disabled = false; return; }
+                var msg = 'Přesunuto ' + (Math.round(j.amount)).toLocaleString('cs-CZ') + ' Kč: ' + j.from + ' → ' + j.to + '.';
+                if (j.doc_out || j.doc_in) { msg += '\n\nPokladní doklady: výdej ' + (j.doc_out || '—') + ', příjem ' + (j.doc_in || '—') + '.'; }
+                alert(msg);
+                location.reload();
+            })
+            .catch(function () { err.textContent = 'Chyba spojení'; err.style.display = ''; btn.disabled = false; });
+    });
+})();
 
 /* Storno pokladního dokladu — doklad se nikdy nemaže, vystaví se protidoklad. */
 /**
@@ -1920,62 +2049,149 @@ document.addEventListener('DOMContentLoaded', function () {
         submitSale();
     });
 
-    // TISK ÚČTENKY: tiskne VŽDY jen tento počítač — CRM vrátí hotové bajty
-    // a prohlížeč je pošle na lokální můstek (127.0.0.1:9101 → USB tiskárna).
-    // Na počítači bez tiskárny můstek neběží → u prodeje se nabídne tisk
-    // dialogem prohlížeče, u testu jen hláška. Server sám nikdy netiskne.
-    // Záloha přes TISKOVOU FRONTU: appka z TestFlightu (WKWebView) i Safari blokují
-    // z HTTPS požadavky na http://127.0.0.1 — úloha se proto uloží na server a
-    // poller na pokladním Macu ji do ~2 s stáhne a vytiskne. Chrome jde dál napřímo.
-    function enqueuePrint(payload, onFail, onOk) {
-        fetch('api/print_receipt_server.php', {
+    // ═══ TISK ÚČTENKY (v4.2.0) ═══════════════════════════════════════════════
+    // Tiskne pořád jen počítač s tiskárnou v USB (přání majitele) — ale ROZHODUJE
+    // SERVER: pos_checkout hned po uložení prodeje zařadí účtenku do tiskové fronty
+    // pobočky, pokud se agent na pokladním Macu hlásí (poller každé 2 s). Kasa pak
+    // jen sleduje, zda si agent úlohu vzal. Když agent neběží, zkusí prohlížeč
+    // místní můstek 127.0.0.1:9101 (Chrome na pokladním Macu) a frontu jako zálohu.
+    // KAŽDÝ výsledek je vidět: „Účtenka vytištěna“ / červeně „NEVYTIŠTĚNA“ s dotiskem
+    // a tiskem z prohlížeče; „Nový prodej“ bez účtenky chce potvrzení a zapíše se
+    // do historie. Dřív tisk startoval potichu jako poslední krok v JavaScriptu a
+    // selhání (popup blocker, appka z TestFlightu, spící Mac) nikdo neviděl.
+    var CSRF_POS = '<?php echo $_SESSION['csrf_token'] ?? ''; ?>';
+    function escTxt(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function printApi(payload) {
+        return fetch('api/print_receipt_server.php', {
             method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(Object.assign({ csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>', enqueue: 1 }, payload))
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-            if (d.ok && d.queued) {
-                posToast(true, '🖨️ Účtenka odeslána na pokladní tiskárnu (do 2 s).');
-                if (onOk) { onOk(); }
-                return;
-            }
-            onFail((d.error || 'Frontu tisku se nepodařilo naplnit.') + ' Tiskne jen počítač s tiskárnou v USB a spuštěným agentem.');
-        })
-        .catch(function () { onFail('Síťová chyba při zařazení tisku do fronty.'); });
+            body: JSON.stringify(Object.assign({ csrf_token: CSRF_POS }, payload))
+        }).then(function (r) { return r.json(); });
     }
+    // čeká, až si agent vezme úlohu z fronty (do ~12 s); onDone(ok, chyba)
+    function waitForJob(jobId, onDone) {
+        var tries = 0;
+        (function tick() {
+            printApi({ job_status: jobId }).then(function (d) {
+                if (d.ok && d.found && d.taken) { onDone(true); return; }
+                if (!d.ok || !d.found) { onDone(false, 'Tisková úloha se ve frontě ztratila.'); return; }
+                if (++tries >= 12) { onDone(false, 'Tiskárna u kasy se neozvala — agent tisku neběží nebo Mac spí. Úloha čeká ve frontě ještě 10 minut.'); return; }
+                setTimeout(tick, 1000);
+            }).catch(function () {
+                if (++tries >= 12) { onDone(false, 'Síťová chyba při sledování tisku.'); } else { setTimeout(tick, 1000); }
+            });
+        })();
+    }
+    // záloha: úloha do fronty serveru (appka z TestFlightu / Safari nedosáhnou na můstek)
+    function queuePrint(saleId, drawer, onDone) {
+        printApi({ sale_id: saleId, drawer: drawer ? 1 : 0, enqueue: 1 }).then(function (d) {
+            if (!d.ok || !d.queued) { onDone(false, d.error || 'Frontu tisku se nepodařilo naplnit.'); return; }
+            if (!d.agent_alive) { onDone(false, 'Agent tiskárny u kasy neběží (Mac spí nebo není přihlášený) — účtenka čeká ve frontě 10 minut.'); return; }
+            waitForJob(d.job_id, onDone);
+        }).catch(function () { onDone(false, 'Síťová chyba při zařazení tisku do fronty.'); });
+    }
+    // přímý tisk: bajty ze serveru → místní můstek; když můstek nejede, fronta
+    function bridgePrint(saleId, drawer, onDone) {
+        printApi({ sale_id: saleId, drawer: drawer ? 1 : 0, bytes: 1 }).then(function (d) {
+            if (!d.ok || !d.b64) { onDone(false, d.error || 'Doklad se nepodařilo připravit.'); return; }
+            var bin = Uint8Array.from(atob(d.b64), function (c) { return c.charCodeAt(0); });
+            fetch('http://127.0.0.1:9101/print', { method: 'POST', mode: 'cors', body: bin })
+                .then(function (r2) {
+                    if (r2.ok) { printApi({ mark_printed: saleId, via: 'bridge' }).catch(function () {}); onDone(true); }
+                    else { queuePrint(saleId, drawer, onDone); }   // můstek hlásí vypnutou tiskárnu / selhání lp
+                })
+                .catch(function () { queuePrint(saleId, drawer, onDone); });   // WKWebView/Safari: blokují localhost z HTTPS
+        }).catch(function () { onDone(false, 'Síťová chyba při přípravě dokladu.'); });
+    }
+    /** Vstup po prodeji: d.receipt ze serveru říká, zda už je úloha ve frontě (mode 'queue'). */
+    function printReceipt(saleId, drawer, receiptInfo, onDone) {
+        onDone = onDone || function () {};
+        if (receiptInfo && receiptInfo.mode === 'queue' && parseInt(receiptInfo.job_id, 10) > 0) {
+            waitForJob(parseInt(receiptInfo.job_id, 10), onDone); return;
+        }
+        bridgePrint(saleId, drawer, onDone);
+    }
+    // tisk z prohlížeče — MUSÍ běžet přímo v kliknutí (jinak popup blocker); pro CRM = účtenka vydaná
+    function browserPrint(saleId) {
+        window.open('print_receipt.php?id=' + saleId + '&format=58&auto=1', '_blank');
+        printApi({ mark_printed: saleId, via: 'browser' }).catch(function () {});
+    }
+
+    // stav tisku v panelu „Prodáno“
+    var doneState = { saleId: 0, number: '', printed: false, pending: false };
+    function setPrintStatus(state, text) {
+        var box = document.getElementById('posDonePrint');
+        if (!box) { return; }
+        box.style.display = '';
+        box.className = 'alert border-0 py-2 small ' + (state === 'ok' ? 'alert-success' : (state === 'wait' ? 'alert-secondary' : 'alert-danger'));
+        if (state === 'wait') {
+            box.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Tiskne se účtenka…';
+        } else if (state === 'ok') {
+            box.innerHTML = '<i class="fas fa-print me-1"></i>Účtenka vytištěna' + (text ? ' ' + escTxt(text) : '') + '.';
+        } else {
+            box.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i><strong>Účtenka se NEVYTISKLA.</strong> ' + escTxt(text || '')
+                + '<div class="mt-2 d-flex gap-2 flex-wrap">'
+                + '<button type="button" class="btn btn-sm btn-light" id="posPrintRetry"><i class="fas fa-rotate-right me-1"></i>Zkusit znovu</button>'
+                + '<button type="button" class="btn btn-sm btn-outline-light" id="posPrintBrowser"><i class="fas fa-window-maximize me-1"></i>Tisk z prohlížeče</button>'
+                + '</div>';
+            document.getElementById('posPrintRetry').addEventListener('click', function () {
+                doneState.pending = true; setPrintStatus('wait');
+                bridgePrint(doneState.saleId, false, onPrintDone);
+            });
+            document.getElementById('posPrintBrowser').addEventListener('click', function () {
+                browserPrint(doneState.saleId);
+                doneState.printed = true; doneState.pending = false;
+                setPrintStatus('ok', '(tisk z prohlížeče)');
+            });
+        }
+    }
+    function onPrintDone(ok, err) {
+        doneState.pending = false;
+        doneState.printed = !!ok;
+        setPrintStatus(ok ? 'ok' : 'fail', err);
+        if (!ok) { try { beep(false); } catch (e) {} }
+    }
+    // dotisk odjinud (dnešní pohyby, pokladní kniha): výsledek jako lišta nahoře
+    function posPrintFailBar(saleId, err) {
+        var bar = document.getElementById('posPrintFailBar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'posPrintFailBar';
+            bar.className = 'alert alert-danger shadow position-fixed start-50 translate-middle-x d-flex align-items-center gap-2 flex-wrap mb-0';
+            document.body.appendChild(bar);
+        }
+        bar.innerHTML = '<i class="fas fa-triangle-exclamation"></i><span class="flex-grow-1">Účtenka se nevytiskla: ' + escTxt(err || '') + '</span>'
+            + '<button type="button" class="btn btn-sm btn-light" data-act="retry"><i class="fas fa-rotate-right me-1"></i>Znovu</button>'
+            + '<button type="button" class="btn btn-sm btn-outline-dark" data-act="browser">Tisk z prohlížeče</button>'
+            + '<button type="button" class="btn btn-sm btn-outline-dark" data-act="close" aria-label="Zavřít">✕</button>';
+        bar.querySelector('[data-act="close"]').onclick = function () { bar.remove(); };
+        bar.querySelector('[data-act="browser"]').onclick = function () { browserPrint(saleId); bar.remove(); };
+        bar.querySelector('[data-act="retry"]').onclick = function () { bar.remove(); window.posReprintReceipt(saleId); };
+    }
+    // obecný tisk (lístek směny, zkušební účtenka): bajty → můstek → fronta; onFail(err) / onOk()
     function localPrint(payload, onFail, onOk) {
-        fetch('api/print_receipt_server.php', {
-            method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(Object.assign({ csrf_token: '<?php echo $_SESSION['csrf_token'] ?? ''; ?>', bytes: 1 }, payload))
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
+        onFail = onFail || function () {}; onOk = onOk || function () {};
+        printApi(Object.assign({ bytes: 1 }, payload)).then(function (d) {
             if (!d.ok || !d.b64) { onFail(d.error || 'Doklad se nepodařilo připravit.'); return; }
             var bin = Uint8Array.from(atob(d.b64), function (c) { return c.charCodeAt(0); });
-            return fetch('http://127.0.0.1:9101/print', { method: 'POST', mode: 'cors', body: bin })
-                .then(function (r2) {
-                    if (!r2.ok) { enqueuePrint(payload, onFail, onOk); }
-                    else if (onOk) { onOk(); }
-                })
-                .catch(function () {
-                    // WKWebView/Safari sem spadnou VŽDY (blokují localhost z HTTPS) —
-                    // plynule se přejde na frontu, obsluha nic řešit nemusí
-                    enqueuePrint(payload, onFail, onOk);
-                });
-        })
-        .catch(function () { onFail('Síťová chyba při přípravě dokladu.'); });
-    }
-    function serverPrintReceipt(saleId, drawer) {
-        localPrint({ sale_id: saleId, drawer: drawer ? 1 : 0 }, function () {
-            // fallback: tisk dialogem prohlížeče (obsluha si vybere tiskárnu sama)
-            window.open('print_receipt.php?id=' + saleId + '&format=58&auto=1', '_blank');
-        });
+            var viaQueue = function () {
+                printApi(Object.assign({ enqueue: 1 }, payload)).then(function (q) {
+                    if (q.ok && q.queued) { posToast(true, '🖨️ Odesláno na pokladní tiskárnu (do 2 s).'); onOk(); }
+                    else { onFail((q.error || 'Frontu tisku se nepodařilo naplnit.') + ' Tiskne jen počítač s tiskárnou v USB a spuštěným agentem.'); }
+                }).catch(function () { onFail('Síťová chyba při zařazení tisku do fronty.'); });
+            };
+            fetch('http://127.0.0.1:9101/print', { method: 'POST', mode: 'cors', body: bin })
+                .then(function (r2) { if (r2.ok) { onOk(); } else { viaQueue(); } })
+                .catch(viaQueue);
+        }).catch(function () { onFail('Síťová chyba při přípravě dokladu.'); });
     }
     window.posReprintReceipt = function (saleId) {
         saleId = parseInt(saleId, 10) || 0;
-        if (saleId > 0) { serverPrintReceipt(saleId, false); }
+        if (saleId <= 0) { return; }
+        posToast(true, '🖨️ Tisknu účtenku…');
+        bridgePrint(saleId, false, function (ok, err) {
+            if (ok) { posToast(true, 'Účtenka vytištěna.'); } else { posToast(false, 'Účtenka se nevytiskla.'); posPrintFailBar(saleId, err); }
+        });
     };
 
     function submitSale() {
@@ -2005,6 +2221,13 @@ document.addEventListener('DOMContentLoaded', function () {
             $finish.innerHTML = '<i class="fas fa-check me-2"></i>Dokončit prodej';
             if (!d.success) { alert(d.message || 'Prodej se nepodařil.'); updateFinish(); return; }   // adhoc necháváme vyplněný — obsluha to jen opraví
             lastSale = d;
+            // ÚČTENKA JAKO PRVNÍ (v4.2.0): sledování tisku startuje hned, nezávisle na
+            // obnově obrazovky níž — výjimka v ní dřív tisk úplně přeskočila.
+            doneState = { saleId: d.sale_id, number: d.sale_number, printed: false, pending: true };
+            try { document.getElementById('posDone').style.display = ''; setPrintStatus('wait'); } catch (e) {}
+            try { printReceipt(d.sale_id, wasCash, d.receipt, onPrintDone); }
+            catch (e) { onPrintDone(false, 'Tisk se nepodařilo spustit.'); }
+            try {
             totalBeforeClear = total();   // pro zákaznický displej (než se košík smaže)
             // čistý výdaj z kasy: zákazník žádný není → „zaplaceno" na monitor nepatří
             var cdSkipReceipt = cart.length > 0 && cart.every(function (c) { return c.type === 'expense'; });
@@ -2030,8 +2253,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // zákaznický displej: „zaplaceno" + vráceno (sám se vrátí na reklamu);
             // u čistého výdaje z kasy se displej nechává na reklamě
             if (!cdSkipReceipt) { afxCdReceipt(d); }
-            // účtenka na termotiskárnu (hotově s otevřením šuplíku), fallback = prohlížeč
-            serverPrintReceipt(d.sale_id, wasCash);
+            } catch (e) { console.error('pokladna: obnova obrazovky po prodeji', e); }
         })
         .catch(function () {
             $finish.innerHTML = '<i class="fas fa-check me-2"></i>Dokončit prodej';
@@ -2041,7 +2263,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('posDoneReceipt').addEventListener('click', function () {
-        if (lastSale) serverPrintReceipt(lastSale.sale_id, false);   // dotisk bez šuplíku
+        if (!lastSale) { return; }
+        doneState.pending = true; setPrintStatus('wait');
+        bridgePrint(lastSale.sale_id, false, onPrintDone);   // dotisk bez šuplíku
     });
     document.getElementById('posDoneInvoice').addEventListener('click', function () {
         if (lastSale && lastSale.invoice_id) window.open('print_invoice.php?id=' + lastSale.invoice_id, '_blank');
@@ -2072,6 +2296,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     document.getElementById('posDoneInvoiceMail').addEventListener('click', function () { sendInvoiceMail(''); });
     document.getElementById('posDoneNew').addEventListener('click', function () {
+        // bez vytištěné účtenky se dál nejde „jen tak“ — obsluha to musí potvrdit a zapíše se to do historie
+        if (doneState.saleId > 0 && !doneState.printed) {
+            var q = doneState.pending
+                ? 'Účtenka k dokladu ' + doneState.number + ' se ještě tiskne. Pokračovat bez čekání na tisk?'
+                : 'Účtenka k dokladu ' + doneState.number + ' se NEVYTISKLA.\n\nPokračovat bez účtenky? Zapíše se to do historie.';
+            if (!confirm(q)) { return; }
+            var sid = doneState.saleId, reason = doneState.pending ? 'obsluha nečekala na tisk' : 'tisk selhal';
+            document.getElementById('posDone').style.display = 'none';
+            printApi({ skip: sid, reason: reason }).catch(function () {}).then(function () { location.reload(); });
+            return;
+        }
         document.getElementById('posDone').style.display = 'none';
         location.reload();
     });

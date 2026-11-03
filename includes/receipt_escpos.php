@@ -405,6 +405,53 @@ function crmShiftSlipRaster(array $shift, string $typ, ?array $prev = null, ?arr
  *  vyjely nesmyslné znaky („aaaa≡x…", Praha 1, 25. 9. 2026). NUL tiskárna mimo
  *  příkaz ignoruje; uvnitř příkazu jím nedokončený pás doplní (nejdelší pás
  *  ESC * = 3 × 384 = 1152 bajtů) a ESC @ ho pak smaže, takže nic navíc nevyjede. */
+/** Hotové ESC/POS bajty účtenky k prodejce (preambule + případný šuplík + rastr).
+ *  NULL = doklad nenalezen / bez přístupu. Používá kasa (auto-tisk po prodeji),
+ *  tiskové API i dotisk. */
+function afxReceiptBytesForSale(int $saleId, bool $drawer = false, bool $checkBranch = true, ?int &$branchOut = null): ?string {
+    $data = afxReceiptDataForSale($saleId, $branchOut, $checkBranch);
+    if (!$data) { return null; }
+    $bytes = crmEscposPreamble();                       // tiskárna ve výchozím stavu, i kdyby visela v cizí úloze
+    if ($drawer) { $bytes .= crmEscposDrawerPulse(); }  // šuplík ještě před tiskem
+    return $bytes . crmEscposReceipt(crmReceiptRaster($data));
+}
+
+/**
+ * ÚČTENKA HNED PO PRODEJI — rozhoduje SERVER, ne prohlížeč (v4.2.0).
+ * Dřív tisk začínal až v JavaScriptu kasy jako poslední krok po prodeji: výjimka
+ * v obnově obrazovky, zavřená záložka, popup blocker u záložního tisku nebo appka
+ * z TestFlightu (window.open nic neudělá) = prodej uložený, účtenka nikde a nikdo
+ * se o tom nedozvěděl. Teď:
+ *   · běží-li agent tiskové fronty pobočky OBSLUHY (poller na pokladním Macu se
+ *     ozval do 2 min) → úloha jde rovnou do fronty a kasa jen sleduje, zda si ji
+ *     agent vzal (režim 'queue');
+ *   · jinak kasa zkusí můstek 127.0.0.1:9101 z prohlížeče a frontu jako zálohu
+ *     (režim 'client').
+ * Fronta pobočky OBSLUHY (ne dokladu): doklad k zakázce nese pobočku zakázky, ale
+ * zákazník stojí u kasy, kde se markuje. Vrací info pro UI kasy; nikdy nehází.
+ */
+function afxReceiptAutoPrint(int $saleId, bool $drawer): array {
+    $out = ['mode' => 'client', 'job_id' => 0, 'agent_alive' => false, 'branch_id' => 0];
+    try {
+        $branch = (int)getCurrentStaffBranchId();
+        if ($branch <= 0) {
+            $sb = 0;
+            afxReceiptDataForSale($saleId, $sb, false);
+            $branch = $sb;
+        }
+        $out['branch_id'] = $branch;
+        if (!afxPrintAgentAlive($branch)) { return $out; }
+        $out['agent_alive'] = true;
+        $bytes = afxReceiptBytesForSale($saleId, $drawer, false);
+        if ($bytes === null) { return $out; }
+        $jobId = afxPrintJobEnqueue($branch, $bytes, $saleId, 'receipt');
+        if ($jobId > 0) { $out['mode'] = 'queue'; $out['job_id'] = $jobId; }
+    } catch (Throwable $e) {
+        error_log('afxReceiptAutoPrint #' . $saleId . ': ' . $e->getMessage());
+    }
+    return $out;
+}
+
 function crmEscposPreamble(): string {
     return str_repeat("\x00", 1200) . "\x1B\x40";
 }
