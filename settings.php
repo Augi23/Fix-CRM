@@ -67,6 +67,19 @@ if (isset($_POST['update_company']) && $is_admin_check) {
 }
 
 // ── Push notifikace (APNs) — .p8 klíč + identifikátory pro iOS appku ──
+// Přístup hlasového asistenta Jarvis (api/jarvis.php): prázdný token = rozhraní vypnuté.
+if (isset($_POST['jarvis_token_action']) && $is_admin_check) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
+    $jarvisEnable = $_POST['jarvis_token_action'] === 'create';
+    set_setting('jarvis_api_token', $jarvisEnable ? bin2hex(random_bytes(32)) : '');
+    // Token patří profilu, který ho vytvořil: api/jarvis.php pod ním zakázky zakládá.
+    set_setting('jarvis_api_profile', $jarvisEnable ? json_encode(array_intersect_key($_SESSION,
+        array_flip(['user_id', 'username', 'role', 'full_name', 'tech_id', 'branch_id', 'internal_role'])), JSON_UNESCAPED_UNICODE) : '');
+    crmAuditLog('settings.update', ['entity_type' => 'settings', 'summary' => 'Přístup Jarvise: ' . ($jarvisEnable ? 'vytvořen nový token' : 'zrušen')]);
+    header("Location: settings.php?tab=integrations&updated=1");
+    exit;
+}
+
 if (isset($_POST['update_apns']) && $is_admin_check) {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { die(__('csrf_invalid')); }
     set_setting('apns_key_id', trim($_POST['apns_key_id'] ?? ''));
@@ -811,6 +824,28 @@ require_once 'includes/header.php';
         <!-- SYSTÉM › INTEGRACE -->
         <div class="tab-pane fade <?php echo ($active_tab == 'system' && $sys_sub == 'integrace' && $is_admin_user) ? 'show active' : ''; ?>">
             <?php $sysSubnav('integrace'); ?>
+                <div class="glass-panel p-3 border-secondary mb-4">
+                    <?php $jarvisToken = (string)get_setting('jarvis_api_token', ''); ?>
+                    <h5 class="mb-2 text-warning"><i class="fas fa-microphone me-2"></i>Hlasový asistent Jarvis</h5>
+                    <div class="small text-white-75 mb-2">Jarvis vám umožní zakládat klienty a zakázky hlasem. Nemá vlastní účet: vše dělá pod profilem, který token vytvořil. Token vložte do Jarvise (Nastavení → CRM) a nikomu ho neposílejte. Nový token ten starý zneplatní.</div>
+                    <?php $jarvisProfile = json_decode((string)get_setting('jarvis_api_profile', ''), true); ?>
+                    <?php if ($jarvisToken !== '' && is_array($jarvisProfile)): ?>
+                    <div class="small text-white-75 mb-2">Zakázky se zakládají na profil: <strong><?php echo e(($jarvisProfile['full_name'] ?? '') ?: ($jarvisProfile['username'] ?? '')); ?></strong></div>
+                    <?php endif; ?>
+                    <?php if ($jarvisToken !== ''): ?>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-4"><label class="form-label small text-white-75">Adresa CRM</label><input type="text" class="form-control" readonly onclick="this.select()" value="https://admin.applefix.cloud"></div>
+                        <div class="col-md-8"><label class="form-label small text-white-75">Token</label><input type="text" class="form-control" readonly onclick="this.select()" value="<?php echo e($jarvisToken); ?>"></div>
+                    </div>
+                    <?php endif; ?>
+                    <form method="POST" class="d-flex gap-2">
+                        <?php echo csrfField(); ?>
+                        <button type="submit" name="jarvis_token_action" value="create" class="btn btn-sm btn-primary"><?php echo $jarvisToken !== '' ? 'Vytvořit nový token' : 'Povolit Jarvise a vytvořit token'; ?></button>
+                        <?php if ($jarvisToken !== ''): ?>
+                        <button type="submit" name="jarvis_token_action" value="revoke" class="btn btn-sm btn-outline-danger">Zrušit přístup</button>
+                        <?php endif; ?>
+                    </form>
+                </div>
             <form method="POST">
                 <?php echo csrfField(); ?>
                 <div class="row g-4 settings-integrations-row">

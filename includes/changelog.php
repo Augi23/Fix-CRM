@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.3.2',
+        'date' => '2026-11-06',
+        'time' => '19:10',
+        'title' => 'Zakázky přes hlasového asistenta Jarvis',
+        'items' => [
+            'Jarvis umí podle diktátu najít nebo založit klienta a založit zakázku. Zakázka vzniká na váš profil a prochází stejnou kontrolou duplicit a číslováním jako ruční příjem; v auditu je jen poznámka, že vznikla hlasem.',
+            'Přístup se zapíná v <b>Nastavení → Systém → Integrace → Hlasový asistent Jarvis</b>. Token patří profilu, který ho vytvořil. Bez tokenu je přístup vypnutý a kdykoli ho jde zrušit.',
+        ],
+    ],
+    [
         'version' => '4.3.1',
         'date' => '2026-11-03',
         'time' => '22:00',
