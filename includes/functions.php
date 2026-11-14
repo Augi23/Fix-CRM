@@ -9428,6 +9428,21 @@ function crmGuessDeviceType(string $device): string {
 }
 
 /**
+ * Pobočka zvolená zákazníkem v průvodci na novém webu: pole `afx_branch` nese KÓD pobočky
+ * (branches.code, např. karlin / prikope). Vrací ID aktivní pobočky, nebo 0, když pole chybí
+ * či kód neexistuje — volající pak použije výchozí pobočku. Záměrně se čte jen toto jedno
+ * vlastní pole, aby se nic nezměnilo pro rezervace z RepairPluginu.
+ */
+function crmResolveWebBranchId(array $raw): int {
+    $code = isset($raw['afx_branch']) && is_scalar($raw['afx_branch']) ? crmFoldText((string)$raw['afx_branch']) : '';
+    if ($code === '') { return 0; }
+    foreach (getBranches(true) as $b) {
+        if (crmFoldText((string)($b['code'] ?? '')) === $code) { return (int)$b['id']; }
+    }
+    return 0;
+}
+
+/**
  * Z webové rezervace (web_bookings) rovnou založí ZÁKAZNÍKA (pokud neexistuje) a ZAKÁZKU „Přijato".
  * Idempotentní: pokud už rezervace má order_id nebo je dismissed, nic nedělá.
  * Vrací ID vytvořené zakázky, nebo null (nezaložilo se — rezervace zůstane v panelu k ručnímu převzetí).
@@ -9526,7 +9541,9 @@ function crmCreateOrderFromWebBooking(int $bookingId): ?int {
         ensureRepairPluginOrderStatus();
         ensureOrderPriorityLowValue();
         $status = 'Přijato z RepairPluginu';
-        $branchId = getDefaultBranchId();
+        // Pobočka: nový web (průvodce opravou) posílá kód pobočky, kterou si zákazník vybral;
+        // RepairPlugin nic takového neposílá → výchozí pobočka jako dosud.
+        $branchId = crmResolveWebBranchId($raw) ?: getDefaultBranchId();
         $orderCode = function_exists('generateNextOrderCode') ? generateNextOrderCode($pdo) : null;
         $deviceType = crmGuessDeviceType($device);
 

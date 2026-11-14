@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.3.3',
+        'date' => '2026-11-14',
+        'time' => '21:34',
+        'title' => 'Rezervace z webu: zakázka na správné pobočce',
+        'items' => [
+            'Zakázka založená z rezervace na webu dostane <b>pobočku, kterou si zákazník při objednání vybral</b>. Platí pro nový průvodce objednávkou opravy, který posílá kód pobočky. Rezervace z RepairPluginu se nemění a dál padají na výchozí pobočku.',
+        ],
+    ],
+    [
         'version' => '4.3.2',
         'date' => '2026-11-06',
         'time' => '19:10',
