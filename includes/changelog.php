@@ -11,6 +11,21 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.3.4',
+        'date' => '2026-11-16',
+        'time' => '15:11',
+        'title' => 'Pokladna: storno i pro manažera přímo v kase. Produkty: doplněné varianty Maců',
+        'items' => [
+            'Storno už proběhlého prodeje smí vedle administrátora a Bosse nově i <b>manažer</b>, a to u dokladů <b>své prodejny</b>. Doklad jiné prodejny nebo doklad bez přiřazené prodejny mu systém stornovat nedovolí.',
+            'V Pokladně je u každého prodeje v záložce <b>Dnešní pohyby</b> tlačítko <b>Storno</b>, ať se platilo hotově, kartou nebo na fakturu. Dřív šel z pokladny stornovat jen hotovostní prodej přes Pokladní knihu.',
+            'Nová záložka <b>Starší prodeje</b> v Pokladně: dohledání prodeje za zvolené období podle čísla dokladu, prodejce nebo položky a jeho storno. Vidí ji jen ten, kdo stornovat smí; manažer v ní má jen prodeje své prodejny.',
+            'U prodeje <b>kartou</b> storno připomene, že peníze je potřeba zákazníkovi vrátit na platebním terminálu. Systém je sám nevrací, jen prodej zruší a vrátí zboží na sklad.',
+            'Beze změny zůstává: důvod storna je povinný, prodejka se nemaže, hotovost se zapíše do pokladní knihy k dnešku a storno jde jen v otevřeném účetním období.',
+            'Produkty: nabídky u Maců jsou doplněné podle toho, co Apple skutečně vyrábí. <b>Jádra CPU</b> nově 15, 18, 30 a 36, <b>jádra GPU</b> 7, 12, 24, 48 a 64, <b>RAM</b> 192, 256 a 512 GB, <b>úložiště</b> 4, 8 a 16 TB.',
+            'Produkty: přibyly letošní čipy <b>M5 Pro, M5 Max, M5 Ultra, M6</b> a <b>A18 Pro</b> a modely MacBook Air M5, MacBook Pro M5 Pro / M5 Max / M6, MacBook Neo, iMac M6, Mac mini M6 a M5 Pro a Mac Studio M5 Max a M5 Ultra. U MacBooku jdou vybrat i barvy Gold, Rose Gold, Blush, Citrus a Indigo.',
+        ],
+    ],
+    [
         'version' => '4.3.3',
         'date' => '2026-11-14',
         'time' => '21:34',

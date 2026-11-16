@@ -153,7 +153,7 @@ require_once 'includes/header.php';
 <?php endif; ?>
 
 <?php if ($activeTab === 'kasa'): ?>
-<p class="text-white-50 small mb-3">Všechny prodeje přes Pokladnu — doklady, položky, typ platby, prodejce. Storno smí jen vedení a vrací zboží na sklad.</p>
+<p class="text-white-50 small mb-3">Všechny prodeje přes Pokladnu — doklady, položky, typ platby, prodejce. Storno smí vedení (administrátor, Boss a manažer na své prodejně) a vrací zboží na sklad.</p>
 
 <form method="GET" class="glass-panel p-3 border-secondary mb-3">
     <input type="hidden" name="tab" value="kasa">
@@ -255,8 +255,10 @@ require_once 'includes/header.php';
                         <?php if (!empty($s['invoice_id'])): ?>
                             <a href="print_invoice.php?id=<?php echo (int)$s['invoice_id']; ?>" target="_blank" class="btn btn-white border text-warning" title="Faktura"><i class="fas fa-file-invoice"></i></a>
                         <?php endif; ?>
-                        <?php if (!$cn && crmCanCancelPosSale()): ?>
-                            <button type="button" class="btn btn-white border text-danger kasa-cancel-btn" data-id="<?php echo (int)$s['id']; ?>" data-num="<?php echo htmlspecialchars($s['sale_number']); ?>" title="Storno (vrátí zboží na sklad)"><i class="fas fa-rotate-left"></i></button>
+                        <?php /* s řádkem prodeje hlídá i pobočku: manažer vidí v Historii prodeje obou prodejen,
+                                 stornovat ale smí jen ty své (v4.3.4) */ ?>
+                        <?php if (!$cn && crmCanCancelPosSale($s)): ?>
+                            <button type="button" class="btn btn-white border text-danger kasa-cancel-btn" data-id="<?php echo (int)$s['id']; ?>" data-num="<?php echo htmlspecialchars($s['sale_number']); ?>" data-pay="<?php echo htmlspecialchars((string)$s['payment_method']); ?>" title="Storno (vrátí zboží na sklad)"><i class="fas fa-rotate-left"></i></button>
                         <?php endif; ?>
                     </div>
                 </td>
@@ -288,10 +290,16 @@ require_once 'includes/header.php';
 <?php if (crmCanCancelPosSale()): ?>
 <script>
 $(document).on('click', '.kasa-cancel-btn', function () {
-    var id = this.dataset.id, num = this.dataset.num;
+    var id = this.dataset.id, num = this.dataset.num, pay = this.dataset.pay || '';
+    // co se stane s penězi, záleží na způsobu platby — kartu CRM samo nevrací
+    var penize = pay === 'card'
+        ? 'POZOR: platbu kartou musíš zákazníkovi vrátit na platebním terminálu, CRM ji samo nevrací.'
+        : (pay === 'cash'
+            ? 'Hotovost se vydá zpět (zapíše se do pokladní knihy k dnešnímu dni).'
+            : 'Z pokladny se nic nevydává.');
     // Důvod je povinný — opravný účetní záznam musí být srozumitelný (§ 35 zák.
     // č. 563/1991 Sb.) a u opravného daňového dokladu je důvod přímo náležitostí.
-    var reason = prompt('Storno prodeje ' + num + '\n\nZboží se vrátí na sklad, případná faktura se zruší a hotovost se vydá zpět (zapíše se do pokladní knihy k dnešnímu dni).\n\nNapiš důvod storna (povinné, uvede se na dokladu):');
+    var reason = prompt('Storno prodeje ' + num + '\n\nZboží se vrátí na sklad a případná faktura se zruší. ' + penize + '\n\nNapiš důvod storna (povinné, uvede se na dokladu):');
     if (reason === null) { return; }
     reason = reason.trim();
     if (reason.length < 3) { showAlert('Bez důvodu storno provést nejde — napiš aspoň pár slov.'); return; }

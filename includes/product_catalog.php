@@ -23,11 +23,22 @@ const AFX_WATCH_COLORS = ['Silver', 'Space Gray', 'Space Black', 'Graphite', 'Sl
     'Gold', 'Rose Gold', 'Black', 'Jet Black', 'White', 'Midnight', 'Starlight',
     'Blue', 'Green', 'Pink', 'Red', 'Yellow', 'Orange',
     'Natural Titanium', 'Black Titanium', 'Ceramic White'];
-const AFX_CAPS = ['16 GB', '32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB', '2 TB'];
+// 16. 11. 2026: 4 a 8 TB (MacBook Pro, Mac mini) a 16 TB (Mac Studio).
+const AFX_CAPS = ['16 GB', '32 GB', '64 GB', '128 GB', '256 GB', '512 GB', '1 TB', '2 TB', '4 TB', '8 TB', '16 TB'];
 // RAM/jádra mají i telefony, tablety, konzole… — menší hodnoty pro ne-Macy (31.7. rozšířeno)
-const AFX_RAMS = ['2 GB', '3 GB', '4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '18 GB', '24 GB', '32 GB', '36 GB', '48 GB', '64 GB', '96 GB', '128 GB'];
-const AFX_CPU_CORES = ['2', '4', '6', '8', '10', '11', '12', '14', '16', '20', '24', '28', '32'];
-const AFX_GPU_CORES = ['3', '4', '5', '6', '8', '10', '14', '16', '18', '19', '20', '30', '32', '38', '40', '60', '76', '80'];
+const AFX_RAMS = ['2 GB', '3 GB', '4 GB', '6 GB', '8 GB', '12 GB', '16 GB', '18 GB', '24 GB', '32 GB', '36 GB', '48 GB', '64 GB', '96 GB', '128 GB', '192 GB', '256 GB', '512 GB'];
+// Jádra čipů Apple (CPU / GPU). Zkontrolováno 16. 11. 2026 proti technickým údajům na apple.com,
+// v nabídce je každá kombinace, kterou Apple v Macu vyrobil:
+//   M1 8 / 7, 8 · M1 Pro 8, 10 / 14, 16 · M1 Max 10 / 24, 32 · M1 Ultra 20 / 48, 64
+//   M2 8 / 8, 10 · M2 Pro 10, 12 / 16, 19 · M2 Max 12 / 30, 38 · M2 Ultra 24 / 60, 76
+//   M3 8 / 8, 10 · M3 Pro 11, 12 / 14, 18 · M3 Max 14, 16 / 30, 40 · M3 Ultra 28, 32 / 60, 80
+//   M4 8, 10 / 8, 10 · M4 Pro 12, 14 / 16, 20 · M4 Max 14, 16 / 32, 40
+//   M5 10 / 8, 10 · M5 Pro 15, 18 / 16, 20 · M5 Max 18 / 32, 40 · M5 Ultra 30, 36 / 64, 80
+//   M6 10, 12 / 10, 12 · A18 Pro (MacBook Neo) 6 / 5
+//   Macy s Intelem: 2, 4, 6, 8, 10, 12, 14, 16, 18, 24 a 28 jader CPU (jádra GPU se u nich nevyplňují).
+// Až vyjde nový čip, stačí sem připsat jeho počty jader.
+const AFX_CPU_CORES = ['2', '4', '6', '8', '10', '11', '12', '14', '15', '16', '18', '20', '24', '28', '30', '32', '36'];
+const AFX_GPU_CORES = ['3', '4', '5', '6', '7', '8', '10', '12', '14', '16', '18', '19', '20', '24', '30', '32', '38', '40', '48', '60', '64', '76', '80'];
 const AFX_GRADE_LABELS = ['Nový', 'Zánovní', 'A – jako nové', 'B – mírné stopy', 'C – viditelné opotřebení', 'D – silné opotřebení'];
 const AFX_PRODEJNY = [['Karlín', 'karlin'], ['Černá Růže', 'vaclavak']];
 const AFX_PROCESSOR_FAMILIES = ['AMD', 'Intel', 'M chip - ARM'];
@@ -149,10 +160,16 @@ const AFX_PROCESSORS_M_ARM = [
     'Apple M3 (2023)',
     'Apple M3 Pro (2023)',
     'Apple M3 Max (2023)',
+    'Apple M3 Ultra (2025)',
     'Apple M4 (2024)',
     'Apple M4 Pro (2024)',
     'Apple M4 Max (2024)',
     'Apple M5 (2025+)',
+    'Apple M5 Pro (2026)',
+    'Apple M5 Max (2026)',
+    'Apple M5 Ultra (2026)',
+    'Apple M6 (2026)',
+    'A18 Pro (2026)',   // MacBook Neo; v názvu se zobrazí jako „Apple A18 Pro (2026)"
 ];
 
 const AFX_IPHONES = ['iPhone 6s', 'iPhone 7', 'iPhone 7 Plus', 'iPhone 8', 'iPhone 8 Plus', 'iPhone X', 'iPhone XR', 'iPhone XS', 'iPhone XS Max', 'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max', 'iPhone 12 mini', 'iPhone 12', 'iPhone 12 Pro', 'iPhone 12 Pro Max', 'iPhone 13 mini', 'iPhone 13', 'iPhone 13 Pro', 'iPhone 13 Pro Max', 'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max', 'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max', 'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max', 'iPhone 17', 'iPhone 17 Pro', 'iPhone 17 Pro Max', 'iPhone SE 2020', 'iPhone SE 2022'];
@@ -161,7 +178,9 @@ const AFX_MACBOOKS_AIR = [
     'MacBook Air 13″ (2017) Intel', 'MacBook Air 13″ (2018) Intel', 'MacBook Air 13″ (2019) Intel', 'MacBook Air 13″ (2020) Intel',
     'MacBook Air 13″ M1 (2020)', 'MacBook Air 13″ M2 (2022)', 'MacBook Air 15″ M2 (2023)',
     'MacBook Air 13″ M3 (2024)', 'MacBook Air 15″ M3 (2024)', 'MacBook Air 13″ M4 (2025)', 'MacBook Air 15″ M4 (2025)',
+    'MacBook Air 13″ M5 (2026)', 'MacBook Air 15″ M5 (2026)',
 ];
+const AFX_MACBOOKS_NEO = ['MacBook Neo 13″ (2026)'];
 const AFX_MACBOOKS_PRO = [
     'MacBook Pro 13″ (2015) Intel', 'MacBook Pro 13″ (2016) Intel', 'MacBook Pro 13″ (2017) Intel', 'MacBook Pro 13″ (2018) Intel', 'MacBook Pro 13″ (2019) Intel', 'MacBook Pro 13″ (2020) Intel',
     'MacBook Pro 15″ (2015) Intel', 'MacBook Pro 15″ (2016) Intel', 'MacBook Pro 15″ (2017) Intel', 'MacBook Pro 15″ (2018) Intel', 'MacBook Pro 15″ (2019) Intel', 'MacBook Pro 16″ (2019) Intel',
@@ -171,21 +190,24 @@ const AFX_MACBOOKS_PRO = [
     'MacBook Pro 14″ M3 (2023)', 'MacBook Pro 14″ M3 Pro (2023)', 'MacBook Pro 14″ M3 Max (2023)', 'MacBook Pro 16″ M3 Pro (2023)', 'MacBook Pro 16″ M3 Max (2023)',
     'MacBook Pro 14″ M4 (2024)', 'MacBook Pro 14″ M4 Pro (2024)', 'MacBook Pro 14″ M4 Max (2024)', 'MacBook Pro 16″ M4 Pro (2024)', 'MacBook Pro 16″ M4 Max (2024)',
     'MacBook Pro 14″ M5 (2025)',
+    'MacBook Pro 14″ M5 Pro (2026)', 'MacBook Pro 14″ M5 Max (2026)', 'MacBook Pro 16″ M5 Pro (2026)', 'MacBook Pro 16″ M5 Max (2026)',
+    'MacBook Pro 14″ M6 (2026)',
 ];
 const AFX_IMACS = [
     'iMac 21,5″ (2012) Intel', 'iMac 27″ (2012) Intel', 'iMac 21,5″ (2013) Intel', 'iMac 27″ (2013) Intel',
     'iMac 21,5″ (2014) Intel', 'iMac 27″ Retina 5K (2014) Intel', 'iMac 21,5″ (2015) Intel', 'iMac 27″ Retina 5K (2015) Intel',
     'iMac 21,5″ (2017) Intel', 'iMac 27″ Retina 5K (2017) Intel', 'iMac 21,5″ (2019) Intel', 'iMac 27″ Retina 5K (2019) Intel',
-    'iMac 27″ Retina 5K (2020) Intel', 'iMac 24″ M1 (2021)', 'iMac 24″ M3 (2023)', 'iMac 24″ M4 (2024)',
+    'iMac 27″ Retina 5K (2020) Intel', 'iMac 24″ M1 (2021)', 'iMac 24″ M3 (2023)', 'iMac 24″ M4 (2024)', 'iMac 24″ M6 (2026)',
 ];
 const AFX_MAC_MINI = [
     'Mac mini (2010) Intel', 'Mac mini (2011) Intel', 'Mac mini (2012) Intel', 'Mac mini (2014) Intel',
     'Mac mini (2018) Intel', 'Mac mini M1 (2020)', 'Mac mini M2 (2023)', 'Mac mini M2 Pro (2023)',
-    'Mac mini M4 (2024)', 'Mac mini M4 Pro (2024)',
+    'Mac mini M4 (2024)', 'Mac mini M4 Pro (2024)', 'Mac mini M6 (2026)', 'Mac mini M5 Pro (2026)',
 ];
 const AFX_MAC_STUDIO = [
     'Mac Studio M1 Max (2022)', 'Mac Studio M1 Ultra (2022)', 'Mac Studio M2 Max (2023)',
-    'Mac Studio M2 Ultra (2023)', 'Mac Studio M4 Max (2025)', 'Mac Studio M4 Ultra (2025)',
+    'Mac Studio M2 Ultra (2023)', 'Mac Studio M4 Max (2025)', 'Mac Studio M3 Ultra (2025)',
+    'Mac Studio M5 Max (2026)', 'Mac Studio M5 Ultra (2026)',
 ];
 const AFX_MAC_PRO = [
     'Mac Pro (2010) Intel', 'Mac Pro (2012) Intel', 'Mac Pro (2013) Intel',
@@ -397,7 +419,7 @@ function afxProductTypes(): array {
             ['id' => 'iPhone', 'manuf' => 'Apple', 'k' => 'K00039', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => AFX_APPLE_COLORS, 'models' => AFX_IPHONES],
             ['id' => 'iPad', 'manuf' => 'Apple', 'k' => 'K00041', 'cap' => true, 'ram' => false, 'gen' => true, 'colors' => AFX_APPLE_COLORS, 'models' => AFX_IPADS],
             ['id' => 'MacBook', 'manuf' => 'Apple', 'k' => '', 'kmatch' => ['K00143', 'K00144'], 'cap' => true, 'ram' => true, 'gen' => false,
-                'colors' => ['Space Gray', 'Silver', 'Space Black', 'Starlight', 'Midnight', 'Sky Blue'], 'models' => array_merge(AFX_MACBOOKS_PRO, AFX_MACBOOKS_AIR)],
+                'colors' => ['Space Gray', 'Silver', 'Space Black', 'Starlight', 'Midnight', 'Sky Blue', 'Gold', 'Rose Gold', 'Blush', 'Citrus', 'Indigo'], 'models' => array_merge(AFX_MACBOOKS_PRO, AFX_MACBOOKS_AIR, AFX_MACBOOKS_NEO)],
             ['id' => 'iMac', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver', 'Blue', 'Green', 'Pink', 'Purple', 'Yellow', 'Orange'], 'models' => AFX_IMACS],
             ['id' => 'Mac mini', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver', 'Space Gray'], 'models' => AFX_MAC_MINI],
             ['id' => 'Mac Studio', 'manuf' => 'Apple', 'k' => '', 'cap' => true, 'ram' => true, 'gen' => false, 'colors' => ['Silver'], 'models' => AFX_MAC_STUDIO],

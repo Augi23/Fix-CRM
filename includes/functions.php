@@ -505,7 +505,9 @@ function crmCanManageInvoices(): bool {
 /** Kdo smí VYSTAVOVAT a odesílat faktury: vedení (admin, Boss) a nově i
  *  POBOČKOVÝ MANAŽER (v3.70.0 — manažer fakturuje zákazníkům na své prodejně).
  *  Není to totéž co crmCanManageInvoices(): ta hlídá i doklady totožnosti,
- *  storna kasy a počáteční zůstatek — tam manažer nepatří.
+ *  storna pokladních dokladů a počáteční zůstatek — tam manažer nepatří.
+ *  (Storno PRODEJE z pokladny má vlastní pravidlo crmCanCancelPosSale() a manažer
+ *  ho na své prodejně od 16. 11. 2026 smí.)
  *  Účetní sem NEspadá (má vlastní cestu přes crmCanAccountingEdit), aby se
  *  nerozbilo pravidlo „účetní nemaže a nesahá na provoz". */
 function crmCanIssueInvoices(): bool {
@@ -3230,8 +3232,22 @@ function ensurePosSaleCancelReason(): bool {
     return $has;
 }
 
-function crmCanCancelPosSale(): bool {
-    return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
+/** STORNO PRODEJE Z POKLADNY (api/pos_cancel.php): vedení — admin, Boss a nově
+ *  i POBOČKOVÝ MANAŽER (rozhodnutí majitele 16. 11. 2026; do té doby jen admin a Boss).
+ *  Manažer stornuje jen doklady SVÉ prodejny — stejné pravidlo viditelnosti jako
+ *  všude jinde (isBranchGlobalViewer). Doklad bez pobočky (starý záznam) nepatří
+ *  žádné prodejně, ten zůstává adminovi a Bossovi. Účetní ani obsluha kasy nestornují.
+ *
+ *  Bez parametru odpovídá „smí tenhle člověk vůbec stornovat" (branka API, skripty
+ *  na stránce); s řádkem prodeje navíc ověří pobočku (tlačítko u řádku, server). */
+function crmCanCancelPosSale(?array $sale = null): bool {
+    if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) { return false; }
+    if (function_exists('crmIsAccountant') && crmIsAccountant()) { return false; }
+    if (hasPermission('admin_access') || getCurrentStaffRole() === 'boss') { return true; }
+    if (getCurrentStaffRole() !== 'manager') { return false; }
+    if ($sale === null) { return true; }
+    $saleBranch = (int)($sale['branch_id'] ?? 0);
+    return $saleBranch > 0 && $saleBranch === (int)getCurrentStaffBranchId();
 }
 
 /** MAZÁNÍ zakázek jen admin a Boss — je to nevratné. Ostatní zaměstnanci zakázky

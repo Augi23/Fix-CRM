@@ -1,6 +1,7 @@
 <?php
 /**
- * Storno prodeje na kase — JEN vedení (admin/Boss). Plná vratka celého dokladu:
+ * Storno prodeje na kase — JEN vedení: admin, Boss a pobočkový manažer (ten jen
+ * doklady své prodejny, viz crmCanCancelPosSale). Plná vratka celého dokladu:
  * vrátí zboží na sklad, označí doklad jako stornovaný, případnou fakturu zruší.
  *
  * POKLADNÍ KNIHA: u hotovostního prodeje se NEsmí historie přepsat zpětně —
@@ -20,7 +21,7 @@ if (!crmCanUsePos()) {
     echo json_encode(['success' => false, 'message' => __('unauthorized')]); exit;
 }
 if (!crmCanCancelPosSale()) {
-    echo json_encode(['success' => false, 'message' => 'Storno smí jen vedení (admin, Boss).']); exit;
+    echo json_encode(['success' => false, 'message' => 'Storno smí jen vedení (admin, Boss, manažer).'], JSON_UNESCAPED_UNICODE); exit;
 }
 if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
     http_response_code(403);
@@ -73,6 +74,13 @@ try {
     $st->execute([$id]);
     $sale = $st->fetch();
     if (!$sale) { throw new Exception('Doklad nenalezen.'); }
+    // Pobočková izolace: manažer stornuje jen doklady své prodejny (admin a Boss všechny).
+    // Kontrola je až tady, nad zamčeným řádkem — tlačítko na stránce je jen pohodlí.
+    if (!crmCanCancelPosSale($sale)) {
+        throw new Exception((int)($sale['branch_id'] ?? 0) > 0
+            ? 'Tenhle doklad patří jiné prodejně. Stornovat ho smí její manažer, administrátor nebo Boss.'
+            : 'Doklad nemá přiřazenou prodejnu. Stornovat ho smí jen administrátor nebo Boss.');
+    }
     if ((string)$sale['status'] === 'cancelled') { throw new Exception('Doklad už je stornovaný.'); }
 
     // Zaplacenou fakturu storno kasy rušit nesmí — na to je dobropis v Účetnictví.
@@ -247,4 +255,8 @@ echo json_encode([
     'eshop_back' => $eshopBack,
     'cash_returned' => $stornoMoveId > 0 ? formatMoney($stornoAbs) : '',
     'cash_dir' => $stornoMoveId > 0 ? $stornoDir : '',
+    // Platba kartou se nevrací sama — obsluha musí udělat vratku na terminálu.
+    // UI podle toho připomene, co zbývá udělat rukou.
+    'payment_method' => (string)$sale['payment_method'],
+    'amount_label' => formatMoney($stornoAbs),
 ], JSON_UNESCAPED_UNICODE);

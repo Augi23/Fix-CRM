@@ -76,13 +76,52 @@ try {
 $todaySales = [];
 afxEnsurePosReceiptColumns();
 try {
-    $ss = $pdo->query("SELECT id, sale_number, payment_method, total, status, invoice_id, order_id,
+    $ss = $pdo->query("SELECT id, sale_number, payment_method, total, status, invoice_id, order_id, branch_id,
                               seller_name, created_at, receipt_printed_at, receipt_print_via
         FROM pos_sales
         WHERE created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY"
         . orderBranchScopeSql('branch_id') . " ORDER BY id DESC LIMIT 40");
     $todaySales = $ss->fetchAll(PDO::FETCH_ASSOC) ?: [];
 } catch (Throwable $e) { $todaySales = []; }
+
+// ── STARŠÍ PRODEJE — záložka pro storno (v4.3.4) ───────────────────────────
+// Manažer do Historie nesmí (crmCanViewHistory = jen admin a Boss) a pokladní kniha
+// vede jen hotovost, takže by starší prodej kartou nebo na fakturu neměl kde stornovat.
+// Záložku vidí jen ten, kdo stornovat smí; obsluze kasy se neukazuje, pro ni zůstává
+// kasa čistě prodejní plocha. Manažer vidí jen prodeje své prodejny (orderBranchScopeSql).
+$psCan = crmCanUsePos() && crmCanCancelPosSale();
+$psSales = []; $psQ = ''; $psFrom = ''; $psTo = ''; $psActive = false; $psLimit = 100;
+if ($psCan) {
+    $psDate = static fn(string $k, string $def): string
+        => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET[$k] ?? '')) ? (string)$_GET[$k] : $def;
+    $psFrom = $psDate('ps_from', date('Y-m-d', strtotime('-30 days')));
+    $psTo = $psDate('ps_to', date('Y-m-d'));
+    $psQ = mb_substr(trim((string)($_GET['ps_q'] ?? '')), 0, 60);
+    $psActive = isset($_GET['ps_from']) || isset($_GET['ps_to']) || isset($_GET['ps_q']);
+    ensurePosSaleCancelReason();
+    try {
+        $psW = "s.created_at >= ? AND s.created_at < DATE_ADD(?, INTERVAL 1 DAY)";
+        $psP = [$psFrom . ' 00:00:00', $psTo . ' 00:00:00'];
+        if ($psQ !== '') {
+            // číslo dokladu, prodejce nebo název položky na dokladu
+            $psLike = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $psQ) . '%';
+            $psW .= " AND (s.sale_number LIKE ? OR s.seller_name LIKE ?
+                OR EXISTS (SELECT 1 FROM pos_sale_items pi WHERE pi.sale_id = s.id AND pi.item_name LIKE ?))";
+            array_push($psP, $psLike, $psLike, $psLike);
+        }
+        $psSt = $pdo->prepare("SELECT s.id, s.sale_number, s.payment_method, s.total, s.status, s.invoice_id, s.order_id,
+                s.branch_id, s.seller_name, s.created_at, s.cancelled_by, s.cancel_reason,
+                (SELECT GROUP_CONCAT(CONCAT(pi.quantity, '× ', pi.item_name) SEPARATOR ', ')
+                   FROM pos_sale_items pi WHERE pi.sale_id = s.id) AS items_txt
+            FROM pos_sales s
+            WHERE " . $psW . orderBranchScopeSql('s.branch_id') . "
+            ORDER BY s.created_at DESC, s.id DESC LIMIT " . ($psLimit + 1));
+        $psSt->execute($psP);
+        $psSales = $psSt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) { error_log('pokladna starsi prodeje: ' . $e->getMessage()); $psSales = []; }
+}
+$psMore = count($psSales) > $psLimit;
+if ($psMore) { $psSales = array_slice($psSales, 0, $psLimit); }
 
 // Jeden časově řazený proud: prodeje + pohyby hotovosti.
 $todayFeed = [];
@@ -318,6 +357,8 @@ html[data-lg-theme="light"] .pos-eshop-bar b { color: #1e7e38 !important; }
 .pos-tab .n { font-size: 11.5px !important; font-weight: 700 !important; margin-left: 4px !important; padding: 1px 7px !important; border-radius: 99px !important; background: var(--pos-soft) !important; }
 .pos-feed-row { display: grid !important; grid-template-columns: 52px 112px minmax(0, 1fr) auto !important; align-items: center !important; gap: 10px !important; padding: 9px 4px !important; border-top: 1px solid var(--pos-line) !important; font-size: 14px !important; }
 .pos-feed-row:first-child { border-top: 0 !important; }
+.pos-feed-row.pos-feed-row--date { grid-template-columns: 108px 112px minmax(0, 1fr) auto !important; }   /* starší prodeje: datum i čas */
+.pos-feed-row.pos-feed-row--date .t { white-space: nowrap !important; }
 .pos-feed-row .t { color: var(--pos-fg3) !important; font-variant-numeric: tabular-nums !important; }
 .pos-feed-row .a { font-weight: 700 !important; text-align: right !important; white-space: nowrap !important; }
 .pos-feed-row .d { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
@@ -713,11 +754,15 @@ if ($cbToday < $cbFrom || $cbToday > $cbTo) {
 <?php
 // Kniha se otevře rovnou, když se do ní filtruje (období / pobočka) nebo když kasa není k prodeji (účetní).
 $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GET['cb_branch']) || !crmCanUsePos()) ? 'book' : 'feed';
+if ($psCan && $psActive) { $posDefaultTab = 'sales'; }   // hledalo se ve starších prodejích
 ?>
 <div class="pos-lower" id="posLower">
     <div class="pos-tabs" role="tablist">
         <button type="button" class="pos-tab<?php echo $posDefaultTab === 'feed' ? ' active' : ''; ?>" data-tab="feed" role="tab"><i class="fas fa-receipt me-1"></i>Dnešní pohyby<span class="n"><?php echo count($todayFeed); ?></span></button>
         <button type="button" class="pos-tab<?php echo $posDefaultTab === 'book' ? ' active' : ''; ?>" data-tab="book" role="tab"><i class="fas fa-book-open me-1"></i>Pokladní kniha</button>
+        <?php if ($psCan): ?>
+        <button type="button" class="pos-tab<?php echo $posDefaultTab === 'sales' ? ' active' : ''; ?>" data-tab="sales" role="tab" title="Dohledání a storno staršího prodeje"><i class="fas fa-rotate-left me-1"></i>Starší prodeje</button>
+        <?php endif; ?>
     </div>
 
     <div class="pos-card" id="posTabFeed"<?php echo $posDefaultTab === 'feed' ? '' : ' hidden'; ?>>
@@ -765,6 +810,14 @@ $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GE
                     <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" title="Dotisk účtenky"
                         onclick="window.posReprintReceipt ? window.posReprintReceipt(<?php echo (int)$sale['id']; ?>) : window.open('print_receipt.php?id=<?php echo (int)$sale['id']; ?>&format=58&auto=1', '_blank')"><i class="fas fa-receipt"></i></button>
                     <?php endif; ?>
+                    <?php /* v4.3.4: storno rovnou u dnešního prodeje, ať je platba jakákoli. Dřív šlo
+                             z pokladny stornovat jen hotovostní prodej přes Pokladní knihu, kartu a fakturu
+                             jen z Historie. Smí vedení: admin, Boss a manažer své prodejny
+                             (crmCanCancelPosSale s řádkem prodeje hlídá i pobočku, server totéž). */ ?>
+                    <?php if (!$storno && crmCanUsePos() && crmCanCancelPosSale($sale)): ?>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Stornovat tento prodej"
+                        onclick="posSaleStorno(<?php echo (int)$sale['id']; ?>, <?php echo htmlspecialchars(json_encode((string)$sale['sale_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode(formatMoney(abs((float)$sale['total'])), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo $vydej ? 'true' : 'false'; ?>, <?php echo htmlspecialchars(json_encode($pm, JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)"><i class="fas fa-rotate-left me-1"></i>Storno</button>
+                    <?php endif; ?>
                 </span>
             </div>
         <?php else:
@@ -790,6 +843,63 @@ $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GE
         </div>
         <?php endif; ?>
     </div>
+
+    <?php if ($psCan): ?>
+    <!-- ── Starší prodeje: dohledání a storno (v4.3.4) — jen admin, Boss a manažer své prodejny ── -->
+    <div class="pos-card" id="posTabSales"<?php echo $posDefaultTab === 'sales' ? '' : ' hidden'; ?>>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <strong><i class="fas fa-rotate-left me-2 text-danger"></i>Starší prodeje a storno</strong>
+            <form method="get" action="pokladna.php#posLower" class="d-flex align-items-center gap-2 flex-wrap">
+                <input type="search" name="ps_q" class="form-control form-control-sm" style="width:210px;" placeholder="Doklad, prodejce nebo položka" value="<?php echo e($psQ); ?>" aria-label="Hledat prodej">
+                <input type="date" name="ps_from" class="form-control form-control-sm" style="width:auto;" value="<?php echo e($psFrom); ?>" aria-label="Od">
+                <span class="text-white-50 small">–</span>
+                <input type="date" name="ps_to" class="form-control form-control-sm" style="width:auto;" value="<?php echo e($psTo); ?>" aria-label="Do">
+                <button type="submit" class="btn btn-sm btn-outline-info"><i class="fas fa-magnifying-glass me-1"></i>Hledat</button>
+            </form>
+        </div>
+        <div class="text-white-50 small mb-2">
+            Prodeje <?php echo isBranchGlobalViewer() ? 'všech prodejen' : 'tvé prodejny'; ?> za zvolené období, hotově, kartou i na fakturu.
+            Storno vrátí zboží na sklad; hotovost zapíše do pokladní knihy k dnešku, platbu kartou musíš vrátit na terminálu.
+        </div>
+        <?php if (empty($psSales)): ?>
+            <div class="pos-feed-empty"><i class="fas fa-magnifying-glass me-2"></i>V tomto období žádný prodej neodpovídá. Zkus delší období nebo jiný výraz.</div>
+        <?php else: ?>
+        <div>
+        <?php foreach ($psSales as $sale):
+            $storno = (string)$sale['status'] === 'cancelled';
+            $pm = (string)$sale['payment_method'];
+            $vydej = (float)$sale['total'] < 0;
+            $pmLabel = $vydej ? 'Výdej z kasy' : ($posPayLabels[$pm] ?? $pm);
+            $pmClass = $vydej ? 'text-warning' : ($pm === 'cash' ? 'text-success' : ($pm === 'card' ? 'text-info' : 'text-primary'));
+            $itemsTxt = trim((string)($sale['items_txt'] ?? ''));
+        ?>
+            <div class="pos-feed-row pos-feed-row--date<?php echo $storno ? ' storno' : ''; ?>">
+                <span class="t"><?php echo e(date('j. n. H:i', strtotime((string)$sale['created_at']))); ?></span>
+                <span class="a <?php echo $storno ? '' : $pmClass; ?>"><?php echo formatMoney((float)$sale['total']); ?></span>
+                <span class="d" title="<?php echo e($itemsTxt); ?>"><?php echo e($pmLabel); ?>
+                    <small><?php echo e((string)$sale['sale_number']); ?><?php if (!empty($sale['seller_name'])): ?> · <?php echo e((string)$sale['seller_name']); ?><?php endif; ?><?php if ($itemsTxt !== ''): ?> · <?php echo e(mb_substr($itemsTxt, 0, 70)); ?><?php echo mb_strlen($itemsTxt) > 70 ? '…' : ''; ?><?php endif; ?></small>
+                    <?php if ($storno): ?><span class="badge bg-danger bg-opacity-25 text-danger ms-1" title="<?php echo e(trim('Stornoval(a) ' . (string)($sale['cancelled_by'] ?? '') . ' · důvod: ' . (string)($sale['cancel_reason'] ?? ''))); ?>">storno</span><?php endif; ?>
+                    <?php if (!empty($sale['order_id'])): ?><a class="text-info text-decoration-none ms-1 small" href="view_order.php?id=<?php echo (int)$sale['order_id']; ?>">zakázka</a><?php endif; ?>
+                </span>
+                <span class="x">
+                    <?php if (!$storno): ?>
+                    <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" title="Dotisk účtenky"
+                        onclick="window.posReprintReceipt ? window.posReprintReceipt(<?php echo (int)$sale['id']; ?>) : window.open('print_receipt.php?id=<?php echo (int)$sale['id']; ?>&format=58&auto=1', '_blank')"><i class="fas fa-receipt"></i></button>
+                    <?php endif; ?>
+                    <?php if (!$storno && crmCanCancelPosSale($sale)): ?>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="Stornovat tento prodej"
+                        onclick="posSaleStorno(<?php echo (int)$sale['id']; ?>, <?php echo htmlspecialchars(json_encode((string)$sale['sale_number'], JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode(formatMoney(abs((float)$sale['total'])), JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>, <?php echo $vydej ? 'true' : 'false'; ?>, <?php echo htmlspecialchars(json_encode($pm, JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>)"><i class="fas fa-rotate-left me-1"></i>Storno</button>
+                    <?php endif; ?>
+                </span>
+            </div>
+        <?php endforeach; ?>
+        </div>
+        <?php if ($psMore): ?>
+            <div class="text-white-50 small mt-2"><i class="fas fa-circle-info me-1"></i>Zobrazeno posledních <?php echo (int)$psLimit; ?> prodejů. Zkrať období nebo hledej podle čísla dokladu.</div>
+        <?php endif; ?>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 
     <div id="posTabBook"<?php echo $posDefaultTab === 'book' ? '' : ' hidden'; ?>>
 <!-- ── Pokladní kniha (analytika 211): počáteční zůstatek → pohyby → konečný zůstatek ── -->
@@ -886,7 +996,8 @@ $posDefaultTab = (isset($_GET['cb_from']) || isset($_GET['cb_to']) || isset($_GE
                         <?php /* Storno prodeje rovnou z knihy (dřív jen z Historie). Prodejka se
                                  nemaže — označí se jako stornovaná, zboží se vrátí na sklad a k dnešku
                                  vznikne výdajový pohyb + VPD, takže uzavřené dny knihy zůstávají beze
-                                 změny (opravný záznam dle § 35 zák. č. 563/1991 Sb.). Smí jen vedení. */ ?>
+                                 změny (opravný záznam dle § 35 zák. č. 563/1991 Sb.). Smí jen vedení
+                                 (admin, Boss a od v4.3.4 manažer své prodejny). */ ?>
                         <?php /* Stejné dvě branky jako server (api/pos_cancel.php): kasa + právo storna.
                                  Účetní knihu vidí, ale storno mu nepatří (crmCanUsePos() ho nepustí). */ ?>
                         <?php if ($r['source'] === 'pos_sale' && empty($r['sale_cancelled'])
@@ -1242,14 +1353,31 @@ function posCashTransfer() {
  * a k dnešnímu dni vznikne výdajový pohyb + výdajový pokladní doklad, takže
  * už uzavřené dny knihy zůstávají beze změny (§ 35 zák. č. 563/1991 Sb.).
  */
-function posSaleStorno(saleId, saleNumber, amountLabel, isPayout) {
-    var co = isPayout
-        ? 'Vrácená výplata se zapíše jako PŘÍJEM do pokladny (' + amountLabel + ') a výkupní list půjde vyplatit znovu.'
-        : 'Z pokladny se vydá ' + amountLabel + ' zpět zákazníkovi a zboží se vrátí na sklad.';
+function posSaleStorno(saleId, saleNumber, amountLabel, isPayout, pay) {
+    // pay = způsob platby dokladu (cash / card / invoice / invoice_ico). Volání z pokladní
+    // knihy ho neposílá — kniha vede jen hotovost.
+    pay = pay || 'cash';
+    var faktura = pay === 'invoice' || pay === 'invoice_ico';
+    var co;
+    if (isPayout) {
+        co = pay === 'cash'
+            ? 'Vrácená výplata se zapíše jako PŘÍJEM do pokladny (' + amountLabel + ') a výkupní list půjde vyplatit znovu.'
+            : 'Výplata se zruší a výkupní list půjde vyplatit znovu.';
+    } else if (pay === 'card') {
+        co = 'Zboží z dokladu se vrátí na sklad.\n'
+           + 'POZOR: platbu kartou ' + amountLabel + ' musíš zákazníkovi vrátit na platebním terminálu. CRM ji samo nevrací.';
+    } else if (faktura) {
+        co = 'Zboží z dokladu se vrátí na sklad a navázaná faktura se zruší. Z pokladny se nic nevydává.';
+    } else {
+        co = 'Z pokladny se vydá ' + amountLabel + ' zpět zákazníkovi a zboží se vrátí na sklad.';
+    }
+    var doklad = pay === 'cash'
+        ? 'Vystaví se pokladní doklad k dnešnímu dni; původní prodejka zůstává v knize (nemaže se).'
+        : 'Původní prodejka zůstává v evidenci jako stornovaná (nemaže se).';
     var reason = prompt(
         'STORNO PRODEJE ' + saleNumber + ' — ' + amountLabel + '\n\n'
         + co + '\n'
-        + 'Vystaví se pokladní doklad k dnešnímu dni; původní prodejka zůstává v knize (nemaže se).\n\n'
+        + doklad + '\n\n'
         + 'Napiš důvod storna (povinné, uvede se na dokladu):'
     );
     if (reason === null) { return; }
@@ -1273,6 +1401,9 @@ function posSaleStorno(saleId, saleNumber, amountLabel, isPayout) {
                     : 'Přijato zpět do pokladny: ' + j.cash_returned + '.');
             }
             if (j.storno_doc) { t.push('Pokladní doklad: ' + j.storno_doc); }
+            if (j.payment_method === 'card' && !isPayout) {
+                t.push('PLATBA KARTOU: vrať zákazníkovi ' + (j.amount_label || amountLabel) + ' na terminálu — CRM peníze samo nevrací.');
+            }
             if (j.returned_count > 0) { t.push('Na sklad vráceno kusů: ' + j.returned_count + '.'); }
             if (j.missing_parts && j.missing_parts.length) {
                 t.push('POZOR — tyhle díly už ve skladu nejsou a nevrátily se: ' + j.missing_parts.join(', ') + '.');
@@ -1303,12 +1434,14 @@ function posCashDocStorno(docId, docNumber) {
         .catch(function () { alert('Chyba spojení'); });
 }
 
-/* Záložky dole: Dnešní pohyby / Pokladní kniha (scroll=true → posunout na ně, např. z menu Další) */
+/* Záložky dole: Dnešní pohyby / Pokladní kniha / Starší prodeje (scroll=true → posunout na ně, např. z menu Další) */
 function posShowTab(tab, scroll) {
     document.querySelectorAll('.pos-tab').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
-    var feed = document.getElementById('posTabFeed'), book = document.getElementById('posTabBook');
+    var feed = document.getElementById('posTabFeed'), book = document.getElementById('posTabBook'),
+        sales = document.getElementById('posTabSales');
     if (feed) feed.hidden = tab !== 'feed';
     if (book) book.hidden = tab !== 'book';
+    if (sales) sales.hidden = tab !== 'sales';
     if (scroll) { var l = document.getElementById('posLower'); if (l) l.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 }
 document.addEventListener('click', function (e) {
