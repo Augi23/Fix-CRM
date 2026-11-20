@@ -601,8 +601,20 @@ function crmCanViewHistory(): bool {
     return isBranchGlobalViewer();
 }
 
-function addOrderBranchScope(array &$whereClauses, array &$params, string $orderAlias = 'o'): void {
-    if (isBranchGlobalViewer()) {
+/** Zakázky VŠECH poboček smí otevřít a upravovat admin, Boss a od v4.3.7 i pobočkový
+ *  manažer (rozhodnutí majitele 20. 11. 2026). Týká se jen zakázek — výpis, hledání,
+ *  detail a úpravy. Přehledy, tržby, pokladna, sklad a nástěnka zůstávají manažerovi
+ *  po jeho pobočce (isBranchGlobalViewer / orderBranchScopeSql se nemění). */
+function crmCanSeeAllOrders(): bool {
+    if (isBranchGlobalViewer()) { return true; }
+    if (function_exists('crmIsAccountant') && crmIsAccountant()) { return false; }
+    return getCurrentStaffRole() === 'manager';
+}
+
+/** $allOrdersForManager = true jen ve výpisu a hledání zakázek (orders.php,
+ *  api/search_orders.php): tam manažer vidí obě pobočky. Nástěnka zůstává po pobočce. */
+function addOrderBranchScope(array &$whereClauses, array &$params, string $orderAlias = 'o', bool $allOrdersForManager = false): void {
+    if ($allOrdersForManager ? crmCanSeeAllOrders() : isBranchGlobalViewer()) {
         return;
     }
     $branchId = getCurrentStaffBranchId();
@@ -643,7 +655,7 @@ function canAccessOrderBranch(array $order): bool {
     if (empty($_SESSION['user_id']) && empty($_SESSION['tech_id'])) {
         return false;
     }
-    if (isBranchGlobalViewer()) {
+    if (crmCanSeeAllOrders()) {   // admin, Boss a manažer (v4.3.7)
         return true;
     }
     $orderBranchId = (int)($order['branch_id'] ?? 0);

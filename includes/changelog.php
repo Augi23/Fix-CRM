@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.3.7',
+        'date' => '2026-11-20',
+        'time' => '16:44',
+        'title' => 'Manažer upravuje zakázky obou poboček',
+        'items' => [
+            '<b>Manažer</b> teď vidí a může upravovat <b>všechny zakázky</b>, i ty z druhé pobočky: ve výpisu Zakázky (s filtrem podle pobočky), v hledání i v detailu zakázky. Dřív měl jen zakázky své pobočky.',
+            'Nástěnka, přehledy, tržby, pokladna a sklad zůstávají manažerovi za jeho pobočku. Technici a brigádníci mají zakázky dál jen své pobočky a ty, které jsou jim přiřazené.',
+        ],
+    ],
+    [
         'version' => '4.3.6',
         'date' => '2026-11-20',
         'time' => '15:42',

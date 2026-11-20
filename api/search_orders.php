@@ -18,7 +18,7 @@ try {
     $where = ["o.status NOT IN ($closedStatuses)"];
     $params = [];
 
-    addOrderBranchScope($where, $params, 'o');
+    addOrderBranchScope($where, $params, 'o', true);
 
     ensureOrdersSourceColumn();   // legacy_code (migrace 7/2026) — hledání i SELECT níže s ním počítají
 

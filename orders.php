@@ -35,8 +35,8 @@ if (isset($pdo)) {
         $where_clauses = [];
         $sql_params    = []; // FIX #9: renamed from $params to avoid collision with pagination block
 
-        addOrderBranchScope($where_clauses, $sql_params, 'o');
-        $branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) : 0;
+        addOrderBranchScope($where_clauses, $sql_params, 'o', true);
+        $branch_filter = crmCanSeeAllOrders() ? (int)($_GET['branch_id'] ?? 0) : 0;
         if ($branch_filter > 0) {
             $where_clauses[] = 'o.branch_id = ?';
             $sql_params[] = $branch_filter;
@@ -139,7 +139,7 @@ if (isset($pdo)) {
     try {
         $stats_where  = '';
         $stats_params = [];
-        if (!isBranchGlobalViewer()) {
+        if (!crmCanSeeAllOrders()) {
             // stejná logika jako addOrderBranchScope: svoje přiřazené zakázky se počítají vždy
             $__stTid = (int)($_SESSION['tech_id'] ?? 0);
             if ($__stTid > 0) {
@@ -187,7 +187,7 @@ $s_progress_leg = $s_progress_leg ?? 0; $s_ready_leg = $s_ready_leg ?? 0;
 
 // Nepřidělené / Nedokončené (stejná čísla jako dlaždice na nástěnce):
 // vedení = obě pobočky, řadoví zaměstnanci = jen svoje pobočka
-$__uGlobal = isBranchGlobalViewer();
+$__uGlobal = crmCanSeeAllOrders();
 $__uBranch = (int)getCurrentStaffBranchId();
 $__uCond = (!$__uGlobal && $__uBranch > 0) ? " AND branch_id = " . $__uBranch : '';
 $__uLabel = $__uGlobal ? 'Obě pobočky' : getBranchLabel($__uBranch);
@@ -208,7 +208,7 @@ try {
 // FIX #5: Load technicians once (used in both New Order and Quick Edit modals)
 $techs_list = getActiveTechnicians(true);   // volny vyber technika — vsichni aktivni
 $branches = getBranches();
-$active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) : getCurrentStaffBranchId();
+$active_branch_filter = crmCanSeeAllOrders() ? (int)($_GET['branch_id'] ?? 0) : getCurrentStaffBranchId();
 ?>
 
 <div class="row g-3 mb-4">
@@ -305,8 +305,8 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
         <?php else: ?>
             <small class="text-white-75"><?php echo __('all_orders'); ?>: <?php echo $total_orders; ?></small>
         <?php endif; ?>
-        <?php /* Pobočkový filtr (admin/Boss) se přesunul do dropdownu „Pobočka" v řádku Filtrování. */ ?>
-        <?php if (!isBranchGlobalViewer()): ?>
+        <?php /* Pobočkový filtr (admin/Boss/manažer) se přesunul do dropdownu „Pobočka" v řádku Filtrování. */ ?>
+        <?php if (!crmCanSeeAllOrders()): ?>
             <div class="mt-1"><span class="badge bg-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel(getCurrentStaffBranchId())); ?></span></div>
         <?php endif; ?>
     </div>
@@ -315,7 +315,7 @@ $active_branch_filter = isBranchGlobalViewer() ? (int)($_GET['branch_id'] ?? 0) 
 <?php
 // ── Filtr podle stavu (chips) — všechny aktuální stavy + „Vše" ──
 $status_defs = getOrderStatusDefinitions();
-$branch_qs   = ($active_branch_filter > 0 && isBranchGlobalViewer()) ? '&branch_id=' . (int)$active_branch_filter : '';
+$branch_qs   = ($active_branch_filter > 0 && crmCanSeeAllOrders()) ? '&branch_id=' . (int)$active_branch_filter : '';
 $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '';
 $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
 $status_qs   = $filter_status ? '&filter=' . urlencode($filter_status) . ($filter_group_mode ? '&group=1' : '') : '';
@@ -368,7 +368,7 @@ $__techs     = getActiveTechnicians(true);
         </ul>
     </div>
     <?php /* Filtr poboček — dropdown „Pobočka" (jen admin/Boss; dřív chipy v hlavičce) */ ?>
-    <?php if (isBranchGlobalViewer() && !empty($branches)): ?>
+    <?php if (crmCanSeeAllOrders() && !empty($branches)): ?>
     <div class="dropdown">
         <button class="btn btn-sm dropdown-toggle crm-filter-dd-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
             <i class="fas fa-store"></i> <?php echo $active_branch_filter > 0 ? e(getBranchLabel($active_branch_filter)) : 'Pobočka'; ?>
@@ -502,7 +502,7 @@ $__techs     = getActiveTechnicians(true);
                                     <i class="fas fa-user-cog me-1"></i><?php echo htmlspecialchars($order['tech_name']); ?>
                                 </div>
                                 <?php endif; ?>
-                                <?php if (isBranchGlobalViewer() && !empty($order['branch_id'])): ?>
+                                <?php if (crmCanSeeAllOrders() && !empty($order['branch_id'])): ?>
                                 <div class="small mt-1"><span class="badge bg-dark border border-secondary afx-branch-tag"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel((int)$order['branch_id'])); ?></span></div>
                                 <?php endif; ?>
                             </td>
