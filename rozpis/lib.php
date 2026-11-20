@@ -9,10 +9,12 @@
  * pobočku, admin a Boss všechny a můžou mezi nimi přepínat. Rozpis jiné pobočky
  * se nedá ani přečíst přes URL — kontrola je na serveru, ne jen skrytím odkazu.
  *
- * UZÁVĚRKA: na den D se zapisuje nejpozději do D 00:00, tedy do půlnoci
- * předchozího dne. Při otvíračce v 10:00 to je 10 hodin předem — splňuje zadání
- * „minimálně 8 h před otevřením". Na dnešek ani zpětně se tedy zapsat nedá;
- * opravit to může jen vedení (afxShiftCanEditOthers), aby šlo řešit výpadky.
+ * UZÁVĚRKA (od v4.3.5, rozhodnutí majitele 20. 11. 2026): na celý týden (Po–Ne)
+ * se zapisuje nejpozději do SOBOTY PŘEDCHOZÍHO TÝDNE, tedy do půlnoci ze soboty
+ * na neděli před tím týdnem. Rozpis je tak hotový o víkendu před začátkem týdne.
+ * Dřív se zapisovalo den po dni do půlnoci předchozího dne.
+ * Stránka ukazuje dva týdny najednou, aby se šlo zapsat dva týdny dopředu.
+ * Po uzávěrce opravuje jen vedení (afxShiftCanEditOthers), aby šlo řešit výpadky.
  */
 
 /** Role, které smí sahat na cizí zápisy a na uzavřené dny. */
@@ -94,19 +96,48 @@ function afxShiftCanSeeBranch(int $branchId): bool
 }
 
 /**
- * Uzávěrka dne: zapisovat jde, dokud nenastala půlnoc, kterou den začíná.
- * Vrací [smí, důvod proč ne].
+ * Konec zápisu pro týden, do kterého patří den: neděle 00:00 před pondělím toho
+ * týdne, tedy půlnoc na konci soboty předchozího týdne.
+ */
+function afxShiftDeadline(string $date): ?DateTimeImmutable
+{
+    $day = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+    if (!$day) { return null; }
+    return (new DateTimeImmutable(afxShiftMonday($date)))->modify('-1 day')->setTime(0, 0);
+}
+
+/** Sobota, do které se na týden daného dne zapisuje (pro texty na stránce). */
+function afxShiftDeadlineSaturday(string $date): string
+{
+    $dl = afxShiftDeadline($date);
+    return $dl ? $dl->modify('-1 day')->format('Y-m-d') : '';
+}
+
+/** První pondělí, na jehož týden se ještě dá zapsat. */
+function afxShiftFirstOpenMonday(): string
+{
+    $m = new DateTimeImmutable(afxShiftMonday(date('Y-m-d')));
+    $now = new DateTimeImmutable();
+    for ($i = 0; $i < 3; $i++) {
+        $m = $m->modify('+7 day');
+        if ($now < $m->modify('-1 day')->setTime(0, 0)) { break; }
+    }
+    return $m->format('Y-m-d');
+}
+
+/**
+ * Smí se běžný zaměstnanec na den zapsat? Vrací [smí, důvod proč ne].
  */
 function afxShiftDayOpen(string $date): array
 {
     $day = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
-    if (!$day) { return [false, 'Neplatné datum.']; }
-    $deadline = $day->setTime(0, 0);                 // 00:00 toho dne = konec předchozího
+    $deadline = afxShiftDeadline($date);
+    if (!$day || !$deadline) { return [false, 'Neplatné datum.']; }
     if (new DateTimeImmutable() < $deadline) { return [true, '']; }
-    $today = new DateTimeImmutable('today');
-    if ($day < $today) { return [false, 'Den už byl.']; }
-    if ($day == $today) { return [false, 'Na dnešek se zapisuje nejpozději do včerejší půlnoci.']; }
-    return [false, 'Uzávěrka pro tenhle den už proběhla.'];
+    if ($day < new DateTimeImmutable('today')) { return [false, 'Den už byl.']; }
+    $sat = $deadline->modify('-1 day');
+    return [false, 'Na týden od ' . date('j. n.', strtotime(afxShiftMonday($date)))
+        . ' se zapisovalo nejpozději do soboty ' . $sat->format('j. n.') . ' Změnu teď udělá jen vedení.'];
 }
 
 /** Zaměstnanci pobočky, kteří se můžou zapsat (aktivní, bez servisních účtů). */

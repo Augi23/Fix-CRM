@@ -1,7 +1,8 @@
 <?php
 /**
- * ROZPIS SLUŽEB NA PRODEJNĚ — týdenní přehled, do kterého se zaměstnanci
- * zapisují sami. Pravidla a oprávnění drží rozpis/lib.php.
+ * ROZPIS SLUŽEB NA PRODEJNĚ — přehled dvou týdnů, do kterého se zaměstnanci
+ * zapisují sami (dva týdny dopředu, uzávěrka týdne v sobotu před ním).
+ * Pravidla a oprávnění drží rozpis/lib.php.
  */
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
@@ -25,9 +26,11 @@ if (!$branches) {
 $branchId = (int)($_GET['b'] ?? 0);
 if (!$branchId || !afxShiftCanSeeBranch($branchId)) { $branchId = (int)$branches[0]['id']; }
 
-$monday   = afxShiftMonday((string)($_GET['t'] ?? date('Y-m-d', strtotime('+1 day'))));
-$days     = afxShiftWeekDays($monday);
-$entries  = afxShiftEntries($branchId, $days[0], $days[6]);
+// Bez výběru se ukážou dva nejbližší týdny, na které se ještě dá zapsat.
+$monday   = afxShiftMonday((string)($_GET['t'] ?? afxShiftFirstOpenMonday()));
+$monday2  = (new DateTimeImmutable($monday))->modify('+7 day')->format('Y-m-d');
+$weeks    = [afxShiftWeekDays($monday), afxShiftWeekDays($monday2)];
+$entries  = afxShiftEntries($branchId, $weeks[0][0], $weeks[1][6]);
 $staff    = afxShiftStaff($branchId);
 $hours    = afxShiftOpeningHours($branchId);
 $meTech   = afxShiftCurrentTechId();
@@ -41,16 +44,19 @@ $link = static fn(array $q): string => 'rozpis.php?' . http_build_query($q);
 $dayNames  = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle'];
 $dayShort  = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 
-/** Odpracované minuty za týden podle člověka — na souhrn dole. */
-$weekMinutes = [];
-foreach ($entries as $list) {
-    foreach ($list as $e) {
-        $m = (strtotime((string)$e['time_to']) - strtotime((string)$e['time_from'])) / 60;
-        $k = (int)$e['tech_id'];
-        $weekMinutes[$k] = ($weekMinutes[$k] ?? 0) + max(0, (int)$m);
+/** Odpracované minuty za týden podle člověka — souhrn pod každým týdnem. */
+$weekMinutesOf = static function (array $days) use ($entries): array {
+    $out = [];
+    foreach ($days as $d) {
+        foreach ($entries[$d] ?? [] as $e) {
+            $m = (strtotime((string)$e['time_to']) - strtotime((string)$e['time_from'])) / 60;
+            $k = (int)$e['tech_id'];
+            $out[$k] = ($out[$k] ?? 0) + max(0, (int)$m);
+        }
     }
-}
-arsort($weekMinutes);
+    arsort($out);
+    return $out;
+};
 ?>
 
 <div class="container-fluid px-3 px-md-4 py-4 rz">
@@ -81,6 +87,7 @@ arsort($weekMinutes);
                 <a class="btn btn-sm btn-outline-light" href="<?php echo e($link(['b' => $branchId, 't' => $prev])); ?>"
                    aria-label="Předchozí týden"><i class="fas fa-chevron-left"></i></a>
                 <a class="btn btn-sm btn-outline-light" href="<?php echo e($link(['b' => $branchId, 't' => date('Y-m-d')])); ?>">Tento týden</a>
+                <a class="btn btn-sm btn-outline-info" href="<?php echo e($link(['b' => $branchId])); ?>" title="Dva nejbližší týdny, na které se ještě dá zapsat">K zápisu</a>
                 <a class="btn btn-sm btn-outline-light" href="<?php echo e($link(['b' => $branchId, 't' => $next])); ?>"
                    aria-label="Další týden"><i class="fas fa-chevron-right"></i></a>
             </div>
@@ -88,13 +95,27 @@ arsort($weekMinutes);
 
         <div class="small text-white-50 mt-3 d-flex flex-wrap gap-3">
             <span><i class="fas fa-calendar me-1"></i>
-                <?php echo date('j. n.', strtotime($days[0])) . ' – ' . date('j. n. Y', strtotime($days[6])); ?></span>
-            <span><i class="fas fa-lock me-1"></i>Zapsat se jde nejpozději do <b>půlnoci předchozího dne</b>.</span>
+                <?php echo date('j. n.', strtotime($weeks[0][0])) . ' – ' . date('j. n. Y', strtotime($weeks[1][6])); ?></span>
+            <span><i class="fas fa-lock me-1"></i>Na týden se zapisuj nejpozději do <b>soboty předchozího týdne</b>. Zapsat se jde až dva týdny dopředu.</span>
             <?php if ($canOther): ?><span class="text-info"><i class="fas fa-user-shield me-1"></i>Jako vedení můžeš zapisovat i za ostatní a po uzávěrce.</span><?php endif; ?>
         </div>
     </div>
 
+    <?php foreach ($weeks as $days):
+        $weekMinutes = $weekMinutesOf($days);
+        [$weekOpen] = afxShiftDayOpen($days[0]);
+        $deadlineSat = afxShiftDeadlineSaturday($days[0]);
+        $isNowWeek = ($today >= $days[0] && $today <= $days[6]);
+    ?>
     <!-- ── Týden ─────────────────────────────────────────────────────────── -->
+    <div class="rz-weekhead d-flex flex-wrap align-items-baseline gap-2 mt-2">
+        <h5 class="mb-0"><?php echo $isNowWeek ? 'Tento týden' : 'Týden'; ?> <?php echo date('j. n.', strtotime($days[0])) . ' – ' . date('j. n.', strtotime($days[6])); ?></h5>
+        <?php if ($weekOpen): ?>
+            <span class="rz-deadline is-open"><i class="fas fa-pen-to-square me-1"></i>zápis otevřený do soboty <?php echo date('j. n.', strtotime($deadlineSat)); ?></span>
+        <?php else: ?>
+            <span class="rz-deadline"><i class="fas fa-lock me-1"></i>zápis uzavřen v sobotu <?php echo date('j. n.', strtotime($deadlineSat)); ?></span>
+        <?php endif; ?>
+    </div>
     <div class="rz-week mb-4">
         <?php foreach ($days as $i => $d):
             $list = $entries[$d] ?? [];
@@ -172,8 +193,8 @@ arsort($weekMinutes);
 
     <!-- ── Souhrn týdne ──────────────────────────────────────────────────── -->
     <?php if ($weekMinutes): ?>
-    <div class="glass-panel border-secondary p-3 p-md-4">
-        <div class="small text-white-50 mb-3"><i class="fas fa-chart-simple me-2"></i>Hodiny v tomhle týdnu</div>
+    <div class="glass-panel border-secondary p-3 p-md-4 mb-5">
+        <div class="small text-white-50 mb-3"><i class="fas fa-chart-simple me-2"></i>Hodiny v týdnu <?php echo date('j. n.', strtotime($days[0])) . ' – ' . date('j. n.', strtotime($days[6])); ?></div>
         <div class="d-flex flex-wrap gap-2">
             <?php foreach ($weekMinutes as $tid => $min):
                 $nm = '';
@@ -188,6 +209,7 @@ arsort($weekMinutes);
         </div>
     </div>
     <?php endif; ?>
+    <?php endforeach; ?>
 </div>
 
 <!-- ── Dialog zápisu ─────────────────────────────────────────────────────── -->
@@ -251,6 +273,9 @@ arsort($weekMinutes);
 .rz .rz-dow span { font-size: inherit !important; }
 .rz .rz-dow .rz-today-pill { font-size: 12px !important; vertical-align: 2px; margin-left: 4px; }
 .rz .rz-sum { font-size: 12.5px !important; }
+.rz-weekhead h5 { font-weight: 700; }
+.rz .rz-deadline { font-size: 13px !important; color: rgba(255,255,255,.55); }
+.rz .rz-deadline.is-open { color: #43D667; }
 .rz-branch { border: 1px solid rgba(13,202,240,.35); color: rgba(255,255,255,.7); background: transparent; }
 .rz-branch:hover { color: #fff; border-color: #0dcaf0; background: rgba(13,202,240,.1); }
 .rz-branch.is-active { background: #0dcaf0; border-color: #0dcaf0; color: #04222a; font-weight: 700; }

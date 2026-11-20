@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.3.5',
+        'date' => '2026-11-20',
+        'time' => '15:24',
+        'title' => 'Rozpis služeb: dva týdny dopředu, uzávěrka v sobotu',
+        'items' => [
+            'Rozpis ukazuje <b>dva týdny najednou</b>, takže se jde zapsat dva týdny dopředu. Po otevření jsou vidět dva nejbližší týdny, na které se ještě dá zapsat; tlačítko <b>Tento týden</b> ukáže aktuální týden.',
+            'Nová uzávěrka: na celý týden se zapisuje nejpozději do <b>soboty předchozího týdne</b> (do půlnoci ze soboty na neděli). U každého týdne je vidět, do kdy je zápis otevřený. Dřív se zapisovalo den po dni do půlnoci předchozího dne.',
+            'Po uzávěrce může zápisy dál měnit vedení (admin, Boss, manažer), aby šly řešit výpadky.',
+        ],
+    ],
+    [
         'version' => '4.3.4',
         'date' => '2026-11-16',
         'time' => '15:11',
