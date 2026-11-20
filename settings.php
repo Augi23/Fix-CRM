@@ -599,7 +599,7 @@ if (isset($__sysMerge[$active_tab])) {
     if (!isset($_GET['sub'])) { $_GET['sub'] = $__sysMerge[$active_tab]; }
     $active_tab = 'system';
 }
-// Pod-sekce Systému a kdo je smí: Integrace/Databáze jen admin, Aktualizace i vedení.
+// Pod-sekce Systému a kdo je smí: Integrace/Databáze jen admin, Aktualizace všichni zaměstnanci (v4.3.6).
 $sys_subs_allowed = [];
 if ($is_admin_user) { $sys_subs_allowed[] = 'integrace'; $sys_subs_allowed[] = 'databaze'; }
 if (crmCanRunUpdates()) { $sys_subs_allowed[] = 'aktualizace'; }
@@ -664,7 +664,7 @@ if (isset($_POST['delete_greeting']) && crmCanManageSettings()) {
 
 // Security for technicians
 if (!$is_admin_user) {
-    // Systém smí manažer/Boss jen kvůli Aktualizacím; jinak je celý admin-only.
+    // Systém smí ostatní jen kvůli Aktualizacím (všichni zaměstnanci, v4.3.6); jinak je celý admin-only.
     $__blocked = in_array($active_tab, ['company', 'loyalty', 'banka', 'dodavatele'], true)
         || ($active_tab === 'admins' && !hasPermission('manage_passwords'))   // „Správa hesel" (dřív se právo uložilo, ale záložka zůstala zavřená)
         || ($active_tab === 'system' && !crmCanRunUpdates());
@@ -733,7 +733,7 @@ require_once 'includes/header.php';
             <a class="nav-link <?php echo $active_tab == 'admins' ? 'active' : 'text-white-75'; ?>" href="?tab=admins"><i class="fas fa-user-shield me-2"></i><?php echo __('admin_tab'); ?></a>
         </li>
         <?php endif; ?>
-        <?php /* Systém = Integrace + Databáze + Aktualizace. Admin vidí vše; manažer/Boss jen kvůli Aktualizacím. */ ?>
+        <?php /* Systém = Integrace + Databáze + Aktualizace. Admin vidí vše; ostatní zaměstnanci jen Aktualizace. */ ?>
         <?php if ($is_admin_user || crmCanRunUpdates()): ?>
         <li class="nav-item">
             <a class="nav-link <?php echo $active_tab == 'system' ? 'active' : 'text-white-75'; ?>" href="?tab=system" id="updatesNavLink"><i class="fas fa-server me-2"></i><?php echo __('system_tab'); ?> <span class="update-badge-wrap" hidden><span id="updateBadgeNav" class="badge bg-warning text-dark ms-1" title="">!</span></span></a>
@@ -2683,7 +2683,7 @@ require_once 'includes/header.php';
             <?php endif; ?>
         </div>
 
-        <!-- SYSTÉM › AKTUALIZACE — vedení (admin, manažer, Boss) -->
+        <!-- SYSTÉM › AKTUALIZACE — všichni zaměstnanci (v4.3.6) -->
         <?php if (crmCanRunUpdates()): ?>
         <div class="tab-pane fade <?php echo ($active_tab == 'system' && $sys_sub == 'aktualizace') ? 'show active' : ''; ?>">
             <?php $sysSubnav('aktualizace'); ?>

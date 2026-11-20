@@ -9,8 +9,8 @@ require_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// Kontrola aktualizací: jen přihlášené vedení (dřív endpoint neměl žádný gate).
-if (!isset($_SESSION['user_id']) || !crmCanRunUpdates()) {
+// Kontrola aktualizací: každý přihlášený zaměstnanec (crmCanRunUpdates, v4.3.6).
+if (!crmCanRunUpdates()) {
     echo json_encode(['success' => false, 'message' => __('unauthorized')], JSON_UNESCAPED_UNICODE);
     exit;
 }

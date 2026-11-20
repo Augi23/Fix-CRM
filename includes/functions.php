@@ -540,10 +540,13 @@ function crmCanManageCatalogs(): bool {
     return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
 }
 
-/** Aktualizace CRM (kontrola + instalace + diagnostika) = celosystémový zásah
- *  (git pull + migrace) → jen admin a Boss. Pobočkový manažer NE (zjednodušeno 20.7.2026). */
+/** Aktualizace CRM (kontrola + instalace + diagnostika) smí od v4.3.6 KAŽDÝ
+ *  přihlášený zaměstnanec (rozhodnutí majitele 20. 11. 2026, dřív jen admin a Boss).
+ *  Aktualizace jen stáhne z GitHubu verzi, kterou vydal majitel (git pull --ff-only
+ *  + migrace), nic jiného nezmění — ať ji může pustit kdokoli, kdo je zrovna u CRM.
+ *  Klientský portál (applefix.help) sem nepatří: klient nemá user_id ani tech_id. */
 function crmCanRunUpdates(): bool {
-    return hasPermission('admin_access') || getCurrentStaffRole() === 'boss';
+    return !empty($_SESSION['user_id']) || !empty($_SESSION['tech_id']);
 }
 
 /** Původ zakázky: 'crm' = vznikla v našem CRM, 'legacy' = import ze zakazkovylist.cz.

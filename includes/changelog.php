@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.3.6',
+        'date' => '2026-11-20',
+        'time' => '15:42',
+        'title' => 'Aktualizaci systému smí spustit každý zaměstnanec',
+        'items' => [
+            'Kontrolu a instalaci aktualizace v <b>Nastavení → Systém → Aktualizace</b> teď může spustit kterýkoli přihlášený zaměstnanec, ne jen administrátor a Boss. Ostatní části Systému (Integrace, Databáze) zůstávají jen administrátorovi.',
+        ],
+    ],
+    [
         'version' => '4.3.5',
         'date' => '2026-11-20',
         'time' => '15:24',
