@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.3.8',
+        'date' => '2026-11-22',
+        'time' => '15:04',
+        'title' => 'Reklamace: detail se otevře kliknutím na řádek',
+        'items' => [
+            'V seznamu reklamací stačí kliknout <b>kamkoli do řádku</b> a otevře se detail reklamace. Dřív to šlo jen přes kód reklamace nebo malé tlačítko se složkou.',
+            'Odkaz na zakázku, fotky, tisk a výběr stavu v řádku fungují dál po svém. Ctrl nebo Cmd + klik otevře detail v nové záložce.',
+        ],
+    ],
+    [
         'version' => '4.3.7',
         'date' => '2026-11-20',
         'time' => '16:44',

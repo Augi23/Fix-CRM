@@ -159,7 +159,10 @@ if (!empty($rows) && isset($pdo)) {
                         $opts = $statusOptions;
                         if ($curStatus !== '' && !in_array($curStatus, $opts, true)) { array_unshift($opts, $curStatus); }
                     ?>
-                    <tr class="<?php echo e($rowClass); ?>" data-cid="<?php echo (int)$r['id']; ?>">
+                    <?php /* v4.3.8: celý řádek otevírá detail reklamace (odkazy, tlačítka a výběr stavu v řádku fungují dál po svém) */ ?>
+                    <tr class="<?php echo e(trim($rowClass . ' cmpl-row')); ?>" data-cid="<?php echo (int)$r['id']; ?>"
+                        data-href="view_complaint.php?id=<?php echo (int)$r['id']; ?>" tabindex="0" role="link"
+                        aria-label="<?php echo e(__('cmpl_detail') . ' ' . (string)$r['complaint_code']); ?>">
                         <td>
                             <a class="fw-semibold text-decoration-none" href="view_complaint.php?id=<?php echo (int)$r['id']; ?>" title="<?php echo e(__('cmpl_detail')); ?>"><?php echo e($r['complaint_code']); ?></a>
                             <?php if ($isNewClient): ?>
@@ -288,6 +291,10 @@ tr.complaint-row--new-client:hover { animation-play-state: paused; }
    (13,5 px, nowrap, 14 px / 40 px) — proto tu musí být !important taky, jinak se odznak
    „Posouzení technikem" nezalomí a přeteče do sloupce lhůty (nález 3. 11. 2026). */
 .cmpl-table { table-layout: fixed; width: 100%; }
+/* Řádek = odkaz na detail reklamace (v4.3.8) */
+.cmpl-table tr.cmpl-row { cursor: pointer; }
+.cmpl-table tr.cmpl-row:hover > td { background-color: rgba(13,202,240,.07) !important; }
+.cmpl-table tr.cmpl-row:focus-visible { outline: 2px solid #0dcaf0; outline-offset: -2px; }
 .cmpl-table th, .cmpl-table td { padding: .45rem .4rem !important; overflow-wrap: anywhere; word-break: break-word; vertical-align: middle !important; }
 .cmpl-table thead th { font-size: .64rem !important; letter-spacing: .04em; white-space: normal !important; }
 .cmpl-table tbody td { font-size: .76rem !important; line-height: 1.3 !important; }
@@ -323,6 +330,31 @@ tr.complaint-row--new-client:hover { animation-play-state: paused; }
 @media (max-width: 1099px) { .cmpl-table { min-width: 1000px; } }
 </style>
 <script>
+/* Klik kamkoli do řádku otevře detail reklamace. Odkazy (zakázka, fotky, tisk), výběr stavu
+   a tlačítka v řádku se chovají jako dřív. Ctrl/Cmd + klik nebo prostřední tlačítko otevře
+   detail v nové záložce; označení textu myší řádek neotevře. */
+(function(){
+    var SKIP = 'a, button, select, input, textarea, label, option';
+    function open(tr, newTab) {
+        var href = tr.getAttribute('data-href');
+        if (!href) { return; }
+        if (newTab) { window.open(href, '_blank'); } else { window.location.href = href; }
+    }
+    document.querySelectorAll('tr.cmpl-row').forEach(function (tr) {
+        tr.addEventListener('click', function (e) {
+            if (e.target.closest(SKIP)) { return; }
+            var sel = window.getSelection ? String(window.getSelection()) : '';
+            if (sel.trim() !== '') { return; }
+            open(tr, e.ctrlKey || e.metaKey || e.shiftKey);
+        });
+        tr.addEventListener('auxclick', function (e) {
+            if (e.button === 1 && !e.target.closest(SKIP)) { e.preventDefault(); open(tr, true); }
+        });
+        tr.addEventListener('keydown', function (e) {
+            if (e.target === tr && e.key === 'Enter') { e.preventDefault(); open(tr, e.ctrlKey || e.metaKey); }
+        });
+    });
+})();
 (function(){
     var CRM_CSRF = <?php echo json_encode(generateCsrfToken()); ?>;
     document.querySelectorAll('.complaint-status-select').forEach(function(sel){
