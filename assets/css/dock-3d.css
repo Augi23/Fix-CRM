@@ -176,6 +176,7 @@
 .afx-dock a[href="accounting.php"] i             { --t1: #6ee391; --t2: #17924a; }   /* Účetnictví */
 .afx-dock a[href="reports.php"] i                { --t1: #9a8cff; --t2: #4a36d0; }   /* Přehledy */
 .afx-dock a[href="chat.php"] i                   { --t1: #74d0ff; --t2: #2584e0; }   /* Chat */
+.afx-dock a[href="ukoly.php"] i                  { --t1: #a5e267; --t2: #3c961f; }   /* Úkoly — odškrtnuto */
 .afx-dock a[href="rozpis.php"] i                 { --t1: #ff7f78; --t2: #d0262c; }   /* Rozpis — kalendář */
 .afx-dock a[href="dokumenty.php"] i              { --t1: #b6c2d2; --t2: #5f6e84; }   /* Dokumenty — papír */
 .afx-dock a[href="navody.php"] i                 { --t1: #d48dff; --t2: #8636d6; }   /* Návody */

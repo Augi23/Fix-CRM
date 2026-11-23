@@ -47,6 +47,7 @@ if (function_exists('crmIsAccountant') && crmIsAccountant()) {
         'ucetni_prodej.php',   // prodeje z kasy (záložka Prodej v Účetnictví — dřív chyběla → vracelo to zpět)
         'pokladna.php',        // pokladní kniha (prodejní UI se jí skryje, viz pokladna.php)
         'navody.php',          // návody (Jak fungují platby apod.)
+        'ukoly.php',           // úkoly — vidí jen své a ty, které sama zadala
         'search.php',          // výsledky hledání — pro účetní jen účetnictví
         'settings.php',        // JEN kvůli záložce Uzávěrka — ostatní záložky i akce
                                // hlídá crmCanManageSettings, účetní je neuvidí
@@ -117,6 +118,7 @@ $pageTitleMap = [
     'view_order.php' => __('orders'),
     'dokumenty.php' => 'Dokumenty',
     'dokument.php' => 'Dokumenty',
+    'ukoly.php' => 'Úkoly',
 ];
 $topbarTitle = $pageTitleMap[$current_page] ?? get_setting('company_name', 'Repair CRM');
 
@@ -156,6 +158,15 @@ try {
 }
 
 // Počet čekajících položek nákupního seznamu (badge v menu)
+// Úkoly: kolik otevřených úkolů čeká na přihlášeného (v4.4.0)
+$tasksBadge = ['count' => 0, 'unseen' => 0, 'overdue' => 0, 'last_id' => 0];
+try {
+    require_once __DIR__ . '/../ukoly/lib.php';
+    $tasksBadge = afxTaskBadge();
+} catch (Throwable $e) {
+    $tasksBadge = ['count' => 0, 'unseen' => 0, 'overdue' => 0, 'last_id' => 0];
+}
+
 $shoppingListBadgeCount = 0;
 try {
     $shoppingListBadgeCount = (int)($pdo->query("SELECT COUNT(*) FROM purchase_requests WHERE status = 'pending'")->fetchColumn() ?: 0);
@@ -536,6 +547,11 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
         <a class="afx-cell <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php">
             <i class="fas fa-comments"></i><small>Chat</small>
         </a>
+        <?php /* Úkoly: předávání práce mezi lidmi; odznak = moje otevřené úkoly (v4.4.0) */ ?>
+        <a class="afx-cell <?php echo $current_page == 'ukoly.php' ? 'active' : ''; ?><?php echo $tasksBadge['unseen'] > 0 && $current_page != 'ukoly.php' ? ' afx-chat-glow' : ''; ?>" href="ukoly.php">
+            <?php if ($tasksBadge['count'] > 0): ?><span class="afx-badge<?php echo $tasksBadge['overdue'] > 0 ? ' afx-badge--warn' : ''; ?>"><?php echo (int)$tasksBadge['count']; ?></span><?php endif; ?>
+            <i class="fas fa-list-check"></i><small>Úkoly</small>
+        </a>
         <?php /* Rozpis služeb vidí VŠICHNI zaměstnanci — zapisují se do něj sami */ ?>
         <a class="afx-cell <?php echo $current_page == 'rozpis.php' ? 'active' : ''; ?>" href="rozpis.php">
             <i class="fas fa-calendar-days"></i><small>Rozpis</small>
@@ -576,7 +592,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
     </a>
     <button class="afx-tb-plus" type="button" data-bs-toggle="modal" data-bs-target="#newOrderModal" aria-label="<?php echo __('new_order'); ?>"><i class="fas fa-plus"></i></button>
     <a class="afx-tb <?php echo $current_page == 'reklamace.php' ? 'active' : ''; ?>" href="reklamace.php"><i class="fas fa-rotate-left"></i><?php echo __('complaints'); ?></a>
-    <button class="afx-tb" type="button" id="afxSheetOpen"><i class="fas fa-bars"></i><?php echo __('menu'); ?></button>
+    <button class="afx-tb" type="button" id="afxSheetOpen"><?php if ($tasksBadge['count'] > 0): ?><span class="afx-badge" id="afxTaskMenuN" title="Úkoly"><?php echo (int)$tasksBadge['count']; ?></span><?php endif; ?><i class="fas fa-bars"></i><?php echo __('menu'); ?></button>
 </nav>
 
 <!-- Mobil/tablet: sheet menu s hledáním -->
@@ -617,6 +633,7 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
             <a class="afx-sheet-link <?php echo in_array($current_page, ['reports.php', 'history.php'], true) ? 'active' : ''; ?>" href="reports.php"><i class="fas fa-chart-line"></i><?php echo __('reports'); ?></a>
             <?php /* Chat vidí VŠICHNI zaměstnanci (dřív omylem jen vedení) */ ?>
             <a class="afx-sheet-link <?php echo $current_page == 'chat.php' ? 'active' : ''; ?>" href="chat.php"><i class="fas fa-comments"></i>Chat</a>
+            <a class="afx-sheet-link <?php echo $current_page == 'ukoly.php' ? 'active' : ''; ?>" href="ukoly.php"><i class="fas fa-list-check"></i>Úkoly<span class="afx-task-n" id="afxTaskSheetN"<?php echo $tasksBadge['count'] > 0 ? '' : ' hidden'; ?>><?php echo (int)$tasksBadge['count']; ?></span></a>
             <a class="afx-sheet-link <?php echo $current_page == 'rozpis.php' ? 'active' : ''; ?>" href="rozpis.php"><i class="fas fa-calendar-days"></i>Rozpis</a>
             <a class="afx-sheet-link <?php echo in_array($current_page, ['dokumenty.php', 'dokument.php'], true) ? 'active' : ''; ?>" href="dokumenty.php"><i class="fas fa-file-signature"></i>Dokumenty</a>
             <a class="afx-sheet-link <?php echo $current_page == 'navody.php' ? 'active' : ''; ?>" href="navody.php"><i class="fas fa-graduation-cap"></i>Návody</a>
@@ -654,6 +671,61 @@ $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(),
         if (t) close();
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+})();
+</script>
+<style>
+.afx-sheet-link .afx-task-n { margin-left: 8px; min-width: 20px; padding: 0 6px; border-radius: 999px; background: #0a84ff;
+    color: #fff; font-size: 11px !important; font-weight: 700; line-height: 20px; text-align: center; display: inline-block; }
+.afx-sheet-link .afx-task-n[hidden] { display: none; }
+</style>
+<script>
+/* Úkoly: živý odznak v menu (v4.4.0). Počet mých otevřených úkolů, oranžový,
+   když je některý po termínu; ikona svítí, dokud jsem nový úkol neviděl.
+   Vlastní lehký dotaz jednou za půl minuty — na stránce Úkoly ho nahrazuje
+   její vlastní obnovování, které volá window.afxTaskBadge. */
+(function () {
+    var KEY = 'afx_task_last';
+    var onPage = <?php echo $current_page == 'ukoly.php' ? 'true' : 'false'; ?>;
+    function badge(host, id, n, warn) {
+        if (!host) return;
+        var el = id ? document.getElementById(id) : host.querySelector('.afx-badge');
+        if (n > 0) {
+            if (!el) { el = document.createElement('span'); el.className = 'afx-badge'; if (id) { el.id = id; el.title = 'Úkoly'; } host.prepend(el); }
+            el.textContent = n;
+            el.classList.toggle('afx-badge--warn', !!warn);
+        } else if (el) { el.remove(); }
+    }
+    function paint(b) {
+        if (!b) return;
+        var n = b.count || 0;
+        var cell = document.querySelector('.afx-dock a[href="ukoly.php"]');
+        badge(cell, '', n, (b.overdue || 0) > 0);
+        if (cell) { cell.classList.toggle('afx-chat-glow', (b.unseen || 0) > 0 && !onPage); }
+        var sn = document.getElementById('afxTaskSheetN');
+        if (sn) { sn.textContent = n; sn.hidden = !(n > 0); }
+        badge(document.getElementById('afxSheetOpen'), 'afxTaskMenuN', n, false);
+        // nový úkol od někoho jiného → zvuk; značka v prohlížeči hlídá, aby zazněl jen jednou
+        var last = -1;
+        try { last = parseInt(localStorage.getItem(KEY) || '-1', 10); } catch (e) {}
+        if ((b.last_id || 0) > last) {
+            try { localStorage.setItem(KEY, String(b.last_id || 0)); } catch (e) {}
+            if (last >= 0 && window.afxChime) { window.afxChime('assign'); }
+        }
+    }
+    window.afxTaskBadge = paint;
+    function tick() {
+        if (document.hidden) return;
+        fetch('ukoly/api.php?action=badge', { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (r) { if (r && r.success) { paint(r.badge); } })
+            .catch(function () {});
+    }
+    // první vykreslení až po načtení stránky — zvuk (main.js) se zavádí v patičce
+    window.addEventListener('load', function () { paint(<?php echo json_encode($tasksBadge); ?>); });
+    if (!onPage) {
+        setInterval(tick, 30000);
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) { tick(); } });
+    }
 })();
 </script>
 

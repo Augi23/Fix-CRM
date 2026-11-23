@@ -226,6 +226,7 @@ function gsPagesIndex(): array {
         ['Přehledy — statistiky', 'reports.php', 'fa-chart-line', 'statistiky reporty trzby prehled'],
         ['Historie úprav', 'history.php', 'fa-clock-rotate-left', 'historie audit log kdo co zmenil'],
         ['Chat', 'chat.php', 'fa-comments', 'zpravy tym chat'],
+        ['Úkoly', 'ukoly.php', 'fa-list-check', 'ukoly ukol zadat predani smeny todo co udelat'],
         ['Rozpis služeb', 'rozpis.php', 'fa-calendar-days', 'rozpis smeny dochazka kalendar'],
         ['Dokumenty', 'dokumenty.php', 'fa-file-signature', 'vykupni list zastava smlouva dokumenty'],
         ['Návody', 'navody.php', 'fa-graduation-cap', 'navody postupy napoveda help'],

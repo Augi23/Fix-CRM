@@ -11,6 +11,21 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.4.0',
+        'date' => '2026-11-23',
+        'time' => '03:20',
+        'title' => 'Úkoly: předávání práce mezi kolegy',
+        'items' => [
+            'V horním menu je mezi Chatem a Rozpisem nová sekce <b>Úkoly</b>. Je to místo pro všechno, co si nestihnete říct po telefonu nebo při předání směny: kdokoli zadá úkol komukoli, ten ho odškrtne a zadavatel vidí, jak je daleko.',
+            '<b>Zadání:</b> napíšeš, co je potřeba, vybereš komu a do kdy (Dnes, Zítra, jiný den, případně i hodinu). Úkol jde dát jednomu člověku, víc lidem najednou (každý ho dostane zvlášť), nebo <b>komukoli z prodejny</b> — to je vzkaz pro směnu, odškrtne ho první, kdo ho udělá. Naléhavé věci jde označit <b>Spěchá</b>.',
+            '<b>Pro mě:</b> moje úkoly seřazené jako denní plán — po termínu, dnes, zítra, později. Hotový úkol se odškrtne kolečkem.',
+            '<b>Zadal jsem:</b> u každého úkolu je vidět stav — zatím neviděno, viděno, hotovo. K úkolu jde připsat poznámku, upravit ho, předat někomu jinému nebo hotový vrátit k dořešení.',
+            '<b>Tým</b> (admin, Boss, manažer): přehled, kdo má co na stole a co je po termínu. Manažer vidí lidi své prodejny, admin a Boss všechny.',
+            'U ikony Úkoly svítí <b>počet úkolů, které na tebe čekají</b> (oranžově, když je některý po termínu). Na nový úkol upozorní zvuk a v aplikaci na telefonu oznámení.',
+            'Úkol zadaný volbou <b>Já sám</b> je soukromá poznámka, nevidí ho nikdo jiný. Postup je v <b>Návodech</b>.',
+        ],
+    ],
+    [
         'version' => '4.3.8',
         'date' => '2026-11-22',
         'time' => '15:04',

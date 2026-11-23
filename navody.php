@@ -24,6 +24,25 @@ try {
 $guides = [];
 $guides['crm'] = [
     [
+        'id' => 'ukoly', 'icon' => 'fa-list-check', 'color' => '#30D158',
+        'title' => 'Úkoly — předání práce kolegům',
+        'intro' => 'Co si nestihnete říct po telefonu nebo při předání směny, napiš do Úkolů. Kolega úkol uvidí, odškrtne ho a ty vidíš, jak je daleko.',
+        'steps' => [
+            'V horním menu otevři <b>Úkoly</b> (mezi Chatem a Rozpisem) a klikni do pole <b>Co je potřeba udělat?</b>',
+            'Napiš úkol jednou větou. Podrobnosti patří do pole pod ním.',
+            'Vyber, <b>pro koho</b> úkol je: jednoho kolegu, víc lidí najednou, nebo <b>Kdokoli z prodejny</b>. To je vzkaz pro směnu — odškrtne ho první, kdo ho udělá.',
+            'Zvol, <b>do kdy</b> to má být (Dnes, Zítra, jiný den, případně i hodinu). U naléhavých věcí zapni <b>Spěchá</b> a potvrď tlačítkem <b>Zadat úkol</b>.',
+            'Svoje úkoly najdeš v záložce <b>Pro mě</b>, seřazené podle termínu. Hotový úkol <b>odškrtni kolečkem</b> vlevo.',
+            'V záložce <b>Zadal jsem</b> vidíš u každého úkolu stav: zatím neviděno, viděno, hotovo. Kliknutím úkol rozbalíš — můžeš připsat poznámku, upravit ho, nebo hotový úkol vrátit k dořešení.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => '<b>Číslo u ikony Úkoly</b> ukazuje, kolik úkolů na tebe čeká. Oranžové je, když je některý po termínu. Na nový úkol upozorní zvuk a ikona začne svítit.'],
+            ['typ' => 'info', 'text' => 'Úkol pro víc lidí dostane <b>každý zvlášť</b> a každý si ho odškrtne sám, takže vidíš, kdo ho má hotový a kdo ne.'],
+            ['typ' => 'info', 'text' => 'Volbou <b>Já sám</b> si uděláš poznámku jen pro sebe. Takový úkol nevidí nikdo jiný, ani vedení.'],
+            ['typ' => 'role', 'text' => 'Zadat úkol může <b>kdokoli komukoli</b>. Každý vidí úkoly, které zadal, které jsou pro něj a které jsou pro jeho prodejnu. <b>Manažer</b> má navíc záložku Tým s úkoly lidí své prodejny, <b>admin a Boss</b> vidí všechny. Upravit a smazat úkol smí ten, kdo ho zadal, a admin s Bossem.'],
+        ],
+    ],
+    [
         'id' => 'naskladneni-produktu', 'icon' => 'fa-box-open', 'color' => '#0A84FF',
         'title' => 'Naskladnění produktu (bazar) přímo v CRM',
         'intro' => 'Nový kus použité elektroniky naskladníš rovnou v CRM — bez Mac appky. Kus je okamžitě prodejný na Pokladně a připravený pro e-shop.',
