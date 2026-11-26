@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.5.2',
+        'date' => '2026-11-26',
+        'time' => '23:10',
+        'title' => 'Sklad produktů: přehlednější tabulka a čitelná nabídka klientů',
+        'items' => [
+            '<b>Zápůjčka:</b> nabídka klientů při psaní do pole „Komu“ byla průhledná a splývala s textem pod sebou. Teď má vlastní neprůhledný panel a vybraný řádek se zvýrazní.',
+            '<b>Tabulka produktů:</b> úzké sloupce (kód, stav, baterie, cena, naskladněno, akce) zabírají jen tolik, kolik potřebují. Místo dostal Produkt, Dostupnost a Zápůjčka, takže se delší texty nemačkají.',
+            'Štítek ve sloupci <b>Dostupnost</b> (Skladem, Vyprodáno, Prodáno na kase, Zapůjčeno) je menší, stejně tak štítek stavu a datum naskladnění.',
+            'Tlačítko <b>Reklamace</b> na konci řádku je teď jen ikona jako ostatní; co znamená, je ve vysvětlivkách nad tabulkou. Tlačítko <b>Vráceno</b> u zapůjčeného kusu zůstává s textem.',
+            'U zapůjčeného kusu se jméno klienta ukazuje jen ve sloupci Zápůjčka, ne dvakrát.',
+        ],
+    ],
+    [
         'version' => '4.5.1',
         'date' => '2026-11-26',
         'time' => '21:45',

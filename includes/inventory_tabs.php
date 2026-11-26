@@ -35,6 +35,7 @@ try { $__trDraft = (int)$pdo->query("SELECT COUNT(*) FROM stock_transfer_items t
         <?php if ($__invTab === 'products'): ?>
             <span><i class="fas fa-tag text-info"></i>Cenový štítek</span>
             <span><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i>Zapůjčení</span>
+            <span><i class="fas fa-rotate-left" style="color:#f97316"></i>Reklamace</span>
             <span><i class="fas fa-edit text-warning"></i>Upravit</span>
             <span><i class="fas fa-right-left text-info"></i>Přesun na pobočku</span>
             <span><i class="fas fa-trash text-danger"></i>Smazat</span>

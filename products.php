@@ -201,6 +201,73 @@ try {
 } catch (Throwable $e) { $__histRows = []; }
 ?>
 
+<style>
+/* Našeptávač klientů v okně zápůjčky (v4.5.2): globální styl dělá položky seznamu průhledné,
+   takže nabídka splývala s textem pod sebou. Tady má vlastní neprůhledný panel. */
+#loanToSuggest {
+  margin-top: 6px; padding: 5px;
+  background: linear-gradient(180deg, #1f2229, #16181d);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 12px;
+  box-shadow: 0 18px 44px rgba(0,0,0,.6) !important;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+#loanToSuggest .loan-sug {
+  display: block; width: 100%; text-align: left;
+  padding: 8px 10px !important; border: 0 !important; border-radius: 8px !important;
+  background: transparent !important; color: #f2f4f8 !important;
+}
+#loanToSuggest .loan-sug + .loan-sug { margin-top: 1px; }
+#loanToSuggest .loan-sug .fw-semibold { font-size: 14px !important; line-height: 1.3; }
+#loanToSuggest .loan-sug .small { font-size: 12.5px !important; line-height: 1.3; margin-top: 1px; color: rgba(235,240,250,.62) !important; }
+#loanToSuggest .loan-sug:hover,
+#loanToSuggest .loan-sug:focus-visible { background: #0a84ff !important; color: #fff !important; outline: none; }
+#loanToSuggest .loan-sug:hover .small,
+#loanToSuggest .loan-sug:focus-visible .small { color: rgba(255,255,255,.86) !important; }
+html[data-lg-theme="light"] #loanToSuggest {
+  background: #fff; border-color: rgba(16,22,34,.14);
+  box-shadow: 0 18px 44px rgba(16,22,34,.22) !important;
+}
+html[data-lg-theme="light"] #loanToSuggest .loan-sug { color: #10161f !important; }
+html[data-lg-theme="light"] #loanToSuggest .loan-sug .small { color: rgba(16,22,34,.6) !important; }
+html[data-lg-theme="light"] #loanToSuggest .loan-sug:hover,
+html[data-lg-theme="light"] #loanToSuggest .loan-sug:focus-visible { color: #fff !important; }
+html[data-lg-theme="light"] #loanToSuggest .loan-sug:hover .small,
+html[data-lg-theme="light"] #loanToSuggest .loan-sug:focus-visible .small { color: rgba(255,255,255,.86) !important; }
+/* Tabulka produktů (v4.5.2): globální styl nafukuje každý <span>, .small a .badge na 18 px,
+   takže štítky a data byly větší než název produktu a sloupce se mačkaly. Tady má tabulka
+   vlastní velikosti: úzké sloupce (kód, stav, baterie, cena, datum, akce) se smrští na obsah,
+   místo dostane Produkt, Dostupnost a Zápůjčka. */
+.afx-prod-table > thead > tr > th { white-space: nowrap; }
+.afx-prod-table > tbody > tr > td { padding-top: 11px; padding-bottom: 11px; font-size: 13.5px; }
+.afx-prod-table th.c-tight, .afx-prod-table td.c-tight { width: 1%; white-space: nowrap; }
+.afx-prod-table td span { font-size: inherit !important; }
+.afx-prod-table td.c-prod { min-width: 250px; }
+.afx-prod-table .pt-title { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.afx-prod-table .pt-sub { font-size: 12px; line-height: 1.35; margin-top: 2px; color: rgba(235,240,250,.6); }
+.afx-prod-table td code { font-size: 12px; white-space: nowrap; }
+.afx-prod-table td.c-price { font-size: 14px; }
+.afx-prod-table .pt-note { font-size: 11.5px; font-weight: 400; line-height: 1.35; margin-top: 3px; color: rgba(235,240,250,.6); }
+.afx-prod-table .pt-line { margin-top: 4px; }
+.afx-prod-table .pt-note.is-reserved { color: #ffd479; }
+html[data-lg-theme="light"] .afx-prod-table .pt-note.is-reserved { color: #a35a00; }
+.afx-prod-table td .badge.pt-chip {
+  font-size: 11.5px !important; font-weight: 600; line-height: 1.2; letter-spacing: 0;
+  padding: 3px 8px !important; border-radius: 999px !important; white-space: nowrap;
+}
+.afx-prod-table td .badge.pt-chip.is-loan {
+  background: rgba(139,92,246,.2) !important; color: #cdbdff !important; border: 1px solid rgba(139,92,246,.45) !important;
+}
+html[data-lg-theme="light"] .afx-prod-table td .badge.pt-chip.is-loan { background: rgba(139,92,246,.14) !important; color: #5b33c4 !important; }
+.afx-prod-table td.c-avail { min-width: 150px; }
+.afx-prod-table .pt-date { font-size: 12.5px; line-height: 1.35; }
+.afx-prod-table td.c-loan { min-width: 190px; max-width: 280px; }
+.afx-prod-table .pt-loan-note { font-size: 12.5px; font-weight: 600; line-height: 1.35; white-space: normal; }
+.afx-prod-table .pt-loan-who { font-size: 12px; line-height: 1.35; margin-top: 3px; }
+.afx-prod-table .afx-row-actions { flex-wrap: nowrap; }
+.afx-prod-table .afx-row-actions .btn .pt-btn-label { font-size: 12px !important; font-weight: 600; }
+html[data-lg-theme="light"] .afx-prod-table .pt-sub,
+html[data-lg-theme="light"] .afx-prod-table .pt-note { color: rgba(16,22,34,.6); }
+</style>
 <!-- Zapůjčeno / komisní prodej: kus fyzicky není u nás, ale ve skladu zůstává -->
 <div class="modal fade" id="productLoanModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
@@ -217,7 +284,7 @@ try {
           <div class="position-relative">
             <input type="text" class="form-control" id="loanTo" placeholder="začni psát jméno nebo telefon klienta…" maxlength="120" autocomplete="off">
             <input type="hidden" id="loanCustomerId">
-            <div id="loanToSuggest" class="list-group position-absolute w-100 shadow" style="z-index:1060; top:100%; max-height:260px; overflow-y:auto; display:none"></div>
+            <div id="loanToSuggest" class="position-absolute w-100" style="z-index:1060; top:100%; max-height:260px; overflow-y:auto; display:none"></div>
           </div>
           <div class="form-text small" id="loanToHint">Vyber klienta z databáze — zápůjčka se pak ukáže v jeho kartě. Jde napsat i jméno mimo databázi.</div>
         </div>
@@ -308,19 +375,19 @@ try {
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0 afx-prod-table">
                         <thead class="table-dark">
                             <tr>
-                                <th class="ps-4"><?php echo __('photo_col'); ?></th>
+                                <th class="ps-4 c-tight"><?php echo __('photo_col'); ?></th>
                                 <th>Produkt</th>
-                                <th>Kód</th>
-                                <th>Stav</th>
-                                <th>Baterie</th>
-                                <th>Cena</th>
+                                <th class="c-tight">Kód</th>
+                                <th class="c-tight">Stav</th>
+                                <th class="c-tight">Baterie</th>
+                                <th class="c-tight">Cena</th>
                                 <th>Dostupnost</th>
-                                <th>Naskladněno</th>
+                                <th class="c-tight">Naskladněno</th>
                                 <?php if ($showLoanCol): ?><th>Zápůjčka</th><?php endif; ?>
-                                <th class="text-end pe-4"><?php echo __('action'); ?></th>
+                                <th class="text-end pe-4 c-tight"><?php echo __('action'); ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -335,7 +402,7 @@ try {
                                 <?php foreach ($products as $p): ?>
                                 <?php $img = productImageDisplayUrl($p['image_url'] ?? ''); ?>
                                 <tr>
-                                    <td class="ps-4">
+                                    <td class="ps-4 c-tight">
                                         <?php if ($img !== ''): ?>
                                             <a href="<?php echo e($img); ?>" data-fancybox="products">
                                                 <img src="<?php echo e($img); ?>" class="rounded shadow-sm" style="width: 40px; height: 40px; object-fit: cover;" loading="lazy">
@@ -346,30 +413,30 @@ try {
                                             </div>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="prod-preview" data-id="<?php echo (int)$p['id']; ?>" style="cursor:pointer;" title="Kliknutím zobrazíš náhled položky">
-                                        <div class="fw-bold"><?php echo e($p['title']); ?></div>
-                                        <div class="small text-white-75">
+                                    <td class="prod-preview c-prod" data-id="<?php echo (int)$p['id']; ?>" style="cursor:pointer;" title="Kliknutím zobrazíš náhled položky">
+                                        <div class="pt-title"><?php echo e($p['title']); ?></div>
+                                        <div class="pt-sub">
                                             <?php echo e(trim(($p['manufacturer'] ?? '') . ' ' . ($p['model'] ?? ''))); ?>
                                             <?php if (!empty($p['capacity'])): ?> · <?php echo e($p['capacity']); ?><?php endif; ?>
                                             <?php if (!empty($p['color'])): ?> · <?php echo e($p['color']); ?><?php endif; ?>
                                         </div>
                                     </td>
-                                    <td><code><?php echo e($p['product_code']); ?></code></td>
-                                    <td>
+                                    <td class="c-tight"><code><?php echo e($p['product_code']); ?></code></td>
+                                    <td class="c-tight">
                                         <?php if (!empty($p['grade'])): ?>
-                                            <span class="badge bg-info text-dark">Stav <?php echo e($p['grade']); ?></span>
+                                            <span class="badge bg-info text-dark pt-chip">Stav <?php echo e($p['grade']); ?></span>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td class="c-tight">
                                         <?php if (!empty($p['battery'])): ?>
                                             <span class="fw-medium"><?php echo e($p['battery']); ?></span>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="fw-bold text-primary">
+                                    <td class="fw-bold text-primary c-tight c-price">
                                         <?php
                                         // Sloupec „Cena" je PRODEJNÍ cena. U čerstvého výkupu ještě není
                                         // stanovená (0) — místo nuly ukážeme, za kolik jsme kus vykoupili,
@@ -379,72 +446,73 @@ try {
                                         ?>
                                         <?php if ($__showBuy): ?>
                                             <span class="text-warning" title="Výkupní (nákupní) cena — prodejní cena zatím nenastavená"><?php echo formatMoney($__pp); ?></span>
-                                            <div class="small text-white-75 fw-normal">výkup · prodejní cena nenastavena</div>
+                                            <div class="pt-note fw-normal">výkup · bez prodejní ceny</div>
                                         <?php else: ?>
                                             <?php echo formatMoney((float)$p['price']); ?>
                                             <?php if ($__pp > 0): ?>
-                                                <div class="small text-white-75 fw-normal" title="Výkupní / nákupní cena">nákup <?php echo formatMoney($__pp); ?></div>
+                                                <div class="pt-note fw-normal" title="Výkupní / nákupní cena">nákup <?php echo formatMoney($__pp); ?></div>
                                             <?php endif; ?>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td class="c-avail">
                                         <?php if (productIsLoaned($p)): ?>
-                                            <span class="badge" style="background:#8B5CF6" title="<?php echo e(($p['loan_to'] ?? '') . (!empty($p['loan_at']) ? ' · od ' . date('j.n.Y', strtotime($p['loan_at'])) : '') . (!empty($p['loan_note']) ? ' · ' . $p['loan_note'] : '')); ?>">Zapůjčeno/Komisní prod.</span>
-                                            <div class="small text-white-75 mt-1"><i class="fas fa-user-tag me-1"></i><?php if ((int)($p['loan_customer_id'] ?? 0) > 0): ?><a href="edit_customer.php?id=<?php echo (int)$p['loan_customer_id']; ?>" class="text-reset" title="Otevřít kartu klienta"><?php echo e($p['loan_to'] ?? ''); ?></a><?php else: ?><?php echo e($p['loan_to'] ?? ''); ?><?php endif; ?></div>
+                                            <span class="badge pt-chip is-loan" title="<?php echo e(($p['loan_to'] ?? '') . (!empty($p['loan_at']) ? ' · od ' . date('j.n.Y', strtotime($p['loan_at'])) : '') . (!empty($p['loan_note']) ? ' · ' . $p['loan_note'] : '')); ?>">Zapůjčeno / komise</span>
+                                            <?php /* komu: jen když vedle není sloupec Zápůjčka, jinak by tu bylo totéž dvakrát */ ?>
+                                            <?php if (!$showLoanCol): ?><div class="pt-note"><i class="fas fa-user-tag me-1"></i><?php if ((int)($p['loan_customer_id'] ?? 0) > 0): ?><a href="edit_customer.php?id=<?php echo (int)$p['loan_customer_id']; ?>" class="text-reset" title="Otevřít kartu klienta"><?php echo e($p['loan_to'] ?? ''); ?></a><?php else: ?><?php echo e($p['loan_to'] ?? ''); ?><?php endif; ?></div><?php endif; ?>
                                         <?php elseif ((int)$p['stock_qty'] > 1): ?>
-                                            <span class="badge bg-success">Skladem <?php echo (int)$p['stock_qty']; ?> ks</span>
+                                            <span class="badge bg-success pt-chip">Skladem <?php echo (int)$p['stock_qty']; ?> ks</span>
                                         <?php elseif ((int)$p['stock_qty'] > 0): ?>
-                                            <span class="badge bg-success">Skladem</span>
+                                            <span class="badge bg-success pt-chip">Skladem</span>
                                         <?php elseif (!empty($p['pos_sold_at'])): ?>
-                                            <span class="badge bg-warning text-dark" title="Prodáno přes Pokladnu — CRM ho automaticky drží vyprodaný, i kdyby ho soubor z appky ještě hlásil skladem">Prodáno na kase</span>
+                                            <span class="badge bg-warning text-dark pt-chip" title="Prodáno přes Pokladnu — CRM ho automaticky drží vyprodaný, i kdyby ho soubor z appky ještě hlásil skladem">Prodáno na kase</span>
                                         <?php else: ?>
-                                            <span class="badge bg-secondary">Vyprodáno</span>
+                                            <span class="badge bg-secondary pt-chip">Vyprodáno</span>
                                         <?php endif; ?>
                                         <?php /* rezervace z e-shopu: kus fyzicky leží na prodejně, ale je zamluvený
                                                  objednávkou s platbou při vyzvednutí — prodat ho smí jen ta objednávka */ ?>
                                         <?php if (!empty($__repairMap[(int)$p['id']])): $__rep = $__repairMap[(int)$p['id']]; ?>
-                                            <div class="small mt-1"><a href="view_order.php?id=<?php echo (int)$__rep['id']; ?>" class="badge text-decoration-none" style="background:#FF9F0A;color:#1a1000" title="Interní zakázka na opravu — kus se do dokončení neprodává (e-shop ani Pokladna)"><i class="fas fa-screwdriver-wrench me-1"></i>V opravě · <?php echo e($__rep['code']); ?></a></div>
+                                            <div class="pt-line"><a href="view_order.php?id=<?php echo (int)$__rep['id']; ?>" class="badge text-decoration-none pt-chip" style="background:#FF9F0A;color:#1a1000" title="Interní zakázka na opravu — kus se do dokončení neprodává (e-shop ani Pokladna)"><i class="fas fa-screwdriver-wrench me-1"></i>V opravě · <?php echo e($__rep['code']); ?></a></div>
                                         <?php endif; ?>
                                         <?php if ((int)($p['reserved_qty'] ?? 0) > 0): ?>
-                                            <div class="small mt-1" style="color:#ffd479;" title="Objednávka z e-shopu s platbou při vyzvednutí — zaplatí se na kase přes „Rezervace e-shopu“"><i class="fas fa-clock me-1"></i>rezervováno pro e-shop<?php echo (int)$p['reserved_qty'] > 1 ? ' (' . (int)$p['reserved_qty'] . ' ks)' : ''; ?></div>
+                                            <div class="pt-note is-reserved" title="Objednávka z e-shopu s platbou při vyzvednutí — zaplatí se na kase přes „Rezervace e-shopu“"><i class="fas fa-clock me-1"></i>rezervováno pro e-shop<?php echo (int)$p['reserved_qty'] > 1 ? ' (' . (int)$p['reserved_qty'] . ' ks)' : ''; ?></div>
                                         <?php endif; ?>
                                         <?php if ((int)$p['stock_qty'] <= 0 && !empty($p['last_sold_at']) && !productIsLoaned($p)): ?>
-                                            <div class="small text-white-75 mt-1" title="Kdy se kus prodal (kasa i e-shop)"><i class="fas fa-cart-shopping me-1"></i>prodáno <?php echo date('j. n. Y H:i', strtotime((string)$p['last_sold_at'])); ?></div>
+                                            <div class="pt-note" title="Kdy se kus prodal (kasa i e-shop)"><i class="fas fa-cart-shopping me-1"></i>prodáno <?php echo date('j. n. Y H:i', strtotime((string)$p['last_sold_at'])); ?></div>
                                         <?php endif; ?>
                                         <?php if (!empty($p['stock_key'])): ?>
-                                            <div class="small text-white-75 mt-1"><?php echo $p['stock_key'] === 'karlin' ? 'Karlín' : 'Václavák'; ?></div>
+                                            <div class="pt-note"><?php echo $p['stock_key'] === 'karlin' ? 'Karlín' : 'Václavák'; ?></div>
                                         <?php endif; ?>
                                         <?php if (!empty($p['hide_eshop'])): ?>
-                                            <div class="mt-1"><span class="badge bg-secondary" title="Kus je v CRM, ale feed ho na e-shop neposílá"><i class="fas fa-eye-slash me-1"></i>skrytý na e-shopu</span></div>
+                                            <div class="pt-note" title="Kus je v CRM, ale feed ho na e-shop neposílá"><i class="fas fa-eye-slash me-1"></i>skrytý na e-shopu</div>
                                         <?php endif; ?>
                                     </td>
-                                    <td style="white-space:nowrap;">
+                                    <td class="c-tight c-added">
                                         <?php if (!empty($p['added_at'])): ?>
-                                            <div style="font-size:10.5px;line-height:1.4;"><?php echo crmDateTime($p['added_at']); ?></div>
+                                            <div class="pt-date"><?php echo crmDateTime($p['added_at']); ?></div>
                                         <?php else: ?>
                                             <span class="text-white-75">—</span>
                                         <?php endif; ?>
                                         <?php if (trim((string)($p['created_by'] ?? '')) !== ''): ?>
-                                            <div style="font-size:11px;opacity:.62;line-height:1.35;"><i class="fas fa-user" style="font-size:.85em;margin-right:.25em;"></i><?php echo e($p['created_by']); ?></div>
+                                            <div class="pt-note"><i class="fas fa-user" style="font-size:.85em;margin-right:.25em;"></i><?php echo e($p['created_by']); ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <?php if ($showLoanCol): ?>
-                                    <td style="max-width:230px;">
+                                    <td class="c-loan">
                                         <?php if (!empty($p['loan_at'])): ?>
                                             <?php $loanNote = trim((string)($p['loan_note'] ?? '')); ?>
                                             <?php if ($loanNote !== ''): ?>
-                                                <div class="fw-semibold" style="font-size:12px;line-height:1.4;white-space:normal;"><?php echo e($loanNote); ?></div>
+                                                <div class="pt-loan-note"><?php echo e($loanNote); ?></div>
                                             <?php else: ?>
-                                                <div class="fst-italic text-white-75" style="font-size:12px;line-height:1.4;">důvod nevyplněn</div>
+                                                <div class="pt-note fst-italic">důvod nevyplněn</div>
                                             <?php endif; ?>
                                             <?php if (trim((string)($p['loan_to'] ?? '')) !== ''): ?>
-                                                <div style="font-size:11.5px;line-height:1.4;margin-top:.15rem;"><i class="fas fa-user-tag me-1" style="color:#8B5CF6"></i><?php if ((int)($p['loan_customer_id'] ?? 0) > 0): ?><a href="edit_customer.php?id=<?php echo (int)$p['loan_customer_id']; ?>" class="text-reset" title="Otevřít kartu klienta"><?php echo e($p['loan_to']); ?></a><?php else: ?><?php echo e($p['loan_to']); ?><?php endif; ?></div>
+                                                <div class="pt-loan-who"><i class="fas fa-user-tag me-1" style="color:#8B5CF6"></i><?php if ((int)($p['loan_customer_id'] ?? 0) > 0): ?><a href="edit_customer.php?id=<?php echo (int)$p['loan_customer_id']; ?>" class="text-reset" title="Otevřít kartu klienta"><?php echo e($p['loan_to']); ?></a><?php else: ?><?php echo e($p['loan_to']); ?><?php endif; ?></div>
                                             <?php endif; ?>
                                             <?php
                                                 $loanFrom = strtotime((string)$p['loan_at']);
                                                 $loanDays = $loanFrom ? (int)floor((time() - $loanFrom) / 86400) : null;
                                             ?>
-                                            <div style="font-size:10.5px;opacity:.62;line-height:1.35;margin-top:.15rem;">
+                                            <div class="pt-note">
                                                 <?php if ($loanFrom): ?>od <?php echo date('j.n.Y', $loanFrom); ?><?php endif; ?>
                                                 <?php if ($loanDays !== null): ?> · <?php echo $loanDays; ?>&nbsp;<?php echo ($loanDays === 1 ? 'den' : ($loanDays >= 2 && $loanDays <= 4 ? 'dny' : 'dní')); ?><?php endif; ?>
                                                 <?php if (trim((string)($p['loan_by'] ?? '')) !== ''): ?><br>zapsal(a) <?php echo e($p['loan_by']); ?><?php endif; ?>
@@ -455,7 +523,7 @@ try {
                                     </td>
                                     <?php endif; ?>
                                     <?php if ($canManageBranch): ?>
-                                    <td class="text-end pe-4">
+                                    <td class="text-end pe-4 c-tight">
                                         <div class="btn-group btn-group-sm afx-row-actions">
                                             <?php if ($isVykupTab): ?>
                                                 <?php if ((int)($p['moved_to_inventory_id'] ?? 0) > 0): ?>
@@ -467,11 +535,11 @@ try {
                                             <?php endif; ?>
                                             <button type="button" class="btn btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek (Brother QL-8xx)"><i class="fas fa-tag"></i></button>
                                             <button type="button" class="btn btn-white border text-danger product-label-btn" data-id="<?php echo (int)$p['id']; ?>" data-akce="1" title="Štítek AKCE — cenovka červeně (jen s černo-červenou rolí DK-22251!)"><i class="fas fa-fire"></i></button>
-                                            <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vráceno — vrátit kus do skladu' : 'Zapůjčit / komisní prodej'; ?>"><?php if (productIsLoaned($p)): ?><i class="fas fa-rotate-left" style="color:#8B5CF6"></i><span class="ms-1" style="color:#8B5CF6;font-size:12px;font-weight:600">Vráceno</span><?php else: ?><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i><?php endif; ?></button>
+                                            <button type="button" class="btn btn-white border product-loan-btn" data-id="<?php echo (int)$p['id']; ?>" data-title="<?php echo e($p['title']); ?>" data-loaned="<?php echo productIsLoaned($p) ? '1' : '0'; ?>" data-to="<?php echo e($p['loan_to'] ?? ''); ?>" data-note="<?php echo e($p['loan_note'] ?? ''); ?>" title="<?php echo productIsLoaned($p) ? 'Vráceno — vrátit kus do skladu' : 'Zapůjčit / komisní prodej'; ?>"><?php if (productIsLoaned($p)): ?><i class="fas fa-rotate-left" style="color:#8B5CF6"></i><span class="ms-1 pt-btn-label" style="color:#8B5CF6">Vráceno</span><?php else: ?><i class="fas fa-hand-holding-heart" style="color:#8B5CF6"></i><?php endif; ?></button>
                                             <?php if (!empty($__repairMap[(int)$p['id']])): ?>
                                             <a class="btn btn-white border" href="view_order.php?id=<?php echo (int)$__repairMap[(int)$p['id']]['id']; ?>" title="V opravě — otevřít interní zakázku <?php echo e($__repairMap[(int)$p['id']]['code']); ?>"><i class="fas fa-screwdriver-wrench" style="color:#FF9F0A"></i></a>
                                             <?php elseif (crmInternalCustomerId() > 0 && (int)$p['stock_qty'] > 0): ?>
-                                            <button type="button" class="btn btn-white border" onclick="window.afxStockReklamace && afxStockReklamace(<?php echo (int)$p['id']; ?>)" title="Reklamace — kus potřebuje před prodejem opravit: založí interní zakázku a stáhne ho z prodeje"><i class="fas fa-rotate-left" style="color:#f97316"></i><span class="ms-1" style="color:#f97316;font-size:12px;font-weight:600">Reklamace</span></button>
+                                            <button type="button" class="btn btn-white border" onclick="window.afxStockReklamace && afxStockReklamace(<?php echo (int)$p['id']; ?>)" title="Reklamace — kus potřebuje před prodejem opravit: založí interní zakázku a stáhne ho z prodeje"><i class="fas fa-rotate-left" style="color:#f97316"></i></button>
                                             <?php endif; ?>
                                             <button type="button" class="btn btn-white border product-edit-btn" data-id="<?php echo (int)$p['id']; ?>" title="Upravit produkt"><i class="fas fa-edit text-warning"></i></button>
                                             <button type="button" class="btn btn-white border tr-add-btn" data-type="product" data-id="<?php echo (int)$p['id']; ?>" data-name="<?php echo e($p['title']); ?>" title="Přesun na druhou pobočku"><i class="fas fa-right-left text-info"></i></button>
@@ -479,7 +547,7 @@ try {
                                         </div>
                                     </td>
                                     <?php else: ?>
-                                    <td class="text-end pe-4">
+                                    <td class="text-end pe-4 c-tight">
                                         <button type="button" class="btn btn-sm btn-white border text-info product-label-btn" data-id="<?php echo (int)$p['id']; ?>" title="Vytisknout cenový štítek"><i class="fas fa-tag"></i></button>
                                         <button type="button" class="btn btn-sm btn-white border text-danger product-label-btn" data-id="<?php echo (int)$p['id']; ?>" data-akce="1" title="Štítek AKCE — cenovka červeně (jen s černo-červenou rolí DK-22251!)"><i class="fas fa-fire"></i></button>
                                     </td>
@@ -2409,9 +2477,9 @@ $(document).on('input', '#loanTo', function () {
             var box = document.getElementById('loanToSuggest'), res = (d && d.results) || [];
             if (!res.length) { loanHideSuggest(); return; }
             box.innerHTML = res.slice(0, 10).map(function (r) {
-                return '<button type="button" class="list-group-item list-group-item-action py-2 loan-sug" data-id="' + r.id + '" data-name="' + escHtml(r.name || r.text) + '">'
+                return '<button type="button" class="loan-sug" data-id="' + r.id + '" data-name="' + escHtml(r.name || r.text) + '">'
                     + '<div class="fw-semibold">' + escHtml(r.name || r.text) + '</div>'
-                    + (r.phone ? '<div class="small text-muted">' + escHtml(r.phone) + '</div>' : '') + '</button>';
+                    + (r.phone ? '<div class="small">' + escHtml(r.phone) + '</div>' : '') + '</button>';
             }).join('');
             box.style.display = 'block';
         });
