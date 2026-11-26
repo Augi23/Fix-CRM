@@ -427,9 +427,54 @@ $afxFp = array_values(array_filter(explode(' ', $afxFn)));
 $afxInitials = mb_strtoupper(count($afxFp) >= 2 ? mb_substr($afxFp[0],0,1).mb_substr($afxFp[1],0,1) : mb_substr($afxFn,0,2));
 $afxIsManager = hasPermission('admin_access') || in_array(getCurrentStaffRole(), ['manager', 'boss'], true);
 ?>
-<!-- Pozadí: statická „půlnoční modř" (v3.94.0) — jen CSS (.crm-bgfx v crm-shell.css), nic se
+<?php
+// Barevný nádech pozadí podle sekce (v4.5.1): každá stránka má na pozadí decentní záři
+// v barvě své ikony v horním menu (barvy dlaždic viz dock-3d.css). Podstránky dědí
+// barvu sekce, do které patří. Stránka mimo seznam = modrá jako Nástěnka.
+// Hodnoty: [hlavní záře vlevo nahoře, vedlejší záře vpravo dole] jako „r,g,b".
+$afxBgTones = [
+    'home'      => ['10,132,255',  '85,212,255'],   // Nástěnka — modrá (původní pozadí)
+    'orders'    => ['112,134,172', '160,178,206'],  // Zakázky — ocel
+    'complaint' => ['255,128,32',  '255,190,100'],  // Reklamace — oranžová
+    'customers' => ['20,190,175',  '90,230,215'],   // Klienti — tyrkysová
+    'stock'     => ['206,140,70',  '232,187,128'],  // Sklad — krabice
+    'money'     => ['40,190,100',  '110,227,145'],  // Účetnictví — zelená
+    'reports'   => ['110,90,240',  '154,140,255'],  // Přehledy — indigo
+    'chat'      => ['40,150,245',  '116,208,255'],  // Chat — světle modrá
+    'tasks'     => ['110,190,60',  '165,226,103'],  // Úkoly — limetková
+    'roster'    => ['240,70,70',   '255,127,120'],  // Rozpis — červená
+    'docs'      => ['140,156,182', '182,194,210'],  // Dokumenty — papír
+    'guides'    => ['175,90,235',  '212,141,255'],  // Návody — fialová
+    'settings'  => ['125,135,152', '163,171,184'],  // Nastavení — grafit
+    'shopping'  => ['30,200,140',  '82,240,182'],   // Nákupní seznam — smaragdová
+    'pos'       => ['168,92,236',  '217,157,255'],  // Pokladna — fialová
+];
+$afxBgPages = [
+    'index.php' => 'home', 'search.php' => 'home',
+    'orders.php' => 'orders', 'view_order.php' => 'orders', 'edit_order.php' => 'orders',
+    'reklamace.php' => 'complaint', 'view_complaint.php' => 'complaint',
+    'customers.php' => 'customers', 'edit_customer.php' => 'customers', 'klient-karta.php' => 'customers',
+    'inventory.php' => 'stock', 'products.php' => 'stock', 'procurement.php' => 'stock',
+    'edit_inventory.php' => 'stock', 'sklad.php' => 'stock', 'sklad_mapa.php' => 'stock',
+    'sklad_presuny.php' => 'stock', 'sklad_umisteni.php' => 'stock', 'model_photos.php' => 'stock',
+    'accounting.php' => 'money', 'banka.php' => 'money', 'ucetni_prodej.php' => 'money', 'ucetni_sestavy.php' => 'money',
+    'reports.php' => 'reports', 'history.php' => 'reports',
+    'chat.php' => 'chat',
+    'ukoly.php' => 'tasks',
+    'rozpis.php' => 'roster',
+    'dokumenty.php' => 'docs', 'dokument.php' => 'docs', 'doklady-totoznosti.php' => 'docs',
+    'navody.php' => 'guides',
+    'settings.php' => 'settings', 'trideni-posty.php' => 'settings',
+    'nakupni-seznam.php' => 'shopping',
+    'pokladna.php' => 'pos',
+];
+$afxBgKey  = $afxBgPages[$current_page] ?? 'home';
+$afxBgTone = $afxBgTones[$afxBgKey];
+?>
+<!-- Pozadí: statický tmavý přechod s decentní září v barvě sekce (v4.5.1; původní „půlnoční
+     modř" z v3.94.0 zůstává na Nástěnce). Jen CSS (.crm-bgfx v crm-shell.css), nic se
      nepřekresluje. Pohyblivé pozadí <af-wave-bg> zrušeno na přání majitele (16.10.2026). -->
-<div class="crm-bgfx" aria-hidden="true"></div>
+<div class="crm-bgfx" data-tone="<?php echo e($afxBgKey); ?>" style="--bgfx-a: <?php echo $afxBgTone[0]; ?>; --bgfx-b: <?php echo $afxBgTone[1]; ?>;" aria-hidden="true"></div>
 
 <!-- Tenký servisní řádek -->
 <header class="afx-utility">

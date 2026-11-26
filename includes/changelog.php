@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.5.1',
+        'date' => '2026-11-26',
+        'time' => '21:45',
+        'title' => 'Pozadí v barvě sekce',
+        'items' => [
+            'Každá sekce má na pozadí jemný nádech v barvě své ikony v horním menu: Reklamace do oranžova, Klienti do tyrkysova, Úkoly do zelena, Rozpis do červena, Pokladna do fialova a tak dál.',
+            'Nástěnka zůstává modrá jako dosud. Podstránky mají barvu sekce, do které patří — detail zakázky jako Zakázky, detail reklamace jako Reklamace, banka jako Účetnictví.',
+            'Světlého režimu se změna netýká.',
+        ],
+    ],
+    [
         'version' => '4.5.0',
         'date' => '2026-11-26',
         'time' => '18:55',

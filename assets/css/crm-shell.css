@@ -91,12 +91,18 @@ html, body {
   background-color: #04070d !important;
 }
 /* Vrstva pozadí — fixní přes viewport, obsah leží nad ní (pořadí v DOM). */
+/* Barva záře se řídí sekcí (v4.5.1): --bgfx-a / --bgfx-b nastavuje header.php podle
+   stránky na barvu její ikony v menu. Bez nich platí původní modrá. Základ je neutrálně
+   tmavý a barvu mu dává průsvitný závoj, takže se odstín mění celý, ne jen rohy. */
 .crm-bgfx {
+  --bgfx-a: 10,132,255;
+  --bgfx-b: 85,212,255;
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(65% 55% at 8% -5%, rgba(10,132,255,.22) 0%, rgba(10,132,255,0) 68%),
-    radial-gradient(55% 50% at 100% 105%, rgba(85,212,255,.13) 0%, rgba(85,212,255,0) 70%),
-    linear-gradient(180deg, #0c1220 0%, #080c14 60%, #06080d 100%);
+    radial-gradient(65% 55% at 8% -5%, rgba(var(--bgfx-a),.22) 0%, rgba(var(--bgfx-a),0) 68%),
+    radial-gradient(55% 50% at 100% 105%, rgba(var(--bgfx-b),.13) 0%, rgba(var(--bgfx-b),0) 70%),
+    linear-gradient(180deg, rgba(var(--bgfx-a),.055) 0%, rgba(var(--bgfx-a),.03) 60%, rgba(var(--bgfx-a),.012) 100%),
+    linear-gradient(180deg, #0c0e13 0%, #08090d 60%, #06070a 100%);
 }
 /* POZOR: #content NESMÍ mít z-index — vytvořil by stacking context a všechna
    popup okna definovaná uvnitř stránek by skončila POD .modal-backdrop (1050,
