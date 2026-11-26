@@ -110,8 +110,74 @@ $dshOrderRow = function (array $r) {
     </div>
     <?php return ob_get_clean();
 };
+/** Řádek reklamace v Moje práce — místo ceny ukazuje, kolik zbývá ze zákonné lhůty 30 dní. */
+$dshComplaintRow = function (array $c) {
+    $left = (int)$c['days_left'];
+    $over = !empty($c['over']);
+    $hot = $over || $left <= 7;
+    $phone = normalizePhoneForTel(($c['phone'] ?? '') !== '' ? $c['phone'] : ($c['cust_phone'] ?? ''));
+    $name = trim(($c['first_name'] ?? '') . ' ' . ($c['last_name'] ?? ''));
+    $reason = trim(preg_replace('/\s+/u', ' ', (string)($c['complaint_reason'] ?? '')));
+    $due = $c['deadline'] !== '' ? date('j. n.', strtotime((string)$c['deadline'])) : '';
+    ob_start(); ?>
+    <div class="dsh-o is-cmpl<?php echo $hot ? ' is-hot' : ''; ?>">
+        <a class="dsh-o-link" href="view_complaint.php?id=<?php echo (int)$c['id']; ?>" aria-label="Reklamace <?php echo e((string)$c['complaint_code']); ?>"></a>
+        <div class="dsh-o-code">
+            <b><?php echo e((string)$c['complaint_code']); ?></b>
+            <em><?php echo e(date('j. n. H:i', strtotime((string)$c['created_at']))); ?></em>
+        </div>
+        <div class="dsh-o-who">
+            <b><?php echo $name !== '' ? e($name) : 'Bez jména'; ?></b>
+            <em><?php echo e((string)($c['device'] ?? '')); ?></em>
+        </div>
+        <div class="dsh-o-st">
+            <b class="dsh-pill t-kind"><i class="fas fa-rotate-left"></i> Reklamace</b>
+            <b class="dsh-pill"><?php echo e((string)$c['complaint_status']); ?></b>
+            <?php if ($reason !== ''): ?><em title="<?php echo e($reason); ?>"><?php echo e($reason); ?></em><?php endif; ?>
+        </div>
+        <div class="dsh-o-amt dsh-o-due<?php echo $hot ? ' is-late' : ''; ?>" title="Zákonná lhůta 30 dní<?php echo $due !== '' ? ($over ? ' skončila ' : ' končí ') . e($due) : ''; ?>">
+            <?php echo $over ? 'po lhůtě' . ($left > 0 ? ' ' . $left . ' d' : '') : 'zbývá ' . $left . ' d'; ?>
+        </div>
+        <?php if ($phone !== ''): ?>
+        <a class="dsh-call" href="tel:<?php echo e($phone); ?>" title="Zavolat" aria-label="Zavolat"><i class="fas fa-phone"></i></a>
+        <?php endif; ?>
+    </div>
+    <?php return ob_get_clean();
+};
+/** Řádek úkolu v Moje práce — místo ceny termín. */
+$dshTaskRow = function (array $t) {
+    $detail = trim(preg_replace('/\s+/u', ' ', (string)($t['detail'] ?? '')));
+    $hot = !empty($t['overdue']);
+    $from = !empty($t['own']) ? 'moje poznámka' : 'zadal(a) ' . trim((string)$t['creator_name']);
+    if (strpos((string)$t['assignee_key'], 'branch:') === 0) { $from .= ' · pro prodejnu'; }
+    ob_start(); ?>
+    <div class="dsh-o is-task<?php echo $hot ? ' is-hot' : ''; ?>">
+        <a class="dsh-o-link" href="ukoly.php?u=<?php echo (int)$t['id']; ?>" aria-label="Úkol <?php echo e((string)$t['title']); ?>"></a>
+        <div class="dsh-o-code">
+            <b>Úkol</b>
+            <em><?php echo e(date('j. n. H:i', strtotime((string)$t['created_at']))); ?></em>
+        </div>
+        <div class="dsh-o-who">
+            <b><?php echo e((string)$t['title']); ?></b>
+            <em><?php echo e($detail !== '' ? $detail : $from); ?></em>
+        </div>
+        <div class="dsh-o-st">
+            <b class="dsh-pill t-kind"><i class="fas fa-list-check"></i> Úkol</b>
+            <?php if ((int)$t['urgent'] === 1): ?><b class="dsh-pill t-urgent"><i class="fas fa-bolt"></i> Spěchá</b><?php endif; ?>
+            <?php if ($detail !== ''): ?><em><?php echo e($from); ?></em><?php endif; ?>
+        </div>
+        <div class="dsh-o-amt dsh-o-due<?php echo $hot ? ' is-late' : ''; ?>">
+            <?php echo $hot ? 'po termínu' : e(afxTaskDueWords($t['due_date'] ?: null, $t['due_time'] ?: null)); ?>
+        </div>
+    </div>
+    <?php return ob_get_clean();
+};
+$dshMineRow = function (array $r) use ($dshOrderRow, $dshComplaintRow, $dshTaskRow) {
+    $kind = $r['_kind'] ?? 'order';
+    return $kind === 'complaint' ? $dshComplaintRow($r) : ($kind === 'task' ? $dshTaskRow($r) : $dshOrderRow($r));
+};
 ?>
-<link rel="stylesheet" href="assets/css/dashboard.css?v=3.98.0">
+<link rel="stylesheet" href="assets/css/dashboard.css?v=4.4.1">
 <?php if (crmCanManageProducts()): ?>
 <style>
 .eshop-modal-row{display:flex;gap:12px;padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.04);
@@ -482,7 +548,7 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
                         <h2 class="dsh-h"><?php echo $filter_status ? e(getOrderStatusLabel($filter_status)) : 'Hledání: ' . e($search); ?></h2>
                         <a class="dsh-more" href="index.php">Zrušit</a>
                     <?php else: ?>
-                    <?php if ($D['tech_id'] > 0): ?>
+                    <?php if ($D['show_mine']): ?>
                     <div class="dsh-seg dsh-seg--tabs" role="tablist">
                         <button type="button" class="is-on" data-dsh-tab="mine" role="tab" aria-selected="true">Moje práce <small><?php echo (int)$D['mine_count']; ?></small></button>
                         <button type="button" data-dsh-tab="recent" role="tab" aria-selected="false">Nejnovější</button>
@@ -493,14 +559,14 @@ $__plural = fn(int $n, string $one, string $few, string $many) => $n === 1 ? $on
                     <a class="dsh-more" href="orders.php">Všechny zakázky <i class="fas fa-arrow-right"></i></a>
                     <?php endif; ?>
                 </div>
-                <?php if ($D['tech_id'] > 0 && $search === '' && !$filter_status): ?>
+                <?php if ($D['show_mine'] && $search === '' && !$filter_status): ?>
                 <div class="dsh-olist" data-dsh-pane="mine">
-                    <?php foreach (array_slice($D['mine'], 0, 12) as $r) { echo $dshOrderRow($r); } ?>
-                    <?php if (!$D['mine']): ?><div class="dsh-empty">Nemáš přiřazenou žádnou rozpracovanou zakázku.</div><?php endif; ?>
-                    <?php if ($D['mine_count'] > 12): ?><a class="dsh-more dsh-olist-more" href="orders.php?tech=<?php echo (int)$D['tech_id']; ?>">Všech <?php echo (int)$D['mine_count']; ?> mých zakázek <i class="fas fa-arrow-right"></i></a><?php endif; ?>
+                    <?php foreach (array_slice($D['mine'], 0, 12) as $r) { echo $dshMineRow($r); } ?>
+                    <?php if (!$D['mine']): ?><div class="dsh-empty">Nemáš přiřazenou žádnou rozpracovanou zakázku, reklamaci ani úkol.</div><?php endif; ?>
+                    <?php if ($D['mine_count'] > 12 && $D['mine_orders'] > 0 && $D['tech_id'] > 0): ?><a class="dsh-more dsh-olist-more" href="orders.php?tech=<?php echo (int)$D['tech_id']; ?>">Všech <?php echo (int)$D['mine_orders']; ?> mých zakázek <i class="fas fa-arrow-right"></i></a><?php endif; ?>
                 </div>
                 <?php endif; ?>
-                <div class="dsh-olist" data-dsh-pane="recent"<?php echo ($D['tech_id'] > 0 && $search === '' && !$filter_status) ? ' hidden' : ''; ?>>
+                <div class="dsh-olist" data-dsh-pane="recent"<?php echo ($D['show_mine'] && $search === '' && !$filter_status) ? ' hidden' : ''; ?>>
                     <?php foreach (array_slice($recent, 0, 12) as $r) { echo $dshOrderRow($r); } ?>
                     <?php if (!$recent): ?><div class="dsh-empty"><?php echo __('not_found'); ?></div><?php endif; ?>
                 </div>

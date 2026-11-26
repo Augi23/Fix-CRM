@@ -397,10 +397,69 @@ function crmDashboardBuild(PDO $pdo, int $pick = 0): array {
     usort($tasks, fn($a, $b) => ($rank[$a['key']] ?? 99) <=> ($rank[$b['key']] ?? 99));
     $D['tasks'] = $tasks;
 
-    // ── MOJE PRÁCE (technik) ─────────────────────────────────────────────────
+    // ── MOJE PRÁCE — všechno, co má přihlášený přiřazené: zakázky, reklamace, úkoly ──
+    // Pořadí (skóre): spěchající zakázky a hořící úkoly → reklamace (běží zákonná lhůta)
+    // → ostatní úkoly → běžné zakázky → zapomenuté zakázky.
+    $D['mine_orders'] = count($bucket['mine']);
+    if ($tid > 0) {
+        try {
+            ensureComplaintsClientColumns($pdo);
+            ensureComplaintsWorkflowColumns($pdo);
+            // Přiřazená reklamace je moje bez ohledu na pobočku (stejně jako přiřazená zakázka).
+            $st = $pdo->prepare("SELECT c.id, c.complaint_code, c.device, c.phone, c.complaint_status, c.complaint_reason,
+                    c.created_at, c.order_code, cu.first_name, cu.last_name, cu.phone AS cust_phone, o.branch_id
+                FROM complaints c LEFT JOIN orders o ON o.id = c.order_id LEFT JOIN customers cu ON cu.id = c.customer_id
+                WHERE c.technician_id = ? AND c.complaint_status NOT IN ('Vyřízeno','Zamítnuto') AND c.resolved_at IS NULL"
+                . ($pick ? ' AND (o.branch_id = ' . $pick . ' OR c.order_id IS NULL OR c.order_id = 0)' : '') . "
+                ORDER BY c.created_at ASC LIMIT 60");
+            $st->execute([$tid]);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $c) {
+                $dl = complaintDeadline($c);
+                $secs = $dl ? $dl->getTimestamp() - time() : 30 * 86400;
+                $left = (int)floor(abs($secs) / 86400);   // celé dny do konce lhůty / po ní
+                $c['_kind'] = 'complaint';
+                $c['over'] = $secs < 0;
+                $c['days_left'] = $left;
+                if ($secs < 0) { $left = -$left - 1; }
+                $c['deadline'] = $dl ? $dl->format('Y-m-d') : '';
+                $bucket['mine'][] = [5e8 + (30 - $left) * 86400, $c];
+            }
+        } catch (Throwable $e) { error_log('dashboard mine complaints: ' . $e->getMessage()); }
+    }
+    try {
+        require_once __DIR__ . '/../ukoly/lib.php';
+        afxTaskEnsureSchema();
+        $meKey = afxTaskMe();
+        if ($meKey !== '') {
+            // stejný výběr jako číslo u Úkolů v menu: úkoly pro mě + pro moji prodejnu (ne ty, co jsem jí zadal sám)
+            $st = $pdo->prepare("SELECT id, title, detail, creator_key, creator_name, assignee_key, due_date, due_time, urgent, created_at
+                FROM staff_tasks WHERE deleted_at IS NULL AND status = 'open'
+                  AND (assignee_key = ? OR (assignee_key = ? AND creator_key <> ?))
+                ORDER BY id DESC LIMIT 60");
+            $st->execute([$meKey, 'branch:' . (int)getCurrentStaffBranchId(), $meKey]);
+            $now = time();
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $t) {
+                $dueTs = null;
+                if (!empty($t['due_date'])) {
+                    $dueTs = strtotime($t['due_date'] . ' ' . (!empty($t['due_time']) ? $t['due_time'] : '23:59:59'));
+                }
+                $t['_kind'] = 'task';
+                $t['overdue'] = $dueTs !== null && $dueTs < $now;
+                $t['due_today'] = !empty($t['due_date']) && $t['due_date'] === date('Y-m-d');
+                $t['own'] = $t['creator_key'] === $meKey;
+                if ($t['overdue'] || (int)$t['urgent'] === 1) { $score = 9e8 + ($dueTs !== null ? min(9e7, max(0, $now - $dueTs)) : 0); }
+                elseif ($t['due_today']) { $score = 7e8 - ($dueTs - $now); }
+                elseif ($dueTs !== null) { $score = 4e8 - min(9e7, $dueTs - $now); }
+                else { $score = 3e8 + (int)$t['id']; }
+                $bucket['mine'][] = [$score, $t];
+            }
+        }
+    } catch (Throwable $e) { error_log('dashboard mine tasks: ' . $e->getMessage()); }
     usort($bucket['mine'], fn($x, $y) => $y[0] <=> $x[0]);
     $D['mine'] = array_map(fn($x) => $x[1], array_slice($bucket['mine'], 0, 30));
     $D['mine_count'] = count($bucket['mine']);
+    // záložku má každý technik; účet bez technika jen když mu někdo zadal úkol
+    $D['show_mine'] = $tid > 0 || $D['mine_count'] > 0;
 
     // ── TÝM DNES — plán směn + kdo je online + kdo drží kasu ────────────────
     $team = [];

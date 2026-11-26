@@ -11,6 +11,19 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.4.1',
+        'date' => '2026-11-26',
+        'time' => '18:32',
+        'title' => 'Nástěnka: Moje práce ukazuje i reklamace a úkoly',
+        'items' => [
+            'Záložka <b>Moje práce</b> na nástěnce dřív ukazovala jen zakázky. Teď je v ní všechno, co máš přiřazené: <b>zakázky, reklamace i úkoly</b>.',
+            '<b>Reklamace</b> přiřazená tobě má oranžový proužek a místo ceny ukazuje, kolik dní zbývá ze zákonné lhůty 30 dní. Posledních 7 dní a po lhůtě svítí červeně.',
+            '<b>Úkoly</b> pro tebe (i ty zadané celé prodejně) mají zelený proužek a místo ceny termín. Kliknutím se otevře přímo ten úkol.',
+            'Nahoře jsou spěchající zakázky a úkoly po termínu, pod nimi reklamace, pak ostatní úkoly a běžné zakázky.',
+            'Reklamaci, kterou máš přiřazenou, otevřeš i tehdy, když patří k zakázce druhé prodejny — stejně jako přiřazenou zakázku.',
+        ],
+    ],
+    [
         'version' => '4.4.0',
         'date' => '2026-11-23',
         'time' => '03:20',

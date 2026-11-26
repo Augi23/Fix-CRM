@@ -34,7 +34,9 @@ if (!$c) { header('Location: reklamace.php'); exit; }
 
 // Pobočková izolace: reklamaci k zakázce JINÉ pobočky ne-globální divák (manažer/technik)
 // neotevře. Reklamace bez zakázky (e-shopové) jsou přístupné všem.
-if (!isBranchGlobalViewer() && (int)($c['order_id'] ?? 0) > 0) {
+// Výjimka: reklamaci přiřazenou mně otevřu vždy (stejně jako přiřazenou zakázku).
+$__mineCmpl = (int)($_SESSION['tech_id'] ?? 0) > 0 && (int)($c['technician_id'] ?? 0) === (int)$_SESSION['tech_id'];
+if (!isBranchGlobalViewer() && !$__mineCmpl && (int)($c['order_id'] ?? 0) > 0) {
     $__ob = $pdo->prepare("SELECT branch_id FROM orders WHERE id = ?");
     $__ob->execute([(int)$c['order_id']]);
     $__ordBranch = (int)$__ob->fetchColumn();
