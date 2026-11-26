@@ -37,6 +37,7 @@ ensureOrderPaymentMethodColumn();  // DDL — před transakcí (dřív až uvnit
 ensurePosTables();                 // DDL — před transakcí: výdej se ptá kasy (crmOrderPosSale)
 ensurePosCashMovementsTable();     // DDL — před transakcí: kontrola hotovosti při výdeji
 ensureOrderSignaturesTable();      // DDL — před transakcí: výdej vyžaduje podpis převzetí (v4.2.0)
+ensureOrderDiagColumns();          // DDL — před transakcí: jen diagnostika × odhad (v4.5.0)
 
 if (!$order_id || !$new_status) {
     echo json_encode(['success' => false, 'message' => $t('missing_data')]);
@@ -52,7 +53,7 @@ if (!$order_id || !$new_status) {
 try {
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, repair_solution, payment_method, shipping_method, device_brand, device_model, customer_id, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT order_code, status, technician_id, branch_id, estimated_cost, final_cost, diag_fee, price_pending, repair_solution, payment_method, shipping_method, device_brand, device_model, customer_id, work_started_at, work_finished_at, work_duration_seconds FROM orders WHERE id = ?');
     $stmt->execute([$order_id]);
     $order_data = $stmt->fetch();
 
@@ -64,6 +65,17 @@ try {
     // přihlášený zaměstnanec a technika smí přeřadit na kohokoliv (dřívější
     // pobočková brána canAccessOrderBranch a omezení „technik smí jen převzít
     // nepřiřazenou zakázku" hlásily technikům „Přístup odepřen").
+
+    // Zakázka přijatá jen na diagnostiku bez stanovené ceny (v4.5.0): nejde dokončit ani vydat
+    // a cenu jí nejde podstrčit tímhle formulářem — jediná cesta je „Stanovit cenu" v detailu.
+    if (crmOrderPricePending($order_data)) {
+        if (crmPricePendingBlocksStatus((string)$new_status)) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'code' => 'price_pending', 'message' => crmPricePendingMessage($order_data)]);
+            exit;
+        }
+        $final_cost = null;
+    }
 
     $current_status = $order_data['status'];
     $current_tech_id = $order_data['technician_id'];

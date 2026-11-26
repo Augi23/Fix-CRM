@@ -181,6 +181,30 @@ if (!$customer_id || !$device_model || $pin_code === '') {
     );
 }
 
+// Cena při příjmu (v4.5.0): buď JEN DIAGNOSTIKA (cena opravy se stanoví až po ní — odhad zůstane
+// prázdný, zakázku nejde dokončit ani vydat, dokud ji někdo nestanoví), nebo ODHAD ceny opravy,
+// nebo zakázka bez úhrady. Formulář příjmu volbu vyžaduje (price_mode_required); jiné zdroje
+// (starší otevřené okno) pole neposílají a chovají se jako dřív.
+$price_mode = trim((string)($_POST['price_mode'] ?? ''));
+$diag_fee = null;
+$price_pending = 0;
+if (!empty($_POST['price_mode_required']) && !in_array($price_mode, ['diag', 'estimate', 'free'], true)) {
+    afxOrderFail('Chybí cena', 'Zvolte, jestli zakázku přijímáte jen na diagnostiku, nebo znáte odhad ceny opravy.');
+}
+if ($price_mode === 'diag') {
+    $diag_fee = crmDiagFee($device_type);
+    $price_pending = 1;
+    $estimated_cost = 0.0;   // odhad opravy se schválně neukládá — viz includes/order_price.php
+    $base_cost = 0.0;
+} elseif ($price_mode === 'estimate') {
+    if ($base_cost <= 0) {
+        afxOrderFail('Chybí odhad ceny', 'Zadejte odhad ceny opravy, nebo zvolte „Jen diagnostika“, pokud cenu zatím neznáte.');
+    }
+} elseif ($price_mode === 'free') {
+    $estimated_cost = 0.0;
+    $base_cost = 0.0;
+}
+
 // Fotky při příjmu jsou doporučené, ne povinné — zakázka jde založit i bez nich
 // (na přání majitele zrušeno potvrzovací okno i blokace; 26. 8. 2026).
 
@@ -237,6 +261,7 @@ try {
     ensureOrderPriorityLowValue();
     ensureOrderCreatedByColumn();   // DDL — před transakcí
     ensureOrderPriceLinesTable();   // DDL — před transakcí (rozpis ceny)
+    ensureOrderDiagColumns();       // DDL — před transakcí (diagnostika × odhad)
     ensureWebBookingsSchema();      // DDL — před transakcí (vazba na web rezervaci)
     $pdo->beginTransaction();
 
@@ -268,6 +293,9 @@ try {
             if ($stock_product_id > 0) {
                 $pdo->prepare("UPDATE orders SET stock_product_id = ? WHERE id = ?")->execute([$stock_product_id, $order_id]);
             }
+            if ($price_pending === 1) {
+                $pdo->prepare("UPDATE orders SET estimated_cost = NULL, diag_fee = ?, price_pending = 1 WHERE id = ?")->execute([$diag_fee, $order_id]);
+            }
             break;
         } catch (PDOException $ePdo) {
             // 1062 = duplicitní klíč; na tabulce orders je unikátní jen order_code
@@ -283,7 +311,12 @@ try {
         $plItems = json_decode((string)($_POST['pricelist_items'] ?? ''), true);
         $plItems = is_array($plItems) ? array_values(array_filter($plItems, fn($i) => is_array($i) && trim((string)($i['label'] ?? '')) !== '')) : [];
         $sortN = 0;
-        if (count($plItems) > 0) {
+        if ($price_mode === 'diag' || $price_mode === 'free') {
+            $plItems = [];
+            if ($price_mode === 'diag' && $priority_adjust != 0.0) {
+                crmAddOrderPriceLine($order_id, $priority === 'High' ? 'Expresní příplatek (přednostní oprava)' : 'Sleva — oprava beze spěchu', $priority_adjust, $sortN++);
+            }
+        } elseif (count($plItems) > 0) {
             $linesSum = 0.0;
             foreach ($plItems as $pi) {
                 $piPrice = (isset($pi['price']) && is_numeric($pi['price'])) ? (float)$pi['price'] : null;

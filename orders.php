@@ -7,6 +7,7 @@ require_once 'includes/scan_resolver.php';
 ensureOrderCreatedByColumn();   // sloupec „kdo zakázku vytvořil" (levý sloupec seznamu)
 ensureOrderDeviceBranchColumn(); // fyzické umístění zařízení (přesun mezi pobočkami)
 ensureOrdersSourceColumn();     // source + legacy_code (migrace 7/2026) — hledání níže se na legacy_code ptá
+ensureOrderDiagColumns();       // jen diagnostika × odhad opravy (v4.5.0)
 
 require_once 'includes/header.php';
 // Třídění pošty na pozadí (levná kontrola, běh max. 1× za ~3 min). Patří do
@@ -507,7 +508,7 @@ $__techs     = getActiveTechnicians(true);
                                 <?php endif; ?>
                             </td>
                             <td class="col-priority"><?php echo getOrderPriorityBadge($order['priority'] ?? 'Normal', (string)$order['status']); ?></td>
-                            <td class="fw-bold text-white"><?php echo formatMoney($order['final_cost'] ?: $order['estimated_cost']); ?></td>
+                            <td class="fw-bold text-white"><?php if (crmOrderPricePending($order)): ?><span class="badge bg-warning text-dark" title="Přijato jen na diagnostiku<?php echo (float)($order['diag_fee'] ?? 0) > 0 ? ' (' . e(formatMoney((float)$order['diag_fee'])) . ')' : ''; ?> — cena opravy ještě není stanovená">diagnostika</span><?php else: echo formatMoney($order['final_cost'] ?: $order['estimated_cost']); endif; ?></td>
                             <td class="text-end pe-4">
                                 <?php
                                     // Od 1.6.1: rychlou změnu stavu smí provést KAŽDÝ zaměstnanec
@@ -869,14 +870,14 @@ $(document).ready(function() {
                             <div class="col-12 col-sm-6 col-md-3">
                                 <label class="form-label"><?php echo __('price_estimated'); ?></label>
                                 <div class="input-group">
-                                    <input type="number" step="1" name="estimated_cost" class="form-control" value="${Math.round(o.estimated_cost || 0)}">
+                                    <input type="number" step="1" name="estimated_cost" class="form-control" value="${Math.round(o.estimated_cost || 0)}" ${Number(o.price_pending) === 1 ? 'disabled title="Přijato jen na diagnostiku — cenu stanov v detailu zakázky"' : ''}>
                                     <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                                 </div>
                             </div>
                             <div class="col-12 col-sm-6 col-md-3">
                                 <label class="form-label"><?php echo __('price_final'); ?></label>
                                 <div class="input-group">
-                                    <input type="number" step="1" name="final_cost" class="form-control" value="${Math.round(o.final_cost || o.estimated_cost || 0)}">
+                                    <input type="number" step="1" name="final_cost" class="form-control" value="${Math.round(o.final_cost || o.estimated_cost || 0)}" ${Number(o.price_pending) === 1 ? 'disabled title="Přijato jen na diagnostiku — cenu stanov v detailu zakázky"' : ''}>
                                     <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                                 </div>
                             </div>
@@ -1016,6 +1017,10 @@ $(document).ready(function() {
                 showQuickToast(res.payment_note ? res.payment_note : '<?php echo __('updated_success'); ?>', warn ? 'danger' : 'success');
                 // varování si obsluha musí stihnout přečíst → reload až po dojetí toastu
                 setTimeout(() => window.location.reload(), warn ? 5000 : (res.payment_note ? 1600 : 300));
+            } else if (res.code === 'price_pending') {
+                // v4.5.0: přijato jen na diagnostiku a cena není stanovená → stanovit v detailu zakázky
+                if (btn) btn.prop('disabled', false);
+                showConfirm(res.message + ' Otevřít zakázku?', function () { window.location.href = 'view_order.php?id=' + encodeURIComponent(id); });
             } else if (res.code === 'pickup_signature_required') {
                 // v4.2.0: výdej bez podpisu klienta server odmítne → podepsat rovnou tady a dokončit
                 showPickupSignQuick(id, status, btn, res, repairSolution, paymentMethod);

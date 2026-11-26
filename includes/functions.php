@@ -9859,5 +9859,8 @@ function afxAuthEpochGuard(): void {
         }
     } catch (Throwable $e) { /* výpadek DB nesmí odhlašovat */ }
 }
+// cena zakázky při příjmu: jen diagnostika × odhad opravy (v4.5.0)
+require_once __DIR__ . '/order_price.php';
+
 // stráž běží při každém požadavku — functions.php inkluduje každá stránka i API
 afxAuthEpochGuard();

@@ -11,6 +11,20 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.5.0',
+        'date' => '2026-11-26',
+        'time' => '18:55',
+        'title' => 'Příjem zakázky: jen diagnostika, nebo cena opravy',
+        'items' => [
+            'V posledním kroku nové zakázky je místo jednoho pole „odhad ceny“ část <b>Cena</b> se dvěma volbami: <b>Jen diagnostika</b> a <b>Známe cenu opravy</b>. Bez výběru zakázku založit nejde.',
+            '<b>Jen diagnostika:</b> cenu opravy neznáme. CRM samo doplní cenu diagnostiky — telefony 490 Kč, tablety, počítače a ostatní 990 Kč. Odhad opravy zůstává prázdný a na zakázkovém listu je „cena opravy bude stanovena po diagnostice“.',
+            '<b>Pojistka:</b> zakázku přijatou jen na diagnostiku nejde přepnout na Připraveno k převzetí ani vydat, dokud jí někdo nestanoví cenu. V detailu zakázky je k tomu tlačítko <b>Stanovit cenu</b> — vybereš, jestli se <b>opravuje</b> (a za kolik), nebo se účtuje <b>jen diagnostika</b>.',
+            'Důvod: do odhadu se dřív psala i cena diagnostiky. Když pak oprava proběhla, zakázka se vydala jen za cenu diagnostiky.',
+            'Když někdo do ceny opravy napíše přesně cenu diagnostiky, CRM se zeptá, jestli nejde jen o diagnostiku.',
+            'Záruční, reklamační a interní zakázky mají volbu <b>Bez úhrady</b>. V seznamu zakázek má zakázka bez stanovené ceny štítek <b>diagnostika</b>. Postup je v <b>Návodech</b>.',
+        ],
+    ],
+    [
         'version' => '4.4.1',
         'date' => '2026-11-26',
         'time' => '18:32',

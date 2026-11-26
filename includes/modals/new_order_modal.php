@@ -309,20 +309,62 @@ $crm_order_model_catalog = crmOrderModelCatalog();
                             </div>
                         </div>
 
-                        <div class="mb-2">
+                        <?php
+                        /* Cena při příjmu (v4.5.0): diagnostika a odhad opravy jsou dvě různé věci.
+                           Dřív bylo jen pole „odhad" — kdo do něj napsal cenu diagnostiky, způsobil,
+                           že se pak opravená zakázka vydala za cenu diagnostiky. Viz includes/order_price.php. */
+                        $__feePhone = crmDiagFee('Phone');
+                        $__feeOther = crmDiagFee('Other');
+                        $__cur = get_setting('currency', 'Kč');
+                        ?>
+                        <div class="mb-2 afx-price" id="orderPriceBox" data-fee-phone="<?php echo e((string)$__feePhone); ?>" data-fee-other="<?php echo e((string)$__feeOther); ?>">
                             <div class="d-flex align-items-center mb-2">
                                 <i class="fas fa-coins text-success me-2"></i>
-                                <span class="fw-semibold small text-uppercase"><?php echo __('section_financial'); ?></span>
+                                <span class="fw-semibold small text-uppercase">Cena</span>
                             </div>
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label"><?php echo __('cost_est'); ?></label>
-                                    <div class="input-group">
-                                        <input type="number" name="estimated_cost" class="form-control" step="0.01">
-                                        <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
+                            <input type="hidden" name="price_mode_required" value="1">
+                            <div class="afx-price-opts" role="radiogroup" aria-label="Cena zakázky">
+                                <label class="afx-price-opt">
+                                    <input type="radio" name="price_mode" value="diag">
+                                    <span class="afx-price-opt-t">Jen diagnostika</span>
+                                    <span class="afx-price-opt-d">Cenu opravy zatím neznáme. Stanoví se po diagnostice.</span>
+                                    <span class="afx-price-opt-fee" data-diag-fee><?php echo e(formatMoney($__feePhone)); ?></span>
+                                </label>
+                                <label class="afx-price-opt">
+                                    <input type="radio" name="price_mode" value="estimate">
+                                    <span class="afx-price-opt-t">Známe cenu opravy</span>
+                                    <span class="afx-price-opt-d">Klient se dozví cenu opravy hned při příjmu.</span>
+                                    <span class="afx-price-opt-fee" data-estimate-echo>zadáš níže</span>
+                                </label>
+                            </div>
+
+                            <div class="afx-price-detail afx-price-detail--diag">
+                                <p>Klient zaplatí za diagnostiku <b data-diag-fee><?php echo e(formatMoney($__feePhone)); ?></b> <span data-diag-kind>(telefon)</span>. Cenu opravy mu sdělíme po diagnostice.</p>
+                                <p class="afx-price-muted">Dokud cenu opravy někdo nestanoví, zakázka nepůjde dokončit ani vydat.</p>
+                                <p class="afx-price-muted">Ceník diagnostiky: telefony <?php echo e(formatMoney($__feePhone)); ?> · tablety, počítače a ostatní <?php echo e(formatMoney($__feeOther)); ?></p>
+                            </div>
+
+                            <div class="afx-price-detail afx-price-detail--estimate">
+                                <label class="form-label" for="orderEstimatedCost">Odhad ceny opravy</label>
+                                <div class="input-group afx-price-input">
+                                    <input type="number" name="estimated_cost" id="orderEstimatedCost" class="form-control" step="1" min="0" inputmode="numeric">
+                                    <span class="input-group-text"><?php echo e($__cur); ?></span>
+                                </div>
+                                <p class="afx-price-muted">Celá cena opravy pro klienta. Cenu diagnostiky sem nepiš.</p>
+                                <div class="afx-price-warn" data-price-warn hidden>
+                                    <p><b data-price-warn-amount></b> je cena diagnostiky. Jde opravdu o cenu celé opravy?</p>
+                                    <div class="afx-price-warn-btns">
+                                        <button type="button" class="btn btn-sm btn-warning" data-price-to-diag>Ne, přijímám jen na diagnostiku</button>
+                                        <button type="button" class="btn btn-sm btn-outline-light" data-price-confirm>Ano, tolik stojí oprava</button>
                                     </div>
                                 </div>
                             </div>
+
+                            <label class="afx-price-free">
+                                <input type="radio" name="price_mode" value="free">
+                                <span>Bez úhrady — záruční, reklamační nebo interní zakázka</span>
+                            </label>
+                            <div class="afx-price-err" data-price-err role="alert" hidden></div>
                         </div>
 
                         <hr class="border-secondary my-3 opacity-50">
@@ -489,6 +531,144 @@ $crm_order_model_catalog = crmOrderModelCatalog();
                 }());
                 </script>
                 <?php endif; ?>
+                <style>
+                /* Cena při příjmu — dvě velké volby, pod nimi jen to, co k vybrané patří */
+                #newOrderModal .afx-price-opts { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+                #newOrderModal .afx-price-opt { position: relative !important; display: grid !important; grid-template-columns: 1fr auto !important; gap: 2px 12px !important; align-items: start !important;
+                    margin: 0 !important; padding: 14px 16px !important; border-radius: 14px !important; cursor: pointer !important;
+                    border: 1.5px solid rgba(255,255,255,.16) !important; background: rgba(255,255,255,.04) !important; transition: border-color .15s, background .15s !important; }
+                #newOrderModal .afx-price-opt:hover { border-color: rgba(255,255,255,.34) !important; }
+                #newOrderModal .afx-price-opt input, #newOrderModal .afx-price-free input { position: absolute !important; opacity: 0 !important; pointer-events: none !important; }
+                #newOrderModal .afx-price-opt-t { grid-column: 1 !important; font-size: 16px !important; font-weight: 650 !important; color: #fff !important; }
+                #newOrderModal .afx-price-opt-d { grid-column: 1 !important; font-size: 13px !important; line-height: 1.35 !important; color: rgba(255,255,255,.66) !important; }
+                #newOrderModal .afx-price-opt-fee { grid-column: 2 !important; grid-row: 1 / span 2 !important; align-self: center !important; font-size: 15px !important; font-weight: 650 !important; white-space: nowrap !important; color: rgba(255,255,255,.8) !important; }
+                #newOrderModal .afx-price-opt:has(input:checked) { border-color: #34c759 !important; background: rgba(52,199,89,.14) !important; }
+                #newOrderModal .afx-price-opt:has(input:checked) .afx-price-opt-fee { color: #7ee79a !important; }
+                #newOrderModal .afx-price-opt:has(input:focus-visible), #newOrderModal .afx-price-free:has(input:focus-visible) { outline: 2px solid #0a84ff !important; outline-offset: 2px !important; }
+                #newOrderModal .afx-price-detail { display: none !important; margin-top: 12px !important; padding: 12px 16px !important; border-radius: 12px !important; background: rgba(255,255,255,.05) !important; }
+                #newOrderModal .afx-price:has(input[value="diag"]:checked) .afx-price-detail--diag,
+                #newOrderModal .afx-price:has(input[value="estimate"]:checked) .afx-price-detail--estimate { display: block !important; }
+                #newOrderModal .afx-price-detail p { margin: 0 0 4px !important; font-size: 14.5px !important; color: #fff !important; }
+                #newOrderModal .afx-price-detail p b { font-size: inherit !important; }
+                #newOrderModal .afx-price-detail p span { font-size: inherit !important; }
+                #newOrderModal .afx-price-detail p.afx-price-muted { font-size: 13px !important; color: rgba(255,255,255,.62) !important; }
+                #newOrderModal .afx-price-detail p:last-child { margin-bottom: 0 !important; }
+                #newOrderModal .afx-price-input { max-width: 260px !important; margin-bottom: 6px !important; }
+                #newOrderModal .afx-price-warn { margin-top: 10px !important; padding: 10px 12px !important; border-radius: 10px !important; border: 1px solid rgba(255,159,10,.55) !important; background: rgba(255,159,10,.12) !important; }
+                #newOrderModal .afx-price-warn[hidden], #newOrderModal .afx-price-err[hidden] { display: none !important; }
+                #newOrderModal .afx-price-warn-btns { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; margin-top: 8px !important; }
+                #newOrderModal .afx-price-free { display: inline-flex !important; align-items: center !important; gap: 8px !important; position: relative !important; margin: 12px 0 0 !important; padding: 6px 12px !important; border-radius: 999px !important; cursor: pointer !important;
+                    border: 1px solid rgba(255,255,255,.14) !important; font-size: 13.5px !important; color: rgba(255,255,255,.7) !important; }
+                #newOrderModal .afx-price-free span { font-size: inherit !important; }
+                #newOrderModal .afx-price-free:has(input:checked) { border-color: #34c759 !important; background: rgba(52,199,89,.14) !important; color: #fff !important; }
+                #newOrderModal .afx-price-err { margin-top: 10px !important; padding: 9px 12px !important; border-radius: 10px !important; background: rgba(255,69,58,.16) !important; border: 1px solid rgba(255,69,58,.5) !important; color: #ffd2cf !important; font-size: 14px !important; }
+                #newOrderModal .afx-price.is-missing .afx-price-opt { border-color: rgba(255,69,58,.7) !important; }
+                html[data-lg-theme="light"] #newOrderModal .afx-price-opt { border-color: rgba(10,20,40,.16) !important; background: rgba(10,20,40,.03) !important; }
+                html[data-lg-theme="light"] #newOrderModal .afx-price-opt-t, html[data-lg-theme="light"] #newOrderModal .afx-price-detail p { color: #101a2c !important; }
+                html[data-lg-theme="light"] #newOrderModal .afx-price-opt-d, html[data-lg-theme="light"] #newOrderModal .afx-price-detail p.afx-price-muted,
+                html[data-lg-theme="light"] #newOrderModal .afx-price-opt-fee, html[data-lg-theme="light"] #newOrderModal .afx-price-free { color: rgba(16,23,42,.66) !important; }
+                html[data-lg-theme="light"] #newOrderModal .afx-price-opt:has(input:checked), html[data-lg-theme="light"] #newOrderModal .afx-price-free:has(input:checked) { border-color: #1a7f3c !important; background: #e9fbee !important; color: #101a2c !important; }
+                html[data-lg-theme="light"] #newOrderModal .afx-price-opt:has(input:checked) .afx-price-opt-fee { color: #1a7f3c !important; }
+                html[data-lg-theme="light"] #newOrderModal .afx-price-detail { background: rgba(10,20,40,.04) !important; }
+                html[data-lg-theme="light"] #newOrderModal .afx-price-free { border-color: rgba(10,20,40,.16) !important; }
+                html[data-lg-theme="light"] #newOrderModal .afx-price-err { color: #8a0010 !important; background: #fdebeb !important; }
+                html[data-lg-theme="light"] #newOrderModal .afx-price-warn { background: #fef3df !important; }
+                @media (max-width: 575px) { #newOrderModal .afx-price-opts { grid-template-columns: 1fr !important; } }
+                </style>
+                <script>
+                /* Cena při příjmu: jen diagnostika × odhad opravy. Stav drží samotná rádia
+                   (obnoví je i rozepsaný koncept), skript jen dopočítává částky a hlídá odeslání. */
+                (function () {
+                    var box = document.getElementById('orderPriceBox');
+                    var form = document.getElementById('newOrderForm');
+                    if (!box || !form) { return; }
+                    var feePhone = Number(box.dataset.feePhone) || 490, feeOther = Number(box.dataset.feeOther) || 990;
+                    var est = document.getElementById('orderEstimatedCost');
+                    var warn = box.querySelector('[data-price-warn]'), err = box.querySelector('[data-price-err]');
+                    var confirmedFor = null;   // částka, u které obsluha potvrdila „ano, tolik stojí oprava"
+                    var kc = function (n) { return Number(n).toLocaleString('cs-CZ') + ' Kč'; };
+                    var mode = function () { var r = form.querySelector('input[name="price_mode"]:checked'); return r ? r.value : ''; };
+                    var setMode = function (v) {
+                        var r = form.querySelector('input[name="price_mode"][value="' + v + '"]');
+                        if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+                    };
+                    var devType = function () { var s = form.querySelector('[name="device_type"]'); return s ? String(s.value || '') : ''; };
+                    var fee = function () { return devType() === 'Phone' ? feePhone : feeOther; };
+                    var kinds = { Phone: 'telefon', Tablet: 'tablet', Notebook: 'notebook', PC: 'počítač', HDD: 'disk', Other: 'ostatní zařízení' };
+                    function showErr(msg) { err.textContent = msg; err.hidden = !msg; box.classList.toggle('is-missing', !!msg && !mode()); }
+                    function sync() {
+                        box.querySelectorAll('[data-diag-fee]').forEach(function (el) { el.textContent = kc(fee()); });
+                        var k = box.querySelector('[data-diag-kind]'); if (k) { k.textContent = '(' + (kinds[devType()] || 'ostatní zařízení') + ')'; }
+                        var echo = box.querySelector('[data-estimate-echo]');
+                        var v = Number(est.value);
+                        if (echo) { echo.textContent = (mode() === 'estimate' && v > 0) ? kc(v) : 'zadáš níže'; }
+                        if (mode()) { showErr(''); }
+                        if (mode() !== 'estimate' || !isDiagAmount(v) || confirmedFor === v) { warn.hidden = true; }
+                    }
+                    function isDiagAmount(v) { return v > 0 && (v === feePhone || v === feeOther); }
+                    function askDiag(v) {
+                        box.querySelector('[data-price-warn-amount]').textContent = kc(v);
+                        warn.hidden = false;
+                        warn.scrollIntoView({ block: 'nearest' });
+                    }
+
+                    function onChange(e) {
+                        var n = e.target && e.target.name;
+                        if (n === 'price_mode') {
+                            if (mode() === 'estimate') { setTimeout(function () { try { est.focus(); } catch (x) {} }, 30); }
+                            sync();
+                        } else if (n === 'device_type') { sync(); }
+                    }
+                    // Select2 ohlašuje změnu jen přes jQuery (nativní posluchač by ji neslyšel);
+                    // jQuery posluchač chytí obojí. Bez jQuery zůstane nativní.
+                    if (window.jQuery) { window.jQuery(form).on('change', onChange); } else { form.addEventListener('change', onChange); }
+                    est.addEventListener('input', function () { confirmedFor = null; if (est.value !== '' && !mode()) { setMode('estimate'); } sync(); });
+                    box.querySelector('[data-price-to-diag]').addEventListener('click', function () { est.value = ''; setMode('diag'); sync(); });
+                    box.querySelector('[data-price-confirm]').addEventListener('click', function () { confirmedFor = Number(est.value); warn.hidden = true; });
+
+                    // Výběr z ceníku vyplní odhad (main.js) → přepnout na „Známe cenu opravy".
+                    var chosen = document.getElementById('pricelistChosen');
+                    if (chosen && window.MutationObserver) {
+                        new MutationObserver(function () {
+                            setTimeout(function () {
+                                var picked = (window.afxPricelistItems || []).length > 0;
+                                if (picked && Number(est.value) > 0 && mode() !== 'estimate') { setMode('estimate'); }
+                                sync();
+                            }, 0);
+                        }).observe(chosen, { childList: true });
+                    }
+                    // Interní zakázka = bez úhrady (tlačítko „Interní zakázka" v 1. kroku).
+                    document.addEventListener('click', function (e) {
+                        if (e.target && e.target.closest && e.target.closest('#internalOrderBtn')) { setTimeout(function () { if (!mode()) { setMode('free'); } }, 0); }
+                    });
+                    var modalEl = document.getElementById('newOrderModal');
+                    modalEl.addEventListener('shown.bs.modal', sync);
+                    modalEl.addEventListener('hidden.bs.modal', function () { confirmedFor = null; warn.hidden = true; showErr(''); });
+                    // přechod na poslední krok (tlačítko Další) → přepočítat podle typu zařízení
+                    // (capture: průvodce v main.js klik na „Další" zastaví dřív, než by probublal sem)
+                    modalEl.addEventListener('click', function (e) { if (e.target && e.target.closest && e.target.closest('[data-wizard-next]')) { setTimeout(sync, 0); } }, true);
+
+                    // Bez volby ceny zakázku nezaložíme. Capture + stopImmediatePropagation, ať se
+                    // při zastavení nespustí další obsluha odeslání (zámek tlačítka apod.).
+                    form.addEventListener('submit', function (e) {
+                        var m = mode(), v = Number(est.value), stop = '';
+                        if (!m) { stop = 'Zvol, jestli zakázku přijímáš jen na diagnostiku, nebo znáš cenu opravy.'; }
+                        else if (m === 'estimate' && !(v > 0)) { stop = 'Zadej odhad ceny opravy. Když ji zatím neznáš, zvol „Jen diagnostika“.'; }
+                        else if (m === 'estimate' && isDiagAmount(v) && confirmedFor !== v) { askDiag(v); stop = ' '; }
+                        if (stop) {
+                            e.preventDefault(); e.stopImmediatePropagation();
+                            // main.js po kliknutí na Dokončit zamkne tlačítko („Ukládám…") — neodesíláme, tak ho hned vrátit
+                            setTimeout(function () { if (form.__afxUnlock) { form.__afxUnlock(); } else { form.dataset.afxSubmitting = ''; } }, 0);
+                            showErr(stop.trim());
+                            if (stop.trim()) { box.scrollIntoView({ block: 'center' }); }
+                            if (m === 'estimate' && !(v > 0)) { try { est.focus(); } catch (x) {} }
+                            return;
+                        }
+                        if (m !== 'estimate') { est.value = ''; }   // do odhadu nikdy neputuje nic jiného než cena opravy
+                    }, true);
+                    sync();
+                }());
+                </script>
                 <script>
                 window.CRM_ORDER_MODEL_CATALOG = <?php echo json_encode($crm_order_model_catalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
                 </script>

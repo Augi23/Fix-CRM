@@ -29,6 +29,7 @@ if (!$id) die(__('order_id_missing'));
 ensureOrderDeviceBranchColumn(); // fyzické umístění zařízení (přesun mezi pobočkami)
 ensureOrderRepairSolutionColumn(); // „Provedená oprava" (povinná před dokončením)
 ensureOrderPaymentMethodColumn(); // hotově/kartou/převodem při výdeji
+ensureOrderDiagColumns(); // jen diagnostika × odhad opravy (v4.5.0)
 ensurePosTables(); // vazba hotovostní účtenky z kasy zpět na zakázku
 
 $stmt = $pdo->prepare("SELECT o.*, c.first_name, c.last_name, c.phone, c.email, t.name as tech_name
@@ -715,10 +716,23 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
         <div class="card glass-card border-0 mb-3 ord-card">
             <div class="card-body">
                 <div class="ord-card-title"><i class="fas fa-money-bill-wave"></i>Platba a faktura</div>
+                <?php $__pricePending = crmOrderPricePending($order); $__diagFee = (float)($order['diag_fee'] ?? 0); ?>
+                <?php if ($__pricePending): /* přijato jen na diagnostiku, cena opravy ještě není (v4.5.0) */ ?>
+                <div class="ord-price">
+                    <span>Cena opravy</span>
+                    <b class="ord-price-wait">není stanovená</b>
+                </div>
+                <div class="ord-diag">
+                    <div class="ord-diag-h"><i class="fas fa-stethoscope"></i>Přijato jen na diagnostiku<?php echo $__diagFee > 0 ? ' · ' . formatMoney($__diagFee) : ''; ?></div>
+                    <p>Než zakázku dokončíš nebo vydáš, stanov cenu: buď cenu opravy, nebo jen diagnostiku, když se neopravovalo.</p>
+                    <button type="button" class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#priceResolveModal"><i class="fas fa-tag me-2"></i>Stanovit cenu</button>
+                </div>
+                <?php else: ?>
                 <div class="ord-price">
                     <span><?php echo ((float)($order['final_cost'] ?? 0) > 0) ? 'Cena opravy' : 'Předpokládaná cena'; ?></span>
                     <b><?php echo formatMoney($__amt); ?></b>
                 </div>
+                <?php if ($__diagFee > 0): ?><div class="ord-pay-note mb-2">Přijato na diagnostiku (<?php echo formatMoney($__diagFee); ?>), cena stanovena po ní.</div><?php endif; ?>
 
                 <?php if ($__inv): $__pi = afxInvoicePaymentInfo($__inv); ?>
                     <div class="ord-pay-state">
@@ -768,6 +782,7 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
                 <?php else: ?>
                     <div class="ord-pay-note">Bez záznamu platby. Pro dodatečnou úhradu přepni stav na <strong>„Vydáno - čeká na platbu"</strong> — pak zakázku najde Pokladna.</div>
                 <?php endif; ?>
+                <?php endif; /* $__pricePending */ ?>
             </div>
         </div>
 
@@ -881,10 +896,14 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
                     <div class="row g-2 mb-2">
                         <div class="<?php echo crmIsAdminLevel() ? 'col-6' : 'col-12'; ?>">
                             <label class="form-label mb-1"><?php echo __('work_cost'); ?></label>
+                            <?php if (crmOrderPricePending($order)): ?>
+                            <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#priceResolveModal">Stanovit cenu</button>
+                            <?php else: ?>
                             <div class="input-group">
                                 <input type="number" step="1" name="final_cost" class="form-control" value="<?php echo (int)round((float)($order['final_cost'] ?? $order['estimated_cost'] ?? 0)); ?>">
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
+                            <?php endif; ?>
                         </div>
                         <?php if (crmIsAdminLevel()): ?>
                         <div class="col-6">
@@ -1076,6 +1095,36 @@ html[data-lg-theme="light"] .ord-head-sub span, html[data-lg-theme="light"] .ord
 .ord-price { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 12px; }
 .ord-price span { font-size: 14px !important; color: rgba(255,255,255,.6); }
 .ord-price b { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.ord-price b.ord-price-wait { font-size: 18px; color: #ffb340; letter-spacing: 0; }
+.ord-diag { padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,159,10,.5); background: rgba(255,159,10,.10); margin-bottom: 4px; }
+.ord-card .card-body .ord-diag-h { display: flex; align-items: center; gap: 8px; font-size: 15px !important; font-weight: 650; text-transform: none !important; letter-spacing: 0 !important; }
+.ord-card .card-body .ord-diag p { margin: 6px 0 10px; font-size: 13.5px !important; line-height: 1.4; font-weight: 400; text-transform: none !important; letter-spacing: 0 !important; color: rgba(255,255,255,.75); }
+html[data-lg-theme="light"] .ord-price b.ord-price-wait { color: #a85600; }
+html[data-lg-theme="light"] .ord-diag { background: #fef3df; }
+html[data-lg-theme="light"] .ord-diag p { color: rgba(16,23,42,.7); }
+#priceResolveModal .prm-opt { position: relative; margin: 0 0 10px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04); }
+#priceResolveModal .prm-head { display: block; margin: 0; padding: 14px 16px; cursor: pointer; }
+#priceResolveModal .prm-head > input { position: absolute; opacity: 0; pointer-events: none; }
+#priceResolveModal .prm-opt:hover { border-color: rgba(255,255,255,.34); }
+#priceResolveModal .prm-opt:has(.prm-head > input:checked) { border-color: #34c759; background: rgba(52,199,89,.14); }
+#priceResolveModal .prm-opt:has(.prm-head > input:focus-visible) { outline: 2px solid #0a84ff; outline-offset: 2px; }
+#priceResolveModal .prm-t { display: flex; justify-content: space-between; gap: 12px; font-size: 16px !important; font-weight: 650; }
+#priceResolveModal .prm-t span { font-size: inherit !important; }
+#priceResolveModal .prm-d { display: block; margin-top: 2px; font-size: 13.5px !important; color: rgba(255,255,255,.66); }
+#priceResolveModal .prm-more { display: none; padding: 0 16px 14px; }
+#priceResolveModal .prm-opt:has(.prm-head > input:checked) .prm-more { display: block; }
+#priceResolveModal .prm-more .input-group { max-width: 260px; }
+#priceResolveModal .prm-note { margin: 8px 0 0; font-size: 13px !important; color: rgba(255,255,255,.62); }
+#priceResolveModal .prm-opt.prm-opt--small .prm-head { padding: 9px 14px; }
+#priceResolveModal .prm-opt.prm-opt--small .prm-t { font-size: 14px !important; font-weight: 500; }
+#priceResolveModal .prm-warn { margin-top: 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(255,159,10,.55); background: rgba(255,159,10,.12); font-size: 14px !important; }
+#priceResolveModal .prm-err { margin-top: 4px; padding: 9px 12px; border-radius: 10px; background: rgba(255,69,58,.16); border: 1px solid rgba(255,69,58,.5); font-size: 14px !important; }
+#priceResolveModal [hidden] { display: none !important; }
+html[data-lg-theme="light"] #priceResolveModal .prm-opt { border-color: rgba(10,20,40,.16); background: rgba(10,20,40,.03); }
+html[data-lg-theme="light"] #priceResolveModal .prm-opt:has(.prm-head > input:checked) { border-color: #1a7f3c; background: #e9fbee; }
+html[data-lg-theme="light"] #priceResolveModal .prm-d, html[data-lg-theme="light"] #priceResolveModal .prm-note { color: rgba(16,23,42,.66); }
+html[data-lg-theme="light"] #priceResolveModal .prm-warn { background: #fef3df; }
+html[data-lg-theme="light"] #priceResolveModal .prm-err { background: #fdebeb; color: #8a0010; }
 .ord-pay-state { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
 .ord-pay-state > i { font-size: 18px; margin-top: 2px; }
 .ord-pay-state.ok { background: rgba(48,209,88,.10); border-color: rgba(48,209,88,.35); }
@@ -1237,6 +1286,121 @@ html[data-lg-theme="light"] .ord-barcode, html[data-lg-theme="light"] .ord-sigs 
         </div>
     </div>
 </div>
+
+<?php if (crmOrderPricePending($order)):
+    $__prmFee = (float)($order['diag_fee'] ?? 0);
+    $__prmLines = function_exists('crmGetOrderPriceLines') ? crmGetOrderPriceLines((int)$order['id']) : [];
+?>
+<!-- Stanovení ceny zakázky přijaté jen na diagnostiku (v4.5.0) -->
+<div class="modal fade" id="priceResolveModal" tabindex="-1" aria-labelledby="priceResolveTitle">
+    <div class="modal-dialog">
+        <div class="modal-content glass-card border-secondary text-white">
+            <form id="priceResolveForm" data-fee="<?php echo e((string)$__prmFee); ?>">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="priceResolveTitle">Stanovit cenu zakázky</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Zavřít"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">Zakázka byla přijata jen na diagnostiku<?php echo $__prmFee > 0 ? ' (' . formatMoney($__prmFee) . ')' : ''; ?>. Jak dopadla?</p>
+                    <div class="prm-opt">
+                        <label class="prm-head">
+                            <input type="radio" name="mode" value="repair">
+                            <span class="prm-t"><span>Opravuje se</span></span>
+                            <span class="prm-d">Klient s opravou souhlasí, nebo už je opravená.</span>
+                        </label>
+                        <div class="prm-more">
+                            <label class="form-label mb-1" for="priceResolveAmount">Cena opravy celkem</label>
+                            <div class="input-group">
+                                <input type="number" id="priceResolveAmount" name="amount" class="form-control" step="1" min="1" inputmode="numeric">
+                                <span class="input-group-text"><?php echo e(get_setting('currency', 'Kč')); ?></span>
+                            </div>
+                            <p class="prm-note">Celá částka, kterou klient za zakázku zaplatí. Diagnostika se pak zvlášť neúčtuje.</p>
+                            <?php foreach ($__prmLines as $__pl): ?>
+                            <p class="prm-note">Při příjmu domluveno: <?php echo e((string)$__pl['label']); ?> <?php echo ((float)$__pl['amount'] > 0 ? '+' : '') . formatMoney((float)$__pl['amount']); ?> — započítej do ceny.</p>
+                            <?php endforeach; ?>
+                            <div class="prm-warn" data-prm-warn hidden><b data-prm-warn-amount></b> je cena diagnostiky. Jestli tolik stojí i oprava, potvrď uložení ještě jednou.</div>
+                        </div>
+                    </div>
+                    <?php if ($__prmFee > 0): ?>
+                    <div class="prm-opt">
+                        <label class="prm-head">
+                            <input type="radio" name="mode" value="diag_only">
+                            <span class="prm-t"><span>Bez opravy, jen diagnostika</span><span><?php echo formatMoney($__prmFee); ?></span></span>
+                            <span class="prm-d">Neopravovalo se. Klient zaplatí jen diagnostiku.</span>
+                        </label>
+                    </div>
+                    <?php endif; ?>
+                    <div class="prm-opt prm-opt--small">
+                        <label class="prm-head">
+                            <input type="radio" name="mode" value="free">
+                            <span class="prm-t"><span>Neúčtovat nic (záruka, reklamace, vstřícné gesto)</span><span><?php echo formatMoney(0); ?></span></span>
+                        </label>
+                    </div>
+                    <div class="prm-err" data-prm-err role="alert" hidden></div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zavřít</button>
+                    <button type="submit" class="btn btn-success" data-prm-save>Uložit cenu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var form = document.getElementById('priceResolveForm');
+    if (!form) { return; }
+    var fee = Number(form.dataset.fee) || 0;
+    var amount = document.getElementById('priceResolveAmount');
+    var err = form.querySelector('[data-prm-err]'), warn = form.querySelector('[data-prm-warn]');
+    var save = form.querySelector('[data-prm-save]');
+    var confirmedFor = null;
+    var mode = function () { var r = form.querySelector('input[name="mode"]:checked'); return r ? r.value : ''; };
+    // main.js po kliknutí zamkne tlačítko („Ukládám…") — když neodesíláme nebo server odmítne, hned ho vrátit
+    var unlock = function () { setTimeout(function () { if (form.__afxUnlock) { form.__afxUnlock(); } save.disabled = false; }, 0); };
+    var fail = function (m) { err.textContent = m; err.hidden = !m; if (m) { unlock(); } };
+    form.addEventListener('change', function (e) {
+        if (e.target.name === 'mode') { fail(''); if (mode() === 'repair') { setTimeout(function () { try { amount.focus(); } catch (x) {} }, 30); } }
+    });
+    amount.addEventListener('input', function () { confirmedFor = null; warn.hidden = true; fail(''); });
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var m = mode(), v = Number(amount.value);
+        if (!m) { fail('Zvol, jak zakázka dopadla.'); return; }
+        if (m === 'repair' && !(v > 0)) { fail('Zadej cenu opravy.'); try { amount.focus(); } catch (x) {} return; }
+        if (m === 'repair' && fee > 0 && v === fee && confirmedFor !== v) {
+            form.querySelector('[data-prm-warn-amount]').textContent = v.toLocaleString('cs-CZ') + ' Kč';
+            warn.hidden = false; confirmedFor = v; unlock(); return;
+        }
+        var fd = new FormData();
+        fd.append('csrf_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+        fd.append('order_id', '<?php echo (int)$order['id']; ?>');
+        fd.append('mode', m);
+        if (m === 'repair') { fd.append('amount', String(v)); }
+        save.disabled = true;
+        fetch('api/order_price_resolve.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (j && j.ok) {
+                    try { sessionStorage.setItem('afx_payment_note', j.message || 'Cena je stanovená.'); sessionStorage.setItem('afx_payment_warn', '0'); } catch (x) {}
+                    location.reload();
+                    return;
+                }
+                fail((j && j.error) || 'Cenu se nepodařilo uložit.');
+            })
+            .catch(function () { fail('Cenu se nepodařilo uložit. Zkus to znovu.'); });
+    });
+}());
+</script>
+<?php endif; ?>
+<script>
+/* Server odmítl dokončení / výdej, protože zakázka nemá stanovenou cenu → otevřít okno. */
+function afxPriceResolveOpen() {
+    var el = document.getElementById('priceResolveModal');
+    if (el && window.bootstrap) { bootstrap.Modal.getOrCreateInstance(el).show(); }
+    else if (window.showAlert) { showAlert('Zakázka nemá stanovenou cenu. Načti stránku znovu a klikni na „Stanovit cenu“.'); }
+}
+</script>
 
 <!-- Modal Edit Order Dates -->
 <div class="modal fade" id="editOrderDatesModal" tabindex="-1">
@@ -1769,6 +1933,7 @@ function showStatusConfirmModal(form) {
 
             btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
             // v4.2.0: výdej bez podpisu klienta server odmítne → nechat podepsat a dokončit
+            if (res && res.code === 'price_pending') { modal.modal('hide'); afxPriceResolveOpen(); return; }
             if (res && res.code === 'pickup_signature_required') { modal.modal('hide'); showPickupSignModal(form, res, ''); return; }
             if (res && res.code === 'repair_solution_required') {
                 // Chybí „Provedená oprava" → rovnou nabídnout doplnění a přechod dokončit.
@@ -1819,6 +1984,7 @@ function showRepairSolutionModal(form) {
                 return;
             }
             btn.prop('disabled', false).html('<i class="fas fa-check me-2"></i><?php echo __("confirm"); ?>');
+            if (res && res.code === 'price_pending') { m.modal('hide'); afxPriceResolveOpen(); return; }
             if (res && res.code === 'pickup_signature_required') { m.modal('hide'); showPickupSignModal(form, res, val); return; }
             showAlert('<?php echo __('error'); ?>' + ((res && res.message) ? ': ' + res.message : ''));
         }).fail(function() {
@@ -2248,14 +2414,15 @@ function deleteOrder(id) {
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('price_estimated'); ?></label>
                             <div class="input-group">
-                                <input type="number" name="estimated_cost" class="form-control" step="1" value="<?php $v=$order['estimated_cost']; echo ($v===null||$v==='')?'':(int)round((float)$v); ?>">
+                                <input type="number" name="estimated_cost" class="form-control" step="1" value="<?php $v=$order['estimated_cost']; echo ($v===null||$v==='')?'':(int)round((float)$v); ?>"<?php echo crmOrderPricePending($order) ? ' disabled title="Cenu stanov tlačítkem Stanovit cenu v detailu zakázky"' : ''; ?>>
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><?php echo __('price_final'); ?></label>
                             <div class="input-group">
-                                <input type="number" name="final_cost" class="form-control" step="1" value="<?php $v=$order['final_cost']; echo ($v===null||$v==='')?'':(int)round((float)$v); ?>">
+                                <input type="number" name="final_cost" class="form-control" step="1" value="<?php $v=$order['final_cost']; echo ($v===null||$v==='')?'':(int)round((float)$v); ?>"<?php echo crmOrderPricePending($order) ? ' disabled title="Cenu stanov tlačítkem Stanovit cenu v detailu zakázky"' : ''; ?>>
+                                <?php if (crmOrderPricePending($order)): ?><div class="form-text">Zakázka je přijatá jen na diagnostiku. Cenu stanov tlačítkem <b>Stanovit cenu</b> v detailu zakázky.</div><?php endif; ?>
                                 <span class="input-group-text"><?php echo get_setting('currency', 'Kč'); ?></span>
                             </div>
                         </div>

@@ -49,6 +49,7 @@ try {
     ensurePosTables();                 // DDL — před transakcí: výdej se ptá kasy (crmOrderPosSale)
     ensurePosCashMovementsTable();
     ensureOrderSignaturesTable();      // DDL — před transakcí: výdej vyžaduje podpis převzetí (v4.2.0)
+    ensureOrderDiagColumns();          // DDL — před transakcí: jen diagnostika × odhad (v4.5.0)
 
     $pdo->beginTransaction();
 
@@ -65,6 +66,15 @@ try {
     }
 
     $new_status = normalizeOrderStatus($_POST['status'] ?? $current['status']);
+
+    // Zakázka přijatá jen na diagnostiku bez stanovené ceny (v4.5.0): nejde dokončit ani vydat
+    // a ceny v tomhle formuláři se ignorují — stanoví je jen „Stanovit cenu" v detailu zakázky.
+    if (crmOrderPricePending($current)) {
+        if (crmPricePendingBlocksStatus((string)$new_status) && (string)$new_status !== (string)$current['status']) {
+            throw new Exception(crmPricePendingMessage($current));
+        }
+        unset($_POST['estimated_cost'], $_POST['final_cost']);
+    }
 
     // Nezaplacený výdej → „Vydáno - čeká na platbu" (v3.49.0, stejné pravidlo
     // jako v update_order_status.php): platbu zaznamenává výhradně Pokladna a

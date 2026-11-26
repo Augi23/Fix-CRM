@@ -272,7 +272,19 @@ if (isset($pdo) && function_exists('crmGetOrderPriceLines')) {
                 <?php if (trim((string)($order['repair_solution'] ?? '')) !== ''): // Provedená oprava — jen po vyplnění (příjmový tisk běží před opravou) ?>
                 <table class="kv"><tr><td class="k"><?php echo _l('ord_repair_done'); ?></td><td class="v repair" align="right"><?php echo e((string)$order['repair_solution']); ?></td></tr></table>
                 <?php endif; ?>
-                <?php if (count($priceLines) >= 2): ?>
+                <?php /* Přijato jen na diagnostiku (v4.5.0): cena diagnostiky zvlášť, cena opravy až po ní */
+                $__ppend = function_exists('crmOrderPricePending') && crmOrderPricePending($order);
+                $__pfee = (float)($order['diag_fee'] ?? 0);
+                $__pen = (($target_lang ?? 'cs') === 'en'); ?>
+                <?php if ($__ppend): ?>
+                    <?php if ($__pfee > 0): ?>
+                    <table class="kv"><tr><td class="k"><?php echo $__pen ? 'Diagnostics' : 'Diagnostika'; ?></td><td class="v price" align="right"><?php echo e(formatMoney($__pfee)); ?></td></tr></table>
+                    <?php endif; ?>
+                    <?php foreach ($priceLines as $pl): ?>
+                    <table class="kv"><tr><td class="k"><?php echo e($pl['label']); ?></td><td class="v" align="right"><?php echo e(formatMoney((float)$pl['amount'])); ?></td></tr></table>
+                    <?php endforeach; ?>
+                    <table class="kv"><tr><td class="k"><?php echo $__pen ? 'Repair price' : 'Cena opravy'; ?></td><td class="v" align="right"><?php echo $__pen ? 'to be set after diagnostics' : 'bude stanovena po diagnostice'; ?></td></tr></table>
+                <?php elseif (count($priceLines) >= 2): ?>
                     <?php foreach ($priceLines as $pl): ?>
                     <table class="kv"><tr><td class="k"><?php echo e($pl['label']); ?></td><td class="v" align="right"><?php echo e(formatMoney((float)$pl['amount'])); ?></td></tr></table>
                     <?php endforeach; ?>

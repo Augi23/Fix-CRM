@@ -24,6 +24,24 @@ try {
 $guides = [];
 $guides['crm'] = [
     [
+        'id' => 'diagnostika-cena', 'icon' => 'fa-stethoscope', 'color' => '#FF9F0A',
+        'title' => 'Příjem zakázky: jen diagnostika, nebo cena opravy',
+        'intro' => 'Diagnostika a cena opravy jsou dvě různé věci. Při příjmu vždy vybereš jednu z nich, aby se opravená zakázka nemohla vydat jen za cenu diagnostiky.',
+        'steps' => [
+            'V posledním kroku nové zakázky je část <b>Cena</b> se dvěma volbami. Bez výběru zakázku založit nejde.',
+            '<b>Jen diagnostika</b> zvol, když cenu opravy zatím neznáš. CRM samo doplní cenu diagnostiky podle zařízení: telefony 490 Kč, tablety, počítače a ostatní 990 Kč. Odhad opravy se nevyplňuje.',
+            '<b>Známe cenu opravy</b> zvol, když ji klientovi umíš říct hned. Do pole napiš celou cenu opravy, ne cenu diagnostiky.',
+            'U zakázky přijaté na diagnostiku svítí v detailu <b>Cena opravy: není stanovená</b>. Po diagnostice klikni na <b>Stanovit cenu</b>.',
+            'V okně vyber, jak to dopadlo: <b>Opravuje se</b> (napíšeš celkovou cenu opravy), nebo <b>Bez opravy, jen diagnostika</b> (klient zaplatí jen diagnostiku).',
+            'Teprve potom jde zakázka přepnout na Připraveno k převzetí a vydat.',
+        ],
+        'conditions' => [
+            ['typ' => 'info', 'text' => 'Dokud cena není stanovená, CRM zakázku <b>nepustí do stavu Připraveno k převzetí ani Vydáno</b> a rovnou nabídne okno Stanovit cenu.'],
+            ['typ' => 'info', 'text' => 'Když do odhadu opravy napíšeš přesně cenu diagnostiky (490 nebo 990 Kč), CRM se zeptá, jestli nejde jen o diagnostiku.'],
+            ['typ' => 'info', 'text' => 'Záruční, reklamační a interní zakázky mají při příjmu třetí volbu <b>Bez úhrady</b>.'],
+        ],
+    ],
+    [
         'id' => 'ukoly', 'icon' => 'fa-list-check', 'color' => '#30D158',
         'title' => 'Úkoly — předání práce kolegům',
         'intro' => 'Co si nestihnete říct po telefonu nebo při předání směny, napiš do Úkolů. Kolega úkol uvidí, odškrtne ho a ty vidíš, jak je daleko.',
