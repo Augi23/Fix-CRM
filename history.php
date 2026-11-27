@@ -25,6 +25,16 @@ if ($activeTab === 'kasa') {
     ensurePosSaleCancelReason();   // důvod storna se vypisuje u stornovaných prodejů
     $kPage = max(1, (int)($_GET['p'] ?? 1));
     $kPer = 60;
+    // řazení klikem na záhlaví (v4.6.0) — vlastní mapa pro Kasu; klíč z URL se překládá jen přes tento bílý seznam
+    $kSort = crmListSort([
+        'doklad'   => 's.sale_number',
+        'time'     => 's.created_at, s.id',
+        'items'    => 'items_txt',
+        'customer' => "COALESCE(NULLIF(c.company, ''), c.last_name), c.first_name",
+        'payment'  => 's.payment_method',
+        'total'    => 's.total',
+        'seller'   => 's.seller_name',
+    ], 's.id DESC');
     $kw = []; $kp = [];
     if ($kFrom !== '') { $kw[] = 's.created_at >= ?'; $kp[] = $kFrom . ' 00:00:00'; }
     if ($kTo !== '')   { $kw[] = 's.created_at <= ?'; $kp[] = $kTo . ' 23:59:59'; }
@@ -42,7 +52,7 @@ if ($activeTab === 'kasa') {
             FROM pos_sales s
             LEFT JOIN customers c ON s.customer_id = c.id
             LEFT JOIN invoices i ON s.invoice_id = i.id
-            $kws ORDER BY s.id DESC LIMIT $kPer OFFSET " . (($kPage - 1) * $kPer));
+            $kws ORDER BY {$kSort['sql']} LIMIT $kPer OFFSET " . (($kPage - 1) * $kPer));
         $q->execute($kp);
         $kSales = $q->fetchAll();
 
@@ -92,13 +102,22 @@ if ($fTo !== '')     { $where[] = 'created_at <= ?';  $params[] = $fTo . ' 23:59
 $wsql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
 $total = 0; $rows = []; $actionOptions = []; $empOptions = [];
+// řazení klikem na záhlaví (v4.6.0) — mapa Historie úprav; stejné ?sort/?dir jako Kasa, ale jiný bílý seznam
+$sort = crmListSort([
+    'time'    => 'created_at, id',
+    'action'  => 'action',
+    'actor'   => 'actor_name',
+    'entity'  => 'entity_label',
+    'summary' => 'summary',
+    'ip'      => 'ip_address',
+], 'id DESC');
 if ($activeTab === 'audit') {
     try {
         $cs = $pdo->prepare("SELECT COUNT(*) FROM audit_log $wsql");
         $cs->execute($params);
         $total = (int)$cs->fetchColumn();
 
-        $q = $pdo->prepare("SELECT * FROM audit_log $wsql ORDER BY id DESC LIMIT $per OFFSET $off");
+        $q = $pdo->prepare("SELECT * FROM audit_log $wsql ORDER BY {$sort['sql']} LIMIT $per OFFSET $off");
         $q->execute($params);
         $rows = $q->fetchAll();
 
@@ -204,16 +223,16 @@ require_once 'includes/header.php';
 </div>
 
 <div class="table-responsive glass-panel border-secondary">
-    <table class="table table-dark table-hover align-middle mb-0">
+    <table class="table table-dark table-hover align-middle mb-0"<?php echo crmSortTableAttrs($kSort); ?>>
         <thead>
             <tr>
-                <th>Doklad</th>
-                <th style="white-space:nowrap;">Čas</th>
-                <th>Položky</th>
-                <th>Zákazník</th>
-                <th>Platba</th>
-                <th class="text-end">Částka</th>
-                <th>Prodejce</th>
+                <?php echo crmSortTh('doklad', 'Doklad'); ?>
+                <?php echo crmSortTh('time', 'Čas', 'style="white-space:nowrap;"'); ?>
+                <?php echo crmSortTh('items', 'Položky'); ?>
+                <?php echo crmSortTh('customer', 'Zákazník'); ?>
+                <?php echo crmSortTh('payment', 'Platba'); ?>
+                <?php echo crmSortTh('total', 'Částka', 'class="text-end"'); ?>
+                <?php echo crmSortTh('seller', 'Prodejce'); ?>
                 <th class="text-end">Akce</th>
             </tr>
         </thead>
@@ -272,8 +291,9 @@ require_once 'includes/header.php';
 <nav class="mt-3">
     <ul class="pagination pagination-sm justify-content-center">
         <?php
-        $kqs = function ($p) use ($kFrom, $kTo, $kPay) {
-            return 'history.php?' . http_build_query(array_filter(['tab' => 'kasa', 'from' => $kFrom, 'to' => $kTo, 'pay' => $kPay, 'p' => $p], fn($v) => $v !== '' && $v !== null));
+        $kqs = function ($p) use ($kFrom, $kTo, $kPay, $kSort) {
+            // stránkování nese i aktivní řazení (v4.6.0)
+            return 'history.php?' . http_build_query(array_filter(array_merge(['tab' => 'kasa', 'from' => $kFrom, 'to' => $kTo, 'pay' => $kPay], crmSortQueryParams($kSort), ['p' => $p]), fn($v) => $v !== '' && $v !== null));
         };
         $kPage = max(1, (int)($_GET['p'] ?? 1));
         $ks = max(1, $kPage - 3); $ke = min($kPages, $kPage + 3);
@@ -368,15 +388,15 @@ $(document).on('click', '.kasa-cancel-btn', function () {
 </form>
 
 <div class="table-responsive glass-panel border-secondary">
-    <table class="table table-dark table-hover align-middle mb-0">
+    <table class="table table-dark table-hover align-middle mb-0"<?php echo crmSortTableAttrs($sort); ?>>
         <thead>
             <tr>
-                <th style="white-space:nowrap;">Čas</th>
-                <th>Úkon</th>
-                <th>Kdo provedl</th>
-                <th>Čeho se týká</th>
-                <th>Detail</th>
-                <th class="text-end">IP</th>
+                <?php echo crmSortTh('time', 'Čas', 'style="white-space:nowrap;"'); ?>
+                <?php echo crmSortTh('action', 'Úkon'); ?>
+                <?php echo crmSortTh('actor', 'Kdo provedl'); ?>
+                <?php echo crmSortTh('entity', 'Čeho se týká'); ?>
+                <?php echo crmSortTh('summary', 'Detail'); ?>
+                <?php echo crmSortTh('ip', 'IP', 'class="text-end"'); ?>
             </tr>
         </thead>
         <tbody>
@@ -421,9 +441,13 @@ $(document).on('click', '.kasa-cancel-btn', function () {
 <nav class="mt-3">
     <ul class="pagination pagination-sm justify-content-center">
         <?php
-        $qs = function ($p) use ($fAction, $fActor, $fEmp, $fQ, $fFrom, $fTo, $per) {
-            return 'history.php?' . http_build_query(array_filter(['action' => $fAction, 'actor' => $fActor, 'emp' => $fEmp, 'q' => $fQ, 'from' => $fFrom, 'to' => $fTo, 'per' => $per !== 60 ? $per : '', 'p' => $p], fn($v) => $v !== '' && $v !== null));
+        $qs = function ($p) use ($fAction, $fActor, $fEmp, $fQ, $fFrom, $fTo, $per, $sort) {
+            // stránkování nese i aktivní řazení (v4.6.0)
+            return 'history.php?' . http_build_query(array_filter(array_merge(['action' => $fAction, 'actor' => $fActor, 'emp' => $fEmp, 'q' => $fQ, 'from' => $fFrom, 'to' => $fTo, 'per' => $per !== 60 ? $per : ''], crmSortQueryParams($sort), ['p' => $p]), fn($v) => $v !== '' && $v !== null));
         };
+        // header.php mezitím přepsal $page názvem skriptu („history.php") → PHP 8 padalo na „string - int";
+        // číslo stránky si tu znovu vezmeme z URL (stejně jako to dělá Kasa výše) — v4.6.0
+        $page = max(1, (int)($_GET['p'] ?? 1));
         $start = max(1, $page - 3); $end = min($pages, $page + 3);
         ?>
         <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>"><a class="page-link" href="<?php echo htmlspecialchars($qs(1)); ?>" title="První stránka">«</a></li>

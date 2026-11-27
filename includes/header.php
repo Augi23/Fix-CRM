@@ -216,6 +216,7 @@ try {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/main.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/main.js'); ?>"></script>
+    <script src="assets/js/table-sort.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/table-sort.js'); ?>" defer></script>
     <script src="assets/js/global-search.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/global-search.js'); ?>" defer></script>
     <script src="assets/js/customer-tools.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/customer-tools.js'); ?>" defer></script>
     <script src="assets/js/order-prepay.js?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/js/order-prepay.js'); ?>" defer></script>

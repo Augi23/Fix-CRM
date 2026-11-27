@@ -1180,6 +1180,45 @@ function orderSortSql(string $alias = 'o', ?string $exactIdExpression = null): s
     return implode(",\n                ", $parts);
 }
 
+/* ── ŘAZENÍ STRÁNKOVANÝCH SEZNAMŮ PODLE SLOUPCE (v4.6.0) ──────────────────────
+   Klik na záhlaví (assets/js/table-sort.js) přejde na ?sort=klíč&dir=asc|desc.
+   Stránka si klíče přeloží na SQL přes bílý seznam — do ORDER BY nikdy nejde nic
+   z URL napřímo. Výchozí řazení zůstává přesně to, co stránka měla dosud. */
+
+/**
+ * @param array  $allowed    klíč => SQL výraz (bez ASC/DESC), např. ['created' => 'o.created_at']
+ * @param string $defaultSql kompletní výchozí ORDER BY výraz (bez „ORDER BY"), když sort chybí/je neznámý
+ * @return array ['key' => string|'', 'dir' => 'asc'|'desc'|'', 'sql' => string, 'active' => bool]
+ */
+function crmListSort(array $allowed, string $defaultSql): array {
+    $key = (string)($_GET['sort'] ?? '');
+    $dir = strtolower((string)($_GET['dir'] ?? 'asc')) === 'desc' ? 'desc' : 'asc';
+    if ($key === '' || !isset($allowed[$key])) {
+        return ['key' => '', 'dir' => '', 'sql' => $defaultSql, 'active' => false];
+    }
+    $expr = (string)$allowed[$key];
+    // u výrazu s víc částmi (a, b) dostane směr každá část
+    $parts = array_map('trim', preg_split('/,(?![^()]*\))/', $expr));
+    $sql = implode(', ', array_map(static fn(string $p): string => $p . ' ' . strtoupper($dir), $parts));
+    return ['key' => $key, 'dir' => $dir, 'sql' => $sql, 'active' => true];
+}
+
+/** Atributy pro <table …> stránkovaného seznamu (server režim řazení). */
+function crmSortTableAttrs(array $sort): string {
+    return ' data-sort-url="1" data-sort-key="' . htmlspecialchars((string)$sort['key'], ENT_QUOTES) . '"'
+        . ' data-sort-dir="' . htmlspecialchars((string)$sort['dir'], ENT_QUOTES) . '"';
+}
+
+/** Záhlaví sloupce s klíčem řazení: <th data-sort-key="…" …>Popisek</th>. $attrs = další atributy (class, style…). */
+function crmSortTh(string $key, string $label, string $attrs = ''): string {
+    return '<th data-sort-key="' . htmlspecialchars($key, ENT_QUOTES) . '"' . ($attrs !== '' ? ' ' . $attrs : '') . '>' . $label . '</th>';
+}
+
+/** Parametry sort/dir k přenesení do odkazů stránkování (http_build_query). */
+function crmSortQueryParams(array $sort): array {
+    return $sort['active'] ? ['sort' => $sort['key'], 'dir' => $sort['dir']] : [];
+}
+
 function sqlPlaceholders(array $values): string {
     return implode(',', array_fill(0, count($values), '?'));
 }

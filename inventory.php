@@ -77,6 +77,20 @@ if ($f_location === 'none') {
 
 $where_sql = " WHERE " . implode(" AND ", $where_clauses);
 
+// Řazení klikem na záhlaví (v4.6.0) — klíč sloupce → SQL; výchozí zůstává part_name ASC.
+// Umístění se řadí podle kódu police (sl.code), stav podle stejné logiky jako odznak ve sloupci.
+$sort = crmListSort([
+    'name'         => 'inventory.part_name',
+    'sku'          => 'inventory.sku',
+    'location'     => 'sl.code',
+    'supplier'     => 'inventory.source_supplier',
+    'availability' => 'inventory.supplier_availability, inventory.supplier_stock_qty',
+    'quantity'     => 'inventory.quantity',
+    'cost'         => 'inventory.cost_price',
+    'price'        => 'inventory.sale_price',
+    'status'       => '(CASE WHEN inventory.quantity <= 0 THEN 0 WHEN inventory.quantity <= inventory.min_stock THEN 1 ELSE 2 END)',
+], 'part_name ASC');
+
 // LEFT JOIN kvůli kódu umístění ve sloupci; filtry jedou přes sloupce inventory
 $total_items = $pdo->prepare("SELECT COUNT(*) FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id" . $where_sql);
 $total_items->execute($params);
@@ -84,7 +98,7 @@ $total_count = $total_items->fetchColumn();
 
 $total_pages = ceil($total_count / $limit);
 
-$stmt = $pdo->prepare("SELECT inventory.*, sl.code AS loc_code, sl.name AS loc_name FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id" . $where_sql . " ORDER BY part_name ASC LIMIT $limit OFFSET $offset");
+$stmt = $pdo->prepare("SELECT inventory.*, sl.code AS loc_code, sl.name AS loc_name FROM inventory LEFT JOIN stock_locations sl ON sl.id = inventory.location_id" . $where_sql . " ORDER BY {$sort['sql']} LIMIT $limit OFFSET $offset");
 $stmt->execute($params);
 $inventory = $stmt->fetchAll();
 
@@ -171,8 +185,8 @@ function invLocationOptionsHtml(array $allLocations, string $selected, array $po
 $__cntStock = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE branch_id = " . (int)$skladBranch . " AND " . inventoryStockedWhereSql())->fetchColumn();
 $__cntCat   = (int)$pdo->query("SELECT COUNT(*) FROM inventory WHERE NOT " . inventoryStockedWhereSql())->fetchColumn();
 $__suppliers = $inv_view === 'katalog' ? $pdo->query("SELECT source_supplier, COUNT(*) n FROM inventory WHERE NOT " . inventoryStockedWhereSql() . " AND source_supplier IS NOT NULL AND source_supplier <> '' GROUP BY source_supplier ORDER BY n DESC")->fetchAll(PDO::FETCH_ASSOC) : [];
-$__vq = function (array $extra) use ($skladBranch, $search) {
-    return 'inventory.php?' . http_build_query(array_merge(['branch' => (int)$skladBranch], $search !== '' ? ['search' => $search] : [], $extra));
+$__vq = function (array $extra) use ($skladBranch, $search, $sort) {
+    return 'inventory.php?' . http_build_query(array_merge(['branch' => (int)$skladBranch], $search !== '' ? ['search' => $search] : [], crmSortQueryParams($sort), $extra));
 };
 ?>
 <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
@@ -195,6 +209,7 @@ $__vq = function (array $extra) use ($skladBranch, $search) {
     <div class="card card-body shadow-sm">
         <form action="inventory.php" method="GET" class="row g-3">
             <input type="hidden" name="branch" value="<?php echo (int)$skladBranch; ?>">
+            <?php foreach (crmSortQueryParams($sort) as $__sk => $__sv): ?><input type="hidden" name="<?php echo e($__sk); ?>" value="<?php echo e($__sv); ?>"><?php endforeach; ?>
             <?php if ($inv_view === 'katalog'): ?><input type="hidden" name="view" value="katalog"><?php if (!empty($f_supplier)): ?><input type="hidden" name="supplier" value="<?php echo e($f_supplier); ?>"><?php endif; ?><?php endif; ?>
             <div class="col-md-4">
                 <label class="form-label small"><?php echo __('search_sku_placeholder'); ?></label>
@@ -238,20 +253,20 @@ $__vq = function (array $extra) use ($skladBranch, $search) {
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0"<?php echo crmSortTableAttrs($sort); ?>>
                         <thead class="table-dark">
                             <tr>
                                 <th class="ps-4" style="width:34px;"><input type="checkbox" class="form-check-input" id="invCheckAll" title="Vybrat vše na stránce"></th>
                                 <th><?php echo __('photo_col'); ?></th>
-                                <th><?php echo __('part_name'); ?></th>
-                                <th><?php echo __('sku'); ?></th>
-                                <th>Umístění</th>
-                                <th><?php echo __('supplier_col'); ?></th>
-                                <th><?php echo __('availability_col'); ?></th>
-                                <th><?php echo __('our_stock_col'); ?></th>
-                                <th><?php echo __('buy_price'); ?></th>
-                                <th><?php echo __('sell_price'); ?></th>
-                                <th><?php echo __('status'); ?></th>
+                                <?php echo crmSortTh('name', __('part_name')); ?>
+                                <?php echo crmSortTh('sku', __('sku')); ?>
+                                <?php echo crmSortTh('location', 'Umístění'); ?>
+                                <?php echo crmSortTh('supplier', __('supplier_col')); ?>
+                                <?php echo crmSortTh('availability', __('availability_col')); ?>
+                                <?php echo crmSortTh('quantity', __('our_stock_col')); ?>
+                                <?php echo crmSortTh('cost', __('buy_price')); ?>
+                                <?php echo crmSortTh('price', __('sell_price')); ?>
+                                <?php echo crmSortTh('status', __('status')); ?>
                                 <th class="text-end pe-4"><?php echo __('action'); ?></th>
                             </tr>
                         </thead>
@@ -392,7 +407,7 @@ $__vq = function (array $extra) use ($skladBranch, $search) {
         <!-- Pagination -->
         <?php if ($total_pages > 1): ?>
         <?php
-            $params_p = $_GET;
+            $params_p = array_merge($_GET, crmSortQueryParams($sort));   // řazení se nese i přes stránkování
             unset($params_p['p']);
             $qs = http_build_query($params_p);
             $url_pre = $qs ? "&$qs" : "";

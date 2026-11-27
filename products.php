@@ -108,7 +108,20 @@ if ($search !== '' && $total_count === 0) {
     } catch (Throwable $e) { error_log('products alt search: ' . $e->getMessage()); }
 }
 
-$stmt = $pdo->prepare("SELECT * FROM products" . $where_sql . " ORDER BY added_at DESC, id DESC LIMIT $limit OFFSET $offset");
+// Řazení klikem na záhlaví (v4.6.0) — klíč sloupce → SQL; výchozí zůstává added_at DESC, id DESC.
+// Cena = to, co sloupec skutečně ukazuje (prodejní, u čerstvého výkupu nákupní); baterie „87 %" jako číslo;
+// dostupnost: vyprodáno (0) < zapůjčeno (1) < skladem (2), pak podle kusů.
+$sort = crmListSort([
+    'title'   => 'title',
+    'code'    => 'product_code',
+    'grade'   => 'grade',
+    'battery' => "CAST(NULLIF(REGEXP_REPLACE(COALESCE(battery, ''), '[^0-9]', ''), '') AS UNSIGNED)",
+    'price'   => '(CASE WHEN price > 0 THEN price ELSE COALESCE(purchase_price, 0) END)',
+    'avail'   => '(CASE WHEN loan_at IS NOT NULL THEN 1 WHEN stock_qty > 0 THEN 2 ELSE 0 END), stock_qty',
+    'added'   => 'added_at, id',
+    'loan'    => 'loan_at',
+], 'added_at DESC, id DESC');
+$stmt = $pdo->prepare("SELECT * FROM products" . $where_sql . " ORDER BY {$sort['sql']} LIMIT $limit OFFSET $offset");
 $stmt->execute($params);
 $products = $stmt->fetchAll();
 // skladové kusy v interní opravě (tlačítko Reklamace, v3.96.0) — nejsou k prodeji, dokud zakázka neskončí
@@ -349,6 +362,7 @@ html[data-lg-theme="light"] .afx-prod-table .pt-note { color: rgba(16,22,34,.6);
         <form action="products.php" method="GET" class="row g-3">
             <input type="hidden" name="branch" value="<?php echo (int)$skladBranch; ?>">
             <?php if ($cat !== ''): ?><input type="hidden" name="cat" value="<?php echo e($cat); ?>"><?php endif; ?>
+            <?php foreach (crmSortQueryParams($sort) as $__sk => $__sv): ?><input type="hidden" name="<?php echo e($__sk); ?>" value="<?php echo e($__sv); ?>"><?php endforeach; ?>
             <div class="col-md-6">
                 <label class="form-label small">Hledat (název, kód, model)</label>
                 <input type="text" name="search" class="form-control form-control-sm" value="<?php echo e($search); ?>" placeholder="např. iPhone 13, F2LLD…">
@@ -375,18 +389,18 @@ html[data-lg-theme="light"] .afx-prod-table .pt-note { color: rgba(16,22,34,.6);
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 afx-prod-table">
+                    <table class="table table-hover align-middle mb-0 afx-prod-table"<?php echo crmSortTableAttrs($sort); ?>>
                         <thead class="table-dark">
                             <tr>
                                 <th class="ps-4 c-tight"><?php echo __('photo_col'); ?></th>
-                                <th>Produkt</th>
-                                <th class="c-tight">Kód</th>
-                                <th class="c-tight">Stav</th>
-                                <th class="c-tight">Baterie</th>
-                                <th class="c-tight">Cena</th>
-                                <th>Dostupnost</th>
-                                <th class="c-tight">Naskladněno</th>
-                                <?php if ($showLoanCol): ?><th>Zápůjčka</th><?php endif; ?>
+                                <?php echo crmSortTh('title', 'Produkt'); ?>
+                                <?php echo crmSortTh('code', 'Kód', 'class="c-tight"'); ?>
+                                <?php echo crmSortTh('grade', 'Stav', 'class="c-tight"'); ?>
+                                <?php echo crmSortTh('battery', 'Baterie', 'class="c-tight"'); ?>
+                                <?php echo crmSortTh('price', 'Cena', 'class="c-tight"'); ?>
+                                <?php echo crmSortTh('avail', 'Dostupnost'); ?>
+                                <?php echo crmSortTh('added', 'Naskladněno', 'class="c-tight"'); ?>
+                                <?php if ($showLoanCol): ?><?php echo crmSortTh('loan', 'Zápůjčka'); ?><?php endif; ?>
                                 <th class="text-end pe-4 c-tight"><?php echo __('action'); ?></th>
                             </tr>
                         </thead>
@@ -563,7 +577,7 @@ html[data-lg-theme="light"] .afx-prod-table .pt-note { color: rgba(16,22,34,.6);
 
         <?php if ($total_pages > 1): ?>
         <?php
-            $params_p = $_GET;
+            $params_p = array_merge($_GET, crmSortQueryParams($sort));   // řazení se nese i přes stránkování
             unset($params_p['p']);
             $qs = http_build_query($params_p);
             $url_pre = $qs ? "&$qs" : "";

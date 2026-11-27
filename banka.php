@@ -29,7 +29,10 @@ $gpcMode = $bankAcc === AFX_GPC_ACCOUNT;
 $canImport = crmCanManageInvoices() || (function_exists('crmCanAccountingEdit') && crmCanAccountingEdit());
 
 // zůstatek — jen z lokálních dat (nevolat API při každém zobrazení stránky)
-$fDir = trim((string)($_GET['dir'] ?? ''));
+// Směr pohybu je od v4.6.0 v parametru „smer" — „dir" si vzalo řazení sloupců (asc/desc).
+// Staré odkazy s ?dir=in|out dál fungují.
+$fDir = trim((string)($_GET['smer'] ?? ''));
+if ($fDir === '' && in_array((string)($_GET['dir'] ?? ''), ['in', 'out'], true)) { $fDir = (string)$_GET['dir']; }
 $fMatch = trim((string)($_GET['match'] ?? ''));
 $fFrom = trim((string)($_GET['from'] ?? ''));
 $fTo = trim((string)($_GET['to'] ?? ''));
@@ -48,6 +51,16 @@ if ($fFrom !== '') { $where[] = 'booking_date >= ?'; $params[] = $fFrom; }
 if ($fTo !== '') { $where[] = 'booking_date <= ?'; $params[] = $fTo; }
 $wsql = 'WHERE ' . implode(' AND ', $where);
 
+// řazení klikem na záhlaví (v4.6.0) — bílý seznam sloupců; částka se řadí se znaménkem (příchozí +, odchozí −), jak je zobrazená
+$sort = crmListSort([
+    'date'         => 't.booking_date, t.id',
+    'counterparty' => 't.counterparty_name',
+    'message'      => 't.message',
+    'vs'           => 't.vs',
+    'amount'       => "CASE WHEN t.direction = 'in' THEN t.amount ELSE -t.amount END",
+    'match'        => 't.match_status, i.invoice_number',
+], 't.booking_date DESC, t.id DESC');
+
 $total = 0; $rows = []; $sums = ['in' => 0.0, 'out' => 0.0, 'review' => 0];
 try {
     $c = $pdo->prepare("SELECT COUNT(*) FROM bank_transactions $wsql");
@@ -55,7 +68,7 @@ try {
     $total = (int)$c->fetchColumn();
     $q = $pdo->prepare("SELECT t.*, i.invoice_number FROM bank_transactions t
         LEFT JOIN invoices i ON t.matched_invoice_id = i.id
-        $wsql ORDER BY t.booking_date DESC, t.id DESC LIMIT $per OFFSET " . (($page - 1) * $per));
+        $wsql ORDER BY {$sort['sql']} LIMIT $per OFFSET " . (($page - 1) * $per));
     $q->execute($params);
     $rows = $q->fetchAll(PDO::FETCH_ASSOC);
     $sq = $pdo->prepare("SELECT direction, SUM(amount) s FROM bank_transactions
@@ -154,7 +167,7 @@ try {
     <div class="row g-2 align-items-end">
         <div class="col-md-2 col-6">
             <label class="form-label small mb-1">Směr</label>
-            <select name="dir" class="form-select form-select-sm">
+            <select name="smer" class="form-select form-select-sm">
                 <option value="">— vše —</option>
                 <option value="in" <?php echo $fDir === 'in' ? 'selected' : ''; ?>>Příchozí</option>
                 <option value="out" <?php echo $fDir === 'out' ? 'selected' : ''; ?>>Odchozí</option>
@@ -186,15 +199,15 @@ try {
 </form>
 
 <div class="table-responsive glass-panel border-secondary">
-    <table class="table table-dark table-hover align-middle mb-0">
+    <table class="table table-dark table-hover align-middle mb-0"<?php echo crmSortTableAttrs($sort); ?>>
         <thead>
             <tr>
-                <th style="white-space:nowrap;">Datum</th>
-                <th>Protistrana</th>
-                <th>Zpráva</th>
-                <th>VS</th>
-                <th class="text-end">Částka</th>
-                <th>Párování</th>
+                <?php echo crmSortTh('date', 'Datum', 'style="white-space:nowrap;"'); ?>
+                <?php echo crmSortTh('counterparty', 'Protistrana'); ?>
+                <?php echo crmSortTh('message', 'Zpráva'); ?>
+                <?php echo crmSortTh('vs', 'VS'); ?>
+                <?php echo crmSortTh('amount', 'Částka', 'class="text-end"'); ?>
+                <?php echo crmSortTh('match', 'Párování'); ?>
                 <th class="text-end">Akce</th>
             </tr>
         </thead>
@@ -251,8 +264,9 @@ try {
 <nav class="mt-3">
     <ul class="pagination pagination-sm justify-content-center">
         <?php
-        $qs = function ($p) use ($fDir, $fMatch, $fFrom, $fTo) {
-            return 'banka.php?' . http_build_query(array_filter(['dir' => $fDir, 'match' => $fMatch, 'from' => $fFrom, 'to' => $fTo, 'p' => $p], fn($v) => $v !== '' && $v !== null));
+        $qs = function ($p) use ($fDir, $fMatch, $fFrom, $fTo, $sort) {
+            // stránkování nese filtr i aktivní řazení (v4.6.0)
+            return 'banka.php?' . http_build_query(array_filter(array_merge(['smer' => $fDir, 'match' => $fMatch, 'from' => $fFrom, 'to' => $fTo], crmSortQueryParams($sort), ['p' => $p]), fn($v) => $v !== '' && $v !== null));
         };
         $s = max(1, $page - 3); $e = min($pages, $page + 3);
         ?>

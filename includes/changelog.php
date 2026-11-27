@@ -11,6 +11,17 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.6.0',
+        'date' => '2026-11-27',
+        'time' => '13:30',
+        'title' => 'Řazení podle sloupců ve všech seznamech; zakázky: větší nadpis s počtem a vysvětlivky ikon',
+        'items' => [
+            '<b>Klik na záhlaví sloupce seřadí tabulku</b> — šipka ▲ vzestupně, druhý klik ▼ sestupně, třetí vrátí původní pořadí. Platí ve všech seznamech CRM: zakázky, klienti, sklad dílů i produktů, reklamace, nákupní seznam, historie, banka, dokumenty, přehledy i menší tabulky v nastavení.',
+            'U stránkovaných seznamů (zakázky, klienti, sklad, produkty, reklamace, nákupy, historie, banka) se řadí <b>celá databáze</b>, ne jen zobrazená stránka — volba se nese i do stránkování a zpět na první stránku. U ostatních tabulek řadí prohlížeč a volbu si pamatuje pro danou stránku. Rozpozná čísla („1 500 Kč“), česká data i text; řádky-oddělovače (např. název pobočky) zůstávají na místě.',
+            'Zakázky: <b>větší nadpis s počtem zakázek</b> hned vedle a vpravo <b>vysvětlivky ikon</b> na konci řádku (rychlý stav, tisk, účtování, smazání).',
+        ],
+    ],
+    [
         'version' => '4.5.2',
         'date' => '2026-11-26',
         'time' => '23:10',

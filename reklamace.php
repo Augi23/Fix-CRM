@@ -18,6 +18,7 @@ function complaintStatusUi(?string $status): array
 }
 
 $hasClientCols = false;
+$cc = [];
 if (isset($pdo)) {
     ensureComplaintsClientColumns($pdo);
     ensureComplaintsWorkflowColumns($pdo);   // technik + řešení (v2.10.0)
@@ -29,6 +30,23 @@ if (isset($pdo)) {
 }
 // Nové klientské reklamace (bez reakce servisu) drž nahoře; po reakci se řadí klasicky.
 $pinExpr = $hasClientCols ? "(c.source='client' AND c.staff_ack_at IS NULL) DESC, " : "";
+
+// Řazení klikem na záhlaví (v4.6.0): klíč z ?sort= → SQL přes bílý seznam; připnuté klientské
+// reklamace ({$pinExpr}) zůstávají nahoře i při řazení. Bez sort = dosavadní pořadí (číslo kódu sestupně).
+$cmplSortAllowed = [
+    'code'       => "CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED), c.id",
+    'received'   => 'c.created_at, c.id',
+    'customer'   => 'cu.last_name, cu.first_name',
+    'device'     => 'c.device',
+    'order'      => 'c.order_code',
+    'reason'     => 'c.complaint_reason',
+    'deadline'   => 'c.created_at, c.id',          // lhůta = 30 dní od přijetí → stejné pořadí jako přijato
+    'technician' => 't.name',
+    'status'     => 'c.complaint_status',
+];
+if (in_array('requested_resolution', $cc, true)) { $cmplSortAllowed['request'] = 'c.requested_resolution'; }
+$sort = crmListSort($cmplSortAllowed, "CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC");
+$cmplOrderBy = " ORDER BY {$pinExpr}" . $sort['sql'];
 
 $rows = [];
 if (isset($pdo)) {
@@ -57,7 +75,7 @@ if (isset($pdo)) {
             $count->execute(array_merge($searchParams, $cmplBranchParams));
             $total = (int)$count->fetchColumn();
 
-            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name, o.problem_description AS ord_problem, o.repair_solution AS ord_solution FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . " WHERE " . $searchWhere . $cmplBranch . " ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name, o.problem_description AS ord_problem, o.repair_solution AS ord_solution FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . " WHERE " . $searchWhere . $cmplBranch . $cmplOrderBy . " LIMIT $limit OFFSET $offset");
             $stmt->execute(array_merge($searchParams, $cmplBranchParams));
         } else {
             $whereBranch = $cmplBranch !== '' ? (' WHERE 1=1' . $cmplBranch) : '';
@@ -65,7 +83,7 @@ if (isset($pdo)) {
             $count->execute($cmplBranchParams);
             $total = (int)$count->fetchColumn();
 
-            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name, o.problem_description AS ord_problem, o.repair_solution AS ord_solution FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . $whereBranch . " ORDER BY {$pinExpr}CAST(SUBSTRING_INDEX(c.complaint_code, '-', -1) AS UNSIGNED) DESC, c.id DESC LIMIT $limit OFFSET $offset");
+            $stmt = $pdo->prepare("SELECT c.*, cu.first_name, cu.last_name, t.name AS tech_name, o.problem_description AS ord_problem, o.repair_solution AS ord_solution FROM complaints c LEFT JOIN customers cu ON cu.id=c.customer_id LEFT JOIN technicians t ON t.id=c.technician_id" . $cmplJoin . $whereBranch . $cmplOrderBy . " LIMIT $limit OFFSET $offset");
             $stmt->execute($cmplBranchParams);
         }
 
@@ -122,6 +140,9 @@ if (!empty($rows) && isset($pdo)) {
 <div class="card">
     <div class="card-body">
         <form method="GET" class="mb-3 d-flex gap-2">
+            <?php foreach (crmSortQueryParams($sort) as $__sk => $__sv): /* v4.6.0: hledání nezahodí řazení */ ?>
+                <input type="hidden" name="<?php echo e($__sk); ?>" value="<?php echo e($__sv); ?>">
+            <?php endforeach; ?>
             <input type="text" class="form-control" name="search" placeholder="<?php echo e(__('search_complaints')); ?>" value="<?php echo e($_GET['search'] ?? ''); ?>">
             <button class="btn btn-primary" type="submit"><?php echo __('search'); ?></button>
             <?php if (!empty($_GET['search'])): ?><a class="btn btn-outline-secondary" href="reklamace.php">Reset</a><?php endif; ?>
@@ -130,19 +151,20 @@ if (!empty($rows) && isset($pdo)) {
         <div class="table-responsive cmpl-table-wrap">
             <?php /* v4.3.0: tabulka se vejde na šířku stránky bez vodorovného posuvníku — menší písmo,
                      pevné procentní šířky sloupců, zalamování dlouhých hodnot, akce pod sebou (viz CSS dole) */ ?>
-            <table class="table table-striped table-hover align-middle cmpl-table">
+            <table class="table table-striped table-hover align-middle cmpl-table"<?php echo crmSortTableAttrs($sort); ?>>
                 <thead>
                     <tr>
-                        <th><?php echo __('code_col'); ?></th>
-                        <th class="text-nowrap">Přijato</th>
-                        <th><?php echo __('customer_col'); ?></th>
-                        <th><?php echo __('device'); ?></th>
-                        <th>Původní zakázka / oprava</th>
-                        <th><?php echo __('complaint_reason_col'); ?></th>
-                        <th class="text-nowrap">Požadavek</th>
-                        <th class="text-nowrap">Lhůta (30 dní)</th>
-                        <th><?php echo __('technician'); ?></th>
-                        <th><?php echo __('status_col'); ?></th>
+                        <?php /* v4.6.0: klik na záhlaví řadí celý seznam na serveru (klíče viz $cmplSortAllowed); 11 sloupců beze změny */ ?>
+                        <?php echo crmSortTh('code', __('code_col')); ?>
+                        <?php echo crmSortTh('received', 'Přijato', 'class="text-nowrap"'); ?>
+                        <?php echo crmSortTh('customer', __('customer_col')); ?>
+                        <?php echo crmSortTh('device', __('device')); ?>
+                        <?php echo crmSortTh('order', 'Původní zakázka / oprava'); ?>
+                        <?php echo crmSortTh('reason', __('complaint_reason_col')); ?>
+                        <?php echo isset($cmplSortAllowed['request']) ? crmSortTh('request', 'Požadavek', 'class="text-nowrap"') : '<th class="text-nowrap">Požadavek</th>'; ?>
+                        <?php echo crmSortTh('deadline', 'Lhůta (30 dní)', 'class="text-nowrap"'); ?>
+                        <?php echo crmSortTh('technician', __('technician')); ?>
+                        <?php echo crmSortTh('status', __('status_col')); ?>
                         <th></th>
                     </tr>
                 </thead>
@@ -265,7 +287,9 @@ if (!empty($rows) && isset($pdo)) {
             <nav><ul class="pagination mt-3">
                 <?php for ($i=1; $i<=$pages; $i++): ?>
                     <li class="page-item <?php echo $i===($page ?? 1) ? 'active' : ''; ?>">
-                        <a class="page-link" href="?p=<?php echo $i; ?><?php echo !empty($_GET['search']) ? '&search='.urlencode($_GET['search']) : ''; ?>"><?php echo $i; ?></a>
+                        <?php // v4.6.0: stránkování nese i hledání a řazení
+                              $__pq = http_build_query(array_merge(['p' => $i], !empty($_GET['search']) ? ['search' => (string)$_GET['search']] : [], crmSortQueryParams($sort))); ?>
+                        <a class="page-link" href="?<?php echo e($__pq); ?>"><?php echo $i; ?></a>
                     </li>
                 <?php endfor; ?>
             </ul></nav>

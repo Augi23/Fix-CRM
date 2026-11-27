@@ -90,7 +90,25 @@ if (isset($pdo)) {
         // Fetch orders
         $search_id      = is_numeric($search) ? (int)$search : 0;
         $fetch_params   = $sql_params;
-        $fetch_params[] = $search_id;
+
+        // Řazení klikem na záhlaví (v4.6.0): klíč z ?sort= se přeloží přes tenhle bílý seznam,
+        // směr dostane každá část výrazu. Bez sort/neznámý klíč = dosavadní pořadí (orderSortSql,
+        // tj. přesná shoda ID první → kódy APF… → číslo kódu sestupně). Při aktivním řazení se
+        // placeholder „o.id = ?" v ORDER BY nepoužije, proto se $search_id přidá jen bez řazení.
+        $ordersSortAllowed = [
+            'order_code'  => "CAST(NULLIF(REGEXP_REPLACE(COALESCE(o.order_code, ''), '[^0-9]', ''), '') AS UNSIGNED), o.id",
+            'created'     => 'o.created_at, o.id',
+            'client'      => 'c.last_name, c.first_name',
+            'device'      => 'o.device_brand, o.device_model',
+            'problem'     => 'o.problem_description',
+            'status'      => 'o.status, o.updated_at',
+            'technician'  => 't.name',
+            'priority'    => "FIELD(COALESCE(o.priority, 'Normal'), 'Low', 'Normal', 'High')",
+            'price'       => 'COALESCE(o.final_cost, o.estimated_cost)',
+            'last_change' => '(SELECT MAX(l.changed_at) FROM order_status_log l WHERE l.order_id = o.id)',
+        ];
+        $sort = crmListSort($ordersSortAllowed, orderSortSql('o', 'o.id = ?'));
+        if (!$sort['active']) { $fetch_params[] = $search_id; }
 
         $stmt = $pdo->prepare(
             'SELECT o.*, c.first_name, c.last_name, c.phone, c.email, t.name as tech_name,
@@ -100,7 +118,7 @@ if (isset($pdo)) {
              JOIN customers c ON o.customer_id = c.id
              LEFT JOIN technicians t ON o.technician_id = t.id'
             . $where_sql
-            . ' ORDER BY ' . orderSortSql('o', 'o.id = ?') . "
+            . ' ORDER BY ' . $sort['sql'] . "
               LIMIT " . (int)$limit . ' OFFSET ' . (int)$offset
         );
         $stmt->execute($fetch_params);
@@ -124,6 +142,7 @@ if (isset($pdo)) {
 }
 
 $total_pages = $total_orders > 0 ? (int)ceil($total_orders / $limit) : 1;
+if (!isset($sort)) { $sort = crmListSort([], ''); }   // bez DB: záhlaví bez aktivního řazení
 $order_templates_raw = trim((string)get_setting('order_templates', ''));
 $order_templates = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $order_templates_raw))));
 
@@ -294,22 +313,31 @@ $active_branch_filter = crmCanSeeAllOrders() ? (int)($_GET['branch_id'] ?? 0) : 
     </div>
 </div>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<?php /* v4.6.0 (přání majitele 27. 11. 2026): velký nadpis s POČTEM zakázek hned vedle,
+         vpravo vysvětlivky ikon, které jsou na konci každého řádku. */ ?>
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
     <div>
-        <h2 class="mb-0"><?php echo __('orders'); ?></h2>
+        <div class="d-flex align-items-baseline gap-3 flex-wrap">
+            <h1 class="mb-0 fw-bold" style="font-size:2.3rem;letter-spacing:-.02em;"><?php echo __('orders'); ?></h1>
+            <span class="fw-bold text-info" style="font-size:2rem;letter-spacing:-.02em;" title="<?php echo $filter_status ? e(__('status')) . ': ' . e(getOrderStatusLabel($filter_status)) : e(__('all_orders')); ?>"><?php echo number_format((int)$total_orders, 0, ',', ' '); ?></span>
+            <span class="text-white-75" style="font-size:1rem;"><?php echo $filter_status ? e(getOrderStatusLabel($filter_status)) : e(__('all_orders')); ?></span>
+        </div>
         <?php if($filter_status): ?>
-            <?php $status_label = getOrderStatusLabel($filter_status); ?>
             <div class="mt-1">
-                <span class="badge bg-secondary text-white"><?php echo e(__('status')); ?>: <?php echo e($status_label); ?></span>
-                <a href="orders.php" class="text-danger small ms-2"><i class="fas fa-times me-1"></i><?php echo e(__('cancel')); ?></a>
+                <a href="orders.php" class="text-danger small"><i class="fas fa-times me-1"></i><?php echo e(__('cancel')); ?> filtr</a>
             </div>
-        <?php else: ?>
-            <small class="text-white-75"><?php echo __('all_orders'); ?>: <?php echo $total_orders; ?></small>
         <?php endif; ?>
         <?php /* Pobočkový filtr (admin/Boss/manažer) se přesunul do dropdownu „Pobočka" v řádku Filtrování. */ ?>
         <?php if (!crmCanSeeAllOrders()): ?>
             <div class="mt-1"><span class="badge bg-secondary"><i class="fas fa-store me-1"></i><?php echo e(getBranchLabel(getCurrentStaffBranchId())); ?></span></div>
         <?php endif; ?>
+    </div>
+    <div class="afx-icon-legend d-none d-lg-flex align-items-center flex-wrap gap-3 text-white-75 small" aria-label="Vysvětlivky ikon na konci řádku">
+        <span class="text-white-50 text-uppercase" style="font-size:.68rem;letter-spacing:.06em;">Ikony v řádku</span>
+        <span><i class="fas fa-bolt text-primary me-1"></i><?php echo __('quick_status'); ?></span>
+        <span><i class="fas fa-print me-1"></i><?php echo __('print'); ?></span>
+        <?php if (crmCanUseInvoices()): ?><span><i class="fas fa-file-invoice-dollar text-success me-1"></i><?php echo __('accounting'); ?></span><?php endif; ?>
+        <?php if (crmCanDeleteOrders()): ?><span><i class="fas fa-trash text-danger me-1"></i><?php echo __('delete'); ?></span><?php endif; ?>
     </div>
 </div>
 
@@ -320,6 +348,7 @@ $branch_qs   = ($active_branch_filter > 0 && crmCanSeeAllOrders()) ? '&branch_id
 $search_qs   = !empty($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '';
 $tech_qs     = $tech_filter > 0 ? '&tech=' . (int)$tech_filter : '';
 $status_qs   = $filter_status ? '&filter=' . urlencode($filter_status) . ($filter_group_mode ? '&group=1' : '') : '';
+$sort_qs     = ($sq = http_build_query(crmSortQueryParams($sort))) ? '&' . $sq : '';   // v4.6.0: řazení přežije změnu filtru
 $__techs     = getActiveTechnicians(true);
 ?>
 <?php /* Jedna řada: vlevo „Nová zakázka", vpravo filtry (prohozeno na přání 9.8.2026 —
@@ -342,13 +371,13 @@ $__techs     = getActiveTechnicians(true);
         </button>
         <ul class="dropdown-menu crm-filter-dd-menu shadow">
             <li>
-                <a class="dropdown-item crm-filter-dd-item<?php echo $filter_status ? '' : ' active'; ?>" href="orders.php?<?php echo ltrim($branch_qs . $search_qs . $tech_qs, '&'); ?>">
+                <a class="dropdown-item crm-filter-dd-item<?php echo $filter_status ? '' : ' active'; ?>" href="orders.php?<?php echo ltrim($branch_qs . $search_qs . $tech_qs . $sort_qs, '&'); ?>">
                     <i class="fas fa-layer-group"></i> <?php echo __('all_orders'); ?>
                 </a>
             </li>
             <?php foreach ($status_defs as $st => $meta): if (!empty($meta['legacy'])) continue; ?>
             <li>
-                <a class="dropdown-item crm-filter-dd-item chip--<?php echo e($meta['badge']); ?><?php echo ($filter_status === $st) ? ' active' : ''; ?>" href="orders.php?filter=<?php echo urlencode($st) . $branch_qs . $search_qs . $tech_qs; ?>">
+                <a class="dropdown-item crm-filter-dd-item chip--<?php echo e($meta['badge']); ?><?php echo ($filter_status === $st) ? ' active' : ''; ?>" href="orders.php?filter=<?php echo urlencode($st) . $branch_qs . $search_qs . $tech_qs . $sort_qs; ?>">
                     <span class="chip-dot"></span><?php echo e(getOrderStatusLabel($st)); ?>
                 </a>
             </li>
@@ -362,9 +391,9 @@ $__techs     = getActiveTechnicians(true);
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-2px;"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1z"/><path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/></svg> <?php echo $__curTech ? e((string)$__curTech['name']) : 'Zaměstnanci'; ?>
         </button>
         <ul class="dropdown-menu crm-filter-dd-menu shadow">
-            <li><a class="dropdown-item crm-filter-dd-item<?php echo $tech_filter === 0 ? ' active' : ''; ?>" href="orders.php?<?php echo ltrim($status_qs . $branch_qs . $search_qs, '&'); ?>"><i class="fas fa-users"></i> Všichni zaměstnanci</a></li>
+            <li><a class="dropdown-item crm-filter-dd-item<?php echo $tech_filter === 0 ? ' active' : ''; ?>" href="orders.php?<?php echo ltrim($status_qs . $branch_qs . $search_qs . $sort_qs, '&'); ?>"><i class="fas fa-users"></i> Všichni zaměstnanci</a></li>
             <?php foreach ($__techs as $__t): ?>
-            <li><a class="dropdown-item crm-filter-dd-item<?php echo $tech_filter === (int)$__t['id'] ? ' active' : ''; ?>" href="orders.php?tech=<?php echo (int)$__t['id'] . $status_qs . $branch_qs . $search_qs; ?>"><i class="fas fa-user"></i> <?php echo e((string)$__t['name']); ?></a></li>
+            <li><a class="dropdown-item crm-filter-dd-item<?php echo $tech_filter === (int)$__t['id'] ? ' active' : ''; ?>" href="orders.php?tech=<?php echo (int)$__t['id'] . $status_qs . $branch_qs . $search_qs . $sort_qs; ?>"><i class="fas fa-user"></i> <?php echo e((string)$__t['name']); ?></a></li>
             <?php endforeach; ?>
         </ul>
     </div>
@@ -375,9 +404,9 @@ $__techs     = getActiveTechnicians(true);
             <i class="fas fa-store"></i> <?php echo $active_branch_filter > 0 ? e(getBranchLabel($active_branch_filter)) : 'Pobočka'; ?>
         </button>
         <ul class="dropdown-menu crm-filter-dd-menu shadow">
-            <li><a class="dropdown-item crm-filter-dd-item<?php echo $active_branch_filter === 0 ? ' active' : ''; ?>" href="orders.php?<?php echo ltrim($status_qs . $search_qs . $tech_qs, '&'); ?>"><i class="fas fa-layer-group"></i> <?php echo __('all_branches'); ?></a></li>
+            <li><a class="dropdown-item crm-filter-dd-item<?php echo $active_branch_filter === 0 ? ' active' : ''; ?>" href="orders.php?<?php echo ltrim($status_qs . $search_qs . $tech_qs . $sort_qs, '&'); ?>"><i class="fas fa-layer-group"></i> <?php echo __('all_branches'); ?></a></li>
             <?php foreach ($branches as $branch): ?>
-            <li><a class="dropdown-item crm-filter-dd-item<?php echo $active_branch_filter === (int)$branch['id'] ? ' active' : ''; ?>" href="orders.php?branch_id=<?php echo (int)$branch['id'] . $status_qs . $search_qs . $tech_qs; ?>"><i class="fas fa-store"></i> <?php echo e($branch['name']); ?></a></li>
+            <li><a class="dropdown-item crm-filter-dd-item<?php echo $active_branch_filter === (int)$branch['id'] ? ' active' : ''; ?>" href="orders.php?branch_id=<?php echo (int)$branch['id'] . $status_qs . $search_qs . $tech_qs . $sort_qs; ?>"><i class="fas fa-store"></i> <?php echo e($branch['name']); ?></a></li>
             <?php endforeach; ?>
         </ul>
     </div>
@@ -388,16 +417,17 @@ $__techs     = getActiveTechnicians(true);
 <div class="card glass-card shadow-sm border-0">
     <div class="card-body p-0">
         <div class="table-responsive orders-table-wrap">
-            <table class="table table-hover align-middle mb-0 orders-center-table">
+            <table class="table table-hover align-middle mb-0 orders-center-table"<?php echo crmSortTableAttrs($sort); ?>>
                 <thead class="bg-transparent sticky-top" style="z-index: 10;">
                     <tr>
-                        <th class="ps-4"><?php echo __('order_no'); ?> / <?php echo __('created'); ?></th>
-                        <th><?php echo __('client'); ?></th>
-                        <th><?php echo __('device_model'); ?></th>
-                        <th><?php echo __('problem'); ?></th>
-                        <th><?php echo __('status'); ?></th>
-                        <th class="col-priority"><?php echo __('priority'); ?></th>
-                        <th><?php echo __('amount'); ?></th>
+                        <?php /* v4.6.0: klik na záhlaví řadí celý seznam na serveru (klíče viz $ordersSortAllowed) */ ?>
+                        <?php echo crmSortTh('order_code', __('order_no') . ' / ' . __('created'), 'class="ps-4"'); ?>
+                        <?php echo crmSortTh('client', __('client')); ?>
+                        <?php echo crmSortTh('device', __('device_model')); ?>
+                        <?php echo crmSortTh('problem', __('problem')); ?>
+                        <?php echo crmSortTh('status', __('status')); ?>
+                        <?php echo crmSortTh('priority', __('priority'), 'class="col-priority"'); ?>
+                        <?php echo crmSortTh('price', __('amount')); ?>
                         <th class="text-end pe-4"><?php echo __('action'); ?></th>
                     </tr>
                 </thead>

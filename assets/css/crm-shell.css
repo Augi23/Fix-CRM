@@ -931,3 +931,11 @@ html[data-lg-theme="dark"] .afx-signpad .btn-success { color: #fff !important; b
 @media (max-width: 480px) {
     .afx-signpad-actions .btn-lg { padding: .5rem .8rem; font-size: 1rem; }
 }
+
+/* ── Řazení tabulek klikem na záhlaví (assets/js/table-sort.js, v4.6.0) ── */
+th.ts-th { cursor: pointer; user-select: none; white-space: nowrap; }
+th.ts-th .ts-arrow { display: inline-block; margin-left: 4px; font-size: .78em; opacity: .35; transition: opacity .15s; vertical-align: baseline; }
+th.ts-th:hover .ts-arrow, th.ts-th:focus-visible .ts-arrow { opacity: .8; }
+th.ts-th.ts-active { color: var(--fg1, #fff) !important; }
+th.ts-th.ts-active .ts-arrow { opacity: 1; color: var(--accent, #0a84ff); }
+th.ts-th:focus-visible { outline: 2px solid rgba(10,132,255,.6); outline-offset: -2px; border-radius: 6px; }

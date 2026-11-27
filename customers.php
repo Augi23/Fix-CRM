@@ -48,6 +48,16 @@ if (isset($_GET['dupes']) && crmIsAdminLevel()) {
 }
 
 $customers = [];
+// Řazení seznamu klikem na záhlaví (v4.6.0) — klíč sloupce → SQL; výchozí zůstává last_name ASC.
+// Počet zakázek je spočítaný sloupec → stejný korelovaný dotaz jako v přehledu duplicit.
+$sort = crmListSort([
+    'id'      => 'id',
+    'name'    => 'last_name, first_name',
+    'phone'   => 'phone',
+    'email'   => 'email',
+    'address' => 'address',
+    'orders'  => '(SELECT COUNT(*) FROM orders o WHERE o.customer_id = customers.id)',
+], 'last_name ASC');
 if (isset($pdo)) {
     try {
         $limit = 50; // Show 50 customers per page
@@ -75,14 +85,14 @@ if (isset($pdo)) {
                 ico LIKE ? OR
                 dic LIKE ? OR
                 company LIKE ?$exact_id_filter)
-                ORDER BY (CASE WHEN id = ? THEN 1 ELSE 2 END), last_name ASC LIMIT $limit OFFSET $offset");
+                ORDER BY (CASE WHEN id = ? THEN 1 ELSE 2 END), {$sort['sql']} LIMIT $limit OFFSET $offset");
             $search_id = is_numeric($search) ? (int)$search : 0;
             $exec_params = $params;
             $exec_params[] = $search_id;
             $stmt->execute($exec_params);
         } else {
             $total_customers = $pdo->query("SELECT COUNT(*) FROM customers")->fetchColumn();
-            $stmt = $pdo->query("SELECT * FROM customers ORDER BY last_name ASC LIMIT $limit OFFSET $offset");
+            $stmt = $pdo->query("SELECT * FROM customers ORDER BY {$sort['sql']} LIMIT $limit OFFSET $offset");
         }
         $customers = $stmt->fetchAll();
         $total_pages = ceil($total_customers / $limit);
@@ -161,15 +171,15 @@ function customersOrdersStyleDisplayName(array $customer): string
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover align-middle">
+            <table class="table table-hover align-middle"<?php echo crmSortTableAttrs($sort); ?>>
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th><?php echo __('name_col'); ?></th>
-                        <th><?php echo __('phone'); ?></th>
-                        <th><?php echo __('email'); ?></th>
-                        <th><?php echo __('address'); ?></th>
-                        <th><?php echo __('orders'); ?></th>
+                        <?php echo crmSortTh('id', 'ID'); ?>
+                        <?php echo crmSortTh('name', __('name_col')); ?>
+                        <?php echo crmSortTh('phone', __('phone')); ?>
+                        <?php echo crmSortTh('email', __('email')); ?>
+                        <?php echo crmSortTh('address', __('address')); ?>
+                        <?php echo crmSortTh('orders', __('orders')); ?>
                         <th><?php echo __('actions'); ?></th>
                     </tr>
                 </thead>
@@ -253,7 +263,7 @@ function customersOrdersStyleDisplayName(array $customer): string
 <nav class="mt-4">
     <ul class="pagination justify-content-center">
         <?php 
-        $params = $_GET;
+        $params = array_merge($_GET, crmSortQueryParams($sort));   // řazení se nese i přes stránkování
         unset($params['cp']);
         $query_str = http_build_query($params);
         $url_prefix = $query_str ? "&$query_str" : "";

@@ -57,6 +57,10 @@ Klientský portál (odděleně): `klient/*` (zejména `klient/dashboard.php`).
 - `api/invoice_email.php`
 - (ruční faktury, editace, dobropis: `accounting_actions.php` → `models/InvoiceManager.php`)
 
+### Řazení seznamů (v4.6.0)
+- `assets/js/table-sort.js` — klik na záhlaví: server režim (`data-sort-url="1"`, `?sort=&dir=`) pro stránkované seznamy, jinak řazení v prohlížeči (localStorage); vypnutí `data-nosort`
+- `includes/functions.php`: `crmListSort($allowed, $defaultSql)`, `crmSortTableAttrs()`, `crmSortTh()`, `crmSortQueryParams()` — bílý seznam klíčů → SQL, nikdy nic z URL napřímo do ORDER BY
+
 ### Pokladna (kasa)
 - `api/pos_checkout.php` — dokončení prodeje (jediné místo vzniku `pos_sales`); od 4.2.0 hned po commitu
   `afxReceiptAutoPrint()` → účtenka do tiskové fronty pobočky obsluhy, odpověď nese `receipt` (mode queue|client, job_id)

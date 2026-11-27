@@ -56,6 +56,18 @@ if ($selectedSupplier !== '' && isset($suppliers[$selectedSupplier])) {
 
 $catalogWhereSql = ' WHERE ' . implode(' AND ', $catalogWhere);
 
+// řazení katalogu klikem na záhlaví (v4.6.0) — bílý seznam sloupců, výchozí zůstává podle názvu dílu.
+// Seznam požadavků níže není stránkovaný → řadí se v prohlížeči (table-sort.js), tu nic neřešíme.
+$catalogSort = crmListSort([
+    'name'           => 'part_name',
+    'sku'            => 'sku',
+    'supplier'       => 'source_supplier',
+    'availability'   => 'supplier_availability, supplier_stock_qty',
+    'stock'          => 'quantity',
+    'supplier_price' => 'supplier_price_czk',
+    'price'          => 'sale_price',
+], 'part_name ASC');
+
 $catalog = [];
 $catalogTotal = 0;
 $catalogPages = 0;
@@ -65,7 +77,7 @@ try {
     $catalogTotal = (int)$countStmt->fetchColumn();
     $catalogPages = (int)ceil($catalogTotal / $catalogLimit);
 
-    $catalogStmt = $pdo->prepare("SELECT * FROM inventory" . $catalogWhereSql . " ORDER BY part_name ASC LIMIT $catalogLimit OFFSET $catalogOffset");
+    $catalogStmt = $pdo->prepare("SELECT * FROM inventory" . $catalogWhereSql . " ORDER BY {$catalogSort['sql']} LIMIT $catalogLimit OFFSET $catalogOffset");
     $catalogStmt->execute($catalogParams);
     $catalog = $catalogStmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
@@ -348,17 +360,17 @@ if (isset($_GET['catalog_imported'])):
         </form>
 
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0"<?php echo crmSortTableAttrs($catalogSort); ?>>
                 <thead class="table-dark">
                     <tr>
                         <th class="ps-2"><?php echo __('photo_col'); ?></th>
-                        <th><?php echo __('part_name'); ?></th>
-                        <th><?php echo __('sku'); ?></th>
-                        <th><?php echo __('supplier_col'); ?></th>
-                        <th><?php echo __('availability_col'); ?></th>
-                        <th><?php echo __('in_stock_col'); ?></th>
-                        <th>Cena u dodavatele</th>
-                        <th><?php echo __('sell_price'); ?></th>
+                        <?php echo crmSortTh('name', __('part_name')); ?>
+                        <?php echo crmSortTh('sku', __('sku')); ?>
+                        <?php echo crmSortTh('supplier', __('supplier_col')); ?>
+                        <?php echo crmSortTh('availability', __('availability_col')); ?>
+                        <?php echo crmSortTh('stock', __('in_stock_col')); ?>
+                        <?php echo crmSortTh('supplier_price', 'Cena u dodavatele'); ?>
+                        <?php echo crmSortTh('price', __('sell_price')); ?>
                         <th class="text-end pe-2"><?php echo __('actions_col'); ?></th>
                     </tr>
                 </thead>
@@ -454,6 +466,9 @@ if (isset($_GET['catalog_imported'])):
         <?php
             $params_p = $_GET;
             unset($params_p['p']);
+            // stránkování nese jen ověřené řazení (v4.6.0) — neznámý sort/dir z URL se do odkazů nepropisuje
+            unset($params_p['sort'], $params_p['dir']);
+            $params_p = array_merge($params_p, crmSortQueryParams($catalogSort));
             $qs = http_build_query($params_p);
             $url_pre = $qs ? "&$qs" : "";
 
