@@ -57,7 +57,7 @@
   gap: 6px;
   min-width: 66px;
   flex-shrink: 0;                        /* při přetečení (velká lupa) se dok posouvá, popisky se nepřekrývají */
-  padding: 0 3px 9px;
+  padding: 0 3px 2px;                   /* dole dřív 9px = místo pro tečku aktivní stránky; tečka zrušena (v4.6.1) */
   border-radius: 0;
   color: rgba(255,255,255,.84);
   text-shadow: none;
@@ -253,7 +253,7 @@ html[data-lg-theme="light"] .afx-dock .afx-div {
 /* ── užší obrazovky (1081–1440 px): menší dlaždice, ať se dok vejde ── */
 @media (max-width: 1440px) {
   .afx-dock { padding-left: 12px; padding-right: 12px; gap: 2px; }
-  .afx-dock .afx-cell { min-width: 58px; padding: 0 2px 9px; }
+  .afx-dock .afx-cell { min-width: 58px; padding: 0 2px 2px; }
   .afx-dock .afx-cell i { width: 40px; height: 40px; border-radius: 11px; font-size: 18px; }
   .afx-dock .afx-cell i::after { border-radius: 9px 9px 40% 40% / 9px 9px 12px 12px; }
   .afx-dock .afx-cell small { font-size: 10px !important; }

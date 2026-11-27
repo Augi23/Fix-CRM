@@ -17,6 +17,7 @@ $entries = [
         'title' => 'Horní menu: aktivní stránka je bíle podsvícená ikona místo tečky',
         'items' => [
             'V horním menu zmizela tečka pod otevřenou stránkou. Aktivní ikona je teď <b>jemně bíle podsvícená</b> (bílý lem a měkká záře kolem dlaždice), a to i při najetí myší. Ve světlém motivu má záře tmavší dosvit, aby byla na světlé liště vidět.',
+            'Lišta menu je o něco nižší — zmizela mezera pod popisky, která byla vyhrazená pro tečku.',
         ],
     ],
     [
