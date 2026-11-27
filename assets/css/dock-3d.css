@@ -124,16 +124,23 @@
 }
 .afx-dock .afx-cell:hover { color: #fff; }
 
-/* ── otevřená stránka: tečka pod popiskem (jako běžící aplikace v doku) ── */
+/* ── otevřená stránka: dlaždice jemně BÍLE PODSVÍCENÁ (v4.6.1, přání majitele 27. 11. 2026) ──
+   Dřív tečka pod popiskem (jako běžící aplikace v doku) — nahrazena září kolem ikony:
+   bílý lem + měkká bílá aura, dlaždice o chlup světlejší. Pravidla jsou ZA hover pravidly
+   (stejná specificita), aby aktivní ikona svítila i při najetí myší. */
 .afx-dock .afx-cell.active { color: #fff; }
 .afx-dock .afx-cell.active small { font-weight: 600; }
-.afx-dock .afx-cell.active::after {
-  content: "";
-  position: absolute; left: 50%; bottom: 1px;
-  width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%;
-  background: rgba(255,255,255,.95);
-  box-shadow: 0 0 6px rgba(255,255,255,.55);
-  pointer-events: none;
+.afx-dock .afx-cell.active i,
+.afx-dock .afx-cell.active:hover i {
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.6),
+    inset 0 0 0 .5px rgba(255,255,255,.3),
+    inset 0 -3px 6px rgba(0,0,0,.16),
+    0 0 0 1.5px rgba(255,255,255,.55),          /* bílý lem těsně kolem dlaždice */
+    0 0 14px 2px rgba(255,255,255,.42),         /* měkká bílá záře */
+    0 0 28px 4px rgba(255,255,255,.14),         /* široký dosvit */
+    0 8px 16px -6px rgba(0,0,0,.6);
 }
 
 /* ── odznaky počtů: v pravém horním rohu dlaždice (jako na iPhonu) ──
@@ -227,7 +234,18 @@ html[data-lg-theme="light"] .afx-dock .afx-cell.act-blue small   { color: #0a6fd
 html[data-lg-theme="light"] .afx-dock .afx-cell.act-orange small { color: #a34f00; }
 html[data-lg-theme="light"] .afx-dock .afx-cell.act-green small  { color: #07734a; }
 html[data-lg-theme="light"] .afx-dock .afx-cell.act-purple small { color: #7a33c9; }
-html[data-lg-theme="light"] .afx-dock .afx-cell.active::after { background: rgba(16,22,34,.8); box-shadow: none; }
+/* světlý motiv: polička je světlá, čistě bílá záře by zanikla → bílý lem + měkký tmavší dosvit */
+html[data-lg-theme="light"] .afx-dock .afx-cell.active i,
+html[data-lg-theme="light"] .afx-dock .afx-cell.active:hover i {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.6),
+    inset 0 0 0 .5px rgba(255,255,255,.3),
+    inset 0 -3px 6px rgba(0,0,0,.16),
+    0 0 0 2px #fff,
+    0 0 14px 3px rgba(255,255,255,.95),
+    0 0 22px 4px rgba(16,22,34,.22),
+    0 8px 16px -6px rgba(30,40,60,.45);
+}
 html[data-lg-theme="light"] .afx-dock .afx-div {
   background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.16), rgba(0,0,0,0));
 }

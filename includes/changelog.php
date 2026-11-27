@@ -11,6 +11,15 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.6.1',
+        'date' => '2026-11-27',
+        'time' => '15:00',
+        'title' => 'Horní menu: aktivní stránka je bíle podsvícená ikona místo tečky',
+        'items' => [
+            'V horním menu zmizela tečka pod otevřenou stránkou. Aktivní ikona je teď <b>jemně bíle podsvícená</b> (bílý lem a měkká záře kolem dlaždice), a to i při najetí myší. Ve světlém motivu má záře tmavší dosvit, aby byla na světlé liště vidět.',
+        ],
+    ],
+    [
         'version' => '4.6.0',
         'date' => '2026-11-27',
         'time' => '13:30',
