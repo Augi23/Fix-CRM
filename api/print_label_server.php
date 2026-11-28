@@ -16,6 +16,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/product_catalog.php';   // afxProductIsLaptop — formát cenovky (v4.6.2)
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['ok' => false, 'error' => 'Nepřihlášeno']); exit;
@@ -209,7 +210,12 @@ function afxProductLabelData(PDO $pdo, int $pid): array {
         'procesor' => function_exists('afxLabelProcessorShort') ? afxLabelProcessorShort((string)$processor) : $processor,
         'cpu' => $cpu, 'gpu' => $gpu,
         'sn' => $sn, 'cena' => $cena,
-        'mac' => str_contains(mb_strtolower($nazev !== '' ? $nazev : $title), 'macbook'),
+        // 'mac' = VELKÝ štítek na šířku. Klíč se jmenuje historicky (čtou ho i můstky na
+        // pokladních Macích), od v4.6.2 ale platí pro KAŽDÝ notebook, nejen MacBook —
+        // rozhoduje uložený typ zařízení, případně název/model (afxProductIsLaptop).
+        'mac' => afxProductIsLaptop(
+            trim((string)($raw['[PARAMETER "Typ zařízení"]'] ?? $raw['PRODUKT_TYP'] ?? '')),
+            $nazev, $title, $model),
     ]];
 }
 

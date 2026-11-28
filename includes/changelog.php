@@ -11,6 +11,16 @@
 return (static function (): array {
 $entries = [
     [
+        'version' => '4.6.2',
+        'date' => '2026-11-28',
+        'time' => '10:00',
+        'title' => 'Cenovky: všechny notebooky se tisknou na velký štítek',
+        'items' => [
+            '<b>Cenovka notebooku jakékoli značky</b> (Lenovo, Dell, HP, Asus, Acer, MSI, Samsung Galaxy Book, Surface Laptop…) se tiskne na <b>velký štítek na šířku</b>, stejně jako MacBook. Dřív velký formát dostal jen produkt se slovem „MacBook“ v názvu a ostatní notebooky vyjížděly na malém štítku jako telefony.',
+            'Rozhoduje uložený typ zařízení (Notebook / MacBook); u starších kusů bez uloženého typu se notebook pozná podle názvu nebo modelu z katalogu. Telefony, tablety, hodinky a stolní počítače zůstávají na malém štítku.',
+        ],
+    ],
+    [
         'version' => '4.6.1',
         'date' => '2026-11-27',
         'time' => '15:00',

@@ -616,6 +616,41 @@ function afxProductTypeById(string $id, string $manufacturer = ''): array {
     return ['id' => $id, 'manuf' => $manufacturer, 'k' => '', 'cap' => true, 'ram' => false, 'gen' => false, 'colors' => [], 'models' => []];
 }
 
+/**
+ * Je produkt NOTEBOOK (jakékoli značky)? Rozhoduje o formátu cenovky: notebooky se
+ * tisknou na VELKÝ štítek na šířku, stejně jako MacBooky (v4.6.2, 28. 11. 2026).
+ * Dřív velký formát dostal jen kus s „MacBook" v názvu — Lenovo, Dell, HP, Galaxy
+ * Book… vyjížděly na malém štítku jako telefony.
+ * Pořadí: (1) uložený „Typ zařízení", (2) slovo MacBook/notebook/laptop v názvu,
+ * (3) model z katalogu notebooků (starší kusy bez uloženého typu).
+ * Stolní počítače (iMac, Mac mini, Počítač) sem záměrně nepatří.
+ */
+function afxProductIsLaptop(string $typ, string $nazev, string $title = '', string $model = ''): bool {
+    $typLow = mb_strtolower(trim($typ));
+    if (in_array($typLow, ['notebook', 'macbook', 'macbook pro', 'macbook air', 'laptop'], true)) { return true; }
+    // jiný výslovně uložený typ (Telefon, Tablet, Počítač…) má přednost před hádáním z názvu
+    $typKnown = $typLow !== '';
+    $hay = mb_strtolower($nazev . ' ' . $title . ' ' . $model);
+    if (str_contains($hay, 'macbook')) { return true; }
+    if ($typKnown) { return false; }
+    if (preg_match('/\b(notebook|laptop|ultrabook)\b/u', $hay) === 1) { return true; }
+    static $models = null;
+    if ($models === null) {
+        $models = [];
+        foreach (AFX_BRAND_MODELS as $types) {
+            foreach ($types['Notebook'] ?? [] as $m) {
+                // „XPS 13 9310 (2020/2021)" → „xps 13 9310"; moc krátké názvy by chytaly cizí produkty
+                $m = mb_strtolower(trim(preg_replace('/\s*\([^)]*\)\s*$/u', '', (string)$m)));
+                if (mb_strlen($m) >= 6) { $models[$m] = true; }
+            }
+        }
+    }
+    foreach ($models as $m => $_) {
+        if (str_contains($hay, $m)) { return true; }
+    }
+    return false;
+}
+
 function afxProductCategoryCode(array $t, string $model): string {
     $id = (string)($t['id'] ?? '');
     if (($t['manuf'] ?? '') === 'Apple' && $id === 'MacBook') {
