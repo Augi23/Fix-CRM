@@ -114,7 +114,7 @@ def render_label_big(data):
     ph = 118
     py1 = H - 24
     py0 = py1 - ph
-    lh = 250
+    lh = 212   # logo o ~15 % menší (dřív 250) — přání majitele 28. 11. 2026
     lr = logo.resize((max(1, int(logo.width * lh / logo.height)), lh))
     cy = (DIV1 + py0) // 2
     img.paste(lr, (W - PAD - lr.width, cy - lr.height // 2), lr)
@@ -182,7 +182,7 @@ def render_product_label(data):
     fv_sn = _lblfont(min(fs_v, 27), True)
     # logo se počítá dřív než řádky — hodnoty, které mu leží v cestě, se musí
     # vejít PŘED něj (dlouhé Intely jinak končily nečitelně pod jablkem)
-    lh = 150
+    lh = 128   # logo o ~15 % menší (dřív 150) — přání majitele 28. 11. 2026
     lr = logo.resize((max(1, int(logo.width * lh / logo.height)), lh))
     logo_cy = (DIV1 + 344) // 2
     logo_x = W - PAD - lr.width

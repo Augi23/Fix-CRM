@@ -18,6 +18,7 @@ $entries = [
         'items' => [
             '<b>Cenovka notebooku jakékoli značky</b> (Lenovo, Dell, HP, Asus, Acer, MSI, Samsung Galaxy Book, Surface Laptop…) se tiskne na <b>velký štítek na šířku</b>, stejně jako MacBook. Dřív velký formát dostal jen produkt se slovem „MacBook“ v názvu a ostatní notebooky vyjížděly na malém štítku jako telefony.',
             'Rozhoduje uložený typ zařízení (Notebook / MacBook); u starších kusů bez uloženého typu se notebook pozná podle názvu nebo modelu z katalogu. Telefony, tablety, hodinky a stolní počítače zůstávají na malém štítku.',
+            'Logo na cenovkách (malých i velkých) je o zhruba 15 % menší, údaje vedle něj mají víc místa. Kde cenovky tiskne můstek na počítači u kasy, je potřeba jednou znovu spustit instalační příkaz (Nastavení → Tisk štítků), aby si stáhl novou šablonu.',
         ],
     ],
     [
